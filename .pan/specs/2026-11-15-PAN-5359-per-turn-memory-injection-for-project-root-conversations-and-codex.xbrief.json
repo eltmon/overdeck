@@ -1,0 +1,561 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T15:27:32Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5359: Per-turn memory injection for project-root conversations and Codex",
+    "updated": "2026-11-15T15:36:57.242Z"
+  },
+  "plan": {
+    "id": "pan-5359",
+    "title": "Per-turn memory injection for project-root conversations and Codex",
+    "status": "proposed",
+    "uid": "b0285013-11b4-4e16-b6d1-efcdb4611b25",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-15T15:27:32Z",
+    "updated": "2026-11-15T15:36:57.242Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5359",
+        "label": "PAN-5359",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5366",
+        "label": "PAN-5366 (indicator, split out)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "memory",
+      "codex",
+      "conversations",
+      "prompt-time-injection",
+      "workspaces"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-15-PAN-5359-per-turn-memory-injection-for-project-root-conversations-and-codex.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Codex turns get no per-turn memory: nothing in src/lib/codex calls /api/memory/inject. Project-root Claude conversations already call the route through the global user-prompt-submit-hook (740 injected decisions for overdeck roots). But conversations in the 12 of 24 projects on this machine with no kind='main' workspace row (mind-your-now, lexerra, papers-please, auricle, tindra, krux, myn-cli, orca, pan-tts, puzzdom, eltmon-stream, eltmon-video) resolve no memory identity, so they get nothing. The route also cannot find a Codex conversation before its thread id is a recorded conversation_files locator.",
+      "Proposal": "Share one conversation memory-identity resolver (workspace row, else cwd match) and let the inject route also resolve a conversation by name (body.conversation). Backfill missing main workspace rows at dashboard boot. Give the Codex app-server host a fail-open client that calls /api/memory/inject before each host-mediated turn and wraps the result in an <overdeck-turn-context> block, which readCodexRolloutMessage strips so the timeline, titles and search show only the operator's text. Lock the Claude path with a registration regression test. Document per-turn retrieval by harness. The conversation-page indicator (proposal 3) is split out to PAN-5366.",
+      "NonGoals": "- No new hook in project or workspace .claude/settings.json files and no change to the global user-prompt-submit-hook script\n- No conversation-page indicator (PAN-5366)\n- No fix for zero-hit results in projects with an empty memory corpus (dfai) or for provider-auth-failed query expansion (PAN-4370)\n- No injection for turns typed in the native Codex terminal companion, for codex.transport: tui, or for Codex sub-agent messages\n- No change to Pi conversation injection, including Pi project-root conversations without an issue\n- No change to resolveWorkspaceForCwd's handling of archived rows\n- No observation capture (Stop hook) for project-root conversations\n- No edit to src/lib/agents/runtime-command.ts and no file-size allowlist raise"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Proposal 1 (install the prompt-inject hook for project conversations) is reframed as an identity fix: no new Claude hook is installed.",
+        "rationale": "The global user-prompt-submit-hook in ~/.claude/settings.json already posts every Claude prompt to /api/memory/inject in any cwd (rag-runs show 740 injected decisions for overdeck root conversations and 24,981 zero-hit decisions for dfai roots). A project .claude/settings.json hook would double the calls and dirty tracked files (dfai tracks it). The real gap is identity: projects with no main workspace row and Codex conversations found only by name."
+      },
+      {
+        "summary": "Codex calls the existing /api/memory/inject route over HTTP from the app-server host instead of running injectPromptTimeMemory in-process.",
+        "rationale": "The route already owns identity resolution, compliance warning, briefing update, docs context, the 750 ms fast path and rag-runs logging, so Claude and Codex share one server path."
+      },
+      {
+        "summary": "Injection sits in CodexAppServerHost.handleMessageOp; the native Codex terminal, codex.transport: tui and sub-agent messages are NonGoals.",
+        "rationale": "handleMessageOp is the single choke point for dashboard messages, pan tell and pane lines. A Codex UserPromptSubmit hook would need per-launch trust hashes in every CODEX_HOME and shares hooks.json with SageOx."
+      },
+      {
+        "summary": "Injected context rides in the user input inside one <overdeck-turn-context> block that readCodexRolloutMessage strips.",
+        "rationale": "Overdeck's turn/start sends only threadId, input, model and effort, with no per-turn instruction slot. One wrapper plus one reader-side strip keeps the timeline, titles, search and enrichment clean in both rollout shapes."
+      },
+      {
+        "summary": "Missing kind='main' workspace rows are created at dashboard boot through createWorkspace.",
+        "rationale": "Synthesizing an identity would orphan memory homes, and asking the operator to run pan project finish-setup per project leaves an invisible gap. createWorkspace already refuses a second main row."
+      },
+      {
+        "summary": "The conversation-page indicator (proposal 3) is split into sibling issue PAN-5366.",
+        "rationale": "It needs a new route, a frontend component and scope rows, which pushes this plan past finalize's six-subsystem limit. The issue's acceptance list does not require it, and the swarm contract prefers independently shippable siblings."
+      },
+      {
+        "summary": "Conversation identities keep issueId null and workspace-row keying.",
+        "rationale": "This preserves current cross-workspace sibling search for conversations; changing identity keying is out of scope."
+      }
+    ],
+    "items": [
+      {
+        "id": "conversation-identity",
+        "title": "Shared conversation memory-identity resolver with name and cwd fallbacks in the inject route",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T15:27:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5359",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "codex-host-wiring",
+            "docs"
+          ],
+          "files_scope": [
+            "src/lib/memory/conversation-identity.ts",
+            "src/lib/memory/__tests__/conversation-identity.test.ts",
+            "src/dashboard/server/routes/hooks.ts",
+            "src/dashboard/server/routes/__tests__/hooks-memory-identity.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/memory/__tests__/conversation-identity.test.ts src/dashboard/server/routes/__tests__/hooks-memory-identity.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 (.pan/drafts/pan-5359.md). Create src/lib/memory/conversation-identity.ts exporting memoryIdentityForConversation(conversation, sessionId, deps). It resolves the workspace from conversation.workspaceId via getWorkspaceById, else resolveWorkspaceForCwd(conversation.cwd), and returns { projectId: workspace.projectId, workspaceId: workspace.id, issueId: null, runId: conversation.tmuxSession, sessionId, agentRole: 'conversation', agentHarness: conversation.harness ?? 'claude-code' }, or null. In src/dashboard/server/routes/hooks.ts, make resolveMemoryIdentityFromConversation (line 763) delegate to it, and add a last fallback in resolveMemoryIdentity (line 735) that resolves getConversationByTmuxSession(stringField(body.conversation)). Write the two test files exactly as WI-1 steps 3-4 list."
+        },
+        "items": [
+          {
+            "id": "conversation-identity.ac1",
+            "title": "Given a conversation row with workspaceId null and a cwd inside a project with a main row, memoryIdentityForConversation returns that main row's projectId and workspaceId with issueId null and agentRole 'conversation'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-identity.ac2",
+            "title": "Given the exact body the Codex client sends ({ prompt, sessionId: '01a1-thread', agentId: 'conv-c1', conversation: 'conv-c1' }) with no agent state and no matching Claude session locator, handleMemoryInjectBody resolves the conversation by name and passes injectMemory an identity whose agentHarness is 'codex' and runId is 'conv-c1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-identity.ac3",
+            "title": "Given a project-root Claude conversation found by Claude session id with no agent state, handleMemoryInjectBody calls injectMemory with the main workspace identity",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-identity.ac4",
+            "title": "Given neither lookup resolves, handleMemoryInjectBody returns { error: 'memory identity could not be resolved', status: 202 } and never calls injectMemory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "main-workspace-backfill",
+        "title": "Create missing kind='main' workspace rows at dashboard boot",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T15:27:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5359",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspaces/rebuild.ts",
+            "tests/unit/lib/workspaces/rebuild.test.ts",
+            "src/dashboard/server/main.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspaces/rebuild.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "rebuild.test.ts passes including the backfillMainWorkspaces (PAN-5359) cases",
+            "lint-file-size.sh exits 0 (main.ts stays at 1000 lines or fewer)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. Add export async function backfillMainWorkspaces(): Promise<string[]> to src/lib/workspaces/rebuild.ts after backfillIssueWorkspaces (line 76). For each listProjects() row that is not isSystem, has no getMainWorkspace(project.id), and whose primaryPath stat is a directory, call createWorkspace({ projectId, kind: 'main', name: 'main', path: primaryPath, isGitRepository }), where isGitRepository is whether <path>/.git exists (async stat). Wrap each createWorkspace call in try/catch with console.warn, so one failing project neither stops the rest nor throws into main.ts (a throw would skip migrateMemoryHomesToWorkspacesOnce that boot). Return the created ids. In src/dashboard/server/main.ts, add the import on line 115 and one line `await backfillMainWorkspaces();` right after `await backfillIssueWorkspaces();` (line 559) inside the same try. Add the four test cases from WI-2 step 3 to tests/unit/lib/workspaces/rebuild.test.ts."
+        },
+        "items": [
+          {
+            "id": "main-workspace-backfill.ac1",
+            "title": "Given a registered project with no main row, backfillMainWorkspaces creates exactly one kind='main' row named 'main' whose path is the project's primary path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-workspace-backfill.ac2",
+            "title": "Given a second run, backfillMainWorkspaces returns [] and the main row count per project stays 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-workspace-backfill.ac3",
+            "title": "Given a project whose primary path does not exist, backfillMainWorkspaces skips it and creates no row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-workspace-backfill.ac5",
+            "title": "Given createWorkspace throws for one of two projects, backfillMainWorkspaces still creates the other project's main row and resolves without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-workspace-backfill.ac4",
+            "title": "When dashboard boot runs, main.ts calls backfillMainWorkspaces directly after backfillIssueWorkspaces in the same try block, and main.ts stays at 1000 lines or fewer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rollout-turn-context",
+        "title": "Turn-context wrapper exported from the Codex rollout reader, stripped from user text",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T15:27:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5359",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/codex-rollout-message.ts",
+            "src/lib/__tests__/codex-rollout-message.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/codex-rollout-message.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "codex-rollout-message.test.ts passes including the turn-context block (PAN-5359) cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In src/lib/codex-rollout-message.ts, export CODEX_TURN_CONTEXT_OPEN = '<overdeck-turn-context>', CODEX_TURN_CONTEXT_CLOSE = '</overdeck-turn-context>', wrapCodexTurnContext(context, prompt) (returns null for blank context or context containing the close marker; else `${OPEN}\\n${context}\\n${CLOSE}\\n\\n${prompt}`), and stripCodexTurnContext(text) (removes one leading block and the newlines after it; returns text unchanged when it does not start with OPEN or has no CLOSE). In readCodexRolloutMessage (line 92), strip user text only, in both the legacy user_message branch and the current UserMessage branch, before the empty check. Assistant text is never stripped. Add the WI-3 step 3 tests."
+        },
+        "items": [
+          {
+            "id": "rollout-turn-context.ac1",
+            "title": "Given a legacy user_message and a current UserMessage whose text starts with a wrapped block, readCodexRolloutMessage returns text equal to the bare operator prompt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollout-turn-context.ac2",
+            "title": "Given an AgentMessage starting with <overdeck-turn-context>, readCodexRolloutMessage returns its text unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollout-turn-context.ac3",
+            "title": "wrapCodexTurnContext returns null for empty context and for context containing </overdeck-turn-context>, and stripCodexTurnContext(wrapCodexTurnContext(c, p)) returns exactly p",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-prompt-memory-client",
+        "title": "Fail-open Codex prompt-memory client that calls /api/memory/inject",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T15:27:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5359",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/codex/prompt-memory.ts",
+            "src/lib/codex/__tests__/prompt-memory.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/codex/__tests__/prompt-memory.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "prompt-memory.test.ts passes including the fake-timer timeout case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. Create src/lib/codex/prompt-memory.ts with applyCodexPromptMemory(input, deps) exactly as the PRD snippet shows. It POSTs { prompt, sessionId, agentId, conversation? } to `${baseUrl}/api/memory/inject` with the internal-token header. baseUrl is deps.baseUrl, else env.OVERDECK_DASHBOARD_URL, else getDashboardLoopbackApiUrl() from src/lib/config.ts; never getDashboardApiUrl(), whose DASHBOARD_URL fallback can be a stale public URL. The request runs under an AbortController + setTimeout timeout of 1500 ms (never AbortSignal.timeout). It returns { text: wrapCodexTurnContext(context, prompt), contextChars } on an OK response with ok: true and a non-empty context, and { text: prompt, contextChars: 0 } on every other path: blank prompt, OVERDECK_BARE_CONTEXT=1, no token, rejection, non-OK status, bad body, empty context, or unwrappable context. Write the WI-4 tests with all deps injected and vi.useFakeTimers() for the timeout case."
+        },
+        "items": [
+          {
+            "id": "codex-prompt-memory-client.ac1",
+            "title": "Given a 202 response { ok: true, context: 'MEM' }, applyCodexPromptMemory returns the wrapped text with contextChars 3 and the request body carries prompt, sessionId, agentId and conversation plus the x-overdeck-internal-token header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-prompt-memory-client.ac2",
+            "title": "Given OVERDECK_BARE_CONTEXT=1 or no internal token, applyCodexPromptMemory returns the original prompt and never calls fetch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-prompt-memory-client.ac3",
+            "title": "Given a fetch rejection, HTTP 500, empty context, or context containing </overdeck-turn-context>, applyCodexPromptMemory falls back to the original prompt with contextChars 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-prompt-memory-client.ac4",
+            "title": "Given a fetch that settles only on abort, advancing fake timers by 1500 ms makes applyCodexPromptMemory resolve with the original prompt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-host-wiring",
+        "title": "Codex app-server host prepends per-turn memory before turn/start",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T15:27:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5359",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/codex/app-server-host.ts",
+            "src/lib/codex/__tests__/app-server-host.test.ts",
+            "src/lib/codex/__tests__/replay-app-server.ts",
+            "src/lib/protocol-capture/record.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/codex/__tests__/app-server-host.test.ts src/lib/codex/__tests__/app-server-replay.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "app-server-host.test.ts and app-server-replay.test.ts pass including the new injection cases and every pre-existing case",
+            "lint-file-size.sh exits 0 (app-server-host.ts stays at 1000 lines or fewer)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. Add an optional promptMemory option to CodexAppServerHostOptions (line 57), defaulting to applyCodexPromptMemory from ./prompt-memory.js. In handleMessageOp (line 270), after ensureThread, call it with { prompt: content, agentId: this.options.agentId, sessionId: this.manager.getState().threadId ?? this.options.agentId, conversation: process.env.OVERDECK_CONVERSATION }. Add memoryContextChars to the op/message event, pass memory.text to manager.startTurn (line 293), and keep the `[user] ${content}` pane line on the original text. In src/lib/protocol-capture/record.ts (line 200), pass an identity promptMemory stub so recorded fixtures never contain live memory. Give both test host factories the same identity default, overridable by opts: makeHost in app-server-host.test.ts (line 96) and src/lib/codex/__tests__/replay-app-server.ts (line 94). Add the WI-5 step 4 tests without weakening any existing assertion. Implementation checkpoint: wc -l on app-server-host.ts must print 1000 or less; if not, shorten the new lines, and never raise an allowlist cap."
+        },
+        "items": [
+          {
+            "id": "codex-host-wiring.ac1",
+            "title": "Given a promptMemory stub returning { text: 'WRAPPED build it', contextChars: 7 }, a 'build it' message makes manager.startTurn receive 'WRAPPED build it' while the pane output still renders '[user] build it'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-host-wiring.ac2",
+            "title": "When a message op runs, the op/message event in the host events log records memoryContextChars equal to the stub's contextChars",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-host-wiring.ac3",
+            "title": "When a message op runs after the thread starts, the promptMemory stub is called with the original prompt, the host agentId, and the started thread id as sessionId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-host-wiring.ac4",
+            "title": "The recorder in record.ts and both test host factories (makeHost, replay-app-server.ts) construct CodexAppServerHost with a promptMemory stub that returns the prompt unchanged, app-server-replay.test.ts passes unchanged, and wc -l src/lib/codex/app-server-host.ts prints 1000 or less",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "claude-registration-test",
+        "title": "Regression test: the global UserPromptSubmit hook reaches every Claude session",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:27:32Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-5359",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/__tests__/claude-hooks-registration.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/claude-hooks-registration.test.ts"
+          ],
+          "expected_outputs": [
+            "claude-hooks-registration.test.ts passes including the PAN-5359 describe block"
+          ],
+          "readiness": "ready",
+          "acJustification": "One registration-table assertion is the whole item; the script-level behavior is already covered by tests/scripts/user-prompt-submit-hook.test.ts.",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6. In src/lib/__tests__/claude-hooks-registration.test.ts, add describe('per-turn memory reaches every Claude session (PAN-5359)') with one test asserting that OVERDECK_HOOK_REGISTRATIONS contains { hookType: 'UserPromptSubmit', scriptName: 'user-prompt-submit-hook' } with no matcher. That registration lives in the user-global ~/.claude/settings.json, so it applies to project-root conversations as well as workspaces. Do not duplicate tests/scripts/user-prompt-submit-hook.test.ts."
+        },
+        "items": [
+          {
+            "id": "claude-registration-test.ac1",
+            "title": "The new test fails if the UserPromptSubmit → user-prompt-submit-hook row is removed from OVERDECK_HOOK_REGISTRATIONS or given a matcher, and passes against the current table",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document per-turn retrieval by harness and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:27:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5359",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/memory.mdx",
+            "docs/CONTEXT-LAYERS.md",
+            "changelog.d/pan-5359.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '## Per-turn retrieval' configuration/memory.mdx",
+            "grep -n 'Codex app-server host' docs/CONTEXT-LAYERS.md",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "memory.mdx contains the Per-turn retrieval heading",
+            "CONTEXT-LAYERS.md contains the Codex app-server host row",
+            "lint:docs exits 0 and accepts changelog.d/pan-5359.md"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7. Add `## Per-turn retrieval` to configuration/memory.mdx after the 'Facts vs. observation memory vs. OKF knowledge' table. It states: Claude Code (global user-prompt-submit-hook, any cwd); Codex (app-server host before each host-mediated turn, wrapped in <overdeck-turn-context>, hidden in the timeline; not the native Codex terminal or codex.transport: tui); Pi (issue-linked conversations and work agents); a conversation needs its project's main workspace, which dashboard boot creates when missing; every call is logged to rag-runs/<date>.jsonl. Add the Codex app-server host row to the bare-context table in docs/CONTEXT-LAYERS.md (skipped when OVERDECK_BARE_CONTEXT=1). Create changelog.d/pan-5359.md with the Improved and Fixed bullets from the PRD."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "configuration/memory.mdx renders a '## Per-turn retrieval' section that names the Claude global hook, the Codex app-server host with its <overdeck-turn-context> wrapper, the Pi issue-conversation path, the main-workspace boot backfill, and the rag-runs log path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "The bare-context table in docs/CONTEXT-LAYERS.md contains a 'Codex app-server host' row whose Bare column says it is skipped when OVERDECK_BARE_CONTEXT=1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "changelog.d/pan-5359.md exists with one #### Improved and one #### Fixed bullet linking issue 5359, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "rollout-turn-context",
+        "to": "codex-prompt-memory-client",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-prompt-memory-client",
+        "to": "codex-host-wiring",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
