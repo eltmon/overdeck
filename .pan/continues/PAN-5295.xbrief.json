@@ -1,0 +1,29 @@
+{
+  "version": "1",
+  "issueId": "PAN-5295",
+  "created": "2026-11-15T19:39:19.043Z",
+  "updated": "2026-11-15T19:39:19.043Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "changes-targets": {
+      "status": "completed",
+      "doneAt": "2026-11-15T19:39:19.042Z"
+    },
+    "changes-targets.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T19:39:19.042Z"
+    },
+    "changes-targets.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T19:39:19.042Z"
+    },
+    "changes-targets.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T19:39:19.042Z"
+    }
+  }
+}
