@@ -1,0 +1,498 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T06:37:40Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5329: Workflow redesign B follow-up: Ctrl+Shift+F focus, unreadable Go to file highlight, squeezed chat, .git in tree, tag overflow",
+    "updated": "2026-11-15T06:43:39.635Z"
+  },
+  "plan": {
+    "id": "pan-5329",
+    "title": "Workflow redesign B follow-up: Ctrl+Shift+F focus, unreadable Go to file highlight, squeezed chat, .git in tree, tag overflow",
+    "status": "proposed",
+    "uid": "ec7ea336-5476-446e-bb0f-45e62e702cce",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-15T06:37:40Z",
+    "updated": "2026-11-15T06:43:39.635Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5329",
+        "label": "PAN-5329",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5329/.pan/drafts/pan-5329.md",
+        "label": "PRD draft (.pan/drafts/pan-5329.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "work-dock",
+      "explorer",
+      "conversation",
+      "pan-5284"
+    ],
+    "narratives": {
+      "Problem": "A live check of the PAN-5289 work dock at 1920x1000 found five defects: Ctrl+Shift+F lands in the conversation's find bar instead of the dock Search box; Go to file match highlights render browser-default yellow with near-white text; opening a file beside a conversation leaves about 90 px for messages because the 256 px Agents rail stays open; the Files tree lists .git; a long attribution tag on a project Changes commit row pushes the subject to zero width.",
+      "Proposal": "Five independent frontend fixes plus one docs/changelog item, all in one PR: (1) gate the MessagesTimeline window capture listener on !shiftKey && !altKey; (2) replace the no-op `bg-warning/30` with a named `.match-mark` class in index.css using color-mix on --state-needs-you; (3) SubagentRail measures its parent row with ResizeObserver and shows the collapsed strip below 760 px, with a pane-local override and no localStorage writes while narrow; (4) skip entries named exactly .git in projectRows, projectChangedRows and expandAll; (5) cap ChangeTag at max-w-[25%] (not the issue's 40%, see PRD WI-5) with truncate and a title derived from string children; (6) document FR-1/FR-3/FR-4 in features/file-explorer.mdx, features/keyboard-shortcuts.mdx and docs/CONVERSATION-SUBAGENTS.md, add the .match-mark row to the style guide, and add changelog.d/pan-5329.md. Exact before/after code is in the PRD work items WI-1..WI-6.",
+      "NonGoals": "- Do not touch ConversationPanel.tsx (1525 lines, near its file-size cap); the rail measures its own parent row.\n- Do not fix other Tailwind opacity utilities on var() tokens (bg-accent/60 in ExplorerRow.tsx, bg-muted/NN in viewers).\n- Do not change the ComposerPromptEditor slash-menu <mark> (CSS module class, not PAN-5289).\n- Do not filter .git from server-side explorer listings or Go to file results; this is client-side display only.\n- Do not change PdfViewer Ctrl+F handling.\n- Do not change the Stage 50/50 split, the inline diff panel width, or the conversation layout.\n- Do not add a user setting for the 760 px threshold.\n- Do not write overdeck.ui.agentsRailCollapsed from the automatic collapse or from any toggle made while the pane is narrow.\n- Do not edit changelog.mdx or the file-size allowlist."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Highlight uses a named `.match-mark` class in index.css, not an arbitrary Tailwind value.",
+        "rationale": "Matches the existing `.list-row`/`.list-meta` named-class solution for var()-token opacity, is readable, and gets a style-guide row."
+      },
+      {
+        "summary": "The rail measures its own parentElement (the conversation pane row) inside SubagentRail.tsx.",
+        "rationale": "ConversationPanel.tsx is near its file-size allowlist cap, and the parent row's width does not depend on rail state, so collapse cannot oscillate."
+      },
+      {
+        "summary": "Unmeasured or zero width counts as wide.",
+        "rationale": "jsdom reports 0 and the test-setup ResizeObserver mock never fires, so existing rail tests and hidden panes keep the stored preference."
+      },
+      {
+        "summary": "Every toggle while the pane is narrow (strip click and X) is pane-local and never persisted; the override clears when the pane becomes wide.",
+        "rationale": "The issue says auto-collapse never writes the preference and the stored preference applies again at >= 760 px; treating X the same way keeps a narrow split from changing the wide-pane preference."
+      },
+      {
+        "summary": "ChangeTag derives its title from string children instead of taking a new prop.",
+        "rationale": "Every caller passes a string, so no call site changes; ConversationChangesList tags gain the same cap and tooltip."
+      },
+      {
+        "summary": "WI-1 test extends components/chat/__tests__/MessagesTimeline.test.tsx rather than adding a new file.",
+        "rationale": "The file is already in the CI frontend subset, so no subset edit is needed for this item."
+      },
+      {
+        "summary": "expandAll also skips .git.",
+        "rationale": "Otherwise Expand all folders with dotfiles on loads .git object folders into the store (up to the 2,000 cap) with no visible row."
+      },
+      {
+        "summary": "Docs, style-guide row and changelog are one item with no edges to the code items.",
+        "rationale": "They touch no code file, so there is no shared mutation; the PRD fixes their exact text."
+      },
+      {
+        "summary": "ChangeTag cap is max-w-[25%] instead of the issue's max-w-[40%].",
+        "rationale": "At the default 340 px dock the header's fixed items take ~166 of 316 px; a 40% cap leaves the subject ~24 px, 25% leaves ~71 px. The issue's goal is that the subject keeps most of the row (arithmetic in PRD WI-5)."
+      }
+    ],
+    "items": [
+      {
+        "id": "chat-find-plain-ctrl-f",
+        "title": "Chat find listener matches plain Ctrl/Cmd+F only",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T06:37:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5329",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/MessagesTimeline.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/MessagesTimeline.test.tsx",
+            "grep -n \"!event.shiftKey && !event.altKey && event.key.toLowerCase() === 'f'\" src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx"
+          ],
+          "expected_outputs": [
+            "MessagesTimeline.test.tsx passes, including the two new 'find shortcut (PAN-5329)' tests",
+            "grep prints exactly one line from the keydown listener"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx line 530 change the condition to `(event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'f'`. Leave the Escape branch unchanged. In components/chat/__tests__/MessagesTimeline.test.tsx add describe('MessagesTimeline — find shortcut (PAN-5329)') with two tests rendering `<MessagesTimeline messages={[]} workLog={[]} streaming={false} />`: Ctrl+F (fireEvent.keyDown(window, {key:'f', ctrlKey:true})) mounts the 'Search conversation…' input; a dispatched KeyboardEvent {key:'F', ctrlKey:true, shiftKey:true, cancelable:true} on window mounts no such input and leaves ev.defaultPrevented false."
+        },
+        "items": [
+          {
+            "id": "chat-find-plain-ctrl-f.ac1",
+            "title": "Given a rendered MessagesTimeline, when Ctrl+F is pressed on window, then the 'Search conversation…' input renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chat-find-plain-ctrl-f.ac2",
+            "title": "Given a rendered MessagesTimeline, when a cancelable Ctrl+Shift+F keydown is dispatched on window, then no 'Search conversation…' input renders and the event's defaultPrevented stays false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chat-find-plain-ctrl-f.ac3",
+            "title": "Given a conversation tab at 1920x1000 in an isolated Playwright profile, when the tester presses Ctrl+Shift+F and types workDockStore, then document.activeElement is the dock Search input and its value is workDockStore",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "quick-open-match-mark",
+        "title": "Go to file highlight uses a named .match-mark class",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T06:37:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5329",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/index.css",
+            "src/dashboard/frontend/src/components/explorer/search/QuickOpen.tsx",
+            "src/dashboard/frontend/src/components/explorer/search/__tests__/QuickOpen.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/search/__tests__/QuickOpen.test.tsx",
+            "grep -n -A2 '\\.match-mark' src/dashboard/frontend/src/index.css",
+            "grep -n 'bg-warning/' src/dashboard/frontend/src/components/explorer/search/QuickOpen.tsx || echo no-opacity-utility"
+          ],
+          "expected_outputs": [
+            "QuickOpen.test.tsx passes, including the match-mark class assertions",
+            "grep shows the .match-mark rule with color-mix(in srgb, var(--state-needs-you) 30%, transparent)",
+            "the last command prints no-opacity-utility"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add a `.match-mark` rule (background-color: color-mix(in srgb, var(--state-needs-you) 30%, transparent); color: inherit; border-radius: 2px; padding: 0 1px) to the @layer components block in src/dashboard/frontend/src/index.css right after `.list-meta` (around lines 1220-1232). Set `const MARK_CLASS = 'match-mark'` in components/explorer/search/QuickOpen.tsx line 28. In QuickOpen.test.tsx test 'marks the matched text and ranks a changed path first…' (line 114) assert the first option's <mark> has class match-mark and its className does not match /bg-warning\\//. ContentSearch.tsx has no <mark> and needs no change. The style-guide row is in the docs item."
+        },
+        "items": [
+          {
+            "id": "quick-open-match-mark.ac1",
+            "title": "Given a Go to file query 'foo', when results render, then the matched <mark> has class match-mark and its className contains no 'bg-warning/'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quick-open-match-mark.ac2",
+            "title": "index.css defines .match-mark with background-color color-mix(in srgb, var(--state-needs-you) 30%, transparent), color inherit, border-radius 2px and padding 0 1px (grep returns the rule)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quick-open-match-mark.ac3",
+            "title": "Given the dark theme in an isolated Playwright profile, when Go to file shows a match, then the <mark>'s computed background-color is not rgb(255, 255, 0) and its color equals the row text color",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rail-narrow-auto-collapse",
+        "title": "Agents rail collapses automatically in a pane narrower than 760 px",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T06:37:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5329",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/SubagentRail.tsx",
+            "src/dashboard/frontend/src/components/chat/SubagentRail.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/SubagentRail.test.tsx",
+            "grep -n '^src/components/chat/SubagentRail.test.tsx$' scripts/frontend-test-subset.txt",
+            "git diff --stat origin/main...HEAD -- src/dashboard/frontend/src/components/chat/ConversationPanel.tsx"
+          ],
+          "expected_outputs": [
+            "SubagentRail.test.tsx passes: the 10 existing tests plus the 5 new 'narrow pane (PAN-5329)' tests",
+            "grep prints one line, placed directly before the first src/components/chat/__tests__/ line",
+            "git diff --stat prints nothing for ConversationPanel.tsx"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "acJustification": "Five ACs map to the five rows of the PRD WI-3 state table plus the browser check; the strip-click and X-click rows share one AC."
+        },
+        "narrative": {
+          "Action": "PRD WI-3, follow its state table exactly. In src/dashboard/frontend/src/components/chat/SubagentRail.tsx only: export const NARROW_PANE_PX = 760; rename the collapsed state to storedCollapsed/setStoredCollapsed (same initializer); add `host` state set by a STABLE callback ref `const hostRef = useCallback((el) => { if (el) setHost(el.parentElement) }, [])` (never an inline lambda) attached to BOTH the collapsed <button> and the open <aside>; a useEffect on [host] creates a ResizeObserver on host that sets narrow = width < NARROW_PANE_PX only when the last entry's contentRect.width > 0, and disconnects on cleanup; `override: boolean | null` state reset to null by a useEffect when narrow becomes false; `const collapsed = narrow ? (override ?? true) : storedCollapsed`; toggleCollapsed sets override (no localStorage) while narrow, otherwise behaves as today. All new hooks go above the `if (subagents.length === 0) return null` line. narrow starts false (unmeasured = wide). In SubagentRail.test.tsx add describe('SubagentRail narrow pane (PAN-5329)') with the five tests listed in WI-3, using vi.stubGlobal('ResizeObserver', FakeResizeObserver) whose disconnect() removes its recorded callback, an array emptied in beforeEach, and a resize(width) helper wrapped in act(); vi.unstubAllGlobals() in afterEach. Add `src/components/chat/SubagentRail.test.tsx` to scripts/frontend-test-subset.txt directly before the first `src/components/chat/__tests__/` line. Do not edit ConversationPanel.tsx."
+        },
+        "items": [
+          {
+            "id": "rail-narrow-auto-collapse.ac1",
+            "title": "Given stored preference 'false', when the fake ResizeObserver reports width 400, then the rail renders the 'Show agents rail' strip and localStorage['overdeck.ui.agentsRailCollapsed'] is still 'false'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rail-narrow-auto-collapse.ac2",
+            "title": "Given a narrow pane (width 400), when the strip is clicked and then 'Collapse agents rail' is clicked, then the rail opens and then collapses again and localStorage is unchanged after both clicks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rail-narrow-auto-collapse.ac3",
+            "title": "Given stored 'true' and a narrow-pane override to open, when the width changes to 1000, then the rail falls back to the stored collapsed strip; given stored 'false', 400 then 1000 renders the open rail",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rail-narrow-auto-collapse.ac4",
+            "title": "Given stored 'false', when the observer reports width 0, then the open rail still renders (width 0 falls back to the stored preference)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rail-narrow-auto-collapse.ac5",
+            "title": "Given 1920x1000 in an isolated Playwright profile with a conversation that has subagents, when Ctrl+P then Enter opens a file beside it, then the Agents rail renders as the 30 px strip and the messages column measures at least 300 px wide",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "explorer-hide-dot-git",
+        "title": "Hide .git from projectRows, projectChangedRows and expandAll",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:37:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5329",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/tree/explorer-tree-model.ts",
+            "src/dashboard/frontend/src/components/explorer/tree/directory-loader.ts",
+            "src/dashboard/frontend/src/components/explorer/tree/__tests__/explorer-tree-model.test.ts",
+            "src/dashboard/frontend/src/components/explorer/tree/__tests__/directory-loader.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/tree/__tests__/explorer-tree-model.test.ts src/components/explorer/tree/__tests__/directory-loader.test.ts"
+          ],
+          "expected_outputs": [
+            "both test files pass, including the new .git cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In components/explorer/tree/explorer-tree-model.ts export `isGitDirName(name) => name === '.git'` next to isDotName; in projectRows' walk skip `isGitDirName(entry.name)` before the dotfile check; in projectChangedRows skip a path when `segments.some(isGitDirName)`. In components/explorer/tree/directory-loader.ts expandAll (lines 176-177) skip `isGitDirName(entry.name)` before the dotfile check, importing it from ./explorer-tree-model. Match by name only, any entry kind (a worktree's .git is a file). Tests per WI-4: projectRows with .git dir, .github dir, .gitignore file, expanded src containing src/.git file and showDotfiles true returns rows containing .github, src and .gitignore and not containing .git or src/.git; projectChangedRows drops .git/config and a/.git/HEAD but keeps .github/ci.yml; expandAll with showDotfiles true expands .github, never .git, and never calls load('.git')."
+        },
+        "items": [
+          {
+            "id": "explorer-hide-dot-git.ac1",
+            "title": "Given root entries .git, .github, .gitignore and expanded src containing src/.git with showDotfiles true, when projectRows runs, then the returned paths contain .github, src and .gitignore and do not contain .git or src/.git",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "explorer-hide-dot-git.ac2",
+            "title": "Given changed paths .git/config, a/.git/HEAD and .github/ci.yml, when projectChangedRows runs with showDotfiles true, then no row path equals or starts with .git or a/.git and .github/ci.yml is present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "explorer-hide-dot-git.ac3",
+            "title": "Given a root listing with .git and .github folders and showDotfiles true, when expandAll runs, then expanded contains .github, excludes .git, and load is never called with '.git'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "change-tag-truncate",
+        "title": "ChangeTag caps at 25% width with ellipsis and full-text title",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:37:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5329",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/dock/changes/ChangeGroup.tsx",
+            "src/dashboard/frontend/src/components/dock/__tests__/ProjectMainChangesList.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/dock/__tests__/ProjectMainChangesList.test.tsx src/components/dock/__tests__/ConversationChangesList.test.tsx"
+          ],
+          "expected_outputs": [
+            "both test files pass, including the new 60-character tag test"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In components/dock/changes/ChangeGroup.tsx ChangeTag: derive `title = typeof children === 'string' ? children : undefined`, set it on the span, and use className 'max-w-[25%] shrink-0 truncate rounded border border-border px-1.5 font-mono text-[11px] leading-[18px] text-muted-foreground'. No caller changes; ConversationChangesList tags gain the same cap. In components/dock/__tests__/ProjectMainChangesList.test.tsx add a test with a commit whose by.title is an exact 60-character string: the tag element (getByText) has classes truncate and max-w-[25%] and title equal to the full string, and the commit subject text is still in the document. Use 25%, not the issue's 40%: see PRD WI-5 arithmetic (40% leaves the subject ~24 px at the default 340 px dock)."
+        },
+        "items": [
+          {
+            "id": "change-tag-truncate.ac1",
+            "title": "Given a project main commit attributed to a 60-character title, when ProjectMainChangesList renders, then the tag element has classes truncate and max-w-[25%] and a title attribute equal to the full 60-character text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "change-tag-truncate.ac2",
+            "title": "Given the same commit, when the list renders, then the commit subject text renders in the header row next to the tag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "change-tag-truncate.ac3",
+            "title": "Given project Home Changes with the dock at its default 340 px width in an isolated Playwright profile, when a commit with a long conversation-title tag renders, then the subject span measures at least 50 px wide and the tag's right edge is inside the dock",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-changelog",
+        "title": "Document the five fixes and add changelog.d/pan-5329.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T06:37:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5329",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/file-explorer.mdx",
+            "features/keyboard-shortcuts.mdx",
+            "docs/CONVERSATION-SUBAGENTS.md",
+            "sync-sources/dev-skills/pan-style-guide/SKILL.md",
+            "changelog.d/pan-5329.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'NARROW_PANE_PX' docs/CONVERSATION-SUBAGENTS.md",
+            "grep -n '.git. folder never shows' features/file-explorer.mdx",
+            "grep -n 'match-mark' sync-sources/dev-skills/pan-style-guide/SKILL.md"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "each grep prints at least one line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 plus the style-guide row from WI-2. Add the exact sentences from WI-6 to features/file-explorer.mdx ('The tree' after the View options paragraph: .git never shows even with Show dotfiles on and Expand all skips it; 'Search' after the Search-tab paragraph: Ctrl+Shift+F moves the cursor to the Search box even in a conversation tab, Ctrl+F still opens the conversation's find bar), features/keyboard-shortcuts.mdx (paragraph at line 46: in a conversation Ctrl+F without Shift opens the find bar), and docs/CONVERSATION-SUBAGENTS.md section 'Agents rail collapse (PAN-4222)' (narrow-pane paragraph naming ResizeObserver, 760 px / NARROW_PANE_PX, the 30 px strip, no localStorage write, pane-local override cleared at >= 760 px, width 0 ignored). Add the `.match-mark` row to the class table under 'Lists and switches' in sync-sources/dev-skills/pan-style-guide/SKILL.md after the .list-meta row. Create changelog.d/pan-5329.md with the five '#### Fixed' bullets given in WI-6."
+        },
+        "items": [
+          {
+            "id": "docs-and-changelog.ac1",
+            "title": "When grep runs on features/file-explorer.mdx, then it returns the sentence that the .git folder never shows even with Show dotfiles on, and the sentence that Ctrl+Shift+F moves the cursor to the Search box in a conversation tab while Ctrl+F opens the find bar",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac2",
+            "title": "When grep runs on docs/CONVERSATION-SUBAGENTS.md, then the 'Agents rail collapse' section contains NARROW_PANE_PX, 760 px, the statement that auto-collapse never writes overdeck.ui.agentsRailCollapsed, and that the pane-local override clears at 760 px or wider",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac3",
+            "title": "changelog.d/pan-5329.md exists with one '#### Fixed' heading and five bullets linking #5329, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac4",
+            "title": "When grep runs, then sync-sources/dev-skills/pan-style-guide/SKILL.md contains a .match-mark row under 'Lists and switches' and features/keyboard-shortcuts.mdx contains the sentence that Ctrl+F without Shift opens the conversation's find bar",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "sizeJustification": "The quality lint counts 7 subsystems only because each top-level doc file (features/file-explorer.mdx, features/keyboard-shortcuts.mdx, docs/CONVERSATION-SUBAGENTS.md, changelog.d/pan-5329.md, scripts/frontend-test-subset.txt) counts as its own subsystem. All code lives in one subsystem (src/dashboard frontend), the plan touches 20 files, and the issue asks for all five fixes in one PR.",
+      "canonicalFilename": "2026-11-15-PAN-5329-workflow-redesign-b-follow-up-ctrl-shift-f-focus-unreadable-go-to-file-highlight-squeezed-chat-git-in-tree-tag-overflow.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
