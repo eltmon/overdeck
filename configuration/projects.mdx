@@ -110,6 +110,15 @@ and untracked. Overdeck never edits your tracked `.gitignore`, so a freshly
 cloned repository does not come back dirty. If you want the exclusion shared
 with your team, add it to `.gitignore` yourself.
 
+Issue workspaces also hide the files Overdeck copies into `.claude/` (skills,
+agents, `settings.json`, `settings.local.json`, `mcp.json`, and the two
+Overdeck marker files) through a git exclude file private to that workspace.
+So a fresh workspace starts clean, and those files cannot be committed by
+accident. Your repository's tracked `.gitignore` and your main checkout are
+not changed. If your project tracks one of these files, Overdeck's edits to
+it still count as changes. To commit a new file at one of these paths from an
+issue workspace, use `git add -f`.
+
 Tests and quality gates are **not** detected. Configure those yourself — see
 [Project Configuration](#project-configuration).
 
