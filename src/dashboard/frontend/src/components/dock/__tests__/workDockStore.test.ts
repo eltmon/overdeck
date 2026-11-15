@@ -126,6 +126,14 @@ describe('workDockStore', () => {
     expect(Object.keys(stored('alpha')).sort()).toEqual(['open', 'tab', 'width'])
   })
 
+  it('clearFilesFilter drops a handled filesFilter request and keeps the rest (PAN-5295)', () => {
+    const store = useWorkDockStore.getState()
+    store.openDock('alpha', { tab: 'files', filesFilter: 'mine' })
+    store.clearFilesFilter('alpha')
+    expect(useWorkDockStore.getState().byDeck.alpha).toMatchObject({ open: true, tab: 'files' })
+    expect(useWorkDockStore.getState().byDeck.alpha.filesFilter).toBeUndefined()
+  })
+
   it('toggleTab closes the dock open on that tab and opens it otherwise', () => {
     const store = useWorkDockStore.getState()
     store.openDock('alpha', { tab: 'files' })

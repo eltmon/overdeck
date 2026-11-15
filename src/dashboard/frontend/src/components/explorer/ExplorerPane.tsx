@@ -393,9 +393,15 @@ export function ExplorerFiles({ rootId, deckKey, changedPaths: scopeChangedPaths
   )
   // Show in files (PAN-5295 D2-7): an openDock with filesFilter 'mine' switches a
   // conversation-scoped tree to this conversation's files, even while mounted.
+  // The request is dropped once applied, so a later remount or root change keeps
+  // whatever filter the operator chose after it.
   const openSeq = useWorkDockStore((s) => s.byDeck[deckKey]?.openSeq)
   useEffect(() => {
-    if (conversationScope && useWorkDockStore.getState().byDeck[deckKey]?.filesFilter === 'mine') setFilter('mine')
+    if (!conversationScope) return
+    const dock = useWorkDockStore.getState()
+    if (dock.byDeck[deckKey]?.filesFilter !== 'mine') return
+    setFilter('mine')
+    dock.clearFilesFilter(deckKey)
   }, [deckKey, openSeq, conversationScope, setFilter])
 
   const rows: ExplorerTreeItem[] = useMemo(() => {

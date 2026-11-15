@@ -86,6 +86,8 @@ export interface WorkDockStore {
   clearScopedState(deckKey: string): void
   /** The Files tab handled the reveal request: drop it, so it never applies again. */
   clearReveal(deckKey: string): void
+  /** The Files tab applied the filesFilter request: drop it, so a remount never re-applies it. */
+  clearFilesFilter(deckKey: string): void
   /** Closes the dock when it is open on `tab`; otherwise openDock({ tab }). */
   toggleTab(deckKey: string, tab: DockTab): void
   setQuickOpen(deckKey: string, open: boolean): void
@@ -182,6 +184,13 @@ export const useWorkDockStore = create<WorkDockStore>((set, get) => {
       const deck = get().byDeck[deckKey]
       if (!deck?.reveal) return
       const { reveal: _reveal, ...rest } = deck
+      commit(deckKey, rest)
+    },
+
+    clearFilesFilter: (deckKey) => {
+      const deck = get().byDeck[deckKey]
+      if (!deck?.filesFilter) return
+      const { filesFilter: _filesFilter, ...rest } = deck
       commit(deckKey, rest)
     },
 
