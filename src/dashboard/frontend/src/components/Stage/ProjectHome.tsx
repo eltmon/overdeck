@@ -141,7 +141,7 @@ export function ProjectHome({
     }
   }
 
-  const title = projectKey ? registered?.name ?? projectName : 'No project'
+  const title = registered?.name ?? projectName
   const showPipeline = Boolean(projectKey && features && features.length > 0 && onSelectFeature)
 
   return (
@@ -159,6 +159,7 @@ export function ProjectHome({
 
         <HomeActions
           projectKey={projectKey}
+          newConversationProjectKey={deckProjectKey}
           projectPath={registered?.path}
           hasIssuePrefix={Boolean(registered?.linearTeam)}
           busy={launchBusy}

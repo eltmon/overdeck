@@ -96,6 +96,14 @@ describe('HomeActions (PAN-5294 G-D4)', () => {
     expect(dialog.openNewConversationDialog).toHaveBeenCalledWith({ projectKey: 'overdeck' })
   })
 
+  it('preselects the deck project key in the New conversation dialog when given one', () => {
+    renderActions({ newConversationProjectKey: 'Workflow fixture' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'New conversation options' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'New conversation with options…' }))
+    expect(dialog.openNewConversationDialog).toHaveBeenCalledWith({ projectKey: 'Workflow fixture' })
+  })
+
   it('disables the agent items while a conversation is being created and shows the error inline', () => {
     renderActions({ busy: true, errorText: 'harness unavailable' })
 

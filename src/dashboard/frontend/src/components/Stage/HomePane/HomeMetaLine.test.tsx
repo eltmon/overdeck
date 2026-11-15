@@ -26,7 +26,7 @@ function ciRecord(suites: Record<string, Suite>): ProjectCiSnapshot {
   }
 }
 
-function releaseStatus(overrides: Record<string, unknown> = {}) {
+function releaseFixture(overrides: Record<string, unknown> = {}) {
   return {
     projectKey: PROJECT_KEY,
     available: true,
@@ -119,7 +119,7 @@ describe('HomeMetaLine (PAN-5294 G-D3)', () => {
   })
 
   it('names the latest successful release and opens the release panel in a popover', async () => {
-    release = releaseStatus()
+    release = releaseFixture()
     render(<HomeMetaLine projectKey={PROJECT_KEY} branch="main" />)
 
     const segment = await screen.findByRole('button', { name: 'v1.2.0 released 2h ago' })
@@ -129,8 +129,8 @@ describe('HomeMetaLine (PAN-5294 G-D3)', () => {
   })
 
   it('says release failed for a completed run that did not succeed', async () => {
-    release = releaseStatus({
-      runs: [{ ...releaseStatus().runs[0], conclusion: 'failure' }],
+    release = releaseFixture({
+      runs: [{ ...releaseFixture().runs[0], conclusion: 'failure' }],
     })
     render(<HomeMetaLine projectKey={PROJECT_KEY} branch="main" />)
 
@@ -138,7 +138,7 @@ describe('HomeMetaLine (PAN-5294 G-D3)', () => {
   })
 
   it('says no releases for a project with no publish pipeline', async () => {
-    release = releaseStatus({ available: false, runs: [] })
+    release = releaseFixture({ available: false, runs: [] })
     render(<HomeMetaLine projectKey={PROJECT_KEY} branch="main" />)
 
     expect(await screen.findByText('no releases')).toBeInTheDocument()

@@ -16,6 +16,11 @@ export function formatCost(cost: number): string {
   return '$0';
 }
 
+/** The Spend subline's today value: whole dollars from $10 up (mockup screen 2: "$43 today"). */
+function formatTodayCost(cost: number): string {
+  return cost >= 10 ? `$${Math.round(cost)}` : formatCost(cost)
+}
+
 export function landedSummary(commits: readonly ProjectCommit[]): { count: number; viaPrs: number; capped: boolean } {
   return {
     count: commits.length,
@@ -133,7 +138,7 @@ export function HomeFacts({
       <Fact
         label="Spend this week"
         value={spendUnavailable ? '—' : spend ? formatCost(spend.week) : '…'}
-        sub={spendUnavailable ? 'needs an issue prefix' : spend ? `${formatCost(spend.today)} today` : '…'}
+        sub={spendUnavailable ? 'needs an issue prefix' : spend ? `${formatTodayCost(spend.today)} today` : '…'}
         valueClass={spendUnavailable ? undefined : 'text-signal-cost-foreground'}
         onClick={onSpend}
       />

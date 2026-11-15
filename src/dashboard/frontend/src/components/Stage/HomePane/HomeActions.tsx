@@ -11,6 +11,12 @@ import { AgentIcon } from './AgentIcon'
 export interface HomeActionsProps {
   /** The registered project key; project-only actions render only with it. */
   projectKey?: string
+  /**
+   * The project the New conversation dialog preselects: the deck's project
+   * key, as the left column's NewConversationButton passes. Defaults to
+   * `projectKey`.
+   */
+  newConversationProjectKey?: string
   /** The registered checkout path, for Open in <editor>. */
   projectPath?: string
   /** The project has an issue prefix, so Start an issue… can resolve ids. */
@@ -34,7 +40,11 @@ const AGENTS = [
   { id: 'codex', label: 'Codex' },
 ] as const
 
-const ACT = 'inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-[13px] text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60'
+// Layout and color are separate: cn() does not merge Tailwind classes, so a
+// primary button must not also carry the neutral colors.
+const ACT_LAYOUT = 'inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-[13px] disabled:cursor-not-allowed disabled:opacity-60'
+const ACT = `${ACT_LAYOUT} border-border bg-card text-foreground hover:bg-accent`
+const ACT_PRIMARY = `${ACT_LAYOUT} border-primary bg-primary text-primary-foreground`
 const KEYCAP = 'keycap ml-1 rounded-md px-1.5 font-mono text-xs text-muted-foreground'
 
 function Keycap({ children }: { children: ReactNode }) {
@@ -55,6 +65,7 @@ function openWorkspaceCreation(projectKey: string) {
  */
 export function HomeActions({
   projectKey,
+  newConversationProjectKey = projectKey,
   projectPath,
   hasIssuePrefix,
   busy,
@@ -84,7 +95,7 @@ export function HomeActions({
           <button
             type="button"
             onClick={onNewConversation}
-            className={cn(ACT, 'rounded-r-none border-primary bg-primary text-primary-foreground hover:bg-primary')}
+            className={cn(ACT_PRIMARY, 'rounded-r-none')}
           >
             <MessageSquarePlus size={14} aria-hidden />
             New conversation
@@ -97,7 +108,7 @@ export function HomeActions({
             aria-haspopup="menu"
             aria-expanded={menu === 'agents'}
             onClick={() => setMenu(menu === 'agents' ? null : 'agents')}
-            className={cn(ACT, 'rounded-l-none border-l-0 border-primary bg-primary px-2 text-primary-foreground hover:bg-primary')}
+            className={cn(ACT_PRIMARY, 'rounded-l-none border-l-0 px-2')}
           >
             <ChevronDown size={14} aria-hidden />
           </button>
@@ -128,7 +139,7 @@ export function HomeActions({
                 <MenuItemButton
                   onClick={() => {
                     close()
-                    openNewConversationDialog({ projectKey })
+                    openNewConversationDialog({ projectKey: newConversationProjectKey })
                   }}
                 >
                   New conversation with options…

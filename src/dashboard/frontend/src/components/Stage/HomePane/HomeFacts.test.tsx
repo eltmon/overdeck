@@ -135,7 +135,7 @@ describe('HomeFacts (PAN-5294 G-D10)', () => {
     renderFacts({ spend: { week: 412, today: 43 } })
     expect(fact('Spend this week').value).toHaveTextContent('$412')
     expect(fact('Spend this week').value).toHaveClass('text-signal-cost-foreground')
-    expect(fact('Spend this week').sub).toHaveTextContent('$43.0 today')
+    expect(fact('Spend this week').sub).toHaveTextContent('$43 today')
     cleanup()
 
     renderFacts({ spend: null, spendUnavailable: true })
