@@ -398,9 +398,11 @@ export async function handleCloisterDomainEvent(event: CloisterDomainEventLike):
     if (agentId) {
       // PAN-3917: a stopped agent frees its idle stack and tells its swarm
       // parent. The auto-resume ladder and the orphan-reviewer sweep it also
-      // used to trigger are deleted patrols — a stopped agent that still has
-      // work is re-dispatched by the ordinary dispatch pass, from the PR and
-      // the backend inventory.
+      // used to trigger are deleted patrols. The ordinary dispatch pass
+      // (onIssueStateChange) runs only on an issue lifecycle change, which a
+      // crash never causes, so it does not bring a crashed work agent back.
+      // The deacon-lite routine resumeCrashedWorkAgents (PAN-5354,
+      // crashed-work-resume.ts) does, once its liveness and resume gates pass.
       const { handleAgentLifecycleEventForIdleStack } = await import('./idle-stack-reaper.js');
       handleAgentLifecycleEventForIdleStack(agentId);
       const slotMatch = /^agent-(.+)-slot-\d+$/.exec(agentId);

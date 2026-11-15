@@ -361,9 +361,12 @@ export async function handleAgentCrash(host: CrashHost, agentId: string): Promis
   host.emit({ type: 'agent_crashed', agentId, crashCount: tracker.crashCount });
   console.log(`🔔 Agent ${agentId} crashed (crash #${tracker.crashCount})`);
 
-  // PAN-1908: emit agent.heartbeat_dead so the event-driven deacon recovery
-  // can mark the agent stopped and resume it with the proper gates, rather
-  // than Cloister scheduling its own auto-restart in parallel.
+  // PAN-1908: emit agent.heartbeat_dead for the activity feed and the read
+  // model. Nothing resumes the agent from this event: the handler that did was
+  // deleted in PAN-3917. A work agent that stays dead is resumed by the
+  // deacon-lite routine resumeCrashedWorkAgents (PAN-5354,
+  // crashed-work-resume.ts), with its own gates; Cloister never schedules an
+  // auto-restart in parallel.
   if (host.eventStore) {
     try {
       host.eventStore.append({
@@ -385,7 +388,8 @@ export async function handleAgentCrash(host: CrashHost, agentId: string): Promis
   }
 
   // Calculate backoff delay for logging/mass-death tracking only — the actual
-  // resume is handled by the deacon's agent.heartbeat_dead handler.
+  // resume of a dead work agent is deacon-lite's resumeCrashedWorkAgents
+  // (PAN-5354), not this tracker.
   const backoffIndex = Math.min(tracker.crashCount - 1, config.backoff_seconds.length - 1);
   const backoffSeconds = config.backoff_seconds[backoffIndex];
   const nextRetryAt = new Date(Date.now() + backoffSeconds * 1000);
