@@ -65,6 +65,7 @@ CREATE TABLE `conversation_files` (
 );
 --> statement-breakpoint
 CREATE INDEX `conv_files_conv_idx` ON `conversation_files` (`conversation_id`);--> statement-breakpoint
+CREATE INDEX `conv_files_locator_idx` ON `conversation_files` (`locator`);--> statement-breakpoint
 CREATE TABLE `conversation_pull_requests` (
 	`conversation_id` text NOT NULL,
 	`host` text NOT NULL,
