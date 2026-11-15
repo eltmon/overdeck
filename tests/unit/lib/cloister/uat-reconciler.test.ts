@@ -525,6 +525,24 @@ describe('empty queue', () => {
   });
 });
 
+describe('ready set unavailable (PAN-4753 WI-4)', () => {
+  it('a ready-set read that throws leaves the live batch, its stack and its row untouched', async () => {
+    const proj = freshProject();
+    const live = gen(proj, 'uat/pan-live-0610', 'ready');
+    const deps = makeDeps(proj, { rows: [live] });
+    deps.getReadySet = async () => { throw new Error('ready set unavailable for /repos/myn/api: the GitLab MR listing could not be read'); };
+
+    await expect(reconcileUatGenerations(proj, deps)).rejects.toThrow(/ready set unavailable/);
+
+    expect(deps.rows.get('uat/pan-live-0610')?.status).toBe('ready');
+    expect(deps.teardowns).toEqual([]);
+    expect(deps.assembled).toEqual([]);
+    // The single-flight slot is released, so the next tick runs.
+    deps.getReadySet = async () => READY;
+    await expect(reconcileUatGenerations(proj, deps)).resolves.toMatchObject({ invalidated: [] });
+  });
+});
+
 describe('PAN-3965 no batch for a single ready feature', () => {
   it('assembles no generation when exactly one feature is ready and the project does not hold for UAT', async () => {
     const proj = freshProject();

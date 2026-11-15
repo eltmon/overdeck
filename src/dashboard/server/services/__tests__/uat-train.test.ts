@@ -1011,6 +1011,17 @@ describe('runUatTrainReconcile — ref-refresh outage preserves the live generat
     ]);
   });
 
+  it('lets a failed ready-set read reject the tick, never answer an empty set (PAN-4753 WI-4)', async () => {
+    mocks.listReadyIssuesForProject
+      .mockReturnValueOnce([{ issueId: 'MIN-901', title: 'MIN-901' }])
+      .mockImplementationOnce(() => { throw new Error('ready set unavailable for /repos/myn/api'); });
+
+    await runUatTrainReconcile({ projectRoot: POLY_ROOT });
+
+    const deps = mocks.reconcileUatGenerations.mock.calls.at(-1)![1] as UatReconcilerDeps;
+    await expect(deps.getReadySet()).rejects.toThrow(/ready set unavailable/);
+  });
+
   it('hands the reconciler null, not an empty ready set, when a repo refresh fails', async () => {
     // computePolyrepoMergeQueueFromCandidates is the real implementation here;
     // no ChildProcessSpawner is provided, so every git call fails — exactly the
