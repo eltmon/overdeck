@@ -118,7 +118,7 @@ test.describe('composer effort chip (PAN-4255)', () => {
     // Only a running session's picker carries a chip (data-observed); the
     // sidebar's new-conversation picker does not.
     const chip = page.locator('[data-testid="effort-chip"][data-observed]');
-    await expect(chip).toHaveText('High · default', { timeout: 15_000 });
+    await expect(chip).toHaveText('Thinking: high', { timeout: 15_000 });
     await expect(chip).toHaveAttribute('data-observed', 'true');
     await expect(page.getByText('Effort unverified')).toHaveCount(0);
     await chip.screenshot({ path: testInfo.outputPath('effort-chip-default.png') });
@@ -126,7 +126,7 @@ test.describe('composer effort chip (PAN-4255)', () => {
     await chip.click();
     await page.getByTestId('effort-picker-dropdown').getByRole('button', { name: 'Low', exact: true }).click();
 
-    await expect(chip).toHaveText('Low · set');
+    await expect(chip).toHaveText('Thinking: low');
     expect(thinkingLevelBodies).toEqual([{ level: 'low' }]);
     await expect(page.getByText('Effort unverified')).toHaveCount(0);
     await chip.screenshot({ path: testInfo.outputPath('effort-chip-set.png') });

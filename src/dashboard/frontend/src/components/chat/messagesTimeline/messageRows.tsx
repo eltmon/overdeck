@@ -1,10 +1,9 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight, ClipboardList, GitBranchPlus } from 'lucide-react';
-import type { ChatMessage, TurnDiffSummary } from '../chat-types';
+import type { ChatMessage } from '../chat-types';
 import { ChatMarkdown } from '../ChatMarkdown';
-import { ChangedFilesTree } from '../ChangedFilesTree';
-import { DiffStatLabel } from '../DiffStatLabel';
-import { summarizeTurnDiffStats } from '../../../lib/turnDiffTree';
+import { TurnChangesCard } from './TurnChangesCard';
+import type { TurnChanges } from './turnChanges';
 import styles from '../../CommandDeck/styles/command-deck.module.css';
 import { useComposerStore } from '../../../lib/composerStore';
 import { sendNowQueued } from '../../../lib/composerSendNow';
@@ -320,9 +319,7 @@ export function AssistantMessageRow({
   message,
   durationStart,
   isStreaming,
-  turnDiffSummary,
-  onOpenTurnDiff,
-  resolvedTheme,
+  turnChanges,
   cwd,
   issueId,
   bookmarkable,
@@ -333,9 +330,8 @@ export function AssistantMessageRow({
   isStreaming: boolean;
   cwd?: string;
   issueId?: string | null;
-  turnDiffSummary?: TurnDiffSummary;
-  onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
-  resolvedTheme?: 'light' | 'dark';
+  /** PAN-5295: this user turn's changes when this row is the turn's last assistant message. */
+  turnChanges?: TurnChanges;
   bookmarkable?: boolean;
   citeConversationName?: string;
 }) {
@@ -343,7 +339,6 @@ export function AssistantMessageRow({
     ? formatElapsed(durationStart, message.completedAt)
     : null;
 
-  const [allExpanded, setAllExpanded] = useState(false);
   const stillStreaming = isStreaming && !message.completedAt;
   const turnBody = <TurnBody text={message.text} streaming={stillStreaming} cwd={cwd} issueId={issueId} />;
 
@@ -361,44 +356,7 @@ export function AssistantMessageRow({
             {turnBody}
           </CitableText>
         ) : turnBody}
-        {turnDiffSummary && turnDiffSummary.files.length > 0 && (
-          <div className="mt-2 rounded-md border border-border/50 bg-muted/30 p-2">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-medium text-muted-foreground">
-                Changed files ({turnDiffSummary.files.length})
-                {' '}
-                <DiffStatLabel
-                  additions={summarizeTurnDiffStats(turnDiffSummary.files).additions}
-                  deletions={summarizeTurnDiffStats(turnDiffSummary.files).deletions}
-                  showParentheses
-                />
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  className="text-[10px] text-muted-foreground hover:text-foreground"
-                  onClick={() => setAllExpanded((v) => !v)}
-                >
-                  {allExpanded ? 'Collapse all' : 'Expand all'}
-                </button>
-                {onOpenTurnDiff && (
-                  <button
-                    className="text-[10px] text-primary hover:underline"
-                    onClick={() => onOpenTurnDiff(turnDiffSummary.turnId)}
-                  >
-                    View diff
-                  </button>
-                )}
-              </div>
-            </div>
-            <ChangedFilesTree
-              turnId={turnDiffSummary.turnId}
-              files={turnDiffSummary.files}
-              allDirectoriesExpanded={allExpanded}
-              resolvedTheme={resolvedTheme ?? 'dark'}
-              onOpenTurnDiff={onOpenTurnDiff ?? (() => {})}
-            />
-          </div>
-        )}
+        {turnChanges && <TurnChangesCard turn={turnChanges} />}
         <div className={styles.messageMetadata}>
           <span className={styles.messageTimestamp}>
             {formatTimestamp(message.createdAt)}

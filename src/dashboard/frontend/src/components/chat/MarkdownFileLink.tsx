@@ -23,6 +23,9 @@ import type { MarkdownFileLinkMeta } from '../../markdown-links';
 import { useStageDeck } from '../Stage/StageDeckContext';
 import { useCitationTarget } from '../../lib/composerCitations';
 import { usePickerPosition } from './usePickerPosition';
+import { diffTargetOf, diffTargetsOf } from '../dock/changes-model';
+import type { DockDiffTarget } from '../dock/workDockStore';
+import { useConversationChangesContext, type StageChangeActions } from './conversationChanges/ConversationChangesScope';
 
 type FileLinkIcon = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -185,6 +188,15 @@ function relativePathForPreview(displayPath: string): string {
   return parts.length > 1 ? parts.slice(1).join('/') : normalized;
 }
 
+/** PAN-5295 D2-9: a chip inside a Stage whose file maps into the conversation's repo and root. */
+interface StageChipTarget {
+  stage: StageChangeActions;
+  rootPath: string;
+  /** The file's diff when the conversation changed it: uncommitted first, else the newest commit. */
+  diff?: DockDiffTarget;
+  list: readonly DockDiffTarget[];
+}
+
 function issueIdFromPath(targetPath: string): string | undefined {
   const normalized = targetPath.replace(/\\/g, '/');
   const match = normalized.match(/\/workspaces\/feature-([a-z]+-\d+)(?:\/|:|$)/i);
@@ -220,6 +232,26 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
   const previewRelativePath = useMemo(() => relativePathForPreview(displayPath), [displayPath]);
   const mode = useTheme((s) => s.resolvedTheme);
   const activeTheme = useColorTheme((s) => s.activeTheme(mode));
+  const changesCtx = useConversationChangesContext();
+  const stage = changesCtx?.stage ?? null;
+  const changes = changesCtx?.changes ?? null;
+  const stageTarget = useMemo<StageChipTarget | null>(() => {
+    if (!stage || !changes) return null;
+    const repoPath = stage.repoPathOfAbs(filePath);
+    if (repoPath === null) return null;
+    const rootPath = stage.rootPathOf(repoPath);
+    if (rootPath === null) return null;
+    const list = diffTargetsOf(changes, stage.rootPathOf);
+    const work = changes.uncommitted.find((file) => file.path === repoPath);
+    if (work) return { stage, rootPath, diff: diffTargetOf(changes, work, undefined, stage.rootPathOf), list };
+    let newest: { commit: (typeof changes.commits)[number]; file: (typeof changes.commits)[number]['files'][number] } | null = null;
+    for (const commit of changes.commits) {
+      const file = commit.files.find((f) => f.path === repoPath);
+      if (file && (!newest || Date.parse(commit.authoredAt) > Date.parse(newest.commit.authoredAt))) newest = { commit, file };
+    }
+    const diff = newest ? diffTargetOf(changes, newest.file, newest.commit, stage.rootPathOf) : undefined;
+    return diff ? { stage, rootPath, diff, list } : { stage, rootPath, list };
+  }, [stage, changes, filePath]);
 
   const handleOpen = useCallback(() => {
     void resolvePreferredEditor()
@@ -312,6 +344,17 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
     openWithExternalEditor(target);
   }, [deck, filePath, basename, citeTarget, handleOpen, openWithExternalEditor]);
 
+  // D2-9: Open diff (changed files), Open beside and Reveal in files lead both context menus.
+  const stageMenuItems = useCallback((): ContextMenuFallbackItem[] => {
+    if (!stageTarget) return [];
+    const { stage: actions, rootPath, diff, list } = stageTarget;
+    return [
+      ...(diff ? [{ label: 'Open diff', onClick: () => actions.openDiff(diff, list) }] : []),
+      { label: 'Open beside', onClick: () => actions.openBeside(rootPath, line) },
+      { label: 'Reveal in files', onClick: () => actions.reveal(rootPath) },
+    ];
+  }, [stageTarget, line]);
+
   const closeQuickview = useCallback(() => {
     requestIdRef.current++;
     setQuickviewOpen(false);
@@ -384,6 +427,7 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
       canOpenInBrowser ? fetchAvailableBrowsers() : Promise.resolve<readonly BrowserId[]>([]),
     ]).then(([availableEditors, availableBrowsers]) => {
       const items: ContextMenuFallbackItem[] = [
+        ...stageMenuItems(),
         {
           label: 'Open in internal editor',
           onClick: () => {
@@ -408,7 +452,7 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
       ];
       showContextMenu({ x, y, items });
     });
-  }, [deck, filePath, targetPath, basename, citeTarget, handleOpen, openWithExternalEditor, revealInFileManager, displayPath, copyPath, canOpenInBrowser, browserMenuItems]);
+  }, [deck, filePath, targetPath, basename, citeTarget, handleOpen, openWithExternalEditor, revealInFileManager, displayPath, copyPath, canOpenInBrowser, browserMenuItems, stageMenuItems]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -453,7 +497,13 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
-          if (isMarkdown) {
+          // D2-9: inside a Stage a changed file opens its dock diff, any other
+          // non-Markdown file opens beside the chat; Markdown keeps its target.
+          if (stageTarget?.diff) {
+            stageTarget.stage.openDiff(stageTarget.diff, stageTarget.list);
+          } else if (stageTarget && !isMarkdown) {
+            stageTarget.stage.openBeside(stageTarget.rootPath, line);
+          } else if (isMarkdown) {
             handleMarkdownClick();
           } else {
             handleOpen();
@@ -471,6 +521,7 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
             x,
             y,
             items: [
+              ...stageMenuItems(),
               { label: 'Open in editor', onClick: handleOpen },
               ...browserMenuItems(availableBrowsers),
               { label: 'Open containing folder', onClick: revealInFileManager },

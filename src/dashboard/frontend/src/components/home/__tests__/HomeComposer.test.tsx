@@ -56,7 +56,7 @@ describe('HomeComposer', () => {
 
   it('sends the chosen effort level in the create payload (PAN-4254)', async () => {
     renderWithProviders(<HomeComposer mode="advanced" />);
-    fireEvent.click(screen.getByRole('button', { name: /High \(default\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Thinking: high$/ }));
     fireEvent.click(await screen.findByRole('button', { name: 'Low' }));
 
     const input = screen.getByTestId('home-composer-input');

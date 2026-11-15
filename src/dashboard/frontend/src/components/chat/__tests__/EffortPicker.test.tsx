@@ -17,7 +17,7 @@ describe('chat EffortPicker dropdown portal (PAN-4266)', () => {
     const user = userEvent.setup();
     const { container } = render(<EffortPicker value="high" onChange={vi.fn()} />);
 
-    await user.click(screen.getByRole('button', { name: /High \(default\)/i }));
+    await user.click(screen.getByRole('button', { name: /^Thinking: high$/ }));
 
     const dropdown = await screen.findByTestId('effort-picker-dropdown');
     expect(dropdown.parentElement).toBe(document.body);
@@ -29,7 +29,7 @@ describe('chat EffortPicker dropdown portal (PAN-4266)', () => {
     const onChange = vi.fn();
     render(<EffortPicker value="high" onChange={onChange} />);
 
-    await user.click(screen.getByRole('button', { name: /High \(default\)/i }));
+    await user.click(screen.getByRole('button', { name: /^Thinking: high$/ }));
     await user.click(await screen.findByRole('button', { name: 'Low' }));
 
     expect(onChange).toHaveBeenCalledWith('low');
@@ -40,7 +40,7 @@ describe('chat EffortPicker dropdown portal (PAN-4266)', () => {
     const user = userEvent.setup();
     render(<EffortPicker value="high" onChange={vi.fn()} />);
 
-    await user.click(screen.getByRole('button', { name: /High \(default\)/i }));
+    await user.click(screen.getByRole('button', { name: /^Thinking: high$/ }));
     const dropdown = await screen.findByTestId('effort-picker-dropdown');
 
     fireEvent.mouseDown(dropdown);
@@ -68,7 +68,8 @@ describe('chat EffortPicker chip label (PAN-4255)', () => {
     render(<EffortPicker value="high" onChange={vi.fn()} chip={{ level: 'high', source: 'default', observed: false }} />);
 
     const chip = screen.getByTestId('effort-chip');
-    expect(chip).toHaveTextContent('High · default');
+    expect(chip).toHaveTextContent(/^Thinking: high$/);
+    expect(chip).toHaveAttribute('title', expect.stringContaining('Source: default'));
     expect(chip).toHaveAttribute('data-observed', 'false');
     expect(screen.queryByText(/Effort\s+unverified/)).toBeNull();
   });
@@ -77,7 +78,8 @@ describe('chat EffortPicker chip label (PAN-4255)', () => {
     render(<EffortPicker value="high" onChange={vi.fn()} chip={{ level: 'low', source: 'terminal', observed: true }} />);
 
     const chip = screen.getByTestId('effort-chip');
-    expect(chip).toHaveTextContent('Low · terminal');
+    expect(chip).toHaveTextContent(/^Thinking: low$/);
+    expect(chip).toHaveAttribute('title', expect.stringContaining('Source: terminal'));
     expect(chip).toHaveAttribute('data-observed', 'true');
     expect(screen.queryByText(/Effort\s+unverified/)).toBeNull();
   });
@@ -85,7 +87,8 @@ describe('chat EffortPicker chip label (PAN-4255)', () => {
   it('renders an observed level with no known source', () => {
     render(<EffortPicker value="high" onChange={vi.fn()} chip={{ level: 'xhigh', source: null, observed: true }} />);
 
-    expect(screen.getByTestId('effort-chip')).toHaveTextContent(/^Extra High$/);
+    expect(screen.getByTestId('effort-chip')).toHaveTextContent(/^Thinking: extra high$/);
+    expect(screen.getByTestId('effort-chip')).not.toHaveAttribute('title');
   });
 
   it('renders Applying… while a change is pending', () => {
@@ -95,11 +98,21 @@ describe('chat EffortPicker chip label (PAN-4255)', () => {
     expect(screen.queryByText(/Effort\s+unverified/)).toBeNull();
   });
 
+  it('keeps the dropdown option labels and joins the title with the source (PAN-5295)', () => {
+    render(<EffortPicker value="high" onChange={vi.fn()} title="Effort for this session" chip={{ level: 'high', source: 'default', observed: true }} />);
+
+    const chip = screen.getByTestId('effort-chip');
+    expect(chip).toHaveAttribute('title', 'Effort for this session · Source: default');
+    fireEvent.click(chip);
+    const dropdown = screen.getByTestId('effort-picker-dropdown');
+    expect(Array.from(dropdown.querySelectorAll('button')).map((b) => b.textContent)).toEqual(['Low', 'Medium', 'High (default)', 'Extra High', 'Max']);
+  });
+
   it('falls back to the draft label without a chip', () => {
     render(<EffortPicker value="high" onChange={vi.fn()} />);
 
     const chip = screen.getByTestId('effort-chip');
-    expect(chip).toHaveTextContent('High (default)');
+    expect(chip).toHaveTextContent(/^Thinking: high$/);
     expect(chip).not.toHaveAttribute('data-observed');
     expect(screen.queryByText(/Effort\s+unverified/)).toBeNull();
   });

@@ -145,7 +145,8 @@ describe('ComposerFooter: send when limits reset (PAN-4641)', () => {
     const notice = await screen.findByTestId('limit-reset-notice');
     expect(notice).toHaveTextContent(/Your 5-hour limit resets at about \d{2}:\d{2}\./);
     expect(screen.getByRole('button', { name: 'Send when limits reset' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'When limits reset' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Send:/ }));
+    expect(screen.getByRole('menuitemradio', { name: /^when the limit resets/ })).toBeInTheDocument();
   });
 
   it('the notice button POSTs the typed text and clears the editor', async () => {
@@ -167,8 +168,8 @@ describe('ComposerFooter: send when limits reset (PAN-4641)', () => {
   it('choosing "When limits reset" in the selector queues instead of sending', async () => {
     const { posts, fetchMock } = stubServer({ supported: true, limited: false });
     render(<ComposerFooter conversation={conversationNamed('limited-c')} />);
-    await screen.findByRole('option', { name: 'When limits reset' });
-    fireEvent.change(screen.getByLabelText('Delivery mode'), { target: { value: 'when_limit_resets' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Send:/ }));
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: /^when the limit resets/ }));
     fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'later please' } });
 
     fireEvent.click(screen.getByTitle('Send message (Enter)'));
@@ -183,7 +184,8 @@ describe('ComposerFooter: send when limits reset (PAN-4641)', () => {
     render(<ComposerFooter conversation={conversationNamed('limited-d')} />);
     await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/scheduled-messages'))).toBe(true));
 
-    expect(screen.queryByRole('option', { name: 'When limits reset' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Send:/ }));
+    expect(screen.queryByRole('menuitemradio', { name: /^when the limit resets/ })).not.toBeInTheDocument();
     expect(screen.queryByTestId('limit-reset-notice')).not.toBeInTheDocument();
   });
 });

@@ -92,6 +92,21 @@ vi.mock('../../CommandDeck/styles/command-deck.module.css', () => ({
   default: new Proxy({}, { get: (_target, prop) => String(prop) }),
 }));
 
+/** PAN-5295 WI-7: the Send menu replaced the delivery-mode select. */
+const sendModeButton = (): HTMLElement => screen.getByRole('button', { name: /^Send:/ });
+const sendModeItem = (label: string): HTMLElement => screen.getByRole('menuitemradio', { name: new RegExp(`^${label}`) });
+function chooseSendMode(label: string): void {
+  fireEvent.click(sendModeButton());
+  fireEvent.click(sendModeItem(label));
+}
+/** The Send menu's item labels, in order (opens and closes the menu). */
+function sendModeLabels(): string[] {
+  fireEvent.click(sendModeButton());
+  const labels = screen.getAllByRole('menuitemradio').map((item) => item.querySelector('.font-medium')?.textContent ?? '');
+  fireEvent.click(sendModeButton());
+  return labels;
+}
+
 const conversation = {
   id: 1,
   name: 'test-conv',
@@ -756,9 +771,9 @@ describe('ComposerFooter attachments', () => {
     const onSendAcknowledged = vi.fn();
     const piConversation = { ...conversation, harness: 'pi' as const };
 
-    render(<ComposerFooter conversation={piConversation} agentBusy onSendAcknowledged={onSendAcknowledged} />);
+    render(<ComposerFooter conversation={piConversation} onSendAcknowledged={onSendAcknowledged} />);
 
-    fireEvent.change(screen.getByLabelText('Pi delivery mode'), { target: { value: 'follow_up' } });
+    chooseSendMode('after this turn');
     fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'hello pi' } });
     fireEvent.click(screen.getByTitle('Send message (Enter)'));
 
@@ -780,7 +795,7 @@ describe('ComposerFooter attachments', () => {
 
     render(<ComposerFooter conversation={piConversation} onSendAcknowledged={onSendAcknowledged} />);
 
-    expect(screen.getByLabelText('Pi delivery mode')).toHaveValue('auto');
+    expect(sendModeButton()).toHaveTextContent('Send: normally');
     fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'hello pi' } });
     fireEvent.click(screen.getByTitle('Send message (Enter)'));
 
@@ -794,31 +809,57 @@ describe('ComposerFooter attachments', () => {
     );
   });
 
+  it('orders the toolbar attach, model, Thinking, Send, context, mic, send (PAN-5295)', () => {
+    const usage = { usedTokens: 12_500, maxTokens: 200_000, usedPercentage: 6.25, remainingTokens: 187_500, remainingPercentage: 93.75 };
+    const { container } = render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} contextWindowUsage={usage} />);
+
+    const ordered = [
+      screen.getByRole('button', { name: 'Attach files' }),
+      screen.getByTestId('model-picker'),
+      screen.getByTestId('effort-picker'),
+      screen.getByRole('button', { name: /^Send:/ }),
+      screen.getByTestId('context-window-meter'),
+      screen.getByTitle('Toggle voice input (Ctrl+Shift+M)'),
+      screen.getByTitle('Send message (Enter)'),
+    ];
+    for (let i = 1; i < ordered.length; i++) {
+      expect(ordered[i - 1].compareDocumentPosition(ordered[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    expect(container.querySelector('.composerToolbarDivider')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Attach files' })).toHaveAttribute('title', 'Attach files');
+    expect(screen.getByRole('button', { name: 'Attach files' }).querySelector('svg.lucide-plus')).not.toBeNull();
+  });
+
+  it('keeps the Pi Compact button after the Send button (PAN-5295)', () => {
+    render(<ComposerFooter conversation={{ ...conversation, harness: 'pi' as const }} />);
+
+    const send = screen.getByRole('button', { name: /^Send:/ });
+    const compact = screen.getByRole('button', { name: 'Compact context' });
+    expect(send.compareDocumentPosition(compact) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('offers Auto and Steer for a Claude Code conversation (PAN-4292)', () => {
     render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} />);
 
-    const select = screen.getByLabelText('Delivery mode');
-    expect(Array.from(select.querySelectorAll('option')).map((option) => option.getAttribute('value'))).toEqual(['auto', 'steer']);
+    expect(sendModeLabels()).toEqual(['normally', 'interrupt now']);
   });
 
   it('offers the delivery selector on a Claude Code agent session (PAN-4292)', () => {
     render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} agentId="agent-pan-4292" />);
 
-    expect(screen.getByLabelText('Delivery mode')).toBeInTheDocument();
+    expect(sendModeButton()).toBeInTheDocument();
   });
 
   it('keeps Auto, Steer and Follow-up for a Pi conversation (PAN-4292)', () => {
     render(<ComposerFooter conversation={{ ...conversation, harness: 'ohmypi' as const }} />);
 
-    const select = screen.getByLabelText('Pi delivery mode');
-    expect(Array.from(select.querySelectorAll('option')).map((option) => option.getAttribute('value'))).toEqual(['auto', 'steer', 'follow_up']);
+    expect(sendModeLabels()).toEqual(['normally', 'interrupt now', 'after this turn']);
   });
 
   it('renders no delivery selector for a Codex conversation (PAN-4292)', () => {
     render(<ComposerFooter conversation={{ ...conversation, harness: 'codex' as const }} />);
 
-    expect(screen.queryByLabelText('Delivery mode')).toBeNull();
-    expect(screen.queryByLabelText('Pi delivery mode')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Send:/ })).toBeNull();
   });
 
   it('posts deliverAs steer when Steer is chosen on a Claude Code conversation (PAN-4292)', async () => {
@@ -826,10 +867,13 @@ describe('ComposerFooter attachments', () => {
     fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
     const onSendAcknowledged = vi.fn();
 
-    render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} agentBusy onSendAcknowledged={onSendAcknowledged} />);
+    render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} onSendAcknowledged={onSendAcknowledged} />);
 
-    fireEvent.change(screen.getByLabelText('Delivery mode'), { target: { value: 'steer' } });
-    expect(screen.getByLabelText('Delivery mode')).toHaveAttribute('title', expect.stringContaining('interrupt the current turn'));
+    chooseSendMode('interrupt now');
+    expect(sendModeButton()).toHaveTextContent('Send: interrupt now');
+    fireEvent.click(sendModeButton());
+    expect(sendModeItem('interrupt now')).toHaveAttribute('title', expect.stringContaining('interrupt the current turn'));
+    fireEvent.click(sendModeButton());
     fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'change course' } });
     fireEvent.click(screen.getByTitle('Send message (Enter)'));
 
@@ -850,7 +894,7 @@ describe('ComposerFooter attachments', () => {
 
     render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} agentId="agent-pan-4292" onSendAcknowledged={onSendAcknowledged} />);
 
-    fireEvent.change(screen.getByLabelText('Delivery mode'), { target: { value: 'steer' } });
+    chooseSendMode('interrupt now');
     fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'change course' } });
     fireEvent.click(screen.getByTitle('Send message (Enter)'));
 
@@ -868,10 +912,12 @@ describe('ComposerFooter attachments', () => {
     fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
     const onSendAcknowledged = vi.fn();
 
-    render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} agentBusy onSendAcknowledged={onSendAcknowledged} />);
+    render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} onSendAcknowledged={onSendAcknowledged} />);
 
-    expect(screen.getByLabelText('Delivery mode')).toHaveValue('auto');
-    expect(screen.getByRole('option', { name: /Steer \((Ctrl|⌘)\+Enter\)/ })).toBeInTheDocument();
+    expect(sendModeButton()).toHaveTextContent('Send: normally');
+    fireEvent.click(sendModeButton());
+    expect(sendModeItem('interrupt now')).toHaveTextContent(/(Ctrl|⌘) Enter/);
+    fireEvent.click(sendModeButton());
     fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'change course' } });
     editorState.onCommandKeyDown?.('SteerEnter');
 
@@ -909,11 +955,11 @@ describe('ComposerFooter attachments', () => {
     const onSendAcknowledged = vi.fn();
 
     const view = render(<ComposerFooter conversation={{ ...conversation, harness: 'ohmypi' as const }} onSendAcknowledged={onSendAcknowledged} />);
-    fireEvent.change(screen.getByLabelText('Pi delivery mode'), { target: { value: 'follow_up' } });
+    chooseSendMode('after this turn');
 
     view.rerender(<ComposerFooter conversation={{ ...secondConversation, harness: 'claude-code' as const }} onSendAcknowledged={onSendAcknowledged} />);
 
-    await waitFor(() => expect(screen.getByLabelText('Delivery mode')).toHaveValue('auto'));
+    await waitFor(() => expect(sendModeButton()).toHaveTextContent('Send: normally'));
     fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'plain message' } });
     fireEvent.click(screen.getByTitle('Send message (Enter)'));
 
@@ -932,7 +978,7 @@ describe('ComposerFooter attachments', () => {
     ));
     const onSendAcknowledged = vi.fn();
 
-    render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} agentBusy onSendAcknowledged={onSendAcknowledged} />);
+    render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} onSendAcknowledged={onSendAcknowledged} />);
     fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'change course' } });
     editorState.onCommandKeyDown?.('SteerEnter');
 
@@ -1346,7 +1392,7 @@ describe('ComposerFooter attachments', () => {
     const text = new File(['# notes'], 'drop-notes.md', { type: 'text/markdown' });
 
     fireEvent.drop(screen.getByTestId('composer-editor'), {
-      dataTransfer: { files: [image, text], items: [{ kind: 'file' }] },
+      dataTransfer: { files: [image, text], items: [{ kind: 'file', type: image.type }, { kind: 'file', type: text.type }] },
     });
 
     await waitFor(() => {
@@ -1386,7 +1432,7 @@ describe('ComposerFooter attachments', () => {
     const image = new File(['png-bytes'], 'drop-image.png', { type: '' });
 
     fireEvent.drop(screen.getByTestId('composer-editor'), {
-      dataTransfer: { files: [image], items: [{ kind: 'file' }] },
+      dataTransfer: { files: [image], items: [{ kind: 'file', type: image.type }] },
     });
 
     await waitFor(() => {
@@ -1424,7 +1470,7 @@ describe('ComposerFooter attachments', () => {
     const image = new File(['png-bytes'], 'drop-image.png', { type: 'image/png' });
 
     fireEvent.drop(screen.getByTestId('composer-editor'), {
-      dataTransfer: { files: [image], items: [{ kind: 'file' }] },
+      dataTransfer: { files: [image], items: [{ kind: 'file', type: image.type }] },
     });
 
     expect(await screen.findByText('drop-image.png')).toBeInTheDocument();

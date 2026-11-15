@@ -146,13 +146,21 @@ const mockConversation: React.ComponentProps<typeof ConversationPanel>['conversa
 let queryClients: QueryClient[] = [];
 let fetchControl: ReturnType<typeof installStrictFetchMock>;
 
+function emptyChanges(name: string) {
+  return {
+    conversation: name, repoRoot: '/home/user', rootId: null, branch: 'main', scope: 'conversation',
+    uncommitted: [], commits: [],
+    totals: { files: 0, additions: 0, deletions: 0, commitsPushed: 0, commitsLocal: 0, uncommittedFiles: 0 },
+  };
+}
+
 function defaultConversationResponse(method: string, url: string): Response | undefined {
   if (method === 'POST' && url === 'http://localhost:3000/api/dashboard/session') {
     return Response.json({ csrfToken: 'test-csrf-token' });
   }
-  if (method === 'GET' && /^\/api\/conversations\/(test-conv|next-conv|agent-test-stream-[ab])\/diffs$/.test(url)) {
-    return Response.json({ summaries: [] });
-  }
+  // PAN-5295: the panel's one changes query (no /diffs request any more).
+  const changes = /^\/api\/conversations\/(test-conv|next-conv|agent-test-stream-[ab])\/changes\?scope=conversation$/.exec(url);
+  if (method === 'GET' && changes) return Response.json(emptyChanges(changes[1]!));
   if (method === 'GET' && /^\/api\/agents\/agent-test-stream-[ab]\/conversation\?window=initial$/.test(url)) {
     return Response.json({ messages: [], workLog: [], streaming: false });
   }
@@ -259,13 +267,55 @@ describe('ConversationPanel rename flow', () => {
     expect(screen.getByText('My Panel Title')).toBeInTheDocument();
   });
 
-  it('renders no Changes or Files button and asks for no change data outside a Stage (PAN-5291)', async () => {
+  it('renders no Changes or Files button outside a Stage and asks only for the conversation changes (PAN-5291, PAN-5295)', async () => {
     renderPanel();
     expect(screen.getByText('My Panel Title')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Files' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Changes/ })).not.toBeInTheDocument();
+    // D2-3: the turn cards still need the changes outside a Stage, so the panel
+    // makes exactly one /changes?scope=conversation request and resolves no root.
+    await waitFor(() => {
+      const urls = fetchControl.fetchMock.mock.calls.map(([input]) => String(input));
+      expect(urls.filter((url) => url.includes('/changes') || url === '/api/registered-projects' || url === '/api/workspace-registry'))
+        .toEqual(['/api/conversations/test-conv/changes?scope=conversation']);
+    });
+  });
+
+  it('shows one turn card under the turn\'s last assistant message inside a Stage, with no Changed files text and no /diffs request (PAN-5295)', async () => {
+    vi.stubGlobal('navigator', { platform: 'Linux x86_64', clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/registered-projects') return Response.json([]);
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      if (method === 'GET' && url === '/api/conversations/test-conv/changes?scope=conversation') {
+        return Response.json({
+          ...emptyChanges('test-conv'),
+          uncommitted: [{ path: 'docs/shared.md', status: 'M', additions: 6, deletions: 0, attribution: 'lines', turnIds: ['a-1'] }],
+          commits: [{
+            sha: 'abc1234', shortSha: 'abc1234', subject: 'feat: app', authoredAt: '2024-01-01T00:02:00Z', pushed: true,
+            attribution: 'trailer', turnId: 'a-2', files: [{ path: 'src/app.ts', status: 'A', additions: 3, deletions: 0 }],
+          }],
+          totals: { files: 2, additions: 9, deletions: 0, commitsPushed: 1, commitsLocal: 0, uncommittedFiles: 1 },
+        });
+      }
+      return defaultConversationResponse(method, url);
+    });
+    const messages = [
+      { id: 'u-1', role: 'user', text: 'do it', createdAt: '2024-01-01T00:00:00Z' },
+      { id: 'a-1', role: 'assistant', text: 'editing', createdAt: '2024-01-01T00:01:00Z' },
+      { id: 'a-2', role: 'assistant', text: 'done', createdAt: '2024-01-01T00:03:00Z' },
+    ];
+    renderPanel(mockConversation, {}, { messages, workLog: [] } as unknown as Parameters<typeof makeClient>[0], {
+      deckKey: 'p', openOrFocusEditorPane: vi.fn(), openOrFocusAgentPane: vi.fn(), openDock: vi.fn(), openBeside: vi.fn(() => 'pane'),
+    });
+
+    await waitFor(() => {
+      const cards = timelineMock.props.mock.lastCall?.[0]?.turnChangesByAssistantMessageId as ReadonlyMap<string, { files: number }> | undefined;
+      expect(cards ? [...cards.keys()] : []).toEqual(['a-2']);
+      expect(cards?.get('a-2')?.files).toBe(2);
+    });
+    expect(screen.queryByText(/Changed files/)).not.toBeInTheDocument();
     const urls = fetchControl.fetchMock.mock.calls.map(([input]) => String(input));
-    expect(urls.filter((url) => url.includes('/changes') || url === '/api/registered-projects' || url === '/api/workspace-registry')).toEqual([]);
+    expect(urls.filter((url) => url.endsWith('/diffs'))).toEqual([]);
   });
 
   it('shows Changes and Files inside a Stage and opens the dock from them (PAN-5291)', async () => {
@@ -383,13 +433,14 @@ describe('ConversationPanel rename flow', () => {
       streaming: false,
       subagents: [subagent('a1'), subagent('b2')],
     } as Parameters<typeof makeClient>[0]);
-    expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toBeInTheDocument();
+    // PAN-5295 D2-15: with nothing stored the rail starts as the collapsed strip.
+    expect(screen.getByRole('button', { name: 'Show agents rail' })).toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Conversation agents' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
     const item = screen.getByRole('menuitem', { name: /^Subagents/ });
     expect(item).toHaveTextContent(/Subagents\s*2/);
     fireEvent.click(item);
-    expect(screen.queryByRole('complementary', { name: 'Conversation agents' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Show agents rail' })).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toBeInTheDocument();
   });
 
   it('keeps About, Tools and Bookmarks out of row 1 (PAN-5291)', () => {
@@ -481,64 +532,40 @@ describe('ConversationPanel rename flow', () => {
     expect(screen.getByRole('menuitemcheckbox', { name: 'About this conversation' })).toHaveAttribute('aria-checked', 'false');
   });
 
-  it('does not mount the terminal when a diff deep-link opens a live terminal-mode conversation', () => {
+  it('ignores a stale ?diff=1 deep link: no inline diff panel mounts and terminal mode follows viewMode (PAN-5295)', () => {
     window.history.replaceState(null, '', '/conv/1?diff=1&diffTurnId=turn-1&diffFilePath=src%2Ffile.ts');
-    // The mounted diff panel resolves the conversation's explorer root (PAN-5338).
-    fetchControl = installStrictFetchMock(({ method, url }) => {
-      if (method === 'GET' && url === '/api/registered-projects') return Response.json([]);
-      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
-      return defaultConversationResponse(method, url);
-    });
     const activeConversation = {
       ...mockConversation,
       sessionAlive: true,
       endedAt: null,
     };
-    const client = makeClient();
-    client.setQueryData(['conversation-diffs', 'test-conv'], {
-      summaries: [{ turnId: 'turn-1', completedAt: '2024-01-01T00:00:00Z', status: 'completed', files: [] }],
-    });
-    render(
-      <DialogProvider>
-        <QueryClientProvider client={client}>
-          <ConversationPanel
-            conversation={activeConversation}
-            viewMode="terminal"
-            onArchived={() => {}}
-          />
-        </QueryClientProvider>
-      </DialogProvider>,
-    );
+    renderPanel(activeConversation, { viewMode: 'terminal' });
 
-    expect(screen.getByTestId('diff-panel')).toBeInTheDocument();
-    expect(screen.queryByTestId('xterminal')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('diff-panel')).not.toBeInTheDocument();
+    expect(screen.getByTestId('xterminal')).toBeInTheDocument();
   });
 
-  it('passes the conversation explorer root to the diff panel (PAN-5338)', () => {
-    window.history.replaceState(null, '', '/conv/1?diff=1&diffTurnId=turn-1&diffFilePath=src%2Ffile.ts');
+  it('⋯ → Full diff in a new window passes the conversation\'s explorer root inside a Stage (PAN-5338, PAN-5295)', async () => {
+    vi.stubGlobal('navigator', { platform: 'Linux x86_64', clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
     fetchControl = installStrictFetchMock(({ method, url }) => {
       if (method === 'GET' && url === '/api/registered-projects') return Response.json([]);
       if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
       return defaultConversationResponse(method, url);
     });
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
     const issueConversation = { ...mockConversation, issueId: 'PAN-1' };
-    const client = makeClient();
-    client.setQueryData(['conversation-diffs', 'test-conv'], {
-      summaries: [{ turnId: 'turn-1', completedAt: '2024-01-01T00:00:00Z', status: 'completed', files: [] }],
+    renderPanel(issueConversation, {}, undefined, {
+      deckKey: 'p', openOrFocusEditorPane: vi.fn(), openOrFocusAgentPane: vi.fn(), openDock: vi.fn(), openBeside: vi.fn(() => 'pane'),
     });
-    render(
-      <DialogProvider>
-        <QueryClientProvider client={client}>
-          <ConversationPanel
-            conversation={issueConversation}
-            viewMode="conversation"
-            onArchived={() => {}}
-          />
-        </QueryClientProvider>
-      </DialogProvider>,
-    );
 
-    expect(screen.getByTestId('diff-panel')).toHaveAttribute('data-root', 'issue:PAN-1');
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Full diff in a new window' }));
+
+    const params = new URLSearchParams(String(openSpy.mock.calls[0]?.[0]).split('?')[1]);
+    expect(params.get('root')).toBe('issue:PAN-1');
+    expect(params.get('prefix')).toBe('/api/conversations/test-conv/diffs');
+    openSpy.mockRestore();
+    await waitFor(() => expect(fetchControl.fetchMock.mock.calls.map(([input]) => String(input))).toContain('/api/conversations/test-conv/changes?scope=conversation'));
   });
 
   it('passes conversation context usage to the composer footer', () => {
@@ -764,6 +791,32 @@ describe('ConversationPanel rename flow', () => {
       expect.stringContaining('popup=yes'),
     );
     openSpy.mockRestore();
+  });
+
+  it('⋯ → Full diff in a new window opens /popout/diff with the conversation\'s prefix (PAN-5295)', () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    renderPanel();
+
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Full diff in a new window' }));
+
+    expect(openSpy).toHaveBeenCalledTimes(1);
+    const [url, target, features] = openSpy.mock.calls[0];
+    expect(String(url)).toMatch(/^\/popout\/diff\?/);
+    const params = new URLSearchParams(String(url).split('?')[1]);
+    expect(params.get('diff')).toBe('1');
+    expect(params.get('prefix')).toBe('/api/conversations/test-conv/diffs');
+    expect(target).toBe('_blank');
+    expect(features).toBe('width=1000,height=800');
+    openSpy.mockRestore();
+  });
+
+  it('hides Full diff in a new window for a linked conversation (PAN-5295)', () => {
+    renderPanel({ ...mockConversation, origin: 'linked' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    expect(screen.getByRole('menuitem', { name: 'Open in new window' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Full diff in a new window' })).toBeNull();
   });
 
   it('hides the ⋯ menu when the panel is embedded', () => {
@@ -1280,7 +1333,7 @@ describe('ConversationPanel subagent message target (PAN-3982)', () => {
   });
 });
 
-describe('ConversationPanel /diffs polling (PAN-4312)', () => {
+describe('ConversationPanel /changes polling (PAN-4312, PAN-5295)', () => {
   beforeEach(() => {
     queryClients = [];
     fetchControl = installStrictFetchMock(({ method, url }) => defaultConversationResponse(method, url));
@@ -1299,28 +1352,29 @@ describe('ConversationPanel /diffs polling (PAN-4312)', () => {
     localStorage.clear();
   });
 
-  function diffsCallCount(): number {
+  function changesCallCount(): number {
     return fetchControl.fetchMock.mock.calls.filter(([input]) => {
       const url = input instanceof Request ? input.url : String(input);
-      return /\/api\/conversations\/test-conv\/diffs$/.test(url);
+      return url === '/api/conversations/test-conv/changes?scope=conversation';
     }).length;
   }
 
-  it('polls /diffs exactly once for an ended conversation over 15s', async () => {
-    renderPanel({ ...mockConversation, sessionAlive: false });
+  it('asks for /changes exactly once over 15s for an idle conversation, and never for /diffs', async () => {
+    renderPanel({ ...mockConversation, sessionAlive: false, isWorking: false });
     await act(() => vi.advanceTimersByTimeAsync(0));
-    expect(diffsCallCount()).toBe(1);
+    expect(changesCallCount()).toBe(1);
 
     await act(() => vi.advanceTimersByTimeAsync(15_000));
-    expect(diffsCallCount()).toBe(1);
+    expect(changesCallCount()).toBe(1);
+    expect(fetchControl.fetchMock.mock.calls.filter(([input]) => String(input).endsWith('/diffs'))).toEqual([]);
   });
 
-  it('keeps polling /diffs for a live conversation', async () => {
-    renderPanel({ ...mockConversation, sessionAlive: true });
+  it('keeps polling /changes every 5 s while the conversation is working (NFR-1)', async () => {
+    renderPanel({ ...mockConversation, sessionAlive: true, isWorking: true });
     await act(() => vi.advanceTimersByTimeAsync(0));
 
     await act(() => vi.advanceTimersByTimeAsync(10_000));
-    expect(diffsCallCount()).toBeGreaterThan(1);
+    expect(changesCallCount()).toBeGreaterThan(1);
   });
 });
 

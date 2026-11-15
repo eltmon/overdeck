@@ -671,7 +671,7 @@ door that does not exist; a real record read door would be a separate change.
     searches loaded rows only and does not search omitted tool bodies.
 - Delivery modes (PAN-4292). `HarnessBehavior.steerKind` (`packages/contracts/src/harness-behavior.ts`)
   says how a harness can be steered: `send-now-keys` (Claude Code), `control-channel` (Pi), or
-  `null`. The composer shows its delivery selector only for a steer-capable harness (Pi only on
+  `null`. The composer shows its Send menu (`SendModeMenu`, PAN-5295) only for a steer-capable harness (Pi only on
   conversations), and Ctrl/Cmd+Enter sends with `deliverAs: 'steer'`; elsewhere Ctrl+Enter is
   Enter. Both `POST /api/conversations/:name/message` and `POST /api/agents/:id/message` accept
   the `deliverAs` body field. A Claude Code steer reaches the delivery door as
@@ -1157,8 +1157,8 @@ wait until the conversation is unarchived.
 | `DELETE /api/conversations/:name/scheduled-messages/:id` | 200 `{ removed: true }`; 404; 409 `already-sent` (row `sending` or `sent`) |
 
 **Client.** `useScheduledMessages` (`components/chat/scheduledMessages.ts`) polls the GET every
-15 s through one shared poller per conversation. The composer offers **When limits reset** in
-the delivery selector and, while the conversation is limited, a notice with a **Send when limits
+15 s through one shared poller per conversation. The composer offers **Send: when the limit resets** in
+the Send menu and, while the conversation is limited, a notice with a **Send when limits
 reset** button. Queued rows render at the end of the timeline as dimmed user bubbles
 (`messagesTimeline/ScheduledMessageRow.tsx`) with the expected send time, Edit and Cancel
 (Dismiss for a failed or unconfirmed row). From a terminal: `pan tell <conv> --when-limit-resets
@@ -1999,6 +1999,50 @@ So the header's Changes button resets the chip to This conversation and
 
 **Subagents.** `SubagentRail` takes `toggleSignal`; the panel bumps it from
 ⋯ → Subagents, and each change after mount flips the rail as its own buttons do.
+
+
+## Conversation turn card and file chips (PAN-5295)
+
+`ConversationPanel` wraps its content in `ConversationChangesScope`
+(`components/chat/conversationChanges/ConversationChangesScope.tsx`). The scope calls
+`useConversationChanges(conversation, 'conversation', …)` once, so the header, the turn cards,
+the file chips and the dock share one query, `['conversation-changes', name, 'conversation', null]`,
+and one request. Its cadence is the dock's: every 5 s only while the conversation is working,
+plus explorer watch batches inside a Stage. Synthetic rows (`id < 0`), linked conversations and
+vault copies make no request. Children read `useConversationChangesContext()`:
+`{ conversation, changes, rootId, stage, openDiffWindow }`.
+
+- **Inside a Stage** (the deck offers `openDock` and `openBeside`), `StageChangesScope` resolves the
+  explorer root with `rootIdForConversation` and exposes `stage`: `rootPathOf`, `repoPathOfAbs`,
+  `openDiff`, `openBeside`, `reveal` and `showInFiles` (an `openDock` with `filesFilter: 'mine'`,
+  which the Files tab applies once and then clears).
+- **Outside a Stage**, `PlainChangesScope` queries with `rootId: null` and never calls
+  `useRootContext()`, so a popout, drawer or directory mount makes no `/api/registered-projects` or
+  `/api/workspace-registry` request. `stage` is `null`.
+
+**Turn grouping.** `turnChangesByAnchor` (`messagesTimeline/turnChanges.ts`) splits the server
+messages (never optimistic echoes) into user turns: a `user` message starts one, a `system`
+message does not end one. A turn's card aggregates every commit whose `turnId` and every
+uncommitted file whose `turnIds` name one of the turn's assistant ids, one row per repo path
+(uncommitted first), and renders under the turn's last assistant message
+(`TurnChangesCard`). The server keys an edit to the next assistant *text* message, so a turn whose
+edits have no assistant text after them shows no card until text arrives.
+
+**Why Review does not use `scope=turn`.** The server's `turn` scope filters by one assistant id
+and can miss part of a user turn. Review instead opens the dock's Changes diff view on the turn's
+first file with `diffList` set to exactly this turn's files.
+
+**The diff window.** Outside a Stage, Review and the card's rows open the diff window
+(`components/chat/diffWindow.ts`: `/popout/diff?diff=1&prefix=/api/conversations/<name>/diffs…`),
+and ⋯ → **Full diff in a new window** opens it from every mount. The inline `DiffPanel` beside the
+chat, the panel's `/diffs` poll, `turnDiffSummaryByAssistantMessageId` and the `?diff=1` URL state
+are removed; the `/diffs` routes, `DiffPanel` and the `/popout/diff` route remain for the window.
+
+**File chips.** Inside a Stage, `MarkdownFileLink` maps a chip's absolute path to a repo path and
+a root path. A changed file opens its dock diff (the uncommitted entry, else the newest commit),
+with every conversation target as the list; another non-Markdown file opens beside the chat; an
+unchanged Markdown file keeps its persisted open target. Both context menus lead with Open diff,
+Open beside and Reveal in files. Outside a Stage chips behave as before.
 
 ## Top bar (PAN-5292)
 

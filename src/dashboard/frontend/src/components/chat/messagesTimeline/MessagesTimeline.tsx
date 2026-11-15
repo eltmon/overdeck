@@ -87,9 +87,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   agentId,
   subagentByToolUseId,
   onOpenSubagent,
-  turnDiffSummaryByAssistantMessageId,
-  onOpenTurnDiff,
-  resolvedTheme,
+  turnChangesByAssistantMessageId,
   hideToolCalls = false,
   workingPhase,
   targetMessageId,
@@ -615,9 +613,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                       agentId={agentId}
                       subagentByToolUseId={subagentByToolUseId}
                       onOpenSubagent={onOpenSubagent}
-                      turnDiffSummary={row.kind === 'message' && row.message.role === 'assistant' ? turnDiffSummaryByAssistantMessageId?.get(row.message.id) : undefined}
-                      onOpenTurnDiff={onOpenTurnDiff}
-                      resolvedTheme={resolvedTheme}
+                      turnChanges={row.kind === 'message' && row.message.role === 'assistant' ? turnChangesByAssistantMessageId?.get(row.message.id) : undefined}
                       hideToolCalls={hideToolCalls}
                       workingPhase={workingPhase}
                       onConfirmCommand={onConfirmCommand}
@@ -663,9 +659,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                 agentId={agentId}
                 subagentByToolUseId={subagentByToolUseId}
                 onOpenSubagent={onOpenSubagent}
-                turnDiffSummary={row.kind === 'message' && row.message.role === 'assistant' ? turnDiffSummaryByAssistantMessageId?.get(row.message.id) : undefined}
-                onOpenTurnDiff={onOpenTurnDiff}
-                resolvedTheme={resolvedTheme}
+                turnChanges={row.kind === 'message' && row.message.role === 'assistant' ? turnChangesByAssistantMessageId?.get(row.message.id) : undefined}
                 hideToolCalls={hideToolCalls}
                 workingPhase={workingPhase}
                 onConfirmCommand={onConfirmCommand}

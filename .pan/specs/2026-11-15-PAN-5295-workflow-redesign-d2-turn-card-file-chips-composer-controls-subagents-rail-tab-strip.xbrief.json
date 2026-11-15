@@ -1,0 +1,1481 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T19:36:10Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5295: Workflow redesign D2: turn card, file chips, composer controls, subagents rail, tab strip",
+    "updated": "2026-11-15T19:37:18.284Z"
+  },
+  "plan": {
+    "id": "pan-5295",
+    "title": "Workflow redesign D2: turn card, file chips, composer controls, subagents rail, tab strip",
+    "status": "running",
+    "uid": "c0ce1282-4e8b-4bf8-81ff-5bd40cd49e06",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-15T19:36:10Z",
+    "updated": "2026-11-15T19:37:18.284Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5295",
+        "label": "PAN-5295",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5295/.pan/drafts/pan-5295.md",
+        "label": "PRD draft (.pan/drafts/pan-5295.md)",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-5284.md",
+        "label": "Parent PRD PAN-5284 (child D2)",
+        "type": "prd"
+      },
+      {
+        "uri": "docs/design/workflow-redesign-mockup.html",
+        "label": "Approved mockup, screen 1",
+        "type": "design"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "conversation",
+      "workflow-redesign",
+      "composer",
+      "stage",
+      "dock"
+    ],
+    "metadata": {
+      "parentIssue": "PAN-5284",
+      "sizeJustification": "The parent PRD (PAN-5284 §9-§10) fixes D2 as one child: the rest of the conversation tab of mockup screen 1, after D1. It is split here into 19 small items; the file count comes from one new test file per new module, the pinned tests the parent requires be updated (not deleted), one Playwright spec with two screenshots, and three doc files. The three threads (turn card + chips, composer, tabs) share no files and run in parallel slots; splitting them into sibling issues would leave the screen half-converted between merges (parent D-13) and repeat the fixture UAT three times.",
+      "canonicalFilename": "2026-11-15-PAN-5295-workflow-redesign-d2-turn-card-file-chips-composer-controls-subagents-rail-tab-strip.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "From a conversation, what the agent changed shows as a per-message \"Changed files\" tree with an inline diff panel that covers the chat; file paths in replies open an external editor; the composer controls use three styles (a raw \"Auto\" select, \"High · set\", a greyed model button); the subagents rail opens by default; Stage tabs grow without limit, show ⌘N chips on mac, and label untitled chats \"Chat <hash>\".",
+      "Proposal": "Per PRD .pan/drafts/pan-5295.md: one ConversationChangesScope per panel shares the /changes query with the header; a TurnChangesCard per user turn replaces the Changed-files card (dock actions inside a Stage, the diff window outside); ⋯ gains Full diff in a new window; file chips open the dock diff or the file beside the chat; the composer toolbar moves to its own file and gets Send: <mode>, Thinking: <level> and an explaining model control in mockup order; the rail starts collapsed; tabs clamp with an \"N tabs ▾\" list, a registry-driven + menu and a \"New conversation\" fallback.",
+      "NonGoals": "- No change to the server /changes, /diffs or /popout/diff routes, or to scope=turn semantics.\n- No change to DiffPanel internals or the dock Changes chips (\"Last turn\" keeps its server meaning).\n- No header, status line or ⋯ menu change beyond the one \"Full diff in a new window\" item.\n- No new polling faster than 5 s and no new /changes caller beyond ConversationChangesScope (chips and cards never call the hook).\n- No raise of any scripts/file-size-allowlist.txt row.\n- No deleted or skipped tests; pinned tests are replaced.\n- No Ledger-theme work beyond not breaking.\n- No per-line attribution for non-Claude harnesses."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Outside a Stage the turn card still renders, from /changes with rootId null; its Review and rows open the /popout/diff window (D2-3).",
+        "rationale": "Today the Changed-files card and inline diff show in every mount; parent D-14 forbids dropping a function without a home, and §7 keeps /popout/diff. This replaces the /diffs request those mounts already made, at the same cadence, and avoids useRootContext outside a Stage."
+      },
+      {
+        "summary": "⋯ gains \"Full diff in a new window\" (D2-4).",
+        "rationale": "Removing the inline DiffPanel would leave Compare…, vs main, All turns, whitespace and Markdown preview unreachable; one menu item restores the only entry point."
+      },
+      {
+        "summary": "Turn cards group by user turn on the client; Review opens the dock diff view over the turn's files instead of the server scope=turn (D2-5, D2-6).",
+        "rationale": "Server turn ids are per assistant message (uncommitted edits on mid-turn messages, commits on the last edited one), and scope=turn filters by one id, so it can miss part of a turn."
+      },
+      {
+        "summary": "Show in files opens the Files tab filtered to \"Only what this conversation changed\" via a new filesFilter field on openDock (D2-7).",
+        "rationale": "Matches mockup action files-mine; the Files filter lived only in ExplorerPane state, so openDock needs one optional field."
+      },
+      {
+        "summary": "Unchanged Markdown chips keep the persisted PAN-3260 open target instead of opening beside (D2-9).",
+        "rationale": "The operator saved that choice explicitly; Open beside is added to the context menu, so nothing is lost."
+      },
+      {
+        "summary": "\"Thinking: <level>\" applies to every EffortPicker (composer, New conversation pickers, HomeComposer) (D2-12).",
+        "rationale": "It is one shared control; per-site labels would split one control into two styles, against FR-19."
+      },
+      {
+        "summary": "The composer toolbar is extracted to ComposerToolbar.tsx first (D2-10).",
+        "rationale": "ComposerFooter.tsx is 986 lines against a 1000 cap; agents cannot raise caps."
+      },
+      {
+        "summary": "Rail \"closed\" = the existing 30 px collapsed strip; an unset key means collapsed, a stored \"false\" still opens (D2-15).",
+        "rationale": "The strip carries the rail's width measurement and reopen click; respecting a stored \"false\" keeps operators who opened it on purpose."
+      },
+      {
+        "summary": "+ menu keycaps come from the registry by shortcut id; mockup keycaps Ctrl N and Ctrl ` are not used (D2-17).",
+        "rationale": "Parent D-7 replaced Ctrl N with N; the terminal toggle has no non-mac binding, so showing a keycap would lie."
+      },
+      {
+        "summary": "Changelog file is changelog.d/pan-5295.md.",
+        "rationale": "changelog.d/README.md requires the lowercase issue id; the child stub's 5295.md is wrong."
+      }
+    ],
+    "items": [
+      {
+        "id": "changes-targets",
+        "title": "Shared dock diff-target helpers diffTargetOf/diffTargetsOf in changes-model.ts (WI-1)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T19:36:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-5295",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/dock/changes-model.ts",
+            "src/dashboard/frontend/src/components/dock/changes/ConversationChangesList.tsx",
+            "src/dashboard/frontend/src/components/dock/__tests__/changes-model.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/dock/__tests__/changes-model.test.ts src/components/dock/__tests__/ConversationChangesList.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "changes-model.test.ts and ConversationChangesList.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Add pure diffTargetOf(changes, file, commit, rootPathOf) and diffTargetsOf(changes, rootPathOf) to components/dock/changes-model.ts, returning exactly what ConversationChangesList's inline targetOf/targets return today (path: rootPath ?? file.path, repoPath, repoRoot, sha/pushed for commits, outsideRoot when rootPath is null; uncommitted first, then each commit's files). Import DockDiffTarget with `import type` from ./workDockStore. Switch ConversationChangesList to the helpers with no behavior change."
+        },
+        "items": [
+          {
+            "id": "changes-targets.ac1",
+            "title": "Given a ConversationChanges answer with one uncommitted file and one pushed commit, when diffTargetsOf runs, then it returns the uncommitted target first and the commit target with sha and pushed: true (changes-model.test.ts).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changes-targets.ac2",
+            "title": "Given a repo path outside the dock root, when diffTargetOf runs with a rootPathOf that returns null, then the target has outsideRoot: true and path equal to the repo path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changes-targets.ac3",
+            "title": "Given the existing ConversationChangesList.test.tsx, when it runs after the switch to the helpers, then it passes with no test edits.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "turn-grouping",
+        "title": "Group conversation changes by user turn in turnChanges.ts (WI-2)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T19:36:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5295",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/turnChanges.ts",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/__tests__/turnChanges.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/messagesTimeline/__tests__/turnChanges.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "turnChanges.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ],
+          "foundationFor": [
+            "turn-card",
+            "turn-card-wiring"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 and D2-5/D2-8. New pure module chat/messagesTimeline/turnChanges.ts exporting TurnFileRow, TurnChanges, userTurns(messages) and turnChangesByAnchor(messages, changes). A user turn runs from a role:user message to the next role:user message; role:system does not end it; the anchor is its last assistant id. A card aggregates every commit whose turnId is one of the turn's assistant ids and every uncommitted file whose turnIds contains one; rows are uncommitted first then commits in response order, one row per repo path (first wins); counts per PRD WI-2. Turns with no matching change are absent; null changes gives an empty map. Add the test file to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "turn-grouping.ac1",
+            "title": "Given an uncommitted file whose turnIds names a mid-turn assistant id and a commit whose turnId is the last assistant id of the same user turn, when turnChangesByAnchor runs, then it returns one TurnChanges keyed by the last assistant id containing both rows.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-grouping.ac2",
+            "title": "Given a role:system message between two assistant messages of one turn, when userTurns runs, then it returns one turn, and two user messages produce two turns; assistant messages before the first user message form their own turn.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-grouping.ac3",
+            "title": "Given a path that is both committed and uncommitted in one turn, when turnChangesByAnchor runs, then it returns one row for that path carrying the uncommitted entry.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-grouping.ac4",
+            "title": "Given a turn with no matching change, or changes === null, when turnChangesByAnchor runs, then the map has no entry for that turn (empty map for null).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dock-files-filter",
+        "title": "Dock openDock accepts filesFilter \"mine\" for Show in files (WI-3)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T19:36:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5295",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/dock/workDockStore.ts",
+            "src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx",
+            "src/dashboard/frontend/src/components/dock/__tests__/workDockStore.test.ts",
+            "src/dashboard/frontend/src/components/explorer/__tests__/ExplorerPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/dock/__tests__/workDockStore.test.ts src/components/explorer/__tests__/ExplorerPane.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "workDockStore.test.ts and ExplorerPane.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 and D2-7. Add filesFilter?: 'mine' to OpenDockInput and DockState in workDockStore.ts; openDock drops the previous value (add it to the destructure in openDock) and sets it only when the input has it; never persisted. In ExplorerPane.tsx ExplorerFiles, read openSeq and filesFilter for deckKey and, in an effect on openSeq, call setFilter('mine') when filesFilter === 'mine' and conversationScope is true."
+        },
+        "items": [
+          {
+            "id": "dock-files-filter.ac1",
+            "title": "Given openDock(deck, { tab: \"files\", filesFilter: \"mine\" }), when the store is read, then filesFilter is \"mine\"; when a later openDock without filesFilter runs, then filesFilter is undefined; and localStorage overdeck.dock.<deck> never contains filesFilter.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-files-filter.ac2",
+            "title": "Given a conversation-scoped Files tab, when openDock with filesFilter \"mine\" runs, then the View options radio \"Only what this conversation changed\" becomes checked (ExplorerPane.test.tsx).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-files-filter.ac3",
+            "title": "Given a non-conversation scope, when openDock with filesFilter \"mine\" runs, then the Files tab stays on \"Show all files\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "diff-window",
+        "title": "Diff window helper and ⋯ → Full diff in a new window (WI-4)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T19:36:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5295",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/diffWindow.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/diffWindow.test.ts",
+            "src/dashboard/frontend/src/components/chat/header/ConversationHeaderMenu.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/diffWindow.test.ts src/components/chat/__tests__/ConversationPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "diffWindow.test.ts and ConversationPanel.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 and D2-4. New chat/diffWindow.ts with conversationDiffWindowUrl(conversation, { filePath?, rootId? }) and openConversationDiffWindow (window.open(url, \"_blank\", \"width=1000,height=800\")). URL: /popout/diff? with diff=1, prefix=/api/conversations/<encoded name>/diffs, agentId=<name>, repo=<cwd> when set, root=<rootId> when set, diffFilePath=<filePath> when set. Implementation checkpoint: on the workflow fixture confirm diffFilePath=<repo path> selects that file in the diff window; fallback: omit diffFilePath and note it in a code comment. Add MenuItemButton \"Full diff in a new window\" (icon FileDiff) after \"Open in new window\" in ConversationHeaderMenu.tsx, shown only when conversation.id >= 0 and origin is neither linked nor vault, calling openConversationDiffWindow(conversation, { rootId: null }). Add diffWindow.test.ts to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "diff-window.ac1",
+            "title": "Given a conversation named \"a b\" with cwd /repo, when conversationDiffWindowUrl runs with filePath docs/x.md and rootId project:p, then the URL has diff=1, prefix=/api/conversations/a%20b/diffs, agentId, repo, root and diffFilePath params (diffWindow.test.ts).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diff-window.ac2",
+            "title": "Given a ConversationPanel for a real conversation, when the operator opens ⋯ and clicks \"Full diff in a new window\", then window.open is called with a /popout/diff URL carrying that conversation's prefix (ConversationPanel.test.tsx).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diff-window.ac3",
+            "title": "Given a linked conversation, when ⋯ opens, then the menu renders no \"Full diff in a new window\" item.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "changes-scope",
+        "title": "ConversationChangesScope context: one shared /changes query, Stage dock actions, outside-Stage diff window (WI-5)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T19:36:10Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5295",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/conversationChanges/ConversationChangesScope.tsx",
+            "src/dashboard/frontend/src/components/chat/conversationChanges/__tests__/ConversationChangesScope.test.tsx",
+            "src/dashboard/frontend/src/components/chat/header/ConversationHeaderMenu.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/conversationChanges/__tests__/ConversationChangesScope.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConversationChangesScope.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "turn-card",
+            "file-chips",
+            "turn-card-wiring"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 and D2-1/D2-2/D2-3. New chat/conversationChanges/ConversationChangesScope.tsx exporting StageChangeActions, ConversationChangesContextValue, ConversationChangesScope and useConversationChangesContext exactly as the PRD signature block. ConversationChangesScope renders StageChangesScope when useStageDeck()?.openDock and openBeside exist, else PlainChangesScope (separate components, hooks never branch). StageChangesScope resolves rootId via rootIdForConversation(conversation, useRootContext()) and rootAbs from the explorer store; PlainChangesScope uses rootId null and never calls useRootContext(). Both call useConversationChanges(conversation, \"conversation\", { rootId, enabled }) with enabled = conversation.id >= 0 && origin not linked/vault. stage is non-null only inside a Stage with a rootId; openDiff -> openDock({ tab: \"changes\", changesScope: \"conversation\", diff, diffList }); reveal -> openDock({ tab: \"files\", reveal: { rootId, path } }); showInFiles -> openDock({ tab: \"files\", filesFilter: \"mine\" }); openBeside -> deck.openBeside({ rootId, path, line }); openDiffWindow uses the diff-window helper with rootId. Switch the ⋯ \"Full diff in a new window\" item to pass useConversationChangesContext()?.rootId ?? null. Nothing mounts the scope yet (turn-card-wiring does). Add the test file to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "changes-scope.ac1",
+            "title": "Given a ConversationChangesScope inside a StageDeckProvider with openDock and openBeside, when a child reads the context and calls stage.openDiff and stage.showInFiles, then openDock is called with { tab: \"changes\", changesScope: \"conversation\", diff, diffList } and { tab: \"files\", filesFilter: \"mine\" }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changes-scope.ac2",
+            "title": "Given a ConversationChangesScope outside a Stage, when it mounts for a real conversation, then context.stage is null and the only fetches are GET /api/conversations/<name>/changes?scope=conversation (no /api/registered-projects, no /api/workspace-registry).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changes-scope.ac3",
+            "title": "Given a conversation with id < 0 or origin \"linked\", when the scope mounts, then no /changes request is made and context.changes is null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changes-scope.ac4",
+            "title": "Given an absolute path under changes.repoRoot, when stage.repoPathOfAbs runs, then it returns the repo-relative path, and it returns null for a path outside repoRoot.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-toolbar-extract",
+        "title": "Move the composer toolbar JSX into ComposerToolbar.tsx with no behavior change (WI-6)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T19:36:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-5295",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/ComposerToolbar.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run ComposerFooter",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "all ComposerFooter test files pass",
+            "typecheck completes without errors",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 and D2-10. Move the JSX from `{/* Toolbar inside the box */}` through the send button's closing </div> (ComposerFooter.tsx lines 810-896) into new chat/ComposerToolbar.tsx (export ComposerToolbar); props are exactly the values and handlers the JSX reads. No markup or behavior change; the hidden file <input> and the VoiceWidget stay in ComposerFooter. Do not edit any test."
+        },
+        "items": [
+          {
+            "id": "composer-toolbar-extract.ac1",
+            "title": "Given the extraction, when `wc -l src/dashboard/frontend/src/components/chat/ComposerFooter.tsx` runs, then it prints 950 or fewer lines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-toolbar-extract.ac2",
+            "title": "Given the unchanged ComposerFooter*.test.tsx files, when `npx vitest run ComposerFooter` runs, then it reports zero failures with no test file edited.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "send-mode-menu",
+        "title": "Replace the delivery select with the \"Send: <mode>\" menu (SendModeMenu.tsx) (WI-7)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T19:36:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5295",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/SendModeMenu.tsx",
+            "src/dashboard/frontend/src/components/chat/DeliveryModeSelect.tsx",
+            "src/dashboard/frontend/src/components/chat/ComposerToolbar.tsx",
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/SendModeMenu.test.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.schedule.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/SendModeMenu.test.tsx src/components/chat/__tests__/ComposerFooter.test.tsx src/components/chat/__tests__/ComposerFooter.schedule.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SendModeMenu, ComposerFooter and ComposerFooter.schedule tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 and D2-11. New chat/SendModeMenu.tsx: a menu button in the picker style (styles.pickerBtn, portal dropdown like EffortPicker), text \"Send: <label>\", title \"How your message reaches a busy agent\", aria-haspopup=\"menu\", disabled when !sessionAlive. Items role=\"menuitemradio\" with aria-checked: auto \"normally\"; steer \"interrupt now\" with keycap Ctrl Enter (⌘ Enter on mac) and CLAUDE_STEER_TOOLTIP as title; follow_up \"after this turn\" only when steerKind === \"control-channel\"; when_limit_resets \"when the limit resets\" only when scheduleAvailable; descriptions per the PRD table. Export type DeliverAs from SendModeMenu; git rm DeliveryModeSelect.tsx; update imports in ComposerToolbar and ComposerFooter. Replace every getByLabelText(\"Delivery mode\"|\"Pi delivery mode\") select interaction in ComposerFooter.test.tsx and ComposerFooter.schedule.test.tsx with a chooseSendMode(name) helper; keep test names and posted-value assertions. Add SendModeMenu.test.tsx to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "send-mode-menu.ac1",
+            "title": "Given a Claude Code conversation, when the Send button is clicked, then the menu lists \"normally\" and \"interrupt now\" only; given a Pi conversation, then it also lists \"after this turn\"; given scheduleAvailable, then it also lists \"when the limit resets\" (SendModeMenu.test.tsx).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "send-mode-menu.ac2",
+            "title": "Given the menu, when the operator chooses \"interrupt now\", then onChange receives \"steer\" and the button reads \"Send: interrupt now\"; given a stopped session, then the button is disabled.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "send-mode-menu.ac3",
+            "title": "Given the updated ComposerFooter tests, when a message is sent after choosing each mode, then the POST body carries the same deliverAs value the old select posted.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "send-mode-menu.ac4",
+            "title": "Given the branch, when `test -e src/dashboard/frontend/src/components/chat/DeliveryModeSelect.tsx` runs, then it exits non-zero.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "thinking-label",
+        "title": "Effort control reads \"Thinking: <level>\" with the source in its tooltip (WI-8)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T19:36:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5295",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/EffortPicker.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/EffortPicker.test.tsx",
+            "src/dashboard/frontend/tests/effort-chip.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/EffortPicker.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "EffortPicker.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 and D2-12. In EffortPicker.tsx the trigger reads \"Thinking: <level>\" with the level lower case (low, medium, high, extra high, max) for both chip and draft states, or \"Applying…\" while pending. title = the title prop, then (when chip?.source) \"Source: <EFFORT_SOURCE_LABELS[source]>\", joined by \" · \". Dropdown options unchanged. Update EffortPicker.test.tsx label expectations and tests/effort-chip.spec.ts lines 121 and 129 (Thinking: high / Thinking: low)."
+        },
+        "items": [
+          {
+            "id": "thinking-label.ac1",
+            "title": "Given chip { level: \"high\", source: \"default\" }, when EffortPicker renders, then the effort-chip button text is \"Thinking: high\" and its title contains \"Source: default\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "thinking-label.ac2",
+            "title": "Given chip { level: \"xhigh\", source: null }, when EffortPicker renders, then the text is \"Thinking: extra high\"; given no chip and value \"high\", then the text is \"Thinking: high\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "thinking-label.ac3",
+            "title": "Given pending, when EffortPicker renders, then the text is \"Applying…\" and the dropdown option labels are unchanged (High (default) still listed).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "model-locked-reason",
+        "title": "Model control stays enabled and explains why the model cannot change (WI-9)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T19:36:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5295",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+            "src/dashboard/frontend/src/components/chat/ComposerToolbar.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.model-picker.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ModelPicker.test.tsx src/components/chat/__tests__/ComposerFooter.model-picker.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ModelPicker.test.tsx and ComposerFooter.model-picker.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 and D2-13. ModelPicker gains lockedReason?: string: when set the trigger is not disabled; a click opens the dropdown containing only <p data-testid=\"model-picker-locked-reason\"> with the reason; no model can be picked. ComposerToolbar passes disabled={isDisabled} and lockedReason when !canEditModelBeforeStart: agentId set => \"An agent's model is fixed when it starts.\"; otherwise \"The model is fixed once a conversation starts. To use another model, hand off to a new conversation (⋯ → Hand off).\" Other ModelPicker callers pass nothing."
+        },
+        "items": [
+          {
+            "id": "model-locked-reason.ac1",
+            "title": "Given ModelPicker with lockedReason \"x\", when the trigger is clicked, then the trigger is enabled, model-picker-locked-reason shows \"x\", no model row renders, and onChange is never called (ModelPicker.test.tsx).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "model-locked-reason.ac2",
+            "title": "Given a live conversation in the composer, when the model button is clicked, then the menu shows the hand-off reason text and no switch-model request is posted (ComposerFooter.model-picker.test.tsx).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "model-locked-reason.ac3",
+            "title": "Given a not-yet-started conversation, when the model button is clicked, then the normal model list renders as before.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "toolbar-order",
+        "title": "Composer toolbar in mockup order with one control style (WI-10)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T19:36:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5295",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ComposerToolbar.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ComposerFooter.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10 and D2-14. ComposerToolbar order: attach (Plus icon, title \"Attach files\"), ModelPicker, model-drift chip, EffortPicker, SendModeMenu, Pi Compact button, spacer, ContextWindowMeter, mic, send. Remove the styles.composerToolbarDivider element. Attach and mic keep styles.voiceToolbarButton. Add a ComposerFooter.test.tsx test comparing DOM order."
+        },
+        "items": [
+          {
+            "id": "toolbar-order.ac1",
+            "title": "Given a live Claude Code conversation composer, when the toolbar renders, then compareDocumentPosition orders attach, model trigger, effort-chip, the Send button, the context meter, the mic button and the send button in that sequence.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "toolbar-order.ac2",
+            "title": "Given the toolbar, when it renders, then no element carries the composerToolbarDivider class and the attach button shows the Plus icon with title \"Attach files\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "toolbar-order.ac3",
+            "title": "Given a Pi conversation, when the toolbar renders, then the Compact context button still renders after the Send button.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "turn-card",
+        "title": "TurnChangesCard component with Stage dock actions and outside-Stage diff window (WI-11)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T19:36:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5295",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/TurnChangesCard.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/__tests__/TurnChangesCard.test.tsx",
+            "src/dashboard/frontend/src/components/dock/changes/ChangeFileRow.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/messagesTimeline/__tests__/TurnChangesCard.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "TurnChangesCard.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11 and D2-6/D2-8. New TurnChangesCard({ turn }) reading useConversationChangesContext() (renders nothing without context). Header: icon, \"N files changed\", +a −d (text-success-foreground / text-destructive-foreground), tags in order when non-zero: \"N commit(s) pushed\", \"N commit(s) not pushed\", \"N not committed\" (only this one amber, badge-bg-state-needs-you); right side Show in files (ghost, Stage only) and Review. Rows via ChangeFileRow with new inset={false} (pl-3; default true keeps pl-8); first 8 rows then \"Show all N files\". Inside a Stage: row diff -> stage.openDiff(diffTargetOf(...), turnTargets); Open beside/Reveal -> stage.openBeside/stage.reveal with the row root path; Review -> stage.openDiff(turnTargets[0], turnTargets); Show in files -> stage.showInFiles(). Outside: row diff -> ctx.openDiffWindow(row.file.path); Review -> ctx.openDiffWindow(); no Show in files; rootPath null disables Open beside/Reveal. Load the pan-style-guide skill first. Add the test to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "turn-card.ac1",
+            "title": "Given a synthetic turn with 2 files (+86 −1), 2 pushed commits and 1 uncommitted file, when TurnChangesCard renders, then it shows \"2 files changed\", \"+86\", \"−1\", \"2 commits pushed\" and \"1 not committed\", and only \"1 not committed\" carries the amber class.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-card.ac2",
+            "title": "Given a turn with 10 rows, when the card renders, then 8 rows show plus a \"Show all 10 files\" button, and clicking it shows all 10.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-card.ac3",
+            "title": "Given a Stage context, when Review is clicked, then stage.openDiff is called with the turn's first target and the turn's full target list; when Show in files is clicked, then stage.showInFiles is called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-card.ac4",
+            "title": "Given a context with stage null, when Review is clicked, then openDiffWindow is called with no file, and no Show in files button renders.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "turn-card-wiring",
+        "title": "Mount the scope and turn cards in ConversationPanel; remove the Changed-files card, inline DiffPanel and /diffs poll (WI-12)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T19:36:10Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5295",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/messageRows.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/messageRows.test.tsx",
+            "src/dashboard/frontend/src/components/chat/ChangedFilesTree.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.native.test.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.streaming-render-count.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ConversationPanel.test.tsx src/components/chat/__tests__/ConversationPanel.native.test.tsx src/components/chat/messagesTimeline/messageRows.test.tsx src/components/chat/__tests__/MessagesTimeline.test.tsx src/components/chat/__tests__/ComposerFooter.streaming-render-count.test.tsx src/components/Stage/Stage.test.tsx src/components/CommandDeck/SessionView/SessionPanel.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "all listed test files pass",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12 and D2-19. In ConversationPanel.tsx wrap the returned tree (inside ConversationBookmarksProvider) in <ConversationChangesScope conversation={conversation}>; delete ConversationDiffPanel, the /diffs useQuery, turnDiffSummaryByAssistantMessageId, the diffOpen state/handlers/popstate effect, the DiffPanel mount and now-unused imports; effectiveViewMode becomes viewMode. In ConversationView compute turnCards = turnChangesByAnchor(messagesData?.messages ?? [], ctx?.changes ?? null) and pass turnChangesByAssistantMessageId to MessagesTimeline; rename the prop through MessagesTimeline and TimelineRowRenderer; AssistantMessageRow renders <TurnChangesCard turn={turnChanges} /> instead of the Changed files block. git rm chat/ChangedFilesTree.tsx (it holds NUL bytes; never edit it). Replace tests per PRD WI-12: ConversationPanel.test.tsx lines 262, 484 and 517, add the in-Stage turn-card test, messageRows.test.tsx card cases, and swap /diffs handlers for /changes?scope=conversation in ConversationPanel.native.test.tsx and ComposerFooter.streaming-render-count.test.tsx (the only other files that render the real panel; every other mount test mocks it). Implementation checkpoint (fixture ids): after npm run build, seed the workflow fixture into an isolated OVERDECK_HOME, start an isolated dashboard as the D1 spec does, and confirm at least one turnId/turnIds value of GET /api/conversations/fixture-1/changes?scope=conversation equals an assistant id of GET /api/conversations/fixture-1/messages; fallback if none match: stop and report with pan tell flywheel-orchestrator, never change the server."
+        },
+        "items": [
+          {
+            "id": "turn-card-wiring.ac1",
+            "title": "Given a ConversationPanel inside a Stage with a /changes answer whose commit turnId matches an assistant message, when it renders, then that assistant row shows one turn card, the page contains no \"Changed files\" text, and no request to /api/conversations/<name>/diffs is made.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-card-wiring.ac2",
+            "title": "Given a ConversationPanel outside a Stage for a real conversation, when it renders, then it shows no Changes or Files buttons, makes exactly one /changes?scope=conversation request and no /api/registered-projects or /api/workspace-registry request (replacing the D1 test at line 262).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-card-wiring.ac3",
+            "title": "Given a URL with ?diff=1 on a live terminal-mode conversation, when the panel renders, then no inline diff panel mounts and the view follows viewMode (replacing the line-484 test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-card-wiring.ac4",
+            "title": "Given the branch, when `test -e src/dashboard/frontend/src/components/chat/ChangedFilesTree.tsx` runs, then it exits non-zero, and `wc -l` of ConversationPanel.tsx prints fewer than 1065 lines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-card-wiring.ac5",
+            "title": "Given the seeded workflow fixture on an isolated dashboard, when /changes and /messages for fixture-1 are fetched, then at least one change turnId equals an assistant message id (implementation checkpoint recorded in the commit message).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "file-chips",
+        "title": "File chips inside a Stage open the dock diff or the file beside the chat (WI-13)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T19:36:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5295",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/MarkdownFileLink.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/MarkdownFileLink.test.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/__tests__/workLogRows.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/MarkdownFileLink.test.tsx src/components/chat/messagesTimeline/__tests__/workLogRows.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MarkdownFileLink.test.tsx and workLogRows.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13 and D2-9. In MarkdownFileLink.tsx read useConversationChangesContext(); compute once per chip stageTarget = { rootPath, diff?, list } when ctx.stage and ctx.changes and repoPathOfAbs(filePath) and rootPathOf(repoPath) are non-null (diff: the uncommitted file with that repo path, else the newest-authoredAt commit containing it, via diffTargetOf; list: diffTargetsOf). Click: changed => stage.openDiff(diff, list); unchanged non-Markdown => stage.openBeside(rootPath, line); unchanged Markdown => today's PAN-3260 path; no stageTarget => today's code path unchanged. Both context menus prepend Open diff (when diff), Open beside, Reveal in files when stageTarget exists. Tool rows render chips through ChatMarkdown, so workLogRows needs only a test."
+        },
+        "items": [
+          {
+            "id": "file-chips.ac1",
+            "title": "Given a chip inside the context whose path is uncommitted in the changes, when it is clicked, then stage.openDiff is called with that file's uncommitted target and the full target list.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-chips.ac2",
+            "title": "Given an unchanged src/x.ts chip with line 12 inside the context, when it is clicked, then stage.openBeside is called with root path src/x.ts and line 12; given an unchanged .md chip, then the persisted Markdown open target is used as before.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-chips.ac3",
+            "title": "Given a chip outside the repo or rendered without the context, when it is clicked, then the shellOpenInEditor request is sent exactly as today.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-chips.ac4",
+            "title": "Given a chip inside the context, when it is right-clicked, then the menu starts with Open diff (changed paths only), Open beside and Reveal in files, followed by today's items.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-chips.ac5",
+            "title": "Given an Edit tool row inside the context, when its path chip is clicked, then the dock diff opens (workLogRows.test.tsx).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rail-closed-default",
+        "title": "Subagents rail starts collapsed when nothing is stored (WI-14)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T19:36:10Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5295",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/SubagentRail.tsx",
+            "src/dashboard/frontend/src/components/chat/SubagentRail.test.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/SubagentRail.test.tsx src/components/chat/__tests__/ConversationPanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "SubagentRail.test.tsx and ConversationPanel.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14 and D2-15. SubagentRail.tsx line 65: change `localStorage.getItem(AGENTS_RAIL_COLLAPSED_KEY) === 'true'` to `!== 'false'`. In SubagentRail.test.tsx add \"starts collapsed when nothing is stored (PAN-5295)\"; tests that remove the key and expect the open rail set it to \"false\" first. ConversationPanel.test.tsx line 373 (⋯ → Subagents toggles the rail, PAN-5291) now expects the \"Show agents rail\" strip first and ⋯ → Subagents to open the rail; same test name. Test names and counts stay."
+        },
+        "items": [
+          {
+            "id": "rail-closed-default.ac1",
+            "title": "Given no overdeck.ui.agentsRailCollapsed key and two subagents, when SubagentRail renders, then it shows the \"Show agents rail\" strip and not the \"Conversation agents\" aside.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rail-closed-default.ac2",
+            "title": "Given a stored \"false\", when SubagentRail renders, then the open rail renders; given a stored \"true\", then the strip renders.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rail-closed-default.ac3",
+            "title": "Given a conversation with two subagents and nothing stored, when ⋯ → Subagents is clicked in ConversationPanel, then the \"Conversation agents\" rail opens (ConversationPanel.test.tsx line 373 updated, same name).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tab-strip",
+        "title": "Stage tabs clamp to 120–230 px, no shortcut chips, no scroll arrows, \"N tabs ▾\" list (WI-15)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T19:36:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5295",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/PaneBar.tsx",
+            "src/dashboard/frontend/src/components/Stage/stage.module.css",
+            "src/dashboard/frontend/src/components/Stage/PaneBar.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/PaneBar.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "PaneBar.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15 and D2-16. PaneBar.tsx: remove the ⌘N chip, the two overflow buttons with their overflow state/effect and scrollTabs; wrap the label in <span className={styles.panetabLabel}>; add title={pane.label} and data-pane-type={pane.paneType}; add an \"N tabs ▾\" button (aria-haspopup=\"menu\", aria-label \"<N> tabs, list all tabs\") after the scrolling .panebar div inside .panebarWrap, opening a portaled menu (role=\"menuitemradio\", aria-checked on the active tab) whose items call onSelect. stage.module.css: .panetab min-width 120px / max-width 230px, .panetabLabel ellipsis, .panetab[data-pane-type=\"home\"] min-width 0, .panebarWrap display flex; delete .tabScrollBtn/.tabScrollLeft/.tabScrollRight and .kbd rules only if no other file uses them (grep). Replace the PaneBar \"⌘1 hint\" test; add list and title tests."
+        },
+        "items": [
+          {
+            "id": "tab-strip.ac1",
+            "title": "Given a mac navigator.platform and three panes, when PaneBar renders, then no tab contains \"⌘\" text (replacing the ⌘1 hint test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-strip.ac2",
+            "title": "Given three panes, when the \"3 tabs\" button is clicked and the second item chosen, then onSelect is called with that pane id and the active tab item has aria-checked=\"true\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-strip.ac3",
+            "title": "Given a pane with a 60-character label, when PaneBar renders, then the tab's title attribute equals the full label and no \"Scroll tabs left/right\" button exists.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "plus-menu",
+        "title": "Stage + menu: order, labels and registry keycaps (WI-16)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T19:36:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5295",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/PaneBar.tsx",
+            "src/dashboard/frontend/src/components/Stage/index.tsx",
+            "src/dashboard/frontend/src/components/Stage/Stage.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/__tests__/stageDockMenu.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/Stage.test.tsx src/components/Stage/__tests__/stageDockMenu.test.tsx src/components/Stage/PaneBar.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "Stage.test.tsx, stageDockMenu.test.tsx and PaneBar.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-16 and D2-17. NewPaneAction gains shortcutId?: string and separatorBefore?: boolean; the + menu renders the keycap from useShortcutList() (find by id, keys[currentPlatform()], formatSpec) right-aligned, nothing when unregistered or null for the platform, and a separator before flagged items. Stage/index.tsx newActions order: New conversation (deck.new-conversation), Files (dock.files), Changes in <project> (dock.changes, when the deck has a project), Go to file… (explorer.quick-open), Terminal (stage.toggle-terminal, separatorBefore), Web page. Rename \"New terminal\" -> \"Terminal\", \"Web\" -> \"Web page\". Update the Stage.test.tsx PAN-1561 test name/label; add an order test and a keycap test in stageDockMenu.test.tsx."
+        },
+        "items": [
+          {
+            "id": "plus-menu.ac1",
+            "title": "Given a deck with a project and onCreateConversation, when the + menu opens, then its menuitems are, in order, New conversation, Files, Changes in <project>, Go to file…, Terminal, Web page.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plus-menu.ac2",
+            "title": "Given a Linux navigator.platform with the explorer shortcuts registered, when the + menu opens, then the Files item shows the keycap \"Ctrl Shift E\" and Terminal shows no keycap.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plus-menu.ac3",
+            "title": "Given the + menu, when Terminal is chosen, then the terminal drawer opens (renamed PAN-1561 test passes).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tab-label-fallback",
+        "title": "Untitled conversation tabs read \"New conversation\", never \"Chat <id>\" (WI-17)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T19:36:10Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5295",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/index.tsx",
+            "src/dashboard/frontend/src/components/Stage/Stage.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/Stage.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "Stage.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-17 and D2-18. In Stage/index.tsx (search `const isPlaceholder`) use the label \"New conversation\" instead of the `Chat ${…}` template and update the comment above it. Add a Stage.test.tsx test and update the comment near line 110."
+        },
+        "items": [
+          {
+            "id": "tab-label-fallback.ac1",
+            "title": "Given an agent pane for a conversation whose title is null or \"New conversation\", when the Stage renders, then its tab reads \"New conversation\" and no tab text matches /^Chat /.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-label-fallback.ac2",
+            "title": "Given a titled conversation, when the Stage renders, then its tab reads the title.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "turn-uat-spec",
+        "title": "Fixture-backed Playwright spec and light/dark NFR-6 screenshots (WI-18)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T19:36:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5295",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-5295-conversation-turn.spec.ts",
+            "docs/screenshots/pan-5295/conversation-turn-light.png",
+            "docs/screenshots/pan-5295/conversation-turn-dark.png"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-5295-conversation-turn.spec.ts"
+          ],
+          "expected_outputs": [
+            "build succeeds",
+            "the Playwright spec passes and writes both PNGs"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-6",
+            "FR-11",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-18. New tests/pan-5295-conversation-turn.spec.ts modelled on tests/pan-5291-conversation-header.spec.ts: isolated dashboard (tests/fixtures/isolated-dashboard.ts, temp OVERDECK_HOME, fake HOME, workflow fixture, isolated browser context; never the live :3011 dashboard), 1920x1000. Opens fixture-1 in the workflow-fixture deck and checks the turn card, Review -> dock diff \"1/N\", a docs/shared.md chip -> its diff, the Send menu items, \"Thinking: …\", no ⌘ / \"Chat \" tab text and the \"N tabs\" list. Writes the two PNGs. fixture-1 is not alive, so for the composer checks and screenshots the spec patches the conversation rows (page.route on **/api/conversations and **/api/conversations/*, route.fetch() then sessionAlive: true for fixture-1). Implementation checkpoint: if the row also arrives over /ws/rpc and no live composer appears, add a second fully route-mocked test (pattern of tests/effort-chip.spec.ts) for the composer checks and screenshots, keeping the fixture test for the card and chip checks. Run npm run build first. Not added to CI's test:playwright list. Inspect both PNGs yourself and attach them to the PR description."
+        },
+        "items": [
+          {
+            "id": "turn-uat-spec.ac1",
+            "title": "Given an isolated dashboard seeded with the workflow fixture, when the spec runs, then it passes and the fixture-1 transcript shows one turn card with no \"Changed files\" text.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-uat-spec.ac2",
+            "title": "Given the spec run, when it finishes, then docs/screenshots/pan-5295/conversation-turn-light.png and conversation-turn-dark.png exist at 1920x1000 and show the turn card, composer controls and tab strip of mockup screen 1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-uat-spec.ac3",
+            "title": "Given the turn card in the browser, when Review is clicked, then the dock shows the diff view with a \"1/N\" counter for the turn's files.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-changelog",
+        "title": "Document the turn card, file chips, Send/Thinking/model controls, rail and tabs; add changelog.d/pan-5295.md (WI-19)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T19:36:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5295",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "features/keyboard-shortcuts.mdx",
+            "configuration/harnesses.mdx",
+            "configuration/effort.mdx",
+            "docs/CONVERSATION-SUBAGENTS.md",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "changelog.d/pan-5295.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-10",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-19. features/conversations.mdx: a ⋯ \"Full diff in a new window\" sentence under \"### The header and status line\"; new \"### The turn card\", \"### File paths in replies\" and \"### Sending to a busy agent\" sections with the content listed in the PRD; rewrite \"## Reviewing changes in the diff panel\" to open with ⋯ → Full diff in a new window and describe the diff window. Also in conversations.mdx: line 74 notes the rail starts collapsed; line 109 replaces `High · default`/`Low · set` with `Thinking: high` and the tooltip source. configuration/harnesses.mdx Steering section: Send: interrupt now in the Send menu, mode names normally / interrupt now / after this turn. configuration/effort.mdx line 213: Thinking: <level>, source in the tooltip. docs/CONVERSATION-SUBAGENTS.md Agents rail collapse: an unset key means collapsed. docs/DASHBOARD-ARCHITECTURE.md line 1160: Send: when the limit resets in the Send menu. features/keyboard-shortcuts.mdx: tabs show no shortcut chips; keys are in the ? sheet and \"N tabs ▾\" reaches every tab. docs/DASHBOARD-ARCHITECTURE.md: new \"## Conversation turn card and file chips (PAN-5295)\" after \"## Conversation header (PAN-5291)\" covering ConversationChangesScope, the shared query key, user-turn grouping, why Review avoids scope=turn, the outside-Stage diff window, and the removal of the inline DiffPanel and /diffs poll. changelog.d/pan-5295.md with #### Improved bullets."
+        },
+        "items": [
+          {
+            "id": "docs-changelog.ac1",
+            "title": "Given features/conversations.mdx, when read, then it contains the headings \"### The turn card\", \"### File paths in replies\" and \"### Sending to a busy agent\", and the \"## Reviewing changes in the diff panel\" section names \"Full diff in a new window\" as the way in.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac2",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, when read, then it contains \"## Conversation turn card and file chips (PAN-5295)\" naming ConversationChangesScope and the query key ['conversation-changes', name, 'conversation', null].",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac3",
+            "title": "Given configuration/harnesses.mdx and configuration/effort.mdx, when read, then they name \"Send: interrupt now\" and \"Thinking:\" and no longer contain \"delivery selector\" or \"High · default\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac4",
+            "title": "Given changelog.d/pan-5295.md, when `npm run lint:docs` runs, then it exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "changes-targets",
+        "to": "turn-card",
+        "type": "blocks"
+      },
+      {
+        "from": "changes-targets",
+        "to": "file-chips",
+        "type": "blocks"
+      },
+      {
+        "from": "turn-grouping",
+        "to": "turn-card",
+        "type": "blocks"
+      },
+      {
+        "from": "turn-grouping",
+        "to": "turn-card-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "dock-files-filter",
+        "to": "changes-scope",
+        "type": "blocks"
+      },
+      {
+        "from": "diff-window",
+        "to": "changes-scope",
+        "type": "blocks"
+      },
+      {
+        "from": "changes-scope",
+        "to": "turn-card",
+        "type": "blocks"
+      },
+      {
+        "from": "changes-scope",
+        "to": "file-chips",
+        "type": "blocks"
+      },
+      {
+        "from": "turn-card",
+        "to": "turn-card-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "turn-card-wiring",
+        "to": "rail-closed-default",
+        "type": "blocks"
+      },
+      {
+        "from": "diff-window",
+        "to": "turn-card-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "composer-toolbar-extract",
+        "to": "send-mode-menu",
+        "type": "blocks"
+      },
+      {
+        "from": "send-mode-menu",
+        "to": "model-locked-reason",
+        "type": "blocks"
+      },
+      {
+        "from": "model-locked-reason",
+        "to": "toolbar-order",
+        "type": "blocks"
+      },
+      {
+        "from": "tab-strip",
+        "to": "plus-menu",
+        "type": "blocks"
+      },
+      {
+        "from": "plus-menu",
+        "to": "tab-label-fallback",
+        "type": "blocks"
+      },
+      {
+        "from": "thinking-label",
+        "to": "turn-uat-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "toolbar-order",
+        "to": "turn-uat-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "turn-card-wiring",
+        "to": "turn-uat-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "file-chips",
+        "to": "turn-uat-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "rail-closed-default",
+        "to": "turn-uat-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "tab-label-fallback",
+        "to": "turn-uat-spec",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

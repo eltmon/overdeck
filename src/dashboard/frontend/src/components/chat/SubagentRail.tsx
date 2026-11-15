@@ -62,7 +62,8 @@ export function useSubagentSelection(subagents: readonly SubagentSummary[]) {
 export function SubagentRail({ conversation, subagents, selectedAgentId, defaultCollapsed, toggleSignal }: SubagentRailProps) {
   const select = useCallback((agentId: string | null) => updateSelectedSubagent(agentId), []);
   const [storedCollapsed, setStoredCollapsed] = useState(
-    () => defaultCollapsed ?? (typeof window !== 'undefined' && localStorage.getItem(AGENTS_RAIL_COLLAPSED_KEY) === 'true'),
+    // PAN-5295 D2-15: closed by default — only a stored 'false' opens the rail.
+    () => defaultCollapsed ?? (typeof window === 'undefined' || localStorage.getItem(AGENTS_RAIL_COLLAPSED_KEY) !== 'false'),
   );
 
   // Measures the rail's host pane (its parent) rather than itself: the rail's own

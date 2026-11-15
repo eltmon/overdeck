@@ -1,5 +1,6 @@
 import type { WorkingPhase } from '../../../lib/workingPhase';
-import type { ChatMessage, CompactBoundary, ProposedPlan, SubagentSummary, TurnDiffSummary, WorkLogEntry } from '../chat-types';
+import type { ChatMessage, CompactBoundary, ProposedPlan, SubagentSummary, WorkLogEntry } from '../chat-types';
+import type { TurnChanges } from './turnChanges';
 import type { FailedMessage } from '../ConversationPanel';
 import type { RoundVerdict } from '../../CommandDeck/RoundCard';
 import type { AnsweredPaneChoice, PendingPaneChoice } from '../../../lib/paneChoice';
@@ -49,9 +50,8 @@ export interface MessagesTimelineProps {
   agentId?: string;
   subagentByToolUseId?: ReadonlyMap<string, SubagentSummary>;
   onOpenSubagent?: (toolUseId: string) => void;
-  turnDiffSummaryByAssistantMessageId?: Map<string, TurnDiffSummary>;
-  onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
-  resolvedTheme?: 'light' | 'dark';
+  /** PAN-5295: turn cards keyed by each user turn's last assistant message id. */
+  turnChangesByAssistantMessageId?: ReadonlyMap<string, TurnChanges>;
   /** When true, pure tool-call work groups are collapsed to a single muted line. */
   hideToolCalls?: boolean;
   /** Current working phase — drives the working indicator icon. */

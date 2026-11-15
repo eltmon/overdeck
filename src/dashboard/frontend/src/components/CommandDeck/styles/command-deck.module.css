@@ -4147,16 +4147,6 @@
   white-space: nowrap;
 }
 
-/* Pipe divider between toolbar items (matches t3code style) */
-.composerToolbarDivider {
-  width: 1px;
-  height: 16px;
-  background: var(--input);
-  opacity: 0.5;
-  flex-shrink: 0;
-  margin: 0 4px;
-}
-
 /* Send button — rounded, inside the box */
 .sendButton {
   display: flex;

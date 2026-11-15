@@ -67,6 +67,8 @@ const subagents: SubagentSummary[] = [
 describe('SubagentRail', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/conv/42');
+    // PAN-5295 D2-15: the rail starts collapsed unless 'false' is stored.
+    localStorage.setItem('overdeck.ui.agentsRailCollapsed', 'false');
   });
 
   it('renders nothing when no subagents exist', () => {
@@ -129,7 +131,15 @@ describe('SubagentRail', () => {
 describe('SubagentRail collapse (Awareness-rail pattern)', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/conv/42');
+    localStorage.setItem('overdeck.ui.agentsRailCollapsed', 'false');
+  });
+
+  it('starts collapsed when nothing is stored (PAN-5295)', () => {
     localStorage.removeItem('overdeck.ui.agentsRailCollapsed');
+    render(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} />);
+
+    expect(screen.getByRole('button', { name: 'Show agents rail' })).toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Conversation agents' })).not.toBeInTheDocument();
   });
 
   it('collapses to a slim vertical tab and expands back', async () => {
@@ -276,14 +286,14 @@ describe('SubagentRail narrow pane (PAN-5329)', () => {
 describe('SubagentRail toggleSignal (PAN-5291 ⋯ → Subagents)', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/conv/42');
-    localStorage.removeItem('overdeck.ui.agentsRailCollapsed');
+    localStorage.setItem('overdeck.ui.agentsRailCollapsed', 'false');
   });
 
   it('never toggles on the mount value', () => {
     render(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} toggleSignal={5} />);
 
     expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toBeInTheDocument();
-    expect(localStorage.getItem('overdeck.ui.agentsRailCollapsed')).toBeNull();
+    expect(localStorage.getItem('overdeck.ui.agentsRailCollapsed')).toBe('false');
   });
 
   it('collapses an open rail on 0 → 1 and opens it again on 1 → 2, storing each state', () => {
@@ -308,7 +318,7 @@ describe('SubagentRail toggleSignal (PAN-5291 ⋯ → Subagents)', () => {
 
     rerender(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} defaultCollapsed toggleSignal={1} />);
     expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toBeInTheDocument();
-    expect(localStorage.getItem('overdeck.ui.agentsRailCollapsed')).toBeNull();
+    expect(localStorage.getItem('overdeck.ui.agentsRailCollapsed')).toBe('false');
   });
 
   it('flips only the pane-local state on a narrow pane', () => {
@@ -320,7 +330,7 @@ describe('SubagentRail toggleSignal (PAN-5291 ⋯ → Subagents)', () => {
 
     rerender(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} toggleSignal={1} />);
     expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toBeInTheDocument();
-    expect(localStorage.getItem('overdeck.ui.agentsRailCollapsed')).toBeNull();
+    expect(localStorage.getItem('overdeck.ui.agentsRailCollapsed')).toBe('false');
     vi.unstubAllGlobals();
   });
 });

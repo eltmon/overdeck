@@ -701,6 +701,43 @@ describe('chat ModelPicker Kimi harness-labeled rows (2026-08-02)', () => {
   });
 });
 
+describe('chat ModelPicker locked reason (PAN-5295)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    installFetchMock();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('keeps the trigger enabled and shows only the reason, with no model rows', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<ModelPicker value="claude-sonnet-4-6" onChange={onChange} lockedReason="The model is fixed." />);
+    const trigger = await screen.findByRole('button', { name: /Claude Sonnet 4\.6/i });
+    expect(trigger).toBeEnabled();
+
+    await user.click(trigger);
+
+    const dropdown = await screen.findByTestId('model-picker-dropdown');
+    expect(within(dropdown).getByTestId('model-picker-locked-reason')).toHaveTextContent('The model is fixed.');
+    expect(within(dropdown).queryAllByRole('button')).toEqual([]);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('shows the model list as before without a reason', async () => {
+    const user = userEvent.setup();
+    render(<ModelPicker value="claude-sonnet-4-6" onChange={vi.fn()} />);
+    await user.click(await screen.findByRole('button', { name: /Claude Sonnet 4\.6/i }));
+
+    const dropdown = await screen.findByTestId('model-picker-dropdown');
+    expect(within(dropdown).queryByTestId('model-picker-locked-reason')).toBeNull();
+    expect(within(dropdown).getAllByRole('button').length).toBeGreaterThan(0);
+  });
+});
+
 describe('chat ModelPicker dropdown portal (PAN-4266)', () => {
   beforeEach(() => {
     localStorage.clear();

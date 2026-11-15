@@ -113,7 +113,8 @@ beforeEach(() => {
     const url = String(input);
     if (url.endsWith('/api/conversations/pending-input')) return Response.json([]);
     if (/\/bookmarks$/.test(url)) return Response.json({ bookmarks: [] });
-    if (/\/diffs$/.test(url)) return Response.json({ summaries: [] });
+    const changes = /^\/api\/conversations\/([^/]+)\/changes\?scope=conversation$/.exec(url);
+    if (changes) return Response.json({ ...{ conversation: 'x', repoRoot: '/home/user', rootId: null, branch: 'main', scope: 'conversation', uncommitted: [], commits: [], totals: { files: 0, additions: 0, deletions: 0, commitsPushed: 0, commitsLocal: 0, uncommittedFiles: 0 } }, conversation: decodeURIComponent(changes[1]!) });
     if (url.includes('/api/dashboard/session')) return Response.json({ csrfToken: 'test-csrf-token' });
     return Response.json({});
   }));

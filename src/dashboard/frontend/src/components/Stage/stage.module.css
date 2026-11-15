@@ -661,42 +661,15 @@
   font-size: 13px;
 }
 
-/* Relative wrapper so the ‹ › scroll buttons can overlay the tab strip's edges
-   without scrolling along with the tabs (they live outside the scroll box). */
+/* The tab strip plus the "N tabs" list button after it (PAN-5295 D2-16): the
+   button sits outside the scrolling strip, so it never scrolls away. The wrap
+   carries the bar's background and inset bottom border under the button too. */
 .panebarWrap {
   position: relative;
   flex: 0 0 43px;
-}
-
-/* Edge scroll buttons — only rendered when tabs overflow (PAN-1591). The
-   gradient fades the underlying tabs so the arrow reads as "more this way". */
-.tabScrollBtn {
-  position: absolute;
-  top: 6px;
-  bottom: 1px;
-  z-index: 4;
   display: flex;
-  width: 34px;
-  align-items: center;
-  border: none;
-  cursor: pointer;
-  color: var(--muted-foreground);
-  transition: color 0.12s;
-}
-.tabScrollBtn:hover {
-  color: var(--foreground);
-}
-.tabScrollLeft {
-  left: 0;
-  justify-content: flex-start;
-  padding-left: 4px;
-  background: linear-gradient(to right, var(--card) 62%, transparent);
-}
-.tabScrollRight {
-  right: 0;
-  justify-content: flex-end;
-  padding-right: 4px;
-  background: linear-gradient(to left, var(--card) 62%, transparent);
+  background: var(--card);
+  box-shadow: inset 0 -1px 0 0 var(--border);
 }
 
 .panebar {
@@ -724,6 +697,9 @@
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none; /* Firefox */
+  /* A row item of .panebarWrap: take the remaining width, never push the list button out. */
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 /* Chromium/WebKit: hide the scrollbar so it claims no vertical space. */
@@ -750,6 +726,22 @@
      cover it and merge into the content below. */
   position: relative;
   z-index: 1;
+  /* PAN-5295 D2-16: tabs clamp to 120–230 px; the label ellipsizes. */
+  min-width: 120px;
+  max-width: 230px;
+  flex-shrink: 0;
+}
+
+.panetab[data-tab-type='home'] {
+  min-width: 0;
+}
+
+.panetabLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .panetabIcon {
@@ -779,9 +771,6 @@
   top: 1px;
 }
 
-.active .kbd {
-  color: var(--muted-foreground);
-}
 
 .close {
   display: inline-flex;
@@ -818,6 +807,36 @@
   background: var(--secondary);
 }
 
+/* "N tabs ▾" — lists every tab (PAN-5295 D2-16). */
+.tabList {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-end;
+  height: 36px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--muted-foreground);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 8px 8px 0 0;
+  white-space: nowrap;
+}
+
+.tabList:hover {
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.tabListMenu {
+  width: 240px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
 /* New-tab dropdown (PAN-1561) — portaled to <body> and positioned inline
  * (position:fixed) so the PaneBar's overflow-x clip can't hide it. */
 .addMenu {
@@ -850,4 +869,10 @@
 
 .addMenuItem:hover {
   background: var(--accent);
+}
+
+.addMenuSeparator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
 }

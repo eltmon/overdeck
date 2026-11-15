@@ -4,7 +4,8 @@
 // explorer root can be a folder inside that repo, so every path goes through
 // `toRootPath` before it reaches the explorer (dots, filters, reveals). Pure.
 
-import type { ConversationChanges } from '@overdeck/contracts'
+import type { ChangeCommit, ChangedFile, ConversationChanges } from '@overdeck/contracts'
+import type { DockDiffTarget } from './workDockStore'
 
 function trimSlash(path: string): string {
   return path.length > 1 ? path.replace(/\/+$/, '') : path
@@ -45,4 +46,29 @@ export function ancestorFolders(paths: Iterable<string>): Set<string> {
     }
   }
   return folders
+}
+
+/** The dock diff target for one changed file (uncommitted when `commit` is undefined). */
+export function diffTargetOf(
+  changes: ConversationChanges,
+  file: ChangedFile,
+  commit: ChangeCommit | undefined,
+  rootPathOf: (repoPath: string) => string | null,
+): DockDiffTarget {
+  const rootPath = rootPathOf(file.path)
+  const target: DockDiffTarget = { path: rootPath ?? file.path, repoPath: file.path, repoRoot: changes.repoRoot }
+  if (commit) {
+    target.sha = commit.sha
+    target.pushed = commit.pushed
+  }
+  if (rootPath === null) target.outsideRoot = true
+  return target
+}
+
+/** Every file of `changes` in display order: uncommitted first, then each commit's files. */
+export function diffTargetsOf(changes: ConversationChanges, rootPathOf: (repoPath: string) => string | null): DockDiffTarget[] {
+  return [
+    ...changes.uncommitted.map((file) => diffTargetOf(changes, file, undefined, rootPathOf)),
+    ...changes.commits.flatMap((commit) => commit.files.map((file) => diffTargetOf(changes, file, commit, rootPathOf))),
+  ]
 }

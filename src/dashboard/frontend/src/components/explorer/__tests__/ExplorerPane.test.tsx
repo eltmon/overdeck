@@ -271,6 +271,36 @@ describe('ExplorerFiles', () => {
     expect(screen.getByTestId('explorer-filter-line')).toHaveTextContent('Showing files this conversation changed')
   })
 
+  it('Show in files (openDock filesFilter mine) switches a conversation-scoped tree to its files (PAN-5295)', async () => {
+    renderPane({ conversationScope: true, changedPaths: new Set(['src/a.ts']) })
+    await screen.findByText('README.md')
+    act(() => useWorkDockStore.getState().openDock(DECK, { tab: 'files', filesFilter: 'mine' }))
+    expect(await screen.findByText('a.ts')).toBeInTheDocument()
+    expect(viewOption('Only what this conversation changed')).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('applies Show in files once: a remount keeps the filter the operator chose after it (PAN-5295)', async () => {
+    const { unmount } = renderPane({ conversationScope: true, changedPaths: new Set(['src/a.ts']) })
+    await screen.findByText('README.md')
+    act(() => useWorkDockStore.getState().openDock(DECK, { tab: 'files', filesFilter: 'mine' }))
+    expect(await screen.findByText('a.ts')).toBeInTheDocument()
+    expect(useWorkDockStore.getState().byDeck[DECK]?.filesFilter).toBeUndefined()
+    fireEvent.click(viewOption('Show all files'))
+    unmount()
+
+    renderPane({ conversationScope: true, changedPaths: new Set(['src/a.ts']) })
+    expect(await screen.findByText('README.md')).toBeInTheDocument()
+    expect(viewOption('Show all files')).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('ignores the filesFilter request outside a conversation scope (PAN-5295)', async () => {
+    renderPane({ conversationScope: false })
+    await screen.findByText('README.md')
+    act(() => useWorkDockStore.getState().openDock(DECK, { tab: 'files', filesFilter: 'mine' }))
+    expect(viewOption('Show all files')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByText('README.md')).toBeInTheDocument()
+  })
+
   it('toggles git-ignored files and dotfiles from View options, and runs its actions', async () => {
     renderPane()
     await screen.findByText('README.md')

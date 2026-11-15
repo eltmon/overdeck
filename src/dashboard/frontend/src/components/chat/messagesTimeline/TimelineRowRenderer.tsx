@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import type { WorkingPhase } from '../../../lib/workingPhase';
-import type { SubagentSummary, TurnDiffSummary } from '../chat-types';
+import type { SubagentSummary } from '../chat-types';
+import type { TurnChanges } from './turnChanges';
 import type { MessagesTimelineRow } from '../MessagesTimeline.logic';
 import { PlanCard } from '../PlanCard';
 import { AssistantMessageRow, UserMessageRow } from './messageRows';
@@ -25,9 +26,7 @@ interface RowProps {
   agentId?: string;
   subagentByToolUseId?: ReadonlyMap<string, SubagentSummary>;
   onOpenSubagent?: (toolUseId: string) => void;
-  turnDiffSummary?: TurnDiffSummary;
-  onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
-  resolvedTheme?: 'light' | 'dark';
+  turnChanges?: TurnChanges;
   hideToolCalls?: boolean;
   workingPhase?: WorkingPhase;
   onConfirmCommand?: (messageId: string, typedText?: string) => Promise<void>;
@@ -41,7 +40,7 @@ interface RowProps {
   citeConversationName?: string;
 }
 
-export const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming, conversationName, cwd, issueId, sendNowAvailable, agentId, subagentByToolUseId, onOpenSubagent, turnDiffSummary, onOpenTurnDiff, resolvedTheme, hideToolCalls, workingPhase, onConfirmCommand, onOpenTerminal, onPaneChoiceAnswered, bookmarkable, citeConversationName }: RowProps) {
+export const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming, conversationName, cwd, issueId, sendNowAvailable, agentId, subagentByToolUseId, onOpenSubagent, turnChanges, hideToolCalls, workingPhase, onConfirmCommand, onOpenTerminal, onPaneChoiceAnswered, bookmarkable, citeConversationName }: RowProps) {
   if (row.kind === 'working') {
     return <WorkingIndicator startedAt={row.createdAt} phase={workingPhase} />;
   }
@@ -97,9 +96,7 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isSt
       isStreaming={isStreaming}
       cwd={cwd}
       issueId={issueId}
-      turnDiffSummary={turnDiffSummary}
-      onOpenTurnDiff={onOpenTurnDiff}
-      resolvedTheme={resolvedTheme}
+      turnChanges={turnChanges}
       bookmarkable={bookmarkable}
       citeConversationName={citeConversationName}
     />

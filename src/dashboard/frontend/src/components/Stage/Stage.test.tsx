@@ -107,17 +107,17 @@ describe('Stage', () => {
     renderStage(<Stage deckKey={DECK} renderHome={renderHome} renderIssue={renderIssue} />)
     fireEvent.click(screen.getByRole('button', { name: /open agent/ }))
     // The agent tab's label is derived from the live conversation (untitled →
-    // "Chat <id>"); assert the pane body + tab count rather than a static label.
+    // "New conversation"); assert the pane body + tab count rather than a static label.
     await screen.findByTestId('agent-pane')
     expect(screen.getAllByRole('tab')).toHaveLength(2)
   })
 
-  it('the + menu offers New terminal which opens the drawer (PAN-1561)', () => {
+  it('the + menu offers Terminal which opens the drawer (PAN-1561)', () => {
     renderStage(<Stage deckKey={DECK} renderHome={renderHome} renderIssue={renderIssue} />)
     expect(screen.queryByTestId('terminal-drawer')).toBeNull()
     // "+" opens a menu of what to create, rather than guessing.
     fireEvent.click(screen.getByLabelText('Open new tab'))
-    fireEvent.click(screen.getByRole('menuitem', { name: /New terminal/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Terminal$/ }))
     expect(screen.getByTestId('terminal-drawer')).toBeTruthy()
   })
 
@@ -137,6 +137,22 @@ describe('Stage', () => {
   // off the bar (no drop zone accepts it) opens a new window at the bare
   // conversation popout (/popout/conversation/<id>). The Stage resolves
   // conversation.name → numeric id before opening.
+  it('an untitled conversation tab reads New conversation, never Chat <id> (PAN-5295)', () => {
+    const row = { status: 'ended', cwd: '', issueId: null, createdAt: '2024-01-01', endedAt: null, lastAttachedAt: null, sessionAlive: false }
+    const conversations = [
+      { ...row, name: 'conv-untitled-ab12', id: 7, tmuxSession: 's7', title: null },
+      { ...row, name: 'conv-seeded-cd34', id: 8, tmuxSession: 's8', title: 'New conversation' },
+      { ...row, name: 'conv-titled', id: 9, tmuxSession: 's9', title: 'Fix the parser' },
+    ]
+    usePanesStore.getState().ensureHome(DECK)
+    for (const c of conversations) usePanesStore.getState().addPane(DECK, { paneType: 'agent', label: 'Agent', conversationId: c.name })
+    renderStage(<Stage deckKey={DECK} renderHome={renderHome} renderIssue={renderIssue} conversations={conversations} />)
+
+    const labels = screen.getAllByRole('tab').map((t) => t.getAttribute('title'))
+    expect(labels).toEqual(['Home', 'New conversation', 'New conversation', 'Fix the parser'])
+    for (const tab of screen.getAllByRole('tab')) expect(tab.textContent).not.toMatch(/^Chat /)
+  })
+
   it('dragging a conversation tab off the bar opens /popout/conversation/<id> in a new window', () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
     // Seed a conversation the agent pane can resolve. id=42 is the numeric

@@ -18,6 +18,8 @@ export interface ChangeFileRowProps {
   onReveal(): void
   /** Extra content under the row (the shared-file note). */
   children?: ReactNode
+  /** Indent under a group header (default); false for the turn card's flat list (PAN-5295 D2-8). */
+  inset?: boolean
 }
 
 function RowButton({ label, onClick, disabled, children }: { label: string; onClick(): void; disabled?: boolean; children: ReactNode }) {
@@ -38,11 +40,11 @@ function RowButton({ label, onClick, disabled, children }: { label: string; onCl
   )
 }
 
-export function ChangeFileRow({ path, additions, deletions, rootPath, onDiff, onOpenBeside, onReveal, children }: ChangeFileRowProps) {
+export function ChangeFileRow({ path, additions, deletions, rootPath, onDiff, onOpenBeside, onReveal, children, inset = true }: ChangeFileRowProps) {
   const dir = parentPath(path)
   return (
     <div data-change-path={path}>
-      <div className="group flex items-center gap-2 py-1 pl-8 pr-2 text-[12.5px] hover:bg-accent">
+      <div className={`group flex items-center gap-2 py-1 ${inset ? 'pl-8' : 'pl-3'} pr-2 text-[12.5px] hover:bg-accent`}>
         <button type="button" onClick={onDiff} className="min-w-0 flex-1 truncate text-left font-mono text-xs" title={path}>
           {dir && <span className="text-muted-foreground">{dir}/</span>}
           <span className="text-foreground">{baseName(path)}</span>

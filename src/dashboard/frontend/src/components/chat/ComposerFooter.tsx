@@ -11,7 +11,7 @@
  */
 
 import { memo, useState, useRef, useCallback, useEffect } from 'react';
-import { AlertCircle, Mic, MicOff, Paperclip, Scissors, SendHorizontal, Loader2 } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import type { ClipboardEvent, ChangeEvent, DragEvent } from 'react';
 import { toast } from 'sonner';
 import { getHarnessBehavior } from '@overdeck/contracts';
@@ -27,17 +27,15 @@ import { clearDraft } from '../../lib/composerDraft';
 import { enqueueConversationSend } from '../../lib/composerSendQueue';
 import { deliverQueuedPrompt } from './queuedPromptSend';
 import { VoiceWidget } from './VoiceWidget';
-import { ModelPicker, MODEL_EFFORT_SUPPORT, saveStoredHarness, saveStoredModel } from './ModelPicker';
-import { pickerEffortLevels } from '../shared/ModelPicker';
+import { saveStoredHarness, saveStoredModel } from './ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import { modelSupportsImages, findModelDef } from '../Settings/modelCatalog';
-import { EffortPicker } from './EffortPicker';
-import { DeliveryModeSelect, type DeliverAs } from './DeliveryModeSelect';
+import type { DeliverAs } from './SendModeMenu';
 import { LimitResetNotice } from './LimitResetNotice';
 import { useScheduledMessages } from './scheduledMessages';
 import { useComposerEffort, type EffortResolution } from './useComposerEffort';
-import { ContextWindowMeter } from './ContextWindowMeter';
+import { ComposerToolbar } from './ComposerToolbar';
 import { VaultContinueDialog } from './VaultContinueDialog';
 import { conversationMachineState, isLiveMachineState, MachineReadOnlyNotice } from './ConversationMachineBanner';
 import { VaultContinuityNotice } from './VaultContinuityNotice';
@@ -89,8 +87,6 @@ interface ComposerFooterProps {
    * placement (right side, just before the send button).
    */
   contextWindowUsage?: ContextWindowSnapshot | null;
-  /** True while the runtime is mid-turn. Used to choose Pi delivery defaults. */
-  agentBusy?: boolean;
   /** Claude Code's agent selector shows a subagent, not the main agent,
    * receiving typed input (PAN-4268). */
   subagentNotice?: SubagentRoutingNotice;
@@ -127,7 +123,6 @@ function ComposerFooterInput({
   onSendFailed,
   agentId,
   contextWindowUsage = null,
-  agentBusy = false,
   subagentNotice = null,
   observedEffort = null,
   effortResolution = null,
@@ -179,14 +174,12 @@ function ComposerFooterInput({
   useComposerRestoreTarget(editorRef, conversation.name);
 
   const piConversation = isPiConversation(conversation);
-  const { effort, chip: effortChip, pending: effortPending, liveChangeEnabled, title: effortTitle, onChange: handleEffortChange } =
-    useComposerEffort({ conversation, agentId, harness, model, piConversation, observedEffort, effortResolution });
+  const composerEffort = useComposerEffort({ conversation, agentId, harness, model, piConversation, observedEffort, effortResolution });
   // PAN-4292: the delivery selector follows the harness steer capability. Pi
   // steers over its control channel, which only the conversation route
   // carries; Claude Code steers with send-now keys on both routes.
   const steerKind = getHarnessBehavior(harness).steerKind;
   const showDeliverySelector = steerKind === 'send-now-keys' || (steerKind === 'control-channel' && !agentId);
-  const steerOptionLabel = navigator.platform.toLowerCase().includes('mac') ? 'Steer (⌘+Enter)' : 'Steer (Ctrl+Enter)';
   const isDisabled = !conversation.sessionAlive || sending;
   // The phone app (PAN-4837): no model picker (admin reads) and no voice input (its own session mint).
   const native = isNativeShell();
@@ -808,92 +801,34 @@ function ComposerFooterInput({
         />
 
         {/* Toolbar inside the box */}
-        <div className={styles.composerToolbar}>
-          {!native && (
-            <ModelPicker
-              value={model}
-              onChange={handleModelChange}
-              onComboChange={handleComboChange}
-              disabled={isDisabled || !canEditModelBeforeStart}
-              harness={harness}
-              onHarnessChange={handleHarnessChange}
-              liveConversation={conversation.sessionAlive}
-            />
-          )}
-          {/*
-            Model drift indicator. The picker holds the model that the
-            *next* message will be sent with; if the running session's last
-            assistant turn used a different model (e.g. the user ran /model
-            inside Claude Code, or Cloister auto-routed), surface it here so
-            the picker doesn't silently lie about what's actually running.
-          */}
-          {contextWindowUsage?.lastModel && contextWindowUsage.lastModel !== model && (
-            <span
-              className={styles.composerToolbarModelDrift}
-              title={`Last assistant turn ran as ${contextWindowUsage.lastModel}; the picker value applies to the next message you send.`}
-              data-testid="composer-model-drift"
-            >
-              running: {contextWindowUsage.lastModel}
-            </span>
-          )}
-          <div className={styles.composerToolbarDivider} />
-          <EffortPicker chip={effortChip} pending={effortPending} title={effortTitle} value={effort} onChange={handleEffortChange} disabled={effortPending || !liveChangeEnabled} availableLevels={pickerEffortLevels(model) ?? MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
-
-          {showDeliverySelector && (
-            <DeliveryModeSelect value={deliverAs} onChange={setDeliverAs} steerKind={steerKind} agentBusy={agentBusy} sessionAlive={conversation.sessionAlive} steerOptionLabel={steerOptionLabel} scheduleAvailable={scheduleSupported && !agentId} />
-          )}
-          {piConversation && !agentId && (
-            <>
-              <button
-                className={styles.voiceToolbarButton}
-                onClick={handleCompact}
-                disabled={!conversation.sessionAlive || compactPending}
-                type="button"
-                title="Compact context"
-                aria-label="Compact context"
-              >
-                {compactPending ? <Loader2 size={16} className={styles.spinner} /> : <Scissors size={16} />}
-              </button>
-            </>
-          )}
-
-          <div className={styles.composerToolbarSpacer} />
-
-          <button
-            className={styles.voiceToolbarButton}
-            onClick={handleAttachClick}
-            disabled={isDisabled}
-            type="button"
-            title="Attach files"
-            aria-label="Attach files"
-          >
-            <Paperclip size={16} />
-          </button>
-
-          {!native && (
-            <button
-              className={isVoiceWidgetOpen ? styles.voiceToolbarButtonActive : styles.voiceToolbarButton}
-              onClick={() => setIsVoiceWidgetOpen((open) => !open)}
-              disabled={isDisabled}
-              type="button"
-              title={voiceState.error ? `Voice error: ${voiceState.error}` : voiceState.isListening ? 'Voice input listening' : 'Toggle voice input (Ctrl+Shift+M)'}
-            >
-              {voiceState.error ? <AlertCircle size={16} /> : voiceState.isListening ? <MicOff size={16} /> : <Mic size={16} />}
-            </button>
-          )}
-
-          <ContextWindowMeter usage={contextWindowUsage} />
-
-          <button
-            className={styles.sendButton}
-            onClick={() => void handleSubmit()}
-            disabled={(isEmpty && pendingAttachments.filter((attachment) => !!attachment.serverPath).length === 0 && citationCount === 0) || isDisabled}
-            type="button"
-            title="Send message (Enter)"
-          >
-            <SendHorizontal size={16} />
-          </button>
-        </div>
+        <ComposerToolbar
+          conversation={conversation}
+          agentId={agentId}
+          native={native}
+          isDisabled={isDisabled}
+          canEditModelBeforeStart={canEditModelBeforeStart}
+          model={model}
+          harness={harness}
+          onModelChange={handleModelChange}
+          onComboChange={handleComboChange}
+          onHarnessChange={handleHarnessChange}
+          contextWindowUsage={contextWindowUsage}
+          effort={composerEffort}
+          showDeliverySelector={showDeliverySelector}
+          deliverAs={deliverAs}
+          setDeliverAs={setDeliverAs}
+          steerKind={steerKind}
+          scheduleSupported={scheduleSupported}
+          piConversation={piConversation}
+          compactPending={compactPending}
+          onCompact={handleCompact}
+          onAttach={handleAttachClick}
+          isVoiceWidgetOpen={isVoiceWidgetOpen}
+          setIsVoiceWidgetOpen={setIsVoiceWidgetOpen}
+          voiceState={voiceState}
+          sendDisabled={(isEmpty && pendingAttachments.filter((attachment) => !!attachment.serverPath).length === 0 && citationCount === 0) || isDisabled}
+          onSend={() => void handleSubmit()}
+        />
         <input
           ref={fileInputRef}
           type="file"

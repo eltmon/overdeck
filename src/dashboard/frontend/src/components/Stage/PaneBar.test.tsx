@@ -20,7 +20,7 @@ describe('PaneBar', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders a tab per pane in order, HOME first with a ⌘1 hint', () => {
+  it('renders a tab per pane in order, HOME first, with no shortcut chip on any platform (PAN-5295)', () => {
     vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel')
     render(
       <PaneBar
@@ -34,9 +34,33 @@ describe('PaneBar', () => {
     const tabs = screen.getAllByRole('tab')
     expect(tabs).toHaveLength(3)
     expect(tabs[0]).toHaveTextContent('Home')
-    expect(tabs[0]).toHaveTextContent('⌘1')
     expect(tabs[1]).toHaveTextContent('Terminal')
-    expect(tabs[1]).toHaveTextContent('⌘2')
+    for (const tab of tabs) expect(tab.textContent).not.toContain('⌘')
+  })
+
+  it('N tabs ▾ lists every tab and selecting one calls onSelect (PAN-5295)', () => {
+    const onSelect = vi.fn()
+    render(<PaneBar panes={makePanes()} activePaneId="h" onSelect={onSelect} onClose={() => {}} onAdd={() => {}} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '3 tabs, list all tabs' }))
+    const items = screen.getAllByRole('menuitemradio')
+    expect(items.map((item) => item.textContent)).toEqual(['Home', 'Terminal', 'Docs'])
+    expect(items[0]).toHaveAttribute('aria-checked', 'true')
+    expect(items[1]).toHaveAttribute('aria-checked', 'false')
+
+    fireEvent.click(items[1])
+    expect(onSelect).toHaveBeenCalledWith('t')
+    expect(screen.queryByRole('menu', { name: 'All tabs' })).toBeNull()
+  })
+
+  it('a long label carries its full text in title, with no scroll arrows (PAN-5295)', () => {
+    const label = 'A conversation title that runs well past sixty characters long'
+    const panes = [...makePanes(), { paneId: 'l', paneType: 'agent' as const, label, createdAt: 5 }]
+    render(<PaneBar panes={panes} activePaneId="h" onSelect={() => {}} onClose={() => {}} onAdd={() => {}} />)
+
+    expect(label.length).toBeGreaterThanOrEqual(60)
+    expect(screen.getAllByRole('tab')[3]).toHaveAttribute('title', label)
+    expect(screen.queryByRole('button', { name: /Scroll tabs (left|right)/ })).toBeNull()
   })
 
   it('shows no ⌘N hint on Linux (PAN-5287 S-D9)', () => {

@@ -24,10 +24,6 @@ vi.mock('../../chat/MessagesTimeline', () => ({
   },
 }));
 
-vi.mock('../../../hooks/useTheme', () => ({
-  useTheme: () => ({ resolvedTheme: 'dark' }),
-}));
-
 type Session = ComponentProps<typeof SessionTranscript>['session'];
 
 const BASE_SESSION: Session = {
@@ -113,7 +109,6 @@ describe('SessionTranscript', () => {
       messages,
       workLog: [],
       streaming: false,
-      resolvedTheme: 'dark',
     }));
   });
 
