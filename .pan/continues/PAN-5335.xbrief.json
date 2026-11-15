@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5335",
   "created": "2026-11-15T15:36:24.641Z",
-  "updated": "2026-11-15T16:48:41.441Z",
+  "updated": "2026-11-15T16:48:53.387Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
     "unclipped-row-cost.ac2": {
       "status": "completed",
       "doneAt": "2026-11-15T16:48:41.441Z"
+    },
+    "footer-machines-icon": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5335",
+      "claimedAt": "2026-11-15T16:48:53.387Z"
     }
   }
 }
