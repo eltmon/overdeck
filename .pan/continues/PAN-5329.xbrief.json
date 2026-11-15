@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5329",
+  "created": "2026-11-15T06:45:07.358Z",
+  "updated": "2026-11-15T06:45:07.358Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "chat-find-plain-ctrl-f": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5329",
+      "claimedAt": "2026-11-15T06:45:07.358Z"
+    }
+  }
+}
