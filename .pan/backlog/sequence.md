@@ -1,26 +1,23 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T17:46:53.351669Z · model: claude-opus-5-5 · open: 904_
+_Last sequenced: 2026-11-15T18:17:46.585475Z · model: claude-opus-5-5 · open: 901_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
-| 4 | PAN-5337 | S | high | ok |  |  | In pipeline: every relative link in a Markdown preview opens a 404 /conv/<file> URL instead of the linked file. |
 | 7 | PAN-5363 | S | high | ok |  |  | In pipeline: merge train board Train switch flips back on after off; board cache not dropped on write, optimistic value lost. |
-| 8 | PAN-5357 | S | critical | ok |  |  | Sequencer commits sequence.md every 1-3 min with timestamp-only diffs; skip the commit when the ranking is unchanged and rate-limit runs. |
 | 9 | PAN-5361 | S | critical | ok |  |  | In pipeline: bare-host-linux idle check fails ~3% of runs; pid-net counts machine-wide runner PID bursts one baseline can't cancel. |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
-| 11 | PAN-5364 | M | high | ok |  |  | In pipeline: merge train board shows a voided rebuild on top, buries the merged batch, and voided batches never age out. |
 | 12 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
-| 12 | PAN-5354 | M | critical | ok |  |  | Host-crash-killed work agents stay dead: deacon-lite confirms death but nothing resumes; add paced resumeCrashedWorkAgents. |
 | 13 | PAN-4710 | S | high | ok |  |  | Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff |
 | 14 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; seen on MYN and now overdeck (PAN-5232). |
 | 15 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
 | 16 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 17 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
 | 18 | PAN-5369 | M | critical | ok |  |  | Dashboard main thread pinned at 100%: orphan scan re-queries SQLite for 4000 transcripts per tick; cost/usage routes never answer. |
+| 19 | PAN-5381 | S | high | ok |  |  | Dashboard main thread: findProjectByPath runs realpathSync on every project root per call (10.8% of profile); cache roots once. |
 | 20 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 21 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
 | 21 | PAN-5347 | S | medium | ok |  |  | In pipeline: composer / menu lists no skills; add them from /api/skills/overrides under a labeled Skills group |
@@ -454,7 +451,7 @@ _Last sequenced: 2026-11-15T17:46:53.351669Z · model: claude-opus-5-5 · open: 
 | 446 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
 | 447 | PAN-5180 | M | medium | ok |  |  | Tab-open REST burst (~45 requests) delays every client 1.0-1.4 s; uncached prerequisite and status probes. |
 | 448 | PAN-5264 | M | medium | ok |  |  | Attribute the app-rest GitHub caller (1,422 untraced App REST calls/hour), then cut the largest path. |
-| 449 | PAN-5340 | S | medium | ok |  | PAN-5337 | A Preview link to another Markdown file should open it in Preview, not Edit. Follows PAN-5337. |
+| 449 | PAN-5340 | S | medium | ok |  |  | A Preview link to another Markdown file should open it in Preview, not Edit. Follows PAN-5337. |
 | 450 | PAN-5341 | S | medium | ok |  |  | Dock Changes diff view reuses the Markdown Preview that shipped in PAN-5338; matters once D2 moves diffs to the dock. |
 | 451 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
 | 452 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
@@ -916,17 +913,9 @@ _Last sequenced: 2026-11-15T17:46:53.351669Z · model: claude-opus-5-5 · open: 
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
 
-### PAN-5337 (rank 4)
-
-New in-pipeline bug, pinned at a freed top slot. All 93 links in a measured docs index were dead; PAN-5340 builds on its fix.
-
 ### PAN-5363 (rank 7)
 
 Back in the manifest after dropping out of the last two passes; restored with its prior node. In-pipeline bug with a file:line root cause (switch falls back to a stale 5 s server board cache after the POST settles). Placed in a free top-tier slot near PAN-5364, which edits the same ProjectTrainCard.tsx; high rather than critical because the write itself succeeds.
-
-### PAN-5357 (rank 8)
-
-New critical substrate bug: 41 no-op sequence commits in 3 hours churn main, feeding the merge-train starvation in PAN-5356 and forcing every worktree to merge noise. Small, self-contained fix in the write-sequence path, ranked right after PAN-5356.
 
 ### PAN-5361 (rank 9)
 
@@ -940,17 +929,9 @@ New substrate bug with a verified root cause: adoption (PAN-4605) calls startRev
 
 Rank unchanged; its duplicate PAN-4929 entered the pipeline with an open PR, so this issue now waits on that PR instead of being picked up separately.
 
-### PAN-5364 (rank 11)
-
-New in-pipeline bug filed 2026-11-15, confirmed against the live board: after a promote there is no hero batch, so the voided sibling sits first and the merged batch is buried among aging voided rows. Pinned beside PAN-5363 because both edit ProjectTrainCard.tsx; the rebuild churn itself is PAN-5356, which this issue explicitly leaves out of scope.
-
 ### PAN-4733 (rank 12)
 
 Rank held: parent PAN-4732 (move heavy e2e out of the default shards) closed as completed on 2026-11-01, so this follow-up is now unblocked and next in line.
-
-### PAN-5354 (rank 12)
-
-New substrate bug from the 2026-11-15 host crash: five work agents sat dead 1-2h because no code path turns a confirmed death into a resume or Needs-you item since the PAN-3917 cut. It ranks just below the in-pipeline pins because unattended recovery is a pipeline prerequisite, and the body already carries file:line root cause, a reuse-the-crash-door design, 11 ACs and named tests, so it is ready to plan.
 
 ### PAN-4710 (rank 13)
 
@@ -975,6 +956,10 @@ pan spawn is the foreman's pane-only item worker, so parallel waves cannot run a
 ### PAN-5369 (rank 18)
 
 New issue with a profiled root cause: 42% of main-thread CPU goes to an unindexed per-transcript lookup on every conversation poll tick, which starves /api/costs/summary, /api/fleet/usage and /api/health. It degrades every dashboard surface and blocks PAN-5370 item 3 from being observable, so it ranks beside the other event-loop fix PAN-4544.
+
+### PAN-5381 (rank 19)
+
+New follow-up to in-pipeline PAN-5369 from the same main-thread CPU profile: about 40 call sites, several on poll paths, each pay (projects+1) synchronous realpath calls, so it is the next-largest cause of a frozen dashboard after the orphan scan. Small, verified in code, with a mechanical acceptance test, so it ranks directly after PAN-5369.
 
 ### PAN-4544 (rank 20)
 
@@ -1232,6 +1217,18 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
 
 New this pass. Every agent pane is a child of one transient tmux-server unit, so agent memory is the unit's memory and systemd-oomd's kill decision is all-or-nothing: one hungry agent takes the entire fleet with it. That has now happened twice, the second time killing seven work agents, four strikes and a live review convoy. Blast-radius containment is a different fix from choosing a better victim.
 
+### PAN-3278 (rank 82)
+
+Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.
+
+### PAN-5330 (rank 83)
+
+New substrate bug placed in a freed high-tier slot. With several workspace stacks up, browser checks hit the wrong backend and flake, which corrupts verification.
+
+### PAN-3234 (rank 84)
+
+Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1239,10 +1236,10 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T17:46:53.351669Z",
+  "generatedAt": "2026-11-15T18:17:46.585475Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 904,
+  "openCount": 901,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -1258,19 +1255,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-5337",
-      "rank": 4,
-      "size": "S",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: every relative link in a Markdown preview opens a 404 /conv/<file> URL instead of the linked file.",
-      "rationale": "New in-pipeline bug, pinned at a freed top slot. All 93 links in a measured docs index were dead; PAN-5340 builds on its fix.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-5363",
       "rank": 7,
       "size": "S",
@@ -1280,19 +1264,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "dependsOn": [],
       "why": "In pipeline: merge train board Train switch flips back on after off; board cache not dropped on write, optimistic value lost.",
       "rationale": "Back in the manifest after dropping out of the last two passes; restored with its prior node. In-pipeline bug with a file:line root cause (switch falls back to a stale 5 s server board cache after the POST settles). Placed in a free top-tier slot near PAN-5364, which edits the same ProjectTrainCard.tsx; high rather than critical because the write itself succeeds.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5357",
-      "rank": 8,
-      "size": "S",
-      "importance": "critical",
-      "score": 87,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Sequencer commits sequence.md every 1-3 min with timestamp-only diffs; skip the commit when the ranking is unchanged and rate-limit runs.",
-      "rationale": "New critical substrate bug: 41 no-op sequence commits in 3 hours churn main, feeding the merge-train starvation in PAN-5356 and forcing every worktree to merge noise. Small, self-contained fix in the write-sequence path, ranked right after PAN-5356.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1336,19 +1307,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-5364",
-      "rank": 11,
-      "size": "M",
-      "importance": "high",
-      "score": 68,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: merge train board shows a voided rebuild on top, buries the merged batch, and voided batches never age out.",
-      "rationale": "New in-pipeline bug filed 2026-11-15, confirmed against the live board: after a promote there is no hero batch, so the voided sibling sits first and the merged batch is buried among aging voided rows. Pinned beside PAN-5363 because both edit ProjectTrainCard.tsx; the rebuild churn itself is PAN-5356, which this issue explicitly leaves out of scope.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4733",
       "rank": 12,
       "size": "M",
@@ -1358,19 +1316,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "dependsOn": [],
       "why": "Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it.",
       "rationale": "Rank held: parent PAN-4732 (move heavy e2e out of the default shards) closed as completed on 2026-11-01, so this follow-up is now unblocked and next in line.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5354",
-      "rank": 12,
-      "size": "M",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Host-crash-killed work agents stay dead: deacon-lite confirms death but nothing resumes; add paced resumeCrashedWorkAgents.",
-      "rationale": "New substrate bug from the 2026-11-15 host crash: five work agents sat dead 1-2h because no code path turns a confirmed death into a resume or Needs-you item since the PAN-3917 cut. It ranks just below the in-pipeline pins because unattended recovery is a pipeline prerequisite, and the body already carries file:line root cause, a reuse-the-crash-door design, 11 ACs and named tests, so it is ready to plan.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1449,6 +1394,19 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "dependsOn": [],
       "why": "Dashboard main thread pinned at 100%: orphan scan re-queries SQLite for 4000 transcripts per tick; cost/usage routes never answer.",
       "rationale": "New issue with a profiled root cause: 42% of main-thread CPU goes to an unindexed per-transcript lookup on every conversation poll tick, which starves /api/costs/summary, /api/fleet/usage and /api/health. It degrades every dashboard surface and blocks PAN-5370 item 3 from being observable, so it ranks beside the other event-loop fix PAN-4544.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5381",
+      "rank": 19,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Dashboard main thread: findProjectByPath runs realpathSync on every project root per call (10.8% of profile); cache roots once.",
+      "rationale": "New follow-up to in-pipeline PAN-5369 from the same main-thread CPU profile: about 40 call sites, several on poll paths, each pay (projects+1) synchronous realpath calls, so it is the next-largest cause of a frozen dashboard after the orphan scan. Small, verified in code, with a mechanical acceptance test, so it ranks directly after PAN-5369.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6908,10 +6866,9 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "importance": "medium",
       "score": 50,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5337"
-      ],
+      "dependsOn": [],
       "why": "A Preview link to another Markdown file should open it in Preview, not Edit. Follows PAN-5337.",
+      "rationale": "Rank kept; its only dependency PAN-5337 closed, so the dependsOn entry is removed and it is now unblocked.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13385,6 +13342,13 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 0.5
     },
     {
+      "from": "PAN-4544",
+      "to": "PAN-5381",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
       "from": "PAN-4552",
       "to": "PAN-2416",
       "type": "informs",
@@ -13532,13 +13496,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 0.6
     },
     {
-      "from": "PAN-5013",
-      "to": "PAN-5354",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
       "from": "PAN-5029",
       "to": "PAN-5058",
       "type": "informs",
@@ -13679,20 +13636,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 1
     },
     {
-      "from": "PAN-5337",
-      "to": "PAN-5340",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5337",
-      "to": "PAN-5372",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-5358",
       "to": "PAN-1121",
       "type": "informs",
@@ -13749,15 +13692,15 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 0.8
     },
     {
-      "from": "PAN-5363",
-      "to": "PAN-5364",
+      "from": "PAN-5369",
+      "to": "PAN-5370",
       "type": "informs",
       "source": "ai-inferred",
-      "confidence": 0.5
+      "confidence": 0.6
     },
     {
       "from": "PAN-5369",
-      "to": "PAN-5370",
+      "to": "PAN-5381",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6

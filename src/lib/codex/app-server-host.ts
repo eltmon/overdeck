@@ -27,6 +27,7 @@ import { calculateCost, getPricing } from '../cost.js';
 import { recordAgentActivity } from '../agents/agent-state.js';
 import { appendSessionIdToHistory } from '../session-history.js';
 import { isEffortLevel } from '@overdeck/contracts';
+import { applyCodexPromptMemory, type CodexPromptMemoryInput, type CodexPromptMemoryResult } from './prompt-memory.js';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -74,6 +75,8 @@ export interface CodexAppServerHostOptions {
   stdin?: Readable;
   stdout?: Writable;
   recordActivity?: (agentId: string, activity: { at?: string; costSoFar?: number }) => boolean;
+  /** PAN-5359: per-turn memory (test seam; defaults to applyCodexPromptMemory). */
+  promptMemory?: (input: CodexPromptMemoryInput) => Promise<CodexPromptMemoryResult>;
 }
 
 interface HostOpResult {
@@ -283,14 +286,22 @@ export class CodexAppServerHost {
     const state = this.manager.getState();
     await this.ensureThread(model, { strict: false });
 
+    const memory = await (this.options.promptMemory ?? applyCodexPromptMemory)({
+      prompt: content,
+      agentId: this.options.agentId,
+      sessionId: this.manager.getState().threadId ?? this.options.agentId,
+      conversation: process.env.OVERDECK_CONVERSATION,
+    });
+
     await this.appendEvent('op/message', {
       contentLength: content.length,
       model: requestedModel,
       effort: requestedEffort,
       hasExistingThread: Boolean(state.threadId),
+      memoryContextChars: memory.contextChars,
     });
     this.writePaneLine(`[user] ${content}`);
-    await this.manager.startTurn(content, {
+    await this.manager.startTurn(memory.text, {
       ...(requestedModel ? { model: requestedModel } : {}),
       ...(requestedEffort ? { effort: requestedEffort } : {}),
     });
