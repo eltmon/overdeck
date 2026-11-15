@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5294",
   "created": "2026-11-15T11:49:42.622Z",
-  "updated": "2026-11-15T13:50:53.286Z",
+  "updated": "2026-11-15T14:21:03.907Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -12,6 +12,16 @@
       "reason": "resume",
       "agentModel": "claude-opus-5-5",
       "timestamp": "2026-11-15T13:18:49.515Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-15T14:20Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-15T14:20:27.021Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-15T14:21Z] ci-monitor → FAILED — seq 2",
+      "timestamp": "2026-11-15T14:21:03.907Z"
     }
   ],
   "items": {
@@ -276,5 +286,21 @@
       "doneAt": "2026-11-15T13:50:53.285Z"
     }
   },
-  "agentModel": "claude-opus-5-5"
+  "agentModel": "claude-opus-5-5",
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-15T14:20:27Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5294\n\nPull request: https://github.com/eltmon/overdeck/pull/5351 (head `dba7ba44`)\n\nSource: check_run:test-shard (4/4)\n\n## Failing checks (1)\n\n### test-shard (4/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/132839652725/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/43723276136/job/132839652725  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/styleguide-conformance.spec.ts\u001b[2m > \u001b[22mstyleguide rendered surface conformance\u001b[2m > \u001b[22mrenders shared primitives on the Command Deck route\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/styleguide-conformance.spec.ts\u001b[2m > \u001b[22mstyleguide rendered surface conformance\u001b[2m > \u001b[22mrenders shared primitives on the Command Deck route\n\u001b[31m\u001b[1mTimeoutError\u001b[22m: locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for getByText('Overdeck', { exact: true }).nth(1)\n    - locator resolved to <span class=\"shrink-0 font-medium text-foreground\">Overdeck</span>\n  - attempting click action\n    - waiting for element to be visible, enabled and stable\n  - element was detached from the DOM, retrying\n\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m tests/e2e/styleguide-conformance.spec.ts:\u001b[2m470:74\u001b[22m\u001b[39m\n    \u001b[90m468|\u001b[39m   it('renders shared primitives on the Command Deck route', async () =…\n    \u001b[90m469|\u001b[39m     \u001b[35mconst\u001b[39m commandDeck \u001b[33m=\u001b[39m \u001b[35mawait\u001b[39m \u001b[34mopenRoute\u001b[39m(\u001b[32m'/command-deck'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m470|\u001b[39m     await commandDeck.page.getByText('Overdeck', { exact: true }).nth(…\n    \u001b[90m   |\u001b[39m                                                                          \u001b[31m^\u001b[39m\n    \u001b[90m471|\u001b[39m     // CommandDeck uses FeatureItem (not IssueRow) since the ProjectTr…\n    \u001b[90m472|\u001b[39m     await expect.poll(() => commandDeck.page.locator('[data-component=…\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/styleguide-conformance.spec.ts\u001b[2m > \u001b[22mstyleguide rendered surface conformance\u001b[2m > \u001b[22menforces visual contracts from the style guide (grid, badge tokens, drawer title font)\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/styleguide-conformance.spec.ts\u001b[2m > \u001b[22mstyleguide r\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m671 passed\u001b[39m\u001b[22m\u001b[90m (672)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-15T14:21:03Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5294\n\nPull request: https://github.com/eltmon/overdeck/pull/5351 (head `dba7ba44`)\n\nSource: check_run:test\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (4/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/132839652725/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/43723276136/job/132839652725  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/styleguide-conformance.spec.ts\u001b[2m > \u001b[22mstyleguide rendered surface conformance\u001b[2m > \u001b[22mrenders shared primitives on the Command Deck route\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/styleguide-conformance.spec.ts\u001b[2m > \u001b[22mstyleguide rendered surface conformance\u001b[2m > \u001b[22mrenders shared primitives on the Command Deck route\n\u001b[31m\u001b[1mTimeoutError\u001b[22m: locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for getByText('Overdeck', { exact: true }).nth(1)\n    - locator resolved to <span class=\"shrink-0 font-medium text-foreground\">Overdeck</span>\n  - attempting click action\n    - waiting for element to be visible, enabled and stable\n  - element was detached from the DOM, retrying\n\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m tests/e2e/styleguide-conformance.spec.ts:\u001b[2m470:74\u001b[22m\u001b[39m\n    \u001b[90m468|\u001b[39m   it('renders shared primitives on the Command Deck route', async () =…\n    \u001b[90m469|\u001b[39m     \u001b[35mconst\u001b[39m commandDeck \u001b[33m=\u001b[39m \u001b[35mawait\u001b[39m \u001b[34mopenRoute\u001b[39m(\u001b[32m'/command-deck'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m470|\u001b[39m     await commandDeck.page.getByText('Overdeck', { exact: true }).nth(…\n    \u001b[90m   |\u001b[39m                                                                          \u001b[31m^\u001b[39m\n    \u001b[90m471|\u001b[39m     // CommandDeck uses FeatureItem (not IssueRow) since the ProjectTr…\n    \u001b[90m472|\u001b[39m     await expect.poll(() => commandDeck.page.locator('[data-component=…\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/styleguide-conformance.spec.ts\u001b[2m > \u001b[22mstyleguide rendered surface conformance\u001b[2m > \u001b[22menforces visual contracts from the style guide (grid, badge tokens, drawer title font)\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/styleguide-conformance.spec.ts\u001b[2m > \u001b[22mstyleguide r\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m671 passed\u001b[39m\u001b[22m\u001b[90m (672)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
 }
