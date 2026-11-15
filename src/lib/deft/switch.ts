@@ -56,7 +56,7 @@ export interface DeftSwitchDeps {
   nativeDirective?: (workspace: string) => Promise<boolean>;
   hasSnapshot?: (workspace: string) => Promise<boolean>;
   findPlanPath?: (workspace: string) => Promise<string | null>;
-  writePlaceholderPlan?: (projectPath: string, workspace: string, issueId: string) => Promise<void>;
+  writePlaceholderPlan?: (workspace: string, issueId: string) => Promise<void>;
 }
 
 export interface UseDeftResult {
@@ -113,11 +113,11 @@ async function readPlanMetadata(path: string): Promise<Record<string, unknown> |
 }
 
 /** Write the one-item stand-in plan and mark it `plan.metadata.deftPlaceholder` (AD-3). */
-async function defaultWritePlaceholderPlan(projectPath: string, workspace: string, issueId: string): Promise<void> {
-  const written = await Effect.runPromise(writeAutoStartXBrief(projectPath, workspace, { issueId, title: DEFT_PLACEHOLDER_TITLE }));
-  const doc = JSON.parse(await readFile(written.projectSpecPath, 'utf8')) as { plan: { metadata?: Record<string, unknown> } };
+async function defaultWritePlaceholderPlan(workspace: string, issueId: string): Promise<void> {
+  const written = await Effect.runPromise(writeAutoStartXBrief(workspace, { issueId, title: DEFT_PLACEHOLDER_TITLE }));
+  const doc = JSON.parse(await readFile(written.specPath, 'utf8')) as { plan: { metadata?: Record<string, unknown> } };
   doc.plan.metadata = { ...(doc.plan.metadata ?? {}), deftPlaceholder: true };
-  await writeFile(written.projectSpecPath, `${JSON.stringify(doc, null, 2)}\n`, 'utf8');
+  await writeFile(written.specPath, `${JSON.stringify(doc, null, 2)}\n`, 'utf8');
 }
 
 function withDefaults(deps: DeftSwitchDeps): Required<DeftSwitchDeps> {
@@ -140,20 +140,20 @@ function withDefaults(deps: DeftSwitchDeps): Required<DeftSwitchDeps> {
 }
 
 /** AD-16: polyrepo and remote workspaces are out of v1. */
-function refuseUnsupported(issueId: string, d: Required<DeftSwitchDeps>): { projectPath: string; workspace: string } {
+function refuseUnsupported(issueId: string, d: Required<DeftSwitchDeps>): { workspace: string } {
   const project = d.resolveProject(issueId);
   if (!project) throw new DeftSwitchError(`no registered project owns ${issueId}`);
   if (project.polyrepo) throw new DeftSwitchError(`${issueId} is in a polyrepo workspace; running an issue on Deft supports single-repo workspaces only`);
   if (d.isRemote(issueId)) throw new DeftSwitchError(`${issueId} has a remote workspace; running an issue on Deft supports local workspaces only`);
   const workspace = d.workspacePath(issueId);
   if (!workspace) throw new DeftSwitchError(`no workspace path for ${issueId}`);
-  return { projectPath: project.projectPath, workspace };
+  return { workspace };
 }
 
 export async function useDeftPipeline(issueId: string, deps: DeftSwitchDeps = {}): Promise<UseDeftResult> {
   const issue = issueId.toUpperCase();
   const d = withDefaults(deps);
-  const { projectPath, workspace } = refuseUnsupported(issue, d);
+  const { workspace } = refuseUnsupported(issue, d);
 
   await d.stopAgents(issue);
   await d.setPipeline(issue, 'deft');
@@ -163,7 +163,7 @@ export async function useDeftPipeline(issueId: string, deps: DeftSwitchDeps = {}
     if (!result.ok) throw new DeftSwitchError(result.error);
     let placeholderPlan = false;
     if ((await d.findPlanPath(workspace)) === null) {
-      await d.writePlaceholderPlan(projectPath, workspace, issue);
+      await d.writePlaceholderPlan(workspace, issue);
       placeholderPlan = true;
     }
     if (result.mode === 'directive-project') return { mode: 'directive-project', snapshotPaths: [], workspace, placeholderPlan };

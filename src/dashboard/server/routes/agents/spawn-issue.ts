@@ -360,11 +360,12 @@ export const spawnIssueAgentForRoute = (input: { body: unknown; internalRequest:
     const workspacePanContinuePath = join(workspacePanDir, PAN_CONTINUE_FILENAME);
 
     let planPath = yield* findPlan(workspacePath);
-    if (autoStart && !planPath) {
+    // PAN-5316: only synthesize once the workspace dir actually exists.
+    if (autoStart && !planPath && existsSync(workspacePath)) {
       const issueTitle = cachedIssue?.title || issueId;
       const issueBody = cachedIssue?.description || '';
       // writeAutoStartXBrief is Effect-returning — yield it directly (PAN-1768).
-      yield* writeAutoStartXBrief(projectPath, workspacePath, {
+      yield* writeAutoStartXBrief(workspacePath, {
         issueId,
         title: issueTitle,
         body: issueBody,

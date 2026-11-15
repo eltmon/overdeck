@@ -28,8 +28,8 @@
  *
  * The same guard directory also holds a `gh` shim (PAN-4264) that records each
  * agent `gh` call in the GitHub quota ledger and, first, refuses writes of the
- * operator grant labels `released`, `auto-merge` and `hold-for-uat`
- * (PAN-4343). An absolute `/usr/bin/gh` bypasses it too.
+ * operator grant labels `released`, `auto-merge`, `hold-for-uat` and `vetoed`
+ * (PAN-4343, PAN-5325). An absolute `/usr/bin/gh` bypasses it too.
  *
  * Default mode also refuses `commit`, `push`, `merge` and `cherry-pick` in a
  * drifted worktree (PAN-4337): when the target's toplevel is a linked worktree
@@ -366,10 +366,10 @@ function trailerShimLines(key: 'Overdeck-Agent' | 'Overdeck-Conversation', value
 }
 
 /**
- * PAN-4343: the `gh` shim's grant-label deny. `released`, `auto-merge` and
- * `hold-for-uat` carry operator decisions, so adding or removing one is
- * refused: `gh issue|pr edit|create` label flags (comma lists, `=` and
- * attached forms, any case), and `gh api` calls whose effective method is not
+ * PAN-4343: the `gh` shim's grant-label deny. `released`, `auto-merge`,
+ * `hold-for-uat` and `vetoed` (PAN-5325) carry operator decisions, so adding
+ * or removing one is refused: `gh issue|pr edit|create` label flags (comma
+ * lists, `=` and attached forms, any case), and `gh api` calls whose effective method is not
  * GET with a label carrier (a `labels…=` field or an `issues/<n>/labels/<name>`
  * path) naming a grant label. The implied method follows `gh api`: POST when a
  * field or `--input` is given, else GET. A refusal exits 1 before the ledger
@@ -378,7 +378,7 @@ function trailerShimLines(key: 'Overdeck-Agent' | 'Overdeck-Conversation', value
  */
 const GRANT_LABEL_DENY_SH = [
   '_overdeck_gh_refuse() {',
-  '  echo "Overdeck refused gh: \'$1\' is an operator grant label (released, auto-merge, hold-for-uat). Only the operator adds or removes it. Ask the operator instead of changing it." >&2',
+  '  echo "Overdeck refused gh: \'$1\' is an operator grant label (released, auto-merge, hold-for-uat, vetoed). Only the operator adds or removes it. Ask the operator instead of changing it." >&2',
   '  exit 1',
   '}',
   '_overdeck_gh_grant_in() {',
@@ -386,7 +386,7 @@ const GRANT_LABEL_DENY_SH = [
   '  _og_ifs="$IFS"; IFS=\',\'',
   '  for _og_v in $_og_list; do',
   '    case "$_og_v" in',
-  '      released|auto-merge|hold-for-uat) IFS="$_og_ifs"; printf \'%s\\n\' "$_og_v"; return 0 ;;',
+  '      released|auto-merge|hold-for-uat|vetoed) IFS="$_og_ifs"; printf \'%s\\n\' "$_og_v"; return 0 ;;',
   '    esac',
   '  done',
   '  IFS="$_og_ifs"',
@@ -428,6 +428,7 @@ const GRANT_LABEL_DENY_SH = [
   '            *released*) _og_hit=released ;;',
   '            *auto-merge*) _og_hit=auto-merge ;;',
   '            *hold-for-uat*) _og_hit=hold-for-uat ;;',
+  '            *vetoed*) _og_hit=vetoed ;;',
   '          esac',
   '          ;;',
   '      esac',

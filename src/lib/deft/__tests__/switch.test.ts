@@ -108,18 +108,28 @@ describe('useDeftPipeline', () => {
   });
 
   it('marks the stand-in plan it writes with deftPlaceholder', async () => {
+    // PAN-5316: the stand-in plan lands in the workspace plan home, never in
+    // the primary checkout that resolveProject reports.
     const projectPath = mkdtempSync(join(scratch, 'project-'));
-    const { deps } = recorder({ findPlanPath: async () => null, writePlaceholderPlan: undefined });
+    const workspace = join(mkdtempSync(join(scratch, 'ws-')), 'workspaces', 'feature-tst-1');
+    mkdirSync(workspace, { recursive: true });
+    const { deps } = recorder({
+      findPlanPath: async () => null,
+      writePlaceholderPlan: undefined,
+      resolveProject: () => ({ projectKey: 'tst', projectPath, polyrepo: false }),
+      workspacePath: () => workspace,
+    });
 
-    await useDeftPipeline('TST-1', { ...deps, resolveProject: () => ({ projectKey: 'tst', projectPath, polyrepo: false }) });
+    await useDeftPipeline('TST-1', deps);
 
-    const specs = readdirSync(join(projectPath, '.pan', 'specs'));
+    const specs = readdirSync(join(workspace, '.pan', 'specs'));
     expect(specs).toHaveLength(1);
-    const plan = JSON.parse(readFileSync(join(projectPath, '.pan', 'specs', specs[0] ?? ''), 'utf8')) as {
+    const plan = JSON.parse(readFileSync(join(workspace, '.pan', 'specs', specs[0] ?? ''), 'utf8')) as {
       plan: { title: string; metadata: Record<string, unknown> };
     };
     expect(plan.plan.title).toBe(DEFT_PLACEHOLDER_TITLE);
     expect(plan.plan.metadata.deftPlaceholder).toBe(true);
+    expect(existsSync(join(projectPath, '.pan', 'specs'))).toBe(false);
   });
 });
 

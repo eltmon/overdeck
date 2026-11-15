@@ -622,7 +622,7 @@ describe('generateLauncherScript', () => {
       #!/bin/sh
       _OVERDECK_REAL_GH="$_OVERDECK_REAL_GH"
       _overdeck_gh_refuse() {
-        echo "Overdeck refused gh: '\\$1' is an operator grant label (released, auto-merge, hold-for-uat). Only the operator adds or removes it. Ask the operator instead of changing it." >&2
+        echo "Overdeck refused gh: '\\$1' is an operator grant label (released, auto-merge, hold-for-uat, vetoed). Only the operator adds or removes it. Ask the operator instead of changing it." >&2
         exit 1
       }
       _overdeck_gh_grant_in() {
@@ -630,7 +630,7 @@ describe('generateLauncherScript', () => {
         _og_ifs="\\$IFS"; IFS=','
         for _og_v in \\$_og_list; do
           case "\\$_og_v" in
-            released|auto-merge|hold-for-uat) IFS="\\$_og_ifs"; printf '%s\\n' "\\$_og_v"; return 0 ;;
+            released|auto-merge|hold-for-uat|vetoed) IFS="\\$_og_ifs"; printf '%s\\n' "\\$_og_v"; return 0 ;;
           esac
         done
         IFS="\\$_og_ifs"
@@ -672,6 +672,7 @@ describe('generateLauncherScript', () => {
                   *released*) _og_hit=released ;;
                   *auto-merge*) _og_hit=auto-merge ;;
                   *hold-for-uat*) _og_hit=hold-for-uat ;;
+                  *vetoed*) _og_hit=vetoed ;;
                 esac
                 ;;
             esac
@@ -985,7 +986,7 @@ describe('generateLauncherScript', () => {
       #!/bin/sh
       _OVERDECK_REAL_GH="$_OVERDECK_REAL_GH"
       _overdeck_gh_refuse() {
-        echo "Overdeck refused gh: '\\$1' is an operator grant label (released, auto-merge, hold-for-uat). Only the operator adds or removes it. Ask the operator instead of changing it." >&2
+        echo "Overdeck refused gh: '\\$1' is an operator grant label (released, auto-merge, hold-for-uat, vetoed). Only the operator adds or removes it. Ask the operator instead of changing it." >&2
         exit 1
       }
       _overdeck_gh_grant_in() {
@@ -993,7 +994,7 @@ describe('generateLauncherScript', () => {
         _og_ifs="\\$IFS"; IFS=','
         for _og_v in \\$_og_list; do
           case "\\$_og_v" in
-            released|auto-merge|hold-for-uat) IFS="\\$_og_ifs"; printf '%s\\n' "\\$_og_v"; return 0 ;;
+            released|auto-merge|hold-for-uat|vetoed) IFS="\\$_og_ifs"; printf '%s\\n' "\\$_og_v"; return 0 ;;
           esac
         done
         IFS="\\$_og_ifs"
@@ -1035,6 +1036,7 @@ describe('generateLauncherScript', () => {
                   *released*) _og_hit=released ;;
                   *auto-merge*) _og_hit=auto-merge ;;
                   *hold-for-uat*) _og_hit=hold-for-uat ;;
+                  *vetoed*) _og_hit=vetoed ;;
                 esac
                 ;;
             esac

@@ -251,11 +251,11 @@ batch for every later tick, because no newer row could ever form to break the
 streak. A fixed cause now heals itself within the window, and **Retry batch
 assembly** bypasses the cutoff at once.
 
-**Grant labels are operator-only.** `released`, `auto-merge` and `hold-for-uat`
-carry operator decisions. The agent `gh` shim refuses to add or remove them
-(`gh issue|pr edit|create` label flags and `gh api` writes on
+**Grant labels are operator-only.** `released`, `auto-merge`, `hold-for-uat`
+and `vetoed` carry operator decisions. The agent `gh` shim refuses to add or
+remove them (`gh issue|pr edit|create` label flags and `gh api` writes on
 `issues/<n>/labels`) for every agent pane and the Flywheel conversation
-(PAN-4343); operator conversations and the dashboard pass. It is a PATH shim,
+(PAN-4343, PAN-5325); operator conversations and the dashboard pass. It is a PATH shim,
 so an absolute `/usr/bin/gh`, or a GraphQL mutation by label node ID,
 bypasses it.
 

@@ -957,7 +957,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     if (options.auto && !findPlanSync(workspace)) {
       prep.update(`Synthesizing minimal xBRIEF for ${id}...`);
       const issue = await fetchIssueForAutoStart(id);
-      await Effect.runPromise(writeAutoStartXBrief(projectRoot, workspace, issue));
+      await Effect.runPromise(writeAutoStartXBrief(workspace, issue));
     }
 
     if (!findPlanSync(workspace)) {

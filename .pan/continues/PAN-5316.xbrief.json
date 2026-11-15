@@ -1,0 +1,79 @@
+{
+  "version": "1",
+  "issueId": "PAN-5316",
+  "created": "2026-11-15T05:00:24.282Z",
+  "updated": "2026-11-15T05:14:24.630Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "workspace-writer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5316",
+      "claimedAt": "2026-11-15T05:00:24.282Z",
+      "doneAt": "2026-11-15T05:08:56.517Z"
+    },
+    "workspace-writer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T05:08:56.517Z"
+    },
+    "workspace-writer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T05:08:56.517Z"
+    },
+    "workspace-writer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T05:08:56.517Z"
+    },
+    "workspace-writer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T05:08:56.517Z"
+    },
+    "regression-tests": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5316",
+      "claimedAt": "2026-11-15T05:09:03.606Z",
+      "doneAt": "2026-11-15T05:11:37.244Z"
+    },
+    "regression-tests.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T05:11:37.244Z"
+    },
+    "regression-tests.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T05:11:37.244Z"
+    },
+    "regression-tests.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T05:11:37.244Z"
+    },
+    "regression-tests.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T05:11:37.244Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5316",
+      "claimedAt": "2026-11-15T05:11:43.367Z",
+      "doneAt": "2026-11-15T05:14:24.630Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T05:14:24.630Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T05:14:24.630Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T05:14:24.630Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T05:14:24.630Z"
+    }
+  }
+}
