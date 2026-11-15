@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5395",
   "created": "2026-11-15T20:20:46.652Z",
-  "updated": "2026-11-15T20:44:41.479Z",
+  "updated": "2026-11-15T20:44:46.474Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,11 @@
     "start-heals-sync-exclude.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T20:44:41.478Z"
+    },
+    "docs-sync-exclude": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5395",
+      "claimedAt": "2026-11-15T20:44:46.474Z"
     }
   }
 }
