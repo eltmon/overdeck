@@ -24,7 +24,6 @@ import { homedir } from 'os';
 import { join } from 'path';
 import {
   createConversation,
-  getConversationByClaudeSessionId,
   getConversationByName,
   listConversations,
   markConversationEnded,
@@ -32,6 +31,7 @@ import {
   setClearedToConvId,
   type LegacyConversation as Conversation,
 } from '../../../lib/overdeck/conversations.js';
+import { listConversationLocators, isConversationLocatorOwned } from '../../../lib/overdeck/conversation-batch-lookup.js';
 import { closeCompanionTerminalForOwner } from '../../../lib/overdeck/companion-terminal/index.js';
 import { conversationLaunchContext } from '../../../lib/overdeck/conversation-launch-context.js';
 import { adoptForkedClaudeSessions, readFirstClearTimestamp } from '../../../lib/overdeck/conversation-fork-adoption.js';
@@ -529,6 +529,8 @@ async function detectOrphanedClaudeCodeSessions(activeConvs: Conversation[]): Pr
     list.push(conv);
     cwdGroups.set(conv.cwd, list);
   }
+  if (cwdGroups.size === 0) return;
+  const ownedLocators = listConversationLocators();
 
   for (const [cwd, convs] of cwdGroups) {
     const projectDir = claudeProjectDir(cwd);
@@ -554,7 +556,7 @@ async function detectOrphanedClaudeCodeSessions(activeConvs: Conversation[]): Pr
 
       // Already linked to a conversation (either as a primary session or via a previous
       // orphan-detect pass that adopted it).
-      if (getConversationByClaudeSessionId(sessionId)) continue;
+      if (ownedLocators.has(sessionId)) continue;
 
       const { clearTs: firstClearTs, definitive } = await readFirstClearTimestamp(jsonlPath);
       if (firstClearTs === null) {
@@ -590,6 +592,8 @@ async function detectOrphanedClaudeCodeSessions(activeConvs: Conversation[]): Pr
         continue;
       }
 
+      if (isConversationLocatorOwned(sessionId)) continue;
+
       const baseTitle = parent.title ?? 'Conversation';
       const autoTitle = `[post-/clear] ${baseTitle}`;
       let sibling: Conversation;
@@ -612,6 +616,7 @@ async function detectOrphanedClaudeCodeSessions(activeConvs: Conversation[]): Pr
         console.warn(`[conversation-lifecycle] Failed to create post-/clear sibling for ${sessionId}: ${(err as Error).message}`);
         continue;
       }
+      ownedLocators.add(sessionId);
 
       try {
         setClearedToConvId(parent.name, sibling.id);
