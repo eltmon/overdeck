@@ -654,13 +654,13 @@ describe('ConversationList sections (PAN-4639 WI-5)', () => {
     };
   }
 
-  function renderRows(rows: unknown[]) {
+  function renderRows(rows: unknown[], scope?: 'active' | 'all') {
     const client = makeClient();
     client.setQueryData(['conversations'], rows);
     render(
       <DialogProvider>
         <QueryClientProvider client={client}>
-          <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+          <ConversationList selectedConversation={null} onSelectConversation={() => {}} scope={scope} />
         </QueryClientProvider>
       </DialogProvider>,
     );
@@ -688,6 +688,32 @@ describe('ConversationList sections (PAN-4639 WI-5)', () => {
     expect(inboxRow).toHaveAttribute('data-section', 'inbox');
     // needsYouRow precedes inboxRow in document order.
     expect(needsYouRow!.compareDocumentPosition(inboxRow!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('scope active shows Needs you and Inbox but not Snoozed or Settled (PAN-5293 F-D13)', () => {
+    renderRows([
+      triageConv(1, 'plain-a'),
+      triageConv(2, 'needs-you', { pendingInputCount: 1 }),
+      triageConv(3, 'settled-1', { settledAt: '2026-09-01T00:00:00.000Z' }),
+      triageConv(4, 'snoozed-1', { snoozedUntil: '2099-01-01T00:00:00.000Z' }),
+    ], 'active');
+    expect(screen.getByTitle('needs-you')).toBeInTheDocument();
+    expect(screen.getByTitle('plain-a')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Settled · 1/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Snoozed · 1/ })).not.toBeInTheDocument();
+  });
+
+  it('without a scope (WorkspaceView) all four sections render as before', () => {
+    renderRows([
+      triageConv(1, 'plain-a'),
+      triageConv(2, 'needs-you', { pendingInputCount: 1 }),
+      triageConv(3, 'settled-1', { settledAt: '2026-09-01T00:00:00.000Z' }),
+      triageConv(4, 'snoozed-1', { snoozedUntil: '2099-01-01T00:00:00.000Z' }),
+    ]);
+    expect(screen.getByTitle('needs-you').closest('[data-section]')).toHaveAttribute('data-section', 'needsYou');
+    expect(screen.getByTitle('plain-a').closest('[data-section]')).toHaveAttribute('data-section', 'inbox');
+    expect(screen.getByRole('button', { name: /Settled · 1/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Snoozed · 1/ })).toBeInTheDocument();
   });
 
   it('list-sections.ac2: Snoozed and Settled headers render collapsed, with their rows hidden until clicked', () => {
