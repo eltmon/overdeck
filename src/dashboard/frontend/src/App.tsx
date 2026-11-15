@@ -14,7 +14,6 @@ import { NO_PROJECT_KEY } from './components/CommandDeck/projectsData';
 import { IssueDrawer } from './components/drawer/IssueDrawer';
 import { IssueDrawerAvailableContext } from './components/drawer/issueDrawerAvailableContext';
 import { ResumableSessionDialog } from './components/ResumableSessionDialog';
-import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar';
 import type { CreatedProject } from './components/project/new/useProjectCreateIntent';
 import { takeAddProjectReturnTo, useAddProjectDialog } from './components/project/new/addProjectDialogStore';
 import { requestLauncherFocusAfterCreate } from './components/Stage/launcherFocusStore';
@@ -90,14 +89,6 @@ export type { ConversationViewModeMap } from './App/routes';
 // PAN-2355 (D-4) — the phone shell loads in its own chunk; the desktop bundle
 // carries only this lazy import.
 const MobileApp = lazy(() => import('./components/mobile/MobileApp'));
-
-export const SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY = 'overdeck.ui.sessionFeedSidebarOpen';
-
-function readSessionFeedSidebarOpen(): boolean {
-  if (typeof window === 'undefined') return true;
-  const value = window.localStorage.getItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY);
-  return value === null ? true : value === 'true';
-}
 
 function TasksViewerHost() {
   const issueId = useDashboardStore((state) => state.tasksViewerIssueId);
@@ -267,7 +258,6 @@ export default function App() {
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [paletteInitialScope, setPaletteInitialScope] = useState<'all' | 'conversations'>('all');
   const [pendingConversationTarget, setPendingConversationTarget] = useState<PendingConversationTarget | null>(null);
-  const [isSessionFeedSidebarOpen, setIsSessionFeedSidebarOpen] = useState(readSessionFeedSidebarOpen);
   const [trackerBannerDismissed, setTrackerBannerDismissed] = useState(false);
 
   const drawerIssueId = useDashboardStore((state) => state.drawer.issueId);
@@ -559,11 +549,6 @@ export default function App() {
     setConversationRoute(conversationName, 'conversation');
   }, [setActiveTab, setConversationRoute]);
 
-  const setSessionFeedSidebarOpen = useCallback((open: boolean) => {
-    setIsSessionFeedSidebarOpen(open);
-    window.localStorage.setItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY, String(open));
-  }, []);
-
   // PAN-1561: open a project's deck from the sidebar rail. Land on the project's
   // HOME pane (the S4 cockpit) rather than whatever tab the deck last had active
   // — the panes store remembers per-workspace, so it would otherwise restore a
@@ -794,13 +779,11 @@ export default function App() {
         showCliproxyBanner={showCliproxyBanner}
         isRestartBackendPending={restartBackendMutation.isPending}
         isRestartCliproxyPending={restartCliproxyMutation.isPending}
-        isSessionFeedSidebarOpen={isSessionFeedSidebarOpen}
         onPaletteOpen={() => { setPaletteInitialScope('all'); setIsPaletteOpen(true); }}
         onOpenSettings={() => setActiveTab('settings')}
         onDismissTrackerBanner={() => setTrackerBannerDismissed(true)}
         onRestartBackend={() => restartBackendMutation.mutate()}
         onRestartCliproxy={() => restartCliproxyMutation.mutate()}
-        onToggleSessionFeedSidebar={() => setSessionFeedSidebarOpen(!isSessionFeedSidebarOpen)}
         onProjectCreated={handleProjectCreated}
         onGoHome={() => setActiveTab('home')}
       />
@@ -852,11 +835,6 @@ export default function App() {
           />
         </main>
         </DeckNavigationProvider>
-        {/* PAN-1591: in the Command Deck the merged Awareness rail already covers
-            this global feed, so don't double it up there. */}
-        {isSessionFeedSidebarOpen && !['command-deck', 'backlog', 'god-view'].includes(activeTab) && (
-          <SessionFeedSidebar onClose={() => setSessionFeedSidebarOpen(false)} />
-        )}
       </div>
 
       <IssueDrawer />

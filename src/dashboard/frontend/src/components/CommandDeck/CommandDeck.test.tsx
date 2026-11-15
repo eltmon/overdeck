@@ -499,15 +499,15 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     expect(screen.queryByTestId('project-node')).not.toBeInTheDocument();
   });
 
-  it('mounts the project deck and activity feed for the selected project', async () => {
+  it('mounts the project deck, and no Awareness rail (PAN-5293 F-D22)', async () => {
     renderCommandDeck({ selectedProject: 'test-project' });
     await screen.findAllByTestId('project-node');
 
     const stage = screen.getByTestId('stage');
     expect(stage).toHaveAttribute('data-deck', 'test-project');
-    expect(screen.getByTestId('activity-feed')).toHaveAttribute('data-issues', 'PAN-821');
-    // PAN-4301 FR-15: the rail scopes by the project's resolved conversation set.
-    await waitFor(() => expect(screen.getByTestId('activity-feed')).toHaveAttribute('data-conversations', '1'));
+    // The feed moved to the Feed tab on /activity (ActivityFeedTab.test).
+    expect(screen.queryByTestId('activity-feed')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show Awareness rail' })).not.toBeInTheDocument();
   });
 
   it('keeps the issue rail rendered while selected-project membership is unavailable', async () => {

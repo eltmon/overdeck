@@ -4,7 +4,6 @@ import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DialogProvider } from './components/DialogProvider';
 import App, {
-  SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY,
   buildConversationUrl,
   getCommandDeckProjectRouteFromPath,
   getConversationRouteState,
@@ -68,7 +67,7 @@ vi.mock('./components/KanbanBoard', () => ({
 vi.mock('./components/Agents/FleetAgentsView', () => ({ FleetAgentsView: () => null }));
 vi.mock('./components/HealthDashboard', () => ({ HealthDashboard: () => null }));
 vi.mock('./components/SkillsList', () => ({ SkillsList: () => null }));
-vi.mock('./components/ActivityPanel', () => ({ ActivityPanel: () => null }));
+vi.mock('./components/ActivityPanel', () => ({ ActivityPanel: () => <div data-testid="activity-panel" /> }));
 vi.mock('./components/ConfirmationDialog', () => ({
   ConfirmationDialog: () => null,
 }));
@@ -242,7 +241,7 @@ beforeEach(() => {
   mockToastInfo.mockClear()
   mockToastSuccess.mockClear()
   useDashboardStore.setState.mockClear()
-  window.localStorage.removeItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY)
+  window.localStorage.removeItem('overdeck.ui.sessionFeedSidebarOpen')
   window.localStorage.removeItem('overdeck:last-tab')
 })
 
@@ -565,7 +564,7 @@ describe('App primary routing', () => {
   });
 });
 
-describe('App session feed sidebar', () => {
+describe('App feed column removed (PAN-5293)', () => {
   beforeEach(() => {
     window.history.replaceState(null, '', '/');
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
@@ -583,37 +582,35 @@ describe('App session feed sidebar', () => {
     }));
   });
 
-  it('keeps the sidebar open by default', () => {
+  // PAN-5293 F-D22: the off-deck feed column and its History toggle are gone;
+  // the feed is the Feed tab on /activity.
+  it('renders no feed column', () => {
     renderApp();
-
-    expect(screen.getByTestId('session-feed-sidebar')).toBeInTheDocument();
-  });
-
-  it('closes the sidebar from the toggle and persists the closed state', () => {
-    renderApp();
-
-    fireEvent.click(screen.getByLabelText('Toggle activity feed'));
 
     expect(screen.queryByTestId('session-feed-sidebar')).toBeNull();
-    expect(window.localStorage.getItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY)).toBe('false');
   });
 
-  it('restores the open sidebar from localStorage on mount', () => {
-    window.localStorage.setItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY, 'true');
-
+  it('has no Activity-feed toggle in the top bar', () => {
     renderApp();
 
-    expect(screen.getByTestId('session-feed-sidebar')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Toggle activity feed')).toBeNull();
   });
 
-  it('closes from the in-sidebar close button and persists the closed state', () => {
-    window.localStorage.setItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY, 'true');
-    renderApp();
+  it('ignores an old stored open state', () => {
+    window.localStorage.setItem('overdeck.ui.sessionFeedSidebarOpen', 'true');
+    window.history.replaceState(null, '', '/flywheel');
 
-    fireEvent.click(screen.getByText('Close activity feed'));
+    renderApp();
 
     expect(screen.queryByTestId('session-feed-sidebar')).toBeNull();
-    expect(window.localStorage.getItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY)).toBe('false');
+  });
+
+  it('reaches the feed through /activity', () => {
+    window.history.replaceState(null, '', '/activity');
+
+    renderApp();
+
+    expect(screen.getByTestId('activity-panel')).toBeInTheDocument();
   });
 });
 

@@ -64,13 +64,11 @@ function renderChrome(overrides: { activeTab?: Tab; onPaletteOpen?: () => void; 
       showCliproxyBanner={false}
       isRestartBackendPending={false}
       isRestartCliproxyPending={false}
-      isSessionFeedSidebarOpen={false}
       onPaletteOpen={overrides.onPaletteOpen ?? vi.fn()}
       onOpenSettings={vi.fn()}
       onDismissTrackerBanner={vi.fn()}
       onRestartBackend={vi.fn()}
       onRestartCliproxy={vi.fn()}
-      onToggleSessionFeedSidebar={vi.fn()}
       onProjectCreated={vi.fn()}
       onGoHome={overrides.onGoHome ?? vi.fn()}
     />,
@@ -121,9 +119,9 @@ describe('AppChrome top bar (PAN-5292)', () => {
     }
   });
 
-  it('shows the Activity-feed toggle off the Command Deck only', () => {
-    const { unmount } = renderChrome({ activeTab: 'home' });
-    expect(screen.getByRole('button', { name: 'Toggle activity feed' })).toBeInTheDocument();
+  it('has no Activity-feed toggle on any page (PAN-5293 F-D22)', () => {
+    const { unmount } = renderChrome({ activeTab: 'flywheel' });
+    expect(screen.queryByRole('button', { name: 'Toggle activity feed' })).toBeNull();
     unmount();
 
     renderChrome({ activeTab: 'command-deck' });

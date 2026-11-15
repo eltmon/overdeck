@@ -1,11 +1,9 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useCallback, useRef, useEffect, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft } from 'lucide-react';
 import { Stage } from '../Stage';
 import { ProjectHome } from '../Stage/ProjectHome';
 import { IssueOverview } from '../Stage/IssueOverview';
-import { SessionFeedSidebar } from '../sessionFeed/SessionFeedSidebar';
 import { NO_PROJECT_KEY, NO_PROJECT_LABEL } from './projectsData';
 import { type Conversation } from './ConversationList';
 import { openConversationTab } from './openConversationTab';
@@ -85,14 +83,6 @@ export function CommandDeck({
 }: CommandDeckProps) {
   const selectedFeature = useCommandDeckSelection((s) => s.selectedFeature);
   const selectedConversation = useCommandDeckSelection((s) => s.selectedConversation);
-  // PAN-1591: the Awareness rail can be collapsed to reclaim pane width.
-  const [awarenessCollapsed, setAwarenessCollapsed] = useState(
-    () => typeof window !== 'undefined' && localStorage.getItem('overdeck.ui.awarenessCollapsed') === 'true',
-  );
-  const toggleAwareness = useCallback((collapsed: boolean) => {
-    setAwarenessCollapsed(collapsed);
-    try { localStorage.setItem('overdeck.ui.awarenessCollapsed', String(collapsed)); } catch { /* ignore */ }
-  }, []);
   const queryClient = useQueryClient();
   // PAN-2893: agent spawn/stop events refetch the projects pane immediately.
   useAgentSetInvalidation(queryClient);
@@ -137,7 +127,7 @@ export function CommandDeck({
 
   const { handleSelectFeature } = useIssueSessionActions(selectedProject);
   const {
-    projectConvs, projectConvIdSet, projectIssueIds, selectedProjectData, visibleFeatures,
+    projectConvs, projectIssueIds, selectedProjectData, visibleFeatures,
     selectedRegisteredProject, resolveConversationProjectName, membership,
   } = useProjectScope(selectedProject, conversations);
   const isProjectValidationPending = membership.pending;
@@ -394,37 +384,7 @@ export function CommandDeck({
             <DeckEmptyState onStartWithoutProject={() => onSelectProject?.(NO_PROJECT_KEY)} />
           )}
         </div>
-
-        {/* Awareness rail (PAN-1591) — the merged feed: one column with a
-            Needs-you / Project / Global scope switcher, replacing the separate
-            Project Activity + global Activity Feed columns. */}
-        {selectedProject && !isProjectValidationPending && !registeredProjectsError && !showUnknownProject && (
-          awarenessCollapsed ? (
-            <button
-              type="button"
-              className={styles.activityColumnCollapsed}
-              onClick={() => toggleAwareness(false)}
-              title="Show Awareness"
-              aria-label="Show Awareness rail"
-            >
-              <ChevronLeft size={16} />
-              <span className={styles.activityCollapsedLabel}>Awareness</span>
-            </button>
-          ) : (
-            <div className={styles.activityColumn}>
-              <SessionFeedSidebar
-                embedded
-                heading="Awareness"
-                scopeSwitcher
-                projectIssueIds={isNoProject ? undefined : projectIssueIds}
-                projectConversationIds={isNoProject ? undefined : projectConvIdSet}
-                onClose={() => toggleAwareness(true)}
-              />
-            </div>
-          )
-        )}
       </div>
-
     </div>
   );
 }

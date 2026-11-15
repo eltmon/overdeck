@@ -1,4 +1,4 @@
-import { AlertTriangle, History, Moon, Search, Sun } from 'lucide-react';
+import { AlertTriangle, Moon, Search, Sun } from 'lucide-react';
 import { DeaconFrozenChip, DeaconPauseToggle } from '../components/DeaconPauseToggle';
 import { DegradedModeBanner } from '../components/DegradedModeBanner';
 import { NewBuildBanner } from '../components/NewBuildBanner';
@@ -44,14 +44,12 @@ interface AppChromeProps {
   showCliproxyBanner: boolean | undefined;
   isRestartBackendPending: boolean;
   isRestartCliproxyPending: boolean;
-  isSessionFeedSidebarOpen: boolean;
   /** Open the command palette (the top bar's search box, PAN-5292 E-D15). */
   onPaletteOpen: () => void;
   onOpenSettings: () => void;
   onDismissTrackerBanner: () => void;
   onRestartBackend: () => void;
   onRestartCliproxy: () => void;
-  onToggleSessionFeedSidebar: () => void;
   /** A project was added through the Add-project modal this chrome hosts. */
   onProjectCreated: (project: CreatedProject) => void;
   /** The brand cell opens Home (PAN-5293 F-D14). */
@@ -67,13 +65,11 @@ export function AppChrome({
   showCliproxyBanner,
   isRestartBackendPending,
   isRestartCliproxyPending,
-  isSessionFeedSidebarOpen,
   onPaletteOpen,
   onOpenSettings,
   onDismissTrackerBanner,
   onRestartBackend,
   onRestartCliproxy,
-  onToggleSessionFeedSidebar,
   onProjectCreated,
   onGoHome,
 }: AppChromeProps) {
@@ -206,20 +202,6 @@ export function AppChrome({
             <HealthSection title="System controls"><CloisterStatusBar onOpenSettings={onOpenSettings} /></HealthSection>
           </SystemHealthPill>
           <ThemeToggleButton />
-          {/* The Command Deck has the always-on Awareness rail, so the global
-              feed toggle only appears on other pages (PAN-1591). */}
-          {activeTab !== 'command-deck' && (
-            <button
-              type="button"
-              aria-label="Toggle activity feed"
-              aria-pressed={isSessionFeedSidebarOpen}
-              title="Activity Feed"
-              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              onClick={onToggleSessionFeedSidebar}
-            >
-              <History className="h-4 w-4" aria-hidden="true" />
-            </button>
-          )}
         </div>
       </div>
     </>
