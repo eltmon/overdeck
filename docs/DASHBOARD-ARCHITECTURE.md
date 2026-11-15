@@ -1367,9 +1367,10 @@ naming its real parent (`↳ continued from #<id>` or `lane of #<id> · <run>`),
 parent is not in the list renders at top level with the same kind of marker. A top-level group
 ranks where its best member would sit in the flat active-then-inactive order, so an ended
 predecessor with a live successor ranks with the successor. Only top-level rows carry a collapse
-toggle, which lists the group's non-zero counts. A group defaults to expanded while any descendant
-is active and collapsed otherwise; the viewer's collapsed groups persist in localStorage under
-`commandDeck.groups.collapsed` (a JSON array of top-level conversation names).
+toggle, which lists the group's non-zero counts. A group defaults to collapsed unless a descendant
+has pending input (PAN-5335); a collapsed group still shows the selected conversation's row. The
+viewer's collapsed groups persist in localStorage under `commandDeck.groups.collapsed` (a JSON
+array of top-level conversation names).
 
 **Reasons.** `live-model.ts` classifies each row on the client from the entry plus real-time store
 facts: the issue's derived state, the agent snapshot's pending inputs, and the runtime snapshot.
@@ -1515,13 +1516,19 @@ Log" on the other streams. `/activity` is not an experimental tab
 
 The Feed tab is `ActivityFeedTab` (`components/ActivityFeedTab.tsx`). It renders
 `SessionFeedSidebar` (`src/dashboard/frontend/src/components/sessionFeed/`)
-embedded, with the heading "Feed" and the scope switcher, inside a `max-w-3xl`
-column. The feed has three scopes, Needs you, Project and Global. Needs you is
-the `DecisionsPanel`, so its inline cards (MCP sign-in, held kickoff, agent
-requests) have a production mount here. Project and Global show one merged feed
-with three tabs: All, Chats and Activity. The Git, Files and Comments tabs are
-gone because no source ever wrote rows for them; a stored hidden tab falls back
-to All. The Command Deck has no feed column, and the top bar has no feed toggle.
+embedded, with the scope switcher, inside a `max-w-5xl` column. It passes
+`hideHeader` (PAN-5335) — the tab's own header already names the view, so
+`SessionFeedSidebar` renders no inner `<header>` here. The feed has up to
+three scopes, Needs you, Project and Global; with no project selected,
+`projectScopeAvailable={false}` hides the Project chip (the scope grid becomes
+two columns) and a stored `project` preference reads as Global without ever
+rewriting `overdeck.ui.awarenessScope` — Project comes back once a project is
+selected again. Needs you is the `DecisionsPanel`, so its inline cards (MCP
+sign-in, held kickoff, agent requests) have a production mount here. Project
+and Global show one merged feed with three tabs: All, Chats and Activity. The
+Git, Files and Comments tabs are gone because no source ever wrote rows for
+them; a stored hidden tab falls back to All. The Command Deck has no feed
+column, and the top bar has no feed toggle.
 
 Sources, merged in `useMergedFeed.ts`:
 
@@ -2081,24 +2088,51 @@ feed column.
 Top to bottom:
 
 1. **Project switcher** (`ProjectSwitcher.tsx`). The button shows the project's
-   two-letter mark, its name and its path with the home directory as `~`. The
-   menu lists every registered project in owner groups, each with its machine
-   count and a status word: `<n> working`, else `<n> in review`, else `idle`.
-   Then come **No project**, projects on other machines
-   (`OtherMachineProjects`), **Add a project** (opens the Add-project dialog)
-   and `New workspace in <project>…`. A filter input appears above 8
-   projects. Picking a project calls `selectProject`, which opens its deck on
-   the Home pane.
-2. **Nav** (`LeftNav.tsx`). **Project home** (hidden with no project),
-   **Flywheel** (with the word "running" while a run is going), **Order books**,
-   and **More ▾**, which holds the groups in `navGroups.ts` (`MORE_GROUPS`).
-   Experimental views appear there only when the setting is on
-   (`isExperimentalTab`). Home (`/`) is the top-bar brand.
+   colored initials mark (`ProjectMark.tsx`), its name and its path with the
+   home directory as `~`. The menu lists every registered project in owner
+   groups, each with its own colored mark, its machine count and a status
+   word: `<n> working`, else `<n> in review`, else `idle`. Then come **No
+   project**, projects on other machines (`OtherMachineProjects`, which get no
+   mark), **Add a project** (opens the Add-project dialog) and `New workspace
+   in <project>…`. A filter input appears above 8 projects. Picking a project
+   calls `selectProject`, which opens its deck on the Home pane.
+   - **`ProjectMark.tsx` (PAN-5335 D-8).** `PROJECT_MARK_COLORS` is an
+     8-entry hex palette (operator-sanctioned; `shared/branding` already holds
+     brand hex values, so no lint enforces a no-hex rule here).
+     `projectMarkColor(key)` hashes the key's char codes
+     (`(sum * 31) % 8`) to a stable palette index. `projectInitials` moved
+     here verbatim; `ProjectSwitcher.tsx` re-exports it. `ProjectMark` renders
+     `md` (switcher button, `h-7 w-7`) or `sm` (menu rows, `h-[18px] w-[18px]`)
+     — colored with white initials when not muted, a muted `–` square
+     otherwise.
+   - **Last project (PAN-5335 D-5).** `lib/lastProject.ts` persists the
+     selected project key under `localStorage` key
+     `overdeck.ui.lastProjectKey` via `writeLastProjectKey`/
+     `readLastProjectKey`/`clearLastProjectKey`. `App.tsx`'s
+     `selectedProjectKey` initializer calls `initialProjectKey({ routeProject,
+     pathname, stored })`: an explicit route project always wins; a bare
+     `/command-deck` or a `/conv/:id` route never inherits from storage;
+     anything else (e.g. `/activity`) falls back to the stored key. A
+     storage-derived selection is validated once the `registered-projects`
+     query resolves (`isKnownProjectKey`, true for `NO_PROJECT_KEY` or a
+     key/name match) — an unknown key is cleared and the selection drops to
+     `null`.
+2. **Nav** (`LeftNav.tsx`). **Project home** (hidden with no project; current
+   — `aria-current="page"` — only on a Command Deck tab whose active pane is
+   the Home pane, PAN-5335), **Flywheel** (with the word "running" while a run
+   is going), **Order books**, and **More ▾**, which holds the groups in
+   `navGroups.ts` (`MORE_GROUPS`) — no longer including Command Deck, since
+   Project home already opens the deck. More is current on its own tabs but
+   never on Settings. Experimental views appear there only when the setting
+   is on (`isExperimentalTab`). Home (`/`) is the top-bar brand.
 3. **New conversation** (`NewConversationButton.tsx`). A split button. The main
    part quick-creates a conversation in the selected project, or an unscoped
-   one for No project or no project, and opens it in the deck. The caret menu
-   holds the model, harness and effort pickers, the Retrospective button and
-   **New conversation with options…**.
+   one for No project or no project, and opens it in the deck. A second line
+   (`newConversationSummary.ts`, PAN-5335 D-7) names the default model's short
+   name, the harness when it is not Claude Code, and the effort word — the
+   same inputs quick create sends. The caret menu holds the model, harness and
+   effort pickers, the Retrospective button and **New conversation with
+   options…**.
 4. **Conversations** (`ConversationsSection.tsx`). An **Active / All N** switch
    over `ConversationList`, persisted in `overdeck.ui.leftColumnConversationScope`
    (default Active). Active shows Needs you and Inbox; All adds Snoozed and
@@ -2112,10 +2146,12 @@ Top to bottom:
    an **Archived (N)** expander and a `+` for a new workspace. The row helpers
    live in `workspaceRows.ts`. The section renders nothing when the project has
    no workspace rows. See `docs/WORKSPACES-AND-PROJECTS.md`.
-7. **Footer** (`LeftColumnFooter.tsx`). **Settings**, **Machines**, the version
-   button (opens the updater; its title says whether this is a source
-   checkout), **Rebuild** (source checkout only), the freshness indicator, and
-   `?` for the shortcuts sheet.
+7. **Footer** (`LeftColumnFooter.tsx`). **Settings**, an icon-only **Machines**
+   button (`MachinesNavItem.tsx`'s `footer` variant — no text label, so it
+   never wraps or clips; its title and accessible name still carry the online
+   count, PAN-5335), the version button (opens the updater; its title says
+   whether this is a source checkout), **Rebuild** (source checkout only), the
+   freshness indicator, and `?` for the shortcuts sheet.
 
 Conversations, Issues and Workspaces share one scroll area. With no project
 selected, that area shows "Pick a project to see its conversations and issues"
