@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T12:22:34.260769Z · model: claude-opus-5-5 · open: 892_
+_Last sequenced: 2026-11-15T12:40:36.134016Z · model: claude-opus-5-5 · open: 893_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -469,434 +469,435 @@ _Last sequenced: 2026-11-15T12:22:34.260769Z · model: claude-opus-5-5 · open: 
 | 462 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
 | 463 | PAN-5174 | XS | medium | ok |  |  | Flaky CI test: share/rate-limit.test.ts flips 201/429 under CI timing; quarantine or make deterministic. |
 | 464 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
-| 465 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
-| 466 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
-| 467 | PAN-1130 | S | medium | ok |  |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
-| 468 | PAN-1129 | S | medium | ok |  |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
-| 469 | PAN-1128 | S | medium | ok |  |  | Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
-| 470 | PAN-1113 | S | medium | ok |  |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
-| 471 | PAN-1068 | S | medium | ok |  |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
-| 472 | PAN-3938 | M | medium | needs-refinement |  |  | Run Muse Spark under Claude Code via cliproxy — only the paid Zen model is routable; free tier is OpenCode-client gated; needs credit… |
-| 473 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
-| 474 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
-| 475 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
-| 476 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
-| 477 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
-| 478 | PAN-778 | M | medium | ok |  |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
-| 479 | PAN-681 | S | medium | ok |  |  | Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
-| 480 | PAN-3732 | S | medium | ok |  |  | Codex handoff serializes a large rollout twice (~286MB peak RSS on 50MB); serialize once or stream. |
-| 481 | PAN-3700 | M | medium | ok |  |  | pan acp serve would let Zed and other ACP clients drive Overdeck conversations through canonical doors. PRD written. |
-| 482 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces, so docs items sit unanchored in the requirement traceability graph. |
-| 483 | PAN-3132 | M | medium | ok |  |  | xBRIEF v0.9 agentic dispatch fields are half-adopted as a behavior accident; make difficulty/filesScope/verifyCommands a contract. |
-| 484 | PAN-3909 | M | medium | needs-refinement |  |  | One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains |
-| 485 | PAN-2659 | S | medium | ok |  |  | acquireRecordLock survives for the planning auto-start consent lock; an ownerless lock after a crash is never reclaimed. |
-| 486 | PAN-3831 | S | medium | ok |  |  | Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver) |
-| 487 | PAN-4779 | S | medium | ok |  |  | Docs on main: 2 MDX parse errors hide pages from Mintlify + 15 broken vision.mdx links; mint broken-links can't gate |
-| 488 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
-| 489 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
-| 490 | PAN-3563 | S | medium | needs-refinement |  |  | pan unstick is gone; verify whether a spawned-but-never-briefed role agent can still read as running forever under liveness.ts |
-| 491 | PAN-1041 | M | medium | ok |  |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
-| 492 | PAN-924 | L | medium | needs-refinement |  |  | Spike: evaluate GitNexus for Panopticon integration |
-| 493 | PAN-3770 | S | medium | ok |  |  | Codex conversations never show the working spinner mid-turn; parser marks every agent_message instantly complete. |
-| 494 | PAN-4568 | XS | medium | ok |  |  | Codex sub-agent turn start shows thread: not sub: label; adoption lands one frame late. PAN-4563 replay test has landed. |
-| 495 | PAN-3731 | S | medium | ok |  |  | Restart-gate banner gives no feedback after approval; dead-requester approvals read as a broken button. |
-| 496 | PAN-3530 | S | medium | ok |  |  | Four God View components poll on 30s timers instead of the documented /ws/rpc event contract. |
-| 497 | PAN-3131 | L | medium | ok |  |  | Support xBRIEF planRef sharding so a 1.1MB/227-item plan stops making every finalize failure whole-plan-fatal. |
-| 498 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
-| 499 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
-| 500 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
-| 501 | PAN-4918 | M | medium | ok |  |  | Six Anywhere UI bugs seen while filming: Codex keeps Claude model, Zen models listed first, chip wrap, Pull-here state, no remote archive. |
-| 502 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
-| 503 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
-| 504 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
-| 505 | PAN-713 | M | medium | ok |  |  | test: add unit tests for doneCommand and approveCommand |
-| 506 | PAN-700 | M | medium | ok |  |  | Detachable terminal for conversation view |
-| 507 | PAN-646 | XS | medium | needs-refinement |  |  | Cancel no longer clears beads or a record; a Recover workflow now means reopening the tracker issue and re-planning |
-| 508 | PAN-532 | M | medium | ok |  |  | Per-project and per-issue model overrides for pipeline roles |
-| 509 | PAN-2896 | M | medium | ok |  |  | Warm resource-discovery and membership caches at boot |
-| 510 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
-| 511 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
-| 512 | PAN-5231 | S | medium | ok |  |  | Explorer: retrying Send through pipeline after a partial failure creates a second issue and branch. |
-| 513 | PAN-5204 | S | medium | ok |  |  | Voice: mixed 16/24 kHz sample rates on /ws/voice, and dictation turns leak into AutoPreso as errors. |
-| 514 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
-| 515 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
-| 516 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
-| 517 | PAN-2566 | L | medium | ok | ✓ |  | Triage list of genuine Traycer capability gaps; a container for child issues, not directly workable. |
-| 518 | PAN-2565 | M | medium | ok |  |  | Multi-agent conversations: N agent sessions in one task surface with agent-to-agent messaging |
-| 519 | PAN-3735 | S | medium | ok |  |  | Sandboxed pan CLI reports 'dashboard down, run pan up' when the real cause is no network; sends agents down the wrong path. |
-| 520 | PAN-3335 | XS | medium | ok |  |  | A pasted screenshot can't be viewed anywhere in the dashboard: thumbnail has no click handler and the sent form is a file-link chip. |
-| 521 | PAN-3054 | M | medium | ok |  |  | Benchmark matrix, redesigned 2026-09-29 as E6 of the model-routing PRD; its medians feed PAN-4364 and PAN-4367 |
-| 522 | PAN-2977 | M | medium | ok |  | PAN-2976 | Settings surface that detects installed ACP CLIs, renders the capability checklist, and guides login without a manual terminal. |
-| 523 | PAN-2557 | M | medium | ok |  |  | project-level 'Restart All' context action |
-| 524 | PAN-2553 | M | medium | ok |  |  | project-level CI visibility |
-| 525 | PAN-2521 | S | medium | ok |  |  | launch pipeline agents with harness rate-limit model-switch reminder disabled |
-| 526 | PAN-2493 | M | medium | ok |  |  | align the cockpit Agents-lane and sidebar issue-tree feature sets (two-way gaps) |
-| 527 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
-| 528 | PAN-3853 | S | medium | needs-refinement |  |  | Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path |
-| 529 | PAN-3830 | S | medium | ok |  |  | OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model |
-| 530 | PAN-4924 | S | medium | ok |  |  | linked-machines.mdx promises switch model for running conversations; dashboard disables it. Fix docs or add the control. |
-| 531 | PAN-4367 | M | medium | ok |  |  | Replace inherited capability scores for Sonnet 5.5, GPT-6 Sol/Luna with measured ones; eval harness has closed |
-| 532 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
-| 533 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
-| 534 | PAN-2409 | M | medium | ok |  |  | enforce the workspace boundary |
-| 535 | PAN-5145 | S | medium | ok |  |  | CLIProxy oauth-model-alias hides gpt-6-sol, gpt-5.6-terra and gpt-5.6-luna by their own ids on claude-code. |
-| 536 | PAN-5201 | XL | medium | ok |  |  | Speaker-aware STT: diarizing engines (Speechmatics, AssemblyAI, Muse, Voxtral, NeMo) and one VoiceSettings contract. |
-| 537 | PAN-2392 | M | medium | needs-refinement |  |  | Standing Crew survives; panel becomes a cost view from cost_events + tier-metrics; verdict/escalation columns need a new source. |
-| 538 | PAN-2335 | XS | medium | ok |  |  | chore: review the full open backlog for junk/stale/nonsensical issues |
-| 539 | PAN-2295 | L | medium | needs-refinement |  |  | built-in web browser surface (openable like terminal/Claude Code/Codex) + native Agentation integration |
-| 540 | PAN-3767 | S | medium | ok |  |  | Model switch could hang at 'Saving…'; onError toast landed, remaining work is reproducing the hang on a healthy server. |
-| 541 | PAN-3615 | S | medium | needs-refinement |  |  | TTS silent 9+ days from four stacked failures; three already fixed, only follow-ups remain — rescope to what is left. |
-| 542 | PAN-3558 | S | medium | ok |  |  | Subagent rail shows no model or provider, so mixed-model orchestration needs a transcript open per row to see what it is running. |
-| 543 | PAN-3469 | S | medium | ok |  |  | NewProjectModal violates the PAN-3410 page-not-modal doctrine; migrate the create-project flow to a routed page. |
-| 544 | PAN-3333 | M | medium | ok |  |  | Model pickers show $/1M, which says nothing under a subscription; show relative plan-quota drain among sibling models. |
-| 545 | PAN-3058 | M | medium | ok |  |  | Ship named crew presets that populate the whole tiered_execution block so operators don't hand-build the crew table. |
-| 546 | PAN-2288 | L | medium | ok |  |  | tmux managed-server: lossless auto-migration of dirty-founded servers + boot-time ensure call |
-| 547 | PAN-2065 | M | medium | ok |  |  | unified usage & headroom panel across all provider plans (z.ai, Anthropic, Codex, OpenRouter) |
-| 548 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
-| 549 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
-| 550 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
-| 551 | PAN-4366 | M | medium | ok |  |  | Plan the Haiku 4.5 successor and give workhorse:cheap a consumer or drop it; gated on E4 summary-faithfulness |
-| 552 | PAN-5314 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5313 (CLIProxy pool): body-read timeout, cache-miss coalescing, reset timestamps. |
-| 553 | PAN-5267 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5266: escalation limit and caching transient GraphQL errors as missing issues. |
-| 554 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
-| 555 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
-| 556 | PAN-3739 | S | medium | ok |  |  | cost-reconcile re-warns every model-less codex subthread rollout on every sweep; log flood grows without bound. |
-| 557 | PAN-4393 | XS | medium | ok |  |  | ac-eval-fixtures requires observable:false >= 8 but honest labeling of all specs yields 6; lower the floor |
-| 558 | PAN-1985 | M | medium | ok |  |  | Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
-| 559 | PAN-1968 | M | medium | ok |  |  | Finish local-domain rename: pan.localhost → overdeck.localhost |
-| 560 | PAN-1967 | M | medium | needs-refinement |  |  | Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
-| 561 | PAN-1965 | M | medium | ok |  |  | Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
-| 562 | PAN-1937 | M | medium | ok |  |  | feat: data export |
-| 563 | PAN-1926 | M | medium | ok |  |  | --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
-| 564 | PAN-1916 | M | medium | ok |  |  | configurable web search providers (Exa, Tavily, Brave, Perplexity) |
-| 565 | PAN-1854 | M | medium | ok |  |  | Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
-| 566 | PAN-1853 | M | medium | ok |  |  | Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
-| 567 | PAN-1852 | XS | medium | ok |  |  | Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
-| 568 | PAN-1844 | M | medium | ok |  |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
-| 569 | PAN-5202 | XL | medium | ok |  | PAN-5201 | Flux: experimental live meeting page capturing open items, ticket proposals and diagrams. Depends on PAN-5201. |
-| 570 | PAN-5141 | M | medium | ok |  |  | Reviewer pairing code: multi-day, reusable, restart-safe code so app store review can pair unattended. |
-| 571 | PAN-1840 | M | medium | ok |  |  | Add 'pan switch <id>' |
-| 572 | PAN-1839 | M | medium | ok |  |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
-| 573 | PAN-1776 | M | medium | ok |  |  | Hot-updatable message delivery: version-stamped supervisors + server-side delivery logic |
-| 574 | PAN-3706 | L | medium | ok |  |  | Broadsheet shipped typography only; color, surface, elevation and texture still on Ledger values, so it doesn't read like Subspace. |
-| 575 | PAN-3539 | XS | medium | needs-refinement |  |  | OOMPolicy=continue fix landed with the issue; re-scope to whatever hardening remains or close it out. |
-| 576 | PAN-3502 | XS | medium | needs-refinement |  |  | tiered-crews blendedCost expectation stale vs pricing catalog; likely already fixed by the PAN-3532 cherry-pick — verify. |
-| 577 | PAN-4409 | M | medium | ok |  |  | Overdeck integration on OKF v0.2.0 (injector trust tiers, new verbs); blocked on external eltmon/okf#9 |
-| 578 | PAN-4410 | M | medium | ok |  | PAN-4409 | Migrate eltmon/overdeck-knowledge to OKF v0.2 and refresh stale concepts; last link in the OKF chain |
-| 579 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
-| 580 | PAN-4878 | XS | low | ok |  |  | Delete dead ox curl installer in prereqs registry; PAN-4852 builds ox from the pinned fork commit, so ~/.local/bin/ox is never used. |
-| 581 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
-| 582 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
-| 583 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
-| 584 | PAN-1748 | M | medium | ok |  |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
-| 585 | PAN-1691 | M | medium | ok |  |  | conflict-aware merge train + on-demand UAT candidate |
-| 586 | PAN-1685 | XS | medium | ok |  |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
-| 587 | PAN-1676 | M | medium | ok |  |  | Harden Fly remote workspaces + pan workspace move; work-agent spill policy now specified in PAN-5241. |
-| 588 | PAN-1667 | M | medium | ok |  |  | unify Agents + Resources into one issue-centric holistic view |
-| 589 | PAN-1657 | M | medium | ok |  |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
-| 590 | PAN-1656 | M | medium | ok |  |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
-| 591 | PAN-1655 | M | medium | ok |  |  | Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
-| 592 | PAN-1654 | XS | medium | ok |  |  | run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
-| 593 | PAN-1653 | XS | medium | ok |  |  | batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
-| 594 | PAN-5309 | S | low | ok |  |  | CodeRabbit minor findings on the PAN-5283 Flywheel page redesign; verify each against main before fixing. |
-| 595 | PAN-5308 | S | low | ok |  |  | CodeRabbit findings on the PAN-5282 CLIProxy v8 upgrade: config-write ordering, Windows upgrade staging. |
-| 596 | PAN-1623 | M | medium | ok |  |  | Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
-| 597 | PAN-1561 | M | medium | ok |  |  | feat: Project-scoped dashboard nav (deck of tabs per project + conversations/tree column + activity feed) |
-| 598 | PAN-1550 | M | medium | ok |  |  | BrowserPane half only; the FilesPane half is superseded by the PAN-5183 file explorer, whose children have all closed. |
-| 599 | PAN-1545 | XS | medium | ok |  |  | New Terminal button |
-| 600 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
-| 601 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
-| 602 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
-| 603 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
-| 604 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
-| 605 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
-| 606 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
-| 607 | PAN-1432 | M | medium | ok |  |  | Merge agent leaves packages/contracts/dist stale |
-| 608 | PAN-1223 | M | medium | ok |  |  | Auto-update for users in the field (npm + desktop binaries) |
-| 609 | PAN-1165 | M | medium | ok |  |  | Lightweight review path for small/trivial PRs |
-| 610 | PAN-1151 | XS | medium | ok |  |  | Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
-| 611 | PAN-4360 | S | medium | ok |  |  | Add pan claude upgrade and offer the Claude Code upgrade in pan install / pan sync; PAN-4359 has closed |
-| 612 | PAN-1060 | M | medium | ok |  |  | Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
-| 613 | PAN-1051 | M | medium | ok |  |  | feat: Subspace-inspired alternate theme with Inter + JetBrains Mono |
-| 614 | PAN-1037 | M | medium | ok |  |  | Retire 'planning-' tmux prefix |
-| 615 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
-| 616 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
-| 617 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
-| 618 | PAN-5067 | M | medium | ok |  |  | Skill overrides: bad-YAML issue file is overwritten on write (data loss), license detection gaps, Pi ignores --pack silently. |
-| 619 | PAN-4908 | S | low | ok |  |  | Other remote-not-enabled messages name no file and the dead verb 'pan remote setup'; reuse PAN-4905's remoteEnabledHint(). |
-| 620 | PAN-5130 | S | medium | ok |  |  | pan project add gains --issue-prefix for any tracker; --linear-team becomes a deprecated alias. Follow-up to closed PAN-51. |
-| 621 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
-| 622 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
-| 623 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
-| 624 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
-| 625 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
-| 626 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
-| 627 | PAN-4308 | S | medium | ok |  |  | Settle reaped Fly remote transcripts into the Session Vault; PAN-4295 auto-reap landed, still blocked by PAN-2609 (engine). |
-| 628 | PAN-3322 | XS | medium | ok |  |  | launcher-generator.ts's file-size ceiling sits 126 lines above the real file, handing back the regrowth the ratchet exists to prevent. |
-| 629 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
-| 630 | PAN-675 | M | medium | needs-refinement |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
-| 631 | PAN-654 | L | medium | ok |  |  | Project Setup Wizard |
-| 632 | PAN-649 | M | medium | ok |  |  | Render Excalidraw drawings inline in Claude Code conversations |
-| 633 | PAN-637 | XS | medium | ok |  |  | Direct issue kickoff (skip planning) from dashboard UI |
-| 634 | PAN-629 | M | medium | ok |  |  | Workspace quotas and resource governance |
-| 635 | PAN-613 | M | medium | needs-refinement |  |  | Investigate thinking effort levels for agents |
-| 636 | PAN-607 | M | medium | needs-refinement |  |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
-| 637 | PAN-606 | M | medium | needs-refinement |  |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
-| 638 | PAN-548 | M | medium | ok |  |  | Command Deck: preserve state across navigation including URL routing for tabs |
-| 639 | PAN-546 | M | medium | ok |  |  | Remove claude-code-router |
-| 640 | PAN-537 | M | medium | ok |  |  | feat: show changed files diff summary after each agent response in activity view |
-| 641 | PAN-531 | XS | medium | ok |  |  | PAN: Windows Electron support (WSL2 required) |
-| 642 | PAN-452 | M | medium | ok |  |  | Conversation input bar |
-| 643 | PAN-450 | M | medium | ok |  |  | Adopt remaining Effect patterns |
-| 644 | PAN-1126 | M | medium | ok |  |  | Integrate TLDR summaries into review context manifest |
-| 645 | PAN-5154 | L | low | needs-refinement |  |  | GitHub account, token and host per owner (work accounts, GHES). Not scheduled; needs a PRD first. |
-| 646 | PAN-1066 | M | medium | ok |  |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
-| 647 | PAN-3441 | L | low | ok |  |  | God View 'River' WebGL pipeline visualization fed by the live hook-event stream; PRD and mockup exist. |
-| 648 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
-| 649 | PAN-2941 | M | low | stale |  |  | Superseded by OKF v0.2: drafts plus human verify replace the PR gate (eltmon/okf#6); semantic pass is eltmon/okf#7 |
-| 650 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
-| 651 | PAN-4373 | M | medium | ok |  |  | Optional Jev relevance filter for prompt-time memory injection candidates; both prerequisites have closed |
-| 652 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
-| 653 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
-| 654 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
-| 655 | PAN-2662 | M | low | ok |  |  | Add project context-menu actions scoped to issues currently in the pipeline |
-| 656 | PAN-2645 | M | low | ok |  |  | Add opt-in Observation-first conversation view |
-| 657 | PAN-2635 | XS | low | ok |  |  | pay down the 152-error src/dashboard/server typecheck debt |
-| 658 | PAN-5066 | M | medium | ok |  |  | Project skills in .pan/skills skip the CLI workspace fallback, never refresh, lose to bundled skills, and never reach Codex/Pi. |
-| 659 | PAN-3443 | L | low | ok |  |  | God View 'Spectrum Deck' visualizer concept with mockup and PRD; pure exploration, no substrate impact. |
-| 660 | PAN-4350 | M | medium | needs-refinement |  |  | Re-dispatch budget for foreman items; issue itself flags an unresolved conflict with the no-stored-state rule |
-| 661 | PAN-4003 | L | medium | ok |  |  | Parked: delete the ohmypi/omp harness, keep Pi; obsoletes 10 open ohmypi issues and shrinks PAN-3958's CH-7 scope |
-| 662 | PAN-4368 | S | medium | ok |  |  | Operator-run checklist: verify Sonnet 5.5 across switch-model, fork and compaction (model-locked thinking blocks) |
-| 663 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
-| 664 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
-| 665 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
-| 666 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
-| 667 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
-| 668 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
-| 669 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
-| 670 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
-| 671 | PAN-4769 | XS | low | ok |  |  | Two-sentence wording fix in features/skill-packs.mdx; PAN-4759 created the page and closed, so this is unblocked. |
-| 672 | PAN-3940 | XL | low | ok | ✓ |  | Parked epic: event-driven plugin/hook system on pipeline-notifier + hygiene-scheduler; do not pick up until the journal has soaked |
-| 673 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
-| 674 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
-| 675 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
-| 676 | PAN-4823 | XL | medium | ok | ✓ |  | Epic: Capacitor phone client for Anywhere without Tailscale; 15 children filed (#4828-4843); OD-1 settled; PAN-4774 done. |
-| 677 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
-| 678 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
-| 679 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
-| 680 | PAN-5082 | XL | medium | ok |  |  | Move every MCP surface to SDK v2 for the 2026-07-28 spec while keeping 2025-11-25 clients; time it on PAN-5083 data. |
-| 681 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
-| 682 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
-| 683 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
-| 684 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
-| 685 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
-| 686 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
-| 687 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
-| 688 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
-| 689 | PAN-2046 | M | low | stale |  |  | Conversation view does not surface terminal command responses |
-| 690 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
-| 691 | PAN-3919 | S | low | needs-refinement |  |  | Review the universal effort-high default and supervisor effort discretion; explicitly an operator decision, no work authorized |
-| 692 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
-| 693 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
-| 694 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
-| 695 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
-| 696 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
-| 697 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
-| 698 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 699 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
-| 700 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
-| 701 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
-| 702 | PAN-1782 | M | low | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout |
-| 703 | PAN-1773 | M | low | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
-| 704 | PAN-1646 | M | low | ok |  |  | Rabbit-hole drift detection and lift-to-new-conversation |
-| 705 | PAN-1643 | M | low | ok |  |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
-| 706 | PAN-1592 | M | low | ok |  |  | Composer: make ephemeral composer state reload-durable (pasted images + unsent/failed message text) |
-| 707 | PAN-1581 | M | low | ok |  |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
-| 708 | PAN-1533 | M | low | ok |  |  | Fork-into-worktree from conversation branch chip |
-| 709 | PAN-1483 | XS | low | ok |  |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
-| 710 | PAN-1482 | M | low | ok |  |  | Token spend report should aggregate data from repo, not just local machine |
-| 711 | PAN-1481 | M | low | ok |  |  | Add cost-event telemetry for Caveman token savings |
-| 712 | PAN-1356 | M | low | ok |  |  | Extend the memory Observation pipeline to ad-hoc conversations |
-| 713 | PAN-1242 | M | low | ok |  |  | Create a new issue directly from a kanban column |
-| 714 | PAN-1222 | M | low | ok |  |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
-| 715 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
-| 716 | PAN-4352 | XS | low | ok |  |  | Operator verification: skill packs in a managed interactive Claude Code launch now that PAN-4334 has shipped |
-| 717 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
-| 718 | PAN-4298 | XL | low | needs-refinement |  | PAN-4294, PAN-1676 | Anywhere paid tier: run agents on hosted Fly capacity; tenant isolation, credentials, metering open; PAN-4294 and PAN-1676 unbuilt |
-| 719 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
-| 720 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
-| 721 | PAN-1133 | M | low | stale |  |  | Deacon-patrol tie-in for TLDR supervision is gone; would need its own liveness check |
-| 722 | PAN-1123 | XS | low | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
-| 723 | PAN-1121 | M | low | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
-| 724 | PAN-4248 | L | medium | ok |  |  | List, pull and delete local Ollama models (size, store, in-use) in CLI, dashboard and doctor; PAN-1641 sidecar has merged. |
-| 725 | PAN-1117 | M | low | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
-| 726 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
-| 727 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
-| 728 | PAN-1064 | M | low | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
-| 729 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
-| 730 | PAN-3971 | L | low | ok |  |  | Overdeck-native artifact pages (pan artifact publish + state door + dashboard listing); body says backlog only, Claude artifacts work today |
-| 731 | PAN-3768 | XS | low | ok |  |  | pan handoff --title already implemented and landed (678f6b389e5); open only pending close-out. |
-| 732 | PAN-3034 | XS | low | ok |  |  | Fix already landed on main (strike/slot workspace names and live tmux now seed the session tree); open pending close-out. |
-| 733 | PAN-2983 | M | low | stale |  |  | Superseded by the OKF v0.2 redesign: write modes and drafts (eltmon/okf#6) and the advisory semantic pass (eltmon/okf#7) |
-| 734 | PAN-3824 | XS | low | needs-refinement |  |  | Image-only report: default view on Windows breaks the model selector; needs a written repro and expected behavior |
-| 735 | PAN-3823 | XS | low | needs-refinement |  |  | Image-only report titled "pan sync issue"; needs the command, output text, and expected behavior |
-| 736 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
-| 737 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
-| 738 | PAN-962 | M | low | needs-refinement |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
-| 739 | PAN-961 | M | low | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
-| 740 | PAN-943 | M | low | ok |  |  | Add memory file review and management command |
-| 741 | PAN-908 | M | low | ok |  |  | PAN-908: Make work-agent spawn limits configurable and overridable |
-| 742 | PAN-898 | M | low | ok |  |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
-| 743 | PAN-853 | L | low | needs-refinement |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
-| 744 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
-| 745 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
-| 746 | PAN-4347 | S | low | ok |  |  | pan done appends continue.json decisions to the PR body so significant decisions outlive the workspace |
-| 747 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
-| 748 | PAN-4275 | S | low | ok |  |  | Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. PAN-1641 has merged. |
-| 749 | PAN-2836 | M | low | needs-refinement |  |  | Placement presets now belong on eltmon/okf#4 after the OKF v0.2 redesign; migrate verb collides; re-scope or move upstream |
-| 750 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
-| 751 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
-| 752 | PAN-777 | M | low | ok |  |  | Inter-agent communication skill: send messages to conversation-mode agents |
-| 753 | PAN-775 | L | low | ok |  |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
-| 754 | PAN-3456 | XS | low | ok |  |  | Already fixed in 4117c9a777 with a regression test; open only pending close-out. |
-| 755 | PAN-774 | XS | low | ok |  |  | Unify launch UX and release pipeline for 1.0 |
-| 756 | PAN-773 | XS | low | ok |  |  | Design prompt-style overlays with model hierarchy and scoped toggles |
-| 757 | PAN-772 | M | low | stale |  |  | Auto-resume ladder paths it names are gone; terminal-stack consistency now means the Herdr/tmux contract in TERMINAL-BACKENDS.md |
-| 758 | PAN-771 | M | low | needs-refinement |  |  | Investigate Vercel Sandbox execution backend support |
-| 759 | PAN-769 | M | low | stale |  | PAN-750 | Phase-transition history no longer accumulates in a record; a churn metric would be rebuilt from PR review cycles or the pipeline journal |
-| 760 | PAN-765 | M | low | ok |  |  | Preserve trailing zeros in cost displays |
-| 761 | PAN-764 | M | low | ok |  |  | Add quota/usage inspector for routed model providers |
-| 762 | PAN-4425 | M | low | ok |  |  | Deft fork work in eltmon/directive (env off switch, external-orchestrator mode); outside the overdeck pipeline |
-| 763 | PAN-752 | M | low | ok |  |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
-| 764 | PAN-751 | M | low | ok |  |  | Historical Metrics Data Persistence |
-| 765 | PAN-750 | L | low | ok |  |  | Complete Metrics Page Redesign |
-| 766 | PAN-749 | M | low | needs-refinement |  |  | Research and borrow best features from gstack |
-| 767 | PAN-747 | XS | low | ok |  |  | Conversation list items lack accessible labels in accessibility tree |
-| 768 | PAN-743 | XS | low | ok |  |  | Add consistent new conversation icon actions in Command Deck |
-| 769 | PAN-738 | M | low | ok |  |  | Add right-click fork option to conversation list |
-| 770 | PAN-735 | M | low | ok |  |  | Settings page: review and configure overridden subagent model files |
-| 771 | PAN-730 | M | low | ok |  |  | Add provider account telemetry for credits, balances, and usage |
-| 772 | PAN-701 | XS | low | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
-| 773 | PAN-663 | XS | low | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
-| 774 | PAN-660 | M | low | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
-| 775 | PAN-624 | M | low | ok |  |  | Loop nodes: iterative agent execution with conditional termination |
-| 776 | PAN-623 | M | low | ok |  |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
-| 777 | PAN-622 | M | low | ok |  |  | YAML workflow DAGs: custom per-project pipeline definitions |
-| 778 | PAN-604 | M | low | ok |  |  | Hide planning agent from workspace detail pane |
-| 779 | PAN-603 | M | low | ok |  |  | Plan review loop with configurable reviewer model |
-| 780 | PAN-591 | XS | low | ok |  |  | Integrate Karpathy LLM guidelines into all Panopticon CLAUDE.md templates |
-| 781 | PAN-589 | XS | low | ok |  |  | Review and update commands-skills.md with all available Panopticon skills |
-| 782 | PAN-576 | M | low | ok |  |  | Global / search should include conversations in addition to workspace features |
-| 783 | PAN-571 | XS | low | ok |  |  | Add OpenRouter credits/plan status endpoint and UI |
-| 784 | PAN-568 | M | low | ok |  |  | Kanban: Show workspace and tmux session counts in stats |
-| 785 | PAN-565 | M | low | ok |  |  | Handle CTRL-Z to undo accidental conversation archival |
-| 786 | PAN-564 | M | low | ok |  |  | Slash menu positioned incorrectly |
-| 787 | PAN-554 | M | low | ok |  |  | Add kanban board deeplinks for issue URLs |
-| 788 | PAN-543 | M | low | ok |  |  | Add confirmation dialog before applying Optimal Defaults |
-| 789 | PAN-483 | M | low | ok |  |  | Unify Resume Agent UX |
-| 790 | PAN-480 | M | low | needs-refinement |  |  | Planning-agent --effort; likely covered by merged PAN-4249 resolver and PAN-4258 (plan effort), confirm or close |
-| 791 | PAN-476 | M | low | ok |  |  | Agent resume with Haiku session summary instead of claude --resume |
-| 792 | PAN-468 | M | low | ok |  |  | Agent test conversations pollute production database |
-| 793 | PAN-461 | M | low | ok |  |  | Deep-wipe multi-step progress dialog |
-| 794 | PAN-459 | M | low | ok |  |  | Planning setup screen with SSE progress streaming |
-| 795 | PAN-407 | XS | low | ok |  |  | Run Panopticon from a main workspace for development isolation |
-| 796 | PAN-2348 | XS | low | ok |  |  | docs: migrate STATE-STORAGE-AUDIT.md content to living docs, then delete |
-| 797 | PAN-2346 | XS | low | ok |  |  | docs: refresh AGENT_TYPES_INDEX.md to the post-Cut taxonomy in ROLES.md (xBRIEF items, foreman, conv-flywheel, worker role). |
-| 798 | PAN-2345 | XS | low | ok |  |  | docs: rewrite pan-done.md against done.ts + done-preflight.ts; fix continue path; point MERGE link at MERGE-WORKFLOW.md. |
-| 799 | PAN-2344 | XS | low | ok |  |  | docs: rewrite KANBAN-MODEL.md for derived issue state, pipeline-membership buckets, PR reviews; drop Inspect and beads. |
-| 800 | PAN-2343 | XS | low | ok |  |  | docs: rewrite MISSION-CONTROL.md: state label from deriveStateLabel, membership, liveness.ts; review_status table is gone. |
-| 801 | PAN-2073 | XS | low | ok |  |  | docs: add user-facing page for the Desktop App |
-| 802 | PAN-2071 | XS | low | ok |  |  | docs: add user-facing page for the Hooks system |
-| 803 | PAN-2068 | XS | low | ok |  |  | docs: add user-facing page for Caveman (agent output compression) |
-| 804 | PAN-2067 | XS | low | ok |  |  | docs: add user-facing page for RTK (Bash output compression) |
-| 805 | PAN-1684 | XS | low | ok |  |  | build full marketing kit + plan (SEO, video list, channels) from MARKETING.md seed |
-| 806 | PAN-1683 | XS | low | ok |  |  | docs: canonical agent session-prefix registry + reconcile role taxonomy (ROLES.md/AGENT_TYPES_INDEX/CLAUDE.md) |
-| 807 | PAN-1474 | M | low | ok |  |  | Add ACKNOWLEDGEMENTS doc |
-| 808 | PAN-1469 | M | low | ok |  |  | End-to-end review and consolidation of all project documentation |
-| 809 | PAN-674 | XS | low | ok |  |  | docs: add glossary of Panopticon domain terms |
-| 810 | PAN-634 | M | low | ok |  |  | Documentation cleanup: restructure docs, update installation (npx panctl), refresh stale PRDs |
-| 811 | PAN-2908 | M | low | ok |  |  | Make overdeck not suck |
-| 812 | PAN-106 | M | high | stale |  |  | Cost prediction/estimation for in-progress work |
-| 813 | PAN-262 | M | high | stale |  |  | Refactor post-merge lifecycle into composable, idempotent operations |
-| 814 | PAN-176 | M | high | stale |  |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
-| 815 | PAN-334 | S | medium | stale |  |  | Dashboard server has no duplicate-process protection |
-| 816 | PAN-324 | XS | medium | needs-refinement |  |  | Approval is now a PR review or the dashboard MERGE button; verify whether the agent detail pane already surfaces MERGE post-cut |
-| 817 | PAN-304 | S | medium | stale |  |  | closeLinearDirect returns stepOk even when state update never happens |
-| 818 | PAN-245 | S | medium | stale |  |  | Ctrl+C aborts planning dialog instead of copying text |
-| 819 | PAN-244 | S | medium | stale |  |  | Deep-wipe leaves local branch and worktree metadata behind |
-| 820 | PAN-4332 | M | low | ok |  |  | Interop: continue t3code sessions in Overdeck and back via native transcripts; PAN-2609 Phase A has closed |
-| 821 | PAN-113 | S | medium | stale |  |  | Dashboard 'Start Agent' returns success before verifying agent actually started |
-| 822 | PAN-49 | XS | medium | stale |  |  | Fix CloisterService tests that require real runtime |
-| 823 | PAN-294 | M | medium | stale |  |  | Surface module initialization errors as system-level, not per-issue |
-| 824 | PAN-293 | M | medium | stale |  |  | Project Living Memory |
-| 825 | PAN-277 | M | medium | stale |  |  | Session reasoning capture & collaborative PRD refinement |
-| 826 | PAN-258 | M | medium | stale |  |  | Kanban board: fit all columns without horizontal scrolling |
-| 827 | PAN-255 | M | medium | stale |  |  | Agents lack awareness of MCP tools |
-| 828 | PAN-252 | XS | medium | stale |  |  | Disable Sync with Main button when workspace is up to date |
-| 829 | PAN-243 | M | medium | stale |  |  | Audit dashboard actions: ensure all are available via CLI |
-| 830 | PAN-77 | XS | medium | stale |  |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
-| 831 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
-| 832 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
-| 833 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
-| 834 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 835 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 836 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 837 | PAN-5033 | XS | medium | ok |  |  | OpenClaw Connect a bot snippet omits hooks.allowConversationAccess, so the needs-you summary stays off with no message. |
-| 838 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 839 | PAN-5043 | S | medium | ok |  |  | Commit the phone-app iOS Simulator harness (Miniflare connect stand-in, stub account service, rig steps) built twice by hand. |
-| 840 | PAN-5065 | L | medium | ok |  |  | Opt-in mode where a project's agents and gates stop seeing ~/.overdeck.env keys the project did not list. |
-| 841 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 842 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
-| 843 | PAN-762 | M | low | stale |  |  | Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about |
-| 844 | PAN-299 | M | low | stale |  |  | Granular session state persistence across context compaction |
-| 845 | PAN-298 | M | low | stale |  |  | Auto-detect package manager and runtime in workspace setup |
-| 846 | PAN-297 | M | low | stale |  |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
-| 847 | PAN-283 | M | low | stale |  |  | Reset should sync workspace feature branch with latest main |
-| 848 | PAN-271 | M | low | stale |  |  | Auto-assign Linear project from project config when creating issues |
-| 849 | PAN-265 | M | low | stale |  |  | Review skill categorization: all skills available everywhere via personal + workspace |
-| 850 | PAN-249 | XS | low | stale |  |  | Add data-testid attributes across dashboard UI and create Playwright smoke test suite |
-| 851 | PAN-228 | M | low | stale |  |  | Shift-left post-edit diagnostics |
-| 852 | PAN-227 | M | low | stale |  |  | Phase gate validation |
-| 853 | PAN-198 | M | low | stale |  |  | Structured audit trail for agent actions |
-| 854 | PAN-190 | M | low | stale |  |  | PAN-190: Specialized reviewer prompts (industry best-practice checklists) |
-| 855 | PAN-180 | M | low | stale |  |  | PAN-180: Cross-terminal file locking for concurrent agents |
-| 856 | PAN-177 | M | low | stale |  |  | PAN-177: Iteration limits with escalation for autonomous agents |
-| 857 | PAN-175 | M | low | stale |  |  | PAN-175: Pre-compact auto-save hook for agent sessions |
-| 858 | PAN-155 | L | low | stale |  |  | PAN-155: Redesign health page with Stitch (system overview, timeline, costs) |
-| 859 | PAN-146 | M | low | stale |  |  | PAN-146: Refine light mode theming across all dashboard pages |
-| 860 | PAN-55 | M | low | stale |  |  | Track specialist costs with time period filtering |
-| 861 | PAN-44 | M | low | stale |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
-| 862 | PAN-2070 | XS | low | needs-refinement |  |  | docs: user-facing Flywheel page should target the pan-flywheel v2 loop skill, not a CLI daemon with a dashboard toggle |
-| 863 | PAN-3536 | S | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): pan tell can not reach ohmypi conversations; fix dies with the harness |
-| 864 | PAN-2027 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): routing kimi-k2 through ohmypi needs a different home once OMP is gone |
-| 865 | PAN-2035 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): Copilot provider routing via omp |
-| 866 | PAN-2034 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): end-to-end test for ohmypi tool-call rendering |
-| 867 | PAN-2033 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi message-delivery latency benchmark |
-| 868 | PAN-2032 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): local Ollama review role via omp |
-| 869 | PAN-2030 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): version-pin the ohmypi extension |
-| 870 | PAN-2029 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi-parser thinking_tokens capture |
-| 871 | PAN-2028 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): per-provider cost grouping keyed on omp |
-| 872 | PAN-2024 | XS | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi conversation Tools-toggle |
-| 873 | PAN-2883 | M | high | needs-refinement |  |  | Appears already fixed: resolveIssuePullRequestRef probes strike/<id> at pull-requests.ts:209, which is exactly the fix. Verify and close. |
-| 874 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
-| 875 | PAN-4555 | XS | low | ok |  |  | Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then. |
-| 876 | PAN-4590 | L | medium | ok |  |  | Semgrep sast verification gate + review-context findings; first buildable Semgrep child (epic PAN-4585 closed), needs config. |
-| 877 | PAN-4591 | L | medium | ok |  |  | Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; epic PAN-4585 closed, now buildable. |
-| 878 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
-| 879 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
-| 880 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
-| 881 | PAN-5022 | L | medium | ok |  |  | Phone app: relay notification preferences to offline machines via the directory, and drop muted pushes on the phone. |
-| 882 | PAN-5021 | M | low | needs-refinement |  |  | PAN-5100 landed phone telemetry with conflicting decisions; re-scope to any remaining gap or close as superseded. |
-| 883 | PAN-5029 | M | medium | needs-refinement |  |  | Grok Build Tailscale reach can't work: pan mcp serve verifies tokens only against its own machine. Needs a design choice. |
-| 884 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
-| 885 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
-| 886 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
-| 887 | PAN-5207 | L | low | needs-refinement |  | PAN-5202 | Parked by the operator: Flux meeting bots for Zoom, Teams, Meet, Slack as a paid integration. Do not start. |
-| 888 | PAN-5183 | XS | low | ok | ✓ |  | Parent of the file explorer; all children PAN-5185..5191 are closed. Verify and close. |
-| 889 | PAN-5181 | XS | low | ok |  |  | Fix shipped in PR #5179 (merged 2026-11-13); the body says it closes on merge. Verify and close. |
-| 890 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
-| 891 | PAN-5235 | XS | low | ok |  |  | Fix already applied: terminal-dialog toast now navigates to the agent's terminal tab. Verify and close. |
-| 892 | PAN-5280 | XS | low | ok |  |  | Record of two UI fixes made inline on main (orbiting logo, unclipped Home project menu). Verify and close. |
+| 465 | PAN-5346 | S | medium | ok |  | PAN-5344 | Auth docs misstate #overdeck_token delivery, the Origin rule and 401 troubleshooting; fix after PAN-5344 lands. |
+| 466 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
+| 467 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
+| 468 | PAN-1130 | S | medium | ok |  |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
+| 469 | PAN-1129 | S | medium | ok |  |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
+| 470 | PAN-1128 | S | medium | ok |  |  | Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
+| 471 | PAN-1113 | S | medium | ok |  |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
+| 472 | PAN-1068 | S | medium | ok |  |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
+| 473 | PAN-3938 | M | medium | needs-refinement |  |  | Run Muse Spark under Claude Code via cliproxy — only the paid Zen model is routable; free tier is OpenCode-client gated; needs credit… |
+| 474 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
+| 475 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
+| 476 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
+| 477 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
+| 478 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
+| 479 | PAN-778 | M | medium | ok |  |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
+| 480 | PAN-681 | S | medium | ok |  |  | Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
+| 481 | PAN-3732 | S | medium | ok |  |  | Codex handoff serializes a large rollout twice (~286MB peak RSS on 50MB); serialize once or stream. |
+| 482 | PAN-3700 | M | medium | ok |  |  | pan acp serve would let Zed and other ACP clients drive Overdeck conversations through canonical doors. PRD written. |
+| 483 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces, so docs items sit unanchored in the requirement traceability graph. |
+| 484 | PAN-3132 | M | medium | ok |  |  | xBRIEF v0.9 agentic dispatch fields are half-adopted as a behavior accident; make difficulty/filesScope/verifyCommands a contract. |
+| 485 | PAN-3909 | M | medium | needs-refinement |  |  | One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains |
+| 486 | PAN-2659 | S | medium | ok |  |  | acquireRecordLock survives for the planning auto-start consent lock; an ownerless lock after a crash is never reclaimed. |
+| 487 | PAN-3831 | S | medium | ok |  |  | Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver) |
+| 488 | PAN-4779 | S | medium | ok |  |  | Docs on main: 2 MDX parse errors hide pages from Mintlify + 15 broken vision.mdx links; mint broken-links can't gate |
+| 489 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
+| 490 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
+| 491 | PAN-3563 | S | medium | needs-refinement |  |  | pan unstick is gone; verify whether a spawned-but-never-briefed role agent can still read as running forever under liveness.ts |
+| 492 | PAN-1041 | M | medium | ok |  |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
+| 493 | PAN-924 | L | medium | needs-refinement |  |  | Spike: evaluate GitNexus for Panopticon integration |
+| 494 | PAN-3770 | S | medium | ok |  |  | Codex conversations never show the working spinner mid-turn; parser marks every agent_message instantly complete. |
+| 495 | PAN-4568 | XS | medium | ok |  |  | Codex sub-agent turn start shows thread: not sub: label; adoption lands one frame late. PAN-4563 replay test has landed. |
+| 496 | PAN-3731 | S | medium | ok |  |  | Restart-gate banner gives no feedback after approval; dead-requester approvals read as a broken button. |
+| 497 | PAN-3530 | S | medium | ok |  |  | Four God View components poll on 30s timers instead of the documented /ws/rpc event contract. |
+| 498 | PAN-3131 | L | medium | ok |  |  | Support xBRIEF planRef sharding so a 1.1MB/227-item plan stops making every finalize failure whole-plan-fatal. |
+| 499 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
+| 500 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
+| 501 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
+| 502 | PAN-4918 | M | medium | ok |  |  | Six Anywhere UI bugs seen while filming: Codex keeps Claude model, Zen models listed first, chip wrap, Pull-here state, no remote archive. |
+| 503 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
+| 504 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
+| 505 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
+| 506 | PAN-713 | M | medium | ok |  |  | test: add unit tests for doneCommand and approveCommand |
+| 507 | PAN-700 | M | medium | ok |  |  | Detachable terminal for conversation view |
+| 508 | PAN-646 | XS | medium | needs-refinement |  |  | Cancel no longer clears beads or a record; a Recover workflow now means reopening the tracker issue and re-planning |
+| 509 | PAN-532 | M | medium | ok |  |  | Per-project and per-issue model overrides for pipeline roles |
+| 510 | PAN-2896 | M | medium | ok |  |  | Warm resource-discovery and membership caches at boot |
+| 511 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
+| 512 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
+| 513 | PAN-5231 | S | medium | ok |  |  | Explorer: retrying Send through pipeline after a partial failure creates a second issue and branch. |
+| 514 | PAN-5204 | S | medium | ok |  |  | Voice: mixed 16/24 kHz sample rates on /ws/voice, and dictation turns leak into AutoPreso as errors. |
+| 515 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
+| 516 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
+| 517 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
+| 518 | PAN-2566 | L | medium | ok | ✓ |  | Triage list of genuine Traycer capability gaps; a container for child issues, not directly workable. |
+| 519 | PAN-2565 | M | medium | ok |  |  | Multi-agent conversations: N agent sessions in one task surface with agent-to-agent messaging |
+| 520 | PAN-3735 | S | medium | ok |  |  | Sandboxed pan CLI reports 'dashboard down, run pan up' when the real cause is no network; sends agents down the wrong path. |
+| 521 | PAN-3335 | XS | medium | ok |  |  | A pasted screenshot can't be viewed anywhere in the dashboard: thumbnail has no click handler and the sent form is a file-link chip. |
+| 522 | PAN-3054 | M | medium | ok |  |  | Benchmark matrix, redesigned 2026-09-29 as E6 of the model-routing PRD; its medians feed PAN-4364 and PAN-4367 |
+| 523 | PAN-2977 | M | medium | ok |  | PAN-2976 | Settings surface that detects installed ACP CLIs, renders the capability checklist, and guides login without a manual terminal. |
+| 524 | PAN-2557 | M | medium | ok |  |  | project-level 'Restart All' context action |
+| 525 | PAN-2553 | M | medium | ok |  |  | project-level CI visibility |
+| 526 | PAN-2521 | S | medium | ok |  |  | launch pipeline agents with harness rate-limit model-switch reminder disabled |
+| 527 | PAN-2493 | M | medium | ok |  |  | align the cockpit Agents-lane and sidebar issue-tree feature sets (two-way gaps) |
+| 528 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
+| 529 | PAN-3853 | S | medium | needs-refinement |  |  | Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path |
+| 530 | PAN-3830 | S | medium | ok |  |  | OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model |
+| 531 | PAN-4924 | S | medium | ok |  |  | linked-machines.mdx promises switch model for running conversations; dashboard disables it. Fix docs or add the control. |
+| 532 | PAN-4367 | M | medium | ok |  |  | Replace inherited capability scores for Sonnet 5.5, GPT-6 Sol/Luna with measured ones; eval harness has closed |
+| 533 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
+| 534 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
+| 535 | PAN-2409 | M | medium | ok |  |  | enforce the workspace boundary |
+| 536 | PAN-5145 | S | medium | ok |  |  | CLIProxy oauth-model-alias hides gpt-6-sol, gpt-5.6-terra and gpt-5.6-luna by their own ids on claude-code. |
+| 537 | PAN-5201 | XL | medium | ok |  |  | Speaker-aware STT: diarizing engines (Speechmatics, AssemblyAI, Muse, Voxtral, NeMo) and one VoiceSettings contract. |
+| 538 | PAN-2392 | M | medium | needs-refinement |  |  | Standing Crew survives; panel becomes a cost view from cost_events + tier-metrics; verdict/escalation columns need a new source. |
+| 539 | PAN-2335 | XS | medium | ok |  |  | chore: review the full open backlog for junk/stale/nonsensical issues |
+| 540 | PAN-2295 | L | medium | needs-refinement |  |  | built-in web browser surface (openable like terminal/Claude Code/Codex) + native Agentation integration |
+| 541 | PAN-3767 | S | medium | ok |  |  | Model switch could hang at 'Saving…'; onError toast landed, remaining work is reproducing the hang on a healthy server. |
+| 542 | PAN-3615 | S | medium | needs-refinement |  |  | TTS silent 9+ days from four stacked failures; three already fixed, only follow-ups remain — rescope to what is left. |
+| 543 | PAN-3558 | S | medium | ok |  |  | Subagent rail shows no model or provider, so mixed-model orchestration needs a transcript open per row to see what it is running. |
+| 544 | PAN-3469 | S | medium | ok |  |  | NewProjectModal violates the PAN-3410 page-not-modal doctrine; migrate the create-project flow to a routed page. |
+| 545 | PAN-3333 | M | medium | ok |  |  | Model pickers show $/1M, which says nothing under a subscription; show relative plan-quota drain among sibling models. |
+| 546 | PAN-3058 | M | medium | ok |  |  | Ship named crew presets that populate the whole tiered_execution block so operators don't hand-build the crew table. |
+| 547 | PAN-2288 | L | medium | ok |  |  | tmux managed-server: lossless auto-migration of dirty-founded servers + boot-time ensure call |
+| 548 | PAN-2065 | M | medium | ok |  |  | unified usage & headroom panel across all provider plans (z.ai, Anthropic, Codex, OpenRouter) |
+| 549 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
+| 550 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
+| 551 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
+| 552 | PAN-4366 | M | medium | ok |  |  | Plan the Haiku 4.5 successor and give workhorse:cheap a consumer or drop it; gated on E4 summary-faithfulness |
+| 553 | PAN-5314 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5313 (CLIProxy pool): body-read timeout, cache-miss coalescing, reset timestamps. |
+| 554 | PAN-5267 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5266: escalation limit and caching transient GraphQL errors as missing issues. |
+| 555 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
+| 556 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
+| 557 | PAN-3739 | S | medium | ok |  |  | cost-reconcile re-warns every model-less codex subthread rollout on every sweep; log flood grows without bound. |
+| 558 | PAN-4393 | XS | medium | ok |  |  | ac-eval-fixtures requires observable:false >= 8 but honest labeling of all specs yields 6; lower the floor |
+| 559 | PAN-1985 | M | medium | ok |  |  | Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
+| 560 | PAN-1968 | M | medium | ok |  |  | Finish local-domain rename: pan.localhost → overdeck.localhost |
+| 561 | PAN-1967 | M | medium | needs-refinement |  |  | Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
+| 562 | PAN-1965 | M | medium | ok |  |  | Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
+| 563 | PAN-1937 | M | medium | ok |  |  | feat: data export |
+| 564 | PAN-1926 | M | medium | ok |  |  | --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
+| 565 | PAN-1916 | M | medium | ok |  |  | configurable web search providers (Exa, Tavily, Brave, Perplexity) |
+| 566 | PAN-1854 | M | medium | ok |  |  | Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
+| 567 | PAN-1853 | M | medium | ok |  |  | Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
+| 568 | PAN-1852 | XS | medium | ok |  |  | Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
+| 569 | PAN-1844 | M | medium | ok |  |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
+| 570 | PAN-5202 | XL | medium | ok |  | PAN-5201 | Flux: experimental live meeting page capturing open items, ticket proposals and diagrams. Depends on PAN-5201. |
+| 571 | PAN-5141 | M | medium | ok |  |  | Reviewer pairing code: multi-day, reusable, restart-safe code so app store review can pair unattended. |
+| 572 | PAN-1840 | M | medium | ok |  |  | Add 'pan switch <id>' |
+| 573 | PAN-1839 | M | medium | ok |  |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
+| 574 | PAN-1776 | M | medium | ok |  |  | Hot-updatable message delivery: version-stamped supervisors + server-side delivery logic |
+| 575 | PAN-3706 | L | medium | ok |  |  | Broadsheet shipped typography only; color, surface, elevation and texture still on Ledger values, so it doesn't read like Subspace. |
+| 576 | PAN-3539 | XS | medium | needs-refinement |  |  | OOMPolicy=continue fix landed with the issue; re-scope to whatever hardening remains or close it out. |
+| 577 | PAN-3502 | XS | medium | needs-refinement |  |  | tiered-crews blendedCost expectation stale vs pricing catalog; likely already fixed by the PAN-3532 cherry-pick — verify. |
+| 578 | PAN-4409 | M | medium | ok |  |  | Overdeck integration on OKF v0.2.0 (injector trust tiers, new verbs); blocked on external eltmon/okf#9 |
+| 579 | PAN-4410 | M | medium | ok |  | PAN-4409 | Migrate eltmon/overdeck-knowledge to OKF v0.2 and refresh stale concepts; last link in the OKF chain |
+| 580 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
+| 581 | PAN-4878 | XS | low | ok |  |  | Delete dead ox curl installer in prereqs registry; PAN-4852 builds ox from the pinned fork commit, so ~/.local/bin/ox is never used. |
+| 582 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
+| 583 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
+| 584 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
+| 585 | PAN-1748 | M | medium | ok |  |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
+| 586 | PAN-1691 | M | medium | ok |  |  | conflict-aware merge train + on-demand UAT candidate |
+| 587 | PAN-1685 | XS | medium | ok |  |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
+| 588 | PAN-1676 | M | medium | ok |  |  | Harden Fly remote workspaces + pan workspace move; work-agent spill policy now specified in PAN-5241. |
+| 589 | PAN-1667 | M | medium | ok |  |  | unify Agents + Resources into one issue-centric holistic view |
+| 590 | PAN-1657 | M | medium | ok |  |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
+| 591 | PAN-1656 | M | medium | ok |  |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
+| 592 | PAN-1655 | M | medium | ok |  |  | Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
+| 593 | PAN-1654 | XS | medium | ok |  |  | run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
+| 594 | PAN-1653 | XS | medium | ok |  |  | batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
+| 595 | PAN-5309 | S | low | ok |  |  | CodeRabbit minor findings on the PAN-5283 Flywheel page redesign; verify each against main before fixing. |
+| 596 | PAN-5308 | S | low | ok |  |  | CodeRabbit findings on the PAN-5282 CLIProxy v8 upgrade: config-write ordering, Windows upgrade staging. |
+| 597 | PAN-1623 | M | medium | ok |  |  | Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
+| 598 | PAN-1561 | M | medium | ok |  |  | feat: Project-scoped dashboard nav (deck of tabs per project + conversations/tree column + activity feed) |
+| 599 | PAN-1550 | M | medium | ok |  |  | BrowserPane half only; the FilesPane half is superseded by the PAN-5183 file explorer, whose children have all closed. |
+| 600 | PAN-1545 | XS | medium | ok |  |  | New Terminal button |
+| 601 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
+| 602 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
+| 603 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
+| 604 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
+| 605 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
+| 606 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
+| 607 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
+| 608 | PAN-1432 | M | medium | ok |  |  | Merge agent leaves packages/contracts/dist stale |
+| 609 | PAN-1223 | M | medium | ok |  |  | Auto-update for users in the field (npm + desktop binaries) |
+| 610 | PAN-1165 | M | medium | ok |  |  | Lightweight review path for small/trivial PRs |
+| 611 | PAN-1151 | XS | medium | ok |  |  | Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
+| 612 | PAN-4360 | S | medium | ok |  |  | Add pan claude upgrade and offer the Claude Code upgrade in pan install / pan sync; PAN-4359 has closed |
+| 613 | PAN-1060 | M | medium | ok |  |  | Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
+| 614 | PAN-1051 | M | medium | ok |  |  | feat: Subspace-inspired alternate theme with Inter + JetBrains Mono |
+| 615 | PAN-1037 | M | medium | ok |  |  | Retire 'planning-' tmux prefix |
+| 616 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
+| 617 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
+| 618 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
+| 619 | PAN-5067 | M | medium | ok |  |  | Skill overrides: bad-YAML issue file is overwritten on write (data loss), license detection gaps, Pi ignores --pack silently. |
+| 620 | PAN-4908 | S | low | ok |  |  | Other remote-not-enabled messages name no file and the dead verb 'pan remote setup'; reuse PAN-4905's remoteEnabledHint(). |
+| 621 | PAN-5130 | S | medium | ok |  |  | pan project add gains --issue-prefix for any tracker; --linear-team becomes a deprecated alias. Follow-up to closed PAN-51. |
+| 622 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
+| 623 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
+| 624 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
+| 625 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
+| 626 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
+| 627 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
+| 628 | PAN-4308 | S | medium | ok |  |  | Settle reaped Fly remote transcripts into the Session Vault; PAN-4295 auto-reap landed, still blocked by PAN-2609 (engine). |
+| 629 | PAN-3322 | XS | medium | ok |  |  | launcher-generator.ts's file-size ceiling sits 126 lines above the real file, handing back the regrowth the ratchet exists to prevent. |
+| 630 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
+| 631 | PAN-675 | M | medium | needs-refinement |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
+| 632 | PAN-654 | L | medium | ok |  |  | Project Setup Wizard |
+| 633 | PAN-649 | M | medium | ok |  |  | Render Excalidraw drawings inline in Claude Code conversations |
+| 634 | PAN-637 | XS | medium | ok |  |  | Direct issue kickoff (skip planning) from dashboard UI |
+| 635 | PAN-629 | M | medium | ok |  |  | Workspace quotas and resource governance |
+| 636 | PAN-613 | M | medium | needs-refinement |  |  | Investigate thinking effort levels for agents |
+| 637 | PAN-607 | M | medium | needs-refinement |  |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
+| 638 | PAN-606 | M | medium | needs-refinement |  |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
+| 639 | PAN-548 | M | medium | ok |  |  | Command Deck: preserve state across navigation including URL routing for tabs |
+| 640 | PAN-546 | M | medium | ok |  |  | Remove claude-code-router |
+| 641 | PAN-537 | M | medium | ok |  |  | feat: show changed files diff summary after each agent response in activity view |
+| 642 | PAN-531 | XS | medium | ok |  |  | PAN: Windows Electron support (WSL2 required) |
+| 643 | PAN-452 | M | medium | ok |  |  | Conversation input bar |
+| 644 | PAN-450 | M | medium | ok |  |  | Adopt remaining Effect patterns |
+| 645 | PAN-1126 | M | medium | ok |  |  | Integrate TLDR summaries into review context manifest |
+| 646 | PAN-5154 | L | low | needs-refinement |  |  | GitHub account, token and host per owner (work accounts, GHES). Not scheduled; needs a PRD first. |
+| 647 | PAN-1066 | M | medium | ok |  |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
+| 648 | PAN-3441 | L | low | ok |  |  | God View 'River' WebGL pipeline visualization fed by the live hook-event stream; PRD and mockup exist. |
+| 649 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
+| 650 | PAN-2941 | M | low | stale |  |  | Superseded by OKF v0.2: drafts plus human verify replace the PR gate (eltmon/okf#6); semantic pass is eltmon/okf#7 |
+| 651 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
+| 652 | PAN-4373 | M | medium | ok |  |  | Optional Jev relevance filter for prompt-time memory injection candidates; both prerequisites have closed |
+| 653 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
+| 654 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
+| 655 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
+| 656 | PAN-2662 | M | low | ok |  |  | Add project context-menu actions scoped to issues currently in the pipeline |
+| 657 | PAN-2645 | M | low | ok |  |  | Add opt-in Observation-first conversation view |
+| 658 | PAN-2635 | XS | low | ok |  |  | pay down the 152-error src/dashboard/server typecheck debt |
+| 659 | PAN-5066 | M | medium | ok |  |  | Project skills in .pan/skills skip the CLI workspace fallback, never refresh, lose to bundled skills, and never reach Codex/Pi. |
+| 660 | PAN-3443 | L | low | ok |  |  | God View 'Spectrum Deck' visualizer concept with mockup and PRD; pure exploration, no substrate impact. |
+| 661 | PAN-4350 | M | medium | needs-refinement |  |  | Re-dispatch budget for foreman items; issue itself flags an unresolved conflict with the no-stored-state rule |
+| 662 | PAN-4003 | L | medium | ok |  |  | Parked: delete the ohmypi/omp harness, keep Pi; obsoletes 10 open ohmypi issues and shrinks PAN-3958's CH-7 scope |
+| 663 | PAN-4368 | S | medium | ok |  |  | Operator-run checklist: verify Sonnet 5.5 across switch-model, fork and compaction (model-locked thinking blocks) |
+| 664 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
+| 665 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
+| 666 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
+| 667 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
+| 668 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
+| 669 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
+| 670 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
+| 671 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
+| 672 | PAN-4769 | XS | low | ok |  |  | Two-sentence wording fix in features/skill-packs.mdx; PAN-4759 created the page and closed, so this is unblocked. |
+| 673 | PAN-3940 | XL | low | ok | ✓ |  | Parked epic: event-driven plugin/hook system on pipeline-notifier + hygiene-scheduler; do not pick up until the journal has soaked |
+| 674 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
+| 675 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
+| 676 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
+| 677 | PAN-4823 | XL | medium | ok | ✓ |  | Epic: Capacitor phone client for Anywhere without Tailscale; 15 children filed (#4828-4843); OD-1 settled; PAN-4774 done. |
+| 678 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
+| 679 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
+| 680 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
+| 681 | PAN-5082 | XL | medium | ok |  |  | Move every MCP surface to SDK v2 for the 2026-07-28 spec while keeping 2025-11-25 clients; time it on PAN-5083 data. |
+| 682 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
+| 683 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
+| 684 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
+| 685 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
+| 686 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
+| 687 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
+| 688 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
+| 689 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
+| 690 | PAN-2046 | M | low | stale |  |  | Conversation view does not surface terminal command responses |
+| 691 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
+| 692 | PAN-3919 | S | low | needs-refinement |  |  | Review the universal effort-high default and supervisor effort discretion; explicitly an operator decision, no work authorized |
+| 693 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
+| 694 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
+| 695 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
+| 696 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
+| 697 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
+| 698 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
+| 699 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
+| 700 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
+| 701 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
+| 702 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
+| 703 | PAN-1782 | M | low | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout |
+| 704 | PAN-1773 | M | low | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
+| 705 | PAN-1646 | M | low | ok |  |  | Rabbit-hole drift detection and lift-to-new-conversation |
+| 706 | PAN-1643 | M | low | ok |  |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
+| 707 | PAN-1592 | M | low | ok |  |  | Composer: make ephemeral composer state reload-durable (pasted images + unsent/failed message text) |
+| 708 | PAN-1581 | M | low | ok |  |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
+| 709 | PAN-1533 | M | low | ok |  |  | Fork-into-worktree from conversation branch chip |
+| 710 | PAN-1483 | XS | low | ok |  |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
+| 711 | PAN-1482 | M | low | ok |  |  | Token spend report should aggregate data from repo, not just local machine |
+| 712 | PAN-1481 | M | low | ok |  |  | Add cost-event telemetry for Caveman token savings |
+| 713 | PAN-1356 | M | low | ok |  |  | Extend the memory Observation pipeline to ad-hoc conversations |
+| 714 | PAN-1242 | M | low | ok |  |  | Create a new issue directly from a kanban column |
+| 715 | PAN-1222 | M | low | ok |  |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
+| 716 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
+| 717 | PAN-4352 | XS | low | ok |  |  | Operator verification: skill packs in a managed interactive Claude Code launch now that PAN-4334 has shipped |
+| 718 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
+| 719 | PAN-4298 | XL | low | needs-refinement |  | PAN-4294, PAN-1676 | Anywhere paid tier: run agents on hosted Fly capacity; tenant isolation, credentials, metering open; PAN-4294 and PAN-1676 unbuilt |
+| 720 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
+| 721 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
+| 722 | PAN-1133 | M | low | stale |  |  | Deacon-patrol tie-in for TLDR supervision is gone; would need its own liveness check |
+| 723 | PAN-1123 | XS | low | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
+| 724 | PAN-1121 | M | low | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
+| 725 | PAN-4248 | L | medium | ok |  |  | List, pull and delete local Ollama models (size, store, in-use) in CLI, dashboard and doctor; PAN-1641 sidecar has merged. |
+| 726 | PAN-1117 | M | low | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
+| 727 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
+| 728 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
+| 729 | PAN-1064 | M | low | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
+| 730 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
+| 731 | PAN-3971 | L | low | ok |  |  | Overdeck-native artifact pages (pan artifact publish + state door + dashboard listing); body says backlog only, Claude artifacts work today |
+| 732 | PAN-3768 | XS | low | ok |  |  | pan handoff --title already implemented and landed (678f6b389e5); open only pending close-out. |
+| 733 | PAN-3034 | XS | low | ok |  |  | Fix already landed on main (strike/slot workspace names and live tmux now seed the session tree); open pending close-out. |
+| 734 | PAN-2983 | M | low | stale |  |  | Superseded by the OKF v0.2 redesign: write modes and drafts (eltmon/okf#6) and the advisory semantic pass (eltmon/okf#7) |
+| 735 | PAN-3824 | XS | low | needs-refinement |  |  | Image-only report: default view on Windows breaks the model selector; needs a written repro and expected behavior |
+| 736 | PAN-3823 | XS | low | needs-refinement |  |  | Image-only report titled "pan sync issue"; needs the command, output text, and expected behavior |
+| 737 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
+| 738 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
+| 739 | PAN-962 | M | low | needs-refinement |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
+| 740 | PAN-961 | M | low | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
+| 741 | PAN-943 | M | low | ok |  |  | Add memory file review and management command |
+| 742 | PAN-908 | M | low | ok |  |  | PAN-908: Make work-agent spawn limits configurable and overridable |
+| 743 | PAN-898 | M | low | ok |  |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
+| 744 | PAN-853 | L | low | needs-refinement |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
+| 745 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
+| 746 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
+| 747 | PAN-4347 | S | low | ok |  |  | pan done appends continue.json decisions to the PR body so significant decisions outlive the workspace |
+| 748 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
+| 749 | PAN-4275 | S | low | ok |  |  | Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. PAN-1641 has merged. |
+| 750 | PAN-2836 | M | low | needs-refinement |  |  | Placement presets now belong on eltmon/okf#4 after the OKF v0.2 redesign; migrate verb collides; re-scope or move upstream |
+| 751 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
+| 752 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
+| 753 | PAN-777 | M | low | ok |  |  | Inter-agent communication skill: send messages to conversation-mode agents |
+| 754 | PAN-775 | L | low | ok |  |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
+| 755 | PAN-3456 | XS | low | ok |  |  | Already fixed in 4117c9a777 with a regression test; open only pending close-out. |
+| 756 | PAN-774 | XS | low | ok |  |  | Unify launch UX and release pipeline for 1.0 |
+| 757 | PAN-773 | XS | low | ok |  |  | Design prompt-style overlays with model hierarchy and scoped toggles |
+| 758 | PAN-772 | M | low | stale |  |  | Auto-resume ladder paths it names are gone; terminal-stack consistency now means the Herdr/tmux contract in TERMINAL-BACKENDS.md |
+| 759 | PAN-771 | M | low | needs-refinement |  |  | Investigate Vercel Sandbox execution backend support |
+| 760 | PAN-769 | M | low | stale |  | PAN-750 | Phase-transition history no longer accumulates in a record; a churn metric would be rebuilt from PR review cycles or the pipeline journal |
+| 761 | PAN-765 | M | low | ok |  |  | Preserve trailing zeros in cost displays |
+| 762 | PAN-764 | M | low | ok |  |  | Add quota/usage inspector for routed model providers |
+| 763 | PAN-4425 | M | low | ok |  |  | Deft fork work in eltmon/directive (env off switch, external-orchestrator mode); outside the overdeck pipeline |
+| 764 | PAN-752 | M | low | ok |  |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
+| 765 | PAN-751 | M | low | ok |  |  | Historical Metrics Data Persistence |
+| 766 | PAN-750 | L | low | ok |  |  | Complete Metrics Page Redesign |
+| 767 | PAN-749 | M | low | needs-refinement |  |  | Research and borrow best features from gstack |
+| 768 | PAN-747 | XS | low | ok |  |  | Conversation list items lack accessible labels in accessibility tree |
+| 769 | PAN-743 | XS | low | ok |  |  | Add consistent new conversation icon actions in Command Deck |
+| 770 | PAN-738 | M | low | ok |  |  | Add right-click fork option to conversation list |
+| 771 | PAN-735 | M | low | ok |  |  | Settings page: review and configure overridden subagent model files |
+| 772 | PAN-730 | M | low | ok |  |  | Add provider account telemetry for credits, balances, and usage |
+| 773 | PAN-701 | XS | low | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
+| 774 | PAN-663 | XS | low | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
+| 775 | PAN-660 | M | low | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
+| 776 | PAN-624 | M | low | ok |  |  | Loop nodes: iterative agent execution with conditional termination |
+| 777 | PAN-623 | M | low | ok |  |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
+| 778 | PAN-622 | M | low | ok |  |  | YAML workflow DAGs: custom per-project pipeline definitions |
+| 779 | PAN-604 | M | low | ok |  |  | Hide planning agent from workspace detail pane |
+| 780 | PAN-603 | M | low | ok |  |  | Plan review loop with configurable reviewer model |
+| 781 | PAN-591 | XS | low | ok |  |  | Integrate Karpathy LLM guidelines into all Panopticon CLAUDE.md templates |
+| 782 | PAN-589 | XS | low | ok |  |  | Review and update commands-skills.md with all available Panopticon skills |
+| 783 | PAN-576 | M | low | ok |  |  | Global / search should include conversations in addition to workspace features |
+| 784 | PAN-571 | XS | low | ok |  |  | Add OpenRouter credits/plan status endpoint and UI |
+| 785 | PAN-568 | M | low | ok |  |  | Kanban: Show workspace and tmux session counts in stats |
+| 786 | PAN-565 | M | low | ok |  |  | Handle CTRL-Z to undo accidental conversation archival |
+| 787 | PAN-564 | M | low | ok |  |  | Slash menu positioned incorrectly |
+| 788 | PAN-554 | M | low | ok |  |  | Add kanban board deeplinks for issue URLs |
+| 789 | PAN-543 | M | low | ok |  |  | Add confirmation dialog before applying Optimal Defaults |
+| 790 | PAN-483 | M | low | ok |  |  | Unify Resume Agent UX |
+| 791 | PAN-480 | M | low | needs-refinement |  |  | Planning-agent --effort; likely covered by merged PAN-4249 resolver and PAN-4258 (plan effort), confirm or close |
+| 792 | PAN-476 | M | low | ok |  |  | Agent resume with Haiku session summary instead of claude --resume |
+| 793 | PAN-468 | M | low | ok |  |  | Agent test conversations pollute production database |
+| 794 | PAN-461 | M | low | ok |  |  | Deep-wipe multi-step progress dialog |
+| 795 | PAN-459 | M | low | ok |  |  | Planning setup screen with SSE progress streaming |
+| 796 | PAN-407 | XS | low | ok |  |  | Run Panopticon from a main workspace for development isolation |
+| 797 | PAN-2348 | XS | low | ok |  |  | docs: migrate STATE-STORAGE-AUDIT.md content to living docs, then delete |
+| 798 | PAN-2346 | XS | low | ok |  |  | docs: refresh AGENT_TYPES_INDEX.md to the post-Cut taxonomy in ROLES.md (xBRIEF items, foreman, conv-flywheel, worker role). |
+| 799 | PAN-2345 | XS | low | ok |  |  | docs: rewrite pan-done.md against done.ts + done-preflight.ts; fix continue path; point MERGE link at MERGE-WORKFLOW.md. |
+| 800 | PAN-2344 | XS | low | ok |  |  | docs: rewrite KANBAN-MODEL.md for derived issue state, pipeline-membership buckets, PR reviews; drop Inspect and beads. |
+| 801 | PAN-2343 | XS | low | ok |  |  | docs: rewrite MISSION-CONTROL.md: state label from deriveStateLabel, membership, liveness.ts; review_status table is gone. |
+| 802 | PAN-2073 | XS | low | ok |  |  | docs: add user-facing page for the Desktop App |
+| 803 | PAN-2071 | XS | low | ok |  |  | docs: add user-facing page for the Hooks system |
+| 804 | PAN-2068 | XS | low | ok |  |  | docs: add user-facing page for Caveman (agent output compression) |
+| 805 | PAN-2067 | XS | low | ok |  |  | docs: add user-facing page for RTK (Bash output compression) |
+| 806 | PAN-1684 | XS | low | ok |  |  | build full marketing kit + plan (SEO, video list, channels) from MARKETING.md seed |
+| 807 | PAN-1683 | XS | low | ok |  |  | docs: canonical agent session-prefix registry + reconcile role taxonomy (ROLES.md/AGENT_TYPES_INDEX/CLAUDE.md) |
+| 808 | PAN-1474 | M | low | ok |  |  | Add ACKNOWLEDGEMENTS doc |
+| 809 | PAN-1469 | M | low | ok |  |  | End-to-end review and consolidation of all project documentation |
+| 810 | PAN-674 | XS | low | ok |  |  | docs: add glossary of Panopticon domain terms |
+| 811 | PAN-634 | M | low | ok |  |  | Documentation cleanup: restructure docs, update installation (npx panctl), refresh stale PRDs |
+| 812 | PAN-2908 | M | low | ok |  |  | Make overdeck not suck |
+| 813 | PAN-106 | M | high | stale |  |  | Cost prediction/estimation for in-progress work |
+| 814 | PAN-262 | M | high | stale |  |  | Refactor post-merge lifecycle into composable, idempotent operations |
+| 815 | PAN-176 | M | high | stale |  |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
+| 816 | PAN-334 | S | medium | stale |  |  | Dashboard server has no duplicate-process protection |
+| 817 | PAN-324 | XS | medium | needs-refinement |  |  | Approval is now a PR review or the dashboard MERGE button; verify whether the agent detail pane already surfaces MERGE post-cut |
+| 818 | PAN-304 | S | medium | stale |  |  | closeLinearDirect returns stepOk even when state update never happens |
+| 819 | PAN-245 | S | medium | stale |  |  | Ctrl+C aborts planning dialog instead of copying text |
+| 820 | PAN-244 | S | medium | stale |  |  | Deep-wipe leaves local branch and worktree metadata behind |
+| 821 | PAN-4332 | M | low | ok |  |  | Interop: continue t3code sessions in Overdeck and back via native transcripts; PAN-2609 Phase A has closed |
+| 822 | PAN-113 | S | medium | stale |  |  | Dashboard 'Start Agent' returns success before verifying agent actually started |
+| 823 | PAN-49 | XS | medium | stale |  |  | Fix CloisterService tests that require real runtime |
+| 824 | PAN-294 | M | medium | stale |  |  | Surface module initialization errors as system-level, not per-issue |
+| 825 | PAN-293 | M | medium | stale |  |  | Project Living Memory |
+| 826 | PAN-277 | M | medium | stale |  |  | Session reasoning capture & collaborative PRD refinement |
+| 827 | PAN-258 | M | medium | stale |  |  | Kanban board: fit all columns without horizontal scrolling |
+| 828 | PAN-255 | M | medium | stale |  |  | Agents lack awareness of MCP tools |
+| 829 | PAN-252 | XS | medium | stale |  |  | Disable Sync with Main button when workspace is up to date |
+| 830 | PAN-243 | M | medium | stale |  |  | Audit dashboard actions: ensure all are available via CLI |
+| 831 | PAN-77 | XS | medium | stale |  |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
+| 832 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
+| 833 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
+| 834 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
+| 835 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 836 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 837 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 838 | PAN-5033 | XS | medium | ok |  |  | OpenClaw Connect a bot snippet omits hooks.allowConversationAccess, so the needs-you summary stays off with no message. |
+| 839 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 840 | PAN-5043 | S | medium | ok |  |  | Commit the phone-app iOS Simulator harness (Miniflare connect stand-in, stub account service, rig steps) built twice by hand. |
+| 841 | PAN-5065 | L | medium | ok |  |  | Opt-in mode where a project's agents and gates stop seeing ~/.overdeck.env keys the project did not list. |
+| 842 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 843 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
+| 844 | PAN-762 | M | low | stale |  |  | Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about |
+| 845 | PAN-299 | M | low | stale |  |  | Granular session state persistence across context compaction |
+| 846 | PAN-298 | M | low | stale |  |  | Auto-detect package manager and runtime in workspace setup |
+| 847 | PAN-297 | M | low | stale |  |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
+| 848 | PAN-283 | M | low | stale |  |  | Reset should sync workspace feature branch with latest main |
+| 849 | PAN-271 | M | low | stale |  |  | Auto-assign Linear project from project config when creating issues |
+| 850 | PAN-265 | M | low | stale |  |  | Review skill categorization: all skills available everywhere via personal + workspace |
+| 851 | PAN-249 | XS | low | stale |  |  | Add data-testid attributes across dashboard UI and create Playwright smoke test suite |
+| 852 | PAN-228 | M | low | stale |  |  | Shift-left post-edit diagnostics |
+| 853 | PAN-227 | M | low | stale |  |  | Phase gate validation |
+| 854 | PAN-198 | M | low | stale |  |  | Structured audit trail for agent actions |
+| 855 | PAN-190 | M | low | stale |  |  | PAN-190: Specialized reviewer prompts (industry best-practice checklists) |
+| 856 | PAN-180 | M | low | stale |  |  | PAN-180: Cross-terminal file locking for concurrent agents |
+| 857 | PAN-177 | M | low | stale |  |  | PAN-177: Iteration limits with escalation for autonomous agents |
+| 858 | PAN-175 | M | low | stale |  |  | PAN-175: Pre-compact auto-save hook for agent sessions |
+| 859 | PAN-155 | L | low | stale |  |  | PAN-155: Redesign health page with Stitch (system overview, timeline, costs) |
+| 860 | PAN-146 | M | low | stale |  |  | PAN-146: Refine light mode theming across all dashboard pages |
+| 861 | PAN-55 | M | low | stale |  |  | Track specialist costs with time period filtering |
+| 862 | PAN-44 | M | low | stale |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
+| 863 | PAN-2070 | XS | low | needs-refinement |  |  | docs: user-facing Flywheel page should target the pan-flywheel v2 loop skill, not a CLI daemon with a dashboard toggle |
+| 864 | PAN-3536 | S | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): pan tell can not reach ohmypi conversations; fix dies with the harness |
+| 865 | PAN-2027 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): routing kimi-k2 through ohmypi needs a different home once OMP is gone |
+| 866 | PAN-2035 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): Copilot provider routing via omp |
+| 867 | PAN-2034 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): end-to-end test for ohmypi tool-call rendering |
+| 868 | PAN-2033 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi message-delivery latency benchmark |
+| 869 | PAN-2032 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): local Ollama review role via omp |
+| 870 | PAN-2030 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): version-pin the ohmypi extension |
+| 871 | PAN-2029 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi-parser thinking_tokens capture |
+| 872 | PAN-2028 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): per-provider cost grouping keyed on omp |
+| 873 | PAN-2024 | XS | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi conversation Tools-toggle |
+| 874 | PAN-2883 | M | high | needs-refinement |  |  | Appears already fixed: resolveIssuePullRequestRef probes strike/<id> at pull-requests.ts:209, which is exactly the fix. Verify and close. |
+| 875 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
+| 876 | PAN-4555 | XS | low | ok |  |  | Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then. |
+| 877 | PAN-4590 | L | medium | ok |  |  | Semgrep sast verification gate + review-context findings; first buildable Semgrep child (epic PAN-4585 closed), needs config. |
+| 878 | PAN-4591 | L | medium | ok |  |  | Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; epic PAN-4585 closed, now buildable. |
+| 879 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
+| 880 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
+| 881 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
+| 882 | PAN-5022 | L | medium | ok |  |  | Phone app: relay notification preferences to offline machines via the directory, and drop muted pushes on the phone. |
+| 883 | PAN-5021 | M | low | needs-refinement |  |  | PAN-5100 landed phone telemetry with conflicting decisions; re-scope to any remaining gap or close as superseded. |
+| 884 | PAN-5029 | M | medium | needs-refinement |  |  | Grok Build Tailscale reach can't work: pan mcp serve verifies tokens only against its own machine. Needs a design choice. |
+| 885 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
+| 886 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
+| 887 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
+| 888 | PAN-5207 | L | low | needs-refinement |  | PAN-5202 | Parked by the operator: Flux meeting bots for Zoom, Teams, Meet, Slack as a paid integration. Do not start. |
+| 889 | PAN-5183 | XS | low | ok | ✓ |  | Parent of the file explorer; all children PAN-5185..5191 are closed. Verify and close. |
+| 890 | PAN-5181 | XS | low | ok |  |  | Fix shipped in PR #5179 (merged 2026-11-13); the body says it closes on merge. Verify and close. |
+| 891 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
+| 892 | PAN-5235 | XS | low | ok |  |  | Fix already applied: terminal-dialog toast now navigates to the agent's terminal tab. Verify and close. |
+| 893 | PAN-5280 | XS | low | ok |  |  | Record of two UI fixes made inline on main (orbiting logo, unclipped Home project menu). Verify and close. |
 
 ## Rationale detail
 
@@ -1227,10 +1228,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T12:22:34.260769Z",
+  "generatedAt": "2026-11-15T12:40:36.134016Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 892,
+  "openCount": 893,
   "nodes": [
     {
       "issue": "PAN-5290",
@@ -7070,8 +7071,23 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "planning": "auto"
     },
     {
-      "issue": "PAN-1150",
+      "issue": "PAN-5346",
       "rank": 465,
+      "size": "S",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5344"
+      ],
+      "why": "Auth docs misstate #overdeck_token delivery, the Origin rule and 401 troubleshooting; fix after PAN-5344 lands.",
+      "rationale": "New docs follow-up to PAN-5344 (rank 3, fix in PR #5345); ranked with other medium docs-accuracy work and sequenced after the fix it documents.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-1150",
+      "rank": 466,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7083,7 +7099,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1149",
-      "rank": 466,
+      "rank": 467,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7095,7 +7111,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1130",
-      "rank": 467,
+      "rank": 468,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7107,7 +7123,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1129",
-      "rank": 468,
+      "rank": 469,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7119,7 +7135,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1128",
-      "rank": 469,
+      "rank": 470,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7131,7 +7147,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1113",
-      "rank": 470,
+      "rank": 471,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7143,7 +7159,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1068",
-      "rank": 471,
+      "rank": 472,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7155,7 +7171,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3938",
-      "rank": 472,
+      "rank": 473,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7168,7 +7184,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-933",
-      "rank": 473,
+      "rank": 474,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7180,7 +7196,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-932",
-      "rank": 474,
+      "rank": 475,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7192,7 +7208,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-927",
-      "rank": 475,
+      "rank": 476,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7204,7 +7220,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-900",
-      "rank": 476,
+      "rank": 477,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7216,7 +7232,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-886",
-      "rank": 477,
+      "rank": 478,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7228,7 +7244,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-778",
-      "rank": 478,
+      "rank": 479,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7240,7 +7256,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-681",
-      "rank": 479,
+      "rank": 480,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7252,7 +7268,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3732",
-      "rank": 480,
+      "rank": 481,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7264,7 +7280,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3700",
-      "rank": 481,
+      "rank": 482,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7276,7 +7292,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3290",
-      "rank": 482,
+      "rank": 483,
       "size": "XS",
       "importance": "medium",
       "score": 50,
@@ -7288,7 +7304,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3132",
-      "rank": 483,
+      "rank": 484,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7300,7 +7316,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3909",
-      "rank": 484,
+      "rank": 485,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7313,7 +7329,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2659",
-      "rank": 485,
+      "rank": 486,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7326,7 +7342,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3831",
-      "rank": 486,
+      "rank": 487,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7339,7 +7355,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4779",
-      "rank": 487,
+      "rank": 488,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7352,7 +7368,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-538",
-      "rank": 488,
+      "rank": 489,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -7364,7 +7380,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1164",
-      "rank": 489,
+      "rank": 490,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7376,7 +7392,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3563",
-      "rank": 490,
+      "rank": 491,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7389,7 +7405,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1041",
-      "rank": 491,
+      "rank": 492,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7401,7 +7417,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-924",
-      "rank": 492,
+      "rank": 493,
       "size": "L",
       "importance": "medium",
       "score": 48,
@@ -7413,7 +7429,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3770",
-      "rank": 493,
+      "rank": 494,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7425,7 +7441,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4568",
-      "rank": 494,
+      "rank": 495,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7438,7 +7454,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3731",
-      "rank": 495,
+      "rank": 496,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7450,7 +7466,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3530",
-      "rank": 496,
+      "rank": 497,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7462,7 +7478,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3131",
-      "rank": 497,
+      "rank": 498,
       "size": "L",
       "importance": "medium",
       "score": 48,
@@ -7474,7 +7490,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3061",
-      "rank": 498,
+      "rank": 499,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7486,7 +7502,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3057",
-      "rank": 499,
+      "rank": 500,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -7499,7 +7515,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3892",
-      "rank": 500,
+      "rank": 501,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7512,7 +7528,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4918",
-      "rank": 501,
+      "rank": 502,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7525,7 +7541,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-863",
-      "rank": 502,
+      "rank": 503,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7537,7 +7553,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-817",
-      "rank": 503,
+      "rank": 504,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7549,7 +7565,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-802",
-      "rank": 504,
+      "rank": 505,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7561,7 +7577,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-713",
-      "rank": 505,
+      "rank": 506,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7573,7 +7589,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-700",
-      "rank": 506,
+      "rank": 507,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7585,7 +7601,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-646",
-      "rank": 507,
+      "rank": 508,
       "size": "XS",
       "importance": "medium",
       "score": 47,
@@ -7598,7 +7614,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-532",
-      "rank": 508,
+      "rank": 509,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7610,7 +7626,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2896",
-      "rank": 509,
+      "rank": 510,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7622,7 +7638,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2685",
-      "rank": 510,
+      "rank": 511,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7634,7 +7650,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2626",
-      "rank": 511,
+      "rank": 512,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7646,7 +7662,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5231",
-      "rank": 512,
+      "rank": 513,
       "size": "S",
       "importance": "medium",
       "score": 46,
@@ -7658,7 +7674,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5204",
-      "rank": 513,
+      "rank": 514,
       "size": "S",
       "importance": "medium",
       "score": 46,
@@ -7670,7 +7686,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2625",
-      "rank": 514,
+      "rank": 515,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7682,7 +7698,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2608",
-      "rank": 515,
+      "rank": 516,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7694,7 +7710,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2582",
-      "rank": 516,
+      "rank": 517,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7706,7 +7722,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2566",
-      "rank": 517,
+      "rank": 518,
       "size": "L",
       "importance": "medium",
       "score": 46,
@@ -7720,7 +7736,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2565",
-      "rank": 518,
+      "rank": 519,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7733,7 +7749,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3735",
-      "rank": 519,
+      "rank": 520,
       "size": "S",
       "importance": "medium",
       "score": 46,
@@ -7745,7 +7761,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3335",
-      "rank": 520,
+      "rank": 521,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7757,7 +7773,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3054",
-      "rank": 521,
+      "rank": 522,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7769,7 +7785,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2977",
-      "rank": 522,
+      "rank": 523,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7783,7 +7799,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2557",
-      "rank": 523,
+      "rank": 524,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7795,7 +7811,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2553",
-      "rank": 524,
+      "rank": 525,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7807,7 +7823,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2521",
-      "rank": 525,
+      "rank": 526,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7819,7 +7835,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2493",
-      "rank": 526,
+      "rank": 527,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7831,7 +7847,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3772",
-      "rank": 527,
+      "rank": 528,
       "size": "XS",
       "importance": "medium",
       "score": 45,
@@ -7843,7 +7859,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3853",
-      "rank": 528,
+      "rank": 529,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7856,7 +7872,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3830",
-      "rank": 529,
+      "rank": 530,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7869,7 +7885,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4924",
-      "rank": 530,
+      "rank": 531,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7882,7 +7898,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4367",
-      "rank": 531,
+      "rank": 532,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7894,7 +7910,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2443",
-      "rank": 532,
+      "rank": 533,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7906,7 +7922,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2442",
-      "rank": 533,
+      "rank": 534,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7918,7 +7934,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2409",
-      "rank": 534,
+      "rank": 535,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7930,7 +7946,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5145",
-      "rank": 535,
+      "rank": 536,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -7942,7 +7958,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5201",
-      "rank": 536,
+      "rank": 537,
       "size": "XL",
       "importance": "medium",
       "score": 44,
@@ -7954,7 +7970,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2392",
-      "rank": 537,
+      "rank": 538,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7967,7 +7983,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2335",
-      "rank": 538,
+      "rank": 539,
       "size": "XS",
       "importance": "medium",
       "score": 44,
@@ -7979,7 +7995,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2295",
-      "rank": 539,
+      "rank": 540,
       "size": "L",
       "importance": "medium",
       "score": 44,
@@ -7991,7 +8007,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3767",
-      "rank": 540,
+      "rank": 541,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8003,7 +8019,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3615",
-      "rank": 541,
+      "rank": 542,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8015,7 +8031,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3558",
-      "rank": 542,
+      "rank": 543,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8027,7 +8043,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3469",
-      "rank": 543,
+      "rank": 544,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8039,7 +8055,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3333",
-      "rank": 544,
+      "rank": 545,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8051,7 +8067,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3058",
-      "rank": 545,
+      "rank": 546,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8063,7 +8079,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2288",
-      "rank": 546,
+      "rank": 547,
       "size": "L",
       "importance": "medium",
       "score": 43,
@@ -8075,7 +8091,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2065",
-      "rank": 547,
+      "rank": 548,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8087,7 +8103,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2031",
-      "rank": 548,
+      "rank": 549,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8099,7 +8115,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2026",
-      "rank": 549,
+      "rank": 550,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8111,7 +8127,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2025",
-      "rank": 550,
+      "rank": 551,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8123,7 +8139,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4366",
-      "rank": 551,
+      "rank": 552,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -8135,7 +8151,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5314",
-      "rank": 552,
+      "rank": 553,
       "size": "S",
       "importance": "medium",
       "score": 42,
@@ -8147,7 +8163,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5267",
-      "rank": 553,
+      "rank": 554,
       "size": "S",
       "importance": "medium",
       "score": 42,
@@ -8159,7 +8175,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2004",
-      "rank": 554,
+      "rank": 555,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8171,7 +8187,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1995",
-      "rank": 555,
+      "rank": 556,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8183,7 +8199,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3739",
-      "rank": 556,
+      "rank": 557,
       "size": "S",
       "importance": "medium",
       "score": 42,
@@ -8195,7 +8211,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4393",
-      "rank": 557,
+      "rank": 558,
       "size": "XS",
       "importance": "medium",
       "score": 44,
@@ -8207,7 +8223,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1985",
-      "rank": 558,
+      "rank": 559,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8219,7 +8235,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1968",
-      "rank": 559,
+      "rank": 560,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8231,7 +8247,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1967",
-      "rank": 560,
+      "rank": 561,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8244,7 +8260,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1965",
-      "rank": 561,
+      "rank": 562,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8256,7 +8272,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1937",
-      "rank": 562,
+      "rank": 563,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8268,7 +8284,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1926",
-      "rank": 563,
+      "rank": 564,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8280,7 +8296,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1916",
-      "rank": 564,
+      "rank": 565,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8292,7 +8308,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1854",
-      "rank": 565,
+      "rank": 566,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8304,7 +8320,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1853",
-      "rank": 566,
+      "rank": 567,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8316,7 +8332,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1852",
-      "rank": 567,
+      "rank": 568,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8328,7 +8344,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1844",
-      "rank": 568,
+      "rank": 569,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8340,7 +8356,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5202",
-      "rank": 569,
+      "rank": 570,
       "size": "XL",
       "importance": "medium",
       "score": 40,
@@ -8354,7 +8370,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5141",
-      "rank": 570,
+      "rank": 571,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8366,7 +8382,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1840",
-      "rank": 571,
+      "rank": 572,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8378,7 +8394,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1839",
-      "rank": 572,
+      "rank": 573,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8390,7 +8406,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1776",
-      "rank": 573,
+      "rank": 574,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8402,7 +8418,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3706",
-      "rank": 574,
+      "rank": 575,
       "size": "L",
       "importance": "medium",
       "score": 40,
@@ -8414,7 +8430,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3539",
-      "rank": 575,
+      "rank": 576,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8426,7 +8442,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3502",
-      "rank": 576,
+      "rank": 577,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8438,7 +8454,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4409",
-      "rank": 577,
+      "rank": 578,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8450,7 +8466,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4410",
-      "rank": 578,
+      "rank": 579,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8464,7 +8480,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2978",
-      "rank": 579,
+      "rank": 580,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -8479,7 +8495,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4878",
-      "rank": 580,
+      "rank": 581,
       "size": "XS",
       "importance": "low",
       "score": 30,
@@ -8492,7 +8508,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1754",
-      "rank": 581,
+      "rank": 582,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8504,7 +8520,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1751",
-      "rank": 582,
+      "rank": 583,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8516,7 +8532,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1750",
-      "rank": 583,
+      "rank": 584,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8528,7 +8544,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1748",
-      "rank": 584,
+      "rank": 585,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8540,7 +8556,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1691",
-      "rank": 585,
+      "rank": 586,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8552,7 +8568,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1685",
-      "rank": 586,
+      "rank": 587,
       "size": "XS",
       "importance": "medium",
       "score": 39,
@@ -8564,7 +8580,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1676",
-      "rank": 587,
+      "rank": 588,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8577,7 +8593,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1667",
-      "rank": 588,
+      "rank": 589,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8589,7 +8605,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1657",
-      "rank": 589,
+      "rank": 590,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8601,7 +8617,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1656",
-      "rank": 590,
+      "rank": 591,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8613,7 +8629,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1655",
-      "rank": 591,
+      "rank": 592,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8625,7 +8641,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1654",
-      "rank": 592,
+      "rank": 593,
       "size": "XS",
       "importance": "medium",
       "score": 38,
@@ -8637,7 +8653,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1653",
-      "rank": 593,
+      "rank": 594,
       "size": "XS",
       "importance": "medium",
       "score": 38,
@@ -8649,7 +8665,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5309",
-      "rank": 594,
+      "rank": 595,
       "size": "S",
       "importance": "low",
       "score": 36,
@@ -8661,7 +8677,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5308",
-      "rank": 595,
+      "rank": 596,
       "size": "S",
       "importance": "low",
       "score": 36,
@@ -8673,7 +8689,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1623",
-      "rank": 596,
+      "rank": 597,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8685,7 +8701,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1561",
-      "rank": 597,
+      "rank": 598,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8697,7 +8713,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1550",
-      "rank": 598,
+      "rank": 599,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8710,7 +8726,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1545",
-      "rank": 599,
+      "rank": 600,
       "size": "XS",
       "importance": "medium",
       "score": 37,
@@ -8722,7 +8738,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1542",
-      "rank": 600,
+      "rank": 601,
       "size": "XS",
       "importance": "medium",
       "score": 37,
@@ -8734,7 +8750,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1524",
-      "rank": 601,
+      "rank": 602,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8746,7 +8762,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1490",
-      "rank": 602,
+      "rank": 603,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8758,7 +8774,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1485",
-      "rank": 603,
+      "rank": 604,
       "size": "S",
       "importance": "medium",
       "score": 32,
@@ -8771,7 +8787,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1473",
-      "rank": 604,
+      "rank": 605,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8783,7 +8799,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1443",
-      "rank": 605,
+      "rank": 606,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -8796,7 +8812,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1442",
-      "rank": 606,
+      "rank": 607,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8808,7 +8824,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1432",
-      "rank": 607,
+      "rank": 608,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8820,7 +8836,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1223",
-      "rank": 608,
+      "rank": 609,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8832,7 +8848,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1165",
-      "rank": 609,
+      "rank": 610,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8844,7 +8860,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1151",
-      "rank": 610,
+      "rank": 611,
       "size": "XS",
       "importance": "medium",
       "score": 35,
@@ -8856,7 +8872,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4360",
-      "rank": 611,
+      "rank": 612,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8868,7 +8884,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1060",
-      "rank": 612,
+      "rank": 613,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8880,7 +8896,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1051",
-      "rank": 613,
+      "rank": 614,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8892,7 +8908,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1037",
-      "rank": 614,
+      "rank": 615,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8904,7 +8920,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-958",
-      "rank": 615,
+      "rank": 616,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8916,7 +8932,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-949",
-      "rank": 616,
+      "rank": 617,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8928,7 +8944,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3157",
-      "rank": 617,
+      "rank": 618,
       "size": "XS",
       "importance": "medium",
       "score": 42,
@@ -8941,7 +8957,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5067",
-      "rank": 618,
+      "rank": 619,
       "size": "M",
       "importance": "medium",
       "score": 54,
@@ -8953,7 +8969,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4908",
-      "rank": 619,
+      "rank": 620,
       "size": "S",
       "importance": "low",
       "score": 34,
@@ -8966,7 +8982,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5130",
-      "rank": 620,
+      "rank": 621,
       "size": "S",
       "importance": "medium",
       "score": 36,
@@ -8979,7 +8995,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-947",
-      "rank": 621,
+      "rank": 622,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8991,7 +9007,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-938",
-      "rank": 622,
+      "rank": 623,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -9003,7 +9019,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-903",
-      "rank": 623,
+      "rank": 624,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -9015,7 +9031,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-902",
-      "rank": 624,
+      "rank": 625,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -9027,7 +9043,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-901",
-      "rank": 625,
+      "rank": 626,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -9039,7 +9055,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-818",
-      "rank": 626,
+      "rank": 627,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -9051,7 +9067,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4308",
-      "rank": 627,
+      "rank": 628,
       "size": "S",
       "importance": "medium",
       "score": 38,
@@ -9064,7 +9080,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3322",
-      "rank": 628,
+      "rank": 629,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -9076,7 +9092,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-678",
-      "rank": 629,
+      "rank": 630,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9088,7 +9104,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-675",
-      "rank": 630,
+      "rank": 631,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9101,7 +9117,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-654",
-      "rank": 631,
+      "rank": 632,
       "size": "L",
       "importance": "medium",
       "score": 33,
@@ -9113,7 +9129,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-649",
-      "rank": 632,
+      "rank": 633,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9125,7 +9141,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-637",
-      "rank": 633,
+      "rank": 634,
       "size": "XS",
       "importance": "medium",
       "score": 33,
@@ -9137,7 +9153,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-629",
-      "rank": 634,
+      "rank": 635,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9149,7 +9165,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-613",
-      "rank": 635,
+      "rank": 636,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9161,7 +9177,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-607",
-      "rank": 636,
+      "rank": 637,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9173,7 +9189,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-606",
-      "rank": 637,
+      "rank": 638,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9185,7 +9201,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-548",
-      "rank": 638,
+      "rank": 639,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9197,7 +9213,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-546",
-      "rank": 639,
+      "rank": 640,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9209,7 +9225,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-537",
-      "rank": 640,
+      "rank": 641,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9221,7 +9237,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-531",
-      "rank": 641,
+      "rank": 642,
       "size": "XS",
       "importance": "medium",
       "score": 32,
@@ -9233,7 +9249,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-452",
-      "rank": 642,
+      "rank": 643,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9245,7 +9261,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-450",
-      "rank": 643,
+      "rank": 644,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9257,7 +9273,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1126",
-      "rank": 644,
+      "rank": 645,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -9269,7 +9285,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5154",
-      "rank": 645,
+      "rank": 646,
       "size": "L",
       "importance": "low",
       "score": 30,
@@ -9281,7 +9297,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1066",
-      "rank": 646,
+      "rank": 647,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -9293,7 +9309,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3441",
-      "rank": 647,
+      "rank": 648,
       "size": "L",
       "importance": "low",
       "score": 30,
@@ -9305,7 +9321,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2968",
-      "rank": 648,
+      "rank": 649,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9317,7 +9333,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2941",
-      "rank": 649,
+      "rank": 650,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9330,7 +9346,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2936",
-      "rank": 650,
+      "rank": 651,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9342,7 +9358,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4373",
-      "rank": 651,
+      "rank": 652,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -9354,7 +9370,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2868",
-      "rank": 652,
+      "rank": 653,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9366,7 +9382,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2767",
-      "rank": 653,
+      "rank": 654,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9378,7 +9394,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2679",
-      "rank": 654,
+      "rank": 655,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9390,7 +9406,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2662",
-      "rank": 655,
+      "rank": 656,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9402,7 +9418,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2645",
-      "rank": 656,
+      "rank": 657,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9414,7 +9430,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2635",
-      "rank": 657,
+      "rank": 658,
       "size": "XS",
       "importance": "low",
       "score": 28,
@@ -9426,7 +9442,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5066",
-      "rank": 658,
+      "rank": 659,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -9438,7 +9454,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3443",
-      "rank": 659,
+      "rank": 660,
       "size": "L",
       "importance": "low",
       "score": 28,
@@ -9450,7 +9466,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4350",
-      "rank": 660,
+      "rank": 661,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -9462,7 +9478,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4003",
-      "rank": 661,
+      "rank": 662,
       "size": "L",
       "importance": "medium",
       "score": 30,
@@ -9475,7 +9491,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4368",
-      "rank": 662,
+      "rank": 663,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -9487,7 +9503,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2622",
-      "rank": 663,
+      "rank": 664,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9499,7 +9515,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2600",
-      "rank": 664,
+      "rank": 665,
       "size": "XS",
       "importance": "low",
       "score": 27,
@@ -9511,7 +9527,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2533",
-      "rank": 665,
+      "rank": 666,
       "size": "XS",
       "importance": "low",
       "score": 27,
@@ -9523,7 +9539,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2527",
-      "rank": 666,
+      "rank": 667,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9535,7 +9551,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2514",
-      "rank": 667,
+      "rank": 668,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9547,7 +9563,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2505",
-      "rank": 668,
+      "rank": 669,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9559,7 +9575,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2504",
-      "rank": 669,
+      "rank": 670,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9571,7 +9587,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2449",
-      "rank": 670,
+      "rank": 671,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9583,7 +9599,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4769",
-      "rank": 671,
+      "rank": 672,
       "size": "XS",
       "importance": "low",
       "score": 26,
@@ -9596,7 +9612,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3940",
-      "rank": 672,
+      "rank": 673,
       "size": "XL",
       "importance": "low",
       "score": 30,
@@ -9610,7 +9626,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2424",
-      "rank": 673,
+      "rank": 674,
       "size": "L",
       "importance": "low",
       "score": 26,
@@ -9624,7 +9640,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2406",
-      "rank": 674,
+      "rank": 675,
       "size": "S",
       "importance": "low",
       "score": 26,
@@ -9637,7 +9653,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2394",
-      "rank": 675,
+      "rank": 676,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9649,7 +9665,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4823",
-      "rank": 676,
+      "rank": 677,
       "size": "XL",
       "importance": "medium",
       "score": 32,
@@ -9663,7 +9679,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2353",
-      "rank": 677,
+      "rank": 678,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9676,7 +9692,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4294",
-      "rank": 678,
+      "rank": 679,
       "size": "L",
       "importance": "low",
       "score": 22,
@@ -9689,7 +9705,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3133",
-      "rank": 679,
+      "rank": 680,
       "size": "S",
       "importance": "low",
       "score": 26,
@@ -9701,7 +9717,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5082",
-      "rank": 680,
+      "rank": 681,
       "size": "XL",
       "importance": "medium",
       "score": 50,
@@ -9713,7 +9729,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3011",
-      "rank": 681,
+      "rank": 682,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9728,7 +9744,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2282",
-      "rank": 682,
+      "rank": 683,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9740,7 +9756,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2091",
-      "rank": 683,
+      "rank": 684,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9752,7 +9768,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2085",
-      "rank": 684,
+      "rank": 685,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9764,7 +9780,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2084",
-      "rank": 685,
+      "rank": 686,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9776,7 +9792,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2083",
-      "rank": 686,
+      "rank": 687,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9791,7 +9807,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2082",
-      "rank": 687,
+      "rank": 688,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9803,7 +9819,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2074",
-      "rank": 688,
+      "rank": 689,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9815,7 +9831,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2046",
-      "rank": 689,
+      "rank": 690,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9828,7 +9844,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2006",
-      "rank": 690,
+      "rank": 691,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9840,7 +9856,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3919",
-      "rank": 691,
+      "rank": 692,
       "size": "S",
       "importance": "low",
       "score": 25,
@@ -9853,7 +9869,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2005",
-      "rank": 692,
+      "rank": 693,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9865,7 +9881,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2002",
-      "rank": 693,
+      "rank": 694,
       "size": "XS",
       "importance": "low",
       "score": 24,
@@ -9877,7 +9893,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1999",
-      "rank": 694,
+      "rank": 695,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9889,7 +9905,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1986",
-      "rank": 695,
+      "rank": 696,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9901,7 +9917,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1983",
-      "rank": 696,
+      "rank": 697,
       "size": "L",
       "importance": "low",
       "score": 24,
@@ -9913,7 +9929,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2672",
-      "rank": 697,
+      "rank": 698,
       "size": "S",
       "importance": "low",
       "score": 25,
@@ -9926,7 +9942,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1958",
-      "rank": 698,
+      "rank": 699,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9938,7 +9954,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1907",
-      "rank": 699,
+      "rank": 700,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9950,7 +9966,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1895",
-      "rank": 700,
+      "rank": 701,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9962,7 +9978,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1878",
-      "rank": 701,
+      "rank": 702,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9974,7 +9990,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1782",
-      "rank": 702,
+      "rank": 703,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9986,7 +10002,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1773",
-      "rank": 703,
+      "rank": 704,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9998,7 +10014,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1646",
-      "rank": 704,
+      "rank": 705,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -10010,7 +10026,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1643",
-      "rank": 705,
+      "rank": 706,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10022,7 +10038,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1592",
-      "rank": 706,
+      "rank": 707,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10034,7 +10050,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1581",
-      "rank": 707,
+      "rank": 708,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10046,7 +10062,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1533",
-      "rank": 708,
+      "rank": 709,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10058,7 +10074,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1483",
-      "rank": 709,
+      "rank": 710,
       "size": "XS",
       "importance": "low",
       "score": 22,
@@ -10070,7 +10086,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1482",
-      "rank": 710,
+      "rank": 711,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10082,7 +10098,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1481",
-      "rank": 711,
+      "rank": 712,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10094,7 +10110,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1356",
-      "rank": 712,
+      "rank": 713,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10106,7 +10122,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1242",
-      "rank": 713,
+      "rank": 714,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10118,7 +10134,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1222",
-      "rank": 714,
+      "rank": 715,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10130,7 +10146,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1208",
-      "rank": 715,
+      "rank": 716,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10142,7 +10158,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4352",
-      "rank": 716,
+      "rank": 717,
       "size": "XS",
       "importance": "low",
       "score": 28,
@@ -10154,7 +10170,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1153",
-      "rank": 717,
+      "rank": 718,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10166,7 +10182,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4298",
-      "rank": 718,
+      "rank": 719,
       "size": "XL",
       "importance": "low",
       "score": 20,
@@ -10182,7 +10198,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1152",
-      "rank": 719,
+      "rank": 720,
       "size": "XS",
       "importance": "low",
       "score": 21,
@@ -10194,7 +10210,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1135",
-      "rank": 720,
+      "rank": 721,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10206,7 +10222,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1133",
-      "rank": 721,
+      "rank": 722,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10219,7 +10235,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1123",
-      "rank": 722,
+      "rank": 723,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10231,7 +10247,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1121",
-      "rank": 723,
+      "rank": 724,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10243,7 +10259,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4248",
-      "rank": 724,
+      "rank": 725,
       "size": "L",
       "importance": "medium",
       "score": 24,
@@ -10256,7 +10272,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1117",
-      "rank": 725,
+      "rank": 726,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10268,7 +10284,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1116",
-      "rank": 726,
+      "rank": 727,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10280,7 +10296,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1065",
-      "rank": 727,
+      "rank": 728,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10292,7 +10308,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1064",
-      "rank": 728,
+      "rank": 729,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10304,7 +10320,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1063",
-      "rank": 729,
+      "rank": 730,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10317,7 +10333,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3971",
-      "rank": 730,
+      "rank": 731,
       "size": "L",
       "importance": "low",
       "score": 20,
@@ -10329,7 +10345,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3768",
-      "rank": 731,
+      "rank": 732,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10341,7 +10357,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3034",
-      "rank": 732,
+      "rank": 733,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10353,7 +10369,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2983",
-      "rank": 733,
+      "rank": 734,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10366,7 +10382,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3824",
-      "rank": 734,
+      "rank": 735,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10379,7 +10395,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3823",
-      "rank": 735,
+      "rank": 736,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10392,7 +10408,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1049",
-      "rank": 736,
+      "rank": 737,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10404,7 +10420,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-984",
-      "rank": 737,
+      "rank": 738,
       "size": "XS",
       "importance": "low",
       "score": 19,
@@ -10416,7 +10432,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-962",
-      "rank": 738,
+      "rank": 739,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10429,7 +10445,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-961",
-      "rank": 739,
+      "rank": 740,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10441,7 +10457,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-943",
-      "rank": 740,
+      "rank": 741,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10453,7 +10469,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-908",
-      "rank": 741,
+      "rank": 742,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10465,7 +10481,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-898",
-      "rank": 742,
+      "rank": 743,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10477,7 +10493,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-853",
-      "rank": 743,
+      "rank": 744,
       "size": "L",
       "importance": "low",
       "score": 19,
@@ -10489,7 +10505,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-833",
-      "rank": 744,
+      "rank": 745,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10501,7 +10517,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-832",
-      "rank": 745,
+      "rank": 746,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10514,7 +10530,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4347",
-      "rank": 746,
+      "rank": 747,
       "size": "S",
       "importance": "low",
       "score": 30,
@@ -10526,7 +10542,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-797",
-      "rank": 747,
+      "rank": 748,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10538,7 +10554,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4275",
-      "rank": 748,
+      "rank": 749,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -10551,7 +10567,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2836",
-      "rank": 749,
+      "rank": 750,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -10564,7 +10580,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-790",
-      "rank": 750,
+      "rank": 751,
       "size": "L",
       "importance": "low",
       "score": 18,
@@ -10576,7 +10592,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-786",
-      "rank": 751,
+      "rank": 752,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10588,7 +10604,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-777",
-      "rank": 752,
+      "rank": 753,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10600,7 +10616,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-775",
-      "rank": 753,
+      "rank": 754,
       "size": "L",
       "importance": "low",
       "score": 18,
@@ -10612,7 +10628,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3456",
-      "rank": 754,
+      "rank": 755,
       "size": "XS",
       "importance": "low",
       "score": 18,
@@ -10624,7 +10640,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-774",
-      "rank": 755,
+      "rank": 756,
       "size": "XS",
       "importance": "low",
       "score": 17,
@@ -10636,7 +10652,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-773",
-      "rank": 756,
+      "rank": 757,
       "size": "XS",
       "importance": "low",
       "score": 17,
@@ -10648,7 +10664,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-772",
-      "rank": 757,
+      "rank": 758,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10661,7 +10677,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-771",
-      "rank": 758,
+      "rank": 759,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10673,7 +10689,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-769",
-      "rank": 759,
+      "rank": 760,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10688,7 +10704,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-765",
-      "rank": 760,
+      "rank": 761,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10700,7 +10716,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-764",
-      "rank": 761,
+      "rank": 762,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10712,7 +10728,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4425",
-      "rank": 762,
+      "rank": 763,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -10724,7 +10740,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-752",
-      "rank": 763,
+      "rank": 764,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10736,7 +10752,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-751",
-      "rank": 764,
+      "rank": 765,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10748,7 +10764,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-750",
-      "rank": 765,
+      "rank": 766,
       "size": "L",
       "importance": "low",
       "score": 16,
@@ -10760,7 +10776,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-749",
-      "rank": 766,
+      "rank": 767,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10772,7 +10788,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-747",
-      "rank": 767,
+      "rank": 768,
       "size": "XS",
       "importance": "low",
       "score": 16,
@@ -10784,7 +10800,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-743",
-      "rank": 768,
+      "rank": 769,
       "size": "XS",
       "importance": "low",
       "score": 16,
@@ -10796,7 +10812,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-738",
-      "rank": 769,
+      "rank": 770,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10808,7 +10824,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-735",
-      "rank": 770,
+      "rank": 771,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10820,7 +10836,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-730",
-      "rank": 771,
+      "rank": 772,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10832,7 +10848,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-701",
-      "rank": 772,
+      "rank": 773,
       "size": "XS",
       "importance": "low",
       "score": 15,
@@ -10844,7 +10860,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-663",
-      "rank": 773,
+      "rank": 774,
       "size": "XS",
       "importance": "low",
       "score": 15,
@@ -10856,7 +10872,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-660",
-      "rank": 774,
+      "rank": 775,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10868,7 +10884,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-624",
-      "rank": 775,
+      "rank": 776,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10880,7 +10896,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-623",
-      "rank": 776,
+      "rank": 777,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10892,7 +10908,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-622",
-      "rank": 777,
+      "rank": 778,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10904,7 +10920,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-604",
-      "rank": 778,
+      "rank": 779,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10916,7 +10932,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-603",
-      "rank": 779,
+      "rank": 780,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10928,7 +10944,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-591",
-      "rank": 780,
+      "rank": 781,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -10940,7 +10956,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-589",
-      "rank": 781,
+      "rank": 782,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -10952,7 +10968,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-576",
-      "rank": 782,
+      "rank": 783,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10964,7 +10980,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-571",
-      "rank": 783,
+      "rank": 784,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -10976,7 +10992,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-568",
-      "rank": 784,
+      "rank": 785,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10988,7 +11004,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-565",
-      "rank": 785,
+      "rank": 786,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -11000,7 +11016,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-564",
-      "rank": 786,
+      "rank": 787,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -11012,7 +11028,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-554",
-      "rank": 787,
+      "rank": 788,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -11024,7 +11040,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-543",
-      "rank": 788,
+      "rank": 789,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -11036,7 +11052,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-483",
-      "rank": 789,
+      "rank": 790,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11048,7 +11064,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-480",
-      "rank": 790,
+      "rank": 791,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11061,7 +11077,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-476",
-      "rank": 791,
+      "rank": 792,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11073,7 +11089,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-468",
-      "rank": 792,
+      "rank": 793,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11085,7 +11101,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-461",
-      "rank": 793,
+      "rank": 794,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11097,7 +11113,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-459",
-      "rank": 794,
+      "rank": 795,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11109,7 +11125,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-407",
-      "rank": 795,
+      "rank": 796,
       "size": "XS",
       "importance": "low",
       "score": 13,
@@ -11121,7 +11137,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2348",
-      "rank": 796,
+      "rank": 797,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11133,7 +11149,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2346",
-      "rank": 797,
+      "rank": 798,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11146,7 +11162,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2345",
-      "rank": 798,
+      "rank": 799,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11159,7 +11175,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2344",
-      "rank": 799,
+      "rank": 800,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11172,7 +11188,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2343",
-      "rank": 800,
+      "rank": 801,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11185,7 +11201,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2073",
-      "rank": 801,
+      "rank": 802,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11197,7 +11213,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2071",
-      "rank": 802,
+      "rank": 803,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11209,7 +11225,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2068",
-      "rank": 803,
+      "rank": 804,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11221,7 +11237,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2067",
-      "rank": 804,
+      "rank": 805,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11233,7 +11249,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1684",
-      "rank": 805,
+      "rank": 806,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11245,7 +11261,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1683",
-      "rank": 806,
+      "rank": 807,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11257,7 +11273,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1474",
-      "rank": 807,
+      "rank": 808,
       "size": "M",
       "importance": "low",
       "score": 9,
@@ -11269,7 +11285,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-1469",
-      "rank": 808,
+      "rank": 809,
       "size": "M",
       "importance": "low",
       "score": 9,
@@ -11281,7 +11297,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-674",
-      "rank": 809,
+      "rank": 810,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11293,7 +11309,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-634",
-      "rank": 810,
+      "rank": 811,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11305,7 +11321,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2908",
-      "rank": 811,
+      "rank": 812,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11317,7 +11333,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-106",
-      "rank": 812,
+      "rank": 813,
       "size": "M",
       "importance": "high",
       "score": 77,
@@ -11330,7 +11346,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-262",
-      "rank": 813,
+      "rank": 814,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -11342,7 +11358,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-176",
-      "rank": 814,
+      "rank": 815,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -11354,7 +11370,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-334",
-      "rank": 815,
+      "rank": 816,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11366,7 +11382,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-324",
-      "rank": 816,
+      "rank": 817,
       "size": "XS",
       "importance": "medium",
       "score": 49,
@@ -11379,7 +11395,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-304",
-      "rank": 817,
+      "rank": 818,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11391,7 +11407,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-245",
-      "rank": 818,
+      "rank": 819,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11403,7 +11419,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-244",
-      "rank": 819,
+      "rank": 820,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11415,7 +11431,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4332",
-      "rank": 820,
+      "rank": 821,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -11427,7 +11443,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-113",
-      "rank": 821,
+      "rank": 822,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -11439,7 +11455,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-49",
-      "rank": 822,
+      "rank": 823,
       "size": "XS",
       "importance": "medium",
       "score": 48,
@@ -11451,7 +11467,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-294",
-      "rank": 823,
+      "rank": 824,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -11463,7 +11479,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-293",
-      "rank": 824,
+      "rank": 825,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11475,7 +11491,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-277",
-      "rank": 825,
+      "rank": 826,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11487,7 +11503,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-258",
-      "rank": 826,
+      "rank": 827,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11499,7 +11515,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-255",
-      "rank": 827,
+      "rank": 828,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11511,7 +11527,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-252",
-      "rank": 828,
+      "rank": 829,
       "size": "XS",
       "importance": "medium",
       "score": 31,
@@ -11523,7 +11539,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-243",
-      "rank": 829,
+      "rank": 830,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11535,7 +11551,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-77",
-      "rank": 830,
+      "rank": 831,
       "size": "XS",
       "importance": "medium",
       "score": 31,
@@ -11547,7 +11563,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-54",
-      "rank": 831,
+      "rank": 832,
       "size": "L",
       "importance": "medium",
       "score": 31,
@@ -11559,7 +11575,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-38",
-      "rank": 832,
+      "rank": 833,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -11571,7 +11587,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-37",
-      "rank": 833,
+      "rank": 834,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -11584,7 +11600,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3248",
-      "rank": 834,
+      "rank": 835,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11597,7 +11613,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3244",
-      "rank": 835,
+      "rank": 836,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11610,7 +11626,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2775",
-      "rank": 836,
+      "rank": 837,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11623,7 +11639,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5033",
-      "rank": 837,
+      "rank": 838,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -11635,7 +11651,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3505",
-      "rank": 838,
+      "rank": 839,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11648,7 +11664,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5043",
-      "rank": 839,
+      "rank": 840,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -11660,7 +11676,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5065",
-      "rank": 840,
+      "rank": 841,
       "size": "L",
       "importance": "medium",
       "score": 44,
@@ -11672,7 +11688,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3321",
-      "rank": 841,
+      "rank": 842,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11685,7 +11701,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-736",
-      "rank": 842,
+      "rank": 843,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -11698,7 +11714,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-762",
-      "rank": 843,
+      "rank": 844,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11711,7 +11727,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-299",
-      "rank": 844,
+      "rank": 845,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11723,7 +11739,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-298",
-      "rank": 845,
+      "rank": 846,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11735,7 +11751,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-297",
-      "rank": 846,
+      "rank": 847,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11747,7 +11763,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-283",
-      "rank": 847,
+      "rank": 848,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11759,7 +11775,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-271",
-      "rank": 848,
+      "rank": 849,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11771,7 +11787,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-265",
-      "rank": 849,
+      "rank": 850,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11783,7 +11799,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-249",
-      "rank": 850,
+      "rank": 851,
       "size": "XS",
       "importance": "low",
       "score": 12,
@@ -11795,7 +11811,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-228",
-      "rank": 851,
+      "rank": 852,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11807,7 +11823,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-227",
-      "rank": 852,
+      "rank": 853,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11819,7 +11835,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-198",
-      "rank": 853,
+      "rank": 854,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11831,7 +11847,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-190",
-      "rank": 854,
+      "rank": 855,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11843,7 +11859,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-180",
-      "rank": 855,
+      "rank": 856,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11855,7 +11871,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-177",
-      "rank": 856,
+      "rank": 857,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11867,7 +11883,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-175",
-      "rank": 857,
+      "rank": 858,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11879,7 +11895,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-155",
-      "rank": 858,
+      "rank": 859,
       "size": "L",
       "importance": "low",
       "score": 11,
@@ -11891,7 +11907,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-146",
-      "rank": 859,
+      "rank": 860,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11903,7 +11919,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-55",
-      "rank": 860,
+      "rank": 861,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11915,7 +11931,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-44",
-      "rank": 861,
+      "rank": 862,
       "size": "M",
       "importance": "low",
       "score": 10,
@@ -11927,7 +11943,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2070",
-      "rank": 862,
+      "rank": 863,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11940,7 +11956,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-3536",
-      "rank": 863,
+      "rank": 864,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -11953,7 +11969,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2027",
-      "rank": 864,
+      "rank": 865,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11966,7 +11982,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2035",
-      "rank": 865,
+      "rank": 866,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11979,7 +11995,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2034",
-      "rank": 866,
+      "rank": 867,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11992,7 +12008,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2033",
-      "rank": 867,
+      "rank": 868,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -12005,7 +12021,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2032",
-      "rank": 868,
+      "rank": 869,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -12018,7 +12034,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2030",
-      "rank": 869,
+      "rank": 870,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -12031,7 +12047,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2029",
-      "rank": 870,
+      "rank": 871,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -12044,7 +12060,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2028",
-      "rank": 871,
+      "rank": 872,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -12057,7 +12073,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2024",
-      "rank": 872,
+      "rank": 873,
       "size": "XS",
       "importance": "low",
       "score": 8,
@@ -12070,7 +12086,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2883",
-      "rank": 873,
+      "rank": 874,
       "size": "M",
       "importance": "high",
       "score": 20,
@@ -12083,7 +12099,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-2995",
-      "rank": 874,
+      "rank": 875,
       "size": "XS",
       "importance": "high",
       "score": 20,
@@ -12096,7 +12112,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4555",
-      "rank": 875,
+      "rank": 876,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -12109,7 +12125,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4590",
-      "rank": 876,
+      "rank": 877,
       "size": "L",
       "importance": "medium",
       "score": 50,
@@ -12122,7 +12138,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4591",
-      "rank": 877,
+      "rank": 878,
       "size": "L",
       "importance": "medium",
       "score": 45,
@@ -12135,7 +12151,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4592",
-      "rank": 878,
+      "rank": 879,
       "size": "M",
       "importance": "low",
       "score": 38,
@@ -12150,7 +12166,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4594",
-      "rank": 879,
+      "rank": 880,
       "size": "M",
       "importance": "low",
       "score": 36,
@@ -12165,7 +12181,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4593",
-      "rank": 880,
+      "rank": 881,
       "size": "L",
       "importance": "low",
       "score": 30,
@@ -12180,7 +12196,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5022",
-      "rank": 881,
+      "rank": 882,
       "size": "L",
       "importance": "medium",
       "score": 42,
@@ -12192,7 +12208,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5021",
-      "rank": 882,
+      "rank": 883,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -12205,7 +12221,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5029",
-      "rank": 883,
+      "rank": 884,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -12217,7 +12233,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4842",
-      "rank": 884,
+      "rank": 885,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -12230,7 +12246,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4851",
-      "rank": 885,
+      "rank": 886,
       "size": "S",
       "importance": "low",
       "score": 15,
@@ -12243,7 +12259,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4887",
-      "rank": 886,
+      "rank": 887,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -12256,7 +12272,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5207",
-      "rank": 887,
+      "rank": 888,
       "size": "L",
       "importance": "low",
       "score": 15,
@@ -12270,7 +12286,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5183",
-      "rank": 888,
+      "rank": 889,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -12283,7 +12299,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5181",
-      "rank": 889,
+      "rank": 890,
       "size": "XS",
       "importance": "low",
       "score": 8,
@@ -12295,7 +12311,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5305",
-      "rank": 890,
+      "rank": 891,
       "size": "XS",
       "importance": "low",
       "score": 8,
@@ -12307,7 +12323,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5235",
-      "rank": 891,
+      "rank": 892,
       "size": "XS",
       "importance": "low",
       "score": 8,
@@ -12319,7 +12335,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5280",
-      "rank": 892,
+      "rank": 893,
       "size": "XS",
       "importance": "low",
       "score": 8,
@@ -13527,6 +13543,13 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.3
+    },
+    {
+      "from": "PAN-5344",
+      "to": "PAN-5346",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.75
     }
   ]
 }
