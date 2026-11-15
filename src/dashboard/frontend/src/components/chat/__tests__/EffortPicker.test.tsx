@@ -17,7 +17,7 @@ describe('chat EffortPicker dropdown portal (PAN-4266)', () => {
     const user = userEvent.setup();
     const { container } = render(<EffortPicker value="high" onChange={vi.fn()} />);
 
-    await user.click(screen.getByRole('button', { name: /High \(default\)/i }));
+    await user.click(screen.getByRole('button', { name: /^Thinking: high$/ }));
 
     const dropdown = await screen.findByTestId('effort-picker-dropdown');
     expect(dropdown.parentElement).toBe(document.body);
@@ -29,7 +29,7 @@ describe('chat EffortPicker dropdown portal (PAN-4266)', () => {
     const onChange = vi.fn();
     render(<EffortPicker value="high" onChange={onChange} />);
 
-    await user.click(screen.getByRole('button', { name: /High \(default\)/i }));
+    await user.click(screen.getByRole('button', { name: /^Thinking: high$/ }));
     await user.click(await screen.findByRole('button', { name: 'Low' }));
 
     expect(onChange).toHaveBeenCalledWith('low');
@@ -40,7 +40,7 @@ describe('chat EffortPicker dropdown portal (PAN-4266)', () => {
     const user = userEvent.setup();
     render(<EffortPicker value="high" onChange={vi.fn()} />);
 
-    await user.click(screen.getByRole('button', { name: /High \(default\)/i }));
+    await user.click(screen.getByRole('button', { name: /^Thinking: high$/ }));
     const dropdown = await screen.findByTestId('effort-picker-dropdown');
 
     fireEvent.mouseDown(dropdown);
