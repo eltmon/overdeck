@@ -18,6 +18,8 @@ function deps(overrides: Partial<MergedAgentRecoveryDeps> = {}): MergedAgentReco
       { id: 'agent-pan-5349', issueId: 'PAN-5349', role: 'work', status: 'running', startedAt: '2026-11-15T15:00:00Z' },
     ],
     isAlive: async () => ({ alive: true, paneAlive: true }),
+    // PAN-5349's last transcript record was 18:47:55, before its 19:04 merge.
+    lastWorkActivityMs: async () => Date.parse('2026-11-15T18:47:55Z'),
     readMergedAt: async () => MERGED_AT,
     resolveProjectPath: async () => '/repo/overdeck',
     runLifecycle: vi.fn(async () => undefined),
@@ -55,6 +57,30 @@ describe('recoverInterruptedPostMergeLifecycles', () => {
     });
     await recoverInterruptedPostMergeLifecycles(resumed);
     expect(resumed.runLifecycle).not.toHaveBeenCalled();
+  });
+
+  it('leaves an agent relaunched after the merge running (restart stamps lastActivity)', async () => {
+    const d = deps({
+      listAgents: async () => [
+        { id: 'agent-pan-5349', issueId: 'PAN-5349', role: 'work', status: 'running', startedAt: '2026-11-15T15:00:00Z', lastActivity: '2026-11-15T20:00:00Z' },
+      ],
+    });
+    await recoverInterruptedPostMergeLifecycles(d);
+    expect(d.runLifecycle).not.toHaveBeenCalled();
+  });
+
+  it('leaves an agent that did work after the merge running', async () => {
+    const d = deps({ lastWorkActivityMs: async () => Date.parse('2026-11-15T19:30:00Z') });
+    const actions = await recoverInterruptedPostMergeLifecycles(d);
+    expect(d.runLifecycle).not.toHaveBeenCalled();
+    expect(actions[0]).toContain('launched or worked after it');
+  });
+
+  it('reports an agent whose liveness is indeterminate instead of skipping it silently', async () => {
+    const d = deps({ isAlive: async () => ({ alive: false, reason: 'runtime-indeterminate' }) });
+    const actions = await recoverInterruptedPostMergeLifecycles(d);
+    expect(d.runLifecycle).not.toHaveBeenCalled();
+    expect(actions).toEqual(['agent-pan-5349: liveness indeterminate — skipped']);
   });
 
   it('ignores agents that are not live, stopped, or not work/planning agents', async () => {

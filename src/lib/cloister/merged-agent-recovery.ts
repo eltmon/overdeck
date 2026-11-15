@@ -10,7 +10,15 @@
  * At boot, the dashboard calls this once. It finds work and planning agents
  * that are still live although their issue's PR merged after they started, and
  * runs the lifecycle again for those issues. The lifecycle is idempotent and
- * skips closed-out issues. The predicate is the one close-out's DoD row 5 uses
+ * skips closed-out issues.
+ *
+ * An agent counts as a leftover only when its last launch AND its last work
+ * activity both predate the merge. The launch is `startedAt`, `lastResumeAt`
+ * and the state file's `lastActivity`, which `markAgentRunning` stamps on a
+ * restart or recover (except for codex). The work activity is the hook-driven
+ * runtime mirror plus the transcript heartbeat (`idleAgeMs`). So a reopened
+ * issue's new agent, or an agent the operator relaunched after the merge, is
+ * left alone. The predicate is the one close-out's DoD row 5 uses
  * (`dod-post-merge-row.ts`): role work/plan, stored status starting/running,
  * and live by the liveness oracle.
  */
@@ -20,11 +28,13 @@ import type { LivenessVerdict } from '../agents/liveness.js';
 /** Let the server, the terminal backend and the runtime census settle before reading liveness. */
 export const MERGED_AGENT_RECOVERY_DELAY_MS = 30_000;
 
-type AgentRow = Pick<AgentState, 'id' | 'issueId' | 'role' | 'status' | 'startedAt' | 'lastResumeAt'>;
+type AgentRow = Pick<AgentState, 'id' | 'issueId' | 'role' | 'status' | 'startedAt' | 'lastResumeAt' | 'lastActivity'>;
 
 export interface MergedAgentRecoveryDeps {
   listAgents: () => Promise<AgentRow[]>;
   isAlive: (agentId: string) => Promise<LivenessVerdict>;
+  /** Epoch ms of the agent's last work activity, or null when there is no signal. */
+  lastWorkActivityMs: (agentId: string) => Promise<number | null>;
   readMergedAt: (issueId: string) => Promise<string | undefined>;
   resolveProjectPath: (issueId: string) => Promise<string | null>;
   runLifecycle: (issueId: string, projectPath: string) => Promise<void>;
@@ -33,13 +43,17 @@ export interface MergedAgentRecoveryDeps {
 const defaultDeps: MergedAgentRecoveryDeps = {
   listAgents: async () => (await import('../agents/queries.js')).listAgentStates(),
   isAlive: async (agentId) => (await import('../agents/liveness.js')).isAlive(agentId),
+  lastWorkActivityMs: async (agentId) => {
+    const age = (await import('../agents/liveness.js')).idleAgeMs(agentId);
+    return age === null ? null : Date.now() - age;
+  },
   readMergedAt: async (issueId) => (await import('../lifecycle/dod-post-merge-row.js')).readPullRequestMergedAt(issueId),
   resolveProjectPath: async (issueId) => (await import('../projects.js')).resolveProjectFromIssueSync(issueId)?.projectPath ?? null,
   runLifecycle: async (issueId, projectPath) => (await import('./merge-agent.js')).postMergeLifecycle(issueId, projectPath),
 };
 
-function latestStartMs(agent: AgentRow): number {
-  const times = [agent.startedAt, agent.lastResumeAt]
+function latestLaunchMs(agent: AgentRow): number {
+  const times = [agent.startedAt, agent.lastResumeAt, agent.lastActivity]
     .map((value) => (value ? Date.parse(value) : Number.NaN))
     .filter((value) => Number.isFinite(value));
   return times.length > 0 ? Math.max(...times) : Number.NaN;
@@ -61,7 +75,11 @@ export async function recoverInterruptedPostMergeLifecycles(
   const byIssue = new Map<string, AgentRow[]>();
   for (const agent of claimedLive) {
     const verdict = await deps.isAlive(agent.id).catch((): LivenessVerdict => ({ alive: false, reason: 'runtime-indeterminate' }));
-    if (!verdict.alive) continue;
+    if (!verdict.alive) {
+      // An unreadable runtime at boot must not look like "nothing to do".
+      if (verdict.reason === 'runtime-indeterminate') actions.push(`${agent.id}: liveness indeterminate — skipped`);
+      continue;
+    }
     const issueId = agent.issueId.toUpperCase();
     byIssue.set(issueId, [...(byIssue.get(issueId) ?? []), agent]);
   }
@@ -71,11 +89,12 @@ export async function recoverInterruptedPostMergeLifecycles(
       const mergedAt = await deps.readMergedAt(issueId);
       const mergedMs = mergedAt ? Date.parse(mergedAt) : Number.NaN;
       if (!Number.isFinite(mergedMs)) continue;
-      // An agent started or resumed after the merge is new work (a reopened
+      // An agent launched or working after the merge is new work (a reopened
       // issue, or an operator follow-up), not a leftover. Leave the issue alone.
-      const starts = agents.map(latestStartMs);
-      if (starts.some((start) => !Number.isFinite(start) || start >= mergedMs)) {
-        actions.push(`${issueId}: PR merged at ${mergedAt}, but ${agents.map((a) => a.id).join(', ')} started after it or has no start time — left running`);
+      const launches = agents.map(latestLaunchMs);
+      const work = await Promise.all(agents.map((agent) => deps.lastWorkActivityMs(agent.id).catch(() => null)));
+      if (launches.some((ms) => !Number.isFinite(ms) || ms >= mergedMs) || work.some((ms) => ms !== null && ms >= mergedMs)) {
+        actions.push(`${issueId}: PR merged at ${mergedAt}, but ${agents.map((a) => a.id).join(', ')} launched or worked after it — left running`);
         continue;
       }
       const projectPath = await deps.resolveProjectPath(issueId);
