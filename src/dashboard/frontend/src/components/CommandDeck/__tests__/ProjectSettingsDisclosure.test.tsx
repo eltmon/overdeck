@@ -32,12 +32,17 @@ let versionSyncValidationErrors: string[] | null;
 let versionSyncLoadFails: boolean;
 /** The server-computed effective flag on the aggregate payloads. */
 let mergeTrainAggregateEnabled: boolean;
+/** PAN-5363: makes the merge-train POST answer 500 without writing. */
+let mergeTrainPostFails: boolean;
 
 function renderDisclosure() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return rtlRender(<ProjectSettingsDisclosure projectKey="overdeck" />, {
-    wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
-  });
+  return {
+    ...rtlRender(<ProjectSettingsDisclosure projectKey="overdeck" />, {
+      wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+    }),
+    client,
+  };
 }
 
 describe('ProjectSettingsDisclosure', () => {
@@ -53,6 +58,7 @@ describe('ProjectSettingsDisclosure', () => {
     versionSyncValidationErrors = null;
     versionSyncLoadFails = false;
     mergeTrainAggregateEnabled = true;
+    mergeTrainPostFails = false;
     fetchControl = installStrictFetchMock(({ method, url, init }) => {
       if (method === 'GET' && url === '/api/projects/overdeck/auto-merge-default') {
         return Response.json({ value: autoMergeValue });
@@ -74,6 +80,7 @@ describe('ProjectSettingsDisclosure', () => {
         return Response.json({ value: mergeTrainValue, effective: mergeTrainValue === null ? mergeTrainEffective : mergeTrainValue !== 'disabled' });
       }
       if (method === 'POST' && url === '/api/projects/overdeck/merge-train') {
+        if (mergeTrainPostFails) return Response.json({ error: 'Failed to save merge-train setting' }, { status: 500 });
         mergeTrainValue = (JSON.parse(String(init?.body)) as { value: 'enabled' | 'disabled' | null }).value;
         return Response.json({ value: mergeTrainValue, effective: mergeTrainValue === null ? mergeTrainEffective : mergeTrainValue !== 'disabled' });
       }
@@ -187,6 +194,37 @@ describe('ProjectSettingsDisclosure', () => {
 
     await screen.findByRole('button', { name: 'Merge train: Disabled' });
     expect(screen.queryByTestId('merge-train-effective')).not.toBeInTheDocument();
+  });
+
+  function boardGetCount(): number {
+    return fetchControl.fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/merge-train/board')).length;
+  }
+
+  it('the Merge train control refreshes the merge train board (PAN-5363)', async () => {
+    const { client } = renderDisclosure();
+    await screen.findByRole('button', { name: 'Merge train: Disabled' });
+    const before = boardGetCount();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Merge train: Disabled' }));
+
+    await waitFor(() => {
+      expect(boardGetCount()).toBeGreaterThan(before);
+      expect(client.getQueryData(['project-merge-train', 'overdeck'])).toMatchObject({ value: 'disabled' });
+    });
+  });
+
+  it('a failed Merge train write leaves the board alone (PAN-5363)', async () => {
+    mergeTrainPostFails = true;
+    const { client } = renderDisclosure();
+    await screen.findByRole('button', { name: 'Merge train: Disabled' });
+    const before = boardGetCount();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Merge train: Disabled' }));
+
+    await waitFor(() => expect(fetchControl.fetchMock.mock.calls.some(([input, init]) =>
+      String(input) === '/api/projects/overdeck/merge-train' && (init?.method ?? 'GET') === 'POST')).toBe(true));
+    expect(boardGetCount()).toBe(before);
+    expect(client.getQueryData(['project-merge-train', 'overdeck'])).toMatchObject({ value: null });
   });
 
   // PAN-1696 fe-cockpit-toggle ac3.
