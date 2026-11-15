@@ -267,6 +267,26 @@ export function foldedRebuildsLine(names: readonly string[]): string {
   return `${n} rebuild${n === 1 ? '' : 's'} voided when this merged: ${names.map(shortName).join(', ')}`;
 }
 
+/** FR-8 (PAN-5364): one row for a run of identical voided rebuilds; `gens` newest first. */
+export function identicalRunLine(gens: readonly { name: string }[]): string {
+  const first = gens[0];
+  const last = gens[gens.length - 1];
+  if (!first || !last) return '';
+  return `${gens.length} rebuilds voided, ${shortName(last.name)} to ${shortName(first.name)}, same members`;
+}
+
+/** FR-7 (PAN-5364): the toggle line over voided batches whose features all merged later. */
+export function coveredVoidedLine(n: number): string {
+  return `${n} voided batch${n === 1 ? '' : 'es'} whose features all merged later`;
+}
+
+/** FR-9 (PAN-5364): reveal the older rows past the first three. */
+export function showMoreOlderLabel(n: number): string {
+  return `show ${n} more`;
+}
+
+export const SHOW_FEWER_OLDER_LABEL = 'show fewer';
+
 /** The one-word status an older batch row names. */
 export function olderBatchStatus(status: UatGenerationPayload['status']): string {
   switch (status) {
