@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5291",
   "created": "2026-11-15T08:32:27.661Z",
-  "updated": "2026-11-15T08:40:22.141Z",
+  "updated": "2026-11-15T08:44:05.481Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,26 @@
       "doneAt": "2026-11-15T08:40:16.066Z"
     },
     "header-dock-buttons": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5291",
-      "claimedAt": "2026-11-15T08:40:22.141Z"
+      "claimedAt": "2026-11-15T08:40:22.141Z",
+      "doneAt": "2026-11-15T08:44:05.481Z"
+    },
+    "header-dock-buttons.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T08:44:05.481Z"
+    },
+    "header-dock-buttons.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T08:44:05.481Z"
+    },
+    "header-dock-buttons.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T08:44:05.481Z"
+    },
+    "header-dock-buttons.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T08:44:05.481Z"
     }
   }
 }
