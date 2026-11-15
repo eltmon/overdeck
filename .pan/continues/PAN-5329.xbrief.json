@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5329",
   "created": "2026-11-15T06:45:07.358Z",
-  "updated": "2026-11-15T06:52:32.612Z",
+  "updated": "2026-11-15T06:54:25.104Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,9 +60,22 @@
       "doneAt": "2026-11-15T06:52:22.900Z"
     },
     "explorer-hide-dot-git": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5329",
-      "claimedAt": "2026-11-15T06:52:32.612Z"
+      "claimedAt": "2026-11-15T06:52:32.612Z",
+      "doneAt": "2026-11-15T06:54:25.104Z"
+    },
+    "explorer-hide-dot-git.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T06:54:25.104Z"
+    },
+    "explorer-hide-dot-git.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T06:54:25.104Z"
+    },
+    "explorer-hide-dot-git.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T06:54:25.104Z"
     }
   }
 }
