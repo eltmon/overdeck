@@ -85,6 +85,7 @@ async function renderDeck() {
 beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async () => Response.json([])));
   useCommandDeckSelection.getState().clearAll();
+  useCommandDeckSelection.setState({ selectedConversation: null, selectedFeature: null });
   usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} });
   localStorage.clear();
   seedDashboardStore({

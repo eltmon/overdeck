@@ -196,6 +196,10 @@ function ProjectPendingState({ onRetry }: { onRetry: () => void }) {
   )
 }
 
+// PAN-5293 F-D1: the left column and the deck share selection through this store.
+const setSelectedFeature = (id: string | null) => useCommandDeckSelection.getState().setSelectedFeature(id);
+const setSelectedConversation = (name: string | null) => useCommandDeckSelection.getState().setSelectedConversation(name);
+
 export function CommandDeck({
   convId,
   pendingConversationTarget = null,
@@ -209,8 +213,8 @@ export function CommandDeck({
   conversationViewMode,
 }: CommandDeckProps) {
   const [projectQueryEpoch, bumpProjectQueryEpoch] = useReducer((value: number) => value + 1, 0);
-  const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
-  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  const selectedFeature = useCommandDeckSelection((s) => s.selectedFeature);
+  const selectedConversation = useCommandDeckSelection((s) => s.selectedConversation);
   // PAN-1591: the Awareness rail can be collapsed to reclaim pane width.
   const [awarenessCollapsed, setAwarenessCollapsed] = useState(
     () => typeof window !== 'undefined' && localStorage.getItem('overdeck.ui.awarenessCollapsed') === 'true',
@@ -677,6 +681,17 @@ export function CommandDeck({
       onCockpitChange(selectedProject, selectedFeature);
     }
   }, [selectedFeature, selectedProject, onCockpitChange]);
+
+  // PAN-5293 F-D1: clear the store on unmount or the next mount's URL sync sees a leftover;
+  // resetting the deep-link guards lets StrictMode's second effect pass re-apply the link.
+  useEffect(() => () => {
+    const selection = useCommandDeckSelection.getState();
+    selection.setSelectedConversation(null);
+    selection.setSelectedFeature(null);
+    appliedConvId.current = null;
+    appliedCockpit.current = null;
+    hasAutoSelected.current = false;
+  }, []);
 
   // PAN-1561: selecting an issue from the tree opens (or focuses) an issue tab
   // in the current project's deck rather than replacing the whole content area.

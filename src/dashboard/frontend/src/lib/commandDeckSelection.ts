@@ -17,6 +17,10 @@ export interface CommandDeckSelectionState {
   selectedSessionByIssue: Record<IssueId, SessionId | null>
   /** Map of issueId → composer draft text. Survives navigation, cleared on page refresh. */
   draftTexts: Record<IssueId, string>
+  /** Conversation selected in the deck and the left column (PAN-5293 F-D1). */
+  selectedConversation: string | null
+  /** Issue selected in the deck and the left column (PAN-5293 F-D1). */
+  selectedFeature: IssueId | null
 }
 
 export interface CommandDeckSelectionStore extends CommandDeckSelectionState {
@@ -30,11 +34,17 @@ export interface CommandDeckSelectionStore extends CommandDeckSelectionState {
   setDraft(issueId: IssueId, text: string): void
   /** Clear draft text for an issue (e.g. after successful send). */
   clearDraft(issueId: IssueId): void
+  /** Set the selected conversation name. `clearAll` leaves it unchanged. */
+  setSelectedConversation(name: string | null): void
+  /** Set the selected issue id. `clearAll` leaves it unchanged. */
+  setSelectedFeature(issueId: IssueId | null): void
 }
 
 const initialState: CommandDeckSelectionState = {
   selectedSessionByIssue: {},
   draftTexts: {},
+  selectedConversation: null,
+  selectedFeature: null,
 }
 
 export const useCommandDeckSelection = create<CommandDeckSelectionStore>((set) => ({
@@ -65,6 +75,10 @@ export const useCommandDeckSelection = create<CommandDeckSelectionStore>((set) =
       const { [issueId]: _removed, ...rest } = state.draftTexts
       return { draftTexts: rest }
     }),
+
+  setSelectedConversation: (name) => set({ selectedConversation: name }),
+
+  setSelectedFeature: (issueId) => set({ selectedFeature: issueId }),
 }))
 
 // ─── Selectors ────────────────────────────────────────────────────────────────

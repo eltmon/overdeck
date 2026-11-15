@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { StrictMode } from 'react';
 import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -254,10 +255,12 @@ vi.mock('lucide-react', async () => {
   };
 });
 
-function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDeck>>) {
-  const queryClient = new QueryClient({
+function renderCommandDeck(
+  props?: Partial<React.ComponentProps<typeof CommandDeck>>,
+  queryClient: QueryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
-  });
+  }),
+) {
 
   // Provide minimal fetch mocks for the hooks
   vi.stubGlobal(
@@ -455,6 +458,7 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
       body: { id: 3, name: 'created-conv', title: 'Agent' },
     };
     useCommandDeckSelection.getState().clearAll();
+    useCommandDeckSelection.setState({ selectedConversation: null, selectedFeature: null });
     usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} });
     usePlannedBacklogVisibility.setState({ showPlannedBacklog: true });
     localStorage.clear();
@@ -819,5 +823,86 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     onConvIdChange.mockClear();
     fireEvent.click(screen.getByTestId('conv-test'));
     await waitFor(() => expect(onConvIdChange).toHaveBeenCalledWith('1'));
+  });
+
+  it('records the tree issue as the store selection and clears the conversation (PAN-5293 F-D1)', async () => {
+    renderCommandDeck({ selectedProject: 'test-project' });
+    await screen.findAllByTestId('project-node');
+
+    fireEvent.click(screen.getByTestId('conv-test'));
+    expect(useCommandDeckSelection.getState().selectedConversation).toBe('test-conv');
+
+    fireEvent.click(screen.getByTestId('feature-PAN-821'));
+    expect(useCommandDeckSelection.getState().selectedFeature).toBe('PAN-821');
+    expect(useCommandDeckSelection.getState().selectedConversation).toBeNull();
+  });
+
+  it('keeps a /conv deep-link selection under StrictMode with a warm cache (PAN-5293 F-D1)', async () => {
+    // StrictMode runs the unmount cleanup once between two effect passes. The
+    // deep-link effect must still leave the conversation selected.
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const warm = renderCommandDeck({ selectedProject: 'test-project', convId: null }, queryClient);
+    await screen.findAllByTestId('project-node');
+    await waitFor(() => expect(queryClient.getQueryData(['conversations'])).toBeTruthy());
+    warm.unmount();
+
+    render(
+      <StrictMode>
+        <QueryClientProvider client={queryClient}>
+          <CommandDeck selectedProject="test-project" convId="1" />
+        </QueryClientProvider>
+      </StrictMode>,
+    );
+    await screen.findAllByTestId('project-node');
+    await waitFor(() => expect(useCommandDeckSelection.getState().selectedConversation).toBe('test-conv'));
+    expect(panes('test-project').filter((p) => p.paneType === 'agent' && p.conversationId === 'test-conv')).toHaveLength(1);
+  });
+
+  it('keeps a cockpit deep-link selection under StrictMode with a warm cache (PAN-5293 F-D1)', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const warm = renderCommandDeck({ selectedProject: 'test-project' }, queryClient);
+    await screen.findAllByTestId('project-node');
+    await waitFor(() => expect(queryClient.getQueryData(['conversations'])).toBeTruthy());
+    warm.unmount();
+
+    render(
+      <StrictMode>
+        <QueryClientProvider client={queryClient}>
+          <CommandDeck selectedProject="test-project" cockpitIssue={{ project: 'test-project', issue: 'PAN-821' }} />
+        </QueryClientProvider>
+      </StrictMode>,
+    );
+    await screen.findAllByTestId('project-node');
+    await waitFor(() => expect(useCommandDeckSelection.getState().selectedFeature).toBe('PAN-821'));
+    expect(panes('test-project').filter((p) => p.paneType === 'issue' && p.issueId === 'PAN-821')).toHaveLength(1);
+  });
+
+  it('does not rewrite the URL on remount after a conversation was selected (PAN-5293 F-D1)', async () => {
+    // The selection lives in a store that outlives the deck. Without the
+    // unmount cleanup, the remounted deck's URL-sync effect (prevSelectedRef
+    // starts null) would see the leftover conversation in the cached list and
+    // write /conv/1. Both mounts share one QueryClient, as the app does.
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const onConvIdChange = vi.fn();
+    const first = renderCommandDeck({ selectedProject: 'test-project', convId: null, onConvIdChange }, queryClient);
+    await screen.findAllByTestId('project-node');
+    await waitFor(() => {
+      fireEvent.click(screen.getByTestId('conv-test'));
+      expect(onConvIdChange).toHaveBeenCalledWith('1');
+    });
+
+    first.unmount();
+    expect(useCommandDeckSelection.getState().selectedConversation).toBeNull();
+    expect(useCommandDeckSelection.getState().selectedFeature).toBeNull();
+
+    onConvIdChange.mockClear();
+    renderCommandDeck({ selectedProject: 'test-project', convId: null, onConvIdChange }, queryClient);
+    await screen.findAllByTestId('project-node');
+    for (let i = 0; i < 5; i += 1) {
+      await act(async () => {
+        await Promise.resolve();
+      });
+    }
+    expect(onConvIdChange).not.toHaveBeenCalled();
   });
 });
