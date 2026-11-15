@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5329",
   "created": "2026-11-15T06:45:07.358Z",
-  "updated": "2026-11-15T06:52:22.901Z",
+  "updated": "2026-11-15T06:52:32.612Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,6 +58,11 @@
     "rail-narrow-auto-collapse.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T06:52:22.900Z"
+    },
+    "explorer-hide-dot-git": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5329",
+      "claimedAt": "2026-11-15T06:52:32.612Z"
     }
   }
 }
