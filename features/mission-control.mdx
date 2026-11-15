@@ -11,14 +11,30 @@ Mission Control is Overdeck's default landing view — a unified monitoring inte
 
 ## Layout
 
-Mission Control uses a two-panel layout:
+The top bar spans the full window width. It starts with the Overdeck brand, which opens Home. Below it, Mission Control uses a two-panel layout:
 
-- **Sidebar (left)**: Resizable project tree showing all configured projects with their active features/workspaces
+- **Left column**: the project switcher, navigation, and the selected project's conversations, issues and workspaces
 - **Main panel (right)**: Feature activity view, planning artifacts, and status reviews
+
+## Left column
+
+The left column is the same on every page. On the Flywheel page, in Settings or anywhere else, it still lists the selected project's conversations, issues and workspaces. Clicking a row opens it in the Command Deck. From top to bottom:
+
+- **Project switcher.** It shows the project's initials, its name and its path (such as `~/Projects/overdeck`). Its menu lists every project, grouped by owner, each with a status word: "2 working", "1 in review" or "idle". Below the projects are **No project**, projects on your other machines, **Add a project**, and **New workspace in** the selected project. With more than 8 projects, a filter box appears at the top of the menu.
+- **Navigation.** **Project home** (shown only when a project is selected), **Flywheel** (reads "running" during a run), **Order books**, and **More**. **More** holds every other view, grouped as Operations, Infrastructure, Observability and System. Experimental views appear there only when experimental features are on.
+- **New conversation.** The main part of the button starts a conversation in the selected project (key `N`). The caret opens a menu with the model and harness picker, the effort picker, the Retrospective button and **New conversation with options…**. See [Conversations](/features/conversations#new-conversation-with-options).
+- **Conversations.** **Active** shows Needs you and Inbox. **All N** adds Snoozed and Settled. Each row has a meta line in words: its state, its changes (`+12 −3`, then "2 not committed"), the harness when it is not Claude Code, and its cost.
+- **Issues.** The header shows the issue count, the project's CI, deploy and identity chips, and a **Filter** menu: All, Alive or Failed, plus **Planned**. A collapsed issue row reads stage · model · progress, for example "Building · opus-4-6 · 3 of 7 items". Expand the row to see its badges, merge controls and sessions.
+- **Workspaces.** This project's workspaces, then **Archived (N)**, and `+` for a new workspace. The section is hidden when the project has no workspaces.
+- **Footer.** **Settings**, **Machines**, the version (click it to check for updates; its tooltip says when Overdeck runs from a source checkout), **Rebuild** (only in a source checkout), the freshness indicator, and `?` for the keyboard shortcuts sheet.
+
+With no project selected, the switcher reads "Choose a project" and the column shows "Pick a project to see its conversations and issues" instead of the lists. New conversation then starts a conversation outside any project.
+
+The column is 264 px wide. Drag its right edge to resize it between 240 and 400 px. Press `[` to collapse it to 48 px, where it shows only icons. In a window narrower than 900 px, the column is a drawer: open it with **Open navigation** at the left of the top bar.
 
 ## Project Tree
 
-Projects appear as collapsible folders. Each active feature shows:
+The Issues section lists the selected project's active features. Each one shows:
 
 | Element | Description |
 |---------|-------------|
@@ -81,7 +97,17 @@ The top bar's **Needs you · N** button counts the same things once each: every
 question, plan, permission request, issue that needs you, Flywheel request and
 system decision. The Home page's "Needs you" card shows the same number. Open
 the button to see the items grouped by project, and use **Open Activity** for
-system events.
+system events. Each row in the menu shows how long the item has waited.
+
+## Activity feed
+
+The **Activity** page (`/activity`) opens on the **Feed** tab. It has three scopes:
+
+- **Needs you**: everything waiting on you, with the same cards as Decisions.
+- **Project**: activity for the selected project's issues and conversations.
+- **Global**: activity across every project.
+
+Within a scope, **All**, **Chats** and **Activity** narrow the feed. The page remembers the tab you last picked. The log streams (Activity Log, Detailed and TTS) appear as more tabs only when experimental features are on.
 
 ## Badge Bar
 
