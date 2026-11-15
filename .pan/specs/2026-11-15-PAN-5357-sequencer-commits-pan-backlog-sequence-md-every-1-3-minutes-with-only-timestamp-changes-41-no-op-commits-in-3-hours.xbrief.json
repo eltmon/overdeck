@@ -4,17 +4,17 @@
     "created": "2026-11-15T15:10:26Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5357: Sequencer commits .pan/backlog/sequence.md every 1-3 minutes with only timestamp changes (41 no-op commits in 3 hours)",
-    "updated": "2026-11-15T15:29:01.428Z"
+    "updated": "2026-11-15T15:31:58.104Z"
   },
   "plan": {
     "id": "pan-5357",
     "title": "Sequencer commits .pan/backlog/sequence.md every 1-3 minutes with only timestamp changes (41 no-op commits in 3 hours)",
-    "status": "proposed",
+    "status": "running",
     "uid": "a8f83213-9a4e-4a4f-adf1-75c3e088ca35",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T15:10:26Z",
-    "updated": "2026-11-15T15:29:01.428Z",
+    "updated": "2026-11-15T15:31:58.104Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5357",
@@ -509,5 +509,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
