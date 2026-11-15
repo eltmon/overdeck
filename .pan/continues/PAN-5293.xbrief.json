@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5293",
   "created": "2026-11-15T06:57:45.448Z",
-  "updated": "2026-11-15T08:08:57.006Z",
+  "updated": "2026-11-15T08:09:03.485Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -322,6 +322,11 @@
     "left-column-footer.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T08:08:57.006Z"
+    },
+    "left-column-shell": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5293",
+      "claimedAt": "2026-11-15T08:09:03.485Z"
     }
   }
 }
