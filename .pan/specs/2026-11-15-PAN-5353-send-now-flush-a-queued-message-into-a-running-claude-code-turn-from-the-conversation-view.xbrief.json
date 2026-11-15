@@ -4,17 +4,17 @@
     "created": "2026-11-15T14:31:52Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5353: Send now: flush a queued message into a running Claude Code turn from the conversation view",
-    "updated": "2026-11-15T14:39:51.337Z"
+    "updated": "2026-11-15T14:41:06.076Z"
   },
   "plan": {
     "id": "pan-5353",
     "title": "Send now: flush a queued message into a running Claude Code turn from the conversation view",
-    "status": "proposed",
+    "status": "running",
     "uid": "78e7680c-ebda-4f5f-b432-b88aa4d48f56",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T14:31:52Z",
-    "updated": "2026-11-15T14:39:51.337Z",
+    "updated": "2026-11-15T14:41:06.076Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5353",
@@ -797,5 +797,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
