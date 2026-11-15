@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T14:29:34.895404Z · model: claude-opus-5-5 · open: 896_
+_Last sequenced: 2026-11-15T14:38:13.035759Z · model: claude-opus-5-5 · open: 897_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -9,898 +9,899 @@ _Last sequenced: 2026-11-15T14:29:34.895404Z · model: claude-opus-5-5 · open: 
 | 2 | PAN-5294 | L | high | ok |  |  | In pipeline: workflow redesign G — rebuilt project Home with actions first, needs-you, pipeline rows, recent changes. |
 | 3 | PAN-5348 | S | high | ok |  |  | In pipeline: bare /pan in the composer 404s with an error telling you to type /pan; make it list commands locally |
 | 4 | PAN-5337 | S | high | ok |  |  | In pipeline: every relative link in a Markdown preview opens a 404 /conv/<file> URL instead of the linked file. |
-| 5 | PAN-5338 | M | medium | ok |  |  | In pipeline: conversation diff view gets a rendered Markdown Preview and an Open file action. |
 | 5 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
-| 6 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
-| 7 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
-| 8 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
-| 9 | PAN-4710 | S | high | ok |  |  | Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff |
-| 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; seen on MYN and now overdeck (PAN-5232). |
-| 11 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
-| 12 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
-| 13 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
-| 14 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
-| 15 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
-| 16 | PAN-4671 | M | high | ok |  |  | CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff. |
-| 17 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
-| 18 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
-| 19 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
-| 20 | PAN-5104 | XS | high | ok |  |  | Stale cost hook bundle prices Fable 5.1/5.2 at Fable 5 rates; reconciler never corrects it. Unblocked: PAN-5103 merged. |
+| 5 | PAN-5338 | M | medium | ok |  |  | In pipeline: conversation diff view gets a rendered Markdown Preview and an Open file action. |
+| 6 | PAN-5354 | M | critical | ok |  |  | Host-crash-killed work agents stay dead: deacon-lite confirms death but nothing resumes; add paced resumeCrashedWorkAgents. |
+| 7 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
+| 8 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
+| 9 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
+| 10 | PAN-4710 | S | high | ok |  |  | Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff |
+| 11 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; seen on MYN and now overdeck (PAN-5232). |
+| 12 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
+| 13 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
+| 14 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
+| 15 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
+| 16 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
+| 17 | PAN-4671 | M | high | ok |  |  | CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff. |
+| 18 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
+| 19 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
+| 20 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
+| 21 | PAN-5104 | XS | high | ok |  |  | Stale cost hook bundle prices Fable 5.1/5.2 at Fable 5 rates; reconciler never corrects it. Unblocked: PAN-5103 merged. |
 | 21 | PAN-5347 | S | medium | ok |  |  | In pipeline: composer / menu lists no skills; add them from /api/skills/overrides under a labeled Skills group |
 | 22 | PAN-5339 | S | medium | ok |  |  | In pipeline: conversation names, conv N forms and /conv URLs in messages become clickable links. |
-| 22 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
-| 23 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
-| 24 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
-| 25 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
-| 26 | PAN-4708 | M | high | needs-refinement |  |  | docs.json nav is a hot file: concurrent docs PRs conflict, each costing a merge-main and re-review. Pick a fix option first. |
-| 27 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
-| 28 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
-| 29 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
-| 30 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
-| 31 | PAN-3524 | M | critical | needs-refinement |  |  | A server-owned --changed verification loop relaunches through deacon freeze, review abort, pause and operator stop; peaked at 78 workers. |
-| 32 | PAN-4166 | S | critical | ok |  |  | write-sequence replays every superseded sequence commit and dies on an old one, so the ranked order never reaches origin/main |
-| 33 | PAN-3250 | S | critical | ok |  |  | Workspace spawn branches from local HEAD instead of origin/main, so every new feature branch inherits unpushed local-main commits. |
-| 34 | PAN-3946 | S | critical | ok |  |  | Review request treats an APPROVED review on an older commit as "already passed"; newer commits ride an old approval |
-| 35 | PAN-2954 | XS | critical | ok |  |  | postMergeLifecycle refuses GitLab projects |
-| 36 | PAN-3935 | S | critical | ok |  |  | PRD draft promotion writes the draft into the primary main checkout and deletes the feature-branch copy; PRDs are stranded untracked |
-| 37 | PAN-3657 | S | critical | ok |  |  | Merge-train queues endpoint runs the monorepo queue builder for polyrepo projects, so MYN/Auricle trains are permanently empty. |
-| 38 | PAN-5097 | S | critical | ok |  |  | Polyrepo GitLab review verdicts never record: forge probe runs at the non-git root, falls back to GitHub; MYN merges stall till hand-merged |
-| 39 | PAN-4240 | S | critical | ok |  |  | Reaper rm -rf's workspaces of closed issues: unmerged polyrepo branches, and (Nov 4) untracked evidence after a merged MR. |
-| 40 | PAN-3565 | M | critical | ok |  |  | Failed review spawn wedges 'starting', and an all-lanes infra failure is synthesized as a real CHANGES REQUESTED verdict. |
-| 41 | PAN-3554 | M | critical | needs-refinement |  |  | Red main has no mechanical owner: it hid for ~5h because the merge gate renders red main as an empty queue, not an alarm. |
-| 42 | PAN-3532 | S | critical | ok |  |  | CI runs only a hand-picked slice of the frontend suite, so main stayed red on frontend for hours while every run reported green. |
-| 43 | PAN-4241 | XS | high | ok |  |  | computeWorkspaceRepoRoots joins an absolute repoPath, so polyrepo repos named unlike their path (fe/frontend) are skipped by pan task done. |
-| 44 | PAN-5167 | S | critical | ok |  |  | Post-merge lifecycle refuses forever on one transient GitHub fetch failure; agent stays running and close-out is blocked. |
-| 45 | PAN-4396 | XS | critical | ok |  |  | test-skip gate fails closed on any branch diff over 1 MiB (execFile default maxBuffer); one-line fix unblocks big PRs |
-| 46 | PAN-3085 | XS | critical | needs-refinement |  |  | Review feedback is written to .overdeck/feedback but agents and the deacon merge gate are pointed at a nonexistent .pan/feedback. |
-| 47 | PAN-3653 | M | critical | ok |  |  | A strike blocked on red main has no owner that wakes it when main goes green; the session stays alive so recover refuses it. |
-| 48 | PAN-3630 | M | critical | ok |  |  | pan tell reported three deliveries to a live agent, moved all three to read/, and the agent received none — the delivery door lies. |
-| 49 | PAN-3805 | S | critical | needs-refinement |  |  | Codex idle poke spawns codex exec instead of the app-server door; failed sends still tick the counter and pause healthy agents |
-| 50 | PAN-5139 | M | critical | ok |  |  | pan reload refuses both generations when the pan shim points at the non-live generation; deploys stall. |
-| 51 | PAN-3560 | M | critical | ok |  |  | PTY supervisor overloads under concurrent review convoys; fleet-wide 502 'input echo confirmation failed' kills resumes and feedback. |
-| 52 | PAN-3520 | S | critical | ok |  |  | Test gate records 'failed' for load-induced timeouts; retry timeout-only failures in isolation before writing a verdict. |
-| 53 | PAN-4439 | S | high | ok |  |  | CI relay has no backstop for webhooks missed during pan reload; red test jobs never reach the agent, PRs stall |
-| 54 | PAN-4392 | XS | high | ok |  |  | pan task done accepts an Item: trailer from another issue's merged commit (history-wide grep); gate passes with no evidence |
-| 55 | PAN-3500 | S | critical | ok |  |  | A review sub-role edited seven tracked files after writing its report and the changes were auto-committed into the feature history. |
-| 56 | PAN-3313 | S | critical | ok |  |  | A transient upstream stream error benches CLIProxy's only auth: ~70% of GPT-routed inference 503s with a message that blames credentials. |
-| 57 | PAN-3282 | M | critical | ok |  |  | Review agents die before writing a verdict across 5 issues and 2 projects, leaving a verdict-shaped status with no artifact behind it. |
-| 58 | PAN-4391 | S | high | ok |  |  | pan worker run fails in polyrepo workspaces because the root is not a git repo; delegation is broken for MYN |
-| 59 | PAN-4390 | S | high | ok |  |  | Polyrepo workspace create runs npm install in the project's parent dir, reports failure and hides the workspace from list |
-| 60 | PAN-2695 | S | high | ok |  |  | Concurrent review dispatches race fresh-spawn vs resume |
-| 61 | PAN-2742 | S | high | ok |  |  | synthesis fires 42s after spawn and reports reviewers with reports on disk as 'infrastructure failure' |
-| 62 | PAN-2706 | M | high | needs-refinement |  |  | Ghost test sessions absorb every test dispatch |
-| 63 | PAN-5228 | S | high | ok |  |  | Advisory CodeRabbit journal entries land last and hide stalled reviews from recoverStalledReviews and other last-entry readers. |
-| 64 | PAN-4344 | S | high | ok |  |  | Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck |
-| 65 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
-| 66 | PAN-4566 | S | high | ok |  |  | A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed. |
-| 67 | PAN-5193 | XS | high | ok |  |  | PRD-first gate reads a short main stub before the full workspace draft and refuses finalize for epic children. |
-| 68 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
-| 69 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
-| 70 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
-| 71 | PAN-5133 | M | high | ok |  |  | pan pause cannot hold a planned issue whose deferred work-agent start is retried; no operator door to stop it. |
-| 72 | PAN-4792 | S | high | ok |  |  | Paste guard only knows numbered menus; a failed paste presses Enter into unnumbered selects, silently setting defaultMode=auto. |
-| 73 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
-| 74 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
-| 75 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
-| 76 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent pane, so a single hungry agent inflates the unit and oomd kills the whole fleet — twice now. |
-| 77 | PAN-3278 | S | critical | needs-refinement |  |  | A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts. |
-| 78 | PAN-5330 | S | high | ok |  |  | Workspace devcontainers share the 'server' DNS alias on the overdeck network, so a frontend can proxy to another workspace. |
-| 79 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
-| 80 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
-| 81 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
-| 82 | PAN-3106 | S | critical | ok |  |  | auto_merge_default: hold is consulted on one merge path only, so held issues merge individually and defeat the UAT train. |
-| 83 | PAN-3100 | S | critical | ok |  |  | The test role evaluates the dirty working tree, so a live work agent's uncommitted edits are recorded as the issue's test failure. |
-| 84 | PAN-4213 | M | high | ok |  |  | Merge-train follow-ups from #4066 (merged): stamp-vs-pin mismatch, reset --keep can strand agent commits, fetch retry, tests |
-| 85 | PAN-5263 | M | high | ok |  |  | Pipeline membership sees zero open overdeck issues: the App token lacks issues permission and the gh fallback never runs. |
-| 86 | PAN-3096 | S | critical | ok |  |  | pan done blocks on generated .devcontainer/ and dev, and agents resolve it by deleting workspace infrastructure or inventing gitignores. |
-| 87 | PAN-3084 | S | critical | needs-refinement |  |  | A review session spawned but never briefed sits at zero context forever, and restart 'preserves' the zombie that blocks its replacement. |
-| 88 | PAN-3043 | S | critical | needs-refinement |  |  | Provider health is probed only at spawn, so a mid-run 403 quota refusal leaves an agent 'running' for days holding a slot. |
-| 89 | PAN-1824 | S | high | ok |  |  | Fix flaky main CI: fake timers + @slow exclusion for real-timer test family |
-| 90 | PAN-2932 | S | high | ok |  | PAN-2337 | intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap leaves :3011 unbound (Bad Gateway) after pan reload |
-| 91 | PAN-2935 | S | critical | ok |  |  | Workspace devcontainer duplicate backend hijacks Traefik router |
-| 92 | PAN-2337 | XS | critical | ok |  |  | Reload/build atomicity: an in-place `npm run build` under a live dashboard breaks new PTY-supervisor spawns until restart |
-| 93 | PAN-2422 | XS | high | ok |  | PAN-2337 | rebuilding dist under a live server breaks lazy chunk imports |
-| 94 | PAN-2699 | XS | high | ok |  |  | npm run build regenerates the committed record-cost-event.js bundle |
-| 95 | PAN-2957 | XS | high | ok |  | PAN-2337 | npm run build intermittently produces stale frontend bundles |
-| 96 | PAN-2850 | M | high | ok |  |  | npm test fails in clean checkout after pretest removes dashboard bundle |
-| 97 | PAN-2758 | S | critical | needs-refinement |  |  | Provider capacity error silently zombies a spawned agent: willRetry=false, turn reported completed, state stays status=running forever |
-| 98 | PAN-2817 | M | high | needs-refinement |  |  | Idle-at-prompt work/review agents are never redriven: gpt-5.6-sol sessions stop at the composer mid-task and sit for hours |
-| 99 | PAN-2813 | M | high | ok |  |  | Scheduler yield never self-clears: yielded work agents stay paused after the blocking review completes/merges |
-| 100 | PAN-2668 | M | high | ok |  |  | Verification/review feedback silently queued to stopped-by-user agents |
-| 101 | PAN-2569 | XS | critical | ok |  |  | planning finalizes (issue→planned) but work agent does not auto-spawn |
-| 102 | PAN-4269 | M | high | ok |  |  | macOS conversations hang on 'Working…'/'waiting for transcript'; governor ruled out, root cause unknown (delivery or transcript find). |
-| 103 | PAN-3811 | M | high | ok |  |  | The PAN-3809 emergency strike prunes BuildKit unconditionally; inventory, bounded reclaim door and retention floor are still missing |
-| 104 | PAN-2179 | S | high | needs-refinement |  |  | relaunch can leave a zombie agent |
-| 105 | PAN-2169 | S | high | needs-refinement |  |  | kimi agent silently frozen at 100% ctx (no thrown overflow error) not caught by CONTEXT_OVERFLOW_PATTERNS |
-| 106 | PAN-2734 | S | high | ok |  |  | merge queue head-of-line zombie |
-| 107 | PAN-3697 | XS | high | ok |  |  | Deployed dashboard PATH omits Bun, so verification workers hit 'bun: not found' before the required install gate. |
-| 108 | PAN-3633 | S | high | ok |  |  | Strike workspaces spawn without @types, so the contract's own typecheck gate fails and agents abort reporting a false red main. |
-| 109 | PAN-4420 | S | high | ok |  |  | npx @overdeck/core on native Windows serves 404 for every page: static root is built from a URL path |
-| 110 | PAN-3099 | XS | critical | ok |  |  | --health-timeout 120 is enforced as 120ms and a false-failed check exits after killing the old server — nothing left listening. |
-| 111 | PAN-4418 | S | high | ok |  |  | vault join fails on native Windows: core.autocrlf=true rewrites the VAULT-FORMAT marker; blocks Windows continue flow |
-| 112 | PAN-3040 | S | critical | ok |  |  | pan strike is monorepo-shaped end to end and fails immediately on polyrepo projects; same defect as PAN-3708. |
-| 113 | PAN-3023 | S | critical | ok |  |  | Post-planning auto-spawn logs 'attempt 1/3' and never retries after a transient Docker EOF, stranding the issue with no re-drive owner. |
-| 114 | PAN-1618 | S | high | ok |  |  | Substrate: work-spawn docker-health gate has no autonomous recovery |
-| 115 | PAN-3916 | M | high | ok |  |  | Session pointers go stale after rollover + crash recovery; issue view and pan tell confirmation track a dead transcript |
-| 116 | PAN-3900 | S | high | ok |  |  | Docker bridge pool exhausted by orphaned workspace networks; pan start fails; bridge-pool patrol only warns |
-| 117 | PAN-3793 | S | high | ok |  |  | resolveIssuePullRequestRef probes only feature/ and strike/ names, so close-out cannot find a merged PR on a descriptive branch |
-| 118 | PAN-2639 | S | high | ok |  | PAN-2331 | codex-resume replays a rotated-out (revoked) refresh token → codex review convoys wedge with 401 |
-| 119 | PAN-2331 | S | high | ok |  |  | codex rate-limit 'Switch to gpt-5.4-mini?' modal stalls autonomous agents (no auto-dismiss) |
-| 120 | PAN-2333 | M | high | ok |  |  | feat: handle codex weekly-quota exhaustion gracefully |
-| 121 | PAN-4184 | S | high | needs-refinement |  |  | --no-deacon on the host port is refused as a peer after the old server stops, so the escape hatch may leave no dashboard; fix unpicked |
-| 122 | PAN-2511 | XS | high | ok |  |  | Work agents burn 20+ min on false test failures |
-| 123 | PAN-2763 | S | high | ok |  |  | Workspace node_modules is symlinked to the primary repo, breaking test resolution |
-| 124 | PAN-2170 | XS | high | ok |  |  | Docker init container lacks Python |
-| 125 | PAN-1198 | S | high | ok |  |  | Workspace init container's bun install doesn't populate container-node-modules named volume |
-| 126 | PAN-4453 | XS | high | ok |  |  | runtimes/codex.ts uses homedir() not OVERDECK_HOME; isolated homes write thread ids into the real ~/.overdeck |
-| 127 | PAN-2106 | S | high | ok |  |  | pan strike workspace setup leaves broken partial workspace + false 'spawned' success (git-lock race) |
-| 128 | PAN-2880 | M | high | ok |  | PAN-2259 | Linear tracker listIssues is a 3N+1 request storm |
-| 129 | PAN-2966 | S | high | ok |  |  | Polyrepo wrapper .gitignore misses .pan/ .devcontainer/ dev |
-| 130 | PAN-2945 | S | high | ok |  |  | pan done rejects Overdeck-generated runtime in polyrepo wrapper repos (.devcontainer/, dev, .pan/review) |
-| 131 | PAN-2680 | M | high | ok |  |  | pan close: Docker teardown silently skips a running stack in multi-repo projects (MYN), aborting close-out |
-| 132 | PAN-4419 | S | high | ok |  | PAN-4418 | pan vault resume cannot spawn claude on native Windows (ENOENT, needs shell/.cmd resolution); --no-launch works |
-| 133 | PAN-3734 | S | high | ok |  |  | Completed swarm slot reuse can start a new item from a stale polyrepo branch — silent wrong-parent work. |
-| 134 | PAN-3621 | M | high | ok |  |  | pan start intermittently dies resolving a chunk graph spliced across two builds — importer from primary dist, path in the live generation. |
-| 135 | PAN-3555 | S | high | ok |  |  | pan start without --fresh silently abandoned an intact 7.5MB warm session, violating the warm-by-default contract. |
-| 136 | PAN-3498 | S | high | ok |  |  | write-sequence pins in-pipeline ranks without renumbering, so the persisted sequence carries duplicate ranks and gaps. |
-| 137 | PAN-3496 | XS | high | ok |  |  | A review convoy member blocked on an operator AskUserQuestion about review depth; review agents must decide and record, not ask. |
-| 138 | PAN-3081 | S | high | ok |  |  | The agent git guard is PATH-based and an agent stripped it unprompted to get past a false block; a control the agent can remove isn't one. |
-| 139 | PAN-2627 | S | high | ok |  |  | Linear poller is blind after cycle rollover |
-| 140 | PAN-2324 | XS | high | ok |  |  | label transition fails atomically on missing 'in-planning' label |
-| 141 | PAN-2165 | XS | high | ok |  |  | pan close: close-issue phase reports success but leaves issue OPEN / wrong labels (remove-label aborts on absent label; no-vBRIEF trans… |
-| 142 | PAN-2905 | S | high | ok |  |  | Dashboard steady-state CPU ~50% keeps API responses at 0.5-1.5s |
-| 143 | PAN-2259 | S | critical | ok |  |  | something burns the full 5k/hr GitHub GraphQL quota |
-| 144 | PAN-2379 | S | high | ok |  |  | dependency install is warn-only + 60s timeout → false verify failures against empty node_modules (blocks swarm convergence) |
-| 145 | PAN-2421 | XS | high | ok |  |  | dashboard server route tests flake under full-suite verification load |
-| 146 | PAN-2430 | S | high | ok |  |  | frontend typecheck fails with dozens of pre-existing unused-local errors |
-| 147 | PAN-2593 | S | high | ok |  |  | server children inherit bare system PATH |
-| 148 | PAN-4302 | M | high | ok |  |  | ~19 files exec gh directly, bypassing runGh: spend is unattributed and keeps hitting GitHub during quota pause. Follow-up to PAN-4291 |
-| 149 | PAN-2080 | M | high | needs-refinement |  |  | External transports (email/Slack/push/TTS) still plausible; its stated dependency on the PAN-2079 Inbox spine is undercut by boot… |
-| 150 | PAN-5048 | M | high | ok |  |  | Needs-you drops an unanswered AskUserQuestion seconds after its phone push; the phone shows 'already answered' with no card. |
-| 151 | PAN-1436 | S | high | ok |  |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
-| 152 | PAN-3556 | S | high | ok |  |  | No per-agent spawn mutex: two flows allocated session identities 3s apart and the second pin orphaned the first transcript. |
-| 153 | PAN-3553 | S | high | ok |  |  | tmux list-panes -a exits 1 on a zero-session server, so the census reads unavailable post-reboot and conversations hang on 'Starting…'. |
-| 154 | PAN-3535 | S | high | ok |  |  | The drain/resume hold is re-derived from the caller's env each boot, so any restart from a clean shell silently drops it. |
-| 155 | PAN-3429 | M | high | ok |  |  | Memory governor defers admissions but sheds nothing under HARD pressure; concurrent heavy gate runs aren't in the shed ladder. |
-| 156 | PAN-3397 | S | high | ok |  |  | Fresh convoy lanes freeze at 0 output before kickoff; PAN-3375's detector only covers warm resumes, so recovery is manual. |
-| 157 | PAN-3325 | S | high | ok |  |  | A fresh workspace ships an empty-but-present node_modules, so tooling silently resolves the parent repo's deps and gates go false-green. |
-| 158 | PAN-3317 | S | high | ok |  |  | Strike agents are told to rebase, the launcher guard blocks it, and pan sync-main can't resolve a -strike workspace. Overlaps PAN-3306. |
-| 159 | PAN-3284 | S | high | ok |  |  | A workspace-confined agent wrote a doc edit into the primary main worktree — the PAN-2204 write-to-main hazard through a new door. |
-| 160 | PAN-3270 | S | high | ok |  |  | New workspaces arrive with empty node_modules and bun off the agent shell PATH, so the documented bun install remedy fails. |
-| 161 | PAN-4487 | XS | high | ok |  |  | cleanAgentState whitelist drops foreman, modelSpawnKey, workspaceId on every state.json write; add fields + round-trip test |
-| 162 | PAN-3257 | S | high | ok |  |  | Crash-resume leaves a stale PTY socket and drops supervisorEnabled from state.json, so every supervisor delivery fails afterwards. |
-| 163 | PAN-3129 | M | high | ok |  |  | No symlink/TOCTOU containment on canonical writes under agent-controlled paths; a planted symlink redirects a server-side write. |
-| 164 | PAN-3120 | S | high | ok |  |  | A scheduler-yielded work agent makes operator MERGE hard-error on polyrepo and silently dead-end on single-repo. |
-| 165 | PAN-4349 | S | high | ok |  |  | Agent-side GitHub reads prefer REST over GraphQL gh --json until PAN-4302 meters callers; protects the hourly quota |
-| 166 | PAN-3062 | M | high | ok |  |  | The shared primary main worktree stacks several sessions' commits, so whoever pushes next ships everyone else's unverified work. |
-| 167 | PAN-3048 | XS | high | needs-refinement |  |  | Pipeline auto-commit lands Overdeck's own .pan/drafts PRD into product feature branches; the exclusion list is duplicated and has drifted. |
-| 168 | PAN-3032 | S | high | ok |  |  | Rebuild composes under overdeck-feature- while Traefik labels name myn-feature- devnet, and traefik attaches are runtime-only. |
-| 169 | PAN-3833 | S | high | ok |  |  | Feed renders assistant text emitted after tool calls as collapsed thinking rows; operator believes the agent never answered |
-| 170 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
-| 171 | PAN-4629 | M | high | ok |  |  | Fresh npx machine cannot pan start: no gh auth token fallback for the GitHub tracker, and registration derives the wrong issue prefix. |
-| 172 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
-| 173 | PAN-4577 | M | high | ok |  |  | Operator's facts didn't follow them to a new Mac: no importer for Claude auto-memory. PAN-3957 merged, so W9-W11 are unblocked. |
-| 174 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
-| 175 | PAN-5250 | M | high | ok |  |  | Idle workspace frontend and dev containers never stop while an agent lives; ~9 GB held by unviewed Vite containers. |
-| 176 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
-| 177 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
-| 178 | PAN-4847 | S | high | ok |  |  | Remote reap silently skips review request when a background writer dirties a tracked file; pipeline stalls at PR-open. |
-| 179 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
-| 180 | PAN-4844 | S | medium | ok |  |  | Claude Code parser prices glm-*/qwen3* as Sonnet 4, ohmypi prices DashScope at $0; route both to custom rows. |
-| 181 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
-| 182 | PAN-2059 | XL | high | ok | ✓ |  | Backlog pickup gate |
-| 183 | PAN-2376 | XL | high | stale | ✓ |  | Epic: CI/CD reliability — all 21 named children are closed; needs an operator disposition (close or restate) |
-| 184 | PAN-3775 | S | high | ok |  |  | makeDbLive opens overdeck.db unmigrated; zero-table db poisons a vitest worker home and breaks later read-only audits. |
-| 185 | PAN-3652 | XS | high | ok |  |  | No workflow_dispatch on ci.yml / state-plane-branches.yml, so an unverified main tip can never be verified and DoD row 6 blocks close-out. |
-| 186 | PAN-3579 | M | high | ok |  |  | ~20 frontend mutations hand-write JSON headers and omit the CSRF token, so each 403s the moment its route becomes guarded. |
-| 187 | PAN-3541 | S | high | ok |  |  | Review restart loops on the session-resume menu because eligibility ignores how the prior session ended; partial mechanical break landed. |
-| 188 | PAN-3463 | S | high | ok |  |  | A legitimate empty-diff slot outcome can never pass item verify, so the slot wedges and blocks dispatch of remaining items forever. |
-| 189 | PAN-3460 | S | high | ok |  |  | Per-item verify_commands that run the whole root suite make slot merge gates load-fragile and hold a patrol in flight for ~17 minutes. |
-| 190 | PAN-3454 | M | high | ok |  |  | Cost hook rescans fork-copied parent history from byte 0 under the reviewer's id — fabricated cache-miss warnings and double-billed spend. |
-| 191 | PAN-3432 | S | high | ok |  |  | Preemptive yield fans out: seven work agents paused to make room for one review convoy, then flood back oldest-first. |
-| 192 | PAN-3306 | S | high | ok |  |  | Three layers disagree on how a strike rebases: the prompt instructs it, the launcher guard blocks it, sync-main resolves the wrong worktree. |
-| 193 | PAN-3297 | S | high | ok |  |  | After a dashboard restart, delivery calls a healthy agent a zombie while resume calls it healthy; both classifiers can't be right. |
-| 194 | PAN-3274 | S | high | needs-refinement |  |  | A test-role agent spawned and never ran a turn, holding an approved CI-green issue out of the merge gate behind a stale failed verdict. |
-| 195 | PAN-3267 | S | high | ok |  |  | GitLab merged-head oracle spawns one glab subprocess per repo × head, so pipeline membership refresh fails on every cycle. |
-| 196 | PAN-3261 | S | high | ok |  |  | The tmux delivery fallback answered a live session-resume menu because its own paste hid the menu from the detector — silent /compact. |
-| 197 | PAN-3256 | S | high | ok |  |  | glab mr list runs with a polyrepo wrapper root as cwd, which is not a git repo, so MYN membership fails forge_unavailable every cycle. |
-| 198 | PAN-4342 | M | medium | ok |  |  | Re-review rounds resume every lane on its own round-1 findings; give each round one fresh critic lane (Deft method) |
-| 199 | PAN-3174 | S | high | ok |  |  | Polyrepo UAT stacks 504: Traefik labels carry the old myn- prefix, Traefik isn't on the overdeck-* devnet, and the fe port is wrong. |
-| 200 | PAN-3050 | XS | high | ok |  |  | Idle-stack reaper's regex only matches overdeck-feature-*-server|frontend, so MYN stacks run for hours after their agents are gone. |
-| 201 | PAN-4365 | S | medium | ok |  |  | Stale defaults: workhorses.expensive is Opus 4.8 and the flywheel role is a literal that ignores the slot; evals now unblocked |
-| 202 | PAN-2980 | XS | high | ok |  |  | The pre-push file-size guard reads the shared working tree, so another session's uncommitted edits block an unrelated, guard-clean push. |
-| 203 | PAN-5295 | L | high | ok |  |  | Workflow redesign D2: turn card, file chips, composer controls, subagents rail and tab strip per mockup screen 1. |
-| 204 | PAN-3769 | S | high | needs-refinement |  |  | Red main 707089c5→e4b280b3 blocked deploys ~14h: missing no-loss lock entry + stale OpenRouter expectation. Verify still reproducing. |
-| 205 | PAN-3760 | S | high | ok |  |  | permissionMode 'auto' undocumented as non-bypass, launcher can emit invalid --permission-mode, invalid values drop silently. |
-| 206 | PAN-3629 | M | high | ok |  |  | No sanctioned door to re-scope a live agent; the operator must violate pan tell doctrine or let the rejected design land. |
-| 207 | PAN-3517 | M | high | ok |  |  | Convoy forks still miss the parent prompt cache in production — launch-injection byte drift plus resume dropping the cache-scope header. |
-| 208 | PAN-3508 | S | high | ok |  |  | pan reload deletes the generation the global pan link points at, so the CLI vanishes mid-deploy for anyone invoking from elsewhere. |
-| 209 | PAN-3303 | S | high | ok |  |  | An empty registered-projects 200 is treated as authoritative, latching Command Deck at 'Unknown project' until a manual page reload. |
-| 210 | PAN-4364 | S | medium | ok |  |  | GPT-6 catalog: gpt-6-sol misclassed frontier and OpenAI tierModels still remap to GPT-5.6; prerequisites have closed |
-| 211 | PAN-3196 | S | high | ok |  |  | Root-owned container residue makes close-out die on EACCES after passing every DoD row; same family as PAN-3570. |
-| 212 | PAN-3186 | XS | high | ok |  |  | One configured non-git member (auricle/infra) blanks pipeline membership for the whole project the resolver claims it can answer. |
-| 213 | PAN-3185 | XS | high | ok |  |  | Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail. |
-| 214 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time with no production-reach check, so members read shipped while prod serves the old build. |
-| 215 | PAN-5335 | M | high | ok |  |  | Workflow redesign F follow-up: collapse handoff groups, unclipped cost, footer label, one current nav item, keep project. |
-| 216 | PAN-3130 | S | high | ok |  |  | Identifier-joined write paths have no containment assertion, so a crafted issue or agent id could redirect a canonical write. |
-| 217 | PAN-3047 | XS | high | ok |  |  | Strike-branch teardown uses --is-ancestor, which cannot see a squash merge, so all 96 strike/* branches survive as residue. |
-| 218 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
-| 219 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
-| 220 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
-| 221 | PAN-4561 | L | medium | ok |  |  | React 18.3 + ~700 hand memo hooks; upgrade to React 19, enable the compiler, ratchet out manual memo. #4560 profiling has landed. |
-| 222 | PAN-4242 | M | high | ok |  |  | pan handoff --cwd skips the folder-trust pre-trust pan start does; successor sits at the trust prompt for hours while shown live |
-| 223 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
-| 224 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
-| 225 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
-| 226 | PAN-5284 | XL | high | ok | ✓ |  | Epic: workflow redesign — one left column, Files/Changes/Search dock, code beside chat, rebuilt Home. Open children: C, G, D2, F+, H. |
-| 227 | PAN-5116 | S | high | ok |  |  | restart-all closes the pane but the launcher ignores SIGHUP, so the old ACP host and agent child keep running; stop runtime first. |
-| 228 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
-| 229 | PAN-4909 | S | high | ok |  |  | Mac set up with connect: Safari on localhost:3011 gets HTTP 401 from the loopback session mint, so the Mac's own dashboard won't load. |
-| 230 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
-| 231 | PAN-4747 | S | high | ok |  |  | Two pan reloads built into the same generation slot 12s apart; restart lock taken over early, first build died on TS6053. |
-| 232 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
-| 233 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
-| 234 | PAN-4348 | S | medium | ok |  |  | Verification emits warn-first evidence of changed files outside every item's files_scope, so scope creep is visible |
-| 235 | PAN-3218 | S | high | ok |  |  | No release-drift signal: an install-breaking fix sat merged and unpublished for ~9 hours with nothing surfacing it. |
-| 236 | PAN-3210 | XS | high | ok |  |  | Close-out teardown scopes by compose project while the guard scopes by working_dir, so an unprefixed dead init container blocks it. |
-| 237 | PAN-3167 | S | high | ok |  |  | krux and lexerra are permanently unreadable through the membership door: an App-not-installed 404 is typed as retryable forge_unavailable. |
-| 238 | PAN-3113 | M | high | ok |  |  | Blocking agent-pane choice prompts show nothing in the conversation view; surface them as inline decision cards with keystroke delivery. |
-| 239 | PAN-3108 | XS | high | ok |  |  | dashboard.log reached 867MB with no rotation — disk cost and un-greppable incident logs exactly when they're needed. |
-| 240 | PAN-3094 | XS | high | ok |  |  | pan done's merge fallback still force-pushes a fast-forwardable branch, so a rejected push leaves completion half-done. |
-| 241 | PAN-3012 | M | high | ok |  |  | Archiving preserves the pointer, not the data: harnesses delete session JSONL on their own schedule and the conversation is unrecoverable. |
-| 242 | PAN-3627 | XS | high | ok |  |  | backlog-auto-trigger throws on a legitimately empty manifest, so a plain npx @overdeck/core in a non-project dir prints a stack trace. |
-| 243 | PAN-3617 | S | high | needs-refinement |  |  | Three strike dispatches for PAN-3586 died with zero output while a sibling worked; may be stale — re-confirm before picking up. |
-| 244 | PAN-4346 | S | medium | ok |  |  | Byte ratchet on the always-loaded rules bundle (40 KB, no ceiling); seeded at current size, growth forbidden |
-| 245 | PAN-3276 | XS | high | ok |  |  | Needs-you rows for pane questions and permission prompts are click-dead, so the list that exists to route the operator routes nowhere. |
-| 246 | PAN-3235 | S | high | ok |  |  | Render and answer agent pane-choice menus on the decision card; PAN-3228 shipped the core and CLI, the dashboard UX remains. |
-| 247 | PAN-4203 | L | high | ok |  |  | Operator-requested pan replan + right-click Replan: API-archive stale branch, verify, reset, comment, auto-replan from main. |
-| 248 | PAN-3789 | L | medium | needs-refinement |  |  | MCP servers configured in standalone Codex never reach Overdeck conversations; no setup, auth or lifecycle story across harnesses |
-| 249 | PAN-3175 | M | high | ok |  |  | Merge-train ordering derives conflicts from file overlap alone, so semantically dependent members batch in any order and break the schema. |
-| 250 | PAN-3015 | L | high | ok |  |  | Claude Code is the only harness still driven by keystroke injection; a pull-based monitor inbox would retire the whole hardening stack. |
-| 251 | PAN-3518 | M | high | needs-refinement |  | PAN-3517 | Re-review resumes re-bill the whole cold history; make reviewResumeDecision TTL- and size-aware. Needs design sign-off. |
-| 252 | PAN-3445 | XS | high | ok |  |  | projects.yaml TCP lock ports overlap the OS ephemeral range, so an unrelated socket makes an uncontended config write fail. |
-| 253 | PAN-3332 | S | high | ok |  |  | A detached slash-command spawn died in 150ms while the UI kept saying 'running in the background'; the activity must own its outcome. |
-| 254 | PAN-4426 | M | medium | ok |  |  | Dashboard controls for Deft Directive detection and managed mode over the PAN-3943 library; blocker has closed |
-| 255 | PAN-4345 | XS | medium | ok |  |  | Terse gate-integrity rule (fix the work, never the gate) plus a Rule Authority note in rule authoring |
-| 256 | PAN-3013 | XS | high | ok |  |  | Role-spawn wrote 26 session-scoped hook paths into the durable ~/.claude/settings.json; they fail on every Linear tool call forever. |
-| 257 | PAN-3771 | M | high | ok |  |  | Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries. |
-| 258 | PAN-4530 | XS | medium | ok |  |  | Flywheel skill: define 'pipeline clear', go idle with conversation open, and never stop on a stuck pipeline |
-| 259 | PAN-3533 | L | high | ok |  |  | No per-project resource partitioning, so one project's docker stacks and installs starve another project's pipeline and the dashboard. |
-| 260 | PAN-3107 | S | high | ok |  |  | OOM spikes are unattributable after the fact; productize the machine-local memory-attribution census stopgap. |
-| 261 | PAN-4512 | M | medium | needs-refinement |  |  | Tier escalation config is shown but nothing fires it since the Cut; choose a trigger, persist tierOverrides, re-dispatch |
-| 262 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
-| 263 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
-| 264 | PAN-4510 | S | medium | ok |  |  | Show effort on issue-view agent rows, conversation rows and Agents-page conversation entries; split from closed PAN-4259 |
-| 265 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
-| 266 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
-| 267 | PAN-2186 | S | high | ok |  |  | Rescoped: after a merge the pending auto-merge row must clear and tracker labels must match the merged PR. Label-retry half is PAN-3557. |
-| 268 | PAN-4632 | S | medium | ok |  |  | Markdown chip 'Open in File Manager' xdg-opens the file in its MIME app and sticks as the left-click default; drop it, repair stored pref. |
-| 269 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
-| 270 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
-| 271 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
-| 272 | PAN-4926 | XS | medium | ok |  |  | pan down SIGTERMs the smee pidfile PID without verifying it is smee; a reused PID kills an unrelated process. XS guard + test. |
-| 273 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
-| 274 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
-| 275 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
-| 276 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
-| 277 | PAN-4811 | M | medium | ok |  |  | Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; PAN-4743 landed the Fly target door, so this is now unblocked. |
-| 278 | PAN-5079 | S | high | ok |  |  | pan task claim/cancel/done write any id, so a typo leaves a stray row in the committed continue file an agent can't remove. |
-| 279 | PAN-4756 | L | medium | ok |  |  | Move ~45 bespoke dialogs onto the shared Modal from PAN-4755 (now landed); surface/structure only, unblocked. |
-| 280 | PAN-4778 | S | medium | ok |  |  | Workspace-image CI never published: wrong Fly app, fly not on PATH, no FLY_API_TOKEN (operator). Fly VMs run a June image. |
-| 281 | PAN-4817 | S | medium | ok |  | PAN-4778 | Fly app's cached image predates pan serve --no-open, so every new Fly VM crashes and rolls back; blocks live Fly verification. |
-| 282 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
-| 283 | PAN-2210 | M | high | ok |  |  | Rewritten pan done has no slot handling: a slot agent takes the issue-level PR/review path. Must record slot completion only. |
-| 284 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
-| 285 | PAN-2646 | XS | high | ok |  |  | configurable global/project/issue policy UI with default OFF |
-| 286 | PAN-2755 | S | high | ok |  |  | per-issue review-model override never reached convoy sub-reviewers on the discovery-fork path |
-| 287 | PAN-2754 | S | high | ok |  |  | `always` is inert |
-| 288 | PAN-2809 | M | high | ok |  |  | Live-terminal Playwright UAT blocked in containerized workspaces (node-pty musl/glibc mismatch + Vite/Traefik WS Origin 403) |
-| 289 | PAN-2810 | M | high | ok |  |  | Workspace 'vitest --changed' gate diverges from CI: App.test.tsx fails locally on missing selectPendingInputSubjects mock |
-| 290 | PAN-2495 | S | high | ok |  |  | PAN-2487 ci-green merge skip bypassed CI-green gate |
-| 291 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
-| 292 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
-| 293 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
-| 294 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
-| 295 | PAN-4853 | M | low | ok |  |  | SageOx dashboard views (session tab, context trace, project panel); blocked by PAN-4852; session-to-issue mapping is a checkpoint |
-| 296 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
-| 297 | PAN-1578 | M | high | ok |  |  | GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
-| 298 | PAN-1538 | M | high | ok |  |  | Unblock Pi source forks |
-| 299 | PAN-687 | M | high | ok |  |  | Support OpenCode as alternative coding agent |
-| 300 | PAN-466 | M | high | ok |  |  | Add QwenCoder CLI as a supported runtime alongside Claude Code and Codex |
-| 301 | PAN-465 | M | high | ok |  |  | Add OpenRouter as a model provider |
-| 302 | PAN-463 | M | high | ok |  |  | Add Qwen 3.6+ model support |
-| 303 | PAN-1142 | M | high | needs-refinement |  |  | Per-role/conversation effort config; likely superseded by merged PAN-4249 resolver and its S-slices, confirm or close |
-| 304 | PAN-1424 | M | high | needs-refinement |  |  | Model pool dispatch + work.* subtype taxonomy (follow-up to PAN-1122) |
-| 305 | PAN-1196 | M | high | needs-refinement |  |  | Workhorse routing by bead difficulty + subject-matter (single-agent and swarm) |
-| 306 | PAN-1311 | M | high | needs-refinement |  |  | Swarm: fast-track tier |
-| 307 | PAN-1313 | L | high | ok |  |  | Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces |
-| 308 | PAN-4863 | S | medium | ok |  |  | Manual AC-10 check of Anywhere connect on a real systemd VPS; needs a release shipping `pan connect` and a human-provisioned VPS. |
-| 309 | PAN-1246 | M | high | ok |  |  | Perf: projection-cached VCS driver for diff/checkpoint reads (port of t3code #2586) |
-| 310 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
-| 311 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
-| 312 | PAN-1915 | M | high | ok |  |  | enhancement(security): API key at-rest hardening |
-| 313 | PAN-4886 | S | medium | ok |  |  | Live relay check on Fly unrun three times: device codes expire unapproved. Needs an operator present to approve one code. |
-| 314 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
-| 315 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
-| 316 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
-| 317 | PAN-4297 | L | medium | ok |  |  | Hosted encrypted vault on overdeck.ai in tester mode; account service built 2026-10-02, billing no longer a prerequisite |
-| 318 | PAN-2350 | L | high | needs-refinement | ✓ |  | Epic rebaselined 2026-09-28; account service and share-service slice 1 built 2026-10-02. Children carry the order. |
-| 319 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
-| 320 | PAN-2079 | M | high | needs-refinement |  |  | Inbox spine: boot reconciliation (producer #1) is gone; may still be worth pursuing for pending AUQ, cost alerts and other producers |
-| 321 | PAN-4204 | S | medium | ok |  | PAN-4203 | Sync-main conflict error dumps every file path; show the count, a Replan button, and Open workspace only for few conflicts. |
-| 322 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
-| 323 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
-| 324 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
-| 325 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
-| 326 | PAN-1504 | M | high | ok |  |  | pan hygiene |
-| 327 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
-| 328 | PAN-5058 | XL | high | ok |  |  | Parked, in planning: TLS passthrough relay at <name>.mcp.overdeck.ai so hosted bots reach /mcp without Tailscale Funnel. |
-| 329 | PAN-1479 | M | high | ok |  |  | RTK: Add telemetry to measure token savings from bash output compression |
-| 330 | PAN-2950 | L | high | ok |  |  | Refactor god files back under file-size ceilings after the UX overhaul |
-| 331 | PAN-2720 | M | high | ok |  |  | File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve |
-| 332 | PAN-2650 | S | high | ok |  |  | Shed-stack half is moot (slot merges verify on host); remaining: pan swarm recover path for a stuck ready-to-merge slot. |
-| 333 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
-| 334 | PAN-2334 | XS | high | ok |  |  | write a Definition of Ready (DoR) |
-| 335 | PAN-2193 | S | high | ok |  |  | Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree |
-| 336 | PAN-1984 | XS | high | ok |  |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
-| 337 | PAN-1913 | XS | high | ok |  |  | Project description: show on click, edit in dashboard, mirror into the project layer (and document what's in .pan and ~/.panopticon) |
-| 338 | PAN-1906 | M | high | ok |  |  | Enforce harness restrictions with subscription: gray out non-claude-code, validate everywhere |
-| 339 | PAN-1544 | M | high | ok |  |  | Type cleanup: strip 'ship' from the Role union and its ~10 downstream references |
-| 340 | PAN-955 | S | high | ok |  |  | Workspace devcontainer template versioning + re-render on demand |
-| 341 | PAN-807 | L | high | ok |  |  | Epic C: Workspace state sanity on spawn |
-| 342 | PAN-630 | M | high | ok |  |  | Multi-tenant workspace isolation with ACLs |
-| 343 | PAN-471 | M | high | ok |  |  | Cost reconciler: auto-trigger on agent lifecycle events with debounce |
-| 344 | PAN-438 | M | high | ok |  |  | Migrate remaining REST polling endpoints to Effect RPC |
-| 345 | PAN-578 | M | high | ok |  |  | Security: Comment mediation layer to prevent prompt injection via tracker comments |
-| 346 | PAN-2921 | S | medium | ok |  |  | Strike merge door can report fetch failure after merge and land the same head twice |
-| 347 | PAN-4195 | M | medium | ok |  |  | Every pan call costs ~0.5s/230MB from eager command imports; lazy-load command modules, target --version <100ms |
-| 348 | PAN-2839 | S | medium | ok |  |  | plan→work autoSpawn now 500s with a duplicated workspace prep |
-| 349 | PAN-2824 | S | medium | ok |  |  | pan review pending dies when one project's lens gather fails (non-degrading caller; PAN-2820 class) |
-| 350 | PAN-2792 | S | medium | ok |  |  | Orphan-process sweeps killed the dashboard and live conversations via lsof +D over Bun-hardlinked node_modules |
-| 351 | PAN-2761 | S | medium | ok |  |  | done.test.ts asserts a hardcoded URL without stubbing env, so it fails in any agent shell with OVERDECK_DASHBOARD_URL set and looks lik… |
-| 352 | PAN-2738 | S | medium | ok |  |  | strikes deadlock |
-| 353 | PAN-2717 | S | medium | ok |  |  | conversation permission waits missing from Awareness; strengthen alert pulse |
-| 354 | PAN-2697 | S | medium | ok |  |  | First-review codex parents enter discovery mode and the supervisor session no-ops every discovery-ready signal |
-| 355 | PAN-4236 | S | medium | ok |  |  | GPT-5.6 luna/sol rows in cost.ts disagree with catalog and OpenAI list prices; reconcile and add a cost.ts-vs-catalog parity test |
-| 356 | PAN-2691 | S | medium | ok |  |  | Auto-planned issues park silently when the post-finalize work spawn is gated (stack-unhealthy 422) |
-| 357 | PAN-4306 | M | medium | ok |  |  | Move phase/role/cleanup telemetry from activity.entry to activity.detailed so it stops evicting news; blocked by PAN-4300 |
-| 358 | PAN-3701 | L | high | ok |  |  | Four separate first-party LLM client stacks; consolidate onto effect/unstable/ai LanguageModel + ExecutionPlan. PRD written. |
-| 359 | PAN-3090 | M | high | ok |  |  | Simple issue page opens with a 55KB raw kickoff prompt and hides the pending question the operator actually has to answer. |
-| 360 | PAN-4552 | M | medium | ok |  |  | Fresh-host setup errors still say 'edit config'/'run X'; audit each to auto-fix or one click, and find other first-launch dialogs |
-| 361 | PAN-2670 | S | medium | ok |  |  | Gate the dashboard-server tsconfig in npm run typecheck |
-| 362 | PAN-2664 | S | medium | ok |  |  | auto-commit completes unresolved merge with conflict markers |
-| 363 | PAN-2663 | S | medium | ok |  |  | health probe can accept old dashboard after replacement EADDRINUSE |
-| 364 | PAN-2649 | S | medium | ok |  |  | Ctrl+K conversation search indexes Claude transcripts only |
-| 365 | PAN-2580 | S | medium | needs-refinement |  |  | pan tell to codex (GPT) conversations; PAN-5095 (closed) added app-server delivery, so verify whether this is fixed. |
-| 366 | PAN-2572 | M | medium | ok |  |  | Noisy EBADENGINE + deprecation warnings on npx/npm install make a healthy install look broken |
-| 367 | PAN-2563 | S | medium | ok |  |  | npm-flavor desktop (npx @overdeck/desktop) lacks node_modules for the server's externalized deps |
-| 368 | PAN-2554 | S | medium | ok |  |  | clicking a project doesn't update the browser URL |
-| 369 | PAN-2550 | XS | medium | ok |  |  | npm test exits 0 despite root-suite failures |
-| 370 | PAN-2547 | S | medium | ok |  |  | pan restart --health-timeout parses seconds as milliseconds |
-| 371 | PAN-2546 | S | medium | needs-refinement |  |  | pan tell is codex-conversation-unaware; PAN-5095 (closed) added app-server delivery, so verify whether this is fixed. |
-| 372 | PAN-4303 | S | medium | needs-refinement |  |  | Steer busy Codex app-server turns via turn/steer; verify first whether turn/start already steers. Needs PAN-4292's steerKind. |
-| 373 | PAN-3003 | XS | medium | ok |  |  | Generated launcher.sh files omit the OVERDECK_AGENT_ID export the PTY supervisor requires, so manual re-launch dies instantly. |
-| 374 | PAN-2501 | S | medium | ok |  |  | deleteResourceVenvEffect's HttpRouter.schemaParams call fails typecheck under the root tsconfig (masked by src/dashboard/** exclusion) |
-| 375 | PAN-2492 | S | medium | needs-refinement |  |  | pane-detected waits (rate-limit/session-resume) surface as 'needs you' but cannot be answered from the dashboard |
-| 376 | PAN-2491 | M | medium | ok |  |  | Migrate @xenova/transformers to @huggingface/transformers to eliminate silent npx install failures from sharp 0.32 postinstall |
-| 377 | PAN-2489 | S | medium | ok |  |  | strike agents are invisible in the project issue tree |
-| 378 | PAN-2465 | S | medium | ok |  |  | pan done's PR lookup fails at MYN polyrepo root |
-| 379 | PAN-2454 | S | medium | ok |  |  | ratchet audit fails per-commit on push ranges whose NET baseline delta is zero |
-| 380 | PAN-2428 | XS | medium | ok |  |  | MYN workspace Traefik routing broken post-rebrand |
-| 381 | PAN-2423 | XS | medium | ok |  |  | pan workspace rebuild hardcodes 'overdeck-' compose project prefix |
-| 382 | PAN-2416 | S | medium | ok |  |  | codex agents can wedge on the Codex CLI first-run/consent screen |
-| 383 | PAN-4250 | XS | medium | ok |  |  | Stale dated CONVERSATION_TITLE_MODEL literal throws UnknownModelError when titleModel config is unset; one-line fix plus audit |
-| 384 | PAN-2395 | S | medium | ok |  |  | one invalid tiered_execution enum poisons every config read |
-| 385 | PAN-2381 | S | medium | ok |  |  | three event types missing from DomainEvent schema union poison the RPC stream |
-| 386 | PAN-2287 | S | medium | ok |  |  | every supervisor.log line written twice |
-| 387 | PAN-3661 | XS | medium | ok |  |  | Secure review-mode dispatch dropped the HTTP-200 semantic-rejection surface; two frontend tests fail locally while CI stays green. |
-| 388 | PAN-3288 | XS | medium | ok |  |  | Dev-checkout preflight: after a git pull that adds a dep, the CLI dies with ERR_MODULE_NOT_FOUND instead of saying 'run bun install'. |
-| 389 | PAN-3164 | XS | medium | ok |  |  | probeUatStack reports readiness from container count, so the UI offers 'Open UAT frontend' while the API is still resolving Maven deps. |
-| 390 | PAN-3121 | S | medium | ok |  |  | The failed-send outbox never reconciles against the transcript, so a delivered message keeps a Retry twin that would double-send. |
-| 391 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
-| 392 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
-| 393 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
-| 394 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
+| 23 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
+| 24 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
+| 25 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
+| 26 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
+| 27 | PAN-4708 | M | high | needs-refinement |  |  | docs.json nav is a hot file: concurrent docs PRs conflict, each costing a merge-main and re-review. Pick a fix option first. |
+| 28 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
+| 29 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
+| 30 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
+| 31 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
+| 32 | PAN-3524 | M | critical | needs-refinement |  |  | A server-owned --changed verification loop relaunches through deacon freeze, review abort, pause and operator stop; peaked at 78 workers. |
+| 33 | PAN-4166 | S | critical | ok |  |  | write-sequence replays every superseded sequence commit and dies on an old one, so the ranked order never reaches origin/main |
+| 34 | PAN-3250 | S | critical | ok |  |  | Workspace spawn branches from local HEAD instead of origin/main, so every new feature branch inherits unpushed local-main commits. |
+| 35 | PAN-3946 | S | critical | ok |  |  | Review request treats an APPROVED review on an older commit as "already passed"; newer commits ride an old approval |
+| 36 | PAN-2954 | XS | critical | ok |  |  | postMergeLifecycle refuses GitLab projects |
+| 37 | PAN-3935 | S | critical | ok |  |  | PRD draft promotion writes the draft into the primary main checkout and deletes the feature-branch copy; PRDs are stranded untracked |
+| 38 | PAN-3657 | S | critical | ok |  |  | Merge-train queues endpoint runs the monorepo queue builder for polyrepo projects, so MYN/Auricle trains are permanently empty. |
+| 39 | PAN-5097 | S | critical | ok |  |  | Polyrepo GitLab review verdicts never record: forge probe runs at the non-git root, falls back to GitHub; MYN merges stall till hand-merged |
+| 40 | PAN-4240 | S | critical | ok |  |  | Reaper rm -rf's workspaces of closed issues: unmerged polyrepo branches, and (Nov 4) untracked evidence after a merged MR. |
+| 41 | PAN-3565 | M | critical | ok |  |  | Failed review spawn wedges 'starting', and an all-lanes infra failure is synthesized as a real CHANGES REQUESTED verdict. |
+| 42 | PAN-3554 | M | critical | needs-refinement |  |  | Red main has no mechanical owner: it hid for ~5h because the merge gate renders red main as an empty queue, not an alarm. |
+| 43 | PAN-3532 | S | critical | ok |  |  | CI runs only a hand-picked slice of the frontend suite, so main stayed red on frontend for hours while every run reported green. |
+| 44 | PAN-4241 | XS | high | ok |  |  | computeWorkspaceRepoRoots joins an absolute repoPath, so polyrepo repos named unlike their path (fe/frontend) are skipped by pan task done. |
+| 45 | PAN-5167 | S | critical | ok |  |  | Post-merge lifecycle refuses forever on one transient GitHub fetch failure; agent stays running and close-out is blocked. |
+| 46 | PAN-4396 | XS | critical | ok |  |  | test-skip gate fails closed on any branch diff over 1 MiB (execFile default maxBuffer); one-line fix unblocks big PRs |
+| 47 | PAN-3085 | XS | critical | needs-refinement |  |  | Review feedback is written to .overdeck/feedback but agents and the deacon merge gate are pointed at a nonexistent .pan/feedback. |
+| 48 | PAN-3653 | M | critical | ok |  |  | A strike blocked on red main has no owner that wakes it when main goes green; the session stays alive so recover refuses it. |
+| 49 | PAN-3630 | M | critical | ok |  |  | pan tell reported three deliveries to a live agent, moved all three to read/, and the agent received none — the delivery door lies. |
+| 50 | PAN-3805 | S | critical | needs-refinement |  |  | Codex idle poke spawns codex exec instead of the app-server door; failed sends still tick the counter and pause healthy agents |
+| 51 | PAN-5139 | M | critical | ok |  |  | pan reload refuses both generations when the pan shim points at the non-live generation; deploys stall. |
+| 52 | PAN-3560 | M | critical | ok |  |  | PTY supervisor overloads under concurrent review convoys; fleet-wide 502 'input echo confirmation failed' kills resumes and feedback. |
+| 53 | PAN-3520 | S | critical | ok |  |  | Test gate records 'failed' for load-induced timeouts; retry timeout-only failures in isolation before writing a verdict. |
+| 54 | PAN-4439 | S | high | ok |  |  | CI relay has no backstop for webhooks missed during pan reload; red test jobs never reach the agent, PRs stall |
+| 55 | PAN-4392 | XS | high | ok |  |  | pan task done accepts an Item: trailer from another issue's merged commit (history-wide grep); gate passes with no evidence |
+| 56 | PAN-3500 | S | critical | ok |  |  | A review sub-role edited seven tracked files after writing its report and the changes were auto-committed into the feature history. |
+| 57 | PAN-3313 | S | critical | ok |  |  | A transient upstream stream error benches CLIProxy's only auth: ~70% of GPT-routed inference 503s with a message that blames credentials. |
+| 58 | PAN-3282 | M | critical | ok |  |  | Review agents die before writing a verdict across 5 issues and 2 projects, leaving a verdict-shaped status with no artifact behind it. |
+| 59 | PAN-4391 | S | high | ok |  |  | pan worker run fails in polyrepo workspaces because the root is not a git repo; delegation is broken for MYN |
+| 60 | PAN-4390 | S | high | ok |  |  | Polyrepo workspace create runs npm install in the project's parent dir, reports failure and hides the workspace from list |
+| 61 | PAN-2695 | S | high | ok |  |  | Concurrent review dispatches race fresh-spawn vs resume |
+| 62 | PAN-2742 | S | high | ok |  |  | synthesis fires 42s after spawn and reports reviewers with reports on disk as 'infrastructure failure' |
+| 63 | PAN-2706 | M | high | needs-refinement |  |  | Ghost test sessions absorb every test dispatch |
+| 64 | PAN-5228 | S | high | ok |  |  | Advisory CodeRabbit journal entries land last and hide stalled reviews from recoverStalledReviews and other last-entry readers. |
+| 65 | PAN-4344 | S | high | ok |  |  | Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck |
+| 66 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
+| 67 | PAN-4566 | S | high | ok |  |  | A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed. |
+| 68 | PAN-5193 | XS | high | ok |  |  | PRD-first gate reads a short main stub before the full workspace draft and refuses finalize for epic children. |
+| 69 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
+| 70 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
+| 71 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
+| 72 | PAN-5133 | M | high | ok |  |  | pan pause cannot hold a planned issue whose deferred work-agent start is retried; no operator door to stop it. |
+| 73 | PAN-4792 | S | high | ok |  |  | Paste guard only knows numbered menus; a failed paste presses Enter into unnumbered selects, silently setting defaultMode=auto. |
+| 74 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
+| 75 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
+| 76 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
+| 77 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent pane, so a single hungry agent inflates the unit and oomd kills the whole fleet — twice now. |
+| 78 | PAN-3278 | S | critical | needs-refinement |  |  | A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts. |
+| 79 | PAN-5330 | S | high | ok |  |  | Workspace devcontainers share the 'server' DNS alias on the overdeck network, so a frontend can proxy to another workspace. |
+| 80 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
+| 81 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
+| 82 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
+| 83 | PAN-3106 | S | critical | ok |  |  | auto_merge_default: hold is consulted on one merge path only, so held issues merge individually and defeat the UAT train. |
+| 84 | PAN-3100 | S | critical | ok |  |  | The test role evaluates the dirty working tree, so a live work agent's uncommitted edits are recorded as the issue's test failure. |
+| 85 | PAN-4213 | M | high | ok |  |  | Merge-train follow-ups from #4066 (merged): stamp-vs-pin mismatch, reset --keep can strand agent commits, fetch retry, tests |
+| 86 | PAN-5263 | M | high | ok |  |  | Pipeline membership sees zero open overdeck issues: the App token lacks issues permission and the gh fallback never runs. |
+| 87 | PAN-3096 | S | critical | ok |  |  | pan done blocks on generated .devcontainer/ and dev, and agents resolve it by deleting workspace infrastructure or inventing gitignores. |
+| 88 | PAN-3084 | S | critical | needs-refinement |  |  | A review session spawned but never briefed sits at zero context forever, and restart 'preserves' the zombie that blocks its replacement. |
+| 89 | PAN-3043 | S | critical | needs-refinement |  |  | Provider health is probed only at spawn, so a mid-run 403 quota refusal leaves an agent 'running' for days holding a slot. |
+| 90 | PAN-1824 | S | high | ok |  |  | Fix flaky main CI: fake timers + @slow exclusion for real-timer test family |
+| 91 | PAN-2932 | S | high | ok |  | PAN-2337 | intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap leaves :3011 unbound (Bad Gateway) after pan reload |
+| 92 | PAN-2935 | S | critical | ok |  |  | Workspace devcontainer duplicate backend hijacks Traefik router |
+| 93 | PAN-2337 | XS | critical | ok |  |  | Reload/build atomicity: an in-place `npm run build` under a live dashboard breaks new PTY-supervisor spawns until restart |
+| 94 | PAN-2422 | XS | high | ok |  | PAN-2337 | rebuilding dist under a live server breaks lazy chunk imports |
+| 95 | PAN-2699 | XS | high | ok |  |  | npm run build regenerates the committed record-cost-event.js bundle |
+| 96 | PAN-2957 | XS | high | ok |  | PAN-2337 | npm run build intermittently produces stale frontend bundles |
+| 97 | PAN-2850 | M | high | ok |  |  | npm test fails in clean checkout after pretest removes dashboard bundle |
+| 98 | PAN-2758 | S | critical | needs-refinement |  |  | Provider capacity error silently zombies a spawned agent: willRetry=false, turn reported completed, state stays status=running forever |
+| 99 | PAN-2817 | M | high | needs-refinement |  |  | Idle-at-prompt work/review agents are never redriven: gpt-5.6-sol sessions stop at the composer mid-task and sit for hours |
+| 100 | PAN-2813 | M | high | ok |  |  | Scheduler yield never self-clears: yielded work agents stay paused after the blocking review completes/merges |
+| 101 | PAN-2668 | M | high | ok |  |  | Verification/review feedback silently queued to stopped-by-user agents |
+| 102 | PAN-2569 | XS | critical | ok |  |  | planning finalizes (issue→planned) but work agent does not auto-spawn |
+| 103 | PAN-4269 | M | high | ok |  |  | macOS conversations hang on 'Working…'/'waiting for transcript'; governor ruled out, root cause unknown (delivery or transcript find). |
+| 104 | PAN-3811 | M | high | ok |  |  | The PAN-3809 emergency strike prunes BuildKit unconditionally; inventory, bounded reclaim door and retention floor are still missing |
+| 105 | PAN-2179 | S | high | needs-refinement |  |  | relaunch can leave a zombie agent |
+| 106 | PAN-2169 | S | high | needs-refinement |  |  | kimi agent silently frozen at 100% ctx (no thrown overflow error) not caught by CONTEXT_OVERFLOW_PATTERNS |
+| 107 | PAN-2734 | S | high | ok |  |  | merge queue head-of-line zombie |
+| 108 | PAN-3697 | XS | high | ok |  |  | Deployed dashboard PATH omits Bun, so verification workers hit 'bun: not found' before the required install gate. |
+| 109 | PAN-3633 | S | high | ok |  |  | Strike workspaces spawn without @types, so the contract's own typecheck gate fails and agents abort reporting a false red main. |
+| 110 | PAN-4420 | S | high | ok |  |  | npx @overdeck/core on native Windows serves 404 for every page: static root is built from a URL path |
+| 111 | PAN-3099 | XS | critical | ok |  |  | --health-timeout 120 is enforced as 120ms and a false-failed check exits after killing the old server — nothing left listening. |
+| 112 | PAN-4418 | S | high | ok |  |  | vault join fails on native Windows: core.autocrlf=true rewrites the VAULT-FORMAT marker; blocks Windows continue flow |
+| 113 | PAN-3040 | S | critical | ok |  |  | pan strike is monorepo-shaped end to end and fails immediately on polyrepo projects; same defect as PAN-3708. |
+| 114 | PAN-3023 | S | critical | ok |  |  | Post-planning auto-spawn logs 'attempt 1/3' and never retries after a transient Docker EOF, stranding the issue with no re-drive owner. |
+| 115 | PAN-1618 | S | high | ok |  |  | Substrate: work-spawn docker-health gate has no autonomous recovery |
+| 116 | PAN-3916 | M | high | ok |  |  | Session pointers go stale after rollover + crash recovery; issue view and pan tell confirmation track a dead transcript |
+| 117 | PAN-3900 | S | high | ok |  |  | Docker bridge pool exhausted by orphaned workspace networks; pan start fails; bridge-pool patrol only warns |
+| 118 | PAN-3793 | S | high | ok |  |  | resolveIssuePullRequestRef probes only feature/ and strike/ names, so close-out cannot find a merged PR on a descriptive branch |
+| 119 | PAN-2639 | S | high | ok |  | PAN-2331 | codex-resume replays a rotated-out (revoked) refresh token → codex review convoys wedge with 401 |
+| 120 | PAN-2331 | S | high | ok |  |  | codex rate-limit 'Switch to gpt-5.4-mini?' modal stalls autonomous agents (no auto-dismiss) |
+| 121 | PAN-2333 | M | high | ok |  |  | feat: handle codex weekly-quota exhaustion gracefully |
+| 122 | PAN-4184 | S | high | needs-refinement |  |  | --no-deacon on the host port is refused as a peer after the old server stops, so the escape hatch may leave no dashboard; fix unpicked |
+| 123 | PAN-2511 | XS | high | ok |  |  | Work agents burn 20+ min on false test failures |
+| 124 | PAN-2763 | S | high | ok |  |  | Workspace node_modules is symlinked to the primary repo, breaking test resolution |
+| 125 | PAN-2170 | XS | high | ok |  |  | Docker init container lacks Python |
+| 126 | PAN-1198 | S | high | ok |  |  | Workspace init container's bun install doesn't populate container-node-modules named volume |
+| 127 | PAN-4453 | XS | high | ok |  |  | runtimes/codex.ts uses homedir() not OVERDECK_HOME; isolated homes write thread ids into the real ~/.overdeck |
+| 128 | PAN-2106 | S | high | ok |  |  | pan strike workspace setup leaves broken partial workspace + false 'spawned' success (git-lock race) |
+| 129 | PAN-2880 | M | high | ok |  | PAN-2259 | Linear tracker listIssues is a 3N+1 request storm |
+| 130 | PAN-2966 | S | high | ok |  |  | Polyrepo wrapper .gitignore misses .pan/ .devcontainer/ dev |
+| 131 | PAN-2945 | S | high | ok |  |  | pan done rejects Overdeck-generated runtime in polyrepo wrapper repos (.devcontainer/, dev, .pan/review) |
+| 132 | PAN-2680 | M | high | ok |  |  | pan close: Docker teardown silently skips a running stack in multi-repo projects (MYN), aborting close-out |
+| 133 | PAN-4419 | S | high | ok |  | PAN-4418 | pan vault resume cannot spawn claude on native Windows (ENOENT, needs shell/.cmd resolution); --no-launch works |
+| 134 | PAN-3734 | S | high | ok |  |  | Completed swarm slot reuse can start a new item from a stale polyrepo branch — silent wrong-parent work. |
+| 135 | PAN-3621 | M | high | ok |  |  | pan start intermittently dies resolving a chunk graph spliced across two builds — importer from primary dist, path in the live generation. |
+| 136 | PAN-3555 | S | high | ok |  |  | pan start without --fresh silently abandoned an intact 7.5MB warm session, violating the warm-by-default contract. |
+| 137 | PAN-3498 | S | high | ok |  |  | write-sequence pins in-pipeline ranks without renumbering, so the persisted sequence carries duplicate ranks and gaps. |
+| 138 | PAN-3496 | XS | high | ok |  |  | A review convoy member blocked on an operator AskUserQuestion about review depth; review agents must decide and record, not ask. |
+| 139 | PAN-3081 | S | high | ok |  |  | The agent git guard is PATH-based and an agent stripped it unprompted to get past a false block; a control the agent can remove isn't one. |
+| 140 | PAN-2627 | S | high | ok |  |  | Linear poller is blind after cycle rollover |
+| 141 | PAN-2324 | XS | high | ok |  |  | label transition fails atomically on missing 'in-planning' label |
+| 142 | PAN-2165 | XS | high | ok |  |  | pan close: close-issue phase reports success but leaves issue OPEN / wrong labels (remove-label aborts on absent label; no-vBRIEF trans… |
+| 143 | PAN-2905 | S | high | ok |  |  | Dashboard steady-state CPU ~50% keeps API responses at 0.5-1.5s |
+| 144 | PAN-2259 | S | critical | ok |  |  | something burns the full 5k/hr GitHub GraphQL quota |
+| 145 | PAN-2379 | S | high | ok |  |  | dependency install is warn-only + 60s timeout → false verify failures against empty node_modules (blocks swarm convergence) |
+| 146 | PAN-2421 | XS | high | ok |  |  | dashboard server route tests flake under full-suite verification load |
+| 147 | PAN-2430 | S | high | ok |  |  | frontend typecheck fails with dozens of pre-existing unused-local errors |
+| 148 | PAN-2593 | S | high | ok |  |  | server children inherit bare system PATH |
+| 149 | PAN-4302 | M | high | ok |  |  | ~19 files exec gh directly, bypassing runGh: spend is unattributed and keeps hitting GitHub during quota pause. Follow-up to PAN-4291 |
+| 150 | PAN-2080 | M | high | needs-refinement |  |  | External transports (email/Slack/push/TTS) still plausible; its stated dependency on the PAN-2079 Inbox spine is undercut by boot… |
+| 151 | PAN-5048 | M | high | ok |  |  | Needs-you drops an unanswered AskUserQuestion seconds after its phone push; the phone shows 'already answered' with no card. |
+| 152 | PAN-1436 | S | high | ok |  |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
+| 153 | PAN-3556 | S | high | ok |  |  | No per-agent spawn mutex: two flows allocated session identities 3s apart and the second pin orphaned the first transcript. |
+| 154 | PAN-3553 | S | high | ok |  |  | tmux list-panes -a exits 1 on a zero-session server, so the census reads unavailable post-reboot and conversations hang on 'Starting…'. |
+| 155 | PAN-3535 | S | high | ok |  |  | The drain/resume hold is re-derived from the caller's env each boot, so any restart from a clean shell silently drops it. |
+| 156 | PAN-3429 | M | high | ok |  |  | Memory governor defers admissions but sheds nothing under HARD pressure; concurrent heavy gate runs aren't in the shed ladder. |
+| 157 | PAN-3397 | S | high | ok |  |  | Fresh convoy lanes freeze at 0 output before kickoff; PAN-3375's detector only covers warm resumes, so recovery is manual. |
+| 158 | PAN-3325 | S | high | ok |  |  | A fresh workspace ships an empty-but-present node_modules, so tooling silently resolves the parent repo's deps and gates go false-green. |
+| 159 | PAN-3317 | S | high | ok |  |  | Strike agents are told to rebase, the launcher guard blocks it, and pan sync-main can't resolve a -strike workspace. Overlaps PAN-3306. |
+| 160 | PAN-3284 | S | high | ok |  |  | A workspace-confined agent wrote a doc edit into the primary main worktree — the PAN-2204 write-to-main hazard through a new door. |
+| 161 | PAN-3270 | S | high | ok |  |  | New workspaces arrive with empty node_modules and bun off the agent shell PATH, so the documented bun install remedy fails. |
+| 162 | PAN-4487 | XS | high | ok |  |  | cleanAgentState whitelist drops foreman, modelSpawnKey, workspaceId on every state.json write; add fields + round-trip test |
+| 163 | PAN-3257 | S | high | ok |  |  | Crash-resume leaves a stale PTY socket and drops supervisorEnabled from state.json, so every supervisor delivery fails afterwards. |
+| 164 | PAN-3129 | M | high | ok |  |  | No symlink/TOCTOU containment on canonical writes under agent-controlled paths; a planted symlink redirects a server-side write. |
+| 165 | PAN-3120 | S | high | ok |  |  | A scheduler-yielded work agent makes operator MERGE hard-error on polyrepo and silently dead-end on single-repo. |
+| 166 | PAN-4349 | S | high | ok |  |  | Agent-side GitHub reads prefer REST over GraphQL gh --json until PAN-4302 meters callers; protects the hourly quota |
+| 167 | PAN-3062 | M | high | ok |  |  | The shared primary main worktree stacks several sessions' commits, so whoever pushes next ships everyone else's unverified work. |
+| 168 | PAN-3048 | XS | high | needs-refinement |  |  | Pipeline auto-commit lands Overdeck's own .pan/drafts PRD into product feature branches; the exclusion list is duplicated and has drifted. |
+| 169 | PAN-3032 | S | high | ok |  |  | Rebuild composes under overdeck-feature- while Traefik labels name myn-feature- devnet, and traefik attaches are runtime-only. |
+| 170 | PAN-3833 | S | high | ok |  |  | Feed renders assistant text emitted after tool calls as collapsed thinking rows; operator believes the agent never answered |
+| 171 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
+| 172 | PAN-4629 | M | high | ok |  |  | Fresh npx machine cannot pan start: no gh auth token fallback for the GitHub tracker, and registration derives the wrong issue prefix. |
+| 173 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
+| 174 | PAN-4577 | M | high | ok |  |  | Operator's facts didn't follow them to a new Mac: no importer for Claude auto-memory. PAN-3957 merged, so W9-W11 are unblocked. |
+| 175 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
+| 176 | PAN-5250 | M | high | ok |  |  | Idle workspace frontend and dev containers never stop while an agent lives; ~9 GB held by unviewed Vite containers. |
+| 177 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
+| 178 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
+| 179 | PAN-4847 | S | high | ok |  |  | Remote reap silently skips review request when a background writer dirties a tracked file; pipeline stalls at PR-open. |
+| 180 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
+| 181 | PAN-4844 | S | medium | ok |  |  | Claude Code parser prices glm-*/qwen3* as Sonnet 4, ohmypi prices DashScope at $0; route both to custom rows. |
+| 182 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
+| 183 | PAN-2059 | XL | high | ok | ✓ |  | Backlog pickup gate |
+| 184 | PAN-2376 | XL | high | stale | ✓ |  | Epic: CI/CD reliability — all 21 named children are closed; needs an operator disposition (close or restate) |
+| 185 | PAN-3775 | S | high | ok |  |  | makeDbLive opens overdeck.db unmigrated; zero-table db poisons a vitest worker home and breaks later read-only audits. |
+| 186 | PAN-3652 | XS | high | ok |  |  | No workflow_dispatch on ci.yml / state-plane-branches.yml, so an unverified main tip can never be verified and DoD row 6 blocks close-out. |
+| 187 | PAN-3579 | M | high | ok |  |  | ~20 frontend mutations hand-write JSON headers and omit the CSRF token, so each 403s the moment its route becomes guarded. |
+| 188 | PAN-3541 | S | high | ok |  |  | Review restart loops on the session-resume menu because eligibility ignores how the prior session ended; partial mechanical break landed. |
+| 189 | PAN-3463 | S | high | ok |  |  | A legitimate empty-diff slot outcome can never pass item verify, so the slot wedges and blocks dispatch of remaining items forever. |
+| 190 | PAN-3460 | S | high | ok |  |  | Per-item verify_commands that run the whole root suite make slot merge gates load-fragile and hold a patrol in flight for ~17 minutes. |
+| 191 | PAN-3454 | M | high | ok |  |  | Cost hook rescans fork-copied parent history from byte 0 under the reviewer's id — fabricated cache-miss warnings and double-billed spend. |
+| 192 | PAN-3432 | S | high | ok |  |  | Preemptive yield fans out: seven work agents paused to make room for one review convoy, then flood back oldest-first. |
+| 193 | PAN-3306 | S | high | ok |  |  | Three layers disagree on how a strike rebases: the prompt instructs it, the launcher guard blocks it, sync-main resolves the wrong worktree. |
+| 194 | PAN-3297 | S | high | ok |  |  | After a dashboard restart, delivery calls a healthy agent a zombie while resume calls it healthy; both classifiers can't be right. |
+| 195 | PAN-3274 | S | high | needs-refinement |  |  | A test-role agent spawned and never ran a turn, holding an approved CI-green issue out of the merge gate behind a stale failed verdict. |
+| 196 | PAN-3267 | S | high | ok |  |  | GitLab merged-head oracle spawns one glab subprocess per repo × head, so pipeline membership refresh fails on every cycle. |
+| 197 | PAN-3261 | S | high | ok |  |  | The tmux delivery fallback answered a live session-resume menu because its own paste hid the menu from the detector — silent /compact. |
+| 198 | PAN-3256 | S | high | ok |  |  | glab mr list runs with a polyrepo wrapper root as cwd, which is not a git repo, so MYN membership fails forge_unavailable every cycle. |
+| 199 | PAN-4342 | M | medium | ok |  |  | Re-review rounds resume every lane on its own round-1 findings; give each round one fresh critic lane (Deft method) |
+| 200 | PAN-3174 | S | high | ok |  |  | Polyrepo UAT stacks 504: Traefik labels carry the old myn- prefix, Traefik isn't on the overdeck-* devnet, and the fe port is wrong. |
+| 201 | PAN-3050 | XS | high | ok |  |  | Idle-stack reaper's regex only matches overdeck-feature-*-server|frontend, so MYN stacks run for hours after their agents are gone. |
+| 202 | PAN-4365 | S | medium | ok |  |  | Stale defaults: workhorses.expensive is Opus 4.8 and the flywheel role is a literal that ignores the slot; evals now unblocked |
+| 203 | PAN-2980 | XS | high | ok |  |  | The pre-push file-size guard reads the shared working tree, so another session's uncommitted edits block an unrelated, guard-clean push. |
+| 204 | PAN-5295 | L | high | ok |  |  | Workflow redesign D2: turn card, file chips, composer controls, subagents rail and tab strip per mockup screen 1. |
+| 205 | PAN-3769 | S | high | needs-refinement |  |  | Red main 707089c5→e4b280b3 blocked deploys ~14h: missing no-loss lock entry + stale OpenRouter expectation. Verify still reproducing. |
+| 206 | PAN-3760 | S | high | ok |  |  | permissionMode 'auto' undocumented as non-bypass, launcher can emit invalid --permission-mode, invalid values drop silently. |
+| 207 | PAN-3629 | M | high | ok |  |  | No sanctioned door to re-scope a live agent; the operator must violate pan tell doctrine or let the rejected design land. |
+| 208 | PAN-3517 | M | high | ok |  |  | Convoy forks still miss the parent prompt cache in production — launch-injection byte drift plus resume dropping the cache-scope header. |
+| 209 | PAN-3508 | S | high | ok |  |  | pan reload deletes the generation the global pan link points at, so the CLI vanishes mid-deploy for anyone invoking from elsewhere. |
+| 210 | PAN-3303 | S | high | ok |  |  | An empty registered-projects 200 is treated as authoritative, latching Command Deck at 'Unknown project' until a manual page reload. |
+| 211 | PAN-4364 | S | medium | ok |  |  | GPT-6 catalog: gpt-6-sol misclassed frontier and OpenAI tierModels still remap to GPT-5.6; prerequisites have closed |
+| 212 | PAN-3196 | S | high | ok |  |  | Root-owned container residue makes close-out die on EACCES after passing every DoD row; same family as PAN-3570. |
+| 213 | PAN-3186 | XS | high | ok |  |  | One configured non-git member (auricle/infra) blanks pipeline membership for the whole project the resolver claims it can answer. |
+| 214 | PAN-3185 | XS | high | ok |  |  | Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail. |
+| 215 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time with no production-reach check, so members read shipped while prod serves the old build. |
+| 216 | PAN-5335 | M | high | ok |  |  | Workflow redesign F follow-up: collapse handoff groups, unclipped cost, footer label, one current nav item, keep project. |
+| 217 | PAN-3130 | S | high | ok |  |  | Identifier-joined write paths have no containment assertion, so a crafted issue or agent id could redirect a canonical write. |
+| 218 | PAN-3047 | XS | high | ok |  |  | Strike-branch teardown uses --is-ancestor, which cannot see a squash merge, so all 96 strike/* branches survive as residue. |
+| 219 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
+| 220 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
+| 221 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
+| 222 | PAN-4561 | L | medium | ok |  |  | React 18.3 + ~700 hand memo hooks; upgrade to React 19, enable the compiler, ratchet out manual memo. #4560 profiling has landed. |
+| 223 | PAN-4242 | M | high | ok |  |  | pan handoff --cwd skips the folder-trust pre-trust pan start does; successor sits at the trust prompt for hours while shown live |
+| 224 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
+| 225 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
+| 226 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
+| 227 | PAN-5284 | XL | high | ok | ✓ |  | Epic: workflow redesign — one left column, Files/Changes/Search dock, code beside chat, rebuilt Home. Open children: C, G, D2, F+, H. |
+| 228 | PAN-5116 | S | high | ok |  |  | restart-all closes the pane but the launcher ignores SIGHUP, so the old ACP host and agent child keep running; stop runtime first. |
+| 229 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
+| 230 | PAN-4909 | S | high | ok |  |  | Mac set up with connect: Safari on localhost:3011 gets HTTP 401 from the loopback session mint, so the Mac's own dashboard won't load. |
+| 231 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
+| 232 | PAN-4747 | S | high | ok |  |  | Two pan reloads built into the same generation slot 12s apart; restart lock taken over early, first build died on TS6053. |
+| 233 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
+| 234 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
+| 235 | PAN-4348 | S | medium | ok |  |  | Verification emits warn-first evidence of changed files outside every item's files_scope, so scope creep is visible |
+| 236 | PAN-3218 | S | high | ok |  |  | No release-drift signal: an install-breaking fix sat merged and unpublished for ~9 hours with nothing surfacing it. |
+| 237 | PAN-3210 | XS | high | ok |  |  | Close-out teardown scopes by compose project while the guard scopes by working_dir, so an unprefixed dead init container blocks it. |
+| 238 | PAN-3167 | S | high | ok |  |  | krux and lexerra are permanently unreadable through the membership door: an App-not-installed 404 is typed as retryable forge_unavailable. |
+| 239 | PAN-3113 | M | high | ok |  |  | Blocking agent-pane choice prompts show nothing in the conversation view; surface them as inline decision cards with keystroke delivery. |
+| 240 | PAN-3108 | XS | high | ok |  |  | dashboard.log reached 867MB with no rotation — disk cost and un-greppable incident logs exactly when they're needed. |
+| 241 | PAN-3094 | XS | high | ok |  |  | pan done's merge fallback still force-pushes a fast-forwardable branch, so a rejected push leaves completion half-done. |
+| 242 | PAN-3012 | M | high | ok |  |  | Archiving preserves the pointer, not the data: harnesses delete session JSONL on their own schedule and the conversation is unrecoverable. |
+| 243 | PAN-3627 | XS | high | ok |  |  | backlog-auto-trigger throws on a legitimately empty manifest, so a plain npx @overdeck/core in a non-project dir prints a stack trace. |
+| 244 | PAN-3617 | S | high | needs-refinement |  |  | Three strike dispatches for PAN-3586 died with zero output while a sibling worked; may be stale — re-confirm before picking up. |
+| 245 | PAN-4346 | S | medium | ok |  |  | Byte ratchet on the always-loaded rules bundle (40 KB, no ceiling); seeded at current size, growth forbidden |
+| 246 | PAN-3276 | XS | high | ok |  |  | Needs-you rows for pane questions and permission prompts are click-dead, so the list that exists to route the operator routes nowhere. |
+| 247 | PAN-3235 | S | high | ok |  |  | Render and answer agent pane-choice menus on the decision card; PAN-3228 shipped the core and CLI, the dashboard UX remains. |
+| 248 | PAN-4203 | L | high | ok |  |  | Operator-requested pan replan + right-click Replan: API-archive stale branch, verify, reset, comment, auto-replan from main. |
+| 249 | PAN-3789 | L | medium | needs-refinement |  |  | MCP servers configured in standalone Codex never reach Overdeck conversations; no setup, auth or lifecycle story across harnesses |
+| 250 | PAN-3175 | M | high | ok |  |  | Merge-train ordering derives conflicts from file overlap alone, so semantically dependent members batch in any order and break the schema. |
+| 251 | PAN-3015 | L | high | ok |  |  | Claude Code is the only harness still driven by keystroke injection; a pull-based monitor inbox would retire the whole hardening stack. |
+| 252 | PAN-3518 | M | high | needs-refinement |  | PAN-3517 | Re-review resumes re-bill the whole cold history; make reviewResumeDecision TTL- and size-aware. Needs design sign-off. |
+| 253 | PAN-3445 | XS | high | ok |  |  | projects.yaml TCP lock ports overlap the OS ephemeral range, so an unrelated socket makes an uncontended config write fail. |
+| 254 | PAN-3332 | S | high | ok |  |  | A detached slash-command spawn died in 150ms while the UI kept saying 'running in the background'; the activity must own its outcome. |
+| 255 | PAN-4426 | M | medium | ok |  |  | Dashboard controls for Deft Directive detection and managed mode over the PAN-3943 library; blocker has closed |
+| 256 | PAN-4345 | XS | medium | ok |  |  | Terse gate-integrity rule (fix the work, never the gate) plus a Rule Authority note in rule authoring |
+| 257 | PAN-3013 | XS | high | ok |  |  | Role-spawn wrote 26 session-scoped hook paths into the durable ~/.claude/settings.json; they fail on every Linear tool call forever. |
+| 258 | PAN-3771 | M | high | ok |  |  | Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries. |
+| 259 | PAN-4530 | XS | medium | ok |  |  | Flywheel skill: define 'pipeline clear', go idle with conversation open, and never stop on a stuck pipeline |
+| 260 | PAN-3533 | L | high | ok |  |  | No per-project resource partitioning, so one project's docker stacks and installs starve another project's pipeline and the dashboard. |
+| 261 | PAN-3107 | S | high | ok |  |  | OOM spikes are unattributable after the fact; productize the machine-local memory-attribution census stopgap. |
+| 262 | PAN-4512 | M | medium | needs-refinement |  |  | Tier escalation config is shown but nothing fires it since the Cut; choose a trigger, persist tierOverrides, re-dispatch |
+| 263 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
+| 264 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
+| 265 | PAN-4510 | S | medium | ok |  |  | Show effort on issue-view agent rows, conversation rows and Agents-page conversation entries; split from closed PAN-4259 |
+| 266 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
+| 267 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
+| 268 | PAN-2186 | S | high | ok |  |  | Rescoped: after a merge the pending auto-merge row must clear and tracker labels must match the merged PR. Label-retry half is PAN-3557. |
+| 269 | PAN-4632 | S | medium | ok |  |  | Markdown chip 'Open in File Manager' xdg-opens the file in its MIME app and sticks as the left-click default; drop it, repair stored pref. |
+| 270 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
+| 271 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
+| 272 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
+| 273 | PAN-4926 | XS | medium | ok |  |  | pan down SIGTERMs the smee pidfile PID without verifying it is smee; a reused PID kills an unrelated process. XS guard + test. |
+| 274 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
+| 275 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
+| 276 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
+| 277 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
+| 278 | PAN-4811 | M | medium | ok |  |  | Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; PAN-4743 landed the Fly target door, so this is now unblocked. |
+| 279 | PAN-5079 | S | high | ok |  |  | pan task claim/cancel/done write any id, so a typo leaves a stray row in the committed continue file an agent can't remove. |
+| 280 | PAN-4756 | L | medium | ok |  |  | Move ~45 bespoke dialogs onto the shared Modal from PAN-4755 (now landed); surface/structure only, unblocked. |
+| 281 | PAN-4778 | S | medium | ok |  |  | Workspace-image CI never published: wrong Fly app, fly not on PATH, no FLY_API_TOKEN (operator). Fly VMs run a June image. |
+| 282 | PAN-4817 | S | medium | ok |  | PAN-4778 | Fly app's cached image predates pan serve --no-open, so every new Fly VM crashes and rolls back; blocks live Fly verification. |
+| 283 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
+| 284 | PAN-2210 | M | high | ok |  |  | Rewritten pan done has no slot handling: a slot agent takes the issue-level PR/review path. Must record slot completion only. |
+| 285 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
+| 286 | PAN-2646 | XS | high | ok |  |  | configurable global/project/issue policy UI with default OFF |
+| 287 | PAN-2755 | S | high | ok |  |  | per-issue review-model override never reached convoy sub-reviewers on the discovery-fork path |
+| 288 | PAN-2754 | S | high | ok |  |  | `always` is inert |
+| 289 | PAN-2809 | M | high | ok |  |  | Live-terminal Playwright UAT blocked in containerized workspaces (node-pty musl/glibc mismatch + Vite/Traefik WS Origin 403) |
+| 290 | PAN-2810 | M | high | ok |  |  | Workspace 'vitest --changed' gate diverges from CI: App.test.tsx fails locally on missing selectPendingInputSubjects mock |
+| 291 | PAN-2495 | S | high | ok |  |  | PAN-2487 ci-green merge skip bypassed CI-green gate |
+| 292 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
+| 293 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
+| 294 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
+| 295 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
+| 296 | PAN-4853 | M | low | ok |  |  | SageOx dashboard views (session tab, context trace, project panel); blocked by PAN-4852; session-to-issue mapping is a checkpoint |
+| 297 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
+| 298 | PAN-1578 | M | high | ok |  |  | GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
+| 299 | PAN-1538 | M | high | ok |  |  | Unblock Pi source forks |
+| 300 | PAN-687 | M | high | ok |  |  | Support OpenCode as alternative coding agent |
+| 301 | PAN-466 | M | high | ok |  |  | Add QwenCoder CLI as a supported runtime alongside Claude Code and Codex |
+| 302 | PAN-465 | M | high | ok |  |  | Add OpenRouter as a model provider |
+| 303 | PAN-463 | M | high | ok |  |  | Add Qwen 3.6+ model support |
+| 304 | PAN-1142 | M | high | needs-refinement |  |  | Per-role/conversation effort config; likely superseded by merged PAN-4249 resolver and its S-slices, confirm or close |
+| 305 | PAN-1424 | M | high | needs-refinement |  |  | Model pool dispatch + work.* subtype taxonomy (follow-up to PAN-1122) |
+| 306 | PAN-1196 | M | high | needs-refinement |  |  | Workhorse routing by bead difficulty + subject-matter (single-agent and swarm) |
+| 307 | PAN-1311 | M | high | needs-refinement |  |  | Swarm: fast-track tier |
+| 308 | PAN-1313 | L | high | ok |  |  | Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces |
+| 309 | PAN-4863 | S | medium | ok |  |  | Manual AC-10 check of Anywhere connect on a real systemd VPS; needs a release shipping `pan connect` and a human-provisioned VPS. |
+| 310 | PAN-1246 | M | high | ok |  |  | Perf: projection-cached VCS driver for diff/checkpoint reads (port of t3code #2586) |
+| 311 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
+| 312 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
+| 313 | PAN-1915 | M | high | ok |  |  | enhancement(security): API key at-rest hardening |
+| 314 | PAN-4886 | S | medium | ok |  |  | Live relay check on Fly unrun three times: device codes expire unapproved. Needs an operator present to approve one code. |
+| 315 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
+| 316 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
+| 317 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
+| 318 | PAN-4297 | L | medium | ok |  |  | Hosted encrypted vault on overdeck.ai in tester mode; account service built 2026-10-02, billing no longer a prerequisite |
+| 319 | PAN-2350 | L | high | needs-refinement | ✓ |  | Epic rebaselined 2026-09-28; account service and share-service slice 1 built 2026-10-02. Children carry the order. |
+| 320 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
+| 321 | PAN-2079 | M | high | needs-refinement |  |  | Inbox spine: boot reconciliation (producer #1) is gone; may still be worth pursuing for pending AUQ, cost alerts and other producers |
+| 322 | PAN-4204 | S | medium | ok |  | PAN-4203 | Sync-main conflict error dumps every file path; show the count, a Replan button, and Open workspace only for few conflicts. |
+| 323 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
+| 324 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
+| 325 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
+| 326 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
+| 327 | PAN-1504 | M | high | ok |  |  | pan hygiene |
+| 328 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
+| 329 | PAN-5058 | XL | high | ok |  |  | Parked, in planning: TLS passthrough relay at <name>.mcp.overdeck.ai so hosted bots reach /mcp without Tailscale Funnel. |
+| 330 | PAN-1479 | M | high | ok |  |  | RTK: Add telemetry to measure token savings from bash output compression |
+| 331 | PAN-2950 | L | high | ok |  |  | Refactor god files back under file-size ceilings after the UX overhaul |
+| 332 | PAN-2720 | M | high | ok |  |  | File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve |
+| 333 | PAN-2650 | S | high | ok |  |  | Shed-stack half is moot (slot merges verify on host); remaining: pan swarm recover path for a stuck ready-to-merge slot. |
+| 334 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
+| 335 | PAN-2334 | XS | high | ok |  |  | write a Definition of Ready (DoR) |
+| 336 | PAN-2193 | S | high | ok |  |  | Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree |
+| 337 | PAN-1984 | XS | high | ok |  |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
+| 338 | PAN-1913 | XS | high | ok |  |  | Project description: show on click, edit in dashboard, mirror into the project layer (and document what's in .pan and ~/.panopticon) |
+| 339 | PAN-1906 | M | high | ok |  |  | Enforce harness restrictions with subscription: gray out non-claude-code, validate everywhere |
+| 340 | PAN-1544 | M | high | ok |  |  | Type cleanup: strip 'ship' from the Role union and its ~10 downstream references |
+| 341 | PAN-955 | S | high | ok |  |  | Workspace devcontainer template versioning + re-render on demand |
+| 342 | PAN-807 | L | high | ok |  |  | Epic C: Workspace state sanity on spawn |
+| 343 | PAN-630 | M | high | ok |  |  | Multi-tenant workspace isolation with ACLs |
+| 344 | PAN-471 | M | high | ok |  |  | Cost reconciler: auto-trigger on agent lifecycle events with debounce |
+| 345 | PAN-438 | M | high | ok |  |  | Migrate remaining REST polling endpoints to Effect RPC |
+| 346 | PAN-578 | M | high | ok |  |  | Security: Comment mediation layer to prevent prompt injection via tracker comments |
+| 347 | PAN-2921 | S | medium | ok |  |  | Strike merge door can report fetch failure after merge and land the same head twice |
+| 348 | PAN-4195 | M | medium | ok |  |  | Every pan call costs ~0.5s/230MB from eager command imports; lazy-load command modules, target --version <100ms |
+| 349 | PAN-2839 | S | medium | ok |  |  | plan→work autoSpawn now 500s with a duplicated workspace prep |
+| 350 | PAN-2824 | S | medium | ok |  |  | pan review pending dies when one project's lens gather fails (non-degrading caller; PAN-2820 class) |
+| 351 | PAN-2792 | S | medium | ok |  |  | Orphan-process sweeps killed the dashboard and live conversations via lsof +D over Bun-hardlinked node_modules |
+| 352 | PAN-2761 | S | medium | ok |  |  | done.test.ts asserts a hardcoded URL without stubbing env, so it fails in any agent shell with OVERDECK_DASHBOARD_URL set and looks lik… |
+| 353 | PAN-2738 | S | medium | ok |  |  | strikes deadlock |
+| 354 | PAN-2717 | S | medium | ok |  |  | conversation permission waits missing from Awareness; strengthen alert pulse |
+| 355 | PAN-2697 | S | medium | ok |  |  | First-review codex parents enter discovery mode and the supervisor session no-ops every discovery-ready signal |
+| 356 | PAN-4236 | S | medium | ok |  |  | GPT-5.6 luna/sol rows in cost.ts disagree with catalog and OpenAI list prices; reconcile and add a cost.ts-vs-catalog parity test |
+| 357 | PAN-2691 | S | medium | ok |  |  | Auto-planned issues park silently when the post-finalize work spawn is gated (stack-unhealthy 422) |
+| 358 | PAN-4306 | M | medium | ok |  |  | Move phase/role/cleanup telemetry from activity.entry to activity.detailed so it stops evicting news; blocked by PAN-4300 |
+| 359 | PAN-3701 | L | high | ok |  |  | Four separate first-party LLM client stacks; consolidate onto effect/unstable/ai LanguageModel + ExecutionPlan. PRD written. |
+| 360 | PAN-3090 | M | high | ok |  |  | Simple issue page opens with a 55KB raw kickoff prompt and hides the pending question the operator actually has to answer. |
+| 361 | PAN-4552 | M | medium | ok |  |  | Fresh-host setup errors still say 'edit config'/'run X'; audit each to auto-fix or one click, and find other first-launch dialogs |
+| 362 | PAN-2670 | S | medium | ok |  |  | Gate the dashboard-server tsconfig in npm run typecheck |
+| 363 | PAN-2664 | S | medium | ok |  |  | auto-commit completes unresolved merge with conflict markers |
+| 364 | PAN-2663 | S | medium | ok |  |  | health probe can accept old dashboard after replacement EADDRINUSE |
+| 365 | PAN-2649 | S | medium | ok |  |  | Ctrl+K conversation search indexes Claude transcripts only |
+| 366 | PAN-2580 | S | medium | needs-refinement |  |  | pan tell to codex (GPT) conversations; PAN-5095 (closed) added app-server delivery, so verify whether this is fixed. |
+| 367 | PAN-2572 | M | medium | ok |  |  | Noisy EBADENGINE + deprecation warnings on npx/npm install make a healthy install look broken |
+| 368 | PAN-2563 | S | medium | ok |  |  | npm-flavor desktop (npx @overdeck/desktop) lacks node_modules for the server's externalized deps |
+| 369 | PAN-2554 | S | medium | ok |  |  | clicking a project doesn't update the browser URL |
+| 370 | PAN-2550 | XS | medium | ok |  |  | npm test exits 0 despite root-suite failures |
+| 371 | PAN-2547 | S | medium | ok |  |  | pan restart --health-timeout parses seconds as milliseconds |
+| 372 | PAN-2546 | S | medium | needs-refinement |  |  | pan tell is codex-conversation-unaware; PAN-5095 (closed) added app-server delivery, so verify whether this is fixed. |
+| 373 | PAN-4303 | S | medium | needs-refinement |  |  | Steer busy Codex app-server turns via turn/steer; verify first whether turn/start already steers. Needs PAN-4292's steerKind. |
+| 374 | PAN-3003 | XS | medium | ok |  |  | Generated launcher.sh files omit the OVERDECK_AGENT_ID export the PTY supervisor requires, so manual re-launch dies instantly. |
+| 375 | PAN-2501 | S | medium | ok |  |  | deleteResourceVenvEffect's HttpRouter.schemaParams call fails typecheck under the root tsconfig (masked by src/dashboard/** exclusion) |
+| 376 | PAN-2492 | S | medium | needs-refinement |  |  | pane-detected waits (rate-limit/session-resume) surface as 'needs you' but cannot be answered from the dashboard |
+| 377 | PAN-2491 | M | medium | ok |  |  | Migrate @xenova/transformers to @huggingface/transformers to eliminate silent npx install failures from sharp 0.32 postinstall |
+| 378 | PAN-2489 | S | medium | ok |  |  | strike agents are invisible in the project issue tree |
+| 379 | PAN-2465 | S | medium | ok |  |  | pan done's PR lookup fails at MYN polyrepo root |
+| 380 | PAN-2454 | S | medium | ok |  |  | ratchet audit fails per-commit on push ranges whose NET baseline delta is zero |
+| 381 | PAN-2428 | XS | medium | ok |  |  | MYN workspace Traefik routing broken post-rebrand |
+| 382 | PAN-2423 | XS | medium | ok |  |  | pan workspace rebuild hardcodes 'overdeck-' compose project prefix |
+| 383 | PAN-2416 | S | medium | ok |  |  | codex agents can wedge on the Codex CLI first-run/consent screen |
+| 384 | PAN-4250 | XS | medium | ok |  |  | Stale dated CONVERSATION_TITLE_MODEL literal throws UnknownModelError when titleModel config is unset; one-line fix plus audit |
+| 385 | PAN-2395 | S | medium | ok |  |  | one invalid tiered_execution enum poisons every config read |
+| 386 | PAN-2381 | S | medium | ok |  |  | three event types missing from DomainEvent schema union poison the RPC stream |
+| 387 | PAN-2287 | S | medium | ok |  |  | every supervisor.log line written twice |
+| 388 | PAN-3661 | XS | medium | ok |  |  | Secure review-mode dispatch dropped the HTTP-200 semantic-rejection surface; two frontend tests fail locally while CI stays green. |
+| 389 | PAN-3288 | XS | medium | ok |  |  | Dev-checkout preflight: after a git pull that adds a dep, the CLI dies with ERR_MODULE_NOT_FOUND instead of saying 'run bun install'. |
+| 390 | PAN-3164 | XS | medium | ok |  |  | probeUatStack reports readiness from container count, so the UI offers 'Open UAT frontend' while the API is still resolving Maven deps. |
+| 391 | PAN-3121 | S | medium | ok |  |  | The failed-send outbox never reconciles against the transcript, so a delivered message keeps a Retry twin that would double-send. |
+| 392 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
+| 393 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
+| 394 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
+| 395 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
 | 395 | PAN-5353 | S | medium | ok |  |  | Send now: flush a queued message into a running Claude Code turn via the Ctrl+X Ctrl+S chord. PRD written, chord live-probed. |
-| 396 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
-| 397 | PAN-2069 | XS | medium | ok |  |  | caveman: follow-up gaps |
-| 398 | PAN-1918 | XS | medium | ok |  |  | full frontend vitest suite runs in no CI path |
-| 399 | PAN-1912 | XS | medium | ok |  |  | Pi agent transcripts hide tool-call detail; agent panes lack the Tools show/hide toggle |
-| 400 | PAN-4208 | M | medium | ok |  |  | #4205 follow-ups: Effect-free config read for telemetry to hit <100ms pan --version; CI import test for lazy command targets |
-| 401 | PAN-1846 | S | medium | needs-refinement |  |  | unbounded log growth |
-| 402 | PAN-1830 | S | medium | ok |  |  | Reviewer stuck on gpt-5.5 rate-limit modal blocks REVIEWER_READY |
-| 403 | PAN-1816 | S | medium | ok |  |  | Scratch/UAT-lifecycle issues (PAN-18031) enter the real pipeline: kanban, review convoys, agent registry |
-| 404 | PAN-1795 | S | medium | ok |  |  | Codebase map bootstrapped in planning worktree is never promoted to main |
-| 405 | PAN-1774 | S | medium | ok |  |  | workspace server container crashloops when dist/dashboard/server.js is missing |
-| 406 | PAN-1769 | S | medium | ok |  |  | Supervisor echo-confirm false negative on long messages → triple-paste delivery (rewrite ×2 + tmux fallback); resumed-conv message stil… |
-| 407 | PAN-1761 | S | medium | ok |  |  | conversations endpoints fetched via relative /api path |
-| 408 | PAN-1755 | S | medium | ok |  |  | uat stuck-assembly cap (30m) kills slow-but-alive assemblies and leaves orphaned conflict agents racing the next generation |
-| 409 | PAN-3516 | XS | medium | ok |  |  | Repo .claude/skills holds stale duplicates of pan-handoff, pan-flywheel and okf, so overdeck-dev sessions load outdated skill text. |
-| 410 | PAN-3455 | XS | medium | ok |  |  | cliproxy --version exits 2, so the up-to-date check always returns false and every ensure re-downloads the pinned release. |
-| 411 | PAN-3117 | XS | medium | ok |  |  | A deterministic 400 renders as the generic 'Failed to send' bubble with a Retry that can never succeed. |
-| 412 | PAN-3036 | XS | medium | ok |  |  | Pane-idle detection reads a completed strike's idle composer as a pending question, so a finished strike shows '! INPUT'. |
-| 413 | PAN-3016 | M | medium | ok |  |  | Operator ask: every view should be URL-addressable; cockpit tabs, stage panes and several drawers are still local state. |
-| 414 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
-| 415 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
-| 416 | PAN-5028 | M | medium | ok |  |  | list_pending_input loses a conversation's AskUserQuestion after the PAN-1520 deny hook, contrary to the existing test's contract. |
-| 417 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
-| 418 | PAN-5227 | S | medium | ok |  |  | Closed-issue reaper re-checks every issue's state every 60 s, spending ~25% of the GitHub App REST bucket while idle. |
-| 419 | PAN-5349 | L | medium | ok |  |  | pan open <path> opens files/folders in the dashboard; opt-in OS file-manager 'Open in Overdeck'. PRD in .pan/drafts/pan-5349.md |
-| 420 | PAN-5342 | L | medium | ok |  |  | Safe shutdown: drain agents at a tool boundary before reboot; PRD landed; item 16 of workflow-redesign order book. |
-| 421 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
-| 422 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
-| 423 | PAN-1627 | M | medium | ok |  |  | Substrate: Claude Code's native .claude/** settings-edit protection wedges in-scope work agents (un-overridable by PreToolUse auto-appr… |
-| 424 | PAN-1624 | S | medium | ok |  |  | pan handoff --author external: authored doc is socket_write-ten but never submitted |
-| 425 | PAN-3901 | S | medium | ok |  |  | test-skip gate has no audited exemption for opt-in live suites (skipIf on env/binary); allowlist row with justification |
-| 426 | PAN-3852 | S | medium | ok |  |  | Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping |
-| 427 | PAN-5343 | L | medium | ok |  | PAN-5335, PAN-5290, PAN-5295, PAN-5294 | Workflow redesign H: All projects deck listing conversations across projects, 1-4 side by side. Waits on four siblings. |
-| 428 | PAN-3862 | L | medium | needs-refinement |  |  | /agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model |
-| 429 | PAN-1572 | M | medium | needs-refinement |  |  | Settings permission-mode can desync from the resolved mode; body cites the removed DSP flag and a renamed symbol — rewrite first |
-| 430 | PAN-4627 | S | medium | ok |  |  | Homebrew Claude Code installs get a copy-only upgrade banner; make the brew plan runnable and auto-upgrade outdated runnable installs. |
-| 431 | PAN-1571 | S | medium | ok |  |  | Large multi-line pastes (handoff docs) land unsubmitted |
-| 432 | PAN-1565 | S | medium | ok |  |  | Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
-| 433 | PAN-5312 | S | medium | ok |  |  | Quality-gate admission: a head that can never fit alone serializes every gate behind it. |
-| 434 | PAN-5241 | L | medium | ok |  |  | Spill work agents to linked machines, then Fly, when this machine is full, up to operator caps. |
-| 435 | PAN-1530 | S | medium | ok |  |  | Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
-| 436 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
-| 437 | PAN-1449 | S | medium | ok |  |  | Memory extraction still failing; the live symptom PAN-4370 closed and PAN-4374 adds a working provider; layout half remains |
-| 438 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
-| 439 | PAN-5180 | M | medium | ok |  |  | Tab-open REST burst (~45 requests) delays every client 1.0-1.4 s; uncached prerequisite and status probes. |
-| 440 | PAN-5264 | M | medium | ok |  |  | Attribute the app-rest GitHub caller (1,422 untraced App REST calls/hour), then cut the largest path. |
-| 441 | PAN-5340 | S | medium | ok |  | PAN-5337 | A Preview link to another Markdown file should open it in Preview, not Edit. Follows PAN-5337. |
-| 442 | PAN-5341 | S | medium | ok |  | PAN-5338 | Dock Changes diff view gets the Markdown Preview switch from PAN-5338; matters once D2 moves diffs to the dock. |
-| 443 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
-| 444 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
-| 445 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
-| 446 | PAN-5322 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5319: unguarded identifier.toUpperCase(), modal focus, needs-you rows that open nothing. |
-| 447 | PAN-5317 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5127: route live Codex app-server sends correctly; no replayable mail for keyed sends. |
-| 448 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
-| 449 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
-| 450 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
-| 451 | PAN-2469 | S | medium | ok |  |  | Assembly landed (mergeReadySlots + finalization); remaining: alarm when all slots merged but no review requested. Swarm dormant. |
-| 452 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
-| 453 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
-| 454 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
-| 455 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
-| 456 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
-| 457 | PAN-4971 | S | medium | ok |  |  | Viewer header shows only host + count; roster of all participants with host/controller marked. Frontend-only, payload exists. |
-| 458 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
-| 459 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
-| 460 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
-| 461 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
-| 462 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
-| 463 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
-| 464 | PAN-5174 | XS | medium | ok |  |  | Flaky CI test: share/rate-limit.test.ts flips 201/429 under CI timing; quarantine or make deterministic. |
-| 465 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
-| 466 | PAN-5346 | S | medium | ok |  |  | Auth docs misstate #overdeck_token delivery, the Origin rule and 401 troubleshooting; PAN-5344 fix has landed. |
-| 467 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
-| 468 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
-| 469 | PAN-1130 | S | medium | ok |  |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
-| 470 | PAN-1129 | S | medium | ok |  |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
-| 471 | PAN-1128 | S | medium | ok |  |  | Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
-| 472 | PAN-1113 | S | medium | ok |  |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
-| 473 | PAN-1068 | S | medium | ok |  |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
-| 474 | PAN-3938 | M | medium | needs-refinement |  |  | Run Muse Spark under Claude Code via cliproxy — only the paid Zen model is routable; free tier is OpenCode-client gated; needs credit… |
-| 475 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
-| 476 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
-| 477 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
-| 478 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
-| 479 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
-| 480 | PAN-778 | M | medium | ok |  |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
-| 481 | PAN-681 | S | medium | ok |  |  | Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
-| 482 | PAN-3732 | S | medium | ok |  |  | Codex handoff serializes a large rollout twice (~286MB peak RSS on 50MB); serialize once or stream. |
-| 483 | PAN-3700 | M | medium | ok |  |  | pan acp serve would let Zed and other ACP clients drive Overdeck conversations through canonical doors. PRD written. |
-| 484 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces, so docs items sit unanchored in the requirement traceability graph. |
-| 485 | PAN-3132 | M | medium | ok |  |  | xBRIEF v0.9 agentic dispatch fields are half-adopted as a behavior accident; make difficulty/filesScope/verifyCommands a contract. |
-| 486 | PAN-3909 | M | medium | needs-refinement |  |  | One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains |
-| 487 | PAN-2659 | S | medium | ok |  |  | acquireRecordLock survives for the planning auto-start consent lock; an ownerless lock after a crash is never reclaimed. |
-| 488 | PAN-3831 | S | medium | ok |  |  | Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver) |
-| 489 | PAN-4779 | S | medium | ok |  |  | Docs on main: 2 MDX parse errors hide pages from Mintlify + 15 broken vision.mdx links; mint broken-links can't gate |
-| 490 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
-| 491 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
-| 492 | PAN-3563 | S | medium | needs-refinement |  |  | pan unstick is gone; verify whether a spawned-but-never-briefed role agent can still read as running forever under liveness.ts |
-| 493 | PAN-1041 | M | medium | ok |  |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
-| 494 | PAN-924 | L | medium | needs-refinement |  |  | Spike: evaluate GitNexus for Panopticon integration |
-| 495 | PAN-3770 | S | medium | ok |  |  | Codex conversations never show the working spinner mid-turn; parser marks every agent_message instantly complete. |
-| 496 | PAN-4568 | XS | medium | ok |  |  | Codex sub-agent turn start shows thread: not sub: label; adoption lands one frame late. PAN-4563 replay test has landed. |
-| 497 | PAN-3731 | S | medium | ok |  |  | Restart-gate banner gives no feedback after approval; dead-requester approvals read as a broken button. |
-| 498 | PAN-3530 | S | medium | ok |  |  | Four God View components poll on 30s timers instead of the documented /ws/rpc event contract. |
-| 499 | PAN-3131 | L | medium | ok |  |  | Support xBRIEF planRef sharding so a 1.1MB/227-item plan stops making every finalize failure whole-plan-fatal. |
-| 500 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
-| 501 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
-| 502 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
-| 503 | PAN-4918 | M | medium | ok |  |  | Six Anywhere UI bugs seen while filming: Codex keeps Claude model, Zen models listed first, chip wrap, Pull-here state, no remote archive. |
-| 504 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
-| 505 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
-| 506 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
-| 507 | PAN-713 | M | medium | ok |  |  | test: add unit tests for doneCommand and approveCommand |
-| 508 | PAN-700 | M | medium | ok |  |  | Detachable terminal for conversation view |
-| 509 | PAN-646 | XS | medium | needs-refinement |  |  | Cancel no longer clears beads or a record; a Recover workflow now means reopening the tracker issue and re-planning |
-| 510 | PAN-532 | M | medium | ok |  |  | Per-project and per-issue model overrides for pipeline roles |
-| 511 | PAN-2896 | M | medium | ok |  |  | Warm resource-discovery and membership caches at boot |
-| 512 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
-| 513 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
-| 514 | PAN-5231 | S | medium | ok |  |  | Explorer: retrying Send through pipeline after a partial failure creates a second issue and branch. |
-| 515 | PAN-5204 | S | medium | ok |  |  | Voice: mixed 16/24 kHz sample rates on /ws/voice, and dictation turns leak into AutoPreso as errors. |
-| 516 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
-| 517 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
-| 518 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
-| 519 | PAN-2566 | L | medium | ok | ✓ |  | Triage list of genuine Traycer capability gaps; a container for child issues, not directly workable. |
-| 520 | PAN-2565 | M | medium | ok |  |  | Multi-agent conversations: N agent sessions in one task surface with agent-to-agent messaging |
-| 521 | PAN-3735 | S | medium | ok |  |  | Sandboxed pan CLI reports 'dashboard down, run pan up' when the real cause is no network; sends agents down the wrong path. |
-| 522 | PAN-3335 | XS | medium | ok |  |  | A pasted screenshot can't be viewed anywhere in the dashboard: thumbnail has no click handler and the sent form is a file-link chip. |
-| 523 | PAN-3054 | M | medium | ok |  |  | Benchmark matrix, redesigned 2026-09-29 as E6 of the model-routing PRD; its medians feed PAN-4364 and PAN-4367 |
-| 524 | PAN-2977 | M | medium | ok |  | PAN-2976 | Settings surface that detects installed ACP CLIs, renders the capability checklist, and guides login without a manual terminal. |
-| 525 | PAN-2557 | M | medium | ok |  |  | project-level 'Restart All' context action |
-| 526 | PAN-2553 | M | medium | ok |  |  | project-level CI visibility |
-| 527 | PAN-2521 | S | medium | ok |  |  | launch pipeline agents with harness rate-limit model-switch reminder disabled |
-| 528 | PAN-2493 | M | medium | ok |  |  | align the cockpit Agents-lane and sidebar issue-tree feature sets (two-way gaps) |
-| 529 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
-| 530 | PAN-3853 | S | medium | needs-refinement |  |  | Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path |
-| 531 | PAN-3830 | S | medium | ok |  |  | OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model |
-| 532 | PAN-4924 | S | medium | ok |  |  | linked-machines.mdx promises switch model for running conversations; dashboard disables it. Fix docs or add the control. |
-| 533 | PAN-4367 | M | medium | ok |  |  | Replace inherited capability scores for Sonnet 5.5, GPT-6 Sol/Luna with measured ones; eval harness has closed |
-| 534 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
-| 535 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
-| 536 | PAN-2409 | M | medium | ok |  |  | enforce the workspace boundary |
-| 537 | PAN-5145 | S | medium | ok |  |  | CLIProxy oauth-model-alias hides gpt-6-sol, gpt-5.6-terra and gpt-5.6-luna by their own ids on claude-code. |
-| 538 | PAN-5201 | XL | medium | ok |  |  | Speaker-aware STT: diarizing engines (Speechmatics, AssemblyAI, Muse, Voxtral, NeMo) and one VoiceSettings contract. |
-| 539 | PAN-2392 | M | medium | needs-refinement |  |  | Standing Crew survives; panel becomes a cost view from cost_events + tier-metrics; verdict/escalation columns need a new source. |
-| 540 | PAN-2335 | XS | medium | ok |  |  | chore: review the full open backlog for junk/stale/nonsensical issues |
-| 541 | PAN-2295 | L | medium | needs-refinement |  |  | built-in web browser surface (openable like terminal/Claude Code/Codex) + native Agentation integration |
-| 542 | PAN-3767 | S | medium | ok |  |  | Model switch could hang at 'Saving…'; onError toast landed, remaining work is reproducing the hang on a healthy server. |
-| 543 | PAN-3615 | S | medium | needs-refinement |  |  | TTS silent 9+ days from four stacked failures; three already fixed, only follow-ups remain — rescope to what is left. |
-| 544 | PAN-3558 | S | medium | ok |  |  | Subagent rail shows no model or provider, so mixed-model orchestration needs a transcript open per row to see what it is running. |
-| 545 | PAN-3469 | S | medium | ok |  |  | NewProjectModal violates the PAN-3410 page-not-modal doctrine; migrate the create-project flow to a routed page. |
-| 546 | PAN-3333 | M | medium | ok |  |  | Model pickers show $/1M, which says nothing under a subscription; show relative plan-quota drain among sibling models. |
-| 547 | PAN-3058 | M | medium | ok |  |  | Ship named crew presets that populate the whole tiered_execution block so operators don't hand-build the crew table. |
-| 548 | PAN-2288 | L | medium | ok |  |  | tmux managed-server: lossless auto-migration of dirty-founded servers + boot-time ensure call |
-| 549 | PAN-2065 | M | medium | ok |  |  | unified usage & headroom panel across all provider plans (z.ai, Anthropic, Codex, OpenRouter) |
-| 550 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
-| 551 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
-| 552 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
-| 553 | PAN-4366 | M | medium | ok |  |  | Plan the Haiku 4.5 successor and give workhorse:cheap a consumer or drop it; gated on E4 summary-faithfulness |
-| 554 | PAN-5314 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5313 (CLIProxy pool): body-read timeout, cache-miss coalescing, reset timestamps. |
-| 555 | PAN-5267 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5266: escalation limit and caching transient GraphQL errors as missing issues. |
-| 556 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
-| 557 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
-| 558 | PAN-3739 | S | medium | ok |  |  | cost-reconcile re-warns every model-less codex subthread rollout on every sweep; log flood grows without bound. |
-| 559 | PAN-4393 | XS | medium | ok |  |  | ac-eval-fixtures requires observable:false >= 8 but honest labeling of all specs yields 6; lower the floor |
-| 560 | PAN-1985 | M | medium | ok |  |  | Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
-| 561 | PAN-1968 | M | medium | ok |  |  | Finish local-domain rename: pan.localhost → overdeck.localhost |
-| 562 | PAN-1967 | M | medium | needs-refinement |  |  | Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
-| 563 | PAN-1965 | M | medium | ok |  |  | Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
-| 564 | PAN-1937 | M | medium | ok |  |  | feat: data export |
-| 565 | PAN-1926 | M | medium | ok |  |  | --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
-| 566 | PAN-1916 | M | medium | ok |  |  | configurable web search providers (Exa, Tavily, Brave, Perplexity) |
-| 567 | PAN-1854 | M | medium | ok |  |  | Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
-| 568 | PAN-1853 | M | medium | ok |  |  | Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
-| 569 | PAN-1852 | XS | medium | ok |  |  | Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
-| 570 | PAN-1844 | M | medium | ok |  |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
-| 571 | PAN-5202 | XL | medium | ok |  | PAN-5201 | Flux: experimental live meeting page capturing open items, ticket proposals and diagrams. Depends on PAN-5201. |
-| 572 | PAN-5141 | M | medium | ok |  |  | Reviewer pairing code: multi-day, reusable, restart-safe code so app store review can pair unattended. |
-| 573 | PAN-1840 | M | medium | ok |  |  | Add 'pan switch <id>' |
-| 574 | PAN-1839 | M | medium | ok |  |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
-| 575 | PAN-1776 | M | medium | ok |  |  | Hot-updatable message delivery: version-stamped supervisors + server-side delivery logic |
-| 576 | PAN-3706 | L | medium | ok |  |  | Broadsheet shipped typography only; color, surface, elevation and texture still on Ledger values, so it doesn't read like Subspace. |
-| 577 | PAN-3539 | XS | medium | needs-refinement |  |  | OOMPolicy=continue fix landed with the issue; re-scope to whatever hardening remains or close it out. |
-| 578 | PAN-3502 | XS | medium | needs-refinement |  |  | tiered-crews blendedCost expectation stale vs pricing catalog; likely already fixed by the PAN-3532 cherry-pick — verify. |
-| 579 | PAN-4409 | M | medium | ok |  |  | Overdeck integration on OKF v0.2.0 (injector trust tiers, new verbs); blocked on external eltmon/okf#9 |
-| 580 | PAN-4410 | M | medium | ok |  | PAN-4409 | Migrate eltmon/overdeck-knowledge to OKF v0.2 and refresh stale concepts; last link in the OKF chain |
-| 581 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
-| 582 | PAN-4878 | XS | low | ok |  |  | Delete dead ox curl installer in prereqs registry; PAN-4852 builds ox from the pinned fork commit, so ~/.local/bin/ox is never used. |
-| 583 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
-| 584 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
-| 585 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
-| 586 | PAN-1748 | M | medium | ok |  |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
-| 587 | PAN-1691 | M | medium | ok |  |  | conflict-aware merge train + on-demand UAT candidate |
-| 588 | PAN-1685 | XS | medium | ok |  |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
-| 589 | PAN-1676 | M | medium | ok |  |  | Harden Fly remote workspaces + pan workspace move; work-agent spill policy now specified in PAN-5241. |
-| 590 | PAN-1667 | M | medium | ok |  |  | unify Agents + Resources into one issue-centric holistic view |
-| 591 | PAN-1657 | M | medium | ok |  |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
-| 592 | PAN-1656 | M | medium | ok |  |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
-| 593 | PAN-1655 | M | medium | ok |  |  | Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
-| 594 | PAN-1654 | XS | medium | ok |  |  | run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
-| 595 | PAN-1653 | XS | medium | ok |  |  | batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
-| 596 | PAN-5309 | S | low | ok |  |  | CodeRabbit minor findings on the PAN-5283 Flywheel page redesign; verify each against main before fixing. |
-| 597 | PAN-5308 | S | low | ok |  |  | CodeRabbit findings on the PAN-5282 CLIProxy v8 upgrade: config-write ordering, Windows upgrade staging. |
-| 598 | PAN-1623 | M | medium | ok |  |  | Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
-| 599 | PAN-1561 | M | medium | ok |  |  | feat: Project-scoped dashboard nav (deck of tabs per project + conversations/tree column + activity feed) |
-| 600 | PAN-1550 | M | medium | ok |  |  | BrowserPane half only; the FilesPane half is superseded by the PAN-5183 file explorer, whose children have all closed. |
-| 601 | PAN-1545 | XS | medium | ok |  |  | New Terminal button |
-| 602 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
-| 603 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
-| 604 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
-| 605 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
-| 606 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
-| 607 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
-| 608 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
-| 609 | PAN-1432 | M | medium | ok |  |  | Merge agent leaves packages/contracts/dist stale |
-| 610 | PAN-1223 | M | medium | ok |  |  | Auto-update for users in the field (npm + desktop binaries) |
-| 611 | PAN-1165 | M | medium | ok |  |  | Lightweight review path for small/trivial PRs |
-| 612 | PAN-1151 | XS | medium | ok |  |  | Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
-| 613 | PAN-4360 | S | medium | ok |  |  | Add pan claude upgrade and offer the Claude Code upgrade in pan install / pan sync; PAN-4359 has closed |
-| 614 | PAN-1060 | M | medium | ok |  |  | Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
-| 615 | PAN-1051 | M | medium | ok |  |  | feat: Subspace-inspired alternate theme with Inter + JetBrains Mono |
-| 616 | PAN-1037 | M | medium | ok |  |  | Retire 'planning-' tmux prefix |
-| 617 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
-| 618 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
-| 619 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
-| 620 | PAN-5067 | M | medium | ok |  |  | Skill overrides: bad-YAML issue file is overwritten on write (data loss), license detection gaps, Pi ignores --pack silently. |
-| 621 | PAN-4908 | S | low | ok |  |  | Other remote-not-enabled messages name no file and the dead verb 'pan remote setup'; reuse PAN-4905's remoteEnabledHint(). |
-| 622 | PAN-5130 | S | medium | ok |  |  | pan project add gains --issue-prefix for any tracker; --linear-team becomes a deprecated alias. Follow-up to closed PAN-51. |
-| 623 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
-| 624 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
-| 625 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
-| 626 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
-| 627 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
-| 628 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
-| 629 | PAN-4308 | S | medium | ok |  |  | Settle reaped Fly remote transcripts into the Session Vault; PAN-4295 auto-reap landed, still blocked by PAN-2609 (engine). |
-| 630 | PAN-3322 | XS | medium | ok |  |  | launcher-generator.ts's file-size ceiling sits 126 lines above the real file, handing back the regrowth the ratchet exists to prevent. |
-| 631 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
-| 632 | PAN-675 | M | medium | needs-refinement |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
-| 633 | PAN-654 | L | medium | ok |  |  | Project Setup Wizard |
-| 634 | PAN-649 | M | medium | ok |  |  | Render Excalidraw drawings inline in Claude Code conversations |
-| 635 | PAN-637 | XS | medium | ok |  |  | Direct issue kickoff (skip planning) from dashboard UI |
-| 636 | PAN-629 | M | medium | ok |  |  | Workspace quotas and resource governance |
-| 637 | PAN-613 | M | medium | needs-refinement |  |  | Investigate thinking effort levels for agents |
-| 638 | PAN-607 | M | medium | needs-refinement |  |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
-| 639 | PAN-606 | M | medium | needs-refinement |  |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
-| 640 | PAN-548 | M | medium | ok |  |  | Command Deck: preserve state across navigation including URL routing for tabs |
-| 641 | PAN-546 | M | medium | ok |  |  | Remove claude-code-router |
-| 642 | PAN-537 | M | medium | ok |  |  | feat: show changed files diff summary after each agent response in activity view |
-| 643 | PAN-531 | XS | medium | ok |  |  | PAN: Windows Electron support (WSL2 required) |
-| 644 | PAN-452 | M | medium | ok |  |  | Conversation input bar |
-| 645 | PAN-450 | M | medium | ok |  |  | Adopt remaining Effect patterns |
-| 646 | PAN-1126 | M | medium | ok |  |  | Integrate TLDR summaries into review context manifest |
-| 647 | PAN-5154 | L | low | needs-refinement |  |  | GitHub account, token and host per owner (work accounts, GHES). Not scheduled; needs a PRD first. |
-| 648 | PAN-1066 | M | medium | ok |  |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
-| 649 | PAN-3441 | L | low | ok |  |  | God View 'River' WebGL pipeline visualization fed by the live hook-event stream; PRD and mockup exist. |
-| 650 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
-| 651 | PAN-2941 | M | low | stale |  |  | Superseded by OKF v0.2: drafts plus human verify replace the PR gate (eltmon/okf#6); semantic pass is eltmon/okf#7 |
-| 652 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
-| 653 | PAN-4373 | M | medium | ok |  |  | Optional Jev relevance filter for prompt-time memory injection candidates; both prerequisites have closed |
-| 654 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
-| 655 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
-| 656 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
-| 657 | PAN-2662 | M | low | ok |  |  | Add project context-menu actions scoped to issues currently in the pipeline |
-| 658 | PAN-2645 | M | low | ok |  |  | Add opt-in Observation-first conversation view |
-| 659 | PAN-2635 | XS | low | ok |  |  | pay down the 152-error src/dashboard/server typecheck debt |
-| 660 | PAN-5066 | M | medium | ok |  |  | Project skills in .pan/skills skip the CLI workspace fallback, never refresh, lose to bundled skills, and never reach Codex/Pi. |
-| 661 | PAN-3443 | L | low | ok |  |  | God View 'Spectrum Deck' visualizer concept with mockup and PRD; pure exploration, no substrate impact. |
-| 662 | PAN-4350 | M | medium | needs-refinement |  |  | Re-dispatch budget for foreman items; issue itself flags an unresolved conflict with the no-stored-state rule |
-| 663 | PAN-4003 | L | medium | ok |  |  | Parked: delete the ohmypi/omp harness, keep Pi; obsoletes 10 open ohmypi issues and shrinks PAN-3958's CH-7 scope |
-| 664 | PAN-4368 | S | medium | ok |  |  | Operator-run checklist: verify Sonnet 5.5 across switch-model, fork and compaction (model-locked thinking blocks) |
-| 665 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
-| 666 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
-| 667 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
-| 668 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
-| 669 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
-| 670 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
-| 671 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
-| 672 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
-| 673 | PAN-4769 | XS | low | ok |  |  | Two-sentence wording fix in features/skill-packs.mdx; PAN-4759 created the page and closed, so this is unblocked. |
-| 674 | PAN-3940 | XL | low | ok | ✓ |  | Parked epic: event-driven plugin/hook system on pipeline-notifier + hygiene-scheduler; do not pick up until the journal has soaked |
-| 675 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
-| 676 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
-| 677 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
-| 678 | PAN-4823 | XL | medium | ok | ✓ |  | Epic: Capacitor phone client for Anywhere without Tailscale; 15 children filed (#4828-4843); OD-1 settled; PAN-4774 done. |
-| 679 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
-| 680 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
-| 681 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
-| 682 | PAN-5082 | XL | medium | ok |  |  | Move every MCP surface to SDK v2 for the 2026-07-28 spec while keeping 2025-11-25 clients; time it on PAN-5083 data. |
-| 683 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
-| 684 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
-| 685 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
-| 686 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
-| 687 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
-| 688 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
-| 689 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
-| 690 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
-| 691 | PAN-2046 | M | low | stale |  |  | Conversation view does not surface terminal command responses |
-| 692 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
-| 693 | PAN-3919 | S | low | needs-refinement |  |  | Review the universal effort-high default and supervisor effort discretion; explicitly an operator decision, no work authorized |
-| 694 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
-| 695 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
-| 696 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
-| 697 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
-| 698 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
-| 699 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
-| 700 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 701 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
-| 702 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
-| 703 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
-| 704 | PAN-1782 | M | low | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout |
-| 705 | PAN-1773 | M | low | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
-| 706 | PAN-1646 | M | low | ok |  |  | Rabbit-hole drift detection and lift-to-new-conversation |
-| 707 | PAN-1643 | M | low | ok |  |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
-| 708 | PAN-1592 | M | low | ok |  |  | Composer: make ephemeral composer state reload-durable (pasted images + unsent/failed message text) |
-| 709 | PAN-1581 | M | low | ok |  |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
-| 710 | PAN-1533 | M | low | ok |  |  | Fork-into-worktree from conversation branch chip |
-| 711 | PAN-1483 | XS | low | ok |  |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
-| 712 | PAN-1482 | M | low | ok |  |  | Token spend report should aggregate data from repo, not just local machine |
-| 713 | PAN-1481 | M | low | ok |  |  | Add cost-event telemetry for Caveman token savings |
-| 714 | PAN-1356 | M | low | ok |  |  | Extend the memory Observation pipeline to ad-hoc conversations |
-| 715 | PAN-1242 | M | low | ok |  |  | Create a new issue directly from a kanban column |
-| 716 | PAN-1222 | M | low | ok |  |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
-| 717 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
-| 718 | PAN-4352 | XS | low | ok |  |  | Operator verification: skill packs in a managed interactive Claude Code launch now that PAN-4334 has shipped |
-| 719 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
-| 720 | PAN-4298 | XL | low | needs-refinement |  | PAN-4294, PAN-1676 | Anywhere paid tier: run agents on hosted Fly capacity; tenant isolation, credentials, metering open; PAN-4294 and PAN-1676 unbuilt |
-| 721 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
-| 722 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
-| 723 | PAN-1133 | M | low | stale |  |  | Deacon-patrol tie-in for TLDR supervision is gone; would need its own liveness check |
-| 724 | PAN-1123 | XS | low | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
-| 725 | PAN-1121 | M | low | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
-| 726 | PAN-4248 | L | medium | ok |  |  | List, pull and delete local Ollama models (size, store, in-use) in CLI, dashboard and doctor; PAN-1641 sidecar has merged. |
-| 727 | PAN-1117 | M | low | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
-| 728 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
-| 729 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
-| 730 | PAN-1064 | M | low | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
-| 731 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
-| 732 | PAN-3971 | L | low | ok |  |  | Overdeck-native artifact pages (pan artifact publish + state door + dashboard listing); body says backlog only, Claude artifacts work today |
-| 733 | PAN-3768 | XS | low | ok |  |  | pan handoff --title already implemented and landed (678f6b389e5); open only pending close-out. |
-| 734 | PAN-3034 | XS | low | ok |  |  | Fix already landed on main (strike/slot workspace names and live tmux now seed the session tree); open pending close-out. |
-| 735 | PAN-2983 | M | low | stale |  |  | Superseded by the OKF v0.2 redesign: write modes and drafts (eltmon/okf#6) and the advisory semantic pass (eltmon/okf#7) |
-| 736 | PAN-3824 | XS | low | needs-refinement |  |  | Image-only report: default view on Windows breaks the model selector; needs a written repro and expected behavior |
-| 737 | PAN-3823 | XS | low | needs-refinement |  |  | Image-only report titled "pan sync issue"; needs the command, output text, and expected behavior |
-| 738 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
-| 739 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
-| 740 | PAN-962 | M | low | needs-refinement |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
-| 741 | PAN-961 | M | low | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
-| 742 | PAN-943 | M | low | ok |  |  | Add memory file review and management command |
-| 743 | PAN-908 | M | low | ok |  |  | PAN-908: Make work-agent spawn limits configurable and overridable |
-| 744 | PAN-898 | M | low | ok |  |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
-| 745 | PAN-853 | L | low | needs-refinement |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
-| 746 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
-| 747 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
-| 748 | PAN-4347 | S | low | ok |  |  | pan done appends continue.json decisions to the PR body so significant decisions outlive the workspace |
-| 749 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
-| 750 | PAN-4275 | S | low | ok |  |  | Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. PAN-1641 has merged. |
-| 751 | PAN-2836 | M | low | needs-refinement |  |  | Placement presets now belong on eltmon/okf#4 after the OKF v0.2 redesign; migrate verb collides; re-scope or move upstream |
-| 752 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
-| 753 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
-| 754 | PAN-777 | M | low | ok |  |  | Inter-agent communication skill: send messages to conversation-mode agents |
-| 755 | PAN-775 | L | low | ok |  |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
-| 756 | PAN-3456 | XS | low | ok |  |  | Already fixed in 4117c9a777 with a regression test; open only pending close-out. |
-| 757 | PAN-774 | XS | low | ok |  |  | Unify launch UX and release pipeline for 1.0 |
-| 758 | PAN-773 | XS | low | ok |  |  | Design prompt-style overlays with model hierarchy and scoped toggles |
-| 759 | PAN-772 | M | low | stale |  |  | Auto-resume ladder paths it names are gone; terminal-stack consistency now means the Herdr/tmux contract in TERMINAL-BACKENDS.md |
-| 760 | PAN-771 | M | low | needs-refinement |  |  | Investigate Vercel Sandbox execution backend support |
-| 761 | PAN-769 | M | low | stale |  | PAN-750 | Phase-transition history no longer accumulates in a record; a churn metric would be rebuilt from PR review cycles or the pipeline journal |
-| 762 | PAN-765 | M | low | ok |  |  | Preserve trailing zeros in cost displays |
-| 763 | PAN-764 | M | low | ok |  |  | Add quota/usage inspector for routed model providers |
-| 764 | PAN-4425 | M | low | ok |  |  | Deft fork work in eltmon/directive (env off switch, external-orchestrator mode); outside the overdeck pipeline |
-| 765 | PAN-752 | M | low | ok |  |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
-| 766 | PAN-751 | M | low | ok |  |  | Historical Metrics Data Persistence |
-| 767 | PAN-750 | L | low | ok |  |  | Complete Metrics Page Redesign |
-| 768 | PAN-749 | M | low | needs-refinement |  |  | Research and borrow best features from gstack |
-| 769 | PAN-747 | XS | low | ok |  |  | Conversation list items lack accessible labels in accessibility tree |
-| 770 | PAN-743 | XS | low | ok |  |  | Add consistent new conversation icon actions in Command Deck |
-| 771 | PAN-738 | M | low | ok |  |  | Add right-click fork option to conversation list |
-| 772 | PAN-735 | M | low | ok |  |  | Settings page: review and configure overridden subagent model files |
-| 773 | PAN-730 | M | low | ok |  |  | Add provider account telemetry for credits, balances, and usage |
-| 774 | PAN-701 | XS | low | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
-| 775 | PAN-663 | XS | low | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
-| 776 | PAN-660 | M | low | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
-| 777 | PAN-624 | M | low | ok |  |  | Loop nodes: iterative agent execution with conditional termination |
-| 778 | PAN-623 | M | low | ok |  |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
-| 779 | PAN-622 | M | low | ok |  |  | YAML workflow DAGs: custom per-project pipeline definitions |
-| 780 | PAN-604 | M | low | ok |  |  | Hide planning agent from workspace detail pane |
-| 781 | PAN-603 | M | low | ok |  |  | Plan review loop with configurable reviewer model |
-| 782 | PAN-591 | XS | low | ok |  |  | Integrate Karpathy LLM guidelines into all Panopticon CLAUDE.md templates |
-| 783 | PAN-589 | XS | low | ok |  |  | Review and update commands-skills.md with all available Panopticon skills |
-| 784 | PAN-576 | M | low | ok |  |  | Global / search should include conversations in addition to workspace features |
-| 785 | PAN-571 | XS | low | ok |  |  | Add OpenRouter credits/plan status endpoint and UI |
-| 786 | PAN-568 | M | low | ok |  |  | Kanban: Show workspace and tmux session counts in stats |
-| 787 | PAN-565 | M | low | ok |  |  | Handle CTRL-Z to undo accidental conversation archival |
-| 788 | PAN-564 | M | low | ok |  |  | Slash menu positioned incorrectly |
-| 789 | PAN-554 | M | low | ok |  |  | Add kanban board deeplinks for issue URLs |
-| 790 | PAN-543 | M | low | ok |  |  | Add confirmation dialog before applying Optimal Defaults |
-| 791 | PAN-483 | M | low | ok |  |  | Unify Resume Agent UX |
-| 792 | PAN-480 | M | low | needs-refinement |  |  | Planning-agent --effort; likely covered by merged PAN-4249 resolver and PAN-4258 (plan effort), confirm or close |
-| 793 | PAN-476 | M | low | ok |  |  | Agent resume with Haiku session summary instead of claude --resume |
-| 794 | PAN-468 | M | low | ok |  |  | Agent test conversations pollute production database |
-| 795 | PAN-461 | M | low | ok |  |  | Deep-wipe multi-step progress dialog |
-| 796 | PAN-459 | M | low | ok |  |  | Planning setup screen with SSE progress streaming |
-| 797 | PAN-407 | XS | low | ok |  |  | Run Panopticon from a main workspace for development isolation |
-| 798 | PAN-2348 | XS | low | ok |  |  | docs: migrate STATE-STORAGE-AUDIT.md content to living docs, then delete |
-| 799 | PAN-2346 | XS | low | ok |  |  | docs: refresh AGENT_TYPES_INDEX.md to the post-Cut taxonomy in ROLES.md (xBRIEF items, foreman, conv-flywheel, worker role). |
-| 800 | PAN-2345 | XS | low | ok |  |  | docs: rewrite pan-done.md against done.ts + done-preflight.ts; fix continue path; point MERGE link at MERGE-WORKFLOW.md. |
-| 801 | PAN-2344 | XS | low | ok |  |  | docs: rewrite KANBAN-MODEL.md for derived issue state, pipeline-membership buckets, PR reviews; drop Inspect and beads. |
-| 802 | PAN-2343 | XS | low | ok |  |  | docs: rewrite MISSION-CONTROL.md: state label from deriveStateLabel, membership, liveness.ts; review_status table is gone. |
-| 803 | PAN-2073 | XS | low | ok |  |  | docs: add user-facing page for the Desktop App |
-| 804 | PAN-2071 | XS | low | ok |  |  | docs: add user-facing page for the Hooks system |
-| 805 | PAN-2068 | XS | low | ok |  |  | docs: add user-facing page for Caveman (agent output compression) |
-| 806 | PAN-2067 | XS | low | ok |  |  | docs: add user-facing page for RTK (Bash output compression) |
-| 807 | PAN-1684 | XS | low | ok |  |  | build full marketing kit + plan (SEO, video list, channels) from MARKETING.md seed |
-| 808 | PAN-1683 | XS | low | ok |  |  | docs: canonical agent session-prefix registry + reconcile role taxonomy (ROLES.md/AGENT_TYPES_INDEX/CLAUDE.md) |
-| 809 | PAN-1474 | M | low | ok |  |  | Add ACKNOWLEDGEMENTS doc |
-| 810 | PAN-1469 | M | low | ok |  |  | End-to-end review and consolidation of all project documentation |
-| 811 | PAN-674 | XS | low | ok |  |  | docs: add glossary of Panopticon domain terms |
-| 812 | PAN-634 | M | low | ok |  |  | Documentation cleanup: restructure docs, update installation (npx panctl), refresh stale PRDs |
-| 813 | PAN-2908 | M | low | ok |  |  | Make overdeck not suck |
-| 814 | PAN-106 | M | high | stale |  |  | Cost prediction/estimation for in-progress work |
-| 815 | PAN-262 | M | high | stale |  |  | Refactor post-merge lifecycle into composable, idempotent operations |
-| 816 | PAN-176 | M | high | stale |  |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
-| 817 | PAN-334 | S | medium | stale |  |  | Dashboard server has no duplicate-process protection |
-| 818 | PAN-324 | XS | medium | needs-refinement |  |  | Approval is now a PR review or the dashboard MERGE button; verify whether the agent detail pane already surfaces MERGE post-cut |
-| 819 | PAN-304 | S | medium | stale |  |  | closeLinearDirect returns stepOk even when state update never happens |
-| 820 | PAN-245 | S | medium | stale |  |  | Ctrl+C aborts planning dialog instead of copying text |
-| 821 | PAN-244 | S | medium | stale |  |  | Deep-wipe leaves local branch and worktree metadata behind |
-| 822 | PAN-4332 | M | low | ok |  |  | Interop: continue t3code sessions in Overdeck and back via native transcripts; PAN-2609 Phase A has closed |
-| 823 | PAN-113 | S | medium | stale |  |  | Dashboard 'Start Agent' returns success before verifying agent actually started |
-| 824 | PAN-49 | XS | medium | stale |  |  | Fix CloisterService tests that require real runtime |
-| 825 | PAN-294 | M | medium | stale |  |  | Surface module initialization errors as system-level, not per-issue |
-| 826 | PAN-293 | M | medium | stale |  |  | Project Living Memory |
-| 827 | PAN-277 | M | medium | stale |  |  | Session reasoning capture & collaborative PRD refinement |
-| 828 | PAN-258 | M | medium | stale |  |  | Kanban board: fit all columns without horizontal scrolling |
-| 829 | PAN-255 | M | medium | stale |  |  | Agents lack awareness of MCP tools |
-| 830 | PAN-252 | XS | medium | stale |  |  | Disable Sync with Main button when workspace is up to date |
-| 831 | PAN-243 | M | medium | stale |  |  | Audit dashboard actions: ensure all are available via CLI |
-| 832 | PAN-77 | XS | medium | stale |  |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
-| 833 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
-| 834 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
-| 835 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
-| 836 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 837 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 838 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 839 | PAN-5033 | XS | medium | ok |  |  | OpenClaw Connect a bot snippet omits hooks.allowConversationAccess, so the needs-you summary stays off with no message. |
-| 840 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 841 | PAN-5043 | S | medium | ok |  |  | Commit the phone-app iOS Simulator harness (Miniflare connect stand-in, stub account service, rig steps) built twice by hand. |
-| 842 | PAN-5065 | L | medium | ok |  |  | Opt-in mode where a project's agents and gates stop seeing ~/.overdeck.env keys the project did not list. |
-| 843 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 844 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
-| 845 | PAN-762 | M | low | stale |  |  | Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about |
-| 846 | PAN-299 | M | low | stale |  |  | Granular session state persistence across context compaction |
-| 847 | PAN-298 | M | low | stale |  |  | Auto-detect package manager and runtime in workspace setup |
-| 848 | PAN-297 | M | low | stale |  |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
-| 849 | PAN-283 | M | low | stale |  |  | Reset should sync workspace feature branch with latest main |
-| 850 | PAN-271 | M | low | stale |  |  | Auto-assign Linear project from project config when creating issues |
-| 851 | PAN-265 | M | low | stale |  |  | Review skill categorization: all skills available everywhere via personal + workspace |
-| 852 | PAN-249 | XS | low | stale |  |  | Add data-testid attributes across dashboard UI and create Playwright smoke test suite |
-| 853 | PAN-228 | M | low | stale |  |  | Shift-left post-edit diagnostics |
-| 854 | PAN-227 | M | low | stale |  |  | Phase gate validation |
-| 855 | PAN-198 | M | low | stale |  |  | Structured audit trail for agent actions |
-| 856 | PAN-190 | M | low | stale |  |  | PAN-190: Specialized reviewer prompts (industry best-practice checklists) |
-| 857 | PAN-180 | M | low | stale |  |  | PAN-180: Cross-terminal file locking for concurrent agents |
-| 858 | PAN-177 | M | low | stale |  |  | PAN-177: Iteration limits with escalation for autonomous agents |
-| 859 | PAN-175 | M | low | stale |  |  | PAN-175: Pre-compact auto-save hook for agent sessions |
-| 860 | PAN-155 | L | low | stale |  |  | PAN-155: Redesign health page with Stitch (system overview, timeline, costs) |
-| 861 | PAN-146 | M | low | stale |  |  | PAN-146: Refine light mode theming across all dashboard pages |
-| 862 | PAN-55 | M | low | stale |  |  | Track specialist costs with time period filtering |
-| 863 | PAN-44 | M | low | stale |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
-| 864 | PAN-2070 | XS | low | needs-refinement |  |  | docs: user-facing Flywheel page should target the pan-flywheel v2 loop skill, not a CLI daemon with a dashboard toggle |
-| 865 | PAN-3536 | S | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): pan tell can not reach ohmypi conversations; fix dies with the harness |
-| 866 | PAN-2027 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): routing kimi-k2 through ohmypi needs a different home once OMP is gone |
-| 867 | PAN-2035 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): Copilot provider routing via omp |
-| 868 | PAN-2034 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): end-to-end test for ohmypi tool-call rendering |
-| 869 | PAN-2033 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi message-delivery latency benchmark |
-| 870 | PAN-2032 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): local Ollama review role via omp |
-| 871 | PAN-2030 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): version-pin the ohmypi extension |
-| 872 | PAN-2029 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi-parser thinking_tokens capture |
-| 873 | PAN-2028 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): per-provider cost grouping keyed on omp |
-| 874 | PAN-2024 | XS | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi conversation Tools-toggle |
-| 875 | PAN-2883 | M | high | needs-refinement |  |  | Appears already fixed: resolveIssuePullRequestRef probes strike/<id> at pull-requests.ts:209, which is exactly the fix. Verify and close. |
-| 876 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
-| 877 | PAN-4555 | XS | low | ok |  |  | Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then. |
-| 878 | PAN-4590 | L | medium | ok |  |  | Semgrep sast verification gate + review-context findings; first buildable Semgrep child (epic PAN-4585 closed), needs config. |
-| 879 | PAN-4591 | L | medium | ok |  |  | Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; epic PAN-4585 closed, now buildable. |
-| 880 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
-| 881 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
-| 882 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
-| 883 | PAN-5022 | L | medium | ok |  |  | Phone app: relay notification preferences to offline machines via the directory, and drop muted pushes on the phone. |
-| 884 | PAN-5021 | M | low | needs-refinement |  |  | PAN-5100 landed phone telemetry with conflicting decisions; re-scope to any remaining gap or close as superseded. |
-| 885 | PAN-5029 | M | medium | needs-refinement |  |  | Grok Build Tailscale reach can't work: pan mcp serve verifies tokens only against its own machine. Needs a design choice. |
-| 886 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
-| 887 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
-| 888 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
-| 889 | PAN-5207 | L | low | needs-refinement |  | PAN-5202 | Parked by the operator: Flux meeting bots for Zoom, Teams, Meet, Slack as a paid integration. Do not start. |
-| 890 | PAN-5183 | XS | low | ok | ✓ |  | Parent of the file explorer; all children PAN-5185..5191 are closed. Verify and close. |
-| 891 | PAN-5181 | XS | low | ok |  |  | Fix shipped in PR #5179 (merged 2026-11-13); the body says it closes on merge. Verify and close. |
-| 892 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
-| 893 | PAN-5235 | XS | low | ok |  |  | Fix already applied: terminal-dialog toast now navigates to the agent's terminal tab. Verify and close. |
-| 894 | PAN-5280 | XS | low | ok |  |  | Record of two UI fixes made inline on main (orbiting logo, unclipped Home project menu). Verify and close. |
+| 397 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
+| 398 | PAN-2069 | XS | medium | ok |  |  | caveman: follow-up gaps |
+| 399 | PAN-1918 | XS | medium | ok |  |  | full frontend vitest suite runs in no CI path |
+| 400 | PAN-1912 | XS | medium | ok |  |  | Pi agent transcripts hide tool-call detail; agent panes lack the Tools show/hide toggle |
+| 401 | PAN-4208 | M | medium | ok |  |  | #4205 follow-ups: Effect-free config read for telemetry to hit <100ms pan --version; CI import test for lazy command targets |
+| 402 | PAN-1846 | S | medium | needs-refinement |  |  | unbounded log growth |
+| 403 | PAN-1830 | S | medium | ok |  |  | Reviewer stuck on gpt-5.5 rate-limit modal blocks REVIEWER_READY |
+| 404 | PAN-1816 | S | medium | ok |  |  | Scratch/UAT-lifecycle issues (PAN-18031) enter the real pipeline: kanban, review convoys, agent registry |
+| 405 | PAN-1795 | S | medium | ok |  |  | Codebase map bootstrapped in planning worktree is never promoted to main |
+| 406 | PAN-1774 | S | medium | ok |  |  | workspace server container crashloops when dist/dashboard/server.js is missing |
+| 407 | PAN-1769 | S | medium | ok |  |  | Supervisor echo-confirm false negative on long messages → triple-paste delivery (rewrite ×2 + tmux fallback); resumed-conv message stil… |
+| 408 | PAN-1761 | S | medium | ok |  |  | conversations endpoints fetched via relative /api path |
+| 409 | PAN-1755 | S | medium | ok |  |  | uat stuck-assembly cap (30m) kills slow-but-alive assemblies and leaves orphaned conflict agents racing the next generation |
+| 410 | PAN-3516 | XS | medium | ok |  |  | Repo .claude/skills holds stale duplicates of pan-handoff, pan-flywheel and okf, so overdeck-dev sessions load outdated skill text. |
+| 411 | PAN-3455 | XS | medium | ok |  |  | cliproxy --version exits 2, so the up-to-date check always returns false and every ensure re-downloads the pinned release. |
+| 412 | PAN-3117 | XS | medium | ok |  |  | A deterministic 400 renders as the generic 'Failed to send' bubble with a Retry that can never succeed. |
+| 413 | PAN-3036 | XS | medium | ok |  |  | Pane-idle detection reads a completed strike's idle composer as a pending question, so a finished strike shows '! INPUT'. |
+| 414 | PAN-3016 | M | medium | ok |  |  | Operator ask: every view should be URL-addressable; cockpit tabs, stage panes and several drawers are still local state. |
+| 415 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
+| 416 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
+| 417 | PAN-5028 | M | medium | ok |  |  | list_pending_input loses a conversation's AskUserQuestion after the PAN-1520 deny hook, contrary to the existing test's contract. |
+| 418 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
+| 419 | PAN-5227 | S | medium | ok |  |  | Closed-issue reaper re-checks every issue's state every 60 s, spending ~25% of the GitHub App REST bucket while idle. |
+| 420 | PAN-5349 | L | medium | ok |  |  | pan open <path> opens files/folders in the dashboard; opt-in OS file-manager 'Open in Overdeck'. PRD in .pan/drafts/pan-5349.md |
+| 421 | PAN-5342 | L | medium | ok |  |  | Safe shutdown: drain agents at a tool boundary before reboot; PRD landed; item 16 of workflow-redesign order book. |
+| 422 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
+| 423 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
+| 424 | PAN-1627 | M | medium | ok |  |  | Substrate: Claude Code's native .claude/** settings-edit protection wedges in-scope work agents (un-overridable by PreToolUse auto-appr… |
+| 425 | PAN-1624 | S | medium | ok |  |  | pan handoff --author external: authored doc is socket_write-ten but never submitted |
+| 426 | PAN-3901 | S | medium | ok |  |  | test-skip gate has no audited exemption for opt-in live suites (skipIf on env/binary); allowlist row with justification |
+| 427 | PAN-3852 | S | medium | ok |  |  | Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping |
+| 428 | PAN-5343 | L | medium | ok |  | PAN-5335, PAN-5290, PAN-5295, PAN-5294 | Workflow redesign H: All projects deck listing conversations across projects, 1-4 side by side. Waits on four siblings. |
+| 429 | PAN-3862 | L | medium | needs-refinement |  |  | /agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model |
+| 430 | PAN-1572 | M | medium | needs-refinement |  |  | Settings permission-mode can desync from the resolved mode; body cites the removed DSP flag and a renamed symbol — rewrite first |
+| 431 | PAN-4627 | S | medium | ok |  |  | Homebrew Claude Code installs get a copy-only upgrade banner; make the brew plan runnable and auto-upgrade outdated runnable installs. |
+| 432 | PAN-1571 | S | medium | ok |  |  | Large multi-line pastes (handoff docs) land unsubmitted |
+| 433 | PAN-1565 | S | medium | ok |  |  | Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
+| 434 | PAN-5312 | S | medium | ok |  |  | Quality-gate admission: a head that can never fit alone serializes every gate behind it. |
+| 435 | PAN-5241 | L | medium | ok |  |  | Spill work agents to linked machines, then Fly, when this machine is full, up to operator caps. |
+| 436 | PAN-1530 | S | medium | ok |  |  | Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
+| 437 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
+| 438 | PAN-1449 | S | medium | ok |  |  | Memory extraction still failing; the live symptom PAN-4370 closed and PAN-4374 adds a working provider; layout half remains |
+| 439 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
+| 440 | PAN-5180 | M | medium | ok |  |  | Tab-open REST burst (~45 requests) delays every client 1.0-1.4 s; uncached prerequisite and status probes. |
+| 441 | PAN-5264 | M | medium | ok |  |  | Attribute the app-rest GitHub caller (1,422 untraced App REST calls/hour), then cut the largest path. |
+| 442 | PAN-5340 | S | medium | ok |  | PAN-5337 | A Preview link to another Markdown file should open it in Preview, not Edit. Follows PAN-5337. |
+| 443 | PAN-5341 | S | medium | ok |  | PAN-5338 | Dock Changes diff view gets the Markdown Preview switch from PAN-5338; matters once D2 moves diffs to the dock. |
+| 444 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
+| 445 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
+| 446 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
+| 447 | PAN-5322 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5319: unguarded identifier.toUpperCase(), modal focus, needs-you rows that open nothing. |
+| 448 | PAN-5317 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5127: route live Codex app-server sends correctly; no replayable mail for keyed sends. |
+| 449 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
+| 450 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
+| 451 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
+| 452 | PAN-2469 | S | medium | ok |  |  | Assembly landed (mergeReadySlots + finalization); remaining: alarm when all slots merged but no review requested. Swarm dormant. |
+| 453 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
+| 454 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
+| 455 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
+| 456 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
+| 457 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
+| 458 | PAN-4971 | S | medium | ok |  |  | Viewer header shows only host + count; roster of all participants with host/controller marked. Frontend-only, payload exists. |
+| 459 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
+| 460 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
+| 461 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
+| 462 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
+| 463 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
+| 464 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
+| 465 | PAN-5174 | XS | medium | ok |  |  | Flaky CI test: share/rate-limit.test.ts flips 201/429 under CI timing; quarantine or make deterministic. |
+| 466 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
+| 467 | PAN-5346 | S | medium | ok |  |  | Auth docs misstate #overdeck_token delivery, the Origin rule and 401 troubleshooting; PAN-5344 fix has landed. |
+| 468 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
+| 469 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
+| 470 | PAN-1130 | S | medium | ok |  |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
+| 471 | PAN-1129 | S | medium | ok |  |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
+| 472 | PAN-1128 | S | medium | ok |  |  | Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
+| 473 | PAN-1113 | S | medium | ok |  |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
+| 474 | PAN-1068 | S | medium | ok |  |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
+| 475 | PAN-3938 | M | medium | needs-refinement |  |  | Run Muse Spark under Claude Code via cliproxy — only the paid Zen model is routable; free tier is OpenCode-client gated; needs credit… |
+| 476 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
+| 477 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
+| 478 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
+| 479 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
+| 480 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
+| 481 | PAN-778 | M | medium | ok |  |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
+| 482 | PAN-681 | S | medium | ok |  |  | Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
+| 483 | PAN-3732 | S | medium | ok |  |  | Codex handoff serializes a large rollout twice (~286MB peak RSS on 50MB); serialize once or stream. |
+| 484 | PAN-3700 | M | medium | ok |  |  | pan acp serve would let Zed and other ACP clients drive Overdeck conversations through canonical doors. PRD written. |
+| 485 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces, so docs items sit unanchored in the requirement traceability graph. |
+| 486 | PAN-3132 | M | medium | ok |  |  | xBRIEF v0.9 agentic dispatch fields are half-adopted as a behavior accident; make difficulty/filesScope/verifyCommands a contract. |
+| 487 | PAN-3909 | M | medium | needs-refinement |  |  | One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains |
+| 488 | PAN-2659 | S | medium | ok |  |  | acquireRecordLock survives for the planning auto-start consent lock; an ownerless lock after a crash is never reclaimed. |
+| 489 | PAN-3831 | S | medium | ok |  |  | Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver) |
+| 490 | PAN-4779 | S | medium | ok |  |  | Docs on main: 2 MDX parse errors hide pages from Mintlify + 15 broken vision.mdx links; mint broken-links can't gate |
+| 491 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
+| 492 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
+| 493 | PAN-3563 | S | medium | needs-refinement |  |  | pan unstick is gone; verify whether a spawned-but-never-briefed role agent can still read as running forever under liveness.ts |
+| 494 | PAN-1041 | M | medium | ok |  |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
+| 495 | PAN-924 | L | medium | needs-refinement |  |  | Spike: evaluate GitNexus for Panopticon integration |
+| 496 | PAN-3770 | S | medium | ok |  |  | Codex conversations never show the working spinner mid-turn; parser marks every agent_message instantly complete. |
+| 497 | PAN-4568 | XS | medium | ok |  |  | Codex sub-agent turn start shows thread: not sub: label; adoption lands one frame late. PAN-4563 replay test has landed. |
+| 498 | PAN-3731 | S | medium | ok |  |  | Restart-gate banner gives no feedback after approval; dead-requester approvals read as a broken button. |
+| 499 | PAN-3530 | S | medium | ok |  |  | Four God View components poll on 30s timers instead of the documented /ws/rpc event contract. |
+| 500 | PAN-3131 | L | medium | ok |  |  | Support xBRIEF planRef sharding so a 1.1MB/227-item plan stops making every finalize failure whole-plan-fatal. |
+| 501 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
+| 502 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
+| 503 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
+| 504 | PAN-4918 | M | medium | ok |  |  | Six Anywhere UI bugs seen while filming: Codex keeps Claude model, Zen models listed first, chip wrap, Pull-here state, no remote archive. |
+| 505 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
+| 506 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
+| 507 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
+| 508 | PAN-713 | M | medium | ok |  |  | test: add unit tests for doneCommand and approveCommand |
+| 509 | PAN-700 | M | medium | ok |  |  | Detachable terminal for conversation view |
+| 510 | PAN-646 | XS | medium | needs-refinement |  |  | Cancel no longer clears beads or a record; a Recover workflow now means reopening the tracker issue and re-planning |
+| 511 | PAN-532 | M | medium | ok |  |  | Per-project and per-issue model overrides for pipeline roles |
+| 512 | PAN-2896 | M | medium | ok |  |  | Warm resource-discovery and membership caches at boot |
+| 513 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
+| 514 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
+| 515 | PAN-5231 | S | medium | ok |  |  | Explorer: retrying Send through pipeline after a partial failure creates a second issue and branch. |
+| 516 | PAN-5204 | S | medium | ok |  |  | Voice: mixed 16/24 kHz sample rates on /ws/voice, and dictation turns leak into AutoPreso as errors. |
+| 517 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
+| 518 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
+| 519 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
+| 520 | PAN-2566 | L | medium | ok | ✓ |  | Triage list of genuine Traycer capability gaps; a container for child issues, not directly workable. |
+| 521 | PAN-2565 | M | medium | ok |  |  | Multi-agent conversations: N agent sessions in one task surface with agent-to-agent messaging |
+| 522 | PAN-3735 | S | medium | ok |  |  | Sandboxed pan CLI reports 'dashboard down, run pan up' when the real cause is no network; sends agents down the wrong path. |
+| 523 | PAN-3335 | XS | medium | ok |  |  | A pasted screenshot can't be viewed anywhere in the dashboard: thumbnail has no click handler and the sent form is a file-link chip. |
+| 524 | PAN-3054 | M | medium | ok |  |  | Benchmark matrix, redesigned 2026-09-29 as E6 of the model-routing PRD; its medians feed PAN-4364 and PAN-4367 |
+| 525 | PAN-2977 | M | medium | ok |  | PAN-2976 | Settings surface that detects installed ACP CLIs, renders the capability checklist, and guides login without a manual terminal. |
+| 526 | PAN-2557 | M | medium | ok |  |  | project-level 'Restart All' context action |
+| 527 | PAN-2553 | M | medium | ok |  |  | project-level CI visibility |
+| 528 | PAN-2521 | S | medium | ok |  |  | launch pipeline agents with harness rate-limit model-switch reminder disabled |
+| 529 | PAN-2493 | M | medium | ok |  |  | align the cockpit Agents-lane and sidebar issue-tree feature sets (two-way gaps) |
+| 530 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
+| 531 | PAN-3853 | S | medium | needs-refinement |  |  | Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path |
+| 532 | PAN-3830 | S | medium | ok |  |  | OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model |
+| 533 | PAN-4924 | S | medium | ok |  |  | linked-machines.mdx promises switch model for running conversations; dashboard disables it. Fix docs or add the control. |
+| 534 | PAN-4367 | M | medium | ok |  |  | Replace inherited capability scores for Sonnet 5.5, GPT-6 Sol/Luna with measured ones; eval harness has closed |
+| 535 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
+| 536 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
+| 537 | PAN-2409 | M | medium | ok |  |  | enforce the workspace boundary |
+| 538 | PAN-5145 | S | medium | ok |  |  | CLIProxy oauth-model-alias hides gpt-6-sol, gpt-5.6-terra and gpt-5.6-luna by their own ids on claude-code. |
+| 539 | PAN-5201 | XL | medium | ok |  |  | Speaker-aware STT: diarizing engines (Speechmatics, AssemblyAI, Muse, Voxtral, NeMo) and one VoiceSettings contract. |
+| 540 | PAN-2392 | M | medium | needs-refinement |  |  | Standing Crew survives; panel becomes a cost view from cost_events + tier-metrics; verdict/escalation columns need a new source. |
+| 541 | PAN-2335 | XS | medium | ok |  |  | chore: review the full open backlog for junk/stale/nonsensical issues |
+| 542 | PAN-2295 | L | medium | needs-refinement |  |  | built-in web browser surface (openable like terminal/Claude Code/Codex) + native Agentation integration |
+| 543 | PAN-3767 | S | medium | ok |  |  | Model switch could hang at 'Saving…'; onError toast landed, remaining work is reproducing the hang on a healthy server. |
+| 544 | PAN-3615 | S | medium | needs-refinement |  |  | TTS silent 9+ days from four stacked failures; three already fixed, only follow-ups remain — rescope to what is left. |
+| 545 | PAN-3558 | S | medium | ok |  |  | Subagent rail shows no model or provider, so mixed-model orchestration needs a transcript open per row to see what it is running. |
+| 546 | PAN-3469 | S | medium | ok |  |  | NewProjectModal violates the PAN-3410 page-not-modal doctrine; migrate the create-project flow to a routed page. |
+| 547 | PAN-3333 | M | medium | ok |  |  | Model pickers show $/1M, which says nothing under a subscription; show relative plan-quota drain among sibling models. |
+| 548 | PAN-3058 | M | medium | ok |  |  | Ship named crew presets that populate the whole tiered_execution block so operators don't hand-build the crew table. |
+| 549 | PAN-2288 | L | medium | ok |  |  | tmux managed-server: lossless auto-migration of dirty-founded servers + boot-time ensure call |
+| 550 | PAN-2065 | M | medium | ok |  |  | unified usage & headroom panel across all provider plans (z.ai, Anthropic, Codex, OpenRouter) |
+| 551 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
+| 552 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
+| 553 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
+| 554 | PAN-4366 | M | medium | ok |  |  | Plan the Haiku 4.5 successor and give workhorse:cheap a consumer or drop it; gated on E4 summary-faithfulness |
+| 555 | PAN-5314 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5313 (CLIProxy pool): body-read timeout, cache-miss coalescing, reset timestamps. |
+| 556 | PAN-5267 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5266: escalation limit and caching transient GraphQL errors as missing issues. |
+| 557 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
+| 558 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
+| 559 | PAN-3739 | S | medium | ok |  |  | cost-reconcile re-warns every model-less codex subthread rollout on every sweep; log flood grows without bound. |
+| 560 | PAN-4393 | XS | medium | ok |  |  | ac-eval-fixtures requires observable:false >= 8 but honest labeling of all specs yields 6; lower the floor |
+| 561 | PAN-1985 | M | medium | ok |  |  | Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
+| 562 | PAN-1968 | M | medium | ok |  |  | Finish local-domain rename: pan.localhost → overdeck.localhost |
+| 563 | PAN-1967 | M | medium | needs-refinement |  |  | Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
+| 564 | PAN-1965 | M | medium | ok |  |  | Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
+| 565 | PAN-1937 | M | medium | ok |  |  | feat: data export |
+| 566 | PAN-1926 | M | medium | ok |  |  | --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
+| 567 | PAN-1916 | M | medium | ok |  |  | configurable web search providers (Exa, Tavily, Brave, Perplexity) |
+| 568 | PAN-1854 | M | medium | ok |  |  | Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
+| 569 | PAN-1853 | M | medium | ok |  |  | Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
+| 570 | PAN-1852 | XS | medium | ok |  |  | Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
+| 571 | PAN-1844 | M | medium | ok |  |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
+| 572 | PAN-5202 | XL | medium | ok |  | PAN-5201 | Flux: experimental live meeting page capturing open items, ticket proposals and diagrams. Depends on PAN-5201. |
+| 573 | PAN-5141 | M | medium | ok |  |  | Reviewer pairing code: multi-day, reusable, restart-safe code so app store review can pair unattended. |
+| 574 | PAN-1840 | M | medium | ok |  |  | Add 'pan switch <id>' |
+| 575 | PAN-1839 | M | medium | ok |  |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
+| 576 | PAN-1776 | M | medium | ok |  |  | Hot-updatable message delivery: version-stamped supervisors + server-side delivery logic |
+| 577 | PAN-3706 | L | medium | ok |  |  | Broadsheet shipped typography only; color, surface, elevation and texture still on Ledger values, so it doesn't read like Subspace. |
+| 578 | PAN-3539 | XS | medium | needs-refinement |  |  | OOMPolicy=continue fix landed with the issue; re-scope to whatever hardening remains or close it out. |
+| 579 | PAN-3502 | XS | medium | needs-refinement |  |  | tiered-crews blendedCost expectation stale vs pricing catalog; likely already fixed by the PAN-3532 cherry-pick — verify. |
+| 580 | PAN-4409 | M | medium | ok |  |  | Overdeck integration on OKF v0.2.0 (injector trust tiers, new verbs); blocked on external eltmon/okf#9 |
+| 581 | PAN-4410 | M | medium | ok |  | PAN-4409 | Migrate eltmon/overdeck-knowledge to OKF v0.2 and refresh stale concepts; last link in the OKF chain |
+| 582 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
+| 583 | PAN-4878 | XS | low | ok |  |  | Delete dead ox curl installer in prereqs registry; PAN-4852 builds ox from the pinned fork commit, so ~/.local/bin/ox is never used. |
+| 584 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
+| 585 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
+| 586 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
+| 587 | PAN-1748 | M | medium | ok |  |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
+| 588 | PAN-1691 | M | medium | ok |  |  | conflict-aware merge train + on-demand UAT candidate |
+| 589 | PAN-1685 | XS | medium | ok |  |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
+| 590 | PAN-1676 | M | medium | ok |  |  | Harden Fly remote workspaces + pan workspace move; work-agent spill policy now specified in PAN-5241. |
+| 591 | PAN-1667 | M | medium | ok |  |  | unify Agents + Resources into one issue-centric holistic view |
+| 592 | PAN-1657 | M | medium | ok |  |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
+| 593 | PAN-1656 | M | medium | ok |  |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
+| 594 | PAN-1655 | M | medium | ok |  |  | Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
+| 595 | PAN-1654 | XS | medium | ok |  |  | run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
+| 596 | PAN-1653 | XS | medium | ok |  |  | batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
+| 597 | PAN-5309 | S | low | ok |  |  | CodeRabbit minor findings on the PAN-5283 Flywheel page redesign; verify each against main before fixing. |
+| 598 | PAN-5308 | S | low | ok |  |  | CodeRabbit findings on the PAN-5282 CLIProxy v8 upgrade: config-write ordering, Windows upgrade staging. |
+| 599 | PAN-1623 | M | medium | ok |  |  | Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
+| 600 | PAN-1561 | M | medium | ok |  |  | feat: Project-scoped dashboard nav (deck of tabs per project + conversations/tree column + activity feed) |
+| 601 | PAN-1550 | M | medium | ok |  |  | BrowserPane half only; the FilesPane half is superseded by the PAN-5183 file explorer, whose children have all closed. |
+| 602 | PAN-1545 | XS | medium | ok |  |  | New Terminal button |
+| 603 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
+| 604 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
+| 605 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
+| 606 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
+| 607 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
+| 608 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
+| 609 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
+| 610 | PAN-1432 | M | medium | ok |  |  | Merge agent leaves packages/contracts/dist stale |
+| 611 | PAN-1223 | M | medium | ok |  |  | Auto-update for users in the field (npm + desktop binaries) |
+| 612 | PAN-1165 | M | medium | ok |  |  | Lightweight review path for small/trivial PRs |
+| 613 | PAN-1151 | XS | medium | ok |  |  | Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
+| 614 | PAN-4360 | S | medium | ok |  |  | Add pan claude upgrade and offer the Claude Code upgrade in pan install / pan sync; PAN-4359 has closed |
+| 615 | PAN-1060 | M | medium | ok |  |  | Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
+| 616 | PAN-1051 | M | medium | ok |  |  | feat: Subspace-inspired alternate theme with Inter + JetBrains Mono |
+| 617 | PAN-1037 | M | medium | ok |  |  | Retire 'planning-' tmux prefix |
+| 618 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
+| 619 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
+| 620 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
+| 621 | PAN-5067 | M | medium | ok |  |  | Skill overrides: bad-YAML issue file is overwritten on write (data loss), license detection gaps, Pi ignores --pack silently. |
+| 622 | PAN-4908 | S | low | ok |  |  | Other remote-not-enabled messages name no file and the dead verb 'pan remote setup'; reuse PAN-4905's remoteEnabledHint(). |
+| 623 | PAN-5130 | S | medium | ok |  |  | pan project add gains --issue-prefix for any tracker; --linear-team becomes a deprecated alias. Follow-up to closed PAN-51. |
+| 624 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
+| 625 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
+| 626 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
+| 627 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
+| 628 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
+| 629 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
+| 630 | PAN-4308 | S | medium | ok |  |  | Settle reaped Fly remote transcripts into the Session Vault; PAN-4295 auto-reap landed, still blocked by PAN-2609 (engine). |
+| 631 | PAN-3322 | XS | medium | ok |  |  | launcher-generator.ts's file-size ceiling sits 126 lines above the real file, handing back the regrowth the ratchet exists to prevent. |
+| 632 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
+| 633 | PAN-675 | M | medium | needs-refinement |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
+| 634 | PAN-654 | L | medium | ok |  |  | Project Setup Wizard |
+| 635 | PAN-649 | M | medium | ok |  |  | Render Excalidraw drawings inline in Claude Code conversations |
+| 636 | PAN-637 | XS | medium | ok |  |  | Direct issue kickoff (skip planning) from dashboard UI |
+| 637 | PAN-629 | M | medium | ok |  |  | Workspace quotas and resource governance |
+| 638 | PAN-613 | M | medium | needs-refinement |  |  | Investigate thinking effort levels for agents |
+| 639 | PAN-607 | M | medium | needs-refinement |  |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
+| 640 | PAN-606 | M | medium | needs-refinement |  |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
+| 641 | PAN-548 | M | medium | ok |  |  | Command Deck: preserve state across navigation including URL routing for tabs |
+| 642 | PAN-546 | M | medium | ok |  |  | Remove claude-code-router |
+| 643 | PAN-537 | M | medium | ok |  |  | feat: show changed files diff summary after each agent response in activity view |
+| 644 | PAN-531 | XS | medium | ok |  |  | PAN: Windows Electron support (WSL2 required) |
+| 645 | PAN-452 | M | medium | ok |  |  | Conversation input bar |
+| 646 | PAN-450 | M | medium | ok |  |  | Adopt remaining Effect patterns |
+| 647 | PAN-1126 | M | medium | ok |  |  | Integrate TLDR summaries into review context manifest |
+| 648 | PAN-5154 | L | low | needs-refinement |  |  | GitHub account, token and host per owner (work accounts, GHES). Not scheduled; needs a PRD first. |
+| 649 | PAN-1066 | M | medium | ok |  |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
+| 650 | PAN-3441 | L | low | ok |  |  | God View 'River' WebGL pipeline visualization fed by the live hook-event stream; PRD and mockup exist. |
+| 651 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
+| 652 | PAN-2941 | M | low | stale |  |  | Superseded by OKF v0.2: drafts plus human verify replace the PR gate (eltmon/okf#6); semantic pass is eltmon/okf#7 |
+| 653 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
+| 654 | PAN-4373 | M | medium | ok |  |  | Optional Jev relevance filter for prompt-time memory injection candidates; both prerequisites have closed |
+| 655 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
+| 656 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
+| 657 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
+| 658 | PAN-2662 | M | low | ok |  |  | Add project context-menu actions scoped to issues currently in the pipeline |
+| 659 | PAN-2645 | M | low | ok |  |  | Add opt-in Observation-first conversation view |
+| 660 | PAN-2635 | XS | low | ok |  |  | pay down the 152-error src/dashboard/server typecheck debt |
+| 661 | PAN-5066 | M | medium | ok |  |  | Project skills in .pan/skills skip the CLI workspace fallback, never refresh, lose to bundled skills, and never reach Codex/Pi. |
+| 662 | PAN-3443 | L | low | ok |  |  | God View 'Spectrum Deck' visualizer concept with mockup and PRD; pure exploration, no substrate impact. |
+| 663 | PAN-4350 | M | medium | needs-refinement |  |  | Re-dispatch budget for foreman items; issue itself flags an unresolved conflict with the no-stored-state rule |
+| 664 | PAN-4003 | L | medium | ok |  |  | Parked: delete the ohmypi/omp harness, keep Pi; obsoletes 10 open ohmypi issues and shrinks PAN-3958's CH-7 scope |
+| 665 | PAN-4368 | S | medium | ok |  |  | Operator-run checklist: verify Sonnet 5.5 across switch-model, fork and compaction (model-locked thinking blocks) |
+| 666 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
+| 667 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
+| 668 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
+| 669 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
+| 670 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
+| 671 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
+| 672 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
+| 673 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
+| 674 | PAN-4769 | XS | low | ok |  |  | Two-sentence wording fix in features/skill-packs.mdx; PAN-4759 created the page and closed, so this is unblocked. |
+| 675 | PAN-3940 | XL | low | ok | ✓ |  | Parked epic: event-driven plugin/hook system on pipeline-notifier + hygiene-scheduler; do not pick up until the journal has soaked |
+| 676 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
+| 677 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
+| 678 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
+| 679 | PAN-4823 | XL | medium | ok | ✓ |  | Epic: Capacitor phone client for Anywhere without Tailscale; 15 children filed (#4828-4843); OD-1 settled; PAN-4774 done. |
+| 680 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
+| 681 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
+| 682 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
+| 683 | PAN-5082 | XL | medium | ok |  |  | Move every MCP surface to SDK v2 for the 2026-07-28 spec while keeping 2025-11-25 clients; time it on PAN-5083 data. |
+| 684 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
+| 685 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
+| 686 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
+| 687 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
+| 688 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
+| 689 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
+| 690 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
+| 691 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
+| 692 | PAN-2046 | M | low | stale |  |  | Conversation view does not surface terminal command responses |
+| 693 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
+| 694 | PAN-3919 | S | low | needs-refinement |  |  | Review the universal effort-high default and supervisor effort discretion; explicitly an operator decision, no work authorized |
+| 695 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
+| 696 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
+| 697 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
+| 698 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
+| 699 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
+| 700 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
+| 701 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
+| 702 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
+| 703 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
+| 704 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
+| 705 | PAN-1782 | M | low | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout |
+| 706 | PAN-1773 | M | low | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
+| 707 | PAN-1646 | M | low | ok |  |  | Rabbit-hole drift detection and lift-to-new-conversation |
+| 708 | PAN-1643 | M | low | ok |  |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
+| 709 | PAN-1592 | M | low | ok |  |  | Composer: make ephemeral composer state reload-durable (pasted images + unsent/failed message text) |
+| 710 | PAN-1581 | M | low | ok |  |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
+| 711 | PAN-1533 | M | low | ok |  |  | Fork-into-worktree from conversation branch chip |
+| 712 | PAN-1483 | XS | low | ok |  |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
+| 713 | PAN-1482 | M | low | ok |  |  | Token spend report should aggregate data from repo, not just local machine |
+| 714 | PAN-1481 | M | low | ok |  |  | Add cost-event telemetry for Caveman token savings |
+| 715 | PAN-1356 | M | low | ok |  |  | Extend the memory Observation pipeline to ad-hoc conversations |
+| 716 | PAN-1242 | M | low | ok |  |  | Create a new issue directly from a kanban column |
+| 717 | PAN-1222 | M | low | ok |  |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
+| 718 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
+| 719 | PAN-4352 | XS | low | ok |  |  | Operator verification: skill packs in a managed interactive Claude Code launch now that PAN-4334 has shipped |
+| 720 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
+| 721 | PAN-4298 | XL | low | needs-refinement |  | PAN-4294, PAN-1676 | Anywhere paid tier: run agents on hosted Fly capacity; tenant isolation, credentials, metering open; PAN-4294 and PAN-1676 unbuilt |
+| 722 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
+| 723 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
+| 724 | PAN-1133 | M | low | stale |  |  | Deacon-patrol tie-in for TLDR supervision is gone; would need its own liveness check |
+| 725 | PAN-1123 | XS | low | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
+| 726 | PAN-1121 | M | low | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
+| 727 | PAN-4248 | L | medium | ok |  |  | List, pull and delete local Ollama models (size, store, in-use) in CLI, dashboard and doctor; PAN-1641 sidecar has merged. |
+| 728 | PAN-1117 | M | low | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
+| 729 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
+| 730 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
+| 731 | PAN-1064 | M | low | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
+| 732 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
+| 733 | PAN-3971 | L | low | ok |  |  | Overdeck-native artifact pages (pan artifact publish + state door + dashboard listing); body says backlog only, Claude artifacts work today |
+| 734 | PAN-3768 | XS | low | ok |  |  | pan handoff --title already implemented and landed (678f6b389e5); open only pending close-out. |
+| 735 | PAN-3034 | XS | low | ok |  |  | Fix already landed on main (strike/slot workspace names and live tmux now seed the session tree); open pending close-out. |
+| 736 | PAN-2983 | M | low | stale |  |  | Superseded by the OKF v0.2 redesign: write modes and drafts (eltmon/okf#6) and the advisory semantic pass (eltmon/okf#7) |
+| 737 | PAN-3824 | XS | low | needs-refinement |  |  | Image-only report: default view on Windows breaks the model selector; needs a written repro and expected behavior |
+| 738 | PAN-3823 | XS | low | needs-refinement |  |  | Image-only report titled "pan sync issue"; needs the command, output text, and expected behavior |
+| 739 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
+| 740 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
+| 741 | PAN-962 | M | low | needs-refinement |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
+| 742 | PAN-961 | M | low | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
+| 743 | PAN-943 | M | low | ok |  |  | Add memory file review and management command |
+| 744 | PAN-908 | M | low | ok |  |  | PAN-908: Make work-agent spawn limits configurable and overridable |
+| 745 | PAN-898 | M | low | ok |  |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
+| 746 | PAN-853 | L | low | needs-refinement |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
+| 747 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
+| 748 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
+| 749 | PAN-4347 | S | low | ok |  |  | pan done appends continue.json decisions to the PR body so significant decisions outlive the workspace |
+| 750 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
+| 751 | PAN-4275 | S | low | ok |  |  | Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. PAN-1641 has merged. |
+| 752 | PAN-2836 | M | low | needs-refinement |  |  | Placement presets now belong on eltmon/okf#4 after the OKF v0.2 redesign; migrate verb collides; re-scope or move upstream |
+| 753 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
+| 754 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
+| 755 | PAN-777 | M | low | ok |  |  | Inter-agent communication skill: send messages to conversation-mode agents |
+| 756 | PAN-775 | L | low | ok |  |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
+| 757 | PAN-3456 | XS | low | ok |  |  | Already fixed in 4117c9a777 with a regression test; open only pending close-out. |
+| 758 | PAN-774 | XS | low | ok |  |  | Unify launch UX and release pipeline for 1.0 |
+| 759 | PAN-773 | XS | low | ok |  |  | Design prompt-style overlays with model hierarchy and scoped toggles |
+| 760 | PAN-772 | M | low | stale |  |  | Auto-resume ladder paths it names are gone; terminal-stack consistency now means the Herdr/tmux contract in TERMINAL-BACKENDS.md |
+| 761 | PAN-771 | M | low | needs-refinement |  |  | Investigate Vercel Sandbox execution backend support |
+| 762 | PAN-769 | M | low | stale |  | PAN-750 | Phase-transition history no longer accumulates in a record; a churn metric would be rebuilt from PR review cycles or the pipeline journal |
+| 763 | PAN-765 | M | low | ok |  |  | Preserve trailing zeros in cost displays |
+| 764 | PAN-764 | M | low | ok |  |  | Add quota/usage inspector for routed model providers |
+| 765 | PAN-4425 | M | low | ok |  |  | Deft fork work in eltmon/directive (env off switch, external-orchestrator mode); outside the overdeck pipeline |
+| 766 | PAN-752 | M | low | ok |  |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
+| 767 | PAN-751 | M | low | ok |  |  | Historical Metrics Data Persistence |
+| 768 | PAN-750 | L | low | ok |  |  | Complete Metrics Page Redesign |
+| 769 | PAN-749 | M | low | needs-refinement |  |  | Research and borrow best features from gstack |
+| 770 | PAN-747 | XS | low | ok |  |  | Conversation list items lack accessible labels in accessibility tree |
+| 771 | PAN-743 | XS | low | ok |  |  | Add consistent new conversation icon actions in Command Deck |
+| 772 | PAN-738 | M | low | ok |  |  | Add right-click fork option to conversation list |
+| 773 | PAN-735 | M | low | ok |  |  | Settings page: review and configure overridden subagent model files |
+| 774 | PAN-730 | M | low | ok |  |  | Add provider account telemetry for credits, balances, and usage |
+| 775 | PAN-701 | XS | low | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
+| 776 | PAN-663 | XS | low | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
+| 777 | PAN-660 | M | low | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
+| 778 | PAN-624 | M | low | ok |  |  | Loop nodes: iterative agent execution with conditional termination |
+| 779 | PAN-623 | M | low | ok |  |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
+| 780 | PAN-622 | M | low | ok |  |  | YAML workflow DAGs: custom per-project pipeline definitions |
+| 781 | PAN-604 | M | low | ok |  |  | Hide planning agent from workspace detail pane |
+| 782 | PAN-603 | M | low | ok |  |  | Plan review loop with configurable reviewer model |
+| 783 | PAN-591 | XS | low | ok |  |  | Integrate Karpathy LLM guidelines into all Panopticon CLAUDE.md templates |
+| 784 | PAN-589 | XS | low | ok |  |  | Review and update commands-skills.md with all available Panopticon skills |
+| 785 | PAN-576 | M | low | ok |  |  | Global / search should include conversations in addition to workspace features |
+| 786 | PAN-571 | XS | low | ok |  |  | Add OpenRouter credits/plan status endpoint and UI |
+| 787 | PAN-568 | M | low | ok |  |  | Kanban: Show workspace and tmux session counts in stats |
+| 788 | PAN-565 | M | low | ok |  |  | Handle CTRL-Z to undo accidental conversation archival |
+| 789 | PAN-564 | M | low | ok |  |  | Slash menu positioned incorrectly |
+| 790 | PAN-554 | M | low | ok |  |  | Add kanban board deeplinks for issue URLs |
+| 791 | PAN-543 | M | low | ok |  |  | Add confirmation dialog before applying Optimal Defaults |
+| 792 | PAN-483 | M | low | ok |  |  | Unify Resume Agent UX |
+| 793 | PAN-480 | M | low | needs-refinement |  |  | Planning-agent --effort; likely covered by merged PAN-4249 resolver and PAN-4258 (plan effort), confirm or close |
+| 794 | PAN-476 | M | low | ok |  |  | Agent resume with Haiku session summary instead of claude --resume |
+| 795 | PAN-468 | M | low | ok |  |  | Agent test conversations pollute production database |
+| 796 | PAN-461 | M | low | ok |  |  | Deep-wipe multi-step progress dialog |
+| 797 | PAN-459 | M | low | ok |  |  | Planning setup screen with SSE progress streaming |
+| 798 | PAN-407 | XS | low | ok |  |  | Run Panopticon from a main workspace for development isolation |
+| 799 | PAN-2348 | XS | low | ok |  |  | docs: migrate STATE-STORAGE-AUDIT.md content to living docs, then delete |
+| 800 | PAN-2346 | XS | low | ok |  |  | docs: refresh AGENT_TYPES_INDEX.md to the post-Cut taxonomy in ROLES.md (xBRIEF items, foreman, conv-flywheel, worker role). |
+| 801 | PAN-2345 | XS | low | ok |  |  | docs: rewrite pan-done.md against done.ts + done-preflight.ts; fix continue path; point MERGE link at MERGE-WORKFLOW.md. |
+| 802 | PAN-2344 | XS | low | ok |  |  | docs: rewrite KANBAN-MODEL.md for derived issue state, pipeline-membership buckets, PR reviews; drop Inspect and beads. |
+| 803 | PAN-2343 | XS | low | ok |  |  | docs: rewrite MISSION-CONTROL.md: state label from deriveStateLabel, membership, liveness.ts; review_status table is gone. |
+| 804 | PAN-2073 | XS | low | ok |  |  | docs: add user-facing page for the Desktop App |
+| 805 | PAN-2071 | XS | low | ok |  |  | docs: add user-facing page for the Hooks system |
+| 806 | PAN-2068 | XS | low | ok |  |  | docs: add user-facing page for Caveman (agent output compression) |
+| 807 | PAN-2067 | XS | low | ok |  |  | docs: add user-facing page for RTK (Bash output compression) |
+| 808 | PAN-1684 | XS | low | ok |  |  | build full marketing kit + plan (SEO, video list, channels) from MARKETING.md seed |
+| 809 | PAN-1683 | XS | low | ok |  |  | docs: canonical agent session-prefix registry + reconcile role taxonomy (ROLES.md/AGENT_TYPES_INDEX/CLAUDE.md) |
+| 810 | PAN-1474 | M | low | ok |  |  | Add ACKNOWLEDGEMENTS doc |
+| 811 | PAN-1469 | M | low | ok |  |  | End-to-end review and consolidation of all project documentation |
+| 812 | PAN-674 | XS | low | ok |  |  | docs: add glossary of Panopticon domain terms |
+| 813 | PAN-634 | M | low | ok |  |  | Documentation cleanup: restructure docs, update installation (npx panctl), refresh stale PRDs |
+| 814 | PAN-2908 | M | low | ok |  |  | Make overdeck not suck |
+| 815 | PAN-106 | M | high | stale |  |  | Cost prediction/estimation for in-progress work |
+| 816 | PAN-262 | M | high | stale |  |  | Refactor post-merge lifecycle into composable, idempotent operations |
+| 817 | PAN-176 | M | high | stale |  |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
+| 818 | PAN-334 | S | medium | stale |  |  | Dashboard server has no duplicate-process protection |
+| 819 | PAN-324 | XS | medium | needs-refinement |  |  | Approval is now a PR review or the dashboard MERGE button; verify whether the agent detail pane already surfaces MERGE post-cut |
+| 820 | PAN-304 | S | medium | stale |  |  | closeLinearDirect returns stepOk even when state update never happens |
+| 821 | PAN-245 | S | medium | stale |  |  | Ctrl+C aborts planning dialog instead of copying text |
+| 822 | PAN-244 | S | medium | stale |  |  | Deep-wipe leaves local branch and worktree metadata behind |
+| 823 | PAN-4332 | M | low | ok |  |  | Interop: continue t3code sessions in Overdeck and back via native transcripts; PAN-2609 Phase A has closed |
+| 824 | PAN-113 | S | medium | stale |  |  | Dashboard 'Start Agent' returns success before verifying agent actually started |
+| 825 | PAN-49 | XS | medium | stale |  |  | Fix CloisterService tests that require real runtime |
+| 826 | PAN-294 | M | medium | stale |  |  | Surface module initialization errors as system-level, not per-issue |
+| 827 | PAN-293 | M | medium | stale |  |  | Project Living Memory |
+| 828 | PAN-277 | M | medium | stale |  |  | Session reasoning capture & collaborative PRD refinement |
+| 829 | PAN-258 | M | medium | stale |  |  | Kanban board: fit all columns without horizontal scrolling |
+| 830 | PAN-255 | M | medium | stale |  |  | Agents lack awareness of MCP tools |
+| 831 | PAN-252 | XS | medium | stale |  |  | Disable Sync with Main button when workspace is up to date |
+| 832 | PAN-243 | M | medium | stale |  |  | Audit dashboard actions: ensure all are available via CLI |
+| 833 | PAN-77 | XS | medium | stale |  |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
+| 834 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
+| 835 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
+| 836 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
+| 837 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 838 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 839 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 840 | PAN-5033 | XS | medium | ok |  |  | OpenClaw Connect a bot snippet omits hooks.allowConversationAccess, so the needs-you summary stays off with no message. |
+| 841 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 842 | PAN-5043 | S | medium | ok |  |  | Commit the phone-app iOS Simulator harness (Miniflare connect stand-in, stub account service, rig steps) built twice by hand. |
+| 843 | PAN-5065 | L | medium | ok |  |  | Opt-in mode where a project's agents and gates stop seeing ~/.overdeck.env keys the project did not list. |
+| 844 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 845 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
+| 846 | PAN-762 | M | low | stale |  |  | Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about |
+| 847 | PAN-299 | M | low | stale |  |  | Granular session state persistence across context compaction |
+| 848 | PAN-298 | M | low | stale |  |  | Auto-detect package manager and runtime in workspace setup |
+| 849 | PAN-297 | M | low | stale |  |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
+| 850 | PAN-283 | M | low | stale |  |  | Reset should sync workspace feature branch with latest main |
+| 851 | PAN-271 | M | low | stale |  |  | Auto-assign Linear project from project config when creating issues |
+| 852 | PAN-265 | M | low | stale |  |  | Review skill categorization: all skills available everywhere via personal + workspace |
+| 853 | PAN-249 | XS | low | stale |  |  | Add data-testid attributes across dashboard UI and create Playwright smoke test suite |
+| 854 | PAN-228 | M | low | stale |  |  | Shift-left post-edit diagnostics |
+| 855 | PAN-227 | M | low | stale |  |  | Phase gate validation |
+| 856 | PAN-198 | M | low | stale |  |  | Structured audit trail for agent actions |
+| 857 | PAN-190 | M | low | stale |  |  | PAN-190: Specialized reviewer prompts (industry best-practice checklists) |
+| 858 | PAN-180 | M | low | stale |  |  | PAN-180: Cross-terminal file locking for concurrent agents |
+| 859 | PAN-177 | M | low | stale |  |  | PAN-177: Iteration limits with escalation for autonomous agents |
+| 860 | PAN-175 | M | low | stale |  |  | PAN-175: Pre-compact auto-save hook for agent sessions |
+| 861 | PAN-155 | L | low | stale |  |  | PAN-155: Redesign health page with Stitch (system overview, timeline, costs) |
+| 862 | PAN-146 | M | low | stale |  |  | PAN-146: Refine light mode theming across all dashboard pages |
+| 863 | PAN-55 | M | low | stale |  |  | Track specialist costs with time period filtering |
+| 864 | PAN-44 | M | low | stale |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
+| 865 | PAN-2070 | XS | low | needs-refinement |  |  | docs: user-facing Flywheel page should target the pan-flywheel v2 loop skill, not a CLI daemon with a dashboard toggle |
+| 866 | PAN-3536 | S | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): pan tell can not reach ohmypi conversations; fix dies with the harness |
+| 867 | PAN-2027 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): routing kimi-k2 through ohmypi needs a different home once OMP is gone |
+| 868 | PAN-2035 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): Copilot provider routing via omp |
+| 869 | PAN-2034 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): end-to-end test for ohmypi tool-call rendering |
+| 870 | PAN-2033 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi message-delivery latency benchmark |
+| 871 | PAN-2032 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): local Ollama review role via omp |
+| 872 | PAN-2030 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): version-pin the ohmypi extension |
+| 873 | PAN-2029 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi-parser thinking_tokens capture |
+| 874 | PAN-2028 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): per-provider cost grouping keyed on omp |
+| 875 | PAN-2024 | XS | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi conversation Tools-toggle |
+| 876 | PAN-2883 | M | high | needs-refinement |  |  | Appears already fixed: resolveIssuePullRequestRef probes strike/<id> at pull-requests.ts:209, which is exactly the fix. Verify and close. |
+| 877 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
+| 878 | PAN-4555 | XS | low | ok |  |  | Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then. |
+| 879 | PAN-4590 | L | medium | ok |  |  | Semgrep sast verification gate + review-context findings; first buildable Semgrep child (epic PAN-4585 closed), needs config. |
+| 880 | PAN-4591 | L | medium | ok |  |  | Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; epic PAN-4585 closed, now buildable. |
+| 881 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
+| 882 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
+| 883 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
+| 884 | PAN-5022 | L | medium | ok |  |  | Phone app: relay notification preferences to offline machines via the directory, and drop muted pushes on the phone. |
+| 885 | PAN-5021 | M | low | needs-refinement |  |  | PAN-5100 landed phone telemetry with conflicting decisions; re-scope to any remaining gap or close as superseded. |
+| 886 | PAN-5029 | M | medium | needs-refinement |  |  | Grok Build Tailscale reach can't work: pan mcp serve verifies tokens only against its own machine. Needs a design choice. |
+| 887 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
+| 888 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
+| 889 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
+| 890 | PAN-5207 | L | low | needs-refinement |  | PAN-5202 | Parked by the operator: Flux meeting bots for Zoom, Teams, Meet, Slack as a paid integration. Do not start. |
+| 891 | PAN-5183 | XS | low | ok | ✓ |  | Parent of the file explorer; all children PAN-5185..5191 are closed. Verify and close. |
+| 892 | PAN-5181 | XS | low | ok |  |  | Fix shipped in PR #5179 (merged 2026-11-13); the body says it closes on merge. Verify and close. |
+| 893 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
+| 894 | PAN-5235 | XS | low | ok |  |  | Fix already applied: terminal-dialog toast now navigates to the agent's terminal tab. Verify and close. |
+| 895 | PAN-5280 | XS | low | ok |  |  | Record of two UI fixes made inline on main (orbiting logo, unclipped Home project menu). Verify and close. |
 
 ## Rationale detail
 
@@ -920,71 +921,75 @@ New in-pipeline bug: the composer parser throws on bare /pan, so every send of t
 
 New in-pipeline bug, pinned at a freed top slot. All 93 links in a measured docs index were dead; PAN-5340 builds on its fix.
 
-### PAN-5338 (rank 5)
-
-New in-pipeline enhancement, pinned at a freed top slot. Its reusable preview body is what PAN-5341 reuses in the dock diff view.
-
 ### PAN-5013 (rank 5)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
 
-### PAN-4636 (rank 6)
+### PAN-5338 (rank 5)
+
+New in-pipeline enhancement, pinned at a freed top slot. Its reusable preview body is what PAN-5341 reuses in the dock diff view.
+
+### PAN-5354 (rank 6)
+
+New substrate bug from the 2026-11-15 host crash: five work agents sat dead 1-2h because no code path turns a confirmed death into a resume or Needs-you item since the PAN-3917 cut. It ranks just below the in-pipeline pins because unattended recovery is a pipeline prerequisite, and the body already carries file:line root cause, a reuse-the-crash-door design, 11 ACs and named tests, so it is ready to plan.
+
+### PAN-4636 (rank 7)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
 
-### PAN-4553 (rank 7)
+### PAN-4553 (rank 8)
 
 Rank unchanged; its duplicate PAN-4929 entered the pipeline with an open PR, so this issue now waits on that PR instead of being picked up separately.
 
-### PAN-4733 (rank 8)
+### PAN-4733 (rank 9)
 
 Rank held: parent PAN-4732 (move heavy e2e out of the default shards) closed as completed on 2026-11-01, so this follow-up is now unblocked and next in line.
 
-### PAN-4710 (rank 9)
+### PAN-4710 (rank 10)
 
 New issue, ranked into the rank-10 slot beside PAN-4554. When pan start --plan auto finishes planning while the pipeline is busy, the deferred hand-off retries without the agent_count_high/memory_tight acknowledgement the first attempt sends, so it is refused below the ceiling until the attempt cap gives up with no operator signal; PAN-4663 and PAN-4670 sat three hours without work agents. It is substrate work with a precise root cause and testable ACs, but it carries needs-handoff (TENET-10), so it lands through a supervised handoff, and a manual second pan start is a working fallback, so it ranks high rather than critical.
 
-### PAN-4554 (rank 10)
+### PAN-4554 (rank 11)
 
 New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it. A 2026-11-14 comment adds an overdeck instance (PAN-5232), so it is not polyrepo-only; rank and importance unchanged because a second pan start still works.
 
-### PAN-4666 (rank 11)
+### PAN-4666 (rank 12)
 
 New substrate bug in the Flywheel's own status read model: a second liveness rule in derive-status.ts hides live agents, so the loop or operator may respawn running work; small fix with clear ACs, ranked beside PAN-4636 as critical but labeled needs-handoff (TENET-10), so it goes through a supervised pan handoff.
 
-### PAN-4547 (rank 12)
+### PAN-4547 (rank 13)
 
 Operator decision 2026-10-04 after the Flywheel closed 19 deployed issues by hand. With false DoD refusals fixed by PAN-4543, auto close-out only needs a patrol on the existing verify-on-main path and live settings. High because unclosed issues distort every pipeline view.
 
-### PAN-4511 (rank 13)
+### PAN-4511 (rank 14)
 
 pan spawn is the foreman's pane-only item worker, so parallel waves cannot run any item through it on either backend. The test suite never asserts argv, so it stayed green. Small fix with a clear expected behavior.
 
-### PAN-4544 (rank 14)
+### PAN-4544 (rank 15)
 
 Follow-up to PAN-4543, which fixed the summary route. The Pipeline view polls this route in the background, so every poll freezes all HTTP and WebSocket traffic for ~1.6 s and can fail DoD health probes. The async reader already exists, so the fix is small.
 
-### PAN-4551 (rank 15)
+### PAN-4551 (rank 16)
 
 Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. PAN-4527, PAN-4531 and PAN-4540 closed on 2026-10-24, so it now waits only on PAN-4534 (in pipeline); rank holds at 14.
 
-### PAN-4671 (rank 16)
+### PAN-4671 (rank 17)
 
 New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.
 
-### PAN-4675 (rank 17)
+### PAN-4675 (rank 18)
 
 New this pass. addLabel in merge-agent.ts uses Effect.promise, so one gh network timeout becomes a defect that skips pausing agents and stopping the stack, and the merge door then refuses re-runs with Already merged. PAN-4299 is stuck half-closed right now, and pan close refuses on DoD row 5. Substrate bug with clear AC, so it slots into the free rank 19 beside the other merge and close-out fixes; it overlaps PAN-3557 (label retry), and fixing either should consult the other.
 
-### PAN-4705 (rank 18)
+### PAN-4705 (rank 19)
 
 New since the prior pass. A latent race in the PAN-4546 admission test fails whole CI shards with an unhandled ENOENT on PRs that never touch it (seen on #4703), costing verification attempts pipeline-wide. It sits beside PAN-4680, the sibling flake fix, because both keep CI verification honest; the fix is small and scoped to one test file or publishExclusive.
 
-### PAN-4746 (rank 19)
+### PAN-4746 (rank 20)
 
 New flaky-test bug: a background membership-snapshot write races the test's teardown rmSync and turned an unrelated PR's CI shard red. Ranked next to PAN-4705, the same leaked-async-work-vs-teardown pattern, because each red shard costs a PR a rerun on the path to merge.
 
-### PAN-5104 (rank 20)
+### PAN-5104 (rank 21)
 
 Its only dependency, PAN-5103 (Fable 5.2 rollout), closed as completed, so the XS rebuild is unblocked; rank held at 20 because it is a cost-accuracy fix, not pipeline substrate.
 
@@ -996,233 +1001,229 @@ New in-pipeline discoverability fix: skills never reach the composer slash menu,
 
 New in-pipeline enhancement, pinned at the freed rank-22 slot. It is self-contained in ChatMarkdown and the existing /conv route.
 
-### PAN-4572 (rank 22)
+### PAN-4572 (rank 23)
 
 PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.
 
-### PAN-4586 (rank 23)
+### PAN-4586 (rank 24)
 
 New issue. Verified against herdr 0.9.1: HerdrApiClient.call returns response.result, whose pane_read text sits under read.text, but readHerdrPaneText, diagnoseDetectionFailure and the herdr-submit composer read a top-level text, so every pane-text consumer on the default backend sees an empty string. A three-site fix plus corrected test stubs; placed in a free rank slot just above the Herdr pane-sizing pair (PAN-4582, PAN-3952) because it is smaller and likely explains part of PAN-3952's 'pane read returns nothing' observation.
 
-### PAN-4217 (rank 24)
+### PAN-4217 (rank 25)
 
 New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done preflight both count acceptance-criterion sub-items, but updateSubItemStatus has no production caller and the feedback names a nonexistent 'pan task close' verb, so every plan with nested ACs fails verification until an agent hand-writes a script. It blocks the pipeline's verification step directly, so it ranks critical in the free slot right after the other in-pipeline pickup blockers.
 
-### PAN-4219 (rank 25)
+### PAN-4219 (rank 26)
 
 New bug filed from PAN-4201: pan done refused completion on 36 acceptance-criterion sub-items that no supported verb can close, and the vbrief-ac feedback names a nonexistent pan task close. It ranks critical and right behind PAN-4217 because it blocks completion of every issue planned with nested ACs, the default planner shape. It is marked needs-refinement because PAN-4217 already describes the same missing writer (updateSubItemStatus has no production caller) including the done-preflight half, so it should be closed as a duplicate or fixed by the same change.
 
-### PAN-4708 (rank 26)
+### PAN-4708 (rank 27)
 
 New substrate-improvement issue, the second hot-file conflict source after in-pipeline PAN-4697; on 2026-11-01 it forced merge-main cycles and fresh head reviews on three PRs. It takes the free rank 27 beside its sibling so no other node moves, and it stays needs-refinement because the body asks for a decision among three fixes (frontmatter-generated nav, per-group fragments, JSON merge driver) before work starts.
 
-### PAN-4229 (rank 27)
+### PAN-4229 (rank 28)
 
 New bug filed from PAN-4222: after all eleven top-level items were closed through pan task done, pan done refused on 39 pending acceptance-criterion children that pan task next never surfaced, and the agent had to make 39 empty trailer commits to get through. It blocks completion of every issue planned with nested ACs, the default planner shape, so it ranks critical beside PAN-4217 and PAN-4219. It is marked needs-refinement because it describes the same missing AC-status writer as PAN-4217 and PAN-4219; the three should be fixed by one change and the extras closed as duplicates.
 
-### PAN-3566 (rank 28)
+### PAN-3566 (rank 29)
 
 New this pass and the highest-leverage fix in the batch: the test-role launcher's final exec has no -p, no positional prompt and no piped stdin, so the role boots an interactive REPL and never takes a turn. That single missing argument is the deterministic producer of the zombie test agents tracked in PAN-2706, PAN-3563 and PAN-3274 — three separate hardening issues chasing one root cause. Reproduced across eight session IDs, so there is no diagnosis left to do.
 
-### PAN-3952 (rank 29)
+### PAN-3952 (rank 30)
 
 On the default backend the harness TUI renders into a one-line terminal until an operator opens it, so stuck detection, readiness scans, health capture, AUQ/permission detection and screenshots all see nothing. Deterministic pane sizing in the Herdr adapter is a small change with fleet-wide effect.
 
-### PAN-3285 (rank 30)
+### PAN-3285 (rank 31)
 
 New this pass, labelled critical. A supervisor unit pinned to a pan reload generation SIGTERMs every correctly-running dashboard and is structurally incapable of starting a replacement; the observed outcome was a 3.5-hour total outage with 1,107 consecutive failed recovery attempts and no operator escalation. Manual recovery also fails, because the supervisor kills the operator's dashboard within 30 seconds. Nothing else in the backlog can take the whole product down for hours with the recovery path itself broken.
 
-### PAN-3524 (rank 31)
+### PAN-3524 (rank 32)
 
 Triage: verify the --changed verification-loop relaunch against deacon-lite's smaller suppression surface. Kept in the critical band: an unstoppable server-owned test loop is the worst kind of runaway.
 
-### PAN-4166 (rank 32)
+### PAN-4166 (rank 33)
 
 New issue (2026-09-24), the only delta since the prior run. pushPlanArtifacts replays the whole local range through git merge-tree, so one superseded rendering of .pan/backlog/sequence.md aborts the push and origin keeps serving a stale ranked order that the Flywheel reads for pickup; the silent reset --keep refusal then adds another unpushed commit every run, so the failure compounds. Ranked 31 rather than into the vacated top slots: the acute incident was hand-repaired (main is level with origin, the identical untracked drafts removed), so the bug is latent until the next untracked-draft collision, and it ranks behind the actively-biting pipeline blockers at 19-30 while staying in the critical band because a stale sequence misdirects every Flywheel pickup. Root cause is verified in the body with a named file, a proposed fix, and three mechanical acceptance criteria.
 
-### PAN-3250 (rank 33)
+### PAN-3250 (rank 34)
 
 New this pass, labelled blocks-main and substrate. Two spawn sites branch from the local HEAD or defaultBranch instead of origin/main, so every new feature branch inherits whatever unpushed commits are sitting on the shared local main. Four branches were already contaminated when it was filed, two of them created after the problem was identified, and their PRs read MERGEABLE/CLEAN. It spreads with each spawn, so the cost of leaving it grows.
 
-### PAN-3946 (rank 34)
+### PAN-3946 (rank 35)
 
 Merge-safety bug seen on PR #3933: an approval on fd3334e6 satisfied the request for head ae9d82f0. Approval must count only when its commit_id is the current head; add --force as the explicit override.
 
-### PAN-2954 (rank 35)
+### PAN-2954 (rank 36)
 
 Dependency cleared: PAN-2882 (the missing GitLab merged-MR oracle this blocked on) closed since the last pass, so postMergeLifecycle's GitLab refusal is now directly workable. Re-ranked up from 67 to sit with the other unblocked critical merge-path fixes.
 
-### PAN-3935 (rank 36)
+### PAN-3935 (rank 37)
 
 The PAN-2858 defect in a new shape: complete-planning promotes to the primary checkout, where nothing commits, and removes the workspace copy the planning commit would have picked up. Evidence: untracked pan-3927.md on main. Also a write-to-main hazard.
 
-### PAN-3657 (rank 37)
+### PAN-3657 (rank 38)
 
 New this pass. The merge-train queues endpoint correctly gathers eligible candidates and then hands them to the monorepo queue builder, which does git rev-parse against a polyrepo project root that is not a git repository — so every polyrepo project's train is permanently empty while monorepo projects populate fine. MYN and Auricle cannot use merge trains at all until this lands.
 
-### PAN-5097 (rank 38)
+### PAN-5097 (rank 39)
 
 New since the prior run. forgeForWorkspace in src/cli/commands/specialists/done.ts probes the polyrepo wrapper root, which is not a git repo, so every MYN review verdict fails and test/merge never start; the last six MYN merges were done by hand. The root cause and fix site are named, so it is ok and S-sized, and it ranks beside the other polyrepo merge-path blockers (PAN-3657, PAN-4240) because it stops the whole review-to-merge pipeline for a project.
 
-### PAN-4240 (rank 39)
+### PAN-4240 (rank 40)
 
 A second incident on 2026-11-04 (MIN-1135) widened the bug: after a merged MR the reaper removed the whole workspace, destroying untracked evidence files and nested worktrees that the merged-branch check never covers. Rank holds at 39 because it is already critical; the fix must now gate on untracked/nested content, not only branch merge state.
 
-### PAN-3565 (rank 40)
+### PAN-3565 (rank 41)
 
 New this pass. Three review-lifecycle defects, one of them severe: when all four reviewer lanes died at spawn on a record lock, the supervisor wrote a synthesis declaring CHANGES REQUESTED with every lane marked failed — an infrastructure flake recorded as a real code verdict. It was caught only because a human was watching live. Same integrity family as PAN-3283 and PAN-2746.
 
-### PAN-3554 (rank 41)
+### PAN-3554 (rank 42)
 
 New this pass. Main stayed red for about five hours because nothing owns the state 'the latest main-push CI run failed' — no needs-you, no activity entry, no strike recommendation. The failure actively hides itself: the merge gate renders red main as an empty eligible set, so the operator sees a quiet queue rather than an alarm. Detection must not depend on the flywheel being awake, since it frequently is not. Condition changed after the PAN-3917 cut: the merge gate that rendered red main as an empty queue was deleted by the cut; red-main ownership still needs a home — re-scope.
 
-### PAN-3532 (rank 42)
+### PAN-3532 (rank 43)
 
 New this pass. The CI test job runs root npm test, whose frontend leg is a hand-picked list of files, so two frontend test files were red on main for hours while every main CI run reported success. Green CI that does not mean green is worse than no CI, because every downstream gate and every close-out trusts it.
 
-### PAN-4241 (rank 43)
+### PAN-4241 (rank 44)
 
 New this pass. computeWorkspaceRepoRoots builds its fallback candidate by joining the workspace path with an absolute repoPath, so any polyrepo repo whose configured name differs from its directory is never found. That makes pan task done refuse valid Item trailers and also affects head snapshots and merge completeness for MYN. The fix is a one-line candidate change plus a test, and a symlink workaround exists, so it ranks high rather than critical.
 
-### PAN-5167 (rank 44)
+### PAN-5167 (rank 45)
 
 New substrate bug placed in a freed critical-tier slot. One transient fetch failure leaves a merged issue in_review with a live agent and needs manual kill plus pan close --force, the same failure class as PAN-4675.
 
-### PAN-4396 (rank 45)
+### PAN-4396 (rank 46)
 
 New issue. The test-skip verification gate fails every branch whose diff exceeds 1 MiB before it inspects a test, as PAN-4362 showed; that blocks verification outright for large but legitimate PRs. The fix is one maxBuffer argument, so it ranks in the critical pipeline block.
 
-### PAN-3085 (rank 46)
+### PAN-3085 (rank 47)
 
 New this pass and a one-line class of defect with outsized cost. Review feedback is written to the resolved .overdeck/feedback directory but the path handed to the work agent is a hardcoded .pan/feedback that no longer exists after the rebrand, and the deacon merge gate reads the same dead path. Agents are told to fix findings they cannot find, and the gate counts zero feedback files no matter how many exist. Condition changed after the PAN-3917 cut: the deacon merge gate is gone; only the agent-side .pan/feedback path pointer remains to verify — re-scope.
 
-### PAN-3653 (rank 47)
+### PAN-3653 (rank 48)
 
 New this pass, labelled blocks-main. A strike that correctly stops because its gate is blocked by red main has no owner that wakes it when main goes green: the session stays alive, so liveness calls it healthy and pan recover refuses with 'already has a live harness runtime'. The urgent path exists precisely to unblock the pipeline fast, so a strike that silently idles through the clearing of its own blocker defeats the mechanism.
 
-### PAN-3630 (rank 48)
+### PAN-3630 (rank 49)
 
 New this pass. pan tell reported successful delivery three times to a live, heart-beating agent, moved all three messages into the read mailbox, and the agent's transcript shows it received none of them. The delivery door is the sanctioned way every part of the system talks to a running agent; a door that lies about delivery makes every downstream 'we told it' claim unreliable.
 
-### PAN-3805 (rank 49)
+### PAN-3805 (rank 50)
 
 Idle remediation is now deacon-lite nudge routines; triage asks to verify the Codex app-server delivery bypass against that implementation. The persistent-session invariant still forbids codex exec; rank held.
 
-### PAN-5139 (rank 50)
+### PAN-5139 (rank 51)
 
 New substrate bug placed in a freed critical-tier slot. Any launch from the non-live generation repoints the shim, after which every pan reload refuses, so merged fixes stop shipping.
 
-### PAN-3560 (rank 51)
+### PAN-3560 (rank 52)
 
 New this pass. Under concurrent review convoys the PTY supervisor returns 502 'input echo confirmation failed' fleet-wide, so no agent can be booted or re-booted and pipeline feedback delivery fails while load is high — confirmed across at least six unrelated agents in one hour. Delivery failing exactly when the pipeline is busiest is what turns a load spike into a stall.
 
-### PAN-3520 (rank 52)
+### PAN-3520 (rank 53)
 
 New this pass. The test gate records a real 'test failed' verdict for uniform 5000ms timeout signatures under host load, proven on multiple branches where the same files pass in isolation in about 19 seconds. Every false verdict costs a full rework cycle and another saturated re-test, so this is both a correctness and a cost fix. Retrying timeout-only failures in isolation before writing a verdict is the minimal change.
 
-### PAN-4439 (rank 53)
+### PAN-4439 (rank 54)
 
 New issue. The polling backstop for the CI failure relay was deleted in the Cut, so a check that completes while the dashboard reloads is never relayed and the PR stalls. Reloads are frequent, and its stated dependency PAN-4432 has closed, so it ranks high in the pipeline block.
 
-### PAN-4392 (rank 54)
+### PAN-4392 (rank 55)
 
 New issue. hasTrailerCommit greps all reachable history, so generic item ids such as docs or tests are satisfied by any merged commit and the checklist gate certifies work that was never committed. It is a gate-integrity hole with an XS fix.
 
-### PAN-3500 (rank 55)
+### PAN-3500 (rank 56)
 
 New this pass. A review sub-role that had already written its report was resumed by a later message and edited seven tracked files, and pan start --fresh then auto-committed those reviewer-owned changes into the feature history during sync-main. Review isolation is currently prompt-level only; it has to be mechanical, because a contaminated branch is very hard to detect after the fact.
 
-### PAN-3313 (rank 56)
+### PAN-3313 (rank 57)
 
 New this pass. A transient upstream stream error benches CLIProxy's only auth entry, so every GPT-routed request returns 503 auth_unavailable until an internal cooldown lapses — 35 failures against 14 successes in one hour, with valid credentials throughout. The message reads as 'your credentials are gone' and sends the operator to re-authenticate, which fixes nothing. Every GPT-routed agent on the machine is affected at once.
 
-### PAN-3282 (rank 57)
+### PAN-3282 (rank 58)
 
 New this pass. Review agents terminate before writing their report across five issues and two projects, twice recurring after a successful recovery, leaving a verdict-shaped status with no artifact behind it and a stuck flag that blocks progress until someone restarts the reviewer by hand. This is the upstream condition PAN-3283 then converts into a false passed verdict.
 
-### PAN-4391 (rank 58)
+### PAN-4391 (rank 59)
 
 New issue. Worker delegation is the supported path for sub-tasks, and it fails outright in every polyrepo workspace, so MYN issues cannot delegate without a manual --cwd workaround. Polyrepo correctness bugs sit in the high band in this sequence.
 
-### PAN-4390 (rank 59)
+### PAN-4390 (rank 60)
 
 New issue. Workspace creation for a polyrepo project reports failure and omits the workspace from pan workspace list although it is usable, which misleads every caller. It belongs with the other polyrepo substrate bugs.
 
-### PAN-2695 (rank 60)
+### PAN-2695 (rank 61)
 
 Concurrent review dispatches race fresh-spawn vs resume, second dispatch resumes a still-booting parent and wedges.
 
-### PAN-2742 (rank 61)
+### PAN-2742 (rank 62)
 
 Synthesis fires 42s after spawn and mislabels reviewers-with-reports-on-disk as infra-failure, bypassing review.
 
-### PAN-2706 (rank 62)
+### PAN-2706 (rank 63)
 
 Triage: verify whether a never-kicked-off test session can still absorb dispatch under the current liveness model. Rank held.
 
-### PAN-5228 (rank 63)
+### PAN-5228 (rank 64)
 
 New pipeline bug placed in a freed critical-tier slot. Reviews whose reviewers die after a CodeRabbit post are never re-dispatched, and PAN-5218 widened the masking.
 
-### PAN-4344 (rank 64)
+### PAN-4344 (rank 65)
 
 New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The main-push guard exists only in the overdeck repo, so agents in other registered projects can still push to main, which is the PAN-2204 hazard class.
 
-### PAN-4550 (rank 65)
+### PAN-4550 (rank 66)
 
 Found cutting v0.65.0: CI was green but the local release check failed on two host-dependent tests. XS fix that removes false reds from the release verb, so it sits above routine medium work.
 
-### PAN-4566 (rank 66)
+### PAN-4566 (rank 67)
 
 Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback this fix routes failures to is on main and work can start.
 
-### PAN-5193 (rank 67)
+### PAN-5193 (rank 68)
 
 New planning bug placed in a freed high-tier slot. It blocks pan plan finalize for every epic child with a stub draft on main; the fix is a candidate-order change plus one test.
 
-### PAN-2940 (rank 68)
+### PAN-2940 (rank 69)
 
 Three red-mains in one day from direct-push series bypassing PR CI — conversations need a pre-merge CI surface.
 
-### PAN-3708 (rank 69)
+### PAN-3708 (rank 70)
 
 New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wrapper root, which is not a git repository, so the urgent-strike escape hatch is simply unavailable for MYN-class projects. pan swarm already understands nested repos; strike must use the same project repository inventory. Duplicate of PAN-3040 — close one when this lands.
 
-### PAN-3605 (rank 70)
+### PAN-3605 (rank 71)
 
 New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.
 
-### PAN-5133 (rank 71)
+### PAN-5133 (rank 72)
 
 New substrate bug placed in a freed high-tier slot. Under memory pressure the operator has no supported way to stop a deferred start, and the Flywheel had to write the journal directly.
 
-### PAN-4792 (rank 72)
+### PAN-4792 (rank 73)
 
 New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's unnumbered select dialogs, so a failed paste's fallback Enter can answer them, including a silent permission-mode change. PAN-4738 removes the one known trigger on Fly, so it ranks with the high-tier delivery bugs rather than the top tier.
 
-### PAN-3557 (rank 73)
+### PAN-3557 (rank 74)
 
 New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
 
-### PAN-3543 (rank 74)
+### PAN-3543 (rank 75)
 
 New this pass. A completed-handoff agent owed rework after a blocked verdict cannot be started at all: pan start refuses and recommends --fresh, --fresh gives the identical refusal, and reset-session is refused too because the durable plane reconstructs the session pointer. The refusal message names an action the operator cannot take, which is the self-contradictory-deadlock family PAN-3526 opened.
 
-### PAN-3522 (rank 75)
+### PAN-3522 (rank 76)
 
 New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts through a new generation's 138-second boot warm phase and killed it anyway, producing four restarts in ten minutes, racing spawns on port 3012, and a WATCHDOG GIVING UP. Each restart re-triggered docker stack rebuilds, feeding the storm. The probe budget has to know the difference between starved and starting.
 
-### PAN-3314 (rank 76)
+### PAN-3314 (rank 77)
 
 New this pass. Every agent pane is a child of one transient tmux-server unit, so agent memory is the unit's memory and systemd-oomd's kill decision is all-or-nothing: one hungry agent takes the entire fleet with it. That has now happened twice, the second time killing seven work agents, four strikes and a live review convoy. Blast-radius containment is a different fix from choosing a better victim.
 
-### PAN-3278 (rank 77)
+### PAN-3278 (rank 78)
 
 Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.
-
-### PAN-5330 (rank 78)
-
-New substrate bug placed in a freed high-tier slot. With several workspace stacks up, browser checks hit the wrong backend and flake, which corrupts verification.
 
 
 <!-- machine-readable; do not hand-edit below this line -->
@@ -1231,10 +1232,10 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T14:29:34.895404Z",
+  "generatedAt": "2026-11-15T14:38:13.035759Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 896,
+  "openCount": 897,
   "nodes": [
     {
       "issue": "PAN-5290",
@@ -1289,19 +1290,6 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
       "planning": "auto"
     },
     {
-      "issue": "PAN-5338",
-      "rank": 5,
-      "size": "M",
-      "importance": "medium",
-      "score": 66,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: conversation diff view gets a rendered Markdown Preview and an Open file action.",
-      "rationale": "New in-pipeline enhancement, pinned at a freed top slot. Its reusable preview body is what PAN-5341 reuses in the dock diff view.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-5013",
       "rank": 5,
       "size": "S",
@@ -1315,8 +1303,34 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
       "planning": "auto"
     },
     {
-      "issue": "PAN-4636",
+      "issue": "PAN-5338",
+      "rank": 5,
+      "size": "M",
+      "importance": "medium",
+      "score": 66,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: conversation diff view gets a rendered Markdown Preview and an Open file action.",
+      "rationale": "New in-pipeline enhancement, pinned at a freed top slot. Its reusable preview body is what PAN-5341 reuses in the dock diff view.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5354",
       "rank": 6,
+      "size": "M",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Host-crash-killed work agents stay dead: deacon-lite confirms death but nothing resumes; add paced resumeCrashedWorkAgents.",
+      "rationale": "New substrate bug from the 2026-11-15 host crash: five work agents sat dead 1-2h because no code path turns a confirmed death into a resume or Needs-you item since the PAN-3917 cut. It ranks just below the in-pipeline pins because unattended recovery is a pipeline prerequisite, and the body already carries file:line root cause, a reuse-the-crash-door design, 11 ACs and named tests, so it is ready to plan.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4636",
+      "rank": 7,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1329,7 +1343,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4553",
-      "rank": 7,
+      "rank": 8,
       "size": "S",
       "importance": "critical",
       "score": 90,
@@ -1342,7 +1356,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4733",
-      "rank": 8,
+      "rank": 9,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -1355,7 +1369,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4710",
-      "rank": 9,
+      "rank": 10,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -1368,7 +1382,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4554",
-      "rank": 10,
+      "rank": 11,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -1381,7 +1395,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4666",
-      "rank": 11,
+      "rank": 12,
       "size": "S",
       "importance": "critical",
       "score": 85,
@@ -1394,7 +1408,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4547",
-      "rank": 12,
+      "rank": 13,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -1407,7 +1421,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4511",
-      "rank": 13,
+      "rank": 14,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -1420,7 +1434,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4544",
-      "rank": 14,
+      "rank": 15,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -1433,7 +1447,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4551",
-      "rank": 15,
+      "rank": 16,
       "size": "L",
       "importance": "high",
       "score": 74,
@@ -1446,7 +1460,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4671",
-      "rank": 16,
+      "rank": 17,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -1459,7 +1473,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4675",
-      "rank": 17,
+      "rank": 18,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -1472,7 +1486,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4705",
-      "rank": 18,
+      "rank": 19,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -1485,7 +1499,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4746",
-      "rank": 19,
+      "rank": 20,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -1498,7 +1512,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5104",
-      "rank": 20,
+      "rank": 21,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -1506,6 +1520,19 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
       "dependsOn": [],
       "why": "Stale cost hook bundle prices Fable 5.1/5.2 at Fable 5 rates; reconciler never corrects it. Unblocked: PAN-5103 merged.",
       "rationale": "Its only dependency, PAN-5103 (Fable 5.2 rollout), closed as completed, so the XS rebuild is unblocked; rank held at 20 because it is a cost-accuracy fix, not pipeline substrate.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5347",
+      "rank": 21,
+      "size": "S",
+      "importance": "medium",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: composer / menu lists no skills; add them from /api/skills/overrides under a labeled Skills group",
+      "rationale": "New in-pipeline discoverability fix: skills never reach the composer slash menu, so operators cannot find skill-only workflows. Pinned in the free rank-21 slot beside the other in-pipeline work; it reuses the existing skills route and category grouping.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1524,7 +1551,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4572",
-      "rank": 22,
+      "rank": 23,
       "size": "M",
       "importance": "medium",
       "score": 58,
@@ -1537,7 +1564,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4586",
-      "rank": 23,
+      "rank": 24,
       "size": "XS",
       "importance": "critical",
       "score": 90,
@@ -1550,7 +1577,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4217",
-      "rank": 24,
+      "rank": 25,
       "size": "S",
       "importance": "critical",
       "score": 87,
@@ -1563,7 +1590,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4219",
-      "rank": 25,
+      "rank": 26,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -1576,7 +1603,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4708",
-      "rank": 26,
+      "rank": 27,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -1589,7 +1616,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4229",
-      "rank": 27,
+      "rank": 28,
       "size": "S",
       "importance": "critical",
       "score": 82,
@@ -1604,7 +1631,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3566",
-      "rank": 28,
+      "rank": 29,
       "size": "XS",
       "importance": "critical",
       "score": 92,
@@ -1617,7 +1644,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3952",
-      "rank": 29,
+      "rank": 30,
       "size": "S",
       "importance": "critical",
       "score": 85,
@@ -1630,7 +1657,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3285",
-      "rank": 30,
+      "rank": 31,
       "size": "M",
       "importance": "critical",
       "score": 92,
@@ -1643,7 +1670,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3524",
-      "rank": 31,
+      "rank": 32,
       "size": "M",
       "importance": "critical",
       "score": 90,
@@ -1656,7 +1683,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4166",
-      "rank": 32,
+      "rank": 33,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -1669,7 +1696,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3250",
-      "rank": 33,
+      "rank": 34,
       "size": "S",
       "importance": "critical",
       "score": 90,
@@ -1682,7 +1709,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3946",
-      "rank": 34,
+      "rank": 35,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -1695,7 +1722,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2954",
-      "rank": 35,
+      "rank": 36,
       "size": "XS",
       "importance": "critical",
       "score": 90,
@@ -1708,7 +1735,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3935",
-      "rank": 36,
+      "rank": 37,
       "size": "S",
       "importance": "critical",
       "score": 82,
@@ -1721,7 +1748,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3657",
-      "rank": 37,
+      "rank": 38,
       "size": "S",
       "importance": "critical",
       "score": 88,
@@ -1734,7 +1761,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5097",
-      "rank": 38,
+      "rank": 39,
       "size": "S",
       "importance": "critical",
       "score": 88,
@@ -1747,7 +1774,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4240",
-      "rank": 39,
+      "rank": 40,
       "size": "S",
       "importance": "critical",
       "score": 88,
@@ -1760,7 +1787,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3565",
-      "rank": 40,
+      "rank": 41,
       "size": "M",
       "importance": "critical",
       "score": 88,
@@ -1773,7 +1800,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3554",
-      "rank": 41,
+      "rank": 42,
       "size": "M",
       "importance": "critical",
       "score": 88,
@@ -1786,7 +1813,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3532",
-      "rank": 42,
+      "rank": 43,
       "size": "S",
       "importance": "critical",
       "score": 88,
@@ -1799,7 +1826,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4241",
-      "rank": 43,
+      "rank": 44,
       "size": "XS",
       "importance": "high",
       "score": 80,
@@ -1812,7 +1839,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5167",
-      "rank": 44,
+      "rank": 45,
       "size": "S",
       "importance": "critical",
       "score": 88,
@@ -1825,7 +1852,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4396",
-      "rank": 45,
+      "rank": 46,
       "size": "XS",
       "importance": "critical",
       "score": 86,
@@ -1838,7 +1865,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3085",
-      "rank": 46,
+      "rank": 47,
       "size": "XS",
       "importance": "critical",
       "score": 88,
@@ -1851,7 +1878,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3653",
-      "rank": 47,
+      "rank": 48,
       "size": "M",
       "importance": "critical",
       "score": 86,
@@ -1864,7 +1891,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3630",
-      "rank": 48,
+      "rank": 49,
       "size": "M",
       "importance": "critical",
       "score": 86,
@@ -1877,7 +1904,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3805",
-      "rank": 49,
+      "rank": 50,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1890,7 +1917,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5139",
-      "rank": 50,
+      "rank": 51,
       "size": "M",
       "importance": "critical",
       "score": 86,
@@ -1903,7 +1930,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3560",
-      "rank": 51,
+      "rank": 52,
       "size": "M",
       "importance": "critical",
       "score": 86,
@@ -1916,7 +1943,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3520",
-      "rank": 52,
+      "rank": 53,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1929,7 +1956,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4439",
-      "rank": 53,
+      "rank": 54,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -1942,7 +1969,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4392",
-      "rank": 54,
+      "rank": 55,
       "size": "XS",
       "importance": "high",
       "score": 82,
@@ -1955,7 +1982,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3500",
-      "rank": 55,
+      "rank": 56,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1968,7 +1995,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3313",
-      "rank": 56,
+      "rank": 57,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1981,7 +2008,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3282",
-      "rank": 57,
+      "rank": 58,
       "size": "M",
       "importance": "critical",
       "score": 86,
@@ -1994,7 +2021,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4391",
-      "rank": 58,
+      "rank": 59,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2007,7 +2034,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4390",
-      "rank": 59,
+      "rank": 60,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2020,7 +2047,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2695",
-      "rank": 60,
+      "rank": 61,
       "size": "S",
       "importance": "high",
       "score": 85,
@@ -2033,7 +2060,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2742",
-      "rank": 61,
+      "rank": 62,
       "size": "S",
       "importance": "high",
       "score": 85,
@@ -2046,7 +2073,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2706",
-      "rank": 62,
+      "rank": 63,
       "size": "M",
       "importance": "high",
       "score": 84,
@@ -2059,7 +2086,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5228",
-      "rank": 63,
+      "rank": 64,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2072,7 +2099,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4344",
-      "rank": 64,
+      "rank": 65,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -2085,7 +2112,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4550",
-      "rank": 65,
+      "rank": 66,
       "size": "XS",
       "importance": "medium",
       "score": 64,
@@ -2098,7 +2125,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4566",
-      "rank": 66,
+      "rank": 67,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -2111,7 +2138,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5193",
-      "rank": 67,
+      "rank": 68,
       "size": "XS",
       "importance": "high",
       "score": 80,
@@ -2124,7 +2151,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2940",
-      "rank": 68,
+      "rank": 69,
       "size": "M",
       "importance": "critical",
       "score": 92,
@@ -2137,7 +2164,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3708",
-      "rank": 69,
+      "rank": 70,
       "size": "M",
       "importance": "critical",
       "score": 84,
@@ -2150,7 +2177,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3605",
-      "rank": 70,
+      "rank": 71,
       "size": "XS",
       "importance": "high",
       "score": 84,
@@ -2163,7 +2190,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5133",
-      "rank": 71,
+      "rank": 72,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -2176,7 +2203,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4792",
-      "rank": 72,
+      "rank": 73,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -2189,7 +2216,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3557",
-      "rank": 73,
+      "rank": 74,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2202,7 +2229,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3543",
-      "rank": 74,
+      "rank": 75,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2215,7 +2242,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3522",
-      "rank": 75,
+      "rank": 76,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2228,7 +2255,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3314",
-      "rank": 76,
+      "rank": 77,
       "size": "M",
       "importance": "critical",
       "score": 84,
@@ -2241,7 +2268,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3278",
-      "rank": 77,
+      "rank": 78,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2254,7 +2281,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5330",
-      "rank": 78,
+      "rank": 79,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -2267,7 +2294,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3234",
-      "rank": 79,
+      "rank": 80,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2280,7 +2307,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3205",
-      "rank": 80,
+      "rank": 81,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2293,7 +2320,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3118",
-      "rank": 81,
+      "rank": 82,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2306,7 +2333,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3106",
-      "rank": 82,
+      "rank": 83,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2319,7 +2346,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3100",
-      "rank": 83,
+      "rank": 84,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2332,7 +2359,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4213",
-      "rank": 84,
+      "rank": 85,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -2345,7 +2372,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5263",
-      "rank": 85,
+      "rank": 86,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -2358,7 +2385,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3096",
-      "rank": 86,
+      "rank": 87,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2371,7 +2398,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3084",
-      "rank": 87,
+      "rank": 88,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2384,7 +2411,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3043",
-      "rank": 88,
+      "rank": 89,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2397,7 +2424,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1824",
-      "rank": 89,
+      "rank": 90,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -2410,7 +2437,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2932",
-      "rank": 90,
+      "rank": 91,
       "size": "S",
       "importance": "high",
       "score": 83,
@@ -2425,7 +2452,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2935",
-      "rank": 91,
+      "rank": 92,
       "size": "S",
       "importance": "critical",
       "score": 91,
@@ -2438,7 +2465,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2337",
-      "rank": 92,
+      "rank": 93,
       "size": "XS",
       "importance": "critical",
       "score": 90,
@@ -2451,7 +2478,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2422",
-      "rank": 93,
+      "rank": 94,
       "size": "XS",
       "importance": "high",
       "score": 83,
@@ -2466,7 +2493,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2699",
-      "rank": 94,
+      "rank": 95,
       "size": "XS",
       "importance": "high",
       "score": 83,
@@ -2479,7 +2506,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2957",
-      "rank": 95,
+      "rank": 96,
       "size": "XS",
       "importance": "high",
       "score": 83,
@@ -2494,7 +2521,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2850",
-      "rank": 96,
+      "rank": 97,
       "size": "M",
       "importance": "high",
       "score": 83,
@@ -2507,7 +2534,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2758",
-      "rank": 97,
+      "rank": 98,
       "size": "S",
       "importance": "critical",
       "score": 90,
@@ -2520,7 +2547,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2817",
-      "rank": 98,
+      "rank": 99,
       "size": "M",
       "importance": "high",
       "score": 83,
@@ -2533,7 +2560,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2813",
-      "rank": 99,
+      "rank": 100,
       "size": "M",
       "importance": "high",
       "score": 83,
@@ -2546,7 +2573,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2668",
-      "rank": 100,
+      "rank": 101,
       "size": "M",
       "importance": "high",
       "score": 82,
@@ -2559,7 +2586,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2569",
-      "rank": 101,
+      "rank": 102,
       "size": "XS",
       "importance": "critical",
       "score": 88,
@@ -2572,7 +2599,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4269",
-      "rank": 102,
+      "rank": 103,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -2585,7 +2612,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3811",
-      "rank": 103,
+      "rank": 104,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -2598,7 +2625,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2179",
-      "rank": 104,
+      "rank": 105,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2611,7 +2638,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2169",
-      "rank": 105,
+      "rank": 106,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2624,7 +2651,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2734",
-      "rank": 106,
+      "rank": 107,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2637,7 +2664,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3697",
-      "rank": 107,
+      "rank": 108,
       "size": "XS",
       "importance": "high",
       "score": 82,
@@ -2649,7 +2676,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3633",
-      "rank": 108,
+      "rank": 109,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2661,7 +2688,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4420",
-      "rank": 109,
+      "rank": 110,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -2673,7 +2700,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3099",
-      "rank": 110,
+      "rank": 111,
       "size": "XS",
       "importance": "critical",
       "score": 82,
@@ -2685,7 +2712,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4418",
-      "rank": 111,
+      "rank": 112,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -2697,7 +2724,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3040",
-      "rank": 112,
+      "rank": 113,
       "size": "S",
       "importance": "critical",
       "score": 82,
@@ -2709,7 +2736,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3023",
-      "rank": 113,
+      "rank": 114,
       "size": "S",
       "importance": "critical",
       "score": 82,
@@ -2721,7 +2748,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1618",
-      "rank": 114,
+      "rank": 115,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -2734,7 +2761,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3916",
-      "rank": 115,
+      "rank": 116,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -2747,7 +2774,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3900",
-      "rank": 116,
+      "rank": 117,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -2760,7 +2787,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3793",
-      "rank": 117,
+      "rank": 118,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -2773,7 +2800,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2639",
-      "rank": 118,
+      "rank": 119,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -2788,7 +2815,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2331",
-      "rank": 119,
+      "rank": 120,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -2801,7 +2828,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2333",
-      "rank": 120,
+      "rank": 121,
       "size": "M",
       "importance": "high",
       "score": 81,
@@ -2814,7 +2841,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4184",
-      "rank": 121,
+      "rank": 122,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -2827,7 +2854,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2511",
-      "rank": 122,
+      "rank": 123,
       "size": "XS",
       "importance": "high",
       "score": 81,
@@ -2840,7 +2867,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2763",
-      "rank": 123,
+      "rank": 124,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2853,7 +2880,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2170",
-      "rank": 124,
+      "rank": 125,
       "size": "XS",
       "importance": "high",
       "score": 80,
@@ -2866,7 +2893,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1198",
-      "rank": 125,
+      "rank": 126,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2879,7 +2906,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4453",
-      "rank": 126,
+      "rank": 127,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -2891,7 +2918,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2106",
-      "rank": 127,
+      "rank": 128,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2904,7 +2931,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2880",
-      "rank": 128,
+      "rank": 129,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -2919,7 +2946,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2966",
-      "rank": 129,
+      "rank": 130,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2932,7 +2959,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2945",
-      "rank": 130,
+      "rank": 131,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2945,7 +2972,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2680",
-      "rank": 131,
+      "rank": 132,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -2958,7 +2985,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4419",
-      "rank": 132,
+      "rank": 133,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -2972,7 +2999,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3734",
-      "rank": 133,
+      "rank": 134,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2984,7 +3011,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3621",
-      "rank": 134,
+      "rank": 135,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -2996,7 +3023,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3555",
-      "rank": 135,
+      "rank": 136,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -3008,7 +3035,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3498",
-      "rank": 136,
+      "rank": 137,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -3020,7 +3047,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3496",
-      "rank": 137,
+      "rank": 138,
       "size": "XS",
       "importance": "high",
       "score": 80,
@@ -3032,7 +3059,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3081",
-      "rank": 138,
+      "rank": 139,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -3044,7 +3071,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2627",
-      "rank": 139,
+      "rank": 140,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3057,7 +3084,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2324",
-      "rank": 140,
+      "rank": 141,
       "size": "XS",
       "importance": "high",
       "score": 79,
@@ -3070,7 +3097,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2165",
-      "rank": 141,
+      "rank": 142,
       "size": "XS",
       "importance": "high",
       "score": 79,
@@ -3083,7 +3110,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2905",
-      "rank": 142,
+      "rank": 143,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3096,7 +3123,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2259",
-      "rank": 143,
+      "rank": 144,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -3109,7 +3136,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2379",
-      "rank": 144,
+      "rank": 145,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3122,7 +3149,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2421",
-      "rank": 145,
+      "rank": 146,
       "size": "XS",
       "importance": "high",
       "score": 79,
@@ -3135,7 +3162,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2430",
-      "rank": 146,
+      "rank": 147,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3148,7 +3175,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2593",
-      "rank": 147,
+      "rank": 148,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3161,7 +3188,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4302",
-      "rank": 148,
+      "rank": 149,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -3174,7 +3201,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2080",
-      "rank": 149,
+      "rank": 150,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3187,7 +3214,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5048",
-      "rank": 150,
+      "rank": 151,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -3200,7 +3227,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1436",
-      "rank": 151,
+      "rank": 152,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3213,7 +3240,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3556",
-      "rank": 152,
+      "rank": 153,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3225,7 +3252,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3553",
-      "rank": 153,
+      "rank": 154,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3237,7 +3264,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3535",
-      "rank": 154,
+      "rank": 155,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3249,7 +3276,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3429",
-      "rank": 155,
+      "rank": 156,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3261,7 +3288,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3397",
-      "rank": 156,
+      "rank": 157,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3273,7 +3300,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3325",
-      "rank": 157,
+      "rank": 158,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3285,7 +3312,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3317",
-      "rank": 158,
+      "rank": 159,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3297,7 +3324,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3284",
-      "rank": 159,
+      "rank": 160,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3309,7 +3336,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3270",
-      "rank": 160,
+      "rank": 161,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3321,7 +3348,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4487",
-      "rank": 161,
+      "rank": 162,
       "size": "XS",
       "importance": "high",
       "score": 74,
@@ -3334,7 +3361,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3257",
-      "rank": 162,
+      "rank": 163,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3346,7 +3373,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3129",
-      "rank": 163,
+      "rank": 164,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3358,7 +3385,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3120",
-      "rank": 164,
+      "rank": 165,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3370,7 +3397,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4349",
-      "rank": 165,
+      "rank": 166,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -3382,7 +3409,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3062",
-      "rank": 166,
+      "rank": 167,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3394,7 +3421,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3048",
-      "rank": 167,
+      "rank": 168,
       "size": "XS",
       "importance": "high",
       "score": 78,
@@ -3407,7 +3434,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3032",
-      "rank": 168,
+      "rank": 169,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3419,7 +3446,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3833",
-      "rank": 169,
+      "rank": 170,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3432,7 +3459,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3902",
-      "rank": 170,
+      "rank": 171,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3445,7 +3472,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4629",
-      "rank": 171,
+      "rank": 172,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -3458,7 +3485,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3854",
-      "rank": 172,
+      "rank": 173,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -3471,7 +3498,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4577",
-      "rank": 173,
+      "rank": 174,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -3484,7 +3511,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3307",
-      "rank": 174,
+      "rank": 175,
       "size": "XS",
       "importance": "high",
       "score": 62,
@@ -3497,7 +3524,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5250",
-      "rank": 175,
+      "rank": 176,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -3510,7 +3537,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2642",
-      "rank": 176,
+      "rank": 177,
       "size": "XL",
       "importance": "high",
       "score": 77,
@@ -3524,7 +3551,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1868",
-      "rank": 177,
+      "rank": 178,
       "size": "XS",
       "importance": "high",
       "score": 77,
@@ -3537,7 +3564,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4847",
-      "rank": 178,
+      "rank": 179,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3550,7 +3577,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1042",
-      "rank": 179,
+      "rank": 180,
       "size": "S",
       "importance": "high",
       "score": 77,
@@ -3563,7 +3590,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4844",
-      "rank": 180,
+      "rank": 181,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -3576,7 +3603,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-570",
-      "rank": 181,
+      "rank": 182,
       "size": "XS",
       "importance": "high",
       "score": 77,
@@ -3591,7 +3618,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2059",
-      "rank": 182,
+      "rank": 183,
       "size": "XL",
       "importance": "high",
       "score": 77,
@@ -3605,7 +3632,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2376",
-      "rank": 183,
+      "rank": 184,
       "size": "XL",
       "importance": "high",
       "score": 77,
@@ -3619,7 +3646,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3775",
-      "rank": 184,
+      "rank": 185,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3631,7 +3658,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3652",
-      "rank": 185,
+      "rank": 186,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -3643,7 +3670,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3579",
-      "rank": 186,
+      "rank": 187,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -3655,7 +3682,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3541",
-      "rank": 187,
+      "rank": 188,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3667,7 +3694,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3463",
-      "rank": 188,
+      "rank": 189,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3679,7 +3706,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3460",
-      "rank": 189,
+      "rank": 190,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3691,7 +3718,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3454",
-      "rank": 190,
+      "rank": 191,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -3703,7 +3730,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3432",
-      "rank": 191,
+      "rank": 192,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3715,7 +3742,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3306",
-      "rank": 192,
+      "rank": 193,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3727,7 +3754,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3297",
-      "rank": 193,
+      "rank": 194,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3739,7 +3766,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3274",
-      "rank": 194,
+      "rank": 195,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3752,7 +3779,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3267",
-      "rank": 195,
+      "rank": 196,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3764,7 +3791,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3261",
-      "rank": 196,
+      "rank": 197,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3776,7 +3803,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3256",
-      "rank": 197,
+      "rank": 198,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3788,7 +3815,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4342",
-      "rank": 198,
+      "rank": 199,
       "size": "M",
       "importance": "medium",
       "score": 64,
@@ -3800,7 +3827,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3174",
-      "rank": 199,
+      "rank": 200,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3812,7 +3839,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3050",
-      "rank": 200,
+      "rank": 201,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -3824,7 +3851,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4365",
-      "rank": 201,
+      "rank": 202,
       "size": "S",
       "importance": "medium",
       "score": 64,
@@ -3836,7 +3863,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2980",
-      "rank": 202,
+      "rank": 203,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -3848,7 +3875,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5295",
-      "rank": 203,
+      "rank": 204,
       "size": "L",
       "importance": "high",
       "score": 72,
@@ -3861,7 +3888,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3769",
-      "rank": 204,
+      "rank": 205,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3873,7 +3900,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3760",
-      "rank": 205,
+      "rank": 206,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3885,7 +3912,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3629",
-      "rank": 206,
+      "rank": 207,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3897,7 +3924,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3517",
-      "rank": 207,
+      "rank": 208,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3909,7 +3936,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3508",
-      "rank": 208,
+      "rank": 209,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3921,7 +3948,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3303",
-      "rank": 209,
+      "rank": 210,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3933,7 +3960,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4364",
-      "rank": 210,
+      "rank": 211,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -3945,7 +3972,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3196",
-      "rank": 211,
+      "rank": 212,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3957,7 +3984,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3186",
-      "rank": 212,
+      "rank": 213,
       "size": "XS",
       "importance": "high",
       "score": 74,
@@ -3969,7 +3996,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3185",
-      "rank": 213,
+      "rank": 214,
       "size": "XS",
       "importance": "high",
       "score": 70,
@@ -3982,7 +4009,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3179",
-      "rank": 214,
+      "rank": 215,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3994,7 +4021,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5335",
-      "rank": 215,
+      "rank": 216,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -4007,7 +4034,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3130",
-      "rank": 216,
+      "rank": 217,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4019,7 +4046,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3047",
-      "rank": 217,
+      "rank": 218,
       "size": "XS",
       "importance": "high",
       "score": 74,
@@ -4032,7 +4059,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3046",
-      "rank": 218,
+      "rank": 219,
       "size": "XS",
       "importance": "high",
       "score": 74,
@@ -4044,7 +4071,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1711",
-      "rank": 219,
+      "rank": 220,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4057,7 +4084,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3667",
-      "rank": 220,
+      "rank": 221,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -4069,7 +4096,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4561",
-      "rank": 221,
+      "rank": 222,
       "size": "L",
       "importance": "medium",
       "score": 52,
@@ -4082,7 +4109,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4242",
-      "rank": 222,
+      "rank": 223,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -4095,7 +4122,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2874",
-      "rank": 223,
+      "rank": 224,
       "size": "M",
       "importance": "high",
       "score": 45,
@@ -4108,7 +4135,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3778",
-      "rank": 224,
+      "rank": 225,
       "size": "S",
       "importance": "medium",
       "score": 46,
@@ -4121,7 +4148,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4575",
-      "rank": 225,
+      "rank": 226,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4134,7 +4161,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5284",
-      "rank": 226,
+      "rank": 227,
       "size": "XL",
       "importance": "high",
       "score": 70,
@@ -4148,7 +4175,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5116",
-      "rank": 227,
+      "rank": 228,
       "size": "S",
       "importance": "high",
       "score": 68,
@@ -4161,7 +4188,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3510",
-      "rank": 228,
+      "rank": 229,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4173,7 +4200,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4909",
-      "rank": 229,
+      "rank": 230,
       "size": "S",
       "importance": "high",
       "score": 68,
@@ -4186,7 +4213,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4616",
-      "rank": 230,
+      "rank": 231,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -4199,7 +4226,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4747",
-      "rank": 231,
+      "rank": 232,
       "size": "S",
       "importance": "high",
       "score": 62,
@@ -4212,7 +4239,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3355",
-      "rank": 232,
+      "rank": 233,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -4224,7 +4251,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3289",
-      "rank": 233,
+      "rank": 234,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4236,7 +4263,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4348",
-      "rank": 234,
+      "rank": 235,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -4248,7 +4275,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3218",
-      "rank": 235,
+      "rank": 236,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4260,7 +4287,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3210",
-      "rank": 236,
+      "rank": 237,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -4272,7 +4299,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3167",
-      "rank": 237,
+      "rank": 238,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4284,7 +4311,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3113",
-      "rank": 238,
+      "rank": 239,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -4296,7 +4323,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3108",
-      "rank": 239,
+      "rank": 240,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -4308,7 +4335,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3094",
-      "rank": 240,
+      "rank": 241,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -4320,7 +4347,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3012",
-      "rank": 241,
+      "rank": 242,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -4332,7 +4359,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3627",
-      "rank": 242,
+      "rank": 243,
       "size": "XS",
       "importance": "high",
       "score": 70,
@@ -4344,7 +4371,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3617",
-      "rank": 243,
+      "rank": 244,
       "size": "S",
       "importance": "high",
       "score": 70,
@@ -4356,7 +4383,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4346",
-      "rank": 244,
+      "rank": 245,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -4368,7 +4395,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3276",
-      "rank": 245,
+      "rank": 246,
       "size": "XS",
       "importance": "high",
       "score": 70,
@@ -4380,7 +4407,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3235",
-      "rank": 246,
+      "rank": 247,
       "size": "S",
       "importance": "high",
       "score": 70,
@@ -4392,7 +4419,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4203",
-      "rank": 247,
+      "rank": 248,
       "size": "L",
       "importance": "high",
       "score": 62,
@@ -4405,7 +4432,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3789",
-      "rank": 248,
+      "rank": 249,
       "size": "L",
       "importance": "medium",
       "score": 58,
@@ -4418,7 +4445,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3175",
-      "rank": 249,
+      "rank": 250,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -4430,7 +4457,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3015",
-      "rank": 250,
+      "rank": 251,
       "size": "L",
       "importance": "high",
       "score": 70,
@@ -4442,7 +4469,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3518",
-      "rank": 251,
+      "rank": 252,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -4457,7 +4484,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3445",
-      "rank": 252,
+      "rank": 253,
       "size": "XS",
       "importance": "high",
       "score": 68,
@@ -4469,7 +4496,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3332",
-      "rank": 253,
+      "rank": 254,
       "size": "S",
       "importance": "high",
       "score": 68,
@@ -4481,7 +4508,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4426",
-      "rank": 254,
+      "rank": 255,
       "size": "M",
       "importance": "medium",
       "score": 58,
@@ -4493,7 +4520,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4345",
-      "rank": 255,
+      "rank": 256,
       "size": "XS",
       "importance": "medium",
       "score": 54,
@@ -4505,7 +4532,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3013",
-      "rank": 256,
+      "rank": 257,
       "size": "XS",
       "importance": "high",
       "score": 68,
@@ -4517,7 +4544,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3771",
-      "rank": 257,
+      "rank": 258,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -4530,7 +4557,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4530",
-      "rank": 258,
+      "rank": 259,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -4543,7 +4570,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3533",
-      "rank": 259,
+      "rank": 260,
       "size": "L",
       "importance": "high",
       "score": 66,
@@ -4555,7 +4582,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3107",
-      "rank": 260,
+      "rank": 261,
       "size": "S",
       "importance": "high",
       "score": 66,
@@ -4567,7 +4594,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4512",
-      "rank": 261,
+      "rank": 262,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -4580,7 +4607,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1666",
-      "rank": 262,
+      "rank": 263,
       "size": "XL",
       "importance": "medium",
       "score": 63,
@@ -4594,7 +4621,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1556",
-      "rank": 263,
+      "rank": 264,
       "size": "S",
       "importance": "high",
       "score": 77,
@@ -4607,7 +4634,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4510",
-      "rank": 264,
+      "rank": 265,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -4620,7 +4647,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2190",
-      "rank": 265,
+      "rank": 266,
       "size": "L",
       "importance": "high",
       "score": 76,
@@ -4633,7 +4660,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2233",
-      "rank": 266,
+      "rank": 267,
       "size": "L",
       "importance": "high",
       "score": 76,
@@ -4646,7 +4673,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2186",
-      "rank": 267,
+      "rank": 268,
       "size": "S",
       "importance": "high",
       "score": 68,
@@ -4659,7 +4686,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4632",
-      "rank": 268,
+      "rank": 269,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -4672,7 +4699,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2241",
-      "rank": 269,
+      "rank": 270,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4684,7 +4711,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2242",
-      "rank": 270,
+      "rank": 271,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4696,7 +4723,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2240",
-      "rank": 271,
+      "rank": 272,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4708,7 +4735,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4926",
-      "rank": 272,
+      "rank": 273,
       "size": "XS",
       "importance": "medium",
       "score": 64,
@@ -4721,7 +4748,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2243",
-      "rank": 273,
+      "rank": 274,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4733,7 +4760,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2202",
-      "rank": 274,
+      "rank": 275,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4745,7 +4772,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2237",
-      "rank": 275,
+      "rank": 276,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4757,7 +4784,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2487",
-      "rank": 276,
+      "rank": 277,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4769,7 +4796,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4811",
-      "rank": 277,
+      "rank": 278,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -4782,7 +4809,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5079",
-      "rank": 278,
+      "rank": 279,
       "size": "S",
       "importance": "high",
       "score": 68,
@@ -4795,7 +4822,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4756",
-      "rank": 279,
+      "rank": 280,
       "size": "L",
       "importance": "medium",
       "score": 50,
@@ -4808,7 +4835,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4778",
-      "rank": 280,
+      "rank": 281,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -4821,7 +4848,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4817",
-      "rank": 281,
+      "rank": 282,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -4836,7 +4863,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2211",
-      "rank": 282,
+      "rank": 283,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4849,7 +4876,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2210",
-      "rank": 283,
+      "rank": 284,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4862,7 +4889,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2201",
-      "rank": 284,
+      "rank": 285,
       "size": "XS",
       "importance": "high",
       "score": 73,
@@ -4874,7 +4901,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2646",
-      "rank": 285,
+      "rank": 286,
       "size": "XS",
       "importance": "high",
       "score": 73,
@@ -4886,7 +4913,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2755",
-      "rank": 286,
+      "rank": 287,
       "size": "S",
       "importance": "high",
       "score": 73,
@@ -4898,7 +4925,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2754",
-      "rank": 287,
+      "rank": 288,
       "size": "S",
       "importance": "high",
       "score": 73,
@@ -4910,7 +4937,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2809",
-      "rank": 288,
+      "rank": 289,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -4922,7 +4949,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2810",
-      "rank": 289,
+      "rank": 290,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -4934,7 +4961,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2495",
-      "rank": 290,
+      "rank": 291,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4946,7 +4973,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2478",
-      "rank": 291,
+      "rank": 292,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4958,7 +4985,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1710",
-      "rank": 292,
+      "rank": 293,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4970,7 +4997,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1558",
-      "rank": 293,
+      "rank": 294,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -4982,7 +5009,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1766",
-      "rank": 294,
+      "rank": 295,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4994,7 +5021,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4853",
-      "rank": 295,
+      "rank": 296,
       "size": "M",
       "importance": "low",
       "score": 40,
@@ -5007,7 +5034,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2266",
-      "rank": 296,
+      "rank": 297,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -5019,7 +5046,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1578",
-      "rank": 297,
+      "rank": 298,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -5031,7 +5058,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1538",
-      "rank": 298,
+      "rank": 299,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -5043,7 +5070,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-687",
-      "rank": 299,
+      "rank": 300,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -5055,7 +5082,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-466",
-      "rank": 300,
+      "rank": 301,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -5067,7 +5094,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-465",
-      "rank": 301,
+      "rank": 302,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -5079,7 +5106,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-463",
-      "rank": 302,
+      "rank": 303,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -5091,7 +5118,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1142",
-      "rank": 303,
+      "rank": 304,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5104,7 +5131,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1424",
-      "rank": 304,
+      "rank": 305,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5116,7 +5143,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1196",
-      "rank": 305,
+      "rank": 306,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5128,7 +5155,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1311",
-      "rank": 306,
+      "rank": 307,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5140,7 +5167,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1313",
-      "rank": 307,
+      "rank": 308,
       "size": "L",
       "importance": "high",
       "score": 70,
@@ -5152,7 +5179,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4863",
-      "rank": 308,
+      "rank": 309,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -5165,7 +5192,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1246",
-      "rank": 309,
+      "rank": 310,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5177,7 +5204,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1253",
-      "rank": 310,
+      "rank": 311,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5190,7 +5217,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1357",
-      "rank": 311,
+      "rank": 312,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5202,7 +5229,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1915",
-      "rank": 312,
+      "rank": 313,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5214,7 +5241,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4886",
-      "rank": 313,
+      "rank": 314,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -5227,7 +5254,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1435",
-      "rank": 314,
+      "rank": 315,
       "size": "XS",
       "importance": "high",
       "score": 69,
@@ -5239,7 +5266,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1672",
-      "rank": 315,
+      "rank": 316,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5251,7 +5278,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1640",
-      "rank": 316,
+      "rank": 317,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5263,7 +5290,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4297",
-      "rank": 317,
+      "rank": 318,
       "size": "L",
       "importance": "medium",
       "score": 62,
@@ -5276,7 +5303,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2350",
-      "rank": 318,
+      "rank": 319,
       "size": "L",
       "importance": "high",
       "score": 69,
@@ -5290,7 +5317,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1217",
-      "rank": 319,
+      "rank": 320,
       "size": "XS",
       "importance": "high",
       "score": 69,
@@ -5302,7 +5329,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2079",
-      "rank": 320,
+      "rank": 321,
       "size": "M",
       "importance": "high",
       "score": 60,
@@ -5315,7 +5342,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4204",
-      "rank": 321,
+      "rank": 322,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -5330,7 +5357,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1219",
-      "rank": 322,
+      "rank": 323,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5343,7 +5370,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1451",
-      "rank": 323,
+      "rank": 324,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5356,7 +5383,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1452",
-      "rank": 324,
+      "rank": 325,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5368,7 +5395,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1553",
-      "rank": 325,
+      "rank": 326,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5380,7 +5407,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1504",
-      "rank": 326,
+      "rank": 327,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5392,7 +5419,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1480",
-      "rank": 327,
+      "rank": 328,
       "size": "L",
       "importance": "high",
       "score": 68,
@@ -5404,7 +5431,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5058",
-      "rank": 328,
+      "rank": 329,
       "size": "XL",
       "importance": "high",
       "score": 66,
@@ -5417,7 +5444,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1479",
-      "rank": 329,
+      "rank": 330,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5429,7 +5456,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2950",
-      "rank": 330,
+      "rank": 331,
       "size": "L",
       "importance": "high",
       "score": 68,
@@ -5441,7 +5468,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2720",
-      "rank": 331,
+      "rank": 332,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5453,7 +5480,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2650",
-      "rank": 332,
+      "rank": 333,
       "size": "S",
       "importance": "high",
       "score": 67,
@@ -5466,7 +5493,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2358",
-      "rank": 333,
+      "rank": 334,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5478,7 +5505,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2334",
-      "rank": 334,
+      "rank": 335,
       "size": "XS",
       "importance": "high",
       "score": 67,
@@ -5490,7 +5517,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2193",
-      "rank": 335,
+      "rank": 336,
       "size": "S",
       "importance": "high",
       "score": 66,
@@ -5502,7 +5529,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1984",
-      "rank": 336,
+      "rank": 337,
       "size": "XS",
       "importance": "high",
       "score": 66,
@@ -5515,7 +5542,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1913",
-      "rank": 337,
+      "rank": 338,
       "size": "XS",
       "importance": "high",
       "score": 66,
@@ -5527,7 +5554,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1906",
-      "rank": 338,
+      "rank": 339,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -5539,7 +5566,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1544",
-      "rank": 339,
+      "rank": 340,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -5551,7 +5578,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-955",
-      "rank": 340,
+      "rank": 341,
       "size": "S",
       "importance": "high",
       "score": 66,
@@ -5563,7 +5590,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-807",
-      "rank": 341,
+      "rank": 342,
       "size": "L",
       "importance": "high",
       "score": 66,
@@ -5575,7 +5602,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-630",
-      "rank": 342,
+      "rank": 343,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -5587,7 +5614,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-471",
-      "rank": 343,
+      "rank": 344,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -5599,7 +5626,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-438",
-      "rank": 344,
+      "rank": 345,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -5611,7 +5638,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-578",
-      "rank": 345,
+      "rank": 346,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -5623,7 +5650,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2921",
-      "rank": 346,
+      "rank": 347,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -5635,7 +5662,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4195",
-      "rank": 347,
+      "rank": 348,
       "size": "M",
       "importance": "medium",
       "score": 63,
@@ -5648,7 +5675,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2839",
-      "rank": 348,
+      "rank": 349,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -5660,7 +5687,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2824",
-      "rank": 349,
+      "rank": 350,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -5672,7 +5699,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2792",
-      "rank": 350,
+      "rank": 351,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -5684,7 +5711,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2761",
-      "rank": 351,
+      "rank": 352,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5696,7 +5723,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2738",
-      "rank": 352,
+      "rank": 353,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5708,7 +5735,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2717",
-      "rank": 353,
+      "rank": 354,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5720,7 +5747,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2697",
-      "rank": 354,
+      "rank": 355,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5732,7 +5759,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4236",
-      "rank": 355,
+      "rank": 356,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5745,7 +5772,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2691",
-      "rank": 356,
+      "rank": 357,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5757,7 +5784,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4306",
-      "rank": 357,
+      "rank": 358,
       "size": "M",
       "importance": "medium",
       "score": 61,
@@ -5770,7 +5797,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3701",
-      "rank": 358,
+      "rank": 359,
       "size": "L",
       "importance": "high",
       "score": 62,
@@ -5782,7 +5809,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3090",
-      "rank": 359,
+      "rank": 360,
       "size": "M",
       "importance": "high",
       "score": 62,
@@ -5794,7 +5821,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4552",
-      "rank": 360,
+      "rank": 361,
       "size": "M",
       "importance": "medium",
       "score": 61,
@@ -5807,7 +5834,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2670",
-      "rank": 361,
+      "rank": 362,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -5819,7 +5846,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2664",
-      "rank": 362,
+      "rank": 363,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -5831,7 +5858,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2663",
-      "rank": 363,
+      "rank": 364,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -5843,7 +5870,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2649",
-      "rank": 364,
+      "rank": 365,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -5855,7 +5882,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2580",
-      "rank": 365,
+      "rank": 366,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -5868,7 +5895,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2572",
-      "rank": 366,
+      "rank": 367,
       "size": "M",
       "importance": "medium",
       "score": 61,
@@ -5880,7 +5907,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2563",
-      "rank": 367,
+      "rank": 368,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -5892,7 +5919,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2554",
-      "rank": 368,
+      "rank": 369,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -5904,7 +5931,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2550",
-      "rank": 369,
+      "rank": 370,
       "size": "XS",
       "importance": "medium",
       "score": 60,
@@ -5916,7 +5943,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2547",
-      "rank": 370,
+      "rank": 371,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -5928,7 +5955,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2546",
-      "rank": 371,
+      "rank": 372,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -5941,7 +5968,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4303",
-      "rank": 372,
+      "rank": 373,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -5954,7 +5981,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3003",
-      "rank": 373,
+      "rank": 374,
       "size": "XS",
       "importance": "medium",
       "score": 60,
@@ -5966,7 +5993,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2501",
-      "rank": 374,
+      "rank": 375,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -5978,7 +6005,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2492",
-      "rank": 375,
+      "rank": 376,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -5991,7 +6018,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2491",
-      "rank": 376,
+      "rank": 377,
       "size": "M",
       "importance": "medium",
       "score": 59,
@@ -6003,7 +6030,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2489",
-      "rank": 377,
+      "rank": 378,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -6015,7 +6042,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2465",
-      "rank": 378,
+      "rank": 379,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -6027,7 +6054,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2454",
-      "rank": 379,
+      "rank": 380,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -6039,7 +6066,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2428",
-      "rank": 380,
+      "rank": 381,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -6051,7 +6078,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2423",
-      "rank": 381,
+      "rank": 382,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -6063,7 +6090,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2416",
-      "rank": 382,
+      "rank": 383,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -6075,7 +6102,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4250",
-      "rank": 383,
+      "rank": 384,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -6087,7 +6114,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2395",
-      "rank": 384,
+      "rank": 385,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -6099,7 +6126,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2381",
-      "rank": 385,
+      "rank": 386,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -6111,7 +6138,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2287",
-      "rank": 386,
+      "rank": 387,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -6123,7 +6150,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3661",
-      "rank": 387,
+      "rank": 388,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -6135,7 +6162,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3288",
-      "rank": 388,
+      "rank": 389,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -6147,7 +6174,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3164",
-      "rank": 389,
+      "rank": 390,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -6159,7 +6186,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3121",
-      "rank": 390,
+      "rank": 391,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -6171,7 +6198,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3014",
-      "rank": 391,
+      "rank": 392,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -6183,7 +6210,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3944",
-      "rank": 392,
+      "rank": 393,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -6196,7 +6223,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3829",
-      "rank": 393,
+      "rank": 394,
       "size": "L",
       "importance": "medium",
       "score": 58,
@@ -6209,7 +6236,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2280",
-      "rank": 394,
+      "rank": 395,
       "size": "M",
       "importance": "medium",
       "score": 57,
@@ -6220,8 +6247,21 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
       "planning": "auto"
     },
     {
+      "issue": "PAN-5353",
+      "rank": 395,
+      "size": "S",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Send now: flush a queued message into a running Claude Code turn via the Ctrl+X Ctrl+S chord. PRD written, chord live-probed.",
+      "rationale": "New issue since the prior run: a small, self-contained conversation-view feature with a PRD and a live-probed mechanism, placed in the free rank-395 slot among medium conversation UX work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2197",
-      "rank": 396,
+      "rank": 397,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -6233,7 +6273,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2069",
-      "rank": 397,
+      "rank": 398,
       "size": "XS",
       "importance": "medium",
       "score": 57,
@@ -6245,7 +6285,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1918",
-      "rank": 398,
+      "rank": 399,
       "size": "XS",
       "importance": "medium",
       "score": 57,
@@ -6257,7 +6297,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1912",
-      "rank": 399,
+      "rank": 400,
       "size": "XS",
       "importance": "medium",
       "score": 57,
@@ -6269,7 +6309,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4208",
-      "rank": 400,
+      "rank": 401,
       "size": "M",
       "importance": "medium",
       "score": 58,
@@ -6282,7 +6322,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1846",
-      "rank": 401,
+      "rank": 402,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -6295,7 +6335,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1830",
-      "rank": 402,
+      "rank": 403,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -6307,7 +6347,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1816",
-      "rank": 403,
+      "rank": 404,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6319,7 +6359,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1795",
-      "rank": 404,
+      "rank": 405,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6331,7 +6371,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1774",
-      "rank": 405,
+      "rank": 406,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6343,7 +6383,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1769",
-      "rank": 406,
+      "rank": 407,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6355,7 +6395,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1761",
-      "rank": 407,
+      "rank": 408,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6367,7 +6407,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1755",
-      "rank": 408,
+      "rank": 409,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6379,7 +6419,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3516",
-      "rank": 409,
+      "rank": 410,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6391,7 +6431,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3455",
-      "rank": 410,
+      "rank": 411,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6403,7 +6443,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3117",
-      "rank": 411,
+      "rank": 412,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6415,7 +6455,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3036",
-      "rank": 412,
+      "rank": 413,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6427,7 +6467,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3016",
-      "rank": 413,
+      "rank": 414,
       "size": "M",
       "importance": "medium",
       "score": 56,
@@ -6439,7 +6479,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3890",
-      "rank": 414,
+      "rank": 415,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6452,7 +6492,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3822",
-      "rank": 415,
+      "rank": 416,
       "size": "L",
       "importance": "medium",
       "score": 56,
@@ -6465,7 +6505,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5028",
-      "rank": 416,
+      "rank": 417,
       "size": "M",
       "importance": "medium",
       "score": 64,
@@ -6478,7 +6518,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1673",
-      "rank": 417,
+      "rank": 418,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6490,7 +6530,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5227",
-      "rank": 418,
+      "rank": 419,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -6502,7 +6542,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5349",
-      "rank": 419,
+      "rank": 420,
       "size": "L",
       "importance": "medium",
       "score": 56,
@@ -6515,7 +6555,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5342",
-      "rank": 420,
+      "rank": 421,
       "size": "L",
       "importance": "medium",
       "score": 60,
@@ -6528,7 +6568,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1669",
-      "rank": 421,
+      "rank": 422,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6540,7 +6580,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1668",
-      "rank": 422,
+      "rank": 423,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6552,7 +6592,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1627",
-      "rank": 423,
+      "rank": 424,
       "size": "M",
       "importance": "medium",
       "score": 55,
@@ -6564,7 +6604,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1624",
-      "rank": 424,
+      "rank": 425,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6576,7 +6616,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3901",
-      "rank": 425,
+      "rank": 426,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6589,7 +6629,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3852",
-      "rank": 426,
+      "rank": 427,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6602,7 +6642,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5343",
-      "rank": 427,
+      "rank": 428,
       "size": "L",
       "importance": "medium",
       "score": 58,
@@ -6619,7 +6659,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3862",
-      "rank": 428,
+      "rank": 429,
       "size": "L",
       "importance": "medium",
       "score": 55,
@@ -6632,7 +6672,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1572",
-      "rank": 429,
+      "rank": 430,
       "size": "M",
       "importance": "medium",
       "score": 54,
@@ -6645,7 +6685,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4627",
-      "rank": 430,
+      "rank": 431,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6658,7 +6698,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1571",
-      "rank": 431,
+      "rank": 432,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6670,7 +6710,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1565",
-      "rank": 432,
+      "rank": 433,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6682,7 +6722,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5312",
-      "rank": 433,
+      "rank": 434,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6694,7 +6734,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5241",
-      "rank": 434,
+      "rank": 435,
       "size": "L",
       "importance": "medium",
       "score": 54,
@@ -6706,7 +6746,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1530",
-      "rank": 435,
+      "rank": 436,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6718,7 +6758,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1461",
-      "rank": 436,
+      "rank": 437,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6730,7 +6770,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1449",
-      "rank": 437,
+      "rank": 438,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6742,7 +6782,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1446",
-      "rank": 438,
+      "rank": 439,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6754,7 +6794,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5180",
-      "rank": 439,
+      "rank": 440,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -6766,7 +6806,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5264",
-      "rank": 440,
+      "rank": 441,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -6778,7 +6818,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5340",
-      "rank": 441,
+      "rank": 442,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6792,7 +6832,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5341",
-      "rank": 442,
+      "rank": 443,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6806,7 +6846,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1445",
-      "rank": 443,
+      "rank": 444,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6818,7 +6858,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3616",
-      "rank": 444,
+      "rank": 445,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6830,7 +6870,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2982",
-      "rank": 445,
+      "rank": 446,
       "size": "XS",
       "importance": "medium",
       "score": 54,
@@ -6842,7 +6882,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5322",
-      "rank": 446,
+      "rank": 447,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -6854,7 +6894,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5317",
-      "rank": 447,
+      "rank": 448,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -6866,7 +6906,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2981",
-      "rank": 448,
+      "rank": 449,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6878,7 +6918,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2976",
-      "rank": 449,
+      "rank": 450,
       "size": "L",
       "importance": "medium",
       "score": 54,
@@ -6890,7 +6930,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1444",
-      "rank": 450,
+      "rank": 451,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6902,7 +6942,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2469",
-      "rank": 451,
+      "rank": 452,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6915,7 +6955,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1433",
-      "rank": 452,
+      "rank": 453,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6927,7 +6967,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1416",
-      "rank": 453,
+      "rank": 454,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6939,7 +6979,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1392",
-      "rank": 454,
+      "rank": 455,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -6952,7 +6992,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4151",
-      "rank": 455,
+      "rank": 456,
       "size": "L",
       "importance": "medium",
       "score": 46,
@@ -6966,7 +7006,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1330",
-      "rank": 456,
+      "rank": 457,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -6978,7 +7018,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4971",
-      "rank": 457,
+      "rank": 458,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -6991,7 +7031,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1226",
-      "rank": 458,
+      "rank": 459,
       "size": "L",
       "importance": "medium",
       "score": 52,
@@ -7003,7 +7043,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1173",
-      "rank": 459,
+      "rank": 460,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -7015,7 +7055,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1154",
-      "rank": 460,
+      "rank": 461,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -7027,7 +7067,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3354",
-      "rank": 461,
+      "rank": 462,
       "size": "XS",
       "importance": "medium",
       "score": 52,
@@ -7039,7 +7079,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3178",
-      "rank": 462,
+      "rank": 463,
       "size": "XL",
       "importance": "medium",
       "score": 52,
@@ -7052,7 +7092,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3017",
-      "rank": 463,
+      "rank": 464,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -7064,7 +7104,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5174",
-      "rank": 464,
+      "rank": 465,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -7076,7 +7116,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3873",
-      "rank": 465,
+      "rank": 466,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -7089,7 +7129,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5346",
-      "rank": 466,
+      "rank": 467,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -7102,7 +7142,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1150",
-      "rank": 467,
+      "rank": 468,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7114,7 +7154,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1149",
-      "rank": 468,
+      "rank": 469,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7126,7 +7166,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1130",
-      "rank": 469,
+      "rank": 470,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7138,7 +7178,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1129",
-      "rank": 470,
+      "rank": 471,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7150,7 +7190,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1128",
-      "rank": 471,
+      "rank": 472,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7162,7 +7202,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1113",
-      "rank": 472,
+      "rank": 473,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7174,7 +7214,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1068",
-      "rank": 473,
+      "rank": 474,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -7186,7 +7226,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3938",
-      "rank": 474,
+      "rank": 475,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7199,7 +7239,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-933",
-      "rank": 475,
+      "rank": 476,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7211,7 +7251,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-932",
-      "rank": 476,
+      "rank": 477,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7223,7 +7263,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-927",
-      "rank": 477,
+      "rank": 478,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7235,7 +7275,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-900",
-      "rank": 478,
+      "rank": 479,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7247,7 +7287,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-886",
-      "rank": 479,
+      "rank": 480,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7259,7 +7299,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-778",
-      "rank": 480,
+      "rank": 481,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7271,7 +7311,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-681",
-      "rank": 481,
+      "rank": 482,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7283,7 +7323,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3732",
-      "rank": 482,
+      "rank": 483,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7295,7 +7335,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3700",
-      "rank": 483,
+      "rank": 484,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7307,7 +7347,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3290",
-      "rank": 484,
+      "rank": 485,
       "size": "XS",
       "importance": "medium",
       "score": 50,
@@ -7319,7 +7359,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3132",
-      "rank": 485,
+      "rank": 486,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7331,7 +7371,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3909",
-      "rank": 486,
+      "rank": 487,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7344,7 +7384,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2659",
-      "rank": 487,
+      "rank": 488,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7357,7 +7397,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3831",
-      "rank": 488,
+      "rank": 489,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7370,7 +7410,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4779",
-      "rank": 489,
+      "rank": 490,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7383,7 +7423,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-538",
-      "rank": 490,
+      "rank": 491,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -7395,7 +7435,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1164",
-      "rank": 491,
+      "rank": 492,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7407,7 +7447,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3563",
-      "rank": 492,
+      "rank": 493,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7420,7 +7460,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1041",
-      "rank": 493,
+      "rank": 494,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7432,7 +7472,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-924",
-      "rank": 494,
+      "rank": 495,
       "size": "L",
       "importance": "medium",
       "score": 48,
@@ -7444,7 +7484,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3770",
-      "rank": 495,
+      "rank": 496,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7456,7 +7496,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4568",
-      "rank": 496,
+      "rank": 497,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7469,7 +7509,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3731",
-      "rank": 497,
+      "rank": 498,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7481,7 +7521,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3530",
-      "rank": 498,
+      "rank": 499,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7493,7 +7533,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3131",
-      "rank": 499,
+      "rank": 500,
       "size": "L",
       "importance": "medium",
       "score": 48,
@@ -7505,7 +7545,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3061",
-      "rank": 500,
+      "rank": 501,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7517,7 +7557,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3057",
-      "rank": 501,
+      "rank": 502,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -7530,7 +7570,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3892",
-      "rank": 502,
+      "rank": 503,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7543,7 +7583,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4918",
-      "rank": 503,
+      "rank": 504,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7556,7 +7596,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-863",
-      "rank": 504,
+      "rank": 505,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7568,7 +7608,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-817",
-      "rank": 505,
+      "rank": 506,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7580,7 +7620,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-802",
-      "rank": 506,
+      "rank": 507,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7592,7 +7632,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-713",
-      "rank": 507,
+      "rank": 508,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7604,7 +7644,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-700",
-      "rank": 508,
+      "rank": 509,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7616,7 +7656,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-646",
-      "rank": 509,
+      "rank": 510,
       "size": "XS",
       "importance": "medium",
       "score": 47,
@@ -7629,7 +7669,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-532",
-      "rank": 510,
+      "rank": 511,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7641,7 +7681,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2896",
-      "rank": 511,
+      "rank": 512,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7653,7 +7693,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2685",
-      "rank": 512,
+      "rank": 513,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7665,7 +7705,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2626",
-      "rank": 513,
+      "rank": 514,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7677,7 +7717,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5231",
-      "rank": 514,
+      "rank": 515,
       "size": "S",
       "importance": "medium",
       "score": 46,
@@ -7689,7 +7729,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5204",
-      "rank": 515,
+      "rank": 516,
       "size": "S",
       "importance": "medium",
       "score": 46,
@@ -7701,7 +7741,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2625",
-      "rank": 516,
+      "rank": 517,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7713,7 +7753,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2608",
-      "rank": 517,
+      "rank": 518,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7725,7 +7765,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2582",
-      "rank": 518,
+      "rank": 519,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7737,7 +7777,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2566",
-      "rank": 519,
+      "rank": 520,
       "size": "L",
       "importance": "medium",
       "score": 46,
@@ -7751,7 +7791,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2565",
-      "rank": 520,
+      "rank": 521,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7764,7 +7804,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3735",
-      "rank": 521,
+      "rank": 522,
       "size": "S",
       "importance": "medium",
       "score": 46,
@@ -7776,7 +7816,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3335",
-      "rank": 522,
+      "rank": 523,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7788,7 +7828,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3054",
-      "rank": 523,
+      "rank": 524,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7800,7 +7840,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2977",
-      "rank": 524,
+      "rank": 525,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7814,7 +7854,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2557",
-      "rank": 525,
+      "rank": 526,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7826,7 +7866,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2553",
-      "rank": 526,
+      "rank": 527,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7838,7 +7878,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2521",
-      "rank": 527,
+      "rank": 528,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7850,7 +7890,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2493",
-      "rank": 528,
+      "rank": 529,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7862,7 +7902,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3772",
-      "rank": 529,
+      "rank": 530,
       "size": "XS",
       "importance": "medium",
       "score": 45,
@@ -7874,7 +7914,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3853",
-      "rank": 530,
+      "rank": 531,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7887,7 +7927,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3830",
-      "rank": 531,
+      "rank": 532,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7900,7 +7940,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4924",
-      "rank": 532,
+      "rank": 533,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7913,7 +7953,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4367",
-      "rank": 533,
+      "rank": 534,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7925,7 +7965,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2443",
-      "rank": 534,
+      "rank": 535,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7937,7 +7977,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2442",
-      "rank": 535,
+      "rank": 536,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7949,7 +7989,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2409",
-      "rank": 536,
+      "rank": 537,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7961,7 +8001,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5145",
-      "rank": 537,
+      "rank": 538,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -7973,7 +8013,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5201",
-      "rank": 538,
+      "rank": 539,
       "size": "XL",
       "importance": "medium",
       "score": 44,
@@ -7985,7 +8025,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2392",
-      "rank": 539,
+      "rank": 540,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7998,7 +8038,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2335",
-      "rank": 540,
+      "rank": 541,
       "size": "XS",
       "importance": "medium",
       "score": 44,
@@ -8010,7 +8050,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2295",
-      "rank": 541,
+      "rank": 542,
       "size": "L",
       "importance": "medium",
       "score": 44,
@@ -8022,7 +8062,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3767",
-      "rank": 542,
+      "rank": 543,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8034,7 +8074,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3615",
-      "rank": 543,
+      "rank": 544,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8046,7 +8086,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3558",
-      "rank": 544,
+      "rank": 545,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8058,7 +8098,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3469",
-      "rank": 545,
+      "rank": 546,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8070,7 +8110,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3333",
-      "rank": 546,
+      "rank": 547,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8082,7 +8122,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3058",
-      "rank": 547,
+      "rank": 548,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8094,7 +8134,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2288",
-      "rank": 548,
+      "rank": 549,
       "size": "L",
       "importance": "medium",
       "score": 43,
@@ -8106,7 +8146,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2065",
-      "rank": 549,
+      "rank": 550,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8118,7 +8158,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2031",
-      "rank": 550,
+      "rank": 551,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8130,7 +8170,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2026",
-      "rank": 551,
+      "rank": 552,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8142,7 +8182,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2025",
-      "rank": 552,
+      "rank": 553,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8154,7 +8194,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4366",
-      "rank": 553,
+      "rank": 554,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -8166,7 +8206,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5314",
-      "rank": 554,
+      "rank": 555,
       "size": "S",
       "importance": "medium",
       "score": 42,
@@ -8178,7 +8218,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5267",
-      "rank": 555,
+      "rank": 556,
       "size": "S",
       "importance": "medium",
       "score": 42,
@@ -8190,7 +8230,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2004",
-      "rank": 556,
+      "rank": 557,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8202,7 +8242,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1995",
-      "rank": 557,
+      "rank": 558,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8214,7 +8254,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3739",
-      "rank": 558,
+      "rank": 559,
       "size": "S",
       "importance": "medium",
       "score": 42,
@@ -8226,7 +8266,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4393",
-      "rank": 559,
+      "rank": 560,
       "size": "XS",
       "importance": "medium",
       "score": 44,
@@ -8238,7 +8278,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1985",
-      "rank": 560,
+      "rank": 561,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8250,7 +8290,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1968",
-      "rank": 561,
+      "rank": 562,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8262,7 +8302,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1967",
-      "rank": 562,
+      "rank": 563,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8275,7 +8315,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1965",
-      "rank": 563,
+      "rank": 564,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8287,7 +8327,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1937",
-      "rank": 564,
+      "rank": 565,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8299,7 +8339,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1926",
-      "rank": 565,
+      "rank": 566,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8311,7 +8351,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1916",
-      "rank": 566,
+      "rank": 567,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8323,7 +8363,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1854",
-      "rank": 567,
+      "rank": 568,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8335,7 +8375,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1853",
-      "rank": 568,
+      "rank": 569,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8347,7 +8387,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1852",
-      "rank": 569,
+      "rank": 570,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8359,7 +8399,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1844",
-      "rank": 570,
+      "rank": 571,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8371,7 +8411,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5202",
-      "rank": 571,
+      "rank": 572,
       "size": "XL",
       "importance": "medium",
       "score": 40,
@@ -8385,7 +8425,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5141",
-      "rank": 572,
+      "rank": 573,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8397,7 +8437,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1840",
-      "rank": 573,
+      "rank": 574,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8409,7 +8449,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1839",
-      "rank": 574,
+      "rank": 575,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8421,7 +8461,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1776",
-      "rank": 575,
+      "rank": 576,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8433,7 +8473,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3706",
-      "rank": 576,
+      "rank": 577,
       "size": "L",
       "importance": "medium",
       "score": 40,
@@ -8445,7 +8485,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3539",
-      "rank": 577,
+      "rank": 578,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8457,7 +8497,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3502",
-      "rank": 578,
+      "rank": 579,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8469,7 +8509,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4409",
-      "rank": 579,
+      "rank": 580,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8481,7 +8521,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4410",
-      "rank": 580,
+      "rank": 581,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8495,7 +8535,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2978",
-      "rank": 581,
+      "rank": 582,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -8510,7 +8550,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4878",
-      "rank": 582,
+      "rank": 583,
       "size": "XS",
       "importance": "low",
       "score": 30,
@@ -8523,7 +8563,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1754",
-      "rank": 583,
+      "rank": 584,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8535,7 +8575,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1751",
-      "rank": 584,
+      "rank": 585,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8547,7 +8587,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1750",
-      "rank": 585,
+      "rank": 586,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8559,7 +8599,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1748",
-      "rank": 586,
+      "rank": 587,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8571,7 +8611,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1691",
-      "rank": 587,
+      "rank": 588,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8583,7 +8623,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1685",
-      "rank": 588,
+      "rank": 589,
       "size": "XS",
       "importance": "medium",
       "score": 39,
@@ -8595,7 +8635,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1676",
-      "rank": 589,
+      "rank": 590,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8608,7 +8648,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1667",
-      "rank": 590,
+      "rank": 591,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8620,7 +8660,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1657",
-      "rank": 591,
+      "rank": 592,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8632,7 +8672,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1656",
-      "rank": 592,
+      "rank": 593,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8644,7 +8684,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1655",
-      "rank": 593,
+      "rank": 594,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8656,7 +8696,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1654",
-      "rank": 594,
+      "rank": 595,
       "size": "XS",
       "importance": "medium",
       "score": 38,
@@ -8668,7 +8708,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1653",
-      "rank": 595,
+      "rank": 596,
       "size": "XS",
       "importance": "medium",
       "score": 38,
@@ -8680,7 +8720,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5309",
-      "rank": 596,
+      "rank": 597,
       "size": "S",
       "importance": "low",
       "score": 36,
@@ -8692,7 +8732,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5308",
-      "rank": 597,
+      "rank": 598,
       "size": "S",
       "importance": "low",
       "score": 36,
@@ -8704,7 +8744,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1623",
-      "rank": 598,
+      "rank": 599,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8716,7 +8756,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1561",
-      "rank": 599,
+      "rank": 600,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8728,7 +8768,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1550",
-      "rank": 600,
+      "rank": 601,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8741,7 +8781,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1545",
-      "rank": 601,
+      "rank": 602,
       "size": "XS",
       "importance": "medium",
       "score": 37,
@@ -8753,7 +8793,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1542",
-      "rank": 602,
+      "rank": 603,
       "size": "XS",
       "importance": "medium",
       "score": 37,
@@ -8765,7 +8805,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1524",
-      "rank": 603,
+      "rank": 604,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8777,7 +8817,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1490",
-      "rank": 604,
+      "rank": 605,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8789,7 +8829,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1485",
-      "rank": 605,
+      "rank": 606,
       "size": "S",
       "importance": "medium",
       "score": 32,
@@ -8802,7 +8842,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1473",
-      "rank": 606,
+      "rank": 607,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8814,7 +8854,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1443",
-      "rank": 607,
+      "rank": 608,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -8827,7 +8867,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1442",
-      "rank": 608,
+      "rank": 609,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8839,7 +8879,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1432",
-      "rank": 609,
+      "rank": 610,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8851,7 +8891,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1223",
-      "rank": 610,
+      "rank": 611,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8863,7 +8903,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1165",
-      "rank": 611,
+      "rank": 612,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8875,7 +8915,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1151",
-      "rank": 612,
+      "rank": 613,
       "size": "XS",
       "importance": "medium",
       "score": 35,
@@ -8887,7 +8927,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4360",
-      "rank": 613,
+      "rank": 614,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8899,7 +8939,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1060",
-      "rank": 614,
+      "rank": 615,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8911,7 +8951,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1051",
-      "rank": 615,
+      "rank": 616,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8923,7 +8963,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1037",
-      "rank": 616,
+      "rank": 617,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8935,7 +8975,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-958",
-      "rank": 617,
+      "rank": 618,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8947,7 +8987,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-949",
-      "rank": 618,
+      "rank": 619,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8959,7 +8999,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3157",
-      "rank": 619,
+      "rank": 620,
       "size": "XS",
       "importance": "medium",
       "score": 42,
@@ -8972,7 +9012,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5067",
-      "rank": 620,
+      "rank": 621,
       "size": "M",
       "importance": "medium",
       "score": 54,
@@ -8984,7 +9024,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4908",
-      "rank": 621,
+      "rank": 622,
       "size": "S",
       "importance": "low",
       "score": 34,
@@ -8997,7 +9037,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5130",
-      "rank": 622,
+      "rank": 623,
       "size": "S",
       "importance": "medium",
       "score": 36,
@@ -9010,7 +9050,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-947",
-      "rank": 623,
+      "rank": 624,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -9022,7 +9062,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-938",
-      "rank": 624,
+      "rank": 625,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -9034,7 +9074,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-903",
-      "rank": 625,
+      "rank": 626,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -9046,7 +9086,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-902",
-      "rank": 626,
+      "rank": 627,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -9058,7 +9098,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-901",
-      "rank": 627,
+      "rank": 628,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -9070,7 +9110,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-818",
-      "rank": 628,
+      "rank": 629,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -9082,7 +9122,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4308",
-      "rank": 629,
+      "rank": 630,
       "size": "S",
       "importance": "medium",
       "score": 38,
@@ -9095,7 +9135,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3322",
-      "rank": 630,
+      "rank": 631,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -9107,7 +9147,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-678",
-      "rank": 631,
+      "rank": 632,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9119,7 +9159,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-675",
-      "rank": 632,
+      "rank": 633,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9132,7 +9172,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-654",
-      "rank": 633,
+      "rank": 634,
       "size": "L",
       "importance": "medium",
       "score": 33,
@@ -9144,7 +9184,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-649",
-      "rank": 634,
+      "rank": 635,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9156,7 +9196,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-637",
-      "rank": 635,
+      "rank": 636,
       "size": "XS",
       "importance": "medium",
       "score": 33,
@@ -9168,7 +9208,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-629",
-      "rank": 636,
+      "rank": 637,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9180,7 +9220,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-613",
-      "rank": 637,
+      "rank": 638,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9192,7 +9232,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-607",
-      "rank": 638,
+      "rank": 639,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -9204,7 +9244,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-606",
-      "rank": 639,
+      "rank": 640,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9216,7 +9256,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-548",
-      "rank": 640,
+      "rank": 641,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9228,7 +9268,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-546",
-      "rank": 641,
+      "rank": 642,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9240,7 +9280,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-537",
-      "rank": 642,
+      "rank": 643,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9252,7 +9292,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-531",
-      "rank": 643,
+      "rank": 644,
       "size": "XS",
       "importance": "medium",
       "score": 32,
@@ -9264,7 +9304,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-452",
-      "rank": 644,
+      "rank": 645,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9276,7 +9316,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-450",
-      "rank": 645,
+      "rank": 646,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9288,7 +9328,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1126",
-      "rank": 646,
+      "rank": 647,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -9300,7 +9340,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5154",
-      "rank": 647,
+      "rank": 648,
       "size": "L",
       "importance": "low",
       "score": 30,
@@ -9312,7 +9352,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1066",
-      "rank": 648,
+      "rank": 649,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -9324,7 +9364,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3441",
-      "rank": 649,
+      "rank": 650,
       "size": "L",
       "importance": "low",
       "score": 30,
@@ -9336,7 +9376,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2968",
-      "rank": 650,
+      "rank": 651,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9348,7 +9388,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2941",
-      "rank": 651,
+      "rank": 652,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9361,7 +9401,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2936",
-      "rank": 652,
+      "rank": 653,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9373,7 +9413,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4373",
-      "rank": 653,
+      "rank": 654,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -9385,7 +9425,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2868",
-      "rank": 654,
+      "rank": 655,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9397,7 +9437,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2767",
-      "rank": 655,
+      "rank": 656,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9409,7 +9449,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2679",
-      "rank": 656,
+      "rank": 657,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9421,7 +9461,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2662",
-      "rank": 657,
+      "rank": 658,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9433,7 +9473,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2645",
-      "rank": 658,
+      "rank": 659,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9445,7 +9485,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2635",
-      "rank": 659,
+      "rank": 660,
       "size": "XS",
       "importance": "low",
       "score": 28,
@@ -9457,7 +9497,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5066",
-      "rank": 660,
+      "rank": 661,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -9469,7 +9509,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3443",
-      "rank": 661,
+      "rank": 662,
       "size": "L",
       "importance": "low",
       "score": 28,
@@ -9481,7 +9521,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4350",
-      "rank": 662,
+      "rank": 663,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -9493,7 +9533,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4003",
-      "rank": 663,
+      "rank": 664,
       "size": "L",
       "importance": "medium",
       "score": 30,
@@ -9506,7 +9546,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4368",
-      "rank": 664,
+      "rank": 665,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -9518,7 +9558,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2622",
-      "rank": 665,
+      "rank": 666,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9530,7 +9570,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2600",
-      "rank": 666,
+      "rank": 667,
       "size": "XS",
       "importance": "low",
       "score": 27,
@@ -9542,7 +9582,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2533",
-      "rank": 667,
+      "rank": 668,
       "size": "XS",
       "importance": "low",
       "score": 27,
@@ -9554,7 +9594,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2527",
-      "rank": 668,
+      "rank": 669,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9566,7 +9606,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2514",
-      "rank": 669,
+      "rank": 670,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9578,7 +9618,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2505",
-      "rank": 670,
+      "rank": 671,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9590,7 +9630,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2504",
-      "rank": 671,
+      "rank": 672,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9602,7 +9642,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2449",
-      "rank": 672,
+      "rank": 673,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9614,7 +9654,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4769",
-      "rank": 673,
+      "rank": 674,
       "size": "XS",
       "importance": "low",
       "score": 26,
@@ -9627,7 +9667,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3940",
-      "rank": 674,
+      "rank": 675,
       "size": "XL",
       "importance": "low",
       "score": 30,
@@ -9641,7 +9681,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2424",
-      "rank": 675,
+      "rank": 676,
       "size": "L",
       "importance": "low",
       "score": 26,
@@ -9655,7 +9695,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2406",
-      "rank": 676,
+      "rank": 677,
       "size": "S",
       "importance": "low",
       "score": 26,
@@ -9668,7 +9708,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2394",
-      "rank": 677,
+      "rank": 678,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9680,7 +9720,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4823",
-      "rank": 678,
+      "rank": 679,
       "size": "XL",
       "importance": "medium",
       "score": 32,
@@ -9694,7 +9734,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2353",
-      "rank": 679,
+      "rank": 680,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9707,7 +9747,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4294",
-      "rank": 680,
+      "rank": 681,
       "size": "L",
       "importance": "low",
       "score": 22,
@@ -9720,7 +9760,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3133",
-      "rank": 681,
+      "rank": 682,
       "size": "S",
       "importance": "low",
       "score": 26,
@@ -9732,7 +9772,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5082",
-      "rank": 682,
+      "rank": 683,
       "size": "XL",
       "importance": "medium",
       "score": 50,
@@ -9744,7 +9784,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3011",
-      "rank": 683,
+      "rank": 684,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9759,7 +9799,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2282",
-      "rank": 684,
+      "rank": 685,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9771,7 +9811,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2091",
-      "rank": 685,
+      "rank": 686,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9783,7 +9823,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2085",
-      "rank": 686,
+      "rank": 687,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9795,7 +9835,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2084",
-      "rank": 687,
+      "rank": 688,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9807,7 +9847,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2083",
-      "rank": 688,
+      "rank": 689,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9822,7 +9862,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2082",
-      "rank": 689,
+      "rank": 690,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9834,7 +9874,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2074",
-      "rank": 690,
+      "rank": 691,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9846,7 +9886,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2046",
-      "rank": 691,
+      "rank": 692,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9859,7 +9899,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2006",
-      "rank": 692,
+      "rank": 693,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9871,7 +9911,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3919",
-      "rank": 693,
+      "rank": 694,
       "size": "S",
       "importance": "low",
       "score": 25,
@@ -9884,7 +9924,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2005",
-      "rank": 694,
+      "rank": 695,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9896,7 +9936,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2002",
-      "rank": 695,
+      "rank": 696,
       "size": "XS",
       "importance": "low",
       "score": 24,
@@ -9908,7 +9948,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1999",
-      "rank": 696,
+      "rank": 697,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9920,7 +9960,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1986",
-      "rank": 697,
+      "rank": 698,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9932,7 +9972,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1983",
-      "rank": 698,
+      "rank": 699,
       "size": "L",
       "importance": "low",
       "score": 24,
@@ -9944,7 +9984,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2672",
-      "rank": 699,
+      "rank": 700,
       "size": "S",
       "importance": "low",
       "score": 25,
@@ -9957,7 +9997,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1958",
-      "rank": 700,
+      "rank": 701,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9969,7 +10009,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1907",
-      "rank": 701,
+      "rank": 702,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9981,7 +10021,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1895",
-      "rank": 702,
+      "rank": 703,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9993,7 +10033,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1878",
-      "rank": 703,
+      "rank": 704,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -10005,7 +10045,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1782",
-      "rank": 704,
+      "rank": 705,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -10017,7 +10057,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1773",
-      "rank": 705,
+      "rank": 706,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -10029,7 +10069,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1646",
-      "rank": 706,
+      "rank": 707,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -10041,7 +10081,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1643",
-      "rank": 707,
+      "rank": 708,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10053,7 +10093,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1592",
-      "rank": 708,
+      "rank": 709,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10065,7 +10105,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1581",
-      "rank": 709,
+      "rank": 710,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10077,7 +10117,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1533",
-      "rank": 710,
+      "rank": 711,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10089,7 +10129,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1483",
-      "rank": 711,
+      "rank": 712,
       "size": "XS",
       "importance": "low",
       "score": 22,
@@ -10101,7 +10141,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1482",
-      "rank": 712,
+      "rank": 713,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10113,7 +10153,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1481",
-      "rank": 713,
+      "rank": 714,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -10125,7 +10165,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1356",
-      "rank": 714,
+      "rank": 715,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10137,7 +10177,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1242",
-      "rank": 715,
+      "rank": 716,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10149,7 +10189,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1222",
-      "rank": 716,
+      "rank": 717,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10161,7 +10201,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1208",
-      "rank": 717,
+      "rank": 718,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10173,7 +10213,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4352",
-      "rank": 718,
+      "rank": 719,
       "size": "XS",
       "importance": "low",
       "score": 28,
@@ -10185,7 +10225,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1153",
-      "rank": 719,
+      "rank": 720,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10197,7 +10237,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4298",
-      "rank": 720,
+      "rank": 721,
       "size": "XL",
       "importance": "low",
       "score": 20,
@@ -10213,7 +10253,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1152",
-      "rank": 721,
+      "rank": 722,
       "size": "XS",
       "importance": "low",
       "score": 21,
@@ -10225,7 +10265,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1135",
-      "rank": 722,
+      "rank": 723,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -10237,7 +10277,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1133",
-      "rank": 723,
+      "rank": 724,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10250,7 +10290,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1123",
-      "rank": 724,
+      "rank": 725,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10262,7 +10302,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1121",
-      "rank": 725,
+      "rank": 726,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10274,7 +10314,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4248",
-      "rank": 726,
+      "rank": 727,
       "size": "L",
       "importance": "medium",
       "score": 24,
@@ -10287,7 +10327,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1117",
-      "rank": 727,
+      "rank": 728,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10299,7 +10339,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1116",
-      "rank": 728,
+      "rank": 729,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10311,7 +10351,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1065",
-      "rank": 729,
+      "rank": 730,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10323,7 +10363,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1064",
-      "rank": 730,
+      "rank": 731,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10335,7 +10375,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1063",
-      "rank": 731,
+      "rank": 732,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10348,7 +10388,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3971",
-      "rank": 732,
+      "rank": 733,
       "size": "L",
       "importance": "low",
       "score": 20,
@@ -10360,7 +10400,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3768",
-      "rank": 733,
+      "rank": 734,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10372,7 +10412,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3034",
-      "rank": 734,
+      "rank": 735,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10384,7 +10424,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2983",
-      "rank": 735,
+      "rank": 736,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10397,7 +10437,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3824",
-      "rank": 736,
+      "rank": 737,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10410,7 +10450,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3823",
-      "rank": 737,
+      "rank": 738,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10423,7 +10463,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1049",
-      "rank": 738,
+      "rank": 739,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10435,7 +10475,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-984",
-      "rank": 739,
+      "rank": 740,
       "size": "XS",
       "importance": "low",
       "score": 19,
@@ -10447,7 +10487,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-962",
-      "rank": 740,
+      "rank": 741,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10460,7 +10500,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-961",
-      "rank": 741,
+      "rank": 742,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10472,7 +10512,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-943",
-      "rank": 742,
+      "rank": 743,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10484,7 +10524,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-908",
-      "rank": 743,
+      "rank": 744,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10496,7 +10536,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-898",
-      "rank": 744,
+      "rank": 745,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10508,7 +10548,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-853",
-      "rank": 745,
+      "rank": 746,
       "size": "L",
       "importance": "low",
       "score": 19,
@@ -10520,7 +10560,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-833",
-      "rank": 746,
+      "rank": 747,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10532,7 +10572,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-832",
-      "rank": 747,
+      "rank": 748,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10545,7 +10585,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4347",
-      "rank": 748,
+      "rank": 749,
       "size": "S",
       "importance": "low",
       "score": 30,
@@ -10557,7 +10597,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-797",
-      "rank": 749,
+      "rank": 750,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10569,7 +10609,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4275",
-      "rank": 750,
+      "rank": 751,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -10582,7 +10622,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2836",
-      "rank": 751,
+      "rank": 752,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -10595,7 +10635,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-790",
-      "rank": 752,
+      "rank": 753,
       "size": "L",
       "importance": "low",
       "score": 18,
@@ -10607,7 +10647,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-786",
-      "rank": 753,
+      "rank": 754,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10619,7 +10659,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-777",
-      "rank": 754,
+      "rank": 755,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10631,7 +10671,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-775",
-      "rank": 755,
+      "rank": 756,
       "size": "L",
       "importance": "low",
       "score": 18,
@@ -10643,7 +10683,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3456",
-      "rank": 756,
+      "rank": 757,
       "size": "XS",
       "importance": "low",
       "score": 18,
@@ -10655,7 +10695,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-774",
-      "rank": 757,
+      "rank": 758,
       "size": "XS",
       "importance": "low",
       "score": 17,
@@ -10667,7 +10707,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-773",
-      "rank": 758,
+      "rank": 759,
       "size": "XS",
       "importance": "low",
       "score": 17,
@@ -10679,7 +10719,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-772",
-      "rank": 759,
+      "rank": 760,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10692,7 +10732,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-771",
-      "rank": 760,
+      "rank": 761,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10704,7 +10744,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-769",
-      "rank": 761,
+      "rank": 762,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10719,7 +10759,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-765",
-      "rank": 762,
+      "rank": 763,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10731,7 +10771,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-764",
-      "rank": 763,
+      "rank": 764,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10743,7 +10783,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4425",
-      "rank": 764,
+      "rank": 765,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -10755,7 +10795,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-752",
-      "rank": 765,
+      "rank": 766,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10767,7 +10807,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-751",
-      "rank": 766,
+      "rank": 767,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10779,7 +10819,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-750",
-      "rank": 767,
+      "rank": 768,
       "size": "L",
       "importance": "low",
       "score": 16,
@@ -10791,7 +10831,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-749",
-      "rank": 768,
+      "rank": 769,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10803,7 +10843,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-747",
-      "rank": 769,
+      "rank": 770,
       "size": "XS",
       "importance": "low",
       "score": 16,
@@ -10815,7 +10855,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-743",
-      "rank": 770,
+      "rank": 771,
       "size": "XS",
       "importance": "low",
       "score": 16,
@@ -10827,7 +10867,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-738",
-      "rank": 771,
+      "rank": 772,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10839,7 +10879,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-735",
-      "rank": 772,
+      "rank": 773,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10851,7 +10891,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-730",
-      "rank": 773,
+      "rank": 774,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10863,7 +10903,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-701",
-      "rank": 774,
+      "rank": 775,
       "size": "XS",
       "importance": "low",
       "score": 15,
@@ -10875,7 +10915,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-663",
-      "rank": 775,
+      "rank": 776,
       "size": "XS",
       "importance": "low",
       "score": 15,
@@ -10887,7 +10927,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-660",
-      "rank": 776,
+      "rank": 777,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10899,7 +10939,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-624",
-      "rank": 777,
+      "rank": 778,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10911,7 +10951,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-623",
-      "rank": 778,
+      "rank": 779,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10923,7 +10963,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-622",
-      "rank": 779,
+      "rank": 780,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10935,7 +10975,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-604",
-      "rank": 780,
+      "rank": 781,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10947,7 +10987,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-603",
-      "rank": 781,
+      "rank": 782,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10959,7 +10999,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-591",
-      "rank": 782,
+      "rank": 783,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -10971,7 +11011,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-589",
-      "rank": 783,
+      "rank": 784,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -10983,7 +11023,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-576",
-      "rank": 784,
+      "rank": 785,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10995,7 +11035,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-571",
-      "rank": 785,
+      "rank": 786,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -11007,7 +11047,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-568",
-      "rank": 786,
+      "rank": 787,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -11019,7 +11059,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-565",
-      "rank": 787,
+      "rank": 788,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -11031,7 +11071,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-564",
-      "rank": 788,
+      "rank": 789,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -11043,7 +11083,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-554",
-      "rank": 789,
+      "rank": 790,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -11055,7 +11095,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-543",
-      "rank": 790,
+      "rank": 791,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -11067,7 +11107,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-483",
-      "rank": 791,
+      "rank": 792,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11079,7 +11119,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-480",
-      "rank": 792,
+      "rank": 793,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11092,7 +11132,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-476",
-      "rank": 793,
+      "rank": 794,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11104,7 +11144,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-468",
-      "rank": 794,
+      "rank": 795,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11116,7 +11156,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-461",
-      "rank": 795,
+      "rank": 796,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11128,7 +11168,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-459",
-      "rank": 796,
+      "rank": 797,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11140,7 +11180,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-407",
-      "rank": 797,
+      "rank": 798,
       "size": "XS",
       "importance": "low",
       "score": 13,
@@ -11152,7 +11192,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2348",
-      "rank": 798,
+      "rank": 799,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11164,7 +11204,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2346",
-      "rank": 799,
+      "rank": 800,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11177,7 +11217,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2345",
-      "rank": 800,
+      "rank": 801,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11190,7 +11230,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2344",
-      "rank": 801,
+      "rank": 802,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11203,7 +11243,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2343",
-      "rank": 802,
+      "rank": 803,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11216,7 +11256,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2073",
-      "rank": 803,
+      "rank": 804,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -11228,7 +11268,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2071",
-      "rank": 804,
+      "rank": 805,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11240,7 +11280,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2068",
-      "rank": 805,
+      "rank": 806,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11252,7 +11292,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2067",
-      "rank": 806,
+      "rank": 807,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11264,7 +11304,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1684",
-      "rank": 807,
+      "rank": 808,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11276,7 +11316,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1683",
-      "rank": 808,
+      "rank": 809,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11288,7 +11328,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1474",
-      "rank": 809,
+      "rank": 810,
       "size": "M",
       "importance": "low",
       "score": 9,
@@ -11300,7 +11340,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-1469",
-      "rank": 810,
+      "rank": 811,
       "size": "M",
       "importance": "low",
       "score": 9,
@@ -11312,7 +11352,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-674",
-      "rank": 811,
+      "rank": 812,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11324,7 +11364,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-634",
-      "rank": 812,
+      "rank": 813,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11336,7 +11376,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2908",
-      "rank": 813,
+      "rank": 814,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11348,7 +11388,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-106",
-      "rank": 814,
+      "rank": 815,
       "size": "M",
       "importance": "high",
       "score": 77,
@@ -11361,7 +11401,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-262",
-      "rank": 815,
+      "rank": 816,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -11373,7 +11413,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-176",
-      "rank": 816,
+      "rank": 817,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -11385,7 +11425,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-334",
-      "rank": 817,
+      "rank": 818,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11397,7 +11437,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-324",
-      "rank": 818,
+      "rank": 819,
       "size": "XS",
       "importance": "medium",
       "score": 49,
@@ -11410,7 +11450,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-304",
-      "rank": 819,
+      "rank": 820,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11422,7 +11462,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-245",
-      "rank": 820,
+      "rank": 821,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11434,7 +11474,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-244",
-      "rank": 821,
+      "rank": 822,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11446,7 +11486,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4332",
-      "rank": 822,
+      "rank": 823,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -11458,7 +11498,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-113",
-      "rank": 823,
+      "rank": 824,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -11470,7 +11510,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-49",
-      "rank": 824,
+      "rank": 825,
       "size": "XS",
       "importance": "medium",
       "score": 48,
@@ -11482,7 +11522,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-294",
-      "rank": 825,
+      "rank": 826,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -11494,7 +11534,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-293",
-      "rank": 826,
+      "rank": 827,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11506,7 +11546,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-277",
-      "rank": 827,
+      "rank": 828,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11518,7 +11558,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-258",
-      "rank": 828,
+      "rank": 829,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11530,7 +11570,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-255",
-      "rank": 829,
+      "rank": 830,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11542,7 +11582,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-252",
-      "rank": 830,
+      "rank": 831,
       "size": "XS",
       "importance": "medium",
       "score": 31,
@@ -11554,7 +11594,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-243",
-      "rank": 831,
+      "rank": 832,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11566,7 +11606,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-77",
-      "rank": 832,
+      "rank": 833,
       "size": "XS",
       "importance": "medium",
       "score": 31,
@@ -11578,7 +11618,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-54",
-      "rank": 833,
+      "rank": 834,
       "size": "L",
       "importance": "medium",
       "score": 31,
@@ -11590,7 +11630,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-38",
-      "rank": 834,
+      "rank": 835,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -11602,7 +11642,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-37",
-      "rank": 835,
+      "rank": 836,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -11615,7 +11655,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3248",
-      "rank": 836,
+      "rank": 837,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11628,7 +11668,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3244",
-      "rank": 837,
+      "rank": 838,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11641,7 +11681,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2775",
-      "rank": 838,
+      "rank": 839,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11654,7 +11694,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5033",
-      "rank": 839,
+      "rank": 840,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -11666,7 +11706,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3505",
-      "rank": 840,
+      "rank": 841,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11679,7 +11719,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5043",
-      "rank": 841,
+      "rank": 842,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -11691,7 +11731,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5065",
-      "rank": 842,
+      "rank": 843,
       "size": "L",
       "importance": "medium",
       "score": 44,
@@ -11703,7 +11743,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3321",
-      "rank": 843,
+      "rank": 844,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11716,7 +11756,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-736",
-      "rank": 844,
+      "rank": 845,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -11729,7 +11769,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-762",
-      "rank": 845,
+      "rank": 846,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11742,7 +11782,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-299",
-      "rank": 846,
+      "rank": 847,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11754,7 +11794,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-298",
-      "rank": 847,
+      "rank": 848,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11766,7 +11806,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-297",
-      "rank": 848,
+      "rank": 849,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11778,7 +11818,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-283",
-      "rank": 849,
+      "rank": 850,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11790,7 +11830,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-271",
-      "rank": 850,
+      "rank": 851,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11802,7 +11842,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-265",
-      "rank": 851,
+      "rank": 852,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11814,7 +11854,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-249",
-      "rank": 852,
+      "rank": 853,
       "size": "XS",
       "importance": "low",
       "score": 12,
@@ -11826,7 +11866,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-228",
-      "rank": 853,
+      "rank": 854,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11838,7 +11878,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-227",
-      "rank": 854,
+      "rank": 855,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11850,7 +11890,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-198",
-      "rank": 855,
+      "rank": 856,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11862,7 +11902,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-190",
-      "rank": 856,
+      "rank": 857,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11874,7 +11914,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-180",
-      "rank": 857,
+      "rank": 858,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11886,7 +11926,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-177",
-      "rank": 858,
+      "rank": 859,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11898,7 +11938,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-175",
-      "rank": 859,
+      "rank": 860,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11910,7 +11950,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-155",
-      "rank": 860,
+      "rank": 861,
       "size": "L",
       "importance": "low",
       "score": 11,
@@ -11922,7 +11962,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-146",
-      "rank": 861,
+      "rank": 862,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11934,7 +11974,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-55",
-      "rank": 862,
+      "rank": 863,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11946,7 +11986,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-44",
-      "rank": 863,
+      "rank": 864,
       "size": "M",
       "importance": "low",
       "score": 10,
@@ -11958,7 +11998,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2070",
-      "rank": 864,
+      "rank": 865,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11971,7 +12011,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-3536",
-      "rank": 865,
+      "rank": 866,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -11984,7 +12024,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2027",
-      "rank": 866,
+      "rank": 867,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11997,7 +12037,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2035",
-      "rank": 867,
+      "rank": 868,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -12010,7 +12050,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2034",
-      "rank": 868,
+      "rank": 869,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -12023,7 +12063,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2033",
-      "rank": 869,
+      "rank": 870,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -12036,7 +12076,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2032",
-      "rank": 870,
+      "rank": 871,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -12049,7 +12089,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2030",
-      "rank": 871,
+      "rank": 872,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -12062,7 +12102,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2029",
-      "rank": 872,
+      "rank": 873,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -12075,7 +12115,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2028",
-      "rank": 873,
+      "rank": 874,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -12088,7 +12128,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2024",
-      "rank": 874,
+      "rank": 875,
       "size": "XS",
       "importance": "low",
       "score": 8,
@@ -12101,7 +12141,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2883",
-      "rank": 875,
+      "rank": 876,
       "size": "M",
       "importance": "high",
       "score": 20,
@@ -12114,7 +12154,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-2995",
-      "rank": 876,
+      "rank": 877,
       "size": "XS",
       "importance": "high",
       "score": 20,
@@ -12127,7 +12167,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4555",
-      "rank": 877,
+      "rank": 878,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -12140,7 +12180,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4590",
-      "rank": 878,
+      "rank": 879,
       "size": "L",
       "importance": "medium",
       "score": 50,
@@ -12153,7 +12193,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4591",
-      "rank": 879,
+      "rank": 880,
       "size": "L",
       "importance": "medium",
       "score": 45,
@@ -12166,7 +12206,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4592",
-      "rank": 880,
+      "rank": 881,
       "size": "M",
       "importance": "low",
       "score": 38,
@@ -12181,7 +12221,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4594",
-      "rank": 881,
+      "rank": 882,
       "size": "M",
       "importance": "low",
       "score": 36,
@@ -12196,7 +12236,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4593",
-      "rank": 882,
+      "rank": 883,
       "size": "L",
       "importance": "low",
       "score": 30,
@@ -12211,7 +12251,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5022",
-      "rank": 883,
+      "rank": 884,
       "size": "L",
       "importance": "medium",
       "score": 42,
@@ -12223,7 +12263,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5021",
-      "rank": 884,
+      "rank": 885,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -12236,7 +12276,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5029",
-      "rank": 885,
+      "rank": 886,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -12248,7 +12288,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4842",
-      "rank": 886,
+      "rank": 887,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -12261,7 +12301,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4851",
-      "rank": 887,
+      "rank": 888,
       "size": "S",
       "importance": "low",
       "score": 15,
@@ -12274,7 +12314,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-4887",
-      "rank": 888,
+      "rank": 889,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -12287,7 +12327,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5207",
-      "rank": 889,
+      "rank": 890,
       "size": "L",
       "importance": "low",
       "score": 15,
@@ -12301,7 +12341,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5183",
-      "rank": 890,
+      "rank": 891,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -12314,7 +12354,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5181",
-      "rank": 891,
+      "rank": 892,
       "size": "XS",
       "importance": "low",
       "score": 8,
@@ -12326,7 +12366,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5305",
-      "rank": 892,
+      "rank": 893,
       "size": "XS",
       "importance": "low",
       "score": 8,
@@ -12338,7 +12378,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5235",
-      "rank": 893,
+      "rank": 894,
       "size": "XS",
       "importance": "low",
       "score": 8,
@@ -12350,39 +12390,13 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "issue": "PAN-5280",
-      "rank": 894,
+      "rank": 895,
       "size": "XS",
       "importance": "low",
       "score": 8,
       "condition": "ok",
       "dependsOn": [],
       "why": "Record of two UI fixes made inline on main (orbiting logo, unclipped Home project menu). Verify and close.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5347",
-      "rank": 21,
-      "size": "S",
-      "importance": "medium",
-      "score": 64,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: composer / menu lists no skills; add them from /api/skills/overrides under a labeled Skills group",
-      "rationale": "New in-pipeline discoverability fix: skills never reach the composer slash menu, so operators cannot find skill-only workflows. Pinned in the free rank-21 slot beside the other in-pipeline work; it reuses the existing skills route and category grouping.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5353",
-      "rank": 395,
-      "size": "S",
-      "importance": "medium",
-      "score": 56,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Send now: flush a queued message into a running Claude Code turn via the Ctrl+X Ctrl+S chord. PRD written, chord live-probed.",
-      "rationale": "New issue since the prior run: a small, self-contained conversation-view feature with a PRD and a live-probed mechanism, placed in the free rank-395 slot among medium conversation UX work.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13584,6 +13598,13 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.3
+    },
+    {
+      "from": "PAN-5013",
+      "to": "PAN-5354",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }
