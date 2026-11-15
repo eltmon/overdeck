@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5360",
   "created": "2026-11-15T15:42:12.629Z",
-  "updated": "2026-11-15T16:24:18.075Z",
+  "updated": "2026-11-15T16:24:25.592Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,11 @@
     "w2-supersede-store.ac5": {
       "status": "completed",
       "doneAt": "2026-11-15T16:24:18.074Z"
+    },
+    "w3-cli-add": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5360",
+      "claimedAt": "2026-11-15T16:24:25.592Z"
     }
   }
 }
