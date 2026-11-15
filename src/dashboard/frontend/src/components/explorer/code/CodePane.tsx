@@ -29,6 +29,7 @@ import { CodePaneHeader, isMarkdownPath, type CodePaneView } from './CodePaneHea
 import { ExternalChangeBanner } from './ExternalChangeBanner'
 import { useCodePaneSave } from './useCodePaneSave'
 import { ChangedLineMarks } from './useChangedLineMarks'
+import { registerCodeEditor, takeViewState } from './view-state-registry'
 import { readDisk, useExternalChange } from './useExternalChange'
 
 type LoadState =
@@ -131,6 +132,22 @@ function CodePaneForFile({
     editor.focus()
   }, [editor, revealLine, revealColumn, revealNonce])
 
+  // PAN-5290 C-D12: a root switch carried this file's cursor, scroll and focus
+  // from the pane that showed it on the old root; restore them once, then
+  // register the editor so the next switch can carry them on.
+  useEffect(() => {
+    if (!editor) return
+    const carried = takeViewState(key)
+    if (carried) {
+      editor.restoreViewState(carried.viewState as Parameters<CodeEditorInstance['restoreViewState']>[0])
+      if (carried.focused) editor.focus()
+    }
+    return registerCodeEditor(key, editor)
+  }, [editor, key])
+  // While the diff is open its modified side is the live editor.
+  const diffRegistration = useRef<(() => void) | null>(null)
+  useEffect(() => () => diffRegistration.current?.(), [])
+
   // Back from the diff: put the cursor where it was on the modified side.
   useEffect(() => {
     const position = carriedPosition.current
@@ -152,7 +169,11 @@ function CodePaneForFile({
   const switchDiff = useCallback(
     (next: 'head' | 'disk' | null) => {
       carriedPosition.current = (diff ? diffEditor.current : editor)?.getPosition() ?? null
-      if (diff) diffEditor.current = null
+      if (diff) {
+        diffEditor.current = null
+        diffRegistration.current?.()
+        diffRegistration.current = null
+      }
       if (!diff && next) setEditor(null)
       setView('edit')
       setDiff(next)
@@ -160,9 +181,14 @@ function CodePaneForFile({
     [diff, editor],
   )
   const toggleChanges = useCallback(() => switchDiff(diff === 'head' ? null : 'head'), [diff, switchDiff])
-  const onDiffMount = useCallback((instance: CodeEditorInstance) => {
-    diffEditor.current = instance
-  }, [])
+  const onDiffMount = useCallback(
+    (instance: CodeEditorInstance) => {
+      diffEditor.current = instance
+      diffRegistration.current?.()
+      diffRegistration.current = registerCodeEditor(key, instance)
+    },
+    [key],
+  )
   const keepOpen = useCallback(
     () => usePanesStore.getState().updatePane(workspaceId, pane.paneId, { explorerPreview: false }),
     [workspaceId, pane.paneId],

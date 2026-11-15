@@ -9,6 +9,9 @@ const mocks = vi.hoisted(() => ({
     setPosition: vi.fn(),
     revealLineInCenter: vi.fn(),
     focus: vi.fn(),
+    saveViewState: vi.fn(() => null),
+    restoreViewState: vi.fn(),
+    hasTextFocus: vi.fn(() => false),
   },
 }))
 
@@ -62,6 +65,7 @@ const { CodePane, CREATING_EDIT_NOTE, PROJECT_EDIT_NOTE } = await import('../Cod
 const { useEditWorkspaceStore } = await import('../../edit/edit-workspace-store')
 const { draftKey, useCodeDrafts } = await import('../code-drafts')
 const { CodePaneSlot } = await import('../CodePaneSlot')
+const { carryViewStates, registerCodeEditor, resetViewStateRegistryForTests } = await import('../view-state-registry')
 const { StageDeckProvider } = await import('../../../Stage/StageDeckContext')
 const { usePanesStore } = await import('../../../../lib/panesStore')
 
@@ -90,6 +94,8 @@ beforeEach(() => {
   mocks.editor.setPosition.mockReset()
   mocks.editor.revealLineInCenter.mockReset()
   mocks.editor.focus.mockReset()
+  mocks.editor.restoreViewState.mockReset()
+  resetViewStateRegistryForTests()
 })
 
 describe('CodePane', () => {
@@ -168,6 +174,25 @@ describe('CodePane', () => {
     render(<CodePane pane={pane({ explorerPath: undefined })} ctx={ctx} />)
     expect(screen.getByTestId('code-pane-no-file')).toBeTruthy()
     expect(mocks.readFile).not.toHaveBeenCalled()
+  })
+
+  it('restores a carried view state and focus when it mounts on the new root (PAN-5290 C-D12)', async () => {
+    const viewState = { cursorState: [{ position: { lineNumber: 30, column: 2 } }] }
+    registerCodeEditor(draftKey('project:overdeck', 'src/a.ts'), {
+      saveViewState: () => viewState,
+      restoreViewState: () => {},
+      hasTextFocus: () => true,
+      focus: () => {},
+    } as unknown as Parameters<typeof registerCodeEditor>[1])
+    carryViewStates('project:overdeck', 'issue:PAN-1')
+    mocks.readFile.mockResolvedValue(textRead())
+
+    render(<CodePane pane={pane()} ctx={ctx} />)
+    await screen.findByTestId('monaco')
+
+    await waitFor(() => expect(mocks.editor.restoreViewState).toHaveBeenCalledWith(viewState))
+    expect(mocks.editor.focus).toHaveBeenCalled()
+    expect(mocks.editor.restoreViewState.mock.invocationCallOrder[0]).toBeLessThan(mocks.editor.focus.mock.invocationCallOrder[0]!)
   })
 
   it('reveals the requested line on mount and again on a new nonce', async () => {

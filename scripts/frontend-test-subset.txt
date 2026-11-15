@@ -288,6 +288,7 @@ src/components/explorer/code/__tests__/save-queue.test.ts
 src/components/explorer/code/__tests__/self-write-registry.test.ts
 src/components/explorer/code/__tests__/useChangedLineMarks.test.tsx
 src/components/explorer/code/__tests__/useExternalChange.test.tsx
+src/components/explorer/code/__tests__/view-state-registry.test.ts
 src/components/explorer/edit/__tests__/CreatePrDialog.test.tsx
 src/components/explorer/edit/__tests__/DiscardDialog.test.tsx
 src/components/explorer/edit/__tests__/EditWorkspaceBanner.test.tsx
