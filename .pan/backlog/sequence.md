@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T16:52:03.870095Z · model: claude-opus-5-5 · open: 907_
+_Last sequenced: 2026-11-15T16:54:38.069218Z · model: claude-opus-5-5 · open: 907_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1242,7 +1242,7 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T16:52:03.870095Z",
+  "generatedAt": "2026-11-15T16:54:38.069218Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 907,
