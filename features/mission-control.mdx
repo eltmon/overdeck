@@ -45,11 +45,43 @@ The Issues section lists the selected project's active features. Each one shows:
 
 State labels are computed from multiple signals: tmux session presence, heartbeat freshness (10-minute threshold), review/test status from the central `review-status.json`, and agent state files.
 
-## Release / Publish Indicator
+## Project home
 
-The project HOME tab shows a compact **Release** row for projects with a publish pipeline: the most recent release-workflow run (live spinner while in progress, then ✓/✕ with the tag deep-linked to the GitHub Actions run), the latest GitHub Release, and each published npm package's `latest` dist-tag linked to the registry. A **partial failure** — the npm publish succeeded but a build matrix job failed, so the GitHub Release was skipped — is called out explicitly with links to the failing jobs, since that shape is otherwise invisible.
+The **Home** tab of a project deck opens with what you can do, then the facts about the project, then what needs you, then the pipeline and who changed main. The no-project deck shows only the title and the New conversation, Terminal and More actions.
 
-Per-project resolution lives in `projects.yaml` under `publish` (`npm_packages`, `release_workflow`), with inference fallbacks: the project root `package.json` name (when not `private`) and `.github/workflows/release.yml` (when present in the checkout). Projects with no publish pipeline simply don't show the row. The surface is read-only — cutting a release stays in the CLI (`pan release stable`).
+**Header and metadata line.** The title is the registered project name, with a pencil to rename it and the GitHub (or GitLab) repository beside it. **Settings** opens the project settings in a dialog. Under the title, one line names the checkout path, the branch, the latest release, the default branch's CI state and, while they apply, an in-flight deploy and the GitHub identity the project acts as. The release word reads `v1.2.0 released 2h ago`, `releasing v1.2.0…`, `v1.2.0 release failed`, `no release runs yet` or `no releases`; click it to open the release detail (the workflow run, the GitHub Release, each npm package's `latest` dist-tag, and any partial failure with links to the failing jobs). The CI word reads `CI passing`, `CI failing`, `CI running 2/5` or `CI unknown`, and opens the run on GitHub.
+
+Per-project release resolution lives in `projects.yaml` under `publish` (`npm_packages`, `release_workflow`), with inference fallbacks: the project root `package.json` name (when not `private`) and `.github/workflows/release.yml` (when present in the checkout). Projects with no publish pipeline say `no releases`. The surface is read-only — cutting a release stays in the CLI (`pan release stable`).
+
+**Action row.** In order:
+
+- **New conversation** (keycap `N`, the left column's shortcut) creates a conversation in this project with your default model, harness and effort. Its caret menu starts one in **Claude Code** or **Codex**, or opens **New conversation with options…**.
+- **Files** (`Ctrl+Shift+E`, `⌘⇧E` on macOS) and **Changes on main** open the work dock on the project checkout.
+- **Terminal** (`⌘T` on macOS) toggles the terminal drawer.
+- **Open in &lt;editor&gt;** opens the checkout in your preferred editor, when one is installed.
+- **Start an issue…** (projects with an issue prefix) takes an issue ID or a pick from this project's startable issues. A planned issue starts its work agent; any other issue opens the plan dialog. Guardrail warnings appear in the dialog with **Start anyway**.
+- **More** holds **Web page**, **Main checkout** and **New workspace**.
+
+**Facts.** Five numbers, each a link:
+
+- **Agents working** counts every agent and conversation working in this project right now, by role (planning, building, reviewing, testing, conversations). It is the same number the project switcher shows. Click it for the Agents page.
+- **Needs you** counts the items waiting on you in this project and shows the first one's question.
+- **In review** counts the issues in the In review lane and names their pull requests.
+- **Landed this week** counts first-parent commits on the default branch in the last 7 days (`500+` at the cap) and how many came through pull requests. Click it for the Changes dock.
+- **Spend this week** is this project's spend for the week, conversations included, with today's spend below. It needs an issue prefix to scope the costs; without one it says so. Click it for the Costs page.
+
+**Needs you.** When anything waits on you, an amber panel lists each item with its question and one action: **Answer** a waiting conversation, **Open** an issue, **Open Flywheel** for a parked Flywheel item, or **Decide** a decision.
+
+**Pipeline.** One card with three lanes that always show their count, plus a fourth when needed:
+
+- **Building** lists issues being planned or built.
+- **In review** lists issues under review.
+- **Ready to merge** lists approved, green issues held for your merge.
+- **Stalled** (only when non-empty) lists issues with work on disk but no live agent and no activity for 14 days. A stalled issue appears in no other lane.
+
+Backlog, queued and merged issues are not listed; **Open the board** shows them. Each row shows the issue ID, its full title, one tag (`needs you`, `blocked`, `stalled`, `planning`, `building`, `in review`, `changes requested` or `ready`), who is on it (the pull request and its checks for review rows, else the agent's model and item progress), and the time since its last activity. Hover a row for the stuck reason and the issue's spend; click it to open the issue. The project's merge train card follows the pipeline.
+
+**Recent changes on main.** Who changed what: today's commits on the default branch when there are at least ten, else the last ten. Each row names the conversation or agent behind the commit, read from its `Overdeck-Conversation` / `Overdeck-Agent` trailers. Click a conversation row to open that conversation, or an agent row to open its issue; commits with no trailer show as `unattributed`. Click a short SHA to copy the full one.
 
 ## Activity View
 

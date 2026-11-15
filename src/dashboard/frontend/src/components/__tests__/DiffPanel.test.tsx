@@ -10,9 +10,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-vi.mock('../../hooks/useTheme', () => ({
-  useTheme: () => ({ resolvedTheme: 'dark' }),
-}));
+// DiffPanel now pulls in ChatMarkdown (via DiffMarkdownPreview → MarkdownTab),
+// whose useColorTheme module needs a real zustand store (getState, subscribe)
+// from useTheme — a plain stub is not enough, so this uses the real store,
+// same as DiffPanel.compare.test.tsx (PAN-5338).
 
 vi.mock('../../hooks/useDiffPreferences', () => ({
   useDiffPreferences: () => ({
@@ -92,6 +93,19 @@ describe('DiffPanel zero-turn file lists (PAN-4501)', () => {
 
     await waitFor(() =>
       expect(globalThis.fetch).toHaveBeenCalledWith('/api/conversations/c1/diffs/vs-main?file=x.ts'),
+    );
+  });
+
+  it('fetches the file-scoped full URL after clicking a file under All turns (PAN-5338 WI-10)', async () => {
+    mockFetchFiles([{ path: 'x.ts', additions: 1, deletions: 0 }]);
+
+    renderPanel();
+
+    const fileEntry = await screen.findByText('x.ts');
+    fireEvent.click(fileEntry);
+
+    await waitFor(() =>
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/conversations/c1/diffs/full?file=x.ts'),
     );
   });
 

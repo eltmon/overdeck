@@ -9,6 +9,12 @@ const mocks = vi.hoisted(() => ({
   listener: null as ((signal: unknown) => void) | null,
 }))
 
+// PAN-5290: the header's root label reads the shared registry queries; no QueryClient in this test.
+vi.mock('../../rootForConversation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../rootForConversation')>()),
+  useRootLabel: (rootId: string | null) => rootId,
+}))
+
 vi.mock('../../explorer-rpc', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../explorer-rpc')>()),
   readFile: mocks.readFile,
@@ -43,6 +49,7 @@ vi.mock('@monaco-editor/react', () => ({
 
 const { ExternalChangeBanner, CHANGED_TEXT, DELETED_TEXT } = await import('../ExternalChangeBanner')
 const { CodePane } = await import('../CodePane')
+const { StageDeckProvider } = await import('../../../Stage/StageDeckContext')
 const { PanRpcError } = await import('@overdeck/contracts')
 const { draftKey, useCodeDrafts } = await import('../code-drafts')
 
@@ -195,5 +202,20 @@ describe('CodePane external-change actions', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Open lib/a.ts' }))
     const paths = usePanesStore.getState().panesByWorkspace[WS]!.filter((p) => p.paneType === 'code').map((p) => p.explorerPath)
     expect(paths).toEqual([PATH, 'lib/a.ts'])
+  })
+  it('inside a Stage, Open on a renamed file opens the new path beside the chat', async () => {
+    const openBeside = vi.fn(() => 'p-new')
+    mocks.readFile.mockResolvedValue(diskRead('base\n', 'sig-base'))
+    render(
+      <StageDeckProvider value={{ deckKey: WS, openOrFocusEditorPane: vi.fn(), openOrFocusAgentPane: vi.fn(), openBeside }}>
+        <CodePane pane={openPane()} ctx={ctx} />
+      </StageDeckProvider>,
+    )
+    await screen.findByTestId('monaco')
+    act(() => mocks.listener!({ kind: 'events', events: [{ kind: 'rename', path: 'lib/a.ts', oldPath: PATH }] }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Open lib/a.ts' }))
+    expect(openBeside).toHaveBeenCalledWith({ rootId: ROOT, path: 'lib/a.ts' })
+    const paths = usePanesStore.getState().panesByWorkspace[WS]!.filter((p) => p.paneType === 'code').map((p) => p.explorerPath)
+    expect(paths).toEqual([PATH])
   })
 })

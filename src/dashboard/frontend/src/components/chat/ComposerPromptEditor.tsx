@@ -191,19 +191,69 @@ interface SlashMenuProps {
 // entries, so "/ovr sync" matches the "pan sync" command.
 const BRAND_ALIASES = ['overdeck', 'ovr'];
 
+function matchRank(cmd: SlashCommand, normalizedFilter: string, aliasFilter: string | null): number {
+  const label = cmd.label.toLowerCase();
+  if (label === `/${normalizedFilter}` || (aliasFilter !== null && label === `/${aliasFilter}`)) return 0;
+  if (label.includes(normalizedFilter) || (aliasFilter !== null && label.includes(aliasFilter))) return 1;
+  return 2;
+}
+
+/**
+ * Orders matches so the flat array stays category-contiguous (SlashMenu groups
+ * rows by category, while selectedIndex walks the flat array) while still
+ * surfacing exact and label matches ahead of description-only ones (PAN-5348).
+ */
+function rankWithinCategories(
+  matches: SlashCommand[],
+  normalizedFilter: string,
+  aliasFilter: string | null,
+): SlashCommand[] {
+  const categoryOrder: string[] = [];
+  const categoryMembers = new Map<string, { cmd: SlashCommand; rank: number; index: number }[]>();
+  matches.forEach((cmd, index) => {
+    const category = cmd.category || 'Commands';
+    let members = categoryMembers.get(category);
+    if (members === undefined) {
+      members = [];
+      categoryOrder.push(category);
+      categoryMembers.set(category, members);
+    }
+    members.push({ cmd, rank: matchRank(cmd, normalizedFilter, aliasFilter), index });
+  });
+
+  const categoryBestRank = new Map<string, number>();
+  for (const category of categoryOrder) {
+    const members = categoryMembers.get(category)!;
+    categoryBestRank.set(category, Math.min(...members.map((member) => member.rank)));
+  }
+
+  const orderedCategories = [...categoryOrder].sort((left, right) => {
+    const rankDelta = categoryBestRank.get(left)! - categoryBestRank.get(right)!;
+    if (rankDelta !== 0) return rankDelta;
+    return categoryOrder.indexOf(left) - categoryOrder.indexOf(right);
+  });
+
+  return orderedCategories.flatMap((category) =>
+    categoryMembers.get(category)!
+      .sort((left, right) => left.rank - right.rank || left.index - right.index)
+      .map((member) => member.cmd));
+}
+
 function filterCommands(commands: SlashCommand[], filter: string): SlashCommand[] {
   const normalizedFilter = filter.toLowerCase();
   const alias = BRAND_ALIASES.find(
     (a) => normalizedFilter === a || normalizedFilter.startsWith(`${a} `),
   );
   const aliasFilter = alias ? `pan${normalizedFilter.slice(alias.length)}` : null;
-  return commands.filter((cmd) => {
+  const matches = commands.filter((cmd) => {
     const haystack = `${cmd.label} ${cmd.description}`.toLowerCase();
     return (
       haystack.includes(normalizedFilter) ||
       (aliasFilter !== null && haystack.includes(aliasFilter))
     );
   });
+  if (!normalizedFilter) return matches;
+  return rankWithinCategories(matches, normalizedFilter, aliasFilter);
 }
 
 function renderHighlightedText(text: string, filter: string, className: string) {

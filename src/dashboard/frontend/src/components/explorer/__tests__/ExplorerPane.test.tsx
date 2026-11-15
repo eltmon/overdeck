@@ -16,6 +16,7 @@ const rpc = vi.hoisted(() => ({
   gitStatus: vi.fn(),
   gitStage: vi.fn(),
   createEntry: vi.fn(),
+  beginEdit: vi.fn(),
   subscribeWatchStream: vi.fn(),
   stream: null as null | { onBatch: (b: ExplorerWatchBatch) => void; onReconnect: () => void },
 }))
@@ -30,6 +31,7 @@ vi.mock('../explorer-rpc', async (importOriginal) => {
     gitStatus: rpc.gitStatus,
     gitStage: rpc.gitStage,
     createEntry: rpc.createEntry,
+    beginEdit: rpc.beginEdit,
     subscribeWatchStream: rpc.subscribeWatchStream,
   }
 })
@@ -66,6 +68,8 @@ function listing(path: string): ExplorerListDirResult {
 let registeredProjects: Array<{ key: string; name?: string; path: string }> = []
 let workspaceRows: Array<{ id: string; projectId: string; kind: 'main' | 'issue' | 'scratch'; name: string; issueId: string | null }> = []
 let fetchGuard: ReturnType<typeof installStrictFetchMock>
+// PAN-5290: answers for GET /api/explorer/edit-workspaces/* that a test expects.
+let editWorkspaceAnswers: Record<string, unknown> = {}
 
 function filesProps(over: Partial<ExplorerFilesProps> = {}): ExplorerFilesProps {
   return { rootId: 'issue:PAN-1', deckKey: DECK, changedPaths: new Set(), conversationScope: false, onFindInFolder: vi.fn(), ...over }
@@ -94,11 +98,14 @@ function deckWith(over: Partial<StageDeckContextValue> = {}): StageDeckContextVa
 beforeEach(() => {
   registeredProjects = []
   workspaceRows = []
+  editWorkspaceAnswers = {}
+  rpc.beginEdit.mockReset()
   useWorkDockStore.setState({ byDeck: {} })
   useActiveDock.setState({ current: null })
   fetchGuard = installStrictFetchMock(({ method, url }) => {
     if (method === 'GET' && url === '/api/registered-projects') return Response.json(registeredProjects)
     if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: workspaceRows })
+    if (method === 'GET' && url in editWorkspaceAnswers) return Response.json(editWorkspaceAnswers[url])
     return undefined
   })
   localStorage.clear()
@@ -310,6 +317,45 @@ describe('ExplorerFiles', () => {
     expect(menu.getByRole('menuitemradio', { name: 'edit-two' })).toHaveAttribute('aria-checked', 'true')
     fireEvent.click(menu.getByRole('menuitemradio', { name: 'Follow the active tab' }))
     expect(useWorkDockStore.getState().byDeck[DECK].rootOverride).toBeUndefined()
+  })
+
+  it('shows the editor bar on an edit root, without Close tab (PAN-5290 C-D10)', async () => {
+    editWorkspaceAnswers = {
+      '/api/explorer/edit-workspaces/w1': {
+        workspace: { id: 'w1', rootId: 'workspace:w1', name: 'edit-one', branch: 'scratch/edit-one', projectKey: 'overdeck', defaultBranch: 'main', path: '/ws' },
+        pr: null,
+        unpushedCommits: false,
+        prSupport: { available: true, reason: null },
+        pipelineSupport: { available: true, reason: null },
+      },
+      '/api/explorer/edit-workspaces/w1/changes': {
+        base: 'abc',
+        files: [{ path: 'README.md', status: 'M', additions: 1, deletions: 0, binary: false }],
+        additions: 1,
+        deletions: 0,
+        uncommittedPaths: ['README.md'],
+      },
+    }
+    renderPane({ rootId: 'workspace:w1' })
+    await waitFor(() =>
+      expect(screen.getByTestId('editor-bar-sentence').textContent).toBe('Editing in edit-one on scratch/edit-one · 1 file changed +1 −0 · All edits saved'),
+    )
+    expect(screen.getByRole('button', { name: 'Create PR' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Discard…' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Close tab' })).toBeNull()
+  })
+
+  it('creates a new edit workspace from the root menu and points the dock at it (PAN-5290 FR-14)', async () => {
+    registeredProjects = [{ key: 'overdeck', name: 'Overdeck', path: '/ws' }]
+    rpc.beginEdit.mockResolvedValue({ rootId: 'workspace:w9', workspaceId: 'w9', name: 'edit-9', branch: 'scratch/edit-9', path: '/ws9', created: true })
+    renderPane({ rootId: 'project:overdeck' })
+    await screen.findByText('README.md')
+    fireEvent.click(await screen.findByRole('button', { name: /Overdeck/ }))
+    const menu = within(screen.getByRole('menu', { name: 'Files root' }))
+    fireEvent.click(await menu.findByRole('menuitem', { name: 'New edit workspace' }))
+    expect(rpc.beginEdit).toHaveBeenCalledWith('overdeck', true)
+    await waitFor(() => expect(useWorkDockStore.getState().byDeck[DECK]?.rootOverride).toBe('workspace:w9'))
+    expect(screen.queryByRole('menu', { name: 'Files root' })).toBeNull()
   })
 
   it('reveals and selects the revealPath file (PAN-5289)', async () => {

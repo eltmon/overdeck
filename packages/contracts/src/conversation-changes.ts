@@ -83,3 +83,9 @@ export interface ProjectChanges {
   branch: string
   commits: ProjectCommit[]
 }
+
+/** GET /api/conversations/:name/changes/lines (PAN-5290): working-tree line numbers (1-based, ascending) the conversation changed in `path`. */
+export interface ConversationChangedLines {
+  path: string
+  lines: number[]
+}
