@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5295",
   "created": "2026-11-15T19:39:19.043Z",
-  "updated": "2026-11-15T20:10:32.714Z",
+  "updated": "2026-11-15T20:17:38.580Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -218,9 +218,30 @@
       "doneAt": "2026-11-15T20:10:24.711Z"
     },
     "turn-card-wiring": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5295",
-      "claimedAt": "2026-11-15T20:10:32.713Z"
+      "claimedAt": "2026-11-15T20:10:32.713Z",
+      "doneAt": "2026-11-15T20:17:38.580Z"
+    },
+    "turn-card-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T20:17:38.580Z"
+    },
+    "turn-card-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T20:17:38.580Z"
+    },
+    "turn-card-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T20:17:38.580Z"
+    },
+    "turn-card-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T20:17:38.580Z"
+    },
+    "turn-card-wiring.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-15T20:17:38.580Z"
     }
   }
 }
