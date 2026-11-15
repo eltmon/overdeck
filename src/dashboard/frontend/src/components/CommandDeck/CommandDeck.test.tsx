@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor, act, within } from '@testing-librar
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { CommandDeck } from './index';
+import { TestDeckNavigationProvider } from '../frame/deck/deckNavigation';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { usePanesStore } from '../../lib/panesStore';
 import { usePlannedBacklogVisibility } from '../../hooks/usePlannedBacklogVisibility';
@@ -435,7 +436,7 @@ function renderCommandDeck(
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <CommandDeck {...props} />
+      <TestDeckNavigationProvider><CommandDeck {...props} /></TestDeckNavigationProvider>
     </QueryClientProvider>,
   );
 }
@@ -849,7 +850,7 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     render(
       <StrictMode>
         <QueryClientProvider client={queryClient}>
-          <CommandDeck selectedProject="test-project" convId="1" />
+          <TestDeckNavigationProvider><CommandDeck selectedProject="test-project" convId="1" /></TestDeckNavigationProvider>
         </QueryClientProvider>
       </StrictMode>,
     );
@@ -868,7 +869,7 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     render(
       <StrictMode>
         <QueryClientProvider client={queryClient}>
-          <CommandDeck selectedProject="test-project" cockpitIssue={{ project: 'test-project', issue: 'PAN-821' }} />
+          <TestDeckNavigationProvider><CommandDeck selectedProject="test-project" cockpitIssue={{ project: 'test-project', issue: 'PAN-821' }} /></TestDeckNavigationProvider>
         </QueryClientProvider>
       </StrictMode>,
     );
