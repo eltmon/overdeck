@@ -235,4 +235,40 @@ describe('getConversationChangedLines', () => {
     expect(await lines(s, 'docs/shared.md', { blame })).toEqual([2, 3]);
     expect(blame).toHaveBeenCalledTimes(2);
   });
+
+  it('does not cache an answer whose blame failed, so the next call retries it', async () => {
+    const s = setup();
+    commit(s.repo, 'docs/shared.md', 'base\n');
+    const shared = join(s.repo, 'docs/shared.md');
+    writeFileSync(shared, 'base\nmine one\n');
+    s.setParsed(parse([edit(shared, 'base\n', 'base\nmine one\n')]));
+    const blame = vi
+      .fn(async (repo: string, file: string) => git(repo, ['blame', '--porcelain', '--', file]) + '\n')
+      .mockRejectedValueOnce(new Error('index.lock exists'));
+
+    expect(await lines(s, 'docs/shared.md', { blame })).toEqual([]);
+    expect(await lines(s, 'docs/shared.md', { blame })).toEqual([2]);
+    expect(blame).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not cache an answer when the file changed while it was computed', async () => {
+    const s = setup();
+    commit(s.repo, 'docs/shared.md', 'base\n');
+    const shared = join(s.repo, 'docs/shared.md');
+    writeFileSync(shared, 'base\nmine one\n');
+    s.setParsed(parse([edit(shared, 'base\n', 'base\nmine one\nmine two\n')]));
+    let first = true;
+    const blame = vi.fn(async (repo: string, file: string) => {
+      const out = git(repo, ['blame', '--porcelain', '--', file]) + '\n';
+      if (first) {
+        first = false;
+        appendFileSync(shared, 'mine two\n');
+      }
+      return out;
+    });
+
+    expect(await lines(s, 'docs/shared.md', { blame })).toEqual([2]);
+    expect(await lines(s, 'docs/shared.md', { blame })).toEqual([2, 3]);
+    expect(blame).toHaveBeenCalledTimes(2);
+  });
 });

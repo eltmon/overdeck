@@ -70,7 +70,7 @@ async function untrackedFile(cwd: string, path: string): Promise<EditWorkspaceCh
   }
 }
 
-/** Paths from `git status --porcelain=v2 -z --untracked-files=all` records 1, 2, u and ?. */
+/** Paths from `git status --porcelain=v2 -z --untracked-files=all` records 1, 2, u and ?; a rename lists both paths. */
 function statusPaths(out: Buffer): string[] {
   const records = out.toString('utf8').split('\0');
   const paths: string[] = [];
@@ -81,7 +81,10 @@ function statusPaths(out: Buffer): string[] {
     if (kind === '1') paths.push(after(record, 8));
     else if (kind === '2') {
       paths.push(after(record, 9));
-      i += 1; // the original path follows in its own field
+      // The original path follows in its own field; committing removes it, so it is uncommitted too.
+      const original = records[i + 1];
+      if (original) paths.push(original);
+      i += 1;
     } else if (kind === 'u') paths.push(after(record, 10));
     else if (kind === '?') paths.push(record.slice(2));
   }
@@ -97,6 +100,10 @@ export async function getEditWorkspaceChanges(
   const cwd = root.absPath;
 
   const mergeBase = await git(cwd, ['merge-base', 'HEAD', baseRefFor(root.defaultBranch)]);
+  // A killed run says nothing about the base; only a git answer of "none" falls back to HEAD.
+  if (mergeBase.timedOut || mergeBase.truncated || mergeBase.code === null) {
+    throw new Error(`git merge-base did not finish: ${mergeBase.stderr.trim() || 'timed out'}`);
+  }
   const base = mergeBase.code === 0 ? mergeBase.stdout.toString('utf8').trim() || 'HEAD' : 'HEAD';
 
   const files = await trackedFiles(git, cwd, base);

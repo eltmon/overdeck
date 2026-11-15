@@ -18,7 +18,10 @@
  *
  * Answers are cached per (conversation, file) while HEAD, the file's stat
  * and the transcript's stat are unchanged (C-D2b), so the client's refetch
- * with every `/changes` refetch spawns no second blame.
+ * with every `/changes` refetch spawns no second blame. The stamp is taken
+ * before any evidence is read, and an answer is cached only when the stamp
+ * is the same afterwards and no evidence (blame, the transcript, an added
+ * file's text) failed to load; anything else is retried on the next call.
  */
 import { execFile } from 'node:child_process';
 import { readFile, stat } from 'node:fs/promises';
@@ -120,44 +123,58 @@ export async function getConversationChangedLines(
   const repoRoot = await repoRootForDir(conv.cwd);
   if (!repoRoot) return none;
 
-  const result = await getConversationChanges(name, { scope: 'conversation' }, deps);
-  if (result.status !== 200) return { status: result.status, body: result.body as { error: string } };
-  const changes = result.body as ConversationChanges;
-
   const sessionFile = await deps.resolveSessionFile(conv);
   const absFile = join(repoRoot, file);
-  const stamp = [await headOf(repoRoot), await statStamp(absFile), await statStamp(sessionFile)].join('\0');
+  const stampNow = async (): Promise<string> =>
+    [await headOf(repoRoot), await statStamp(absFile), await statStamp(sessionFile)].join('\0');
+  // Stamped before any evidence is read: an answer is cached only when nothing moved while it was computed.
+  const stamp = await stampNow();
   const key = `${name}\0${file}`;
   const cached = cache.get(key);
   if (cached && cached.stamp === stamp) return { status: 200, body: cached.body };
 
+  const result = await getConversationChanges(name, { scope: 'conversation' }, deps);
+  if (result.status !== 200) return { status: result.status, body: result.body as { error: string } };
+  const changes = result.body as ConversationChanges;
+
+  // False when evidence the answer needs failed to load: the answer is served but never cached.
+  let complete = true;
+  const answer = async (lines: number[]): Promise<LinesResult> => {
+    const body: ConversationChangedLines = { path: file, lines };
+    if (complete && (await stampNow()) === stamp) remember(key, stamp, body);
+    return { status: 200, body };
+  };
+
   const shas = new Set(changes.commits.filter((c) => c.files.some((f) => f.path === file)).map((c) => c.sha));
   const unc = changes.uncommitted.find((f) => f.path === file);
-  if (shas.size === 0 && !unc) {
-    remember(key, stamp, none.body as ConversationChangedLines);
-    return none;
-  }
+  if (shas.size === 0 && !unc) return answer([]);
 
   let written: Set<string> | undefined;
-  if (unc?.attribution === 'lines' && sessionFile) {
-    const parsed = await deps.getCachedMessages(sessionFile, false).catch(() => null);
-    written = parsed ? editedFiles({ repoRoot, cwd: conv.cwd, parsed }).get(file)?.writtenLines : undefined;
+  if (unc?.attribution === 'lines') {
+    const parsed = sessionFile ? await deps.getCachedMessages(sessionFile, false).catch(() => null) : null;
+    if (parsed) written = editedFiles({ repoRoot, cwd: conv.cwd, parsed }).get(file)?.writtenLines;
+    else complete = false;
   }
 
-  let blamed: Array<{ line: number; sha: string; content: string }>;
+  let blamed: Array<{ line: number; sha: string; content: string }> = [];
   try {
     blamed = parseBlame(await (opts.blame ?? defaultBlame)(repoRoot, file));
   } catch {
-    // C-D2 checkpoint: an untracked file has no blame; every line of it is uncommitted.
-    blamed = [];
     if (unc?.status === 'A') {
+      // C-D2 checkpoint: an added file has no blame; every line of it is uncommitted.
       const info = await stat(absFile).catch(() => null);
       if (info?.isFile() && info.size <= UNTRACKED_READ_MAX) {
-        const text = await readFile(absFile, 'utf8');
-        const rows = text.split('\n');
-        if (rows.at(-1) === '') rows.pop();
-        blamed = rows.map((content, i) => ({ line: i + 1, sha: UNCOMMITTED_SHA, content }));
-      }
+        const text = await readFile(absFile, 'utf8').catch(() => null);
+        if (text === null) complete = false;
+        else {
+          const rows = text.split('\n');
+          if (rows.at(-1) === '') rows.pop();
+          blamed = rows.map((content, i) => ({ line: i + 1, sha: UNCOMMITTED_SHA, content }));
+        }
+      } else if (!info) complete = false;
+    } else if (unc?.status !== 'D') {
+      // A deleted file has no lines; any other blame failure is retried on the next request.
+      complete = false;
     }
   }
 
@@ -170,9 +187,7 @@ export async function getConversationChangedLines(
       if (unc.attribution === 'file' || (text !== '' && written?.has(text))) marked.add(line);
     }
   }
-  const body: ConversationChangedLines = { path: file, lines: [...marked].sort((a, b) => a - b) };
-  remember(key, stamp, body);
-  return { status: 200, body };
+  return answer([...marked].sort((a, b) => a - b));
 }
 
 export function resetConversationChangedLinesCacheForTests(): void {

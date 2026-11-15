@@ -77,6 +77,7 @@ function withQueryClient(children: ReactNode) {
 const { carryViewStates, registerCodeEditor, resetViewStateRegistryForTests } = await import('../view-state-registry')
 const { StageDeckProvider } = await import('../../../Stage/StageDeckContext')
 const { usePanesStore } = await import('../../../../lib/panesStore')
+const { useWorkDockStore } = await import('../../../dock/workDockStore')
 
 function pane(over: Partial<WorkspacePane> = {}): WorkspacePane {
   return {
@@ -307,6 +308,23 @@ describe('CodePane header', () => {
     expect(setActivePane).toHaveBeenCalledWith('PAN-1', 'p1')
     expect(openDock).toHaveBeenCalledWith({ tab: 'files', reveal: { rootId: 'issue:PAN-1', path: 'src/a.ts' } })
     setActivePane.mockRestore()
+  })
+
+  it('Reveal in files points a dock pinned to another root at this file first (CodeRabbit 4578715359)', async () => {
+    mocks.readFile.mockResolvedValue(textRead())
+    useWorkDockStore.setState({ byDeck: {} })
+    useWorkDockStore.getState().setRootOverride('PAN-1', 'project:other')
+    const openDock = vi.fn()
+    render(
+      <StageDeckProvider value={{ deckKey: 'PAN-1', openOrFocusEditorPane: vi.fn(), openOrFocusAgentPane: vi.fn(), openDock }}>
+        <CodePane pane={pane()} ctx={ctx} />
+      </StageDeckProvider>,
+    )
+    await screen.findByTestId('monaco')
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal in files' }))
+    expect(useWorkDockStore.getState().byDeck['PAN-1']).toMatchObject({ rootOverride: 'issue:PAN-1', rootOverrideAnchor: 'p1' })
+    expect(openDock).toHaveBeenCalledWith({ tab: 'files', reveal: { rootId: 'issue:PAN-1', path: 'src/a.ts' } })
+    useWorkDockStore.setState({ byDeck: {} })
   })
 })
 

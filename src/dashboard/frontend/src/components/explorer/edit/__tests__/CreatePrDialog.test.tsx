@@ -169,10 +169,19 @@ describe('CreatePrDialog', () => {
     expect(screen.getByRole('dialog', { name: 'Commit and push' })).toBeInTheDocument()
     expect(screen.getByLabelText('Commit message')).toBeInTheDocument()
     expect(screen.getByTestId('create-pr-files-heading').textContent).toBe('What will be committed · 1 file')
-    expect(within(screen.getByTestId('create-pr-files')).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['README.md+4 −2'])
+    expect(within(screen.getByTestId('create-pr-files')).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['README.md'])
     expect(screen.queryByRole('radiogroup')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Commit and push' }))
     await waitFor(() => expect(http.createEditWorkspacePr).toHaveBeenCalledWith('w1', expect.objectContaining({ mode: 'direct', draft: false })))
+  })
+
+  it('lists an uncommitted deletion of a file a pushed commit added (CodeRabbit 4578715368)', () => {
+    // notes.txt was added by a pushed commit and deleted locally: neither end of the merge-base diff has it.
+    render(
+      <CreatePrDialog status={status({ pr: OPEN_PR })} changes={changes({ uncommittedPaths: ['README.md', 'notes.txt'] })} onClose={() => {}} onDone={() => {}} />,
+    )
+    expect(screen.getByTestId('create-pr-files-heading').textContent).toBe('What will be committed · 2 files')
+    expect(within(screen.getByTestId('create-pr-files')).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['README.md', 'notes.txt'])
   })
 
   it('shows Working… on the primary button while the request runs', async () => {

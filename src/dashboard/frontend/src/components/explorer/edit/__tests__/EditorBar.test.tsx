@@ -30,7 +30,15 @@ vi.mock('../../watch/explorer-watch-hub', () => ({ subscribeExplorerWatch: () =>
 import { draftKey, useCodeDrafts } from '../../code/code-drafts'
 import { PR_STATUS_REFETCH_MS, shouldPollPr } from '../edit-workspace-http'
 import { usePanesStore } from '../../../../lib/panesStore'
-import { CREATING_EDIT_NOTE, EditorBar, MAIN_CHECKOUT_SENTENCE, UNCOMMITTED_REASON, UNSAVED_REASON } from '../EditorBar'
+import {
+  CHANGES_FAILED_REASON,
+  CHECKING_CHANGES_REASON,
+  CREATING_EDIT_NOTE,
+  EditorBar,
+  MAIN_CHECKOUT_SENTENCE,
+  UNCOMMITTED_REASON,
+  UNSAVED_REASON,
+} from '../EditorBar'
 import { useEditWorkspaceStore } from '../edit-workspace-store'
 
 const DECK = 'p'
@@ -329,6 +337,32 @@ describe('EditorBar with a PR', () => {
     renderWorkspaceBar()
     await waitFor(() => expect(screen.getByTestId('edit-pr-merge-reason').textContent).toBe(UNCOMMITTED_REASON))
     expect(screen.getByRole('button', { name: 'Push changes' })).toBeInTheDocument()
+  })
+
+  it('keeps Merge disabled while the changes are still loading (CodeRabbit 4578715371)', async () => {
+    stubServer({ body: status(pr()) })
+    fetchMock.mockImplementation(async (url: string) =>
+      url.endsWith('/changes') ? new Promise<Response>(() => {}) : new Response(JSON.stringify(status(pr())), { status: 200 }),
+    )
+    renderWorkspaceBar()
+    await waitFor(() => expect(screen.getByTestId('edit-pr-merge-reason').textContent).toBe(CHECKING_CHANGES_REASON))
+    expect(screen.getByRole('button', { name: 'Merge' })).toBeDisabled()
+  })
+
+  it('keeps Merge disabled and offers Retry when the changes cannot be read (CodeRabbit 4578715371)', async () => {
+    stubServer({ body: status(pr()) }, { body: { error: 'git exploded', code: 'GIT_FAILED' }, status: 500 })
+    renderWorkspaceBar()
+    await waitFor(() => expect(screen.getByTestId('edit-pr-merge-reason').textContent).toBe(CHANGES_FAILED_REASON))
+    expect(screen.getByRole('button', { name: 'Merge' })).toBeDisabled()
+  })
+
+  it('offers Retry on the editing line when the changes cannot be read', async () => {
+    stubServer({ body: status() }, { body: { error: 'git exploded', code: 'GIT_FAILED' }, status: 500 })
+    renderWorkspaceBar()
+    await waitFor(() => expect(sentence()).toContain(CHANGES_FAILED_REASON))
+    changesAnswer = { body: changes() }
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    await waitFor(() => expect(sentence()).toContain('2 files changed +6 −2'))
   })
 
   it('blocks Merge while a draft on the edit root is unsaved', async () => {

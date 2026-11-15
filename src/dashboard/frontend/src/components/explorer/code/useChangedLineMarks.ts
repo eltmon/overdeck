@@ -53,11 +53,12 @@ export function useChangedLineMarks({ editor, rootId, path, conversation, dirty 
   })
 
   // One decorations collection per editor instance, cleared when it unmounts.
-  const collection = useRef<{ editor: CodeEditorInstance; marks: DecorationsCollection } | null>(null)
+  // `identity` is whose marks the collection holds (conversation, root, path).
+  const collection = useRef<{ editor: CodeEditorInstance; marks: DecorationsCollection; identity: string } | null>(null)
   useEffect(() => {
     if (!editor) return
     const marks = editor.createDecorationsCollection()
-    collection.current = { editor, marks }
+    collection.current = { editor, marks, identity: '' }
     return () => {
       marks.clear()
       if (collection.current?.editor === editor) collection.current = null
@@ -66,9 +67,16 @@ export function useChangedLineMarks({ editor, rootId, path, conversation, dirty 
 
   const show = inChanges && repoPath !== null
   const data = lines.data
+  const identity = `${name}\0${rootId}\0${path}`
   useEffect(() => {
-    const marks = collection.current?.editor === editor ? collection.current.marks : null
-    if (!marks) return
+    const current = collection.current?.editor === editor ? collection.current : null
+    if (!current) return
+    const { marks } = current
+    // Another conversation's marks never stay while this one's lines load (or fail to).
+    if (current.identity !== identity) {
+      marks.clear()
+      current.identity = identity
+    }
     if (!show) {
       marks.clear()
       return
@@ -80,7 +88,7 @@ export function useChangedLineMarks({ editor, rootId, path, conversation, dirty 
         options: { isWholeLine: true, linesDecorationsClassName: CHANGED_LINE_CLASS },
       })),
     )
-  }, [editor, show, dirty, data])
+  }, [editor, identity, show, dirty, data])
 }
 
 /** The hook as a renderless component, mounted only while a conversation is beside the pane. */

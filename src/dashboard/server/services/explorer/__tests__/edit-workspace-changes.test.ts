@@ -112,4 +112,26 @@ describe('getEditWorkspaceChanges', () => {
     expect(changes.base).toBe('HEAD');
     expect(changes.files).toEqual([{ path: 'README.md', status: 'M', additions: 1, deletions: 1, binary: false }]);
   });
+
+  it('lists both paths of a staged rename as uncommitted (CodeRabbit 4578715373)', async () => {
+    const repo = await editRepo({ 'old.ts': 'export const a = 1\n' });
+    await repo.git('mv', 'old.ts', 'new.ts');
+
+    const changes = await getEditWorkspaceChanges('w1', deps(repo.dir));
+
+    expect(changes.uncommittedPaths.sort()).toEqual(['new.ts', 'old.ts']);
+    expect(changes.files.map((f) => [f.path, f.status])).toEqual([['new.ts', 'A'], ['old.ts', 'D']]);
+  });
+
+  it('refuses a merge-base run that was killed instead of falling back to HEAD (CodeRabbit 4578715378)', async () => {
+    const repo = await editRepo({ 'README.md': 'hello\n' });
+    const real = deps(repo.dir);
+    const { runGit } = await import('../git-exec.js');
+    const killed: NonNullable<EditWorkspaceDeps['runGit']> = async (cwd, args, opts) =>
+      args[0] === 'merge-base'
+        ? { code: null, stdout: Buffer.from(''), stderr: '', timedOut: true, truncated: false }
+        : runGit(cwd, args, opts);
+
+    await expect(getEditWorkspaceChanges('w1', { ...real, runGit: killed })).rejects.toThrow('git merge-base did not finish');
+  });
 });

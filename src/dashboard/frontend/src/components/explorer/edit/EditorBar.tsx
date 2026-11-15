@@ -47,6 +47,8 @@ import { ensureEditRoot, leaveEditWorkspace } from './edit-workspace-switch'
 
 export const UNCOMMITTED_REASON = 'Commit and push your changes first.'
 export const UNSAVED_REASON = 'Save or discard your unsaved edits first.'
+export const CHECKING_CHANGES_REASON = 'Checking for uncommitted changes…'
+export const CHANGES_FAILED_REASON = "Couldn't read this edit workspace's changes."
 
 export const MAIN_CHECKOUT_SENTENCE =
   'This is the main checkout. Start typing and Overdeck moves your edits to a new edit workspace, so main never changes until a PR merges.'
@@ -218,7 +220,7 @@ function hasCode(error: unknown, code: string): boolean {
 }
 
 function sentenceEnd(text: string): string {
-  return text.replace(/\.+$/, '') + '.'
+  return text.endsWith('…') ? text : text.replace(/\.+$/, '') + '.'
 }
 
 function FilesChanged({ changes }: { changes: EditWorkspaceChanges | undefined }) {
@@ -372,13 +374,18 @@ function WorkspaceBar({
 
   let row: ReactNode
   if (pr?.state === 'OPEN') {
+    // Unknown changes are never a clean workspace: Merge waits for the changes query.
     const blocked = !pr.canMerge
       ? (pr.reason ?? 'GitHub does not allow this merge.')
       : unsavedPaths.length > 0
         ? UNSAVED_REASON
-        : needsPush
-          ? UNCOMMITTED_REASON
-          : null
+        : changes.isError
+          ? CHANGES_FAILED_REASON
+          : !changes.data
+            ? CHECKING_CHANGES_REASON
+            : needsPush
+              ? UNCOMMITTED_REASON
+              : null
     row = (
       <BarRow
         lead={<StatusDot dot={blocked ? 'live' : 'done'} />}
@@ -423,13 +430,27 @@ function WorkspaceBar({
     )
   } else {
     row = (
-      <BarRow lead={<StatusDot dot="editing" />} actions={<>{discardButton}{createButton}</>}>
+      <BarRow
+        lead={<StatusDot dot="editing" />}
+        actions={
+          <>
+            {changes.isError ? (
+              <button type="button" className={BUTTON} onClick={refresh}>
+                Retry
+              </button>
+            ) : null}
+            {discardButton}
+            {createButton}
+          </>
+        }
+      >
         {pr?.state === 'CLOSED' ? (
           <>
             PR <Strong>#{pr.number}</Strong> was closed.{' '}
           </>
         ) : null}
         <EditingSentence status={data} changes={changes.data} saving={unsavedPaths.length > 0} />
+        {changes.isError ? <> · {CHANGES_FAILED_REASON}</> : null}
       </BarRow>
     )
   }

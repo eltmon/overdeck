@@ -71,6 +71,20 @@ function FileRows({ files }: { files: readonly EditWorkspaceChangedFile[] }) {
   )
 }
 
+function PathRows({ paths }: { paths: readonly string[] }) {
+  return (
+    <ul className={styles.fileList} data-testid="create-pr-files">
+      {paths.map((path) => (
+        <li key={path} className={styles.fileRow}>
+          <span className={styles.filePath} title={path}>
+            {path}
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 export function CreatePrDialog({ status, changes, onClose, onDone }: CreatePrDialogProps) {
   const pushOnly = status.pr?.state === 'OPEN'
   const { workspace, prSupport, pipelineSupport } = status
@@ -109,8 +123,9 @@ export function CreatePrDialog({ status, changes, onClose, onDone }: CreatePrDia
     void submit()
   }
 
-  const uncommitted = new Set(changes?.uncommittedPaths ?? [])
-  const committedFiles = changes?.files.filter((f) => uncommitted.has(f.path)) ?? []
+  // Push mode lists the uncommitted paths themselves: the files above are measured from the merge
+  // base, which can miss a file a pushed commit added and the working tree deleted.
+  const uncommittedPaths = changes?.uncommittedPaths ?? []
 
   return (
     <Modal
@@ -176,7 +191,7 @@ export function CreatePrDialog({ status, changes, onClose, onDone }: CreatePrDia
             {!changes ? (
               'Reading what will land…'
             ) : pushOnly ? (
-              <>What will be committed · {filesWord(committedFiles.length)}</>
+              <>What will be committed · {filesWord(uncommittedPaths.length)}</>
             ) : (
               <>
                 What will land · {filesWord(changes.files.length)}{' '}
@@ -186,7 +201,7 @@ export function CreatePrDialog({ status, changes, onClose, onDone }: CreatePrDia
               </>
             )}
           </span>
-          {changes ? <FileRows files={pushOnly ? committedFiles : changes.files} /> : null}
+          {!changes ? null : pushOnly ? <PathRows paths={uncommittedPaths} /> : <FileRows files={changes.files} />}
         </div>
         {pushOnly ? null : (
           <div className={styles.field}>

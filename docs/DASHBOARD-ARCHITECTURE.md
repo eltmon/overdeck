@@ -2723,8 +2723,9 @@ per project. The routes live in `routes/explorer-edit-workspaces.ts`, all
 
 **What will land** (`services/explorer/edit-workspace-changes.ts`, PAN-5290):
 `/changes` diffs the worktree, untracked files included, against `git
-merge-base HEAD refs/remotes/origin/<default branch>` (`HEAD` when there is
-none) with `--numstat` and `--name-status`, renames split. An untracked file
+merge-base HEAD refs/remotes/origin/<default branch>` (`HEAD` when git reports
+none; a killed or truncated `merge-base` run fails the call instead) with
+`--numstat` and `--name-status`, renames split. An untracked file
 counts its lines, unless it is over 2 MiB, unreadable or has a NUL byte in its
 first 8,192 bytes; then it is `binary: true` with 0/0, like a binary tracked
 file. `uncommittedPaths` comes from `git status --porcelain=v2`. It never
@@ -2850,7 +2851,9 @@ On an edit root it reads the status and `/changes` queries: the workspace,
 branch, file count with +/−, save state, **Discard…** and **Create PR**; an
 open PR's merge verdict reason with a disabled **Merge**, **Push changes** when
 something is uncommitted or unpushed, **View on GitHub** and **Refresh**; then
-"no conflicts" with an enabled **Merge**. A `ROOT_NOT_FOUND` from either query
+"no conflicts" with an enabled **Merge**. Merge also waits for the `/changes`
+query: while it loads or after it fails, Merge stays disabled with that reason,
+and a failure offers **Retry**. A `ROOT_NOT_FOUND` from either query
 calls `onStale`, and `NOT_AN_EDIT_WORKSPACE` renders nothing.
 
 **Landed notes.** Merge, a pipeline send and a discard set
@@ -2864,7 +2867,9 @@ persisted, and `setCreating(projectKey, true)` clears it.
 lists what will land, asks "How should it land?" as a `radiogroup` of the
 direct and pipeline choices (an unsupported one is `aria-disabled` with its
 reason), and labels its one primary button by the choice. With an open PR it
-is "Commit and push" and lists only `uncommittedPaths`.
+is "Commit and push" and lists the `uncommittedPaths` themselves, without
+counts, since the merge-base file list can miss a file a pushed commit added
+and the working tree deleted.
 
 **View state across a root switch** (`code/view-state-registry.ts`). Each
 mounted code pane registers its live editor (the diff's modified editor while
@@ -2896,7 +2901,10 @@ uncommitted; otherwise there are no lines. Unknown conversation 404; a
 missing, absolute, NUL-containing or `..` path 400; no repository, or a file
 the conversation did not change, 200 with `lines: []`. Answers are cached per
 (conversation, file), at most 128, while `HEAD`, the file's stat and the
-transcript's stat are unchanged, so a repeat spawns no blame.
+transcript's stat are unchanged, so a repeat spawns no blame. The stamp is
+taken before any evidence is read, and an answer is cached only when the
+stamp is the same afterwards and no evidence (blame of a tracked file, the
+transcript, an added file's text) failed to load; anything else is retried.
 
 **Stale tabs** (`code/StaleCodeTab.tsx`). A code pane whose `readFile` or bar
 query answers `ROOT_NOT_FOUND` (`isRootNotFound` checks both the RPC and the

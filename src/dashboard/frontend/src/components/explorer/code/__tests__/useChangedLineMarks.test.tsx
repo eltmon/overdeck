@@ -10,6 +10,7 @@ vi.mock('../../watch/explorer-watch-hub', () => ({ subscribeExplorerWatch: () =>
 import { useChangedLineMarks, CHANGED_LINE_CLASS, type ChangedLineMarksInput } from '../useChangedLineMarks'
 import type { CodeEditorInstance } from '../MonacoCodeEditor'
 import { useExplorerStore } from '../../explorerStore'
+import { conversationChangesKey } from '../../../dock/useConversationChanges'
 import type { Conversation } from '../../../CommandDeck/ConversationList'
 
 const ROOT = 'project:p'
@@ -96,6 +97,31 @@ describe('useChangedLineMarks (PAN-5290 FR-6)', () => {
 
     await waitFor(() => expect(linesCalls()).toHaveLength(1))
     await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(collection.set).not.toHaveBeenCalled()
+  })
+
+  it("clears the first conversation's marks while another conversation's lines load (CodeRabbit 4578715363)", async () => {
+    const { editor, collection } = fakeEditor()
+    // c2's changes are already cached (the dock read them), so only its lines are pending after the switch.
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
+    qc.setQueryData(conversationChangesKey('c2', 'conversation'), { ...CHANGES, conversation: 'c2' })
+    const { rerender } = renderHook((props: ChangedLineMarksInput) => useChangedLineMarks(props), {
+      initialProps: { editor, rootId: ROOT, path: 'docs/shared.md', conversation, dirty: false },
+      wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>,
+    })
+    await waitFor(() => expect(collection.set).toHaveBeenCalled())
+    collection.clear.mockClear()
+    collection.set.mockClear()
+    // c2's lines never arrive.
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/c2/changes/lines')) return new Promise<Response>(() => {})
+      if (url.includes('/changes?')) return Response.json({ ...CHANGES, conversation: 'c2' })
+      throw new Error(`unexpected ${url}`)
+    })
+
+    rerender({ editor, rootId: ROOT, path: 'docs/shared.md', conversation: { name: 'c2', isWorking: false } as Conversation, dirty: false })
+    await waitFor(() => expect(linesCalls().some(([url]) => String(url).includes('/c2/'))).toBe(true))
+    expect(collection.clear).toHaveBeenCalled()
     expect(collection.set).not.toHaveBeenCalled()
   })
 

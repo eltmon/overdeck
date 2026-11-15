@@ -18,6 +18,7 @@ import styles from '../../Stage/stage.module.css'
 import type { PaneWrapperProps } from '../../Stage/types'
 import { EditorBar } from '../edit/EditorBar'
 import { useStageDeck } from '../../Stage/StageDeckContext'
+import { useWorkDockStore } from '../../dock/workDockStore'
 import { useRootLabel } from '../rootForConversation'
 import { explorerErrorCode, explorerErrorMessage, parseRootId, readFile } from '../explorer-rpc'
 import { openCodePane } from '../openCodePane'
@@ -261,6 +262,9 @@ function CodePaneForFile({
     if (!openDock) return undefined
     return () => {
       usePanesStore.getState().setActivePane(workspaceId, pane.paneId)
+      // The Files tab ignores a reveal on another root: a dock pinned elsewhere follows this file first.
+      const override = useWorkDockStore.getState().byDeck[workspaceId]?.rootOverride
+      if (override !== undefined && override !== rootId) useWorkDockStore.getState().setRootOverride(workspaceId, rootId, pane.paneId)
       openDock({ tab: 'files', reveal: { rootId, path } })
     }
   }, [deck, workspaceId, pane.paneId, rootId, path])
