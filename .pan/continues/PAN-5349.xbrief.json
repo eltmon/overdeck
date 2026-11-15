@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5349",
   "created": "2026-11-15T15:32:54.289Z",
-  "updated": "2026-11-15T16:07:37.260Z",
+  "updated": "2026-11-15T16:07:52.888Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,11 @@
     "ui-command-channel.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T16:07:37.260Z"
+    },
+    "ui-open-route": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5349",
+      "claimedAt": "2026-11-15T16:07:52.887Z"
     }
   }
 }
