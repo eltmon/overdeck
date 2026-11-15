@@ -762,3 +762,4 @@ With batching paused (PAN-5269's 24 h mark), PAN-5281, PAN-5287, PAN-5282 and PA
 ## 2026-11-15 workflow redesign: B live-checked (conv-20261113-6031)
 
 B (PAN-5289) live check produced PAN-5329 (B follow-up). PAN-5290 C prereqs now PAN-5289 + PAN-5329. GO given for PAN-5329 and PAN-5293 F in the two slots; PAN-5291 D1 starts when one slot frees. Ping conv-20261113-6031 after F merges and is live (rule 3).
+- 2026-11-15 08:2x UTC: PAN-5329 live check PASSED; GO for PAN-5290 C, queued for the next free book slot (F and D1 hold both).
