@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5329",
   "created": "2026-11-15T06:45:07.358Z",
-  "updated": "2026-11-15T06:55:50.264Z",
+  "updated": "2026-11-15T06:55:58.448Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,11 @@
     "change-tag-truncate.ac2": {
       "status": "completed",
       "doneAt": "2026-11-15T06:55:50.264Z"
+    },
+    "docs-and-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5329",
+      "claimedAt": "2026-11-15T06:55:58.448Z"
     }
   }
 }
