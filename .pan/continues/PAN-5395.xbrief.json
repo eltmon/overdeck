@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5395",
   "created": "2026-11-15T20:20:46.652Z",
-  "updated": "2026-11-15T20:20:46.652Z",
+  "updated": "2026-11-15T20:33:29.597Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,34 @@
   "sessionHistory": [],
   "items": {
     "sync-exclude-helper": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5395",
-      "claimedAt": "2026-11-15T20:20:46.652Z"
+      "claimedAt": "2026-11-15T20:20:46.652Z",
+      "doneAt": "2026-11-15T20:33:29.596Z"
+    },
+    "sync-exclude-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T20:33:29.596Z"
+    },
+    "sync-exclude-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T20:33:29.596Z"
+    },
+    "sync-exclude-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T20:33:29.596Z"
+    },
+    "sync-exclude-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T20:33:29.596Z"
+    },
+    "sync-exclude-helper.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-15T20:33:29.596Z"
+    },
+    "sync-exclude-helper.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-15T20:33:29.596Z"
     }
   }
 }
