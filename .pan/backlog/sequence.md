@@ -1,11 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T19:36:40.268150Z · model: claude-opus-5-5 · open: 898_
+_Last sequenced: 2026-11-15T20:10:44.961533Z · model: claude-opus-5-5 · open: 899_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-5392 | XS | low | ok |  |  | In pipeline: docs PR from the file explorer noting Mission Control recent changes refresh every minute. |
+| 2 | PAN-5395 | S | critical | ok |  |  | In pipeline: single-repo workspaces read untracked Overdeck sync output as dirty, so work agents are refused and never start. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
@@ -401,7 +402,7 @@ _Last sequenced: 2026-11-15T19:36:40.268150Z · model: claude-opus-5-5 · open: 
 | 397 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
 | 400 | PAN-5366 | M | medium | ok |  |  | Conversation page cannot show whether per-turn memory injection reaches it; add a state route and a status-line part. |
 | 401 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
-| 401 | PAN-5358 | M | medium | ok |  |  | Curated memory facts reach agents only via a budget-cut launch index (89 of 171 dropped in dfai); add facts to per-turn relevance injection. |
+| 401 | PAN-5358 | M | medium | ok |  |  | Merged to main and verifying; memory facts now selected by relevance into prompts instead of only a budget-cut launch list. |
 | 402 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
 | 403 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
 | 404 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
@@ -910,6 +911,10 @@ _Last sequenced: 2026-11-15T19:36:40.268150Z · model: claude-opus-5-5 · open: 
 
 New since the prior run and already in review with a live workspace, so it is pinned at the top per the in-pipeline rule; it is a docs-only change with no dependencies.
 
+### PAN-5395 (rank 2)
+
+New since the prior run and already in the pipeline, so it is pinned near the top; it blocks work-agent starts in every single-repo project that does not gitignore all sync paths, which makes it a critical substrate fix.
+
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
@@ -1222,10 +1227,6 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
 
 Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
 
-### PAN-3205 (rank 85)
-
-New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1233,10 +1234,10 @@ New this pass. The deployment gate's queue message is unusually good — it name
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T19:36:40.268150Z",
+  "generatedAt": "2026-11-15T20:10:44.961533Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 898,
+  "openCount": 899,
   "nodes": [
     {
       "issue": "PAN-5392",
@@ -1248,6 +1249,19 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "dependsOn": [],
       "why": "In pipeline: docs PR from the file explorer noting Mission Control recent changes refresh every minute.",
       "rationale": "New since the prior run and already in review with a live workspace, so it is pinned at the top per the in-pipeline rule; it is a docs-only change with no dependencies.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5395",
+      "rank": 2,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: single-repo workspaces read untracked Overdeck sync output as dirty, so work agents are refused and never start.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned near the top; it blocks work-agent starts in every single-repo project that does not gitignore all sync paths, which makes it a critical substrate fix.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6243,8 +6257,8 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "score": 58,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Curated memory facts reach agents only via a budget-cut launch index (89 of 171 dropped in dfai); add facts to per-turn relevance injection.",
-      "rationale": "New memory feature with a concrete, measured gap; placed beside the other mid-tier context-delivery work.",
+      "why": "Merged to main and verifying; memory facts now selected by relevance into prompts instead of only a budget-cut launch list.",
+      "rationale": "Its PR merged and the issue left the pipeline, so it keeps its prior rank and awaits close-out; no rank change.",
       "gate": "auto",
       "planning": "auto"
     },
