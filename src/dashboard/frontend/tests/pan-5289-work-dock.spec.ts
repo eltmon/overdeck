@@ -187,18 +187,42 @@ test('the fixture conversation lists docs/shared.md under Not committed yet', as
   await expect(notCommitted).toContainText('Shared file.');
 });
 
-test('the keys leave typed text alone in a text field', async ({ page }) => {
-  // The fixture conversations have ended, so they show Resume Session instead of a
-  // composer; the Ctrl K palette input is the text field here.
+test('the diff view renders an uncommitted and a committed file from the real server', async ({ page }) => {
   await openDeck(page);
-  await page.locator('body').click({ position: { x: 5, y: 5 } });
-  await page.keyboard.press('Control+K');
-  const input = page.getByPlaceholder(/Search commands/);
-  await expect(input).toBeFocused();
-  await input.fill('draft text');
+  await openConversation(page);
+  await page.keyboard.press('Control+Shift+G');
+  const notCommitted = dock(page).getByRole('group', { name: 'Not committed yet' });
+  await expect(notCommitted).toBeVisible({ timeout: 30_000 });
+
+  // Uncommitted: HEAD and the working copy read through the explorer.
+  await notCommitted.locator('[data-change-path="docs/shared.md"]').getByTitle('docs/shared.md').click();
+  const view = dock(page).getByTestId('dock-diff-view');
+  await expect(view).toBeVisible();
+  await expect(view.locator('[data-diff-file-path="docs/shared.md"]')).toBeVisible({ timeout: 30_000 });
+  await expect(view).not.toContainText("Couldn't load this diff");
+  await expect(view).toContainText('not committed');
+  await page.screenshot({ path: path.join(process.env.PAN_5289_DIFF_SHOT_DIR ?? tmp, 'diff-uncommitted.png') });
+
+  // Committed: compare <sha>^..<sha> on the fixture repo.
+  await view.getByRole('button', { name: 'Back to the list' }).click();
+  const commit = dock(page).getByRole('group').filter({ hasText: 'not pushed' }).first();
+  await commit.locator('[data-change-path="src/app.ts"]').getByTitle('src/app.ts').click();
+  await expect(view.locator('[data-diff-file-path="src/app.ts"]')).toBeVisible({ timeout: 30_000 });
+  await expect(view).not.toContainText("Couldn't load this diff");
+  await expect(view).toContainText('not pushed');
+  await page.screenshot({ path: path.join(process.env.PAN_5289_DIFF_SHOT_DIR ?? tmp, 'diff-committed.png') });
+});
+
+test('the keys leave typed text alone in a composer', async ({ page }) => {
+  // The fixture conversations have ended (they show Resume Session), so this uses
+  // the project Home composer, the same kind of textarea.
+  await openDeck(page);
+  const composer = page.getByPlaceholder(/Ask, run, or search/);
+  await composer.click();
+  await composer.fill('draft text');
   await page.keyboard.press('Control+Shift+G');
   await expect(dockTab(page, 'Changes')).toHaveAttribute('aria-selected', 'true');
-  await expect(input).toHaveValue('draft text');
+  await expect(composer).toHaveValue('draft text');
 });
 
 for (const theme of ['light', 'dark'] as const) {

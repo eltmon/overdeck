@@ -167,13 +167,13 @@ export function DockDiffView({ deckKey, scope, list, index, onIndex, onBack }: D
         </button>
       </div>
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1 text-xs">
-        <span className="shrink-0 rounded border border-border px-1.5 font-mono text-[11px] leading-[18px] text-muted-foreground">{tag}</span>
-        <span className="ml-auto flex items-center gap-1">
+        <span className="min-w-0 truncate rounded border border-border px-1.5 font-mono text-[11px] leading-[18px] text-muted-foreground">{tag}</span>
+        <span className="ml-auto flex shrink-0 items-center gap-1">
           <button
             type="button"
             onClick={openBeside}
             disabled={!canOpen}
-            className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-muted-foreground hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+            className="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded px-1.5 text-muted-foreground hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
           >
             <Columns2 className="h-3.5 w-3.5" aria-hidden />
             Open beside chat
