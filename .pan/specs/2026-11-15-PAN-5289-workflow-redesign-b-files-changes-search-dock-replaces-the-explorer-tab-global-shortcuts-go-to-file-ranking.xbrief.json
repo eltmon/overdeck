@@ -1,0 +1,2351 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T02:33:50Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5289: Workflow redesign B: Files/Changes/Search dock replaces the explorer tab; global shortcuts; Go to file ranking",
+    "updated": "2026-11-15T02:44:40.802Z"
+  },
+  "plan": {
+    "id": "pan-5289",
+    "title": "Workflow redesign B: Files/Changes/Search dock replaces the explorer tab; global shortcuts; Go to file ranking",
+    "status": "proposed",
+    "uid": "064c2fe6-ed3e-4428-95f5-2af9e85792b3",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-15T02:33:50Z",
+    "updated": "2026-11-15T02:44:40.802Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5289",
+        "label": "PAN-5289",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5289/.pan/drafts/pan-5289.md",
+        "label": "PRD draft (.pan/drafts/pan-5289.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5284",
+        "label": "PAN-5284 parent epic",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "explorer",
+      "dock",
+      "shortcuts",
+      "workflow-redesign"
+    ],
+    "narratives": {
+      "Problem": "The file explorer is a Stage tab: opening it hides the conversation, nothing shows what a conversation changed, Go to file ranks by a fuzzy score that often puts the exact file low, the palette cannot find files, and a separate floating conversation dock covers the page. Child B of the PAN-5284 workflow redesign moves all of this into one dock beside the chat.",
+      "Proposal": "Mount a WorkDock inside the Command Deck Stage beside the pane area with Files, Changes, Search and Live tabs whose scope follows the active Stage tab (deriveDockScope). Files hosts the existing explorer (ExplorerFiles) with tree polish, ignored files hidden, a View options menu, a root menu and a changed-here dot; Changes reads child A's /changes API, explorer git status and the project changes API with a diff view built on the extracted PatchFiles renderer; Search wraps ContentSearch; Live is the former floating dock. Four global registry shortcuts, the + menu, project Home and issue overview Files buttons open it; persisted files panes migrate into it. Go to file ranks by match tier on the server and boosts changed-here files on the client; the Ctrl K palette gains a Files scope through a mounted-dock registration. An isolated-dashboard Playwright spec covers the entry points and takes the NFR screenshots. A root override belongs to the tab that was active when it was set (rootOverrideAnchor), so tab changes never need to clear it.",
+      "NonGoals": "- Conversation header Changes/Files buttons, status line and per-turn card (children D1 and D2); B only provides openDock\n- Code pane breadcrumb, File/Changes toggle, Reveal button, gutter marks, editor bar, Create PR dialog and stale-tab handling (child C)\n- Any change to components/Stage/PaneBar.tsx, tab sizing, the 'N tabs' list or shortcut labels on the + menu (child D2)\n- Any new or changed server route, and any change under packages/contracts; the only server file is src/dashboard/server/services/explorer/search.ts\n- Per-line mine/others marking inside a diff (the API returns a count only)\n- A committed-file diff for edit-workspace roots\n- A Live surface on pages that have no Stage; those pages keep the Needs-you strip\n- Global Files shortcuts on pages without a Stage (Ctrl+P keeps the browser default there)\n- Mobile-specific dock layout and Ledger theme parity beyond not breaking\n- Adding the isolated Playwright spec to CI's test:playwright list\n- Raising any scripts/file-size-allowlist.txt row\n- Coloured per-language file badges (style guide forbids hex brand colours)"
+    },
+    "metadata": {
+      "sizeJustification": "Child B of the PAN-5284 epic, already split from the epic by the operator's order book. Parent decision D-13 requires that the PR removing the explorer Stage tab ship the dock and every entry point together, so the dock shell, the files-pane migration and the entry points cannot ship as separate issues without leaving the dashboard without an explorer. The surface is wide because each tab owns its own small module and test file; the 29 items are vertical slices that fan out in parallel after four foundations (dock store, scope, shell, changes hook) and two early pure modules (file match, changes model).",
+      "canonicalFilename": "2026-11-15-PAN-5289-workflow-redesign-b-files-changes-search-dock-replaces-the-explorer-tab-global-shortcuts-go-to-file-ranking.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keep child B as one issue with sizeJustification (B-D1)",
+        "rationale": "The order book already split the epic and D-13 ties removing the files tab to shipping the dock."
+      },
+      {
+        "summary": "Dock opens files with openBeside, not revealPane (B-D3)",
+        "rationale": "revealPane with a non-leaf beside id replaces the active region, which is the chat; openBeside (shipped by S) keeps the chat visible."
+      },
+      {
+        "summary": "Global Files shortcuts exist only while a Stage is mounted; E and G toggle, F focuses, P opens (B-D4)",
+        "rationale": "The dock lives in the Stage (D-2); outside it there is nothing to open, so the browser default is the least surprising behavior."
+      },
+      {
+        "summary": "The palette learns the mounted dock through a small zustand registration (activeDock) (B-D5)",
+        "rationale": "CommandPalette is mounted in App.tsx outside every StageDeckProvider; App.tsx is not B-owned beyond removing the floating dock."
+      },
+      {
+        "summary": "Ranking tiers on the server, changed-here re-rank and highlight on the client, one shared case table (B-D6)",
+        "rationale": "The server cannot know the scope and contracts are not B-owned."
+      },
+      {
+        "summary": "Uncommitted diffs are HEAD vs working tree built with parseDiffFromFile from two explorer reads (B-D7)",
+        "rationale": "diffs/full diffs from the conversation start commit, so it is not a not-committed diff; parseDiffFromFile renders with the same FileDiff component."
+      },
+      {
+        "summary": "useConvoDock 'expanded' becomes the request to show the Live tab (B-D9)",
+        "rationale": "Callers on pages without a Stage keep working unchanged and the item appears the next time a deck mounts."
+      },
+      {
+        "summary": "A code pane takes its changes source from the first conversation leaf in the split (B-D10)",
+        "rationale": "The pane a file was opened beside is not stored anywhere; the layout already says what is beside it."
+      },
+      {
+        "summary": "Neutral file icons with monospace extension labels (B-D13)",
+        "rationale": "The mockup badges use hardcoded brand hex colours, which the style guide forbids."
+      },
+      {
+        "summary": "The isolated Playwright spec is run locally by the work and test roles, not added to CI (B-D14)",
+        "rationale": "It seeds git repositories and boots a built dashboard; CI e2e is already flaky (#5298)."
+      },
+      {
+        "summary": "Changelog file is changelog.d/pan-5289.md (B-D15)",
+        "rationale": "changelog.d/README.md requires the lowercase issue id; the child stub said 5289.md."
+      },
+      {
+        "summary": "Root overrides are anchored to the pane active when they were set instead of being cleared on tab changes (B-D17)",
+        "rationale": "A clearing effect would fire during the files-pane migration (closing the active files pane changes the active pane) and wipe the override it just set; a derived anchor needs no effect."
+      }
+    ],
+    "items": [
+      {
+        "id": "dock-store",
+        "title": "Add the Live tab, search path, open sequence, quick-open flag and toggle to the dock store, plus the mounted-dock registration",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/dock/workDockStore.ts",
+            "src/dashboard/frontend/src/components/dock/activeDock.ts",
+            "src/dashboard/frontend/src/components/dock/__tests__/workDockStore.test.ts",
+            "src/dashboard/frontend/src/components/dock/__tests__/activeDock.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/dock/__tests__/workDockStore.test.ts src/components/dock/__tests__/activeDock.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "workDockStore.test.ts and activeDock.test.ts pass",
+            "npm run typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-10",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1, §6.3, B-D5, B-D9. In components/dock/workDockStore.ts: add 'live' to DockTab and DOCK_TABS; add searchPath?: string to OpenDockInput and DockState; add openSeq: number to DockState (starts 0, incremented by every openDock, never persisted); openDock clears searchPath when the input has none; add transient quickOpen: boolean with setQuickOpen(deckKey, open) (never persisted); add toggleTab(deckKey, tab): when the deck is open and its tab equals tab -> closeDock, else openDock({ tab }). Persistence stays { open, tab, width } only. Create components/dock/activeDock.ts exporting interface ActiveDock { deckKey; rootId: string | null; changedPaths: ReadonlySet<string>; openFile(path); revealFile(path) } and useActiveDock = create<{ current: ActiveDock | null; set(d: ActiveDock | null): void; clear(deckKey: string): void }>, where clear only nulls current when current.deckKey === deckKey. Neither file imports any components/Stage module. B-D17: add transient rootOverrideAnchor?: string to DockState (never persisted) and change setRootOverride to setRootOverride(deckKey, rootId, anchorPaneId?): it stores both; rootId undefined clears both. ActiveDock also carries activePaneId: string | null."
+        },
+        "items": [
+          {
+            "id": "dock-store.ac1",
+            "title": "Given localStorage holds {open:true,tab:'live',width:400} for a deck, when ensureDeck runs, then the deck state hydrates with tab 'live' (workDockStore.test.ts case passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-store.ac2",
+            "title": "Given two openDock calls, when the state is read, then openSeq increased by 2, and searchPath is set by an input that has it and cleared by the next input without it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-store.ac3",
+            "title": "Given the dock is open on 'files', when toggleTab(deck,'files') runs, then open becomes false; when toggleTab(deck,'changes') runs on a closed dock, then it opens on 'changes'; quickOpen and openSeq never appear in the persisted JSON",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-store.ac4",
+            "title": "Given activeDock holds deck A, when clear('B') runs, then current is unchanged, and clear('A') sets it to null (activeDock.test.ts passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-store.ac5",
+            "title": "Given setRootOverride(deck,'workspace:w','pane-1'), when the state is read, then rootOverride and rootOverrideAnchor are 'workspace:w' and 'pane-1'; setRootOverride(deck, undefined) clears both; neither appears in the persisted JSON",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dock-shortcuts",
+        "title": "Turn useExplorerShortcuts into the four global dock shortcuts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/search/useExplorerShortcuts.ts",
+            "src/dashboard/frontend/src/components/explorer/search/__tests__/useExplorerShortcuts.test.ts",
+            "src/dashboard/frontend/src/components/explorer/code/MonacoCodeEditor.tsx",
+            "src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx",
+            "src/dashboard/frontend/src/components/explorer/__tests__/ExplorerPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/search/__tests__/useExplorerShortcuts.test.ts src/components/explorer/__tests__/ExplorerPane.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useExplorerShortcuts.test.ts passes including the predicate cases",
+            "npm run typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2, §6.7, B-D4. Keep the file, the export name useExplorerShortcuts and the exported predicates isQuickOpenKey/isContentSearchKey unchanged. Change the hook signature to useExplorerShortcuts(handlers: { onFiles(): void; onChanges(): void; onSearch(): void; onQuickOpen(): void } | null): void; null registers nothing. Register through registerShortcut, scope 'global', group 'Files', no when: dock.files (Meta+Shift+E / Ctrl+Shift+E, label 'Show or hide Files'), dock.changes (Meta+Shift+G / Ctrl+Shift+G, 'Show or hide Changes'), explorer.content-search (Meta+Shift+F / Ctrl+Shift+F, 'Search file contents'), explorer.quick-open (Meta+P / Ctrl+P, 'Go to file'). Keep handlers in a ref so re-renders do not re-register. Update the comment in explorer/code/MonacoCodeEditor.tsx (search '`addCommand` (global across editors) or a window listener') to say these four app keys are registry global shortcuts that win over Monaco by design (PAN-5284 D-7). Rewrite the registry cases of useExplorerShortcuts.test.ts (stub navigator.platform per case, installShortcutListener in setup, resetShortcutsForTests in afterEach); keep the predicate cases. Because the signature changes, also remove the old call from explorer/ExplorerPane.tsx (search 'useExplorerShortcuts({ rootRef: paneRootRef'; drop paneRootRef if unused) and in explorer/__tests__/ExplorerPane.test.tsx replace the case 'opens quick open on Ctrl+P and content search on Ctrl+Shift+F' with 'registers no explorer-scoped shortcuts' (no explorer.quick-open entry in useShortcutList() while the pane is mounted)."
+        },
+        "items": [
+          {
+            "id": "dock-shortcuts.ac1",
+            "title": "Given the hook is mounted on Linux, when Ctrl+Shift+E, Ctrl+Shift+G, Ctrl+Shift+F and Ctrl+P are dispatched with focus in a textarea, then onFiles, onChanges, onSearch and onQuickOpen each run once and each event is defaultPrevented",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-shortcuts.ac2",
+            "title": "Given focus inside an element with class monaco-editor and, separately, on document.body, when Ctrl+P is dispatched, then onQuickOpen runs in both cases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-shortcuts.ac3",
+            "title": "Given the platform is Linux, when Meta+P is dispatched, then no handler runs; given handlers null, then useShortcutList() contains none of the four ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-shortcuts.ac4",
+            "title": "Given ExplorerPane mounted after this item, when useShortcutList() is read, then it has no explorer.quick-open entry, ExplorerPane.test.tsx passes with the replaced case, and npm run typecheck completes with no errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dock-scope",
+        "title": "Add deriveDockScope and useRootContext",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/dock/dockScope.ts",
+            "src/dashboard/frontend/src/components/dock/__tests__/dockScope.test.ts",
+            "src/dashboard/frontend/src/components/explorer/rootForConversation.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/dock/__tests__/dockScope.test.ts src/components/explorer/__tests__/rootForConversation.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "dockScope.test.ts and rootForConversation.test.ts pass",
+            "npm run typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-13"
+          ],
+          "foundationFor": [
+            "dock-shell",
+            "changes-hook",
+            "files-tab",
+            "changes-conversation",
+            "changes-roots",
+            "files-root-menu"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3, §6.2, B-D10, B-D11. Create components/dock/dockScope.ts with exactly the types of PRD §6.2 (DockRootNullReason, DockChanges, DockHeader, DockScope, DockScopeInput) and the pure deriveDockScope applying rules 1-6 in order (rootOverride, only when rootOverrideAnchor is undefined or equals activePane?.paneId (B-D17); conversation agent pane; pipeline-session agent pane with issueId; issue pane; code pane with the first conversation leaf in layoutLeafIds; everything else -> deck root). deckRootId = 'project:<p.key>' where p = findRegisteredProject(rootContext.projects, deckKey) from components/CommandDeck/UnknownProjectState.tsx (deckKey may be a key or a name, B-D11); project-main uses p.key. DockScope also carries overridden: boolean (true when rule 1 applied). Issue ids upper-cased in root ids. Use rootIdForConversation for rule 2. In explorer/rootForConversation.ts extract useRootContext(): RootContext from useRootLabel (same queries ['registered-projects'] and ['workspace-registry'], refetchInterval 10000 for the registry) and make useRootLabel call it. No React in dockScope.ts."
+        },
+        "items": [
+          {
+            "id": "dock-scope.ac1",
+            "title": "Given an active agent pane whose conversation cwd is the project path, when deriveDockScope runs, then rootId is 'project:<key>', changes.kind is 'conversation' and header.kind is 'conversation' with the conversation title",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-scope.ac2",
+            "title": "Given a linked conversation, an outside-every-project conversation and the no-project deck on Home, when deriveDockScope runs for each, then rootId is null with nullReason 'linked', 'outside' and 'no-project' respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-scope.ac3",
+            "title": "Given a split deck where the active code pane on 'project:p' sits beside an agent leaf with a conversation, when deriveDockScope runs, then revealPath equals the code pane's explorerPath and changes.kind is 'conversation'; without such a leaf on 'issue:X' changes.kind is 'root'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-scope.ac4",
+            "title": "Given rootOverride 'workspace:w1' anchored to the active conversation pane, when deriveDockScope runs, then rootId is 'workspace:w1' and changes is { kind: 'root', rootId: 'workspace:w1' }; anchored to another pane, the conversation's own root applies (dockScope.test.ts covers rules 1-6)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-scope.ac5",
+            "title": "Given deckKey equal to a registered project's name (not its key), when deriveDockScope runs on Home, then rootId and deckRootId are 'project:<that project key>' and overridden is false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dock-shell",
+        "title": "Mount the WorkDock shell beside the Stage pane area with tabs, resize, close, scope line and tab stubs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/dock/WorkDock.tsx",
+            "src/dashboard/frontend/src/components/dock/FilesTab.tsx",
+            "src/dashboard/frontend/src/components/dock/ChangesTab.tsx",
+            "src/dashboard/frontend/src/components/dock/SearchTab.tsx",
+            "src/dashboard/frontend/src/components/dock/LiveTab.tsx",
+            "src/dashboard/frontend/src/components/dock/DockQuickOpen.tsx",
+            "src/dashboard/frontend/src/components/dock/__tests__/WorkDock.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/index.tsx",
+            "src/dashboard/frontend/src/components/Stage/stage.module.css"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/dock/__tests__/WorkDock.test.tsx src/components/Stage/__tests__/openBeside.test.tsx src/components/Stage/Stage.test.tsx",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "WorkDock.test.tsx, openBeside.test.tsx and Stage.test.tsx pass",
+            "npm run typecheck completes with no errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-13",
+            "NFR-4",
+            "NFR-6"
+          ],
+          "foundationFor": [
+            "files-tab",
+            "search-tab",
+            "quick-open-ranking",
+            "live-tab",
+            "changes-conversation",
+            "entry-points",
+            "files-pane-migration"
+          ],
+          "parallelSafeReason": "Its only shared files with other items (Stage/index.tsx, the tab stubs, WorkDock.tsx) are ordered by blocks edges; it runs alone once dock-store, dock-shortcuts and dock-scope land."
+        },
+        "narrative": {
+          "Action": "PRD WI-4, §6.3, B-D2, B-D4, B-D5, B-D9, FR-1, FR-13. Load the pan-style-guide skill first and open docs/design/workflow-redesign-mockup.html (the aside.dock block). Create components/dock/WorkDock.tsx with props { deckKey, activePane, layoutLeafIds, panesById, conversations } per §6.3: ensureDeck, deriveDockScope with useRootContext and the store rootOverride, pass rootOverride and rootOverrideAnchor to deriveDockScope (B-D17: no effect clears the override; every override the dock sets is anchored to activePane?.paneId), closed -> no work-dock element, open -> <aside data-testid='work-dock' aria-label='Work dock'> at the store width with a left resize handle (data-testid work-dock-resize, local width while dragging, setWidth on mouseup), role=tab buttons Files/Changes/Search/Live (Changes shows useChangesCount(scope) when > 0; Live only when useLiveTab(deckKey).visible), a close button aria-label 'Hide panel' title 'Hide panel (Ctrl Shift E)', the scope line (data-testid work-dock-scope) with the §6.2 header texts using useRootLabel, and the body for the current tab; a persisted 'live' tab renders Files while Live is not visible; Files/Search show the FR-13 messages when scope.rootId is null, with an 'Open project files' button that calls setRootOverride(deckKey, scope.deckRootId) (hidden when deckRootId is null). Call useExplorerShortcuts({ onFiles: toggleTab files, onChanges: toggleTab changes, onSearch: openDock search, onQuickOpen: setQuickOpen true }); render <DockQuickOpen deckKey scope open={quickOpen} onClose>; publish useActiveDock (changedPaths: empty set until changed-paths lands; openFile -> deck.openBeside; revealFile -> openDock files reveal) and clear it on unmount. Create stubs FilesTab, ChangesTab (+ useChangesCount returning null), SearchTab, LiveTab (+ useLiveTab returning { visible:false, count:0, needsYou:false }), each taking { deckKey, scope } (LiveTab { deckKey }) and rendering one muted sentence; DockQuickOpen renders today's QuickOpen for scope.rootId ?? scope.deckRootId with onPick -> openBeside; when both are null, Ctrl+P shows the toast 'No project files to search here.' and opens nothing. The Live tab label shows its count and, when useLiveTab(...).needsYou, a 6 px bg-warning dot. Publish activeDock including activePaneId. In Stage/index.tsx wrap PaneBar, paneArea and TerminalDrawer in <div className={styles.stageMain}> and render <WorkDock …/> after it; stage.module.css: .stage flex-direction row, new .stageMain column (flex 1, min-width 0, height 100%). WorkDock must not import Stage/index.tsx; it reads openBeside through useStageDeck(). Tokens only, no hex. When scope.overridden, the scope line ends with a button 'Follow tab' (aria-label 'Follow the active tab') that calls setRootOverride(deckKey, undefined)."
+        },
+        "items": [
+          {
+            "id": "dock-shell.ac1",
+            "title": "Given a closed dock, when the Stage renders, then no [data-testid=work-dock] exists; after openDock({tab:'files'}) it renders at the stored width, and clicking 'Hide panel' removes it (WorkDock.test.tsx)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-shell.ac2",
+            "title": "Given an open dock 340 px wide, when the resize handle is dragged 100 px left and released, then the dock is 440 px and localStorage overdeck.dock.<deck> holds width 440; dragging past the limit clamps the width at 720",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-shell.ac3",
+            "title": "Given an active conversation tab, a project Home tab and an issue tab, when each is active, then the scope line reads 'For <title> …', 'Project <name> · main checkout' and 'Issue <id · title>' respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-shell.ac4",
+            "title": "Given a linked conversation is active, when the Files tab shows, then 'This conversation's files are not on this machine' renders with an 'Open project files' button that sets an override to the deck root anchored to that pane; the scope line then shows 'Follow the active tab', which clears the override; switching tabs shows each tab's own root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-shell.ac5",
+            "title": "Given a split deck with a conversation leaf and a home leaf, when the dock opens, then both leaves still render and activeDock.current.deckKey equals the deck; after unmount activeDock.current is null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "files-tab",
+        "title": "Make the explorer the Files tab body (ExplorerFiles) and open files beside the chat",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx",
+            "src/dashboard/frontend/src/components/dock/FilesTab.tsx",
+            "src/dashboard/frontend/src/components/explorer/__tests__/ExplorerPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/__tests__/ExplorerPane.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ExplorerPane.test.tsx passes with the same or higher case count",
+            "npm run typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ],
+          "parallelSafeReason": "It owns ExplorerPane.tsx first in a blocks chain (files-tab -> edit-workspace-dock -> ignored-hidden -> files-header-view-options -> files-root-menu -> changed-paths); no parallel item touches its files."
+        },
+        "narrative": {
+          "Action": "PRD WI-5, §6.8, B-D3. In explorer/ExplorerPane.tsx delete the ExplorerPane pane wrapper and NO_ROOT_MESSAGE; rename ExplorerPaneBody to exported ExplorerFiles with ExplorerFilesProps { rootId, deckKey, changedPaths, conversationScope, revealPath?, onFindInFolder } (PRD §6.8). Keep the loader, watch, git status, actions, inline edit, drag, delete flow and PREVIEW_OPEN_DELAY_MS logic. openFile calls deck.openBeside({ rootId, path, line, preview }) and falls back to openCodePane(deckKey, target) when useStageDeck() or openBeside is missing. Remove QuickOpen, ContentSearch, contentSearchScope state and the useExplorerShortcuts call; the context menu's Find in folder calls onFindInFolder(dirPath). Replace rootLabel(rootId) with useRootLabel(rootId) in the header and the tree aria-label. Keep today's header buttons for now (the files-header-view-options item replaces them). components/dock/FilesTab.tsx renders <ExplorerFiles key={rootId} rootId deckKey changedPaths={EMPTY_SET} conversationScope={scope.changes.kind==='conversation'} revealPath={scope.revealPath} onFindInFolder={(p)=>openDock({tab:'search', searchPath:p})}/>. Update ExplorerPane.test.tsx to render ExplorerFiles inside a StageDeckProvider mock and keep every case, replacing them as PRD WI-5 lists (reveal-beside -> openBeside; the Ctrl+P/Ctrl+Shift+F case -> Find in folder calls onFindInFolder; no-root case -> a case that ExplorerFiles lists the root)."
+        },
+        "items": [
+          {
+            "id": "files-tab.ac1",
+            "title": "Given ExplorerFiles inside a StageDeckProvider with openBeside, when a file row is double-clicked, then openBeside is called with { rootId, path } and preview not true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "files-tab.ac2",
+            "title": "Given a folder context menu, when Find in folder is chosen, then onFindInFolder is called with that folder's path and no ContentSearch renders inside ExplorerFiles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "files-tab.ac3",
+            "title": "Given a project root registered with name 'Overdeck', when ExplorerFiles renders, then the header shows 'Overdeck', not the key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "files-tab.ac4",
+            "title": "Given the existing ExplorerPane.test.tsx cases, when the suite runs, then every case passes and no case was deleted without the replacement WI-5 names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "files-pane-migration",
+        "title": "Close persisted 'files' panes on deck load and open the dock on their root",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/index.tsx",
+            "src/dashboard/frontend/src/components/Stage/__tests__/explorer-migration.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/__tests__/revealPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/__tests__/explorer-migration.test.tsx src/components/Stage/__tests__/revealPane.test.tsx src/lib/__tests__/panesStore.explorer.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "explorer-migration.test.tsx, revealPane.test.tsx and panesStore.explorer.test.ts pass",
+            "npm run typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6, §6.11, parent D-3. In Stage/index.tsx replace the files branch of the load effect (search '// PAN-5186: the Files pane is the explorer') with the §6.11 after-snippet: close every files pane; root = explorerRootId ?? (issueId ? 'issue:'+issueId : null); the last non-null root wins; after the loop call useWorkDockStore.getState().setRootOverride(deckKey, root, selectActivePaneId(deckKey)(usePanesStore.getState()) ?? undefined) (B-D17: the anchor is the pane active after the closes) and openDock(deckKey, { tab: 'files' }). Remove case 'files' from renderPane and the ExplorerPane import. Leave PaneType 'files' and the panesStore files dedupe unchanged. Rewrite explorer-migration.test.tsx with the four cases of WI-6 and update revealPane.test.tsx so the opener is a code pane while its assertion stays the same."
+        },
+        "items": [
+          {
+            "id": "files-pane-migration.ac1",
+            "title": "Given a persisted active files pane with only issueId 'PAN-1', when the deck loads, then the pane is gone from panesStore and the dock is open on 'files' with rootOverride 'issue:PAN-1' anchored to the pane that became active, and the Files tab shows that root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "files-pane-migration.ac2",
+            "title": "Given a files pane with neither issueId nor explorerRootId, when the deck loads, then it is closed and the dock stays closed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "files-pane-migration.ac3",
+            "title": "Given two files panes with roots A then B, when the deck loads, then rootOverride is B; and grep -n \"case 'files'\" components/Stage/index.tsx prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "edit-workspace-dock",
+        "title": "Make edit-workspace switches, New edit workspace and leave move the dock root",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/edit/edit-workspace-switch.ts",
+            "src/dashboard/frontend/src/components/explorer/edit/EditWorkspaceBanner.tsx",
+            "src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx",
+            "src/dashboard/frontend/src/components/explorer/edit/__tests__/edit-workspace-switch.test.ts",
+            "src/dashboard/frontend/src/components/explorer/edit/__tests__/EditWorkspaceBanner.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/edit/__tests__/edit-workspace-switch.test.ts src/components/explorer/edit/__tests__/EditWorkspaceBanner.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "edit-workspace-switch.test.ts and EditWorkspaceBanner.test.tsx pass",
+            "npm run typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7, B-D16, FR-12. In explorer/edit/edit-workspace-switch.ts: openNewEditWorkspace(projectKey, deckKey) sets useWorkDockStore.getState().setRootOverride(deckKey, rootId) instead of updating a pane; retargetPanes(from, to) also sets rootOverride = to on every deck in useWorkDockStore.getState().byDeck whose rootOverride === from; leaveEditWorkspace clears every rootOverride === editRootId; ensureEditRoot, after setActive, reads useActiveDock.getState().current and, when current.rootId === projectRootId, sets that deck's rootOverride to the new edit root anchored to current.activePaneId; moving an override in retargetPanes keeps its anchor (B-D17). EditWorkspaceBanner drops the paneId prop and calls openNewEditWorkspace(projectKey, deckKey); ExplorerPane.tsx stops passing paneId. The banner keeps rendering for workspace: roots exactly as today."
+        },
+        "items": [
+          {
+            "id": "edit-workspace-dock.ac1",
+            "title": "Given a deck whose rootOverride is 'project:p', when switchRoot('project:p','workspace:w') runs, then that deck's rootOverride becomes 'workspace:w'; when leaveEditWorkspace('workspace:w','p') runs, then the override is cleared",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "edit-workspace-dock.ac2",
+            "title": "Given activeDock current.rootId 'project:p', when ensureEditRoot('project:p') resolves to 'workspace:w', then the mounted deck's rootOverride is 'workspace:w'; given activeDock showing 'issue:X', then no override is set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "edit-workspace-dock.ac3",
+            "title": "Given the banner on a workspace root, when New edit workspace is clicked, then the dock rootOverride for the deck becomes the new root (EditWorkspaceBanner.test.tsx passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "file-icons",
+        "title": "Add per-extension file icons for tree rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/tree/fileIcons.ts",
+            "src/dashboard/frontend/src/components/explorer/tree/__tests__/fileIcons.test.ts",
+            "src/dashboard/frontend/src/components/explorer/tree/ExplorerRow.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/tree/__tests__/fileIcons.test.ts src/components/explorer/tree/__tests__/ExplorerTree.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fileIcons.test.ts and ExplorerTree.test.tsx pass",
+            "npm run typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8, §6.8 'tree/fileIcons.ts', B-D13. Create explorer/tree/fileIcons.ts exporting fileIconFor(name, kind, expanded): { Icon: LucideIcon; label?: string } with exactly the extension map in PRD §6.8 (lowercased extension; folders Folder/FolderOpen; symlinks FileSymlink; unknown File). In ExplorerRow.tsx use it: when label exists render it as font-mono text-[9px] font-medium text-muted-foreground in a 16 px box instead of the glyph; ignored rows keep text-faint-foreground. No hex colours."
+        },
+        "items": [
+          {
+            "id": "file-icons.ac1",
+            "title": "Given each extension in the PRD map, when fileIconFor runs, then it returns the listed Icon and label, case-insensitively ('A.TSX' -> label 'TSX')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-icons.ac2",
+            "title": "Given an unknown extension, a folder open and closed, and a symlink, when fileIconFor runs, then it returns File, FolderOpen/Folder and FileSymlink",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-icons.ac3",
+            "title": "Given a row for 'x.ts', when ExplorerRow renders, then the text 'TS' renders in place of the generic File glyph (fileIcons.test.ts and ExplorerTree.test.tsx pass)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tree-row-layout",
+        "title": "Give tree rows chevrons, a 16 px indent, indent guides and the git letter after the name",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/tree/ExplorerRow.tsx",
+            "src/dashboard/frontend/src/components/explorer/tree/__tests__/ExplorerTree.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/tree/__tests__/ExplorerTree.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ExplorerTree.test.tsx passes",
+            "npm run typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9, §6.8 'Tree rows'. In ExplorerRow.tsx: INDENT_PX = 16; folders render ChevronDown (expanded) or ChevronRight, 14 px, before the icon; files render a 14 px spacer; one absolutely positioned 1 px bg-border guide per depth level at left = 6 + level*16 + 7; the git letter renders immediately after the name span (the name span loses flex-1; a trailing ml-auto spacer keeps the row width). ExplorerTruncatedRow uses the same indent. Extend ExplorerTree.test.tsx."
+        },
+        "items": [
+          {
+            "id": "tree-row-layout.ac1",
+            "title": "Given a depth-2 file row, when it renders, then its padding-left is 38px and it contains two guide elements",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tree-row-layout.ac2",
+            "title": "Given a folder row and a file row, when they render, then the folder shows a chevron (down when expanded) and the file shows a same-width spacer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tree-row-layout.ac3",
+            "title": "Given a modified file, when the row renders, then the 'M' letter element is the next sibling of the name element",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ignored-hidden",
+        "title": "Hide git-ignored entries by default and add revealPath to the explorer store",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/explorerStore.ts",
+            "src/dashboard/frontend/src/components/explorer/tree/explorer-tree-model.ts",
+            "src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx",
+            "src/dashboard/frontend/src/components/explorer/__tests__/explorerStore.test.ts",
+            "src/dashboard/frontend/src/components/explorer/tree/__tests__/explorer-tree-model.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/__tests__/explorerStore.test.ts src/components/explorer/tree/__tests__/explorer-tree-model.test.ts src/components/explorer/__tests__/ExplorerPane.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "explorerStore.test.ts, explorer-tree-model.test.ts and ExplorerPane.test.tsx pass",
+            "npm run typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10, §6.8. explorerStore.ts: RootState.showIgnored (persisted in overdeck.explorer.<rootId> next to expanded and showDotfiles, default false, a non-boolean stored value hydrates false) with setShowIgnored(rootId, show); revealPath(rootId, path): add every ancestor folder to expanded (persisted), selection [path], anchor path, focused path. explorer-tree-model.ts: projectRows input gains showIgnored: boolean; entries with ignored true (files and folders) are skipped when it is false. ExplorerPane.tsx (ExplorerFiles) passes root.showIgnored and calls revealPath when the revealPath prop changes (effect keyed on rootId and revealPath)."
+        },
+        "items": [
+          {
+            "id": "ignored-hidden.ac1",
+            "title": "Given a fresh root, when ensureRoot runs, then showIgnored is false; after setShowIgnored(true) localStorage holds showIgnored true; a stored string value hydrates false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ignored-hidden.ac2",
+            "title": "Given entries with an ignored file and an ignored folder, when projectRows runs with showIgnored false, then neither row is produced, and with true both are",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ignored-hidden.ac3",
+            "title": "Given revealPath('r','a/b/c.ts'), when the store is read, then expanded contains 'a' and 'a/b', selection is ['a/b/c.ts'] and focused is 'a/b/c.ts'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "files-header-view-options",
+        "title": "Replace the explorer header with the dock Files header and View options menu",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx",
+            "src/dashboard/frontend/src/components/explorer/__tests__/ExplorerPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/__tests__/ExplorerPane.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ExplorerPane.test.tsx passes with the View options cases",
+            "npm run typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11, B-D12, §6.9 (View options part), FR-5. Load pan-style-guide. In ExplorerFiles replace the header (search 'data-testid=\"explorer-pane\"' and the header row under it) with: root label (useRootLabel) and branch, a New file button (+, label 'New file', only when writable), Collapse all, and a View options button (aria-label 'View options') opening a role=menu with: Show all files, Only changed files, Only what this conversation changed (only when conversationScope) as one checked group; separator; Show git-ignored files (checked = showIgnored); Show dotfiles (checked = showDotfiles); separator; New folder (only when writable); Expand all folders; Refresh. Filter is local state 'all'|'changed'|'mine': 'changed' sets the store changedOnly; 'mine' renders projectChangedRows of changedPaths. When the filter is not 'all' render a line 'Showing changed files' / 'Showing files this conversation changed' with a Show all button. Remove the Eye/EyeOff and Changed buttons."
+        },
+        "items": [
+          {
+            "id": "files-header-view-options.ac1",
+            "title": "Given conversationScope true, when View options opens, then it lists Show all files, Only changed files, Only what this conversation changed, Show git-ignored files and Show dotfiles; with conversationScope false the third item is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "files-header-view-options.ac2",
+            "title": "Given 'Only changed files' is chosen, when the tree renders, then it shows the git-status tree and the line 'Showing changed files' with a Show all button that restores the full tree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "files-header-view-options.ac3",
+            "title": "Given 'Show git-ignored files' is chosen, when the store is read, then showIgnored is true; and New folder, Expand all folders and Refresh are menu items that call their actions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "files-root-menu",
+        "title": "Add the Files header root menu that sets or clears the dock root override",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx",
+            "src/dashboard/frontend/src/components/explorer/__tests__/ExplorerPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/__tests__/ExplorerPane.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ExplorerPane.test.tsx passes with the root-menu cases",
+            "npm run typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ],
+          "acJustification": "Two observable behaviors (menu contents and the override write) cover this small item fully."
+        },
+        "narrative": {
+          "Action": "PRD WI-12, §6.9 first paragraph, FR-2. In ExplorerFiles make the root label a button (aria-haspopup menu) that opens a role=menu: 'Follow the active tab' (checked when the deck has no rootOverride; clears it), 'Main checkout' (sets rootOverride 'project:<deckKey>'; hidden when findRegisteredProject finds no deck project), then one item per workspace-registry row with kind 'scratch' and projectId === the deck project's key (findRegisteredProject(useRootContext().projects, deckKey), B-D11) labelled with its name (sets rootOverride 'workspace:<id>'); every set passes useActiveDock current.activePaneId as the anchor (B-D17). Read useRootContext() and useWorkDockStore."
+        },
+        "items": [
+          {
+            "id": "files-root-menu.ac1",
+            "title": "Given a deck with two scratch workspaces in the registry, when the root menu opens, then it lists Follow the active tab, Main checkout and both workspace names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "files-root-menu.ac2",
+            "title": "Given the menu, when a workspace item is picked, then useWorkDockStore byDeck[deck].rootOverride equals 'workspace:<id>'; when Follow the active tab is picked, then rootOverride is undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "changes-hook",
+        "title": "Add the conversation changes hook, useScopeChangedPaths and the repo-to-root path model",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "changed-paths",
+            "search-tab",
+            "quick-open-ranking",
+            "changes-conversation"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/dock/useConversationChanges.ts",
+            "src/dashboard/frontend/src/components/dock/changes-model.ts",
+            "src/dashboard/frontend/src/components/dock/__tests__/changes-model.test.ts",
+            "src/dashboard/frontend/src/components/dock/__tests__/useConversationChanges.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/dock/__tests__/changes-model.test.ts src/components/dock/__tests__/useConversationChanges.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "changes-model.test.ts and useConversationChanges.test.tsx pass",
+            "npm run typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13a, §6.5, NFR-2. Create components/dock/useConversationChanges.ts with useConversationChanges(conversation, scope, { rootId, enabled, turnId? }): react-query key ['conversation-changes', name, scope, turnId ?? null]; fetch '/api/conversations/' + encodeURIComponent(name) + '/changes?scope=' + scope (+ '&turnId=' + encodeURIComponent(turnId)); non-2xx throws body.error ?? 'Failed to load changes'; refetchInterval 5000 only while conversation.isWorking, else false; staleTime 4000; invalidate the key on useExplorerWatch(rootId, { onDirsChanged, onResync }) when rootId is non-null. Add useScopeChangedPaths(scope, { open }): for changes.kind 'conversation' the scope=conversation query with enabled = open, mapped by changedPathsOf with rootAbs from useExplorerStore(s => s.roots[rootId]?.dirs['']?.absPath ?? null), listing the root once with listDir + setDir when absPath is missing; otherwise an empty set. Create components/dock/changes-model.ts with toRootPath(repoRoot, rootAbs, repoPath), changedPathsOf(changes, rootAbs) and ancestorFolders(paths) exactly as PRD §6.5. Use vi.useFakeTimers() in the hook test."
+        },
+        "items": [
+          {
+            "id": "changes-hook.ac1",
+            "title": "Given repoRoot '/r' and rootAbs '/r/app', when toRootPath('/r','/r/app','app/x.ts') and toRootPath('/r','/r/app','lib/y.ts') run, then they return 'x.ts' and null; with rootAbs '/r' or null the path is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changes-hook.ac2",
+            "title": "Given a conversation with isWorking true, when 10 s of fake time pass, then the changes URL was fetched 3 times; with isWorking false it was fetched once; the URL encodes name, scope and turnId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changes-hook.ac3",
+            "title": "Given an explorer watch batch for the root, when it arrives, then the conversation-changes query is refetched; given open false, then useScopeChangedPaths fetches nothing and returns an empty set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changes-hook.ac4",
+            "title": "Given a ConversationChanges with one uncommitted file and a commit touching two files, when changedPathsOf runs, then it returns the three root paths; ancestorFolders(['a/b/c.ts']) returns {'a','a/b'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "changed-paths",
+        "title": "Show the changed-here dot in the Files tree and publish the changed paths",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/dock/FilesTab.tsx",
+            "src/dashboard/frontend/src/components/dock/WorkDock.tsx",
+            "src/dashboard/frontend/src/components/explorer/tree/ExplorerRow.tsx",
+            "src/dashboard/frontend/src/components/explorer/tree/ExplorerTree.tsx",
+            "src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx",
+            "src/dashboard/frontend/src/components/explorer/tree/__tests__/ExplorerTree.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/tree/__tests__/ExplorerTree.test.tsx src/components/dock/__tests__/WorkDock.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ExplorerTree.test.tsx and WorkDock.test.tsx pass",
+            "npm run typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13, §6.5, §6.8. FilesTab passes useScopeChangedPaths(scope) (from changes-hook) instead of EMPTY_SET; WorkDock publishes the same set as activeDock.changedPaths; ExplorerFiles passes changedPaths to ExplorerTree; ExplorerTree/ExplorerRow render a 6 px bg-primary dot with ml-auto on changed files (aria-label 'Changed by this conversation') and on folders in ancestorFolders(changedPaths) (aria-label 'Contains files this conversation changed'). Extend ExplorerTree.test.tsx."
+        },
+        "items": [
+          {
+            "id": "changed-paths.ac1",
+            "title": "Given changedPaths {'src/a.ts'}, when the tree renders, then the 'src/a.ts' row shows the 'Changed by this conversation' dot and the 'src' folder row shows the 'Contains files this conversation changed' dot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changed-paths.ac2",
+            "title": "Given an empty changedPaths, when the tree renders, then no row shows a dot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changed-paths.ac3",
+            "title": "Given a conversation scope with changes, when the dock is open, then activeDock.current.changedPaths equals the set FilesTab passes to the tree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "search-tab",
+        "title": "Fill the Search tab with ContentSearch scoped to the dock root",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/dock/SearchTab.tsx",
+            "src/dashboard/frontend/src/components/explorer/search/ContentSearch.tsx",
+            "src/dashboard/frontend/src/components/explorer/search/__tests__/ContentSearch.test.tsx",
+            "src/dashboard/frontend/src/components/dock/__tests__/SearchTab.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/search/__tests__/ContentSearch.test.tsx src/components/dock/__tests__/SearchTab.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ContentSearch.test.tsx and SearchTab.test.tsx pass",
+            "npm run typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14, FR-8. SearchTab renders ContentSearch with rootId = scope.rootId, scopePath = store searchPath, onScopeClear -> openDock({ tab: 'search' }), onPick -> deck.openBeside({ rootId, path, line }), changedPaths = useScopeChangedPaths(scope), focusSignal = store openSeq. ContentSearch: onClose optional (no close button and Escape does nothing when absent); changedPaths?: ReadonlySet<string> renders a 6 px bg-primary dot with aria-label 'Changed by this conversation' on a result file header whose path is in it; focusSignal?: number focuses the query input when it changes."
+        },
+        "items": [
+          {
+            "id": "search-tab.ac1",
+            "title": "Given ContentSearch without onClose, when it renders, then no 'Close search' button exists and Escape leaves it mounted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "search-tab.ac2",
+            "title": "Given changedPaths containing a result's path, when results render, then that file header shows the 'Changed by this conversation' dot and others do not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "search-tab.ac3",
+            "title": "Given the store searchPath 'src', when SearchTab renders, then the scope chip shows 'src'; picking a match calls openBeside with that path and line; a new openSeq focuses the query input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "file-match",
+        "title": "Add the client file-match tiers, ranking and highlight ranges with the shared case table",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/search/fileMatch.ts",
+            "src/dashboard/frontend/src/components/explorer/search/__tests__/file-match-cases.json",
+            "src/dashboard/frontend/src/components/explorer/search/__tests__/fileMatch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/search/__tests__/fileMatch.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fileMatch.test.ts passes",
+            "npm run typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15a, §6.6, B-D6. Create explorer/search/fileMatch.ts (no React, no imports beyond types): fileMatchTier(path, query): 0|1|2|3|4|null per the §6.6 table (q = query.trim().toLowerCase(); tiers 0-2 only when q has no '/'; tier 3 p.includes(q); tier 4 the same greedy left-to-right subsequence scan as the server fuzzyScore with whitespace removed; empty q -> null); rankFileMatches(paths, query, changed) stable-sorts by tier then changed-first and drops nulls; matchRanges(path, query) returns [start, end) ranges over the full path (tiers 0-2: one range at the basename offset + base.indexOf(q); tier 3: one range at p.indexOf(q); tier 4: one range per matched character). Create explorer/search/__tests__/file-match-cases.json with at least 12 { path, query, tier } cases covering every tier, a '/' query, a case-insensitive match and a non-match (tier null). The test imports the JSON with a JSON import."
+        },
+        "items": [
+          {
+            "id": "file-match.ac1",
+            "title": "Given every case in file-match-cases.json, when fileMatchTier runs, then it returns the case's tier",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-match.ac2",
+            "title": "Given paths a/foo.ts and b/foo.ts (both tier 1, b changed) and foo (tier 0), when rankFileMatches runs with query 'foo', then the order is foo, b/foo.ts, a/foo.ts; a changed tier-2 path never sorts above a tier-1 path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-match.ac3",
+            "title": "Given 'src/FooBar.ts' and query 'bar', when matchRanges runs, then it returns one range covering 'Bar' in the basename; a fuzzy match returns one range per matched character",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "quick-open-ranking",
+        "title": "Give Go to file highlighting, the changed-here boost and Reveal, and wire it to the dock",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/search/QuickOpen.tsx",
+            "src/dashboard/frontend/src/components/explorer/search/__tests__/QuickOpen.test.tsx",
+            "src/dashboard/frontend/src/components/dock/DockQuickOpen.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/search/__tests__/QuickOpen.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "QuickOpen.test.tsx passes",
+            "npm run typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15, §6.6, FR-9. QuickOpen: props gain changedPaths?: ReadonlySet<string> and onReveal?(path); request searchFiles(rootId, q, 200); apply rankFileMatches (file-match item); show the first 50; wrap matchRanges in <mark className='bg-warning/30 text-inherit rounded-sm'> in the basename and folder; a 'changed here' tag on changed paths; Shift+Enter calls onReveal when given (Enter still calls onPick); footer 'Enter open beside the chat · Shift Enter reveal in files · Files changed here rank first'. DockQuickOpen passes changedPaths = useScopeChangedPaths(scope, { open: true }), onPick -> deck.openBeside({ rootId, path }), onReveal -> openDock({ tab: 'files', reveal: { rootId, path } }). Fake timers for the 120 ms debounce."
+        },
+        "items": [
+          {
+            "id": "quick-open-ranking.ac1",
+            "title": "Given QuickOpen open with query 'foo' after the 120 ms debounce, when results arrive, then searchFiles was called with limit 200 and at most 50 rows render",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quick-open-ranking.ac2",
+            "title": "Given a result matching by basename prefix, when it renders, then the matched text is wrapped in a mark element; a path in changedPaths shows the 'changed here' tag and sorts first within its tier",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quick-open-ranking.ac3",
+            "title": "Given a selected row, when Shift+Enter is pressed, then onReveal is called with its path and onPick is not; Enter calls onPick",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "search-ranking-server",
+        "title": "Rank searchFiles by match tier on the server",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/explorer/search.ts",
+            "src/dashboard/server/services/explorer/__tests__/search.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/search.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "search.test.ts passes",
+            "npm run typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-16, §6.6, B-D6, NFR-1. In src/dashboard/server/services/explorer/search.ts add exported fileMatchTier(path, query) with the §6.6 table (tier 4 = fuzzyScore !== null, fuzzyScore unchanged) and sort searchFiles results by tier ascending; tiers 0-3 by path length then localeCompare; tier 4 by fuzzy score descending, then path length, then localeCompare. Update the header comment. Extend __tests__/search.test.ts: import ../../../../frontend/src/components/explorer/search/__tests__/file-match-cases.json (created by the file-match item) with a JSON import (never readFileSync) and assert every case; add the foo.ts ordering case and a '/' query case. Async only; no execSync."
+        },
+        "items": [
+          {
+            "id": "search-ranking-server.ac1",
+            "title": "Given every case in the shared JSON, when the server fileMatchTier runs, then it returns the case's tier",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "search-ranking-server.ac2",
+            "title": "Given files 'src/a/b/c/foo.ts' and 'foo.tsx', when searchFiles(root,'foo.ts',50) runs, then 'src/a/b/c/foo.ts' is first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "search-ranking-server.ac3",
+            "title": "Given query 'src/foo' and a non-contiguous query 'sfo', when searchFiles runs, then the first matches 'src/foo.ts' by path and the second still returns fuzzy matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "palette-files",
+        "title": "Add a Files scope to the Ctrl K palette through palette/fileProvider.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/palette/fileProvider.ts",
+            "src/dashboard/frontend/src/components/palette/__tests__/fileProvider.test.tsx",
+            "src/dashboard/frontend/src/components/CommandPalette.tsx",
+            "src/dashboard/frontend/src/components/CommandPalette.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/palette/__tests__/fileProvider.test.tsx src/components/CommandPalette.test.tsx",
+            "npm run typecheck",
+            "npm run lint:circular",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "fileProvider.test.tsx and CommandPalette.test.tsx pass",
+            "npm run typecheck completes with no errors",
+            "lint:circular and lint:file-size pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-3",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-17, §6.13, B-D5, NFR-3, NFR-6. Create components/palette/fileProvider.ts with FilePaletteAction and useFileProviderActions(isOpen, query) per §6.13 (reads useActiveDock; searchFiles(rootId, q, 200) with a sequence number dropping stale answers; rankFileMatches (file-match item); first 20 actions; meta 'changed here' pill; onSelect -> current.openFile(path)). It must not import CommandPalette.tsx. In CommandPalette.tsx: PaletteScope adds 'files'; SCOPE_LABEL.files = 'Files'; groupScope returns 'files' for group 'Files'; spread useFileProviderActions(isOpen, debouncedQuery) into allActions (search '...fleetActions,'); the server-matched bypass includes group 'Files' (search \"action.group === 'Conversations' || action.group === 'Memory'\"); 'Files' first in preferred (search 'const preferred = ['); 'files' after 'actions' in the chip order (search \"const ordered = (['actions'\"). CommandPalette.tsx stays at or under 1124 lines."
+        },
+        "items": [
+          {
+            "id": "palette-files.ac1",
+            "title": "Given no active dock or an empty query, when useFileProviderActions runs, then it returns no actions; given an active dock and query 'foo', then actions come back in rankFileMatches order with changed paths tagged 'changed here'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-files.ac2",
+            "title": "Given a file action, when it is selected, then activeDock.current.openFile is called with its path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-files.ac3",
+            "title": "Given the palette open with file results, when it renders, then a 'Files' chip shows and the file rows render even though their labels do not contain the query (CommandPalette.test.tsx)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-files.ac4",
+            "title": "Given the branch, when npm run lint:circular and npm run lint:file-size run, then neither reports a failure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-tab",
+        "title": "Fold the floating conversation dock into the Live tab and remove its App mount",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/dock/ConversationDock.tsx",
+            "src/dashboard/frontend/src/components/dock/LiveTab.tsx",
+            "src/dashboard/frontend/src/App.tsx",
+            "src/dashboard/frontend/src/__tests__/fr7-conversation-pending-input.test.tsx",
+            "src/dashboard/frontend/src/components/dock/__tests__/LiveTab.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/__tests__/fr7-conversation-pending-input.test.tsx src/components/dock/__tests__/LiveTab.test.tsx src/lib/convoDock.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fr7-conversation-pending-input.test.tsx, LiveTab.test.tsx and convoDock.test.ts pass",
+            "npm run typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-18, §6.12, B-D9, parent D-17. In dock/ConversationDock.tsx extract useLiveDockItems() returning { items, needsYouIds } (today's allDockItems, ordered and needsYouIds logic unchanged) and make ConversationDock() render only the panel list (today's list body and empty-state text; no collapsed handle, no fixed aside, no header). LiveTab.tsx: useLiveTab(deckKey) returns { visible: items.length > 0, count, needsYou: needsYouIds.size > 0 } and in an effect: when useConvoDock expanded is true and items exist -> useWorkDockStore.getState().openDock(deckKey, { tab: 'live' }) then setExpanded(false); expanded true with no items -> setExpanded(false) only. LiveTab renders <ConversationDock />. The WorkDock tab label shows the count and a 6 px bg-warning dot when needsYou (already wired by the shell). App.tsx: delete the ConversationDock import and <ConversationDock /> (search both). Retarget the ConversationDock cases in __tests__/fr7-conversation-pending-input.test.tsx to the panel-only component with the same text assertions."
+        },
+        "items": [
+          {
+            "id": "live-tab.ac1",
+            "title": "Given fr7-conversation-pending-input.test.tsx, when it runs, then its ConversationDock AC-1 and AC-3 cases pass with the same text assertions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-tab.ac2",
+            "title": "Given no Live items, when useLiveTab runs, then visible is false; given two items, then visible is true and count is 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-tab.ac3",
+            "title": "Given useConvoDock expanded true and one item, when LiveTab's hook mounts, then the deck's dock is open on 'live' and expanded is false; given expanded true and no items, then only expanded becomes false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-tab.ac4",
+            "title": "Given the branch, when grep -n '<ConversationDock />' src/dashboard/frontend/src/App.tsx runs, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "changes-conversation",
+        "title": "Fill the Changes tab for conversation scopes: chips, groups, file rows, notes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/dock/ChangesTab.tsx",
+            "src/dashboard/frontend/src/components/dock/changes/ConversationChangesList.tsx",
+            "src/dashboard/frontend/src/components/dock/changes/ChangeFileRow.tsx",
+            "src/dashboard/frontend/src/components/dock/changes/ChangeGroup.tsx",
+            "src/dashboard/frontend/src/components/dock/__tests__/ConversationChangesList.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/dock/__tests__/ConversationChangesList.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConversationChangesList.test.tsx passes",
+            "npm run typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ],
+          "parallelSafeReason": "ChangesTab.tsx is edited in the chain dock-shell -> changes-conversation -> changes-roots -> diff-view; its other files are new and owned by it alone."
+        },
+        "narrative": {
+          "Action": "PRD WI-19, §6.4 conversation rows, FR-6, parent D-5. Load pan-style-guide; follow the mockup renderChanges. ChangesTab dispatches on scope.changes.kind ('conversation' -> ConversationChangesList; other kinds keep the stub sentence until changes-roots) and implements useChangesCount (conversation: totals.files of the scope=conversation query; root: count of distinct gitStatus paths; else null). ConversationChangesList: chips This conversation / Last turn / Not committed / All of main today mapped to scopes conversation / turn / uncommitted / main (initial chip from store changesScope, default conversation); 'Not committed yet' group (amber label per mockup) then one ChangeGroup per commit with shortSha, subject, 'pushed' or 'not pushed', time; in scope main a commit shows 'this chat' or by.title ?? by.id ?? 'unattributed' and its files on expand; ChangeFileRow shows path (dimmed folder), +/−, and buttons 'Open diff' (openDock({ tab:'changes', diff:{ path, sha? } })), 'Open the file beside the chat' (openBeside with toRootPath; disabled when null), 'Reveal in files' (openDock({ tab:'files', reveal })); the shared-file note and footnote texts exactly as PRD §6.4; loading and error states in words."
+        },
+        "items": [
+          {
+            "id": "changes-conversation.ac1",
+            "title": "Given a mocked ConversationChanges with one uncommitted file and two commits, when the list renders, then 'Not committed yet' is the first group followed by two groups showing each shortSha, subject and 'pushed' or 'not pushed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changes-conversation.ac2",
+            "title": "Given the 'Last turn' chip is clicked, when the request is made, then the URL has scope=turn; 'All of main today' requests scope=main and shows 'this chat' on own commits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changes-conversation.ac3",
+            "title": "Given an uncommitted file with attribution 'lines', otherLines 612 and two otherConversations, when it renders, then the note reads 'Shared file. 612 other uncommitted lines come from <A> and <B>. Only this conversation's lines are counted.'; attribution 'file' shows the edit-records sentence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changes-conversation.ac4",
+            "title": "Given a file row, when its three buttons are clicked, then openDock with diff, openBeside and openDock with reveal are called with that file's root path; the footnote names conversation.tmuxSession",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "changes-roots",
+        "title": "Fill the Changes tab for issue, edit-workspace and project scopes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/dock/ChangesTab.tsx",
+            "src/dashboard/frontend/src/components/dock/changes/RootChangesList.tsx",
+            "src/dashboard/frontend/src/components/dock/changes/ProjectMainChangesList.tsx",
+            "src/dashboard/frontend/src/components/dock/__tests__/RootChangesList.test.tsx",
+            "src/dashboard/frontend/src/components/dock/__tests__/ProjectMainChangesList.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/dock/__tests__/RootChangesList.test.tsx src/components/dock/__tests__/ProjectMainChangesList.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "RootChangesList.test.tsx and ProjectMainChangesList.test.tsx pass",
+            "npm run typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-20, §6.4 root and project-main rows, FR-6. RootChangesList (changes.kind 'root'): useExplorerGitStatus(rootId) entries -> 'Not committed yet' group, committed -> one group 'Committed on <branch>'; rows reuse ChangeFileRow (diff sha omitted for uncommitted; committed rows pass a marker so the diff view uses vs-main for issue roots). ProjectMainChangesList (changes.kind 'project-main'): GET /api/projects/<projectKey>/changes?since=<ISO of local midnight> -> one ChangeGroup per commit with shortSha, subject, who (by.title ?? by.id ?? 'unattributed') and time; expanding a commit fetches GET /api/diffs/compare?repo=<project path from useRootContext>&base=<sha>^&head=<sha> and lists its files; a 'Not committed yet' group from gitStatus(rootId).entries is listed first when non-empty. Add both cases to ChangesTab's dispatch; 'none' shows 'No project is selected, so there are no changes to show.'"
+        },
+        "items": [
+          {
+            "id": "changes-roots.ac1",
+            "title": "Given gitStatus with two entries and one committed file on branch feature/x, when RootChangesList renders, then it shows 'Not committed yet' with two rows and 'Committed on feature/x' with one row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changes-roots.ac2",
+            "title": "Given ProjectMainChangesList mounts, when it fetches, then the since parameter equals the ISO string of the local day start and each commit row shows its shortSha, subject and who",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changes-roots.ac3",
+            "title": "Given a commit row is expanded, when the compare response returns two files, then two file rows render; given a non-empty uncommitted list, then 'Not committed yet' is the first group",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "patch-files",
+        "title": "Extract the FileDiff list renderer from DiffPanel into components/diff/PatchFiles.tsx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/diff/PatchFiles.tsx",
+            "src/dashboard/frontend/src/components/DiffPanel.tsx",
+            "src/dashboard/frontend/src/components/diff/__tests__/PatchFiles.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/diff/__tests__/PatchFiles.test.tsx src/components/__tests__/DiffPanel.test.tsx src/components/__tests__/DiffPanel.compare.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "PatchFiles.test.tsx and DiffPanel tests pass",
+            "npm run typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-21, B-D7. Move getRenderablePatch, resolveFileDiffPath, buildFileDiffRenderKey, DIFF_PANEL_UNSAFE_CSS and the Virtualizer + FileDiff rendering loop (with the useDiffPreferences options and the raw-patch fallback with its reason) from components/DiffPanel.tsx into components/diff/PatchFiles.tsx exporting PatchFiles({ patch?: string; files?: FileDiffMetadata[]; cacheScope: string }) (files wins when both are given). DiffPanel renders <PatchFiles patch={selectedPatch} cacheScope={`diff-panel:${resolvedTheme}`} /> where the loop was; keep its loading and no-changes states and the scroll-to-selected-file effect (data-diff-file-path stays on each file block). No behavior change."
+        },
+        "items": [
+          {
+            "id": "patch-files.ac1",
+            "title": "Given a two-file unified patch, when PatchFiles renders, then two elements with data-diff-file-path render with the two paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patch-files.ac2",
+            "title": "Given an unparsable patch string, when PatchFiles renders, then the raw text and its reason sentence render",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patch-files.ac3",
+            "title": "Given the existing DiffPanel tests, when they run, then they pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "diff-view",
+        "title": "Add the dock diff view with previous/next, J/K and the three data sources",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/dock/changes/DockDiffView.tsx",
+            "src/dashboard/frontend/src/components/dock/ChangesTab.tsx",
+            "src/dashboard/frontend/src/components/dock/__tests__/DockDiffView.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/dock/__tests__/DockDiffView.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "DockDiffView.test.tsx passes",
+            "npm run typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ],
+          "parallelSafeReason": "It runs after changes-roots and patch-files; DockDiffView.tsx is new and ChangesTab.tsx is last in its blocks chain."
+        },
+        "narrative": {
+          "Action": "PRD WI-22, FR-7, §6.4 diff columns, B-D7, §6.7 J/K. DockDiffView props: { deckKey, scope, list: Array<{ path; sha?; committedVsMain?: boolean }>, index, onIndex(i), onBack() }. Header: back button (title 'Back to the list'), file icon and path, 'i/N', previous (title 'Previous file (K)') and next (title 'Next file (J)') wrapping; second line: +/−, tag 'not committed' or '<shortSha> · pushed|not pushed', 'Open beside chat' (openBeside) and 'Reveal in files'. Data: sha set -> GET /api/diffs/compare?repo=<repoRoot or root abs>&base=<sha>^&head=<sha>&file=<repo path> rendered with PatchFiles patch; committedVsMain on an issue root -> GET /api/agents/<agentId>/diffs/vs-main?file=<path>, where agentId = pickDefaultDrawerAgent(agents whose issueId matches case-insensitively, from useDashboardStore(s => s.agentsById))?.id (pickDefaultDrawerAgent from components/drawer/DrawerAgentSession.tsx); no agent -> \"Couldn't load this diff: no agent has worked on this issue\"; non-2xx -> \"Couldn't load this diff: <error>\"; uncommitted -> readFile(rootId,path,'HEAD') and readFile(rootId,path), parseDiffFromFile({ name: path, contents: head }, { name: path, contents: work }) -> PatchFiles files; a HEAD read failing NOT_FOUND diffs against ''; kind binary or large-text -> 'This file is too large or binary to diff here.' with Open beside; rootId null -> the B-D7/§6.4 sentence. Register dock.diff-next (J) and dock.diff-prev (K), scope not-editing, group Files, while mounted. ChangesTab renders DockDiffView when the store diff is set, with the current list order; back clears diff (openDock({ tab: 'changes' }))."
+        },
+        "items": [
+          {
+            "id": "diff-view.ac1",
+            "title": "Given a committed row with sha abc, when the diff view loads, then fetch is called with /api/diffs/compare and base=abc%5E and the patch renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diff-view.ac2",
+            "title": "Given an uncommitted text file, when the diff view loads, then readFile is called for HEAD and the working copy and one file diff renders; a binary read shows 'This file is too large or binary to diff here.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diff-view.ac3",
+            "title": "Given a list of three files at index 2, when next is clicked, then index becomes 0; when J is pressed with focus on the body the index advances, and with focus in an input it does not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diff-view.ac4",
+            "title": "Given the issue-root committed row and a 404 from vs-main, when the view loads, then \"Couldn't load this diff:\" text renders with an Open beside chat button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "entry-points",
+        "title": "Open the dock from the Stage + menu, project Home Files and the issue overview Files button",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/types.ts",
+            "src/dashboard/frontend/src/components/Stage/index.tsx",
+            "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
+            "src/dashboard/frontend/src/components/Stage/IssueOverview.tsx",
+            "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/IssueOverview.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/__tests__/stageDockMenu.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/ProjectHome.test.tsx src/components/Stage/IssueOverview.test.tsx src/components/Stage/__tests__/stageDockMenu.test.tsx src/components/Stage/PaneBar.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ProjectHome.test.tsx, IssueOverview.test.tsx, stageDockMenu.test.tsx and PaneBar.test.tsx pass",
+            "npm run typecheck completes with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-23, §6.10, FR-3. Stage/types.ts: StageApi gains openDock?: (input: OpenDockInput) => void (type from ../dock/workDockStore). Stage/index.tsx: include openDock in the api memo; append to newActions after Web: Files (FolderTree icon) -> openDock({ tab: 'files' }); when the deck root exists, 'Changes in <project name>' (GitCompare) -> setRootOverride(deckKey, deckRoot, activeId) then openDock({ tab: 'changes' }) (name from findRegisteredProject(useRootContext().projects, deckKey), else its key; B-D11); 'Go to file…' (Search icon) -> useWorkDockStore setQuickOpen(deckKey, true). ProjectHome.tsx (search \"t === 'files' && projectKey\"): Files -> api.openDock?.({ tab: 'files' }). IssueOverview.tsx (search \"...(t === 'files' ? { explorerRootId\"): t === 'files' -> api.openDock?.({ tab: 'files' }) and return. Do not edit PaneBar.tsx. Update ProjectHome.test.tsx and IssueOverview.test.tsx Files cases to assert openDock; keep 'renders no Files button without a project key'."
+        },
+        "items": [
+          {
+            "id": "entry-points.ac1",
+            "title": "Given project Home with a project key, when Files is clicked, then api.openDock is called with { tab: 'files' } and openPane is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "entry-points.ac2",
+            "title": "Given the issue overview, when Files is clicked, then api.openDock is called with { tab: 'files' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "entry-points.ac3",
+            "title": "Given the deck for registered project 'workflow-fixture' named 'Workflow fixture', when the + menu opens, then it lists Files, 'Changes in Workflow fixture' and 'Go to file…'; choosing each opens the dock on files, opens changes with rootOverride 'project:workflow-fixture', and sets quickOpen true (stageDockMenu.test.tsx)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-screenshots",
+        "title": "Add the isolated-dashboard Playwright spec for the dock entry points, shortcuts and NFR screenshots",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-5289-work-dock.spec.ts",
+            "docs/screenshots/pan-5289/conversation-changes-light.png",
+            "docs/screenshots/pan-5289/conversation-changes-dark.png",
+            "docs/screenshots/pan-5289/home-files-light.png",
+            "docs/screenshots/pan-5289/home-files-dark.png"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-5289-work-dock.spec.ts"
+          ],
+          "expected_outputs": [
+            "build succeeds",
+            "pan-5289-work-dock.spec.ts passes and writes four PNGs under docs/screenshots/pan-5289/"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-4",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "Its files are a new spec and new PNGs; it depends on every UI item and nothing depends on it."
+        },
+        "narrative": {
+          "Action": "PRD WI-24, NFR-5, B-D14, parent AC-B and NFR-6. Create src/dashboard/frontend/tests/pan-5289-work-dock.spec.ts (@playwright/test) modelled on tests/pan-5190-file-actions.spec.ts, which drives pan.explorer* over /ws/rpc on an isolated dashboard (do not copy pan-5283's page.routeWebSocket(/\\/ws\\/rpc/, ws => ws.close()); the dock needs the socket): beforeAll makes a temp dir under os.tmpdir(), runs `node --import tsx scripts/dev/seed-workflow-fixture.ts --root <tmp>/fixture --home <tmp>/home` (cwd = repo root, env OVERDECK_HOME=<tmp>/overdeck) as a child process, then startIsolatedDashboard({ home: '<tmp>/overdeck', env: { HOME: '<tmp>/home' } }); afterAll stops it. Cases at viewport 1920x1000: open /command-deck/workflow-fixture; click + menu Files, 'Changes in Workflow fixture', 'Go to file…' and the Home Files button, asserting [data-testid=work-dock] and the selected tab (or the Go to file dialog); press Control+Shift+E, Control+Shift+G, Control+Shift+F and Control+P with focus on the body and assert each effect; repeat Control+Shift+E and Control+P with focus inside a Monaco editor (open README.md through Go to file, click into .monaco-editor) and assert the file text is unchanged; repeat Control+Shift+G with focus in the conversation composer textarea and assert its value is unchanged (parent AC-B); the Files header reads 'Workflow fixture'; 'build' is absent until View options -> Show git-ignored files; open the 'Fixture conversation' tab and assert the Changes tab lists docs/shared.md under 'Not committed yet'. Write docs/screenshots/pan-5289/{conversation-changes,home-files}-{light,dark}.png (localStorage overdeck.ui.theme). Inspect every PNG yourself against the mockup and embed them in the PR description. Run: `npm run build` at the repo root, then `cd src/dashboard/frontend && npx playwright test tests/pan-5289-work-dock.spec.ts`. Never use :3011 or ~/.overdeck. Implementation checkpoint: if the fixture conversation cannot open on the isolated dashboard, keep the Home cases and home-files screenshots, take the conversation screenshots by hand on a branch-built isolated dashboard with the same steps, and say so in the PR description. Do not add the spec to the test:playwright list in package.json."
+        },
+        "items": [
+          {
+            "id": "uat-screenshots.ac1",
+            "title": "Given a fresh npm run build, when npx playwright test tests/pan-5289-work-dock.spec.ts runs from src/dashboard/frontend, then every case passes on an isolated dashboard on a non-3011 port, including the four keys with focus in Monaco and in the composer leaving their text unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-screenshots.ac2",
+            "title": "Given the spec ran, when docs/screenshots/pan-5289/ is listed, then it contains conversation-changes-light.png, conversation-changes-dark.png, home-files-light.png and home-files-dark.png at 1920x1000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-screenshots.ac3",
+            "title": "Given the PR description, when it is read, then it embeds the four screenshots (or states the checkpoint fallback taken) and src/dashboard/frontend/package.json test:playwright is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "explorer-specs",
+        "title": "Update the PAN-5190 and PAN-5187 browser specs for the dock",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-5190-file-actions.spec.ts",
+            "src/dashboard/frontend/tests/pan-5187-code-pane.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-5190-file-actions.spec.ts tests/pan-5187-code-pane.spec.ts"
+          ],
+          "expected_outputs": [
+            "build succeeds",
+            "both specs pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ],
+          "acJustification": "A spec-maintenance item: passing runs and unchanged scenario coverage are its two observable properties."
+        },
+        "narrative": {
+          "Action": "PRD WI-24b. Both specs seed a paneType 'files' pane in localStorage and click a Stage 'Files' tab. Keep the seeded pane (it now exercises the FR-4 migration into the dock), update each header comment to say the explorer is the dock's Files tab, and replace every page.getByRole('tab').filter({ hasText: 'Files' }).first().click() with a click on the Files tab inside [data-testid='work-dock'] (e.g. page.getByTestId('work-dock').getByRole('tab', { name: 'Files' })). Keep every on-disk and editor assertion. Run both after npm run build; they are not in CI's test:playwright list."
+        },
+        "items": [
+          {
+            "id": "explorer-specs.ac1",
+            "title": "Given a fresh npm run build, when npx playwright test tests/pan-5190-file-actions.spec.ts tests/pan-5187-code-pane.spec.ts runs from src/dashboard/frontend, then both pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "explorer-specs.ac2",
+            "title": "Given the two spec files, when grep -n \"getByRole('tab').filter({ hasText: 'Files' })\" runs over them, then it prints nothing, and every original test case name is still present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-subset",
+        "title": "List every new frontend test file in scripts/frontend-test-subset.txt",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for f in activeDock.test.ts dockScope.test.ts WorkDock.test.tsx changes-model.test.ts useConversationChanges.test.tsx SearchTab.test.tsx LiveTab.test.tsx ConversationChangesList.test.tsx RootChangesList.test.tsx ProjectMainChangesList.test.tsx DockDiffView.test.tsx PatchFiles.test.tsx fileIcons.test.ts fileMatch.test.ts fileProvider.test.tsx stageDockMenu.test.tsx; do grep -c \"/$f$\" scripts/frontend-test-subset.txt; done"
+          ],
+          "expected_outputs": [
+            "each grep prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [],
+          "acJustification": "A trivial list edit: presence of each path is the only observable property (the file is not globally sorted)."
+        },
+        "narrative": {
+          "Action": "PRD WI-25 and repo rule (frontend tests not listed never run in CI). Add, next to their neighbours by folder and skipping any already present: src/components/dock/__tests__/activeDock.test.ts, src/components/dock/__tests__/dockScope.test.ts, src/components/dock/__tests__/WorkDock.test.tsx, src/components/dock/__tests__/changes-model.test.ts, src/components/dock/__tests__/useConversationChanges.test.tsx, src/components/dock/__tests__/SearchTab.test.tsx, src/components/dock/__tests__/LiveTab.test.tsx, src/components/dock/__tests__/ConversationChangesList.test.tsx, src/components/dock/__tests__/RootChangesList.test.tsx, src/components/dock/__tests__/ProjectMainChangesList.test.tsx, src/components/dock/__tests__/DockDiffView.test.tsx, src/components/diff/__tests__/PatchFiles.test.tsx, src/components/explorer/tree/__tests__/fileIcons.test.ts, src/components/explorer/search/__tests__/fileMatch.test.ts, src/components/palette/__tests__/fileProvider.test.tsx, src/components/Stage/__tests__/stageDockMenu.test.tsx."
+        },
+        "items": [
+          {
+            "id": "test-subset.ac1",
+            "title": "Given the branch, when each of the 16 listed new test paths is grepped in scripts/frontend-test-subset.txt, then each appears exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the dock, its shortcuts, ranking and data sources; add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T02:33:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5289",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/file-explorer.mdx",
+            "features/keyboard-shortcuts.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "changelog.d/pan-5289.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c 'focus in the explorer' features/keyboard-shortcuts.mdx || true"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "grep prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-26. features/file-explorer.mdx: rewrite 'Opening the explorer' as 'Opening Files' (the dock with Files, Changes, Search and Live tabs; entry points: the Stage + menu, project Home Files, issue overview Files, the shortcuts); update 'The tree' (file icons, View options items, git-ignored files hidden by default, the dot for files the conversation changed, the root menu); update 'Search' (Ctrl+P Go to file anywhere in the Command Deck, tiered ranking, 'changed here'; the Search tab; Find in folder); add 'Changes' (scopes per tab, groups, the diff view with J/K, the shared-file note) and 'Live' (the former floating conversation dock). features/keyboard-shortcuts.mdx: replace the two '(focus in the explorer)' rows with Show or hide Files ⌘⇧E / Ctrl+Shift+E, Show or hide Changes ⌘⇧G / Ctrl+Shift+G, Search file contents ⌘⇧F / Ctrl+Shift+F, Go to file ⌘P / Ctrl+P, and add Next / previous file in a diff J / K; in 'Where shortcuts work' say the four Files keys work only in the Command Deck and win inside the code editor (macOS ⌘⇧G replaces Monaco's Find Previous). docs/DASHBOARD-ARCHITECTURE.md: '### Dock store' gains the live tab, searchPath, openSeq, quickOpen and toggleTab; add '## Work dock (PAN-5289)' before '## File explorer server (PAN-5183)' covering the Stage mount, deriveDockScope rules, the §6.4 data-source table, activeDock, the shortcut ids and the ranking tiers; in '### Explorer pane, tree and search (PAN-5186)' replace the Stage 'files' pane paragraph with the dock and the files-pane migration. changelog.d/pan-5289.md per changelog.d/README.md: '#### New' with a bold-lead bullet for the dock and '#### Improved' with a bold-lead bullet for Go to file, each ending with the issue link; no em dashes."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given features/keyboard-shortcuts.mdx, when it is read, then it has rows for Ctrl+Shift+E, Ctrl+Shift+G, Ctrl+Shift+F, Ctrl+P and J / K and no row containing 'focus in the explorer'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given features/file-explorer.mdx, when it is read, then it has the headings 'Opening Files', 'Changes' and 'Live' and names the + menu, project Home and issue overview entry points",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, when it is read, then a '## Work dock (PAN-5289)' section precedes '## File explorer server (PAN-5183)' and lists the four match tiers and the data-source table",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "Given changelog.d/pan-5289.md, when npm run lint:docs runs, then it passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "dock-store",
+        "to": "dock-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "dock-shortcuts",
+        "to": "dock-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "dock-scope",
+        "to": "dock-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "dock-shell",
+        "to": "files-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "dock-shell",
+        "to": "files-pane-migration",
+        "type": "blocks"
+      },
+      {
+        "from": "dock-shell",
+        "to": "search-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "dock-shell",
+        "to": "quick-open-ranking",
+        "type": "blocks"
+      },
+      {
+        "from": "dock-shell",
+        "to": "live-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "dock-shell",
+        "to": "changes-conversation",
+        "type": "blocks"
+      },
+      {
+        "from": "files-pane-migration",
+        "to": "entry-points",
+        "type": "blocks"
+      },
+      {
+        "from": "dock-store",
+        "to": "entry-points",
+        "type": "blocks"
+      },
+      {
+        "from": "files-tab",
+        "to": "edit-workspace-dock",
+        "type": "blocks"
+      },
+      {
+        "from": "dock-store",
+        "to": "edit-workspace-dock",
+        "type": "blocks"
+      },
+      {
+        "from": "edit-workspace-dock",
+        "to": "ignored-hidden",
+        "type": "blocks"
+      },
+      {
+        "from": "ignored-hidden",
+        "to": "files-header-view-options",
+        "type": "blocks"
+      },
+      {
+        "from": "files-header-view-options",
+        "to": "files-root-menu",
+        "type": "blocks"
+      },
+      {
+        "from": "file-icons",
+        "to": "tree-row-layout",
+        "type": "blocks"
+      },
+      {
+        "from": "tree-row-layout",
+        "to": "changed-paths",
+        "type": "blocks"
+      },
+      {
+        "from": "files-tab",
+        "to": "changed-paths",
+        "type": "blocks"
+      },
+      {
+        "from": "files-root-menu",
+        "to": "changed-paths",
+        "type": "blocks"
+      },
+      {
+        "from": "dock-store",
+        "to": "palette-files",
+        "type": "blocks"
+      },
+      {
+        "from": "changes-conversation",
+        "to": "changes-roots",
+        "type": "blocks"
+      },
+      {
+        "from": "changes-roots",
+        "to": "diff-view",
+        "type": "blocks"
+      },
+      {
+        "from": "patch-files",
+        "to": "diff-view",
+        "type": "blocks"
+      },
+      {
+        "from": "files-root-menu",
+        "to": "uat-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "search-tab",
+        "to": "uat-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "search-ranking-server",
+        "to": "uat-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "palette-files",
+        "to": "uat-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "live-tab",
+        "to": "uat-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "diff-view",
+        "to": "uat-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "entry-points",
+        "to": "uat-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "dock-store",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "dock-scope",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "dock-shell",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "search-tab",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "live-tab",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "changes-conversation",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "changes-roots",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "diff-view",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "patch-files",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "file-icons",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "palette-files",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "entry-points",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "files-root-menu",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "palette-files",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "live-tab",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "diff-view",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "entry-points",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "search-ranking-server",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "files-pane-migration",
+        "to": "files-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "dock-shortcuts",
+        "to": "files-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "dock-scope",
+        "to": "changes-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "changes-hook",
+        "to": "changed-paths",
+        "type": "blocks"
+      },
+      {
+        "from": "changes-hook",
+        "to": "search-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "changes-hook",
+        "to": "quick-open-ranking",
+        "type": "blocks"
+      },
+      {
+        "from": "changes-hook",
+        "to": "changes-conversation",
+        "type": "blocks"
+      },
+      {
+        "from": "file-match",
+        "to": "quick-open-ranking",
+        "type": "blocks"
+      },
+      {
+        "from": "file-match",
+        "to": "search-ranking-server",
+        "type": "blocks"
+      },
+      {
+        "from": "file-match",
+        "to": "palette-files",
+        "type": "blocks"
+      },
+      {
+        "from": "changes-hook",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "file-match",
+        "to": "test-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "changed-paths",
+        "to": "explorer-specs",
+        "type": "blocks"
+      },
+      {
+        "from": "files-pane-migration",
+        "to": "explorer-specs",
+        "type": "blocks"
+      },
+      {
+        "from": "explorer-specs",
+        "to": "uat-screenshots",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
