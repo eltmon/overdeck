@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5361",
   "created": "2026-11-15T15:33:26.300Z",
-  "updated": "2026-11-15T16:00:49.916Z",
+  "updated": "2026-11-15T16:01:00.389Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,11 @@
     "tree-snapshot.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T16:00:49.915Z"
+    },
+    "spawner-flag": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5361",
+      "claimedAt": "2026-11-15T16:01:00.389Z"
     }
   }
 }
