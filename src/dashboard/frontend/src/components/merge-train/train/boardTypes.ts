@@ -107,6 +107,8 @@ export interface UatGenerationPayload {
   } | null;
   /** Why the batch became superseded or invalidated (WI-3); null otherwise. */
   statusReason?: string | null;
+  /** PAN-5364: the batch whose merge voided this one (invalidated only); null otherwise. */
+  voidedBy?: string | null;
   /** Per-repo base (polyrepo has several). */
   repos?: Array<{
     repoKey: string;

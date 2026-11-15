@@ -394,10 +394,12 @@ src/components/merge-train/train/__tests__/CarStatusPill.test.tsx
 src/components/merge-train/train/__tests__/MergeStepTracker.test.tsx
 src/components/merge-train/train/__tests__/MergeTrain.test.tsx
 src/components/merge-train/train/__tests__/OlderBatchRow.test.tsx
+src/components/merge-train/train/__tests__/OlderBatchRun.test.tsx
 src/components/merge-train/train/__tests__/ProjectTrainCard.test.tsx
 src/components/merge-train/train/__tests__/RecentMergesStrip.test.tsx
 src/components/merge-train/train/__tests__/StrikeLane.test.tsx
 src/components/merge-train/train/__tests__/TrainCarRow.test.tsx
+src/components/merge-train/train/__tests__/batchSections.test.ts
 src/components/AutoMergeToggle.test.tsx
 src/components/CommandDeck/__tests__/ProjectOverview-merge-train.test.tsx
 src/components/CommandDeck/__tests__/ProjectSettingsDisclosure.test.tsx

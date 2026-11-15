@@ -170,6 +170,8 @@ export interface UatGeneration {
    * and for rows from before the column existed.
    */
   statusReason?: string | null;
+  /** PAN-5364: name of the batch whose promote voided this one; null otherwise and for rows written earlier. */
+  voidedBy?: string | null;
   createdAt: string;
   /** Last lifecycle change; cleanup does not move it, so a failed row keeps its failure time. */
   updatedAt: string;

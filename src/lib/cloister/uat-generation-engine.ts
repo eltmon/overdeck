@@ -126,7 +126,7 @@ export interface GenerationStorePort {
     name: string,
     // 'repos' is written only by the polyrepo engine; the monorepo path never
     // sets it, so its generations keep reading back as a synthesized N=1 entry.
-    patch: Partial<Pick<UatGeneration, 'status' | 'baseSha' | 'members' | 'heldOut' | 'resolutions' | 'cleanedAt' | 'repos' | 'statusReason'>>,
+    patch: Partial<Pick<UatGeneration, 'status' | 'baseSha' | 'members' | 'heldOut' | 'resolutions' | 'cleanedAt' | 'repos' | 'statusReason' | 'voidedBy'>>,
   ): void;
   /** Existing generation names. */
   listNames(): string[];

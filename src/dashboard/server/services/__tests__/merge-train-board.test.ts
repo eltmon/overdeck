@@ -42,7 +42,7 @@ function batch(name: string, status: UatGenerationPayload['status'], members: st
   return {
     name, status, baseSha: 'b', createdAt: '', updatedAt: '', heldOut: [], resolutions: [],
     members: members.map((issueId, i) => ({ issueId, title: issueId, branch: `feature/${issueId.toLowerCase()}`, mergeOrder: i + 1, acceptanceCriteria: [] })),
-    versionSyncConfigured: false, shipStatus: null, statusReason: null, repos: [],
+    versionSyncConfigured: false, shipStatus: null, statusReason: null, voidedBy: null, repos: [],
     stack: { status: 'absent', frontendUrl: '' },
   };
 }

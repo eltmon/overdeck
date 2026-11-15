@@ -81,6 +81,7 @@ import { isFlywheelRequireUatBeforeMerge } from '../../../lib/overdeck/control-s
 import { memberSpecRoots } from './uat-member-spec-roots.js';
 import { getWorkspaceInfoForIssue } from '../routes/workspaces.js';
 import { promoteStackHealthRefusal, type StackHealthOverride } from './promote-stack-gate.js';
+import { BOARD_SCAN_LIMIT, selectBoardChain } from './uat-board-chain.js';
 
 const RECONCILE_INTERVAL_MS = 60_000;
 const CHAIN_PAYLOAD_LIMIT = 10;
@@ -588,6 +589,8 @@ export interface UatGenerationPayload {
   shipStatus: null;
   /** PAN-4753 WI-3: why the batch became superseded or invalidated; null otherwise. */
   statusReason: string | null;
+  /** PAN-5364: the batch whose merge voided this one (invalidated only); null otherwise. */
+  voidedBy: string | null;
   /**
    * Per-repo generation detail, additive (PAN-3093). Always present and
    * non-empty: a monorepo generation projects the single synthesized entry, so
@@ -719,14 +722,20 @@ async function loadAcceptanceCriteriaCache(
 }
 
 /** The generation chain, newest first, enriched for the UAT batches card. */
-export async function getUatGenerationsPayload(projectRootOverride?: string): Promise<UatGenerationPayload[]> {
+export async function getUatGenerationsPayload(
+  projectRootOverride?: string,
+  options: { board?: { now: number } } = {},
+): Promise<UatGenerationPayload[]> {
   // PAN-1696: no flywheel-run requirement — list generations directly from store.
   // projectRootOverride lets the aggregate /api/merge-train/generations route read
   // each tracked project's chain instead of only the dashboard's own repo.
   const root = projectRootOverride ? resolve(projectRootOverride) : projectRoot();
   const project = findProjectByPath(root);
   const versionSyncConfigured = Boolean(project?.version_sync);
-  const chain = listUatGenerations({ projectRoot: root, limit: CHAIN_PAYLOAD_LIMIT });
+  // PAN-5364: the board scans further back and ages out old voided/merged batches.
+  const chain = options.board
+    ? selectBoardChain(listUatGenerations({ projectRoot: root, limit: BOARD_SCAN_LIMIT }), options.board.now)
+    : listUatGenerations({ projectRoot: root, limit: CHAIN_PAYLOAD_LIMIT });
   if (chain.length === 0) return [];
   const memberIssueIds = new Set(chain.flatMap((gen) => gen.members.map((member) => member.issueId.toUpperCase())));
   // Resolve each member's xBRIEF in ITS OWN project, not the dashboard's repo,
@@ -770,6 +779,7 @@ export async function getUatGenerationsPayload(projectRootOverride?: string): Pr
       shipStatus: null,
       // A reason only explains a voided or replaced batch; a later promote keeps the column.
       statusReason: gen.status === 'superseded' || gen.status === 'invalidated' ? gen.statusReason ?? null : null,
+      voidedBy: gen.status === 'invalidated' ? gen.voidedBy ?? null : null,
       repos: (gen.repos ?? []).map((r) => ({
         repoKey: r.repoKey,
         branch: r.branch,
