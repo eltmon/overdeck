@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T14:20:45.072976Z · model: claude-opus-5-5 · open: 896_
+_Last sequenced: 2026-11-15T14:21:47.550877Z · model: claude-opus-5-5 · open: 896_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1231,7 +1231,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T14:20:45.072976Z",
+  "generatedAt": "2026-11-15T14:21:47.550877Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 896,
