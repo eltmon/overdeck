@@ -53,7 +53,11 @@ export function summarizeSpawns(records, { from, to, pathEntries, inclusiveTo = 
     }
     groups.set(rec.program, g);
   }
-  const top = [...groups.values()].sort((x, y) => y.count - x.count).slice(0, 10);
+  // Every group, unsliced: mergeTop needs every program's full per-window
+  // total before ranking, or a program split evenly across windows can drop
+  // out of each window's own top slice and vanish from the merged top-10
+  // even though its summed count would have led it.
+  const top = [...groups.values()].sort((x, y) => y.count - x.count);
   const cost = count + (pathEntries - 1) * spawnErrors;
   return { count, failed, spawnErrors, cost, pids, top };
 }

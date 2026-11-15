@@ -106,6 +106,25 @@ describe('decideIdle (macOS traced-cost, unchanged)', () => {
   });
 });
 
+describe('mergeTop (via decideIdle)', () => {
+  it('reports the program with the highest total across windows, even when no single window ranks it in its own top 10', () => {
+    const windowBounds = [[0, 30000], [30000, 60000]];
+    const records: Rec[] = [];
+    windowBounds.forEach(([from], w) => {
+      for (let i = 0; i < 9; i += 1) records.push(rec(from + i, 'worker'));
+      for (let p = 0; p < 10; p += 1) {
+        for (let i = 0; i < 10; i += 1) records.push(rec(from + 100 + i, `w${w}-prog${p}`));
+      }
+    });
+    const r = decideIdle(linuxArgs({
+      baselineWindows: [6, 6],
+      idleWindows: windowBounds.map(([from, to]) => window(19, from, to)),
+      records,
+    }));
+    expect(r.spawns?.top[0]).toMatchObject({ program: 'worker', count: 18 });
+  });
+});
+
 describe('summarizeSpawns', () => {
   it('weighs shell calls 2 in pids but leaves cost unchanged', () => {
     const records: Rec[] = [rec(10, 'npm', { shell: true }), rec(11, 'npx', { shell: true }), rec(12, 'node')];
