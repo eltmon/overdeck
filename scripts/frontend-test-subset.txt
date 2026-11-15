@@ -203,6 +203,7 @@ src/components/chat/__tests__/ComposerFooter.path-drop.test.tsx
 src/components/chat/__tests__/ComposerFooter.schedule.test.tsx
 src/components/chat/__tests__/ComposerFooter.send-queue.test.tsx
 src/components/chat/__tests__/ComposerFooter.streaming-render-count.test.tsx
+src/components/chat/__tests__/ComposerPromptEditor.test.tsx
 src/components/chat/__tests__/ConversationAboutDrawer.test.tsx
 src/components/chat/__tests__/ConversationMachineBanner.test.tsx
 src/components/chat/__tests__/ConversationPanel.native.test.tsx
@@ -242,6 +243,7 @@ src/components/chat/continueOnDevice/__tests__/continueOnDeviceStore.test.ts
 src/components/chat/header/__tests__/ConversationStatusLine.test.tsx
 src/components/chat/header/__tests__/OpenFolderMenuItems.test.tsx
 src/components/chat/header/__tests__/headerChanges.test.tsx
+src/components/chat/messagesTimeline/__tests__/CommandResultRow.test.tsx
 src/components/chat/messagesTimeline/__tests__/UserMessageAttachments.test.tsx
 src/components/chat/messagesTimeline/__tests__/attachmentRefs.test.ts
 src/components/chat/messagesTimeline/__tests__/workLogRows.test.tsx
