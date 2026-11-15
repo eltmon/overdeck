@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5289",
   "created": "2026-11-15T02:58:13.006Z",
-  "updated": "2026-11-15T03:24:37.353Z",
+  "updated": "2026-11-15T03:36:10.868Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -113,6 +113,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-5289",
       "claimedAt": "2026-11-15T03:24:37.353Z"
+    },
+    "file-icons": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5289",
+      "claimedAt": "2026-11-15T03:36:10.868Z"
     }
   }
 }
