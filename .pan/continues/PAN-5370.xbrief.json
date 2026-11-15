@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5370",
   "created": "2026-11-15T20:57:54.789Z",
-  "updated": "2026-11-15T23:56:28.311Z",
+  "updated": "2026-11-15T23:56:31.850Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,11 @@
     "spend-error-fact.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T23:56:28.311Z"
+    },
+    "home-actions-one-line": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5370",
+      "claimedAt": "2026-11-15T23:56:31.850Z"
     }
   }
 }
