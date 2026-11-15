@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5360",
   "created": "2026-11-15T15:42:12.629Z",
-  "updated": "2026-11-15T17:04:55.839Z",
+  "updated": "2026-11-15T17:11:30.790Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -204,9 +204,22 @@
       "doneAt": "2026-11-15T17:04:41.765Z"
     },
     "w10-lint-orchestrator": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5360",
-      "claimedAt": "2026-11-15T17:04:55.838Z"
+      "claimedAt": "2026-11-15T17:04:55.838Z",
+      "doneAt": "2026-11-15T17:11:30.790Z"
+    },
+    "w10-lint-orchestrator.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:11:30.790Z"
+    },
+    "w10-lint-orchestrator.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:11:30.790Z"
+    },
+    "w10-lint-orchestrator.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:11:30.790Z"
     }
   }
 }
