@@ -54,6 +54,14 @@ describe('useProjectChanges (PAN-5294 G-D13)', () => {
     expect(requestedUrls()).toEqual(['/api/projects/my%20proj/changes?since=7d'])
   })
 
+  it('turns a response without a commit list into an error, not data', async () => {
+    fetchControl = installStrictFetchMock(({ url }) => (url === '/api/projects/bare/changes?since=7d' ? Response.json({}) : undefined))
+    const { result } = renderHook(() => useProjectChanges('bare'), { wrapper })
+
+    await waitFor(() => expect(result.current.isError).toBe(true))
+    expect(result.current.data).toBeUndefined()
+  })
+
   it('sends no request without a project key', () => {
     const { result } = renderHook(() => useProjectChanges(undefined), { wrapper })
 

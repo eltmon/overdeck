@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render as rtlRender, screen, within } from '@testin
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ProjectCiSnapshot } from '@overdeck/contracts'
 import { useDashboardStore } from '../../../lib/store'
-import { HomeMetaLine } from './HomeMetaLine'
+import { HomeMetaLine, releaseWord } from './HomeMetaLine'
 
 vi.mock('../../CommandDeck/ProjectDeployChip', () => ({
   ProjectDeployChip: () => <span data-testid="deploy-chip" />,
@@ -135,6 +135,11 @@ describe('HomeMetaLine (PAN-5294 G-D3)', () => {
     render(<HomeMetaLine projectKey={PROJECT_KEY} branch="main" />)
 
     expect(await screen.findByRole('button', { name: 'v1.2.0 release failed' })).toHaveClass('text-destructive')
+  })
+
+  it('reads a release status without a run list as no runs instead of crashing', () => {
+    expect(releaseWord({ available: true } as Parameters<typeof releaseWord>[0])).toEqual({ text: 'no release runs yet' })
+    expect(releaseWord({} as Parameters<typeof releaseWord>[0])).toEqual({ text: 'no releases' })
   })
 
   it('says no releases for a project with no publish pipeline', async () => {

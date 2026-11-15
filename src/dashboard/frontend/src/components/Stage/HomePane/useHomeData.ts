@@ -23,7 +23,11 @@ export function useProjectChanges(projectKey?: string) {
     queryFn: async (): Promise<ProjectChanges> => {
       const res = await fetch(`/api/projects/${encodeURIComponent(projectKey!)}/changes?since=7d`)
       if (!res.ok) throw new Error(`Failed to load recent changes (HTTP ${res.status})`)
-      return res.json()
+      const body = await res.json() as Partial<ProjectChanges> | null
+      // A body without a commit list is an error state, never a render crash:
+      // the Landed fact and Recent changes read `commits` directly.
+      if (!body || !Array.isArray(body.commits)) throw new Error('Recent changes response has no commit list')
+      return body as ProjectChanges
     },
     enabled: !!projectKey,
     refetchInterval: 60_000,

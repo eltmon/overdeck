@@ -32,7 +32,8 @@ interface ReleaseWord {
 export function releaseWord(status: ReleaseStatus | undefined): ReleaseWord | null {
   if (!status) return null
   if (!status.available) return { text: 'no releases' }
-  const latest = status.runs[0]
+  // Read `runs` defensively: a malformed response must not crash Home.
+  const latest = Array.isArray(status.runs) ? status.runs[0] : undefined
   if (!latest) return { text: 'no release runs yet' }
   if (latest.status !== 'completed') return { text: `releasing ${latest.tag}…`, className: 'text-state-live' }
   if (latest.conclusion === 'success') return { text: `${latest.tag} released ${formatRelativeTime(latest.updatedAt)}` }
