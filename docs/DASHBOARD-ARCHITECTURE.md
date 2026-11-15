@@ -1923,6 +1923,41 @@ transcripts under `<home>/.claude/projects/`. It refuses to run when
 `OVERDECK_HOME` is unset or is the operator's `~/.overdeck`, so point it at an
 isolated test home.
 
+## Conversation header (PAN-5291)
+
+The conversation header lives in `src/dashboard/frontend/src/components/chat/header/`;
+`ConversationPanel` renders it as `<ConversationHeader>` when it is not embedded.
+
+| File | Owns |
+|---|---|
+| `ConversationHeader.tsx` | both header rows, the title/rename state and mutations, the Pi abort mutation, the ⋯ open state, the `useEditorOpenFavoriteShortcut` call, the Stage gate |
+| `ConversationHeaderMenu.tsx` | the ⋯ `MenuSurface` body: view toggles, open folder, copy ids, copy link, open in new window, favorite/retitle/PR, hand-off and export, Advanced → delivery method, archive, stop |
+| `ConversationStatusLine.tsx` | row 2 in words, plus `abbreviateHome` and the commit/file label helpers |
+| `headerChanges.tsx` | `useHeaderChanges`, `StageHeaderChanges` and `HeaderDockButtons` (Changes + Files) |
+| `OpenFolderMenuItems.tsx` | one "Open folder in …" item per editor, sharing `PanOpenInPicker`'s launch helpers |
+
+**Stage gate.** Change data appears only inside a Stage. `ConversationHeader`
+reads `useStageDeck()`; only when it offers `openDock` does it mount
+`StageHeaderChanges`, which renders the Changes and Files buttons and gives the
+status line its totals and `openDock`. The other mount sites (popout, phone app,
+issue drawer, Flywheel pane, Agents directory) make no `/changes`,
+`/api/registered-projects` or `/api/workspace-registry` request from the header.
+
+**One shared query.** `useHeaderChanges` calls the dock's own
+`useConversationChanges(conversation, 'conversation', { rootId, enabled })`, so
+the header, the Files tab dots and the Changes tab share the cache entry
+`['conversation-changes', name, 'conversation', null]` and one request. It is
+disabled for synthetic rows (`id < 0`) and for linked and vault conversations.
+It refetches every 5 s only while the conversation works.
+
+**Chip resync.** `ConversationChangesList` subscribes to the deck's `openSeq`;
+when it changes and the store has a `changesScope`, the chip moves to that scope.
+So the header's Changes button resets the chip to This conversation and
+"N files not committed" selects Not committed even while the list is on screen.
+
+**Subagents.** `SubagentRail` takes `toggleSignal`; the panel bumps it from
+⋯ → Subagents, and each change after mount flips the rail as its own buttons do.
+
 ## Top bar (PAN-5292)
 
 The top bar is the 48 px row that `App/AppChrome.tsx` renders above the routed

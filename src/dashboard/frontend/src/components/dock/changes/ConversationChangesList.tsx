@@ -5,7 +5,7 @@
 // one group per commit. Paths in the answer are repo paths; every explorer
 // action (open beside, reveal, the diff) maps them to root paths first.
 
-import { useState, type ReactElement } from 'react'
+import { useEffect, useState, type ReactElement } from 'react'
 import { GitCommitHorizontal, Pencil } from 'lucide-react'
 import type { ChangeCommit, ChangeScope, ChangedFile, ConversationChanges, UncommittedFile } from '@overdeck/contracts'
 
@@ -50,6 +50,13 @@ export function ConversationChangesList({ deckKey, scope, conversation }: Conver
   const deck = useStageDeck()
   const initial = useWorkDockStore((s) => s.byDeck[deckKey]?.changesScope) ?? 'conversation'
   const [chip, setChip] = useState<ChangeScope>(initial)
+  // A repeat openDock with a changesScope (header Changes, "N files not
+  // committed") moves the chip even while this list stays mounted (PAN-5291 D1-15).
+  const openSeq = useWorkDockStore((s) => s.byDeck[deckKey]?.openSeq)
+  useEffect(() => {
+    const requested = useWorkDockStore.getState().byDeck[deckKey]?.changesScope
+    if (requested) setChip(requested)
+  }, [deckKey, openSeq])
   const rootId = scope.rootId
   const query = useConversationChanges(conversation, chip, { rootId, enabled: true })
   const rootAbs = useExplorerStore((s) => (rootId ? (s.roots[rootId]?.dirs['']?.absPath ?? null) : null))

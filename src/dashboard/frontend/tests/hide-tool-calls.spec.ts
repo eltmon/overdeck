@@ -106,7 +106,7 @@ test.describe('Hide tool calls toggle', () => {
     });
   });
 
-  test('collapses and expands tool calls via wrench toggle', async ({ page }) => {
+  test('collapses and expands tool calls via the ⋯ menu', async ({ page }) => {
     await page.goto(`${DASHBOARD_URL}/conv/${mockConversation.id}`);
 
     // Wait for the conversation panel to render
@@ -116,10 +116,9 @@ test.describe('Hide tool calls toggle', () => {
     await expect(page.locator('text=Bash')).toBeVisible();
     await expect(page.locator('text=Read')).toBeVisible();
 
-    // Find and click the hide-tool-calls toggle (wrench button in header)
-    const toggle = page.locator('button[title="Hide tool calls"]').first();
-    await expect(toggle).toBeVisible();
-    await toggle.click();
+    // Turn tool calls off from the header ⋯ menu (PAN-5291 moved the toggle there)
+    await page.getByLabel('More conversation actions').click();
+    await page.getByRole('menuitemcheckbox', { name: /Show tool calls/ }).click();
 
     // After toggling, tool calls should be collapsed
     await expect(page.locator('text=2 tool calls were made')).toBeVisible();
@@ -136,8 +135,8 @@ test.describe('Hide tool calls toggle', () => {
     await page.goto(`${DASHBOARD_URL}/conv/${mockConversation.id}`);
     await page.waitForSelector('text=Test Conversation', { timeout: 10000 });
 
-    const toggle = page.locator('button[title="Hide tool calls"]').first();
-    await toggle.click();
+    await page.getByLabel('More conversation actions').click();
+    await page.getByRole('menuitemcheckbox', { name: /Show tool calls/ }).click();
 
     // Verify localStorage was updated
     const ls = await page.evaluate(() => {

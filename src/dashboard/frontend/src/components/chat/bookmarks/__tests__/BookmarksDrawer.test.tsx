@@ -1,4 +1,4 @@
-/** PAN-4498 WI-6: the Bookmarks header toggle and the bookmarks drawer list. */
+/** PAN-4498 WI-6: the ⋯ menu's Bookmarks item (PAN-5291) and the bookmarks drawer list. */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -9,7 +9,7 @@ vi.mock('sonner', () => ({
 }));
 
 import { ConversationBookmarksProvider, useConversationBookmarks } from '../ConversationBookmarks';
-import { BookmarksToggle, BookmarksDrawer } from '../BookmarksDrawer';
+import { BookmarksMenuItem, BookmarksDrawer } from '../BookmarksDrawer';
 
 /** Simulates MessagesTimeline reporting a jump target that isn't in the loaded rows (FR-13). */
 function MissJumpFor({ messageId }: { messageId: string }) {
@@ -23,6 +23,7 @@ function MissJumpFor({ messageId }: { messageId: string }) {
 }
 
 const fetchMock = vi.fn();
+const onDone = vi.fn();
 
 interface StoredBookmark {
   messageId: string;
@@ -59,7 +60,7 @@ function renderPanel(initial: StoredBookmark[] = []) {
   render(
     <QueryClientProvider client={client}>
       <ConversationBookmarksProvider conversationName="conv-a">
-        <BookmarksToggle />
+        <BookmarksMenuItem onDone={onDone} />
         <MissJumpFor messageId="m1" />
         <BookmarksDrawer />
       </ConversationBookmarksProvider>
@@ -70,6 +71,7 @@ function renderPanel(initial: StoredBookmark[] = []) {
 
 beforeEach(() => {
   fetchMock.mockReset();
+  onDone.mockReset();
   vi.stubGlobal('fetch', fetchMock);
 });
 
@@ -77,26 +79,29 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('BookmarksToggle and BookmarksDrawer (PAN-4498 WI-6)', () => {
-  it('the toggle shows the count and opens the drawer', async () => {
+describe('BookmarksMenuItem and BookmarksDrawer (PAN-4498 WI-6)', () => {
+  it('the menu item shows the count, opens the drawer and calls onDone', async () => {
     renderPanel([
       { messageId: 'm1', label: 'First', messageCreatedAt: '2026-01-01T00:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
       { messageId: 'm2', label: 'Second', messageCreatedAt: '2026-01-02T00:00:00.000Z', createdAt: '2026-01-02T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z' },
     ]);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Show bookmarks' })).toHaveTextContent('Bookmarks 2'));
+    await waitFor(() => expect(screen.getByRole('menuitemcheckbox', { name: /Bookmarks/ })).toHaveTextContent(/Bookmarks\s*2/));
+    expect(screen.getByRole('menuitemcheckbox', { name: /Bookmarks/ })).toHaveAttribute('aria-checked', 'false');
     expect(screen.queryByRole('list', { name: 'Bookmarks' })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show bookmarks' }));
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /Bookmarks/ }));
     expect(await screen.findByRole('list', { name: 'Bookmarks' })).toBeInTheDocument();
+    expect(onDone).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('menuitemcheckbox', { name: /Bookmarks/ })).toHaveAttribute('aria-checked', 'true');
   });
 
   it('the drawer lists label and time per bookmark', async () => {
     renderPanel([
       { messageId: 'm1', label: 'A finding', messageCreatedAt: '2026-01-01T00:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
     ]);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Show bookmarks' })).toHaveTextContent('Bookmarks 1'));
-    fireEvent.click(screen.getByRole('button', { name: 'Show bookmarks' }));
+    await waitFor(() => expect(screen.getByRole('menuitemcheckbox', { name: /Bookmarks/ })).toHaveTextContent(/Bookmarks\s*1/));
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /Bookmarks/ }));
 
     expect(await screen.findByRole('button', { name: 'A finding' })).toBeInTheDocument();
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
@@ -106,7 +111,7 @@ describe('BookmarksToggle and BookmarksDrawer (PAN-4498 WI-6)', () => {
     renderPanel([
       { messageId: 'm1', label: 'Old label', messageCreatedAt: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
     ]);
-    fireEvent.click(await screen.findByRole('button', { name: 'Show bookmarks' }));
+    fireEvent.click(await screen.findByRole('menuitemcheckbox', { name: /Bookmarks/ }));
     fireEvent.click(await screen.findByRole('button', { name: 'Rename bookmark' }));
 
     const input = screen.getByRole('textbox', { name: 'Rename bookmark' });
@@ -125,7 +130,7 @@ describe('BookmarksToggle and BookmarksDrawer (PAN-4498 WI-6)', () => {
     renderPanel([
       { messageId: 'm1', label: 'Gone soon', messageCreatedAt: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
     ]);
-    fireEvent.click(await screen.findByRole('button', { name: 'Show bookmarks' }));
+    fireEvent.click(await screen.findByRole('menuitemcheckbox', { name: /Bookmarks/ }));
     fireEvent.click(await screen.findByRole('button', { name: 'Remove bookmark' }));
 
     await waitFor(() => {
@@ -137,7 +142,7 @@ describe('BookmarksToggle and BookmarksDrawer (PAN-4498 WI-6)', () => {
 
   it('the empty state text renders with no bookmarks', async () => {
     renderPanel([]);
-    fireEvent.click(await screen.findByRole('button', { name: 'Show bookmarks' }));
+    fireEvent.click(await screen.findByRole('menuitemcheckbox', { name: /Bookmarks/ }));
     expect(await screen.findByText('No bookmarks yet. Click the icon beside a message to bookmark it.')).toBeInTheDocument();
   });
 
@@ -145,7 +150,7 @@ describe('BookmarksToggle and BookmarksDrawer (PAN-4498 WI-6)', () => {
     renderPanel([
       { messageId: 'm1', label: 'Not loaded', messageCreatedAt: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
     ]);
-    fireEvent.click(await screen.findByRole('button', { name: 'Show bookmarks' }));
+    fireEvent.click(await screen.findByRole('menuitemcheckbox', { name: /Bookmarks/ }));
     expect(screen.queryByText('This message is not in the loaded transcript.')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByText('simulate-miss'));

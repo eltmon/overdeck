@@ -1,11 +1,12 @@
-import { Folder, GitFork } from 'lucide-react';
+import { GitFork } from 'lucide-react';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import { PullRequestBadge } from '../primitives/PullRequestBadge';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 /**
- * The open conversation header's branch chip and, beside it, the effective
- * pull request badge (PAN-3822). Both read from the conversation list row, so
+ * The open conversation header's branch (mono; a fork icon for a worktree,
+ * the Local/Worktree word in the tooltip, PAN-5291 D1-10) and, beside it, the
+ * effective pull request badge (PAN-3822). Both read from the conversation list row, so
  * the badge updates whenever `conversation.pull_requests_changed` refetches it.
  */
 export function ConversationBranchMeta({ conversation }: {
@@ -17,14 +18,11 @@ export function ConversationBranchMeta({ conversation }: {
         <>
           <span className={styles.conversationMetaSep} aria-hidden>·</span>
           <span
-            className={styles.terminalBranchBar}
+            className="inline-flex min-w-0 items-center gap-1 font-mono text-muted-foreground"
             title={`${conversation.isWorktree ? 'Worktree' : 'Local'} · ${conversation.cwd}`}
           >
-            {conversation.isWorktree ? <GitFork size={12} /> : <Folder size={12} />}
-            <span className={styles.terminalBranchBarMode}>
-              {conversation.isWorktree ? 'Worktree' : 'Local'}
-            </span>
-            <span className={styles.terminalBranchBarText}>{conversation.branch}</span>
+            {conversation.isWorktree && <GitFork size={12} className="shrink-0" />}
+            <span className="truncate">{conversation.branch}</span>
           </span>
         </>
       )}

@@ -34,10 +34,56 @@ colleague.
 | **Model picker** | Hot-swap the model for the next message — Sonnet → Opus → Kimi/GPT/Gemini — without losing the conversation |
 | **Reasoning effort** | Tune how hard the model thinks per message (e.g. *Extra High*) |
 | **Conversation / Terminal toggle** | Switch between the rendered conversation and the raw terminal of the same session (the native CLI for OpenCode and Codex) |
-| **Copy link** | Grab the `overdeck.localhost/conv/<id>` URL to share or reopen a conversation |
+| **Copy link** | ⋯ → Copy link copies the `overdeck.localhost/conv/<id>` URL; ⋯ → Open in new window opens the conversation in its own window |
 | **Context window meter** | See how much of the window is used — your cue that a handoff is coming |
-| **Bookmarks** | Mark a message by clicking the icon beside it, then reopen the list from the header to jump back to it |
+| **Bookmarks** | Mark a message by clicking the icon beside it, then reopen the list from ⋯ → Bookmarks to jump back to it |
 | **Citations** | Select text in a reply (or your own message), click **Cite** (or press `C`), add an optional comment, and it goes out with your next prompt |
+
+### The header and status line
+
+The first row of the conversation header holds the title, the Conversation /
+Terminal toggle, and three buttons on the right:
+
+- **Changes** shows how many lines the conversation added and removed (`+86 −1`)
+  and opens the side panel on its Changes tab, with the **This conversation**
+  chip selected. `Ctrl Shift G` (`⌘⇧G` on a Mac) shows or hides the same tab.
+- **Files** opens the side panel on its Files tab. `Ctrl Shift E` (`⌘⇧E`) shows
+  or hides it.
+- **⋯** opens the conversation menu. A right-click on the header opens it too.
+
+Changes and Files open the panel for the conversation whose header you click.
+They appear only when the conversation is a tab in the Command Deck; a popped-out
+window, the phone app and the issue drawer have no side panel, so they do not
+show them.
+
+The second row is the status line. It says, in words and in this order: the
+state (for example "Working"), the machine a linked conversation runs on, the
+folder (with your home directory shortened to `~`), the branch and its pull
+request, **N commits pushed**, **N commits not pushed**, **N files not
+committed**, and the cost. A count of zero is left out. In a Command Deck tab
+the folder opens the Files tab, the commit counts open the Changes tab on
+**This conversation**, and **N files not committed** opens it on **Not
+committed**.
+
+The ⋯ menu lists, in groups:
+
+1. **About this conversation**, **Bookmarks**, **Show tool calls** (on or off),
+   and **Subagents** (with their count, only when the conversation has some)
+   to show or hide the agents rail.
+2. **Open folder in** an editor, one item for each editor on this machine (a linked
+   conversation lists the editors that work over remote SSH), **Copy
+   conversation id** (the conversation's name), **Copy session id** (the agent's
+   session file id, shown only when it differs from the name), **Copy link**,
+   and **Open in new window**.
+3. **Favorite**, **Regenerate title**, and the pull request items.
+4. **Hand off to new conversation**, **Create summary fork**, **Export
+   transcript**, pulling the conversation here, **Continue on another device**,
+   **Share**, and the handoff doc and target.
+5. **Advanced** → **Delivery method** (Claude Code conversations only).
+6. **Archive conversation** and **Stop the agent**.
+
+`⌘⇧O` (`Ctrl Shift O`) still opens the conversation's folder in your favorite
+editor while the menu is closed.
 
 A new conversation's effort is chosen with an effort picker next to the model picker, both on the Home composer and the Command Deck sidebar. The **New conversation with options…** dialog (below) has its own effort field, which defaults to the effort the conversation would get anyway and shows where that default comes from, for example `Default: high (default)` or `Default: medium (project)`.
 
@@ -335,8 +381,7 @@ URLs) are not included.
 
 Click the icon beside an assistant or user message to bookmark it, using its
 first line as the label. The icon turns into a filled bookmark; clicking it
-again opens a popover to rename or remove the bookmark. The **Bookmarks**
-header button opens a list showing each bookmark's label and time — clicking
+again opens a popover to rename or remove the bookmark. ⋯ → **Bookmarks** opens a list showing each bookmark's label and time — clicking
 a label scrolls the timeline to that message and outlines it briefly.
 
 Bookmarks survive reloads and new messages because they point at the
@@ -685,7 +730,7 @@ row, Overdeck skips that repository for 15 minutes.
 ### Linking a pull request by hand
 
 Open a conversation's actions (the row's `⋮`, the open conversation's header
-`⋮`, or a right-click on the row, the header, or its tab) and choose **Link pull
+`⋯`, or a right-click on the row, the header, or its tab) and choose **Link pull
 request…**. Type a PR URL, a
 GitLab merge request URL, `#42`, or `owner/repo#42`, then press Enter. `#42`
 means PR 42 of the conversation's project repository. When the conversation
@@ -943,8 +988,8 @@ conversation past its next scheduled run.
 
 ## Stopping or archiving a conversation
 
-Stop is the `X` on the row or "Stop agent" in the row menu, the tab menu, or
-the conversation header menu; Archive is in those same menus. After you stop
+Stop is the `X` on the row, "Stop agent" in the row menu or the tab menu, or
+"Stop the agent" in the conversation header menu; Archive is in those same menus. After you stop
 or confirm archive, the row dims and stops responding to clicks, and its
 second line reads "Stopping…" or "Archiving…" (a nested row shows the label
 after the title instead); the row's `X` becomes a spinner. The conversation

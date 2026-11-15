@@ -9,6 +9,7 @@ import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
 import { ConversationPanel } from '../ConversationPanel';
 import { DialogProvider } from '../../DialogProvider';
 import { MESSAGES_HTTP_FALLBACK_MS } from '../useMessagesHttpFallback';
+import { StageDeckProvider, type StageDeckContextValue } from '../../Stage/StageDeckContext';
 
 const streamTransportMock = vi.hoisted(() => ({
   listeners: new Map<string, (event: unknown) => void>(),
@@ -112,6 +113,13 @@ vi.mock('../../CommandDeck/styles/command-deck.module.css', () => ({
   },
 }));
 
+// PAN-5291: the header keeps the favorite-editor shortcut once the picker leaves the status line.
+const keybindingsMock = vi.hoisted(() => ({ useEditorOpenFavoriteShortcut: vi.fn() }));
+vi.mock('../../../lib/keybindings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../lib/keybindings')>()),
+  useEditorOpenFavoriteShortcut: keybindingsMock.useEditorOpenFavoriteShortcut,
+}));
+
 // Import the mock so we can assert on it
 import { updateConversationTitle } from '../../CommandDeck/ConversationList';
 import { toast } from 'sonner';
@@ -199,17 +207,21 @@ function renderPanel(
   conversation = mockConversation,
   props: Partial<React.ComponentProps<typeof ConversationPanel>> = {},
   messagesData?: Parameters<typeof makeClient>[0],
+  deck?: StageDeckContextValue,
 ) {
   const client = makeClient(messagesData);
+  const panel = (
+    <ConversationPanel
+      conversation={conversation}
+      viewMode="conversation"
+      onArchived={() => {}}
+      {...props}
+    />
+  );
   const view = render(
     <DialogProvider>
       <QueryClientProvider client={client}>
-        <ConversationPanel
-          conversation={conversation}
-          viewMode="conversation"
-          onArchived={() => {}}
-          {...props}
-        />
+        {deck ? <StageDeckProvider value={deck}>{panel}</StageDeckProvider> : panel}
       </QueryClientProvider>
     </DialogProvider>,
   );
@@ -243,6 +255,44 @@ describe('ConversationPanel rename flow', () => {
   it('renders the conversation title in the header', () => {
     renderPanel();
     expect(screen.getByText('My Panel Title')).toBeInTheDocument();
+  });
+
+  it('renders no Changes or Files button and asks for no change data outside a Stage (PAN-5291)', async () => {
+    renderPanel();
+    expect(screen.getByText('My Panel Title')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Files' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Changes/ })).not.toBeInTheDocument();
+    const urls = fetchControl.fetchMock.mock.calls.map(([input]) => String(input));
+    expect(urls.filter((url) => url.includes('/changes') || url === '/api/registered-projects' || url === '/api/workspace-registry')).toEqual([]);
+  });
+
+  it('shows Changes and Files inside a Stage and opens the dock from them (PAN-5291)', async () => {
+    vi.stubGlobal('navigator', {
+      platform: 'Linux x86_64',
+      clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
+    });
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/registered-projects') return Response.json([]);
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      if (method === 'GET' && url === '/api/conversations/test-conv/changes?scope=conversation') {
+        return Response.json({
+          conversation: 'test-conv', repoRoot: '/home/user', rootId: null, branch: 'main', scope: 'conversation',
+          uncommitted: [], commits: [],
+          totals: { files: 2, additions: 86, deletions: 1, commitsPushed: 0, commitsLocal: 0, uncommittedFiles: 0 },
+        });
+      }
+      return defaultConversationResponse(method, url);
+    });
+    const openDock = vi.fn();
+    renderPanel(mockConversation, {}, undefined, {
+      deckKey: 'p', openOrFocusEditorPane: vi.fn(), openOrFocusAgentPane: vi.fn(), openDock,
+    });
+    const changes = await screen.findByRole('button', { name: 'Changes, 86 lines added, 1 removed' });
+    expect(changes).toHaveTextContent('+86');
+    fireEvent.click(changes);
+    expect(openDock).toHaveBeenLastCalledWith({ tab: 'changes', changesScope: 'conversation' });
+    fireEvent.click(screen.getByRole('button', { name: 'Files' }));
+    expect(openDock).toHaveBeenLastCalledWith({ tab: 'files' });
   });
 
   it('shows the effective pull request badge beside the branch in the header (PAN-3822)', () => {
@@ -280,23 +330,72 @@ describe('ConversationPanel rename flow', () => {
     });
 
     renderPanel();
-    const toggle = screen.getByRole('button', { name: 'Show about this conversation' });
-    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    const item = screen.getByRole('menuitemcheckbox', { name: 'About this conversation' });
+    expect(item).toHaveAttribute('aria-checked', 'false');
 
-    fireEvent.click(toggle);
+    fireEvent.click(item);
 
-    expect(screen.getByRole('button', { name: 'Hide about this conversation' })).toHaveAttribute('aria-pressed', 'true');
     expect(await screen.findByText('This conversation is about tightening dashboard behavior.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    expect(screen.getByRole('menuitemcheckbox', { name: 'About this conversation' })).toHaveAttribute('aria-checked', 'true');
   });
 
   it('shows Hide tool calls as a visible pressed-state toggle', () => {
+    // An ended conversation with history renders the (mocked) timeline, which receives hideToolCalls.
+    renderPanel(
+      { ...mockConversation, endedAt: '2024-01-01T01:00:01Z' },
+      {},
+      { messages: [{ id: 'u1', role: 'user', text: 'hello', createdAt: '2024-01-01T00:00:00Z' }], workLog: [], streaming: false },
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    const item = screen.getByRole('menuitemcheckbox', { name: /Show tool calls/ });
+    expect(item).toHaveAttribute('aria-checked', 'true');
+    expect(item).toHaveTextContent(/on$/);
+
+    expect(timelineMock.props).toHaveBeenLastCalledWith(expect.objectContaining({ hideToolCalls: false }));
+    fireEvent.click(item);
+    expect(timelineMock.props).toHaveBeenLastCalledWith(expect.objectContaining({ hideToolCalls: true }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    expect(screen.getByRole('menuitemcheckbox', { name: /Show tool calls/ })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('menuitemcheckbox', { name: /Show tool calls/ })).toHaveTextContent(/off$/);
+  });
+
+  it('registers the favorite-editor shortcut for the conversation cwd with the menu closed (PAN-5291)', () => {
     renderPanel();
-    const toggle = screen.getByRole('button', { name: 'Hide tool calls' });
-    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('menu', { name: 'Conversation actions' })).toBeNull();
+    expect(keybindingsMock.useEditorOpenFavoriteShortcut).toHaveBeenLastCalledWith(mockConversation.cwd);
+  });
 
-    fireEvent.click(toggle);
+  it('lists ⋯ → Subagents only when the conversation has subagents, and toggles the rail from it (PAN-5291)', () => {
+    renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    expect(screen.queryByRole('menuitem', { name: /^Subagents/ })).toBeNull();
+    cleanup();
 
-    expect(screen.getByRole('button', { name: 'Show tool calls' })).toHaveAttribute('aria-pressed', 'true');
+    const subagent = (agentId: string) => ({ agentId, agentType: 'Explore', description: `Task ${agentId}`, toolUseId: `toolu_${agentId}`, spawnDepth: 1, status: 'done' });
+    renderPanel(mockConversation, {}, {
+      messages: [{ id: 'm-1', role: 'user', text: 'hello', createdAt: '2026-08-04T14:00:00Z' }],
+      workLog: [],
+      streaming: false,
+      subagents: [subagent('a1'), subagent('b2')],
+    } as Parameters<typeof makeClient>[0]);
+    expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    const item = screen.getByRole('menuitem', { name: /^Subagents/ });
+    expect(item).toHaveTextContent(/Subagents\s*2/);
+    fireEvent.click(item);
+    expect(screen.queryByRole('complementary', { name: 'Conversation agents' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show agents rail' })).toBeInTheDocument();
+  });
+
+  it('keeps About, Tools and Bookmarks out of row 1 (PAN-5291)', () => {
+    renderPanel();
+    for (const name of ['Show about this conversation', 'Hide tool calls', 'Show tool calls', 'Show bookmarks']) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
+    }
+    expect(screen.getByRole('button', { name: 'More conversation actions' })).toHaveAttribute('aria-haspopup', 'menu');
   });
 
   it('shows a pi Stop button during a running turn and posts abort', async () => {
@@ -351,8 +450,11 @@ describe('ConversationPanel rename flow', () => {
     });
 
     const { rerender, client } = renderPanel();
-    fireEvent.click(screen.getByRole('button', { name: 'Show about this conversation' }));
-    expect(screen.getByRole('button', { name: 'Hide about this conversation' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'About this conversation' }));
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    expect(screen.getByRole('menuitemcheckbox', { name: 'About this conversation' })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
 
     const nextConversation = {
       ...mockConversation,
@@ -373,7 +475,8 @@ describe('ConversationPanel rename flow', () => {
       </DialogProvider>,
     );
 
-    expect(screen.getByRole('button', { name: 'Show about this conversation' })).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    expect(screen.getByRole('menuitemcheckbox', { name: 'About this conversation' })).toHaveAttribute('aria-checked', 'false');
   });
 
   it('does not mount the terminal when a diff deep-link opens a live terminal-mode conversation', () => {
@@ -595,18 +698,19 @@ describe('ConversationPanel rename flow', () => {
     expect(onViewModeChange).toHaveBeenCalledWith('conversation');
   });
 
-  // Detach affordance — a header button next to Copy link that opens the
-  // conversation in a new browser window. Same target as the ⋮ pop-out item
-  // and the drag-off-to-detach in the PaneBar. All three detach entry points
-  // land on /popout/conversation/<id>, a bare conversation view (no sidebar
-  // or awareness rail) so the detached window focuses on the one chat.
-  it('exposes a Detach button that opens /popout/conversation/<id> in a new window', () => {
+  // Open in new window (formerly the header's Detach button, PAN-5291) —
+  // ⋯ → Open in new window opens the conversation in a new browser window.
+  // Same target as the drag-off-to-detach in the PaneBar: both land on
+  // /popout/conversation/<id>, a bare conversation view (no sidebar or
+  // awareness rail) so the detached window focuses on the one chat.
+  it('exposes Open in new window, which opens /popout/conversation/<id> in a new window', () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
     renderPanel();
 
-    const detach = screen.getByRole('button', { name: 'Detach conversation' });
-    expect(detach).toBeInTheDocument();
-    fireEvent.click(detach);
+    expect(screen.queryByRole('button', { name: 'Detach conversation' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Copy link to conversation' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Open in new window' }));
 
     expect(openSpy).toHaveBeenCalledWith('/popout/conversation/1', '_blank', expect.stringContaining('popup=yes'));
     openSpy.mockRestore();
@@ -616,7 +720,8 @@ describe('ConversationPanel rename flow', () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
     renderPanel({ ...mockConversation, sessionAlive: true }, { viewMode: 'terminal' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Detach conversation' }));
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Open in new window' }));
 
     expect(openSpy).toHaveBeenCalledWith(
       '/popout/conversation/1?view=terminal',
@@ -626,9 +731,43 @@ describe('ConversationPanel rename flow', () => {
     openSpy.mockRestore();
   });
 
-  it('hides the Detach button when the panel is embedded', () => {
+  it('hides the ⋯ menu when the panel is embedded', () => {
     renderPanel(mockConversation, { embedded: true });
+    expect(screen.queryByRole('button', { name: 'More conversation actions' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Detach conversation' })).toBeNull();
+  });
+
+  it('copies the conversation id and the link from the ⋯ menu (PAN-5291)', async () => {
+    renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Copy conversation id/ }));
+    expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith('test-conv');
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Copied conversation id'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
+    expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(`${window.location.origin}/conv/1`);
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Copied link'));
+  });
+
+  it('offers Copy session id only when the session file id differs from the name (PAN-5291)', async () => {
+    renderPanel({ ...mockConversation, sessionFile: '/x/abc12345-0000.jsonl' });
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    const item = screen.getByRole('menuitem', { name: /^Copy session id/ });
+    expect(item).toHaveTextContent('abc12345');
+    fireEvent.click(item);
+    expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith('abc12345-0000');
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Copied session id'));
+    // The status line no longer shows the session id.
+    expect(screen.queryByText('abc12345-0000')).toBeNull();
+  });
+
+  it('has no Copy session id item and no session id text without a session file (PAN-5291)', () => {
+    renderPanel();
+    // The status line used to fall back to the conversation name here.
+    expect(screen.queryByText('test-conv')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    expect(screen.queryByRole('menuitem', { name: /^Copy session id/ })).toBeNull();
   });
 });
 
@@ -1406,7 +1545,7 @@ describe('ConversationPanel archive (PAN-4584)', () => {
     renderPanel({ ...mockConversation, sessionAlive: true });
 
     fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Stop agent' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Stop the agent' }));
 
     expect(await screen.findByRole('status', { name: 'Stopping conversation' })).toHaveTextContent('Stopping…');
 
