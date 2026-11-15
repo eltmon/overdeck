@@ -129,6 +129,14 @@ A polyrepo project — one where a single issue's work lands across several memb
 repositories — gets batch trains too, on the same terms as a single-repo
 project. There is no separate setting: the merge-train flag is the only gate.
 
+A feature is ready there when **every** pull or merge request it has open
+across the member repos is approved, has green checks and can merge. Each
+member repo is read through its own forge, so a project that mixes GitLab and
+GitHub repos works. One draft or unapproved request in any repo keeps the
+feature out of the batch. GitLab projects, single-repo or not, use the same
+rule: a merge request counts as approved only when someone is named as its
+approver.
+
 A batch there spans **one `uat/…` branch per member repo that a ready feature
 actually touches**. Repos no feature touches are left alone entirely. The batch
 still behaves as one unit:

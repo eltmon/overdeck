@@ -22,7 +22,14 @@ import { resolve } from 'node:path';
 import { httpHandler } from './http-handler.js';
 import { jsonResponse } from '../http-helpers.js';
 import { hasDashboardInternalToken, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
-import { getProjectSync, listProjectsSync, resolveProjectFromIssueSync, type ProjectConfig, type ResolvedProject } from '../../../lib/projects.js';
+import {
+  findProjectByPath,
+  getProjectSync,
+  listProjectsSync,
+  resolveProjectFromIssueSync,
+  type ProjectConfig,
+  type ResolvedProject,
+} from '../../../lib/projects.js';
 import type { MergeQueueItem } from '../../../lib/flywheel-merge-order.js';
 import { gatherMergeEligibility, isMergeEligible } from '../../../lib/cloister/merge-eligibility.js';
 import { emitActivityTts } from '../../../lib/activity-logger.js';
@@ -70,8 +77,10 @@ import {
   listReadyIssuesForProject,
   listRepoPullRequestsStaleOk,
   loadIssueStatesForProject,
+  type ReadyIssue,
 } from '../services/derived-issue-state.js';
 import { evaluateIssueMergeGate, type MergeGateResult } from '../../../lib/cloister/merge-gate.js';
+import { orderPolyrepoQueue } from '../services/polyrepo-queue.js';
 import { deftAutoMergeHold } from '../../../lib/deft/policy.js';
 // PAN-4970: moved to services/auto-merge-door-policy.js to break an import
 // cycle through services/uat-train.js and services/merge-path-owner.js.
@@ -142,12 +151,7 @@ async function queueEntryForProject(
   const candidates = await listReadyIssuesForProject(projectPath);
   if (candidates.length === 0) return { ...base, queue: [] };
 
-  // Imported here so the conflict-ordering module's git work is only loaded
-  // when a queue is actually computed.
-  const { computeMergeQueueFromCandidates } = await import('../../../lib/flywheel-merge-order.js');
-  const rawQueue = await Effect.runPromise(
-    computeMergeQueueFromCandidates(candidates, projectPath).pipe(Effect.provide(nodeServicesLayer)),
-  );
+  const rawQueue = await orderedQueueForProject(config, projectPath, candidates);
   // PAN-4970: mark the items the per-PR auto-merge scheduler already owns —
   // this batch never claims them, and the page says so instead of promising
   // a batch that will never assemble.
@@ -163,6 +167,28 @@ async function queueEntryForProject(
     return { ...base, holdsForUat: await issueHoldsForUat(queue[0]!.issueId, config, globalRequireUat), queue };
   }
   return { ...base, queue };
+}
+
+/**
+ * The ready set in merge order. PAN-3657: a polyrepo root is not a git repo,
+ * so a polyrepo project orders per member repo (`orderPolyrepoQueue`, shared
+ * with the reconciler); a refs outage there throws, and the caller reports
+ * the project's error rather than an empty queue.
+ */
+async function orderedQueueForProject(
+  config: ProjectConfig | null | undefined,
+  projectPath: string,
+  candidates: ReadyIssue[],
+): Promise<MergeQueueItem[]> {
+  if (config?.workspace?.type === 'polyrepo') {
+    return orderPolyrepoQueue(projectPath, candidates);
+  }
+  // Imported here so the conflict-ordering module's git work is only loaded
+  // when a queue is actually computed.
+  const { computeMergeQueueFromCandidates } = await import('../../../lib/flywheel-merge-order.js');
+  return Effect.runPromise(
+    computeMergeQueueFromCandidates(candidates, projectPath).pipe(Effect.provide(nodeServicesLayer)),
+  );
 }
 
 /**
@@ -220,10 +246,7 @@ export interface MergeTrainMergeNextDeps {
 async function defaultOrderedIssueIdsForProject(projectPath: string): Promise<string[]> {
   const candidates = await listReadyIssuesForProject(projectPath);
   if (candidates.length === 0) return [];
-  const { computeMergeQueueFromCandidates } = await import('../../../lib/flywheel-merge-order.js');
-  const queue = await Effect.runPromise(
-    computeMergeQueueFromCandidates(candidates, projectPath).pipe(Effect.provide(nodeServicesLayer)),
-  );
+  const queue = await orderedQueueForProject(findProjectByPath(projectPath), projectPath, candidates);
   return queue.map((item) => item.issueId);
 }
 

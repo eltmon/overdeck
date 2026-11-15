@@ -130,6 +130,12 @@ vi.mock('../../services/derived-issue-state.js', async (importOriginal) => {
 });
 vi.mock('../../../../lib/flywheel-merge-order.js', () => mergeOrderMocks);
 vi.mock('../../services/merge-path-owner.js', () => mergePathOwnerMocks);
+// PAN-3657 (PAN-4753 WI-4): a polyrepo project orders per member repo.
+const polyrepoQueueMocks = vi.hoisted(() => {
+  class PolyrepoRefsUnavailableError extends Error {}
+  return { PolyrepoRefsUnavailableError, orderPolyrepoQueue: vi.fn(async () => [] as unknown[]) };
+});
+vi.mock('../../services/polyrepo-queue.js', () => polyrepoQueueMocks);
 vi.mock('../../../../lib/overdeck/merge-sync.js', () => mergeSyncMocks);
 vi.mock('../../services/uat-train.js', () => uatTrainMocks);
 vi.mock('../../../../lib/cloister/merge-batch.js', () => mergeBatchMocks);
@@ -294,6 +300,47 @@ describe('PAN-1696 merge-train-routes', () => {
       const entries = await getMergeTrainQueuesPayload();
       expect(entries.map((e) => e.projectKey)).toEqual(['overdeck', 'myn']);
       expect(entries.find((e) => e.projectKey === 'overdeck')?.queue).toEqual([]);
+    });
+
+    it('orders a polyrepo project per member repo and a monorepo one at its root (PAN-3657)', async () => {
+      const POLY_MYN = { ...MYN as object, workspace: { type: 'polyrepo' } } as never;
+      projectsMocks.listProjectsSync.mockReturnValue([
+        { key: 'overdeck', config: PAN },
+        { key: 'myn', config: POLY_MYN },
+      ]);
+      mergeOrderMocks.listReadyIssuesForProject.mockImplementation((path: string) =>
+        path === '/repos/myn' ? [{ issueId: 'MIN-831', title: 'MIN-831' }] : [{ issueId: 'PAN-1', title: 'PAN-1' }],
+      );
+      mergeOrderMocks.computeMergeQueueFromCandidates.mockImplementation((candidates: readonly { issueId: string }[]) =>
+        Effect.succeed(candidates.map((c, i) => ({ issueId: c.issueId, title: c.issueId, mergeOrder: i }))),
+      );
+      polyrepoQueueMocks.orderPolyrepoQueue.mockResolvedValue([
+        { issueId: 'MIN-831', title: 'MIN-831', branchName: 'feature/min-831', mergeOrder: 0, conflictsWith: [], repoContributions: [] },
+      ]);
+
+      const entries = await getMergeTrainQueuesPayload();
+
+      expect(polyrepoQueueMocks.orderPolyrepoQueue).toHaveBeenCalledWith('/repos/myn', [{ issueId: 'MIN-831', title: 'MIN-831' }]);
+      expect(mergeOrderMocks.computeMergeQueueFromCandidates).toHaveBeenCalledTimes(1);
+      expect(mergeOrderMocks.computeMergeQueueFromCandidates).toHaveBeenCalledWith([{ issueId: 'PAN-1', title: 'PAN-1' }], '/repos/overdeck');
+      expect(entries.find((e) => e.projectKey === 'myn')?.queue.map((item) => item.issueId)).toEqual(['MIN-831']);
+      expect(entries.find((e) => e.projectKey === 'overdeck')?.queue.map((item) => item.issueId)).toEqual(['PAN-1']);
+    });
+
+    it('a polyrepo refs outage fails that project, never an empty-queue success (PAN-3657)', async () => {
+      projectsMocks.listProjectsSync.mockReturnValue([
+        { key: 'myn', config: { ...MYN as object, workspace: { type: 'polyrepo' } } as never },
+      ]);
+      mergeOrderMocks.listReadyIssuesForProject.mockImplementation(() => [{ issueId: 'MIN-831', title: 'MIN-831' }]);
+      polyrepoQueueMocks.orderPolyrepoQueue.mockRejectedValue(new Error('could not refresh refs in /repos/myn/api'));
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const entries = await getMergeTrainQueuesPayload();
+
+      expect(entries).toMatchObject([{ projectKey: 'myn', queue: [] }]);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('could not refresh refs in /repos/myn/api'));
+      expect(mergePathOwnerMocks.mergePathOwner).not.toHaveBeenCalled();
+      warn.mockRestore();
     });
 
     // queue-owner-flag.ac1

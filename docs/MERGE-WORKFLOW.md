@@ -447,6 +447,16 @@ refresher runs only in the primary dashboard process, and it tries each
 issue head at most once per refresh window, so a failing forge read is not
 retried every tick.
 
+**GitLab and polyrepo projects (PAN-3657).** The merge train's ready set
+reads every forge the project uses (`src/lib/overdeck/ready-set.ts`). A GitLab
+MR is ready when its own facts show a named approver, a green pipeline and
+mergeability; the MR listing carries neither approval nor pipeline. A polyrepo
+issue is ready when every open PR/MR for it, across the writable member repos,
+is ready. Its queue is ordered per member repo (`orderPolyrepoQueue`). A forge
+read that fails makes the ready set unknown, never empty, so a live batch
+survives an outage. The batch window stays GitHub-only; see
+[MERGE-TRAIN.md](MERGE-TRAIN.md#the-ready-set).
+
 ## Review freshness
 
 A review verdict is a PR review against a specific commit. A push after

@@ -674,37 +674,45 @@ async function readPrFacts(issueId: string, deps: PrFactsDeps, options: PrFactsO
   if (!repo) return emptyPrFacts(issueId);
 
   const listGitLabMrs = deps.listGitLabMrs ?? listOpenGitLabMergeRequests;
-  const viewGitLabMr = deps.viewGitLabMr ?? defaultViewGitLabMr;
   try {
     const rows = await listGitLabMrs(repo.repoPath);
     const branch = repo.sourceBranch;
     const row = rows.find((candidate) => candidate.source_branch === branch);
     if (!row?.iid) return emptyPrFacts(issueId);
-    const projectPath = parseGitLabProjectPath(row.web_url);
-    if (!projectPath) return gitLabFacts(issueId, row, null);
-    let view: GitLabMrView;
-    try {
-      view = await viewGitLabMr(projectPath, row.iid);
-    } catch (cause) {
-      // Without the MR view there is no approval, pipeline or mergeability to
-      // judge. Keep the row's identity but say why, so a refusal names the
-      // lookup failure instead of a missing approval.
-      return {
-        ...gitLabFacts(issueId, row, null),
-        error: `GitLab MR view failed for !${row.iid}: ${cause instanceof Error ? cause.message : String(cause)}`,
-      };
-    }
-    try {
-      return gitLabFacts(issueId, row, view, await (deps.readGitLabApprovals ?? defaultReadGitLabApprovals)(projectPath, row.iid));
-    } catch (cause) {
-      // No approvals read is no approval: the refusal names the failed read.
-      return {
-        ...gitLabFacts(issueId, row, view),
-        error: `GitLab MR approvals read failed for !${row.iid}: ${cause instanceof Error ? cause.message : String(cause)}`,
-      };
-    }
+    return await readGitLabMrFacts(issueId, row, deps);
   } catch (cause) {
     return emptyPrFacts(issueId, `GitLab MR lookup failed: ${cause instanceof Error ? cause.message : String(cause)}`);
+  }
+}
+
+/** One GitLab MR's facts from its listing row: its view, then its approvals (PAN-4753 WI-4). */
+export async function readGitLabMrFacts(
+  issueId: string,
+  row: GitLabMergeRequestRow,
+  deps: Pick<PrFactsDeps, 'viewGitLabMr' | 'readGitLabApprovals'> = {},
+): Promise<PrFacts> {
+  const projectPath = parseGitLabProjectPath(row.web_url);
+  if (!projectPath || !row.iid) return gitLabFacts(issueId, row, null);
+  let view: GitLabMrView;
+  try {
+    view = await (deps.viewGitLabMr ?? defaultViewGitLabMr)(projectPath, row.iid);
+  } catch (cause) {
+    // Without the MR view there is no approval, pipeline or mergeability to
+    // judge. Keep the row's identity but say why, so a refusal names the
+    // lookup failure instead of a missing approval.
+    return {
+      ...gitLabFacts(issueId, row, null),
+      error: `GitLab MR view failed for !${row.iid}: ${cause instanceof Error ? cause.message : String(cause)}`,
+    };
+  }
+  try {
+    return gitLabFacts(issueId, row, view, await (deps.readGitLabApprovals ?? defaultReadGitLabApprovals)(projectPath, row.iid));
+  } catch (cause) {
+    // No approvals read is no approval: the refusal names the failed read.
+    return {
+      ...gitLabFacts(issueId, row, view),
+      error: `GitLab MR approvals read failed for !${row.iid}: ${cause instanceof Error ? cause.message : String(cause)}`,
+    };
   }
 }
 

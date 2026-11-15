@@ -436,7 +436,7 @@ export interface GlabMrRow {
   merge_commit_sha?: string | null;
 }
 
-const cachedRepoMergeRequests = createSettledTtlPromiseCache<string, readonly GlabMrRow[]>(PR_CACHE_TTL_MS);
+const cachedRepoMergeRequests = createSettledTtlPromiseCache<string, readonly GlabMrRow[] | null>(PR_CACHE_TTL_MS);
 
 /** GitLab pipeline status → the aggregate check state. */
 export function toChecksStateFromPipeline(status: string | undefined): PrChecksState {
@@ -468,7 +468,8 @@ export function mrFromGlabRow(row: GlabMrRow): LoadedPr | null {
   };
 }
 
-export async function listRepoMergeRequests(projectPath: string): Promise<readonly GlabMrRow[]> {
+/** The repo's MR listing (`state=all`), or null when the read failed (PAN-4753 WI-4). */
+export async function readRepoMergeRequests(projectPath: string): Promise<readonly GlabMrRow[] | null> {
   return cachedRepoMergeRequests(projectPath, async () => {
     try {
       const { stdout } = await execFileAsync('glab', [
@@ -476,9 +477,14 @@ export async function listRepoMergeRequests(projectPath: string): Promise<readon
       ], { cwd: projectPath, encoding: 'utf-8', timeout: 20_000, maxBuffer: 16 * 1024 * 1024 });
       return JSON.parse(stdout || '[]') as GlabMrRow[];
     } catch {
-      return [];
+      return null;
     }
   });
+}
+
+/** The repo's MR listing; empty when the read failed. */
+export async function listRepoMergeRequests(projectPath: string): Promise<readonly GlabMrRow[]> {
+  return (await readRepoMergeRequests(projectPath)) ?? [];
 }
 
 async function readMrWithGlab(_issueId: string, projectPath: string, branch: string): Promise<LoadedPr | null> {
