@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5358",
   "created": "2026-11-15T16:13:08.101Z",
-  "updated": "2026-11-15T16:45:44.724Z",
+  "updated": "2026-11-15T16:46:05.017Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,11 @@
     "always-flag-store.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T16:45:44.724Z"
+    },
+    "inject-facts": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5358",
+      "claimedAt": "2026-11-15T16:46:05.017Z"
     }
   }
 }
