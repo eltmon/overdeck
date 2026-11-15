@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5290",
+  "created": "2026-11-15T11:24:24.576Z",
+  "updated": "2026-11-15T11:24:24.576Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "stage-conversation-beside": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5290",
+      "claimedAt": "2026-11-15T11:24:24.576Z"
+    }
+  }
+}
