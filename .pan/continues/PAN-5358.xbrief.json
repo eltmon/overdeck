@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5358",
   "created": "2026-11-15T16:13:08.101Z",
-  "updated": "2026-11-15T18:00:22.335Z",
+  "updated": "2026-11-15T18:00:30.688Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -164,6 +164,11 @@
     "vector-rerank.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T18:00:22.334Z"
+    },
+    "cli-refresh-on-write": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5358",
+      "claimedAt": "2026-11-15T18:00:30.688Z"
     }
   }
 }
