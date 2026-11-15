@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5290",
   "created": "2026-11-15T11:24:24.576Z",
-  "updated": "2026-11-15T13:39:08.527Z",
+  "updated": "2026-11-15T13:59:08.987Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -12,6 +12,11 @@
       "reason": "resume",
       "agentModel": "claude-opus-5-5",
       "timestamp": "2026-11-15T13:18:39.174Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-15T13:59Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-15T13:59:08.987Z"
     }
   ],
   "items": {
@@ -294,5 +299,14 @@
       "doneAt": "2026-11-15T13:39:08.527Z"
     }
   },
-  "agentModel": "claude-opus-5-5"
+  "agentModel": "claude-opus-5-5",
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-15T13:59:08Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5290\n\nPull request: https://github.com/eltmon/overdeck/pull/5350 (head `7fb87b66`)\n\nSource: check_run:test-shard (4/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (4/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/132833773415/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/43721337602/job/132833773415  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/__tests__/route-scopes.test.ts\u001b[2m > \u001b[22mroute-scope table (PAN-2351)\u001b[2m > \u001b[22mlists every scoped path as a telemetry client route (PAN-5100)\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/__tests__/route-scopes.test.ts\u001b[2m > \u001b[22mroute-scope table (PAN-2351)\u001b[2m > \u001b[22mlists every scoped path as a telemetry client route (PAN-5100)\n\u001b[31m\u001b[1mAssertionError\u001b[22m: /api/conversations/:name/changes/lines: expected [ '/api/activity', …(139) ] to include '/api/conversations/:name/changes/lines'\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m src/dashboard/server/__tests__/route-scopes.test.ts:\u001b[2m85:38\u001b[22m\u001b[39m\n    \u001b[90m 83|\u001b[39m     const clientRoutes: readonly string[] = TELEMETRY_PROPERTY_DOMAINS…\n    \u001b[90m 84|\u001b[39m     \u001b[35mfor\u001b[39m (\u001b[35mconst\u001b[39m row \u001b[35mof\u001b[39m \u001b[33mROUTE_SCOPES\u001b[39m) {\n    \u001b[90m 85|\u001b[39m       \u001b[34mexpect\u001b[39m(clientRoutes\u001b[33m,\u001b[39m row\u001b[33m.\u001b[39mpath)\u001b[33m.\u001b[39m\u001b[34mtoContain\u001b[39m(row\u001b[33m.\u001b[39mpath)\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                                      \u001b[31m^\u001b[39m\n    \u001b[90m 86|\u001b[39m     }\n    \u001b[90m 87|\u001b[39m   })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m672 passed\u001b[39m\u001b[22m\u001b[90m (673)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
 }
