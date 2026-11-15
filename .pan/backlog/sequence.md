@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T17:21:25.217182Z · model: claude-opus-5-5 · open: 905_
+_Last sequenced: 2026-11-15T17:22:52.996499Z · model: claude-opus-5-5 · open: 904_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -400,7 +400,6 @@ _Last sequenced: 2026-11-15T17:21:25.217182Z · model: claude-opus-5-5 · open: 
 | 392 | PAN-5372 | XS | medium | ok |  |  | First split in a Stage deck remounts the open pane, silently dropping an unsaved editor draft; fix with a stable key per paneId. |
 | 393 | PAN-3661 | XS | medium | ok |  |  | Secure review-mode dispatch dropped the HTTP-200 semantic-rejection surface; two frontend tests fail locally while CI stays green. |
 | 394 | PAN-3288 | XS | medium | ok |  |  | Dev-checkout preflight: after a git pull that adds a dep, the CLI dies with ERR_MODULE_NOT_FOUND instead of saying 'run bun install'. |
-| 395 | PAN-5353 | S | medium | ok |  |  | Send now: flush a queued message into a running Claude Code turn via the Ctrl+X Ctrl+S chord. PRD written, chord live-probed. |
 | 395 | PAN-3164 | XS | medium | ok |  |  | probeUatStack reports readiness from container count, so the UI offers 'Open UAT frontend' while the API is still resolving Maven deps. |
 | 396 | PAN-3121 | S | medium | ok |  |  | The failed-send outbox never reconciles against the transcript, so a delivered message keeps a Retry twin that would double-send. |
 | 397 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
@@ -1240,10 +1239,10 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T17:21:25.217182Z",
+  "generatedAt": "2026-11-15T17:22:52.996499Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 905,
+  "openCount": 904,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -6218,19 +6217,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "why": "Dev-checkout preflight: after a git pull that adds a dep, the CLI dies with ERR_MODULE_NOT_FOUND instead of saying 'run bun install'.",
       "gate": "auto",
       "planning": "skip"
-    },
-    {
-      "issue": "PAN-5353",
-      "rank": 395,
-      "size": "S",
-      "importance": "medium",
-      "score": 56,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Send now: flush a queued message into a running Claude Code turn via the Ctrl+X Ctrl+S chord. PRD written, chord live-probed.",
-      "rationale": "New issue since the prior run: a small, self-contained conversation-view feature with a PRD and a live-probed mechanism, placed in the free rank-395 slot among medium conversation UX work.",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-3164",
