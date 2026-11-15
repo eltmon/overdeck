@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5370",
   "created": "2026-11-15T20:57:54.789Z",
-  "updated": "2026-11-15T23:37:10.119Z",
+  "updated": "2026-11-15T23:37:13.723Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,11 @@
     "spend-timeout.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T23:37:10.119Z"
+    },
+    "spend-error-fact": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5370",
+      "claimedAt": "2026-11-15T23:37:13.723Z"
     }
   }
 }
