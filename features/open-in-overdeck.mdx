@@ -84,6 +84,8 @@ for f in "$@"; do "$HOME/.overdeck/cli-bin/pan" open "$f"; done
 
 Save it as **Open in Overdeck**.
 
+The generated macOS Quick Action is covered by unit tests only; it is untested on real hardware.
+
 ### Windows
 
 `pan integrate` adds three keys under `HKCU\Software\Classes` with `reg add`: one for files (`*\shell\OpenInOverdeck`), one for folders (`Directory\shell\OpenInOverdeck`) and one for the empty space inside a folder (`Directory\Background\shell\OpenInOverdeck`). On Windows 11 the entry is under **Show more options** in the right-click menu.

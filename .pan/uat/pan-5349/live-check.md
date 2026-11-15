@@ -23,9 +23,10 @@ headless Chromium context (Playwright, no shared profile).
   GNOME Files script was run directly with a folder argument, which is what
   right-click → Scripts → Open in Overdeck runs.
 - **macOS checkpoint not run.** Machine memory says to ask Edward before using
-  the Mac rig, so the Quick Action was not registered on real hardware. The
-  documented fallback applies: `features/open-in-overdeck.mdx` carries the
-  manual Automator steps.
+  the Mac rig, so the Quick Action was never installed or run on real hardware;
+  whether the generated bundle registers is unknown. `features/open-in-overdeck.mdx`
+  labels macOS "untested on real hardware" and carries the manual Automator steps
+  for the case where it does not register.
 - **Windows** is covered by unit tests only, as planned.
 
 ## Results
