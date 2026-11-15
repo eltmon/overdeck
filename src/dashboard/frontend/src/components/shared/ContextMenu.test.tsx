@@ -148,6 +148,23 @@ describe('shared popup primitives', () => {
     fireEvent.keyDown(screen.getByRole('menu', { name: 'Actions' }), { key: 'Escape' });
     expect(screen.queryByRole('menu', { name: 'Actions' })).not.toBeInTheDocument();
   });
+
+  it('gives destructive and active items their own text color instead of text-foreground (PAN-5292)', () => {
+    render(
+      <MenuSurface aria-label="Colors">
+        <MenuItemButton>Plain</MenuItemButton>
+        <MenuItemButton destructive>Stop all agents…</MenuItemButton>
+        <MenuItemButton active>Current</MenuItemButton>
+      </MenuSurface>,
+    );
+    expect(screen.getByRole('menuitem', { name: 'Plain' })).toHaveClass('text-foreground');
+    const destructive = screen.getByRole('menuitem', { name: 'Stop all agents…' });
+    expect(destructive).toHaveClass('text-destructive');
+    expect(destructive).not.toHaveClass('text-foreground');
+    const active = screen.getByRole('menuitem', { name: 'Current' });
+    expect(active).toHaveClass('text-primary');
+    expect(active).not.toHaveClass('text-foreground');
+  });
 });
 
 function MenuToDialogHarness() {

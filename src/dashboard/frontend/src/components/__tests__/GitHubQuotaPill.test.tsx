@@ -1,11 +1,11 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import type { GitHubQuotaSnapshot } from '@overdeck/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { useDashboardStore } from '../../lib/store';
-import { GitHubQuotaPill } from '../GitHubQuotaPill';
+import { GitHubQuotaSection } from '../GitHubQuotaPill';
 
-// PAN-4264 Work Item 17: GH <remaining>/<limit>, and the top callers in descending points.
+// PAN-4264 Work Item 17, retargeted by PAN-5292 WI-E4: the quota label, and the top callers in descending points.
 
 function usage(caller: GitHubQuotaSnapshot['callers'][number]['caller'], graphql: number, rest: number) {
   return { caller, graphql: { points: graphql, calls: 1 }, rest: { points: rest, calls: 1 }, estimated: false };
@@ -33,31 +33,31 @@ function quota(overrides: Partial<GitHubQuotaSnapshot> = {}): GitHubQuotaSnapsho
   };
 }
 
-describe('GitHubQuotaPill (PAN-4264)', () => {
+describe('GitHubQuotaSection (PAN-4264, PAN-5292 WI-E4)', () => {
   afterEach(() => {
     useDashboardStore.setState({ githubQuota: null });
   });
 
   it('renders nothing until the publisher reports', () => {
-    render(<GitHubQuotaPill />);
-    expect(screen.queryByTestId('github-quota-pill')).toBeNull();
+    const { container } = render(<GitHubQuotaSection />);
+    expect(screen.queryByTestId('github-quota-section')).toBeNull();
+    expect(container).toBeEmptyDOMElement();
   });
 
-  it('shows the user GraphQL sample, or a dash without one', () => {
+  it('shows the user GraphQL sample, or "No sample yet" without one', () => {
     useDashboardStore.setState({ githubQuota: quota() });
-    const { unmount } = render(<GitHubQuotaPill />);
-    expect(screen.getByTestId('github-quota-pill').textContent).toBe('GH 4956/5000');
+    const { unmount } = render(<GitHubQuotaSection />);
+    expect(screen.getByTestId('github-quota-label').textContent).toBe('4956 of 5000 GraphQL points left this hour');
     unmount();
 
     useDashboardStore.setState({ githubQuota: quota({ samples: [] }) });
-    render(<GitHubQuotaPill />);
-    expect(screen.getByTestId('github-quota-pill').textContent).toBe('GH —');
+    render(<GitHubQuotaSection />);
+    expect(screen.getByTestId('github-quota-label').textContent).toBe('No sample yet');
   });
 
-  it('lists the top 5 callers by points in descending order plus the unattributed row', () => {
+  it('lists the top 5 callers by points in descending order plus the unattributed row, without a click', () => {
     useDashboardStore.setState({ githubQuota: quota() });
-    render(<GitHubQuotaPill />);
-    fireEvent.click(screen.getByTestId('github-quota-pill'));
+    render(<GitHubQuotaSection />);
 
     const rows = within(screen.getByTestId('github-quota-callers')).getAllByRole('listitem');
     expect(rows.map((row) => row.textContent)).toEqual([
@@ -67,16 +67,17 @@ describe('GitHubQuotaPill (PAN-4264)', () => {
       'pr-cache20 pts',
       'issue-poller12 pts',
     ]);
-    expect(screen.getByRole('dialog').textContent).toContain('120 pts');
+    const section = screen.getByRole('region', { name: 'GitHub quota' });
+    expect(section.textContent).toContain('Unattributed (other tools and installs)120 pts');
   });
 
-  it('uses the warning tone while calls are paused', () => {
+  it('uses the warning tone on the label while calls are paused', () => {
     useDashboardStore.setState({
       githubQuota: quota({
         pauses: [{ pool: 'user', bucket: 'graphql', kind: 'primary', caller: 'pr-sync', since: 'a', until: '2026-09-27T15:10:00.000Z' }],
       }),
     });
-    render(<GitHubQuotaPill />);
-    expect(screen.getByTestId('github-quota-pill').className).toContain('text-warning-foreground');
+    render(<GitHubQuotaSection />);
+    expect(screen.getByTestId('github-quota-label')).toHaveClass('text-warning-foreground');
   });
 });

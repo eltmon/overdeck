@@ -15,7 +15,11 @@ import {
 const MENU_SURFACE_CLASS =
   'max-h-[70vh] min-w-[168px] max-w-[calc(100vw-1rem)] overflow-x-hidden overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-floating';
 const MENU_ITEM_CLASS =
-  'relative flex w-full cursor-pointer select-none items-center gap-2 rounded px-3 py-1.5 text-left text-xs text-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground disabled:pointer-events-none disabled:opacity-40 data-[disabled]:pointer-events-none data-[disabled]:opacity-40';
+  'relative flex w-full cursor-pointer select-none items-center gap-2 rounded px-3 py-1.5 text-left text-xs outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground disabled:pointer-events-none disabled:opacity-40 data-[disabled]:pointer-events-none data-[disabled]:opacity-40';
+// The text color is applied per item kind, never in MENU_ITEM_CLASS: Tailwind
+// emits text-foreground after text-destructive / text-primary, so a shared
+// text-foreground would override the destructive and active colors.
+const MENU_ITEM_TEXT_CLASS = 'text-foreground';
 const MENU_DESTRUCTIVE_ITEM_CLASS =
   'text-destructive hover:bg-destructive/10 hover:text-destructive focus-visible:bg-destructive/10 focus-visible:text-destructive';
 
@@ -164,7 +168,7 @@ export const MenuItemButton = forwardRef<HTMLButtonElement, MenuItemButtonProps>
       ref={ref}
       type={type}
       role="menuitem"
-      className={classes(MENU_ITEM_CLASS, destructive && MENU_DESTRUCTIVE_ITEM_CLASS, active && 'text-primary', className)}
+      className={classes(MENU_ITEM_CLASS, destructive ? MENU_DESTRUCTIVE_ITEM_CLASS : active ? 'text-primary' : MENU_ITEM_TEXT_CLASS, className)}
     >
       {children}
     </button>
@@ -250,7 +254,7 @@ export function ContextMenuItem({
   return (
     <Primitive.Item
       {...props}
-      className={classes(MENU_ITEM_CLASS, 'data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground', className)}
+      className={classes(MENU_ITEM_CLASS, MENU_ITEM_TEXT_CLASS, 'data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground', className)}
     >
       {children}
     </Primitive.Item>
@@ -298,7 +302,7 @@ export function ContextMenuSubTrigger({
   return (
     <Primitive.SubTrigger
       disabled={disabled}
-      className={classes(MENU_ITEM_CLASS, 'justify-between data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[state=open]:bg-accent')}
+      className={classes(MENU_ITEM_CLASS, MENU_ITEM_TEXT_CLASS, 'justify-between data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[state=open]:bg-accent')}
     >
       <span className="flex-1">{children}</span>
       <ChevronRight size={11} className="ml-2 shrink-0 opacity-50" />
@@ -333,7 +337,7 @@ export function ContextMenuCheckItem({
     <Primitive.CheckboxItem
       checked={checked}
       onSelect={onSelect}
-      className={classes(MENU_ITEM_CLASS, 'pl-7 data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground')}
+      className={classes(MENU_ITEM_CLASS, MENU_ITEM_TEXT_CLASS, 'pl-7 data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground')}
     >
       <Primitive.ItemIndicator className="absolute left-2 flex items-center justify-center">
         <Check size={11} />

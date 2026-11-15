@@ -444,7 +444,7 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
 
         {/* Restart with Current Config Modal */}
         {showRestartConfigModal && createPortal(
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+          <div role="dialog" aria-modal="true" aria-label="Restart agents with current config" className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
             <div className="bg-card border border-border rounded-lg shadow-lg max-w-2xl max-h-96 overflow-auto w-96">
               <div className="px-4 py-3 border-b border-border flex justify-between items-center">
                 <h3 className="text-sm font-semibold text-foreground">
