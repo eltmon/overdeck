@@ -26,13 +26,12 @@ export function isReadyToMerge(derived: DerivedIssueState | undefined): boolean 
 
 /**
  * The change is on main. A closed-out issue derives as `closed` (the tracker
- * outranks the PR), so `merged` alone misses every issue `pan close` finished.
- * The forge attaches only an open or merged PR (a closed-unmerged one is
- * dropped), and a closed issue's PR is no longer open work, so `closed` with a
- * PR is shipped; `closed` without one was cancelled (PAN-3420).
+ * outranks the PR), so `merged` alone misses every issue `pan close` finished;
+ * the PR's own `merged` fact survives the close (PAN-4290). A closed issue
+ * whose PR is still open was never shipped (PAN-5310).
  */
 export function isShipped(derived: DerivedIssueState | undefined): boolean {
-  return derived?.state === 'merged' || (derived?.state === 'closed' && derived.pr !== undefined);
+  return derived?.state === 'merged' || (derived?.state === 'closed' && derived.pr?.merged === true);
 }
 
 /** Human-readable reason the issue is not moving. */
@@ -64,11 +63,17 @@ export function sortOperatorNeeds(items: readonly OperatorNeedsYou[]): OperatorN
 /** The merge door's state as the forge reports it. */
 export function deriveShip(derived: DerivedIssueState | undefined): IssueShipModel {
   const status: IssueShipModel['status'] =
-    isShipped(derived) ? 'merged' : derived?.state === 'ready' ? 'ready' : 'pending';
+    isShipped(derived) ? 'merged'
+    : derived?.state === 'ready' ? 'ready'
+    : derived?.state === 'closed' && !derived.pr ? 'closed'
+    : 'pending';
+  const blockerReason = derived?.state === 'closed' && derived.pr
+    ? 'The issue is closed, but this pull request is still open — close or merge it'
+    : derived ? stuckReason(derived) : undefined;
 
   return {
     status,
     ...(derived?.pr ? { prUrl: derived.pr.url, prNumber: derived.pr.number, checks: derived.pr.checks, mergeable: derived.pr.mergeable } : {}),
-    ...(status === 'pending' && derived ? { blockerReason: stuckReason(derived) } : {}),
+    ...(status === 'pending' && blockerReason ? { blockerReason } : {}),
   };
 }
