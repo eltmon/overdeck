@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5349",
   "created": "2026-11-15T15:32:54.289Z",
-  "updated": "2026-11-15T17:12:39.257Z",
+  "updated": "2026-11-15T17:12:50.048Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -320,6 +320,11 @@
     "install-step.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T17:12:39.256Z"
+    },
+    "doctor-check": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5349",
+      "claimedAt": "2026-11-15T17:12:50.048Z"
     }
   }
 }
