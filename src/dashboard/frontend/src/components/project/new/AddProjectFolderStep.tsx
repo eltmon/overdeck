@@ -34,6 +34,8 @@ import type { CreatedProject } from './projectCreateTypes.js';
 interface AddProjectFolderStepProps {
   titleId?: string;
   showGuide: boolean;
+  /** Resolve this folder on mount instead of waiting for a pick (PAN-5349). */
+  initialPath?: string;
   onCreated: (project: CreatedProject) => void;
   /** "Change": back to the start step. */
   onChange: () => void;
@@ -47,6 +49,7 @@ type Phase = 'pick' | 'waiting' | 'review';
 export function AddProjectFolderStep({
   titleId,
   showGuide,
+  initialPath,
   onCreated,
   onChange,
   onCancel,
@@ -94,6 +97,15 @@ export function AddProjectFolderStep({
     setPath(folder);
     setPhase('waiting');
   };
+
+  // A prefilled folder goes straight to resolving, once.
+  const choseInitial = useRef(false);
+  useEffect(() => {
+    if (choseInitial.current || !initialPath) return;
+    choseInitial.current = true;
+    choose(initialPath);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once on mount, with the first initialPath
+  }, []);
 
   const backToPicker = () => {
     // Pick up where the operator was, not back at the projects folder.

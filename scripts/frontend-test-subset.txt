@@ -413,6 +413,7 @@ src/components/primitives/issuePullRequest.test.ts
 src/components/project/new/ProjectCreateForm.jira.test.tsx
 src/components/project/new/__tests__/AddProjectCloneCreate.test.tsx
 src/components/project/new/__tests__/AddProjectDialog.test.tsx
+src/components/project/new/__tests__/AddProjectFolderStep.initialPath.test.tsx
 src/components/project/new/__tests__/AddProjectFolderStep.test.tsx
 src/components/project/new/__tests__/AddProjectNestedStep.test.tsx
 src/components/project/new/__tests__/AddProjectSuggestions.test.tsx
