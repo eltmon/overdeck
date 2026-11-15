@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5289",
   "created": "2026-11-15T02:58:13.006Z",
-  "updated": "2026-11-15T04:24:14.058Z",
+  "updated": "2026-11-15T04:24:32.486Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -368,6 +368,11 @@
     "search-tab.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T04:24:14.058Z"
+    },
+    "quick-open-ranking": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5289",
+      "claimedAt": "2026-11-15T04:24:32.486Z"
     }
   }
 }
