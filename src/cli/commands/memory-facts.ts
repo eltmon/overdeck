@@ -265,6 +265,10 @@ export interface MemoryFactEditOptions extends FactTargetFlags {
   body?: string;
   bodyFile?: string;
   tags?: string;
+  /** PAN-5360: replaces the fact's attribution. */
+  source?: string;
+  /** PAN-5360: comma-separated ids appended to the fact's supersedes list; each is marked superseded. */
+  supersedes?: string;
   clearReview?: boolean;
   json?: boolean;
   /** Injectable for tests; defaults to `syncOperatorMemory` (PAN-4578 D11.4). */
@@ -278,7 +282,8 @@ export async function memoryFactEditCommand(id: string, options: MemoryFactEditO
   }
 
   const hasChange = options.type !== undefined || options.title !== undefined || options.description !== undefined
-    || options.body !== undefined || options.bodyFile !== undefined || options.tags !== undefined || options.clearReview === true;
+    || options.body !== undefined || options.bodyFile !== undefined || options.tags !== undefined || options.clearReview === true
+    || options.source !== undefined || options.supersedes !== undefined;
   if (!hasChange) {
     console.error(chalk.red('nothing to change; pass a field flag or edit <path> directly'));
     return exitCli(1);
@@ -301,26 +306,43 @@ export async function memoryFactEditCommand(id: string, options: MemoryFactEditO
 
   const body = options.body ?? (options.bodyFile ? await readFile(options.bodyFile, 'utf8') : existing.body);
   const tags = options.tags !== undefined ? parseTags(options.tags) : existing.tags;
+  const today = new Date().toISOString().slice(0, 10);
+  const supersedes = parseTags(options.supersedes);
+  // PAN-5360 FR-6: keep created, links, status and unknown keys unless a flag changes them.
+  const fact = {
+    id,
+    type: options.type ?? existing.type,
+    title: options.title ?? existing.title,
+    description: options.description ?? existing.description,
+    tags,
+    created: existing.created,
+    updated: today,
+    source: options.source ?? existing.source,
+    status: existing.status,
+    supersedes: existing.supersedes,
+    supersededBy: existing.supersededBy,
+    review: options.clearReview ? [] : existing.review,
+    extra: existing.extra,
+    body,
+  };
 
   let file: string;
+  let supersededFiles: string[] = [];
   try {
-    file = await writeMemoryFact(target.dir, target.scope, {
-      id,
-      type: options.type ?? existing.type,
-      title: options.title ?? existing.title,
-      description: options.description ?? existing.description,
-      tags,
-      updated: new Date().toISOString().slice(0, 10),
-      source: existing.source,
-      review: options.clearReview ? [] : existing.review,
-      body,
-    }, { overwrite: true });
+    if (supersedes.length > 0) {
+      ({ file, supersededFiles } = await writeSupersedingFact(target.dir, target.scope, fact, supersedes, { overwrite: true, today }));
+    } else {
+      file = await writeMemoryFact(target.dir, target.scope, fact, { overwrite: true });
+    }
   } catch (err) {
     console.error(chalk.red(err instanceof Error ? err.message : String(err)));
     return exitCli(1);
   }
 
-  printWriteResult(file, 'Wrote', options.json, await syncAfterUserWrite(target, options.syncOperator));
+  const sync = await syncAfterUserWrite(target, options.syncOperator);
+  printWriteResult(file, 'Wrote', options.json, sync, supersedes.length > 0 ? supersededFiles : undefined);
+  if (options.json) return;
+  if (target.scope === 'project') console.log(projectCommitHint(target.root, [file, ...supersededFiles]));
 }
 
 export interface MemoryFactRetireOptions extends FactTargetFlags {
@@ -458,6 +480,8 @@ export function registerMemoryFactCommands(memory: Command): void {
     .option('--body <text>', 'Fact body')
     .option('--body-file <path>', 'Read the fact body from a file')
     .option('--tags <a,b>', 'Comma-separated tags')
+    .option('--source <text>', 'Replace who or what made this rule, and when')
+    .option('--supersedes <ids>', 'Comma-separated ids of facts this one replaces; marks them superseded (same store)')
     .option('--clear-review', 'Remove the review marker, re-activating the fact')
     .option('--project <key>', 'Project key (defaults to the project owning the cwd)')
     .option('--user', 'Edit the operator store (travels with you; synced when set up)')

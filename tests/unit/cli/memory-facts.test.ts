@@ -476,6 +476,65 @@ describe('pan memory curated-fact commands (PAN-3957)', () => {
   });
 
   describe('memoryFactEditCommand', () => {
+    const editDir = () => join(projectRoot, '.overdeck', 'memory');
+
+    it('edit existing --supersedes other marks other superseded (the dfai case)', async () => {
+      writeFact(editDir(), 'new-rule', '---\ntype: project\ndescription: New arrival rule.\n---\n\nBody.\n');
+      writeFact(editDir(), 'old-rule', '---\ntype: project\ndescription: Superseded arrival rule.\n---\n\nOld body.\n');
+
+      await memoryFactEditCommand('new-rule', { supersedes: 'old-rule' });
+
+      const { facts } = readMemoryFactsSync(editDir(), 'project');
+      const byId = Object.fromEntries(facts.map((fact) => [fact.id, fact]));
+      expect(byId['new-rule'].supersedes).toEqual(['old-rule']);
+      expect(byId['old-rule'].status).toBe('superseded');
+      expect(byId['old-rule'].supersededBy).toBe('new-rule');
+      expect(byId['old-rule'].body).toBe('Old body.');
+      expect(logSpy.mock.calls.flat().join('\n')).toContain(
+        `Commit it: git -C ${projectRoot} add .overdeck/memory/new-rule.md .overdeck/memory/old-rule.md`,
+      );
+    });
+
+    it('edit keeps created, links and unknown keys when changing only the description', async () => {
+      writeFact(
+        editDir(),
+        'mid-rule',
+        '---\ntype: project\ndescription: Mid rule.\ncreated: 2026-01-02\nsource: operator\nstatus: superseded\nsupersedes:\n  - old-rule\nsuperseded_by: top-rule\nowner: bob\nweight: 3\n---\n\nBody.\n',
+      );
+
+      await memoryFactEditCommand('mid-rule', { description: 'changed' });
+
+      const text = readFileSync(join(editDir(), 'mid-rule.md'), 'utf8');
+      const fact = readMemoryFactsSync(editDir(), 'project').facts.find((entry) => entry.id === 'mid-rule');
+      if (!fact) throw new Error('mid-rule missing');
+      expect(fact.description).toBe('changed');
+      expect(fact.created).toBe('2026-01-02');
+      expect(fact.source).toBe('operator');
+      expect(fact.status).toBe('superseded');
+      expect(fact.supersedes).toEqual(['old-rule']);
+      expect(fact.supersededBy).toBe('top-rule');
+      expect(fact.extra).toEqual({ owner: 'bob', weight: 3 });
+      expect(text).toContain('owner: bob\nweight: 3\n');
+    });
+
+    it('edit --source replaces the attribution', async () => {
+      writeFact(editDir(), 'some-rule', '---\ntype: project\ndescription: A rule.\nsource: twitch:alice\n---\n\nBody.\n');
+      await memoryFactEditCommand('some-rule', { source: 'operator' });
+      const fact = readMemoryFactsSync(editDir(), 'project').facts.find((entry) => entry.id === 'some-rule');
+      expect(fact?.source).toBe('operator');
+    });
+
+    it('edit of a superseded fact with --supersedes exits 1', async () => {
+      writeFact(editDir(), 'mid-rule', '---\ntype: project\ndescription: Mid.\nstatus: superseded\nsuperseded_by: top-rule\n---\n\nBody.\n');
+      writeFact(editDir(), 'other-rule', '---\ntype: project\ndescription: Other.\n---\n\nBody.\n');
+      const before = ['mid-rule', 'other-rule'].map((id) => readFileSync(join(editDir(), `${id}.md`), 'utf8'));
+
+      await expect(memoryFactEditCommand('mid-rule', { supersedes: 'other-rule' })).rejects.toThrow();
+      expect(exitCodes).toEqual([1]);
+      expect(errorSpy.mock.calls.flat().join('\n')).toContain('"mid-rule" is superseded by "top-rule"; edit that fact instead');
+      expect(['mid-rule', 'other-rule'].map((id) => readFileSync(join(editDir(), `${id}.md`), 'utf8'))).toEqual(before);
+    });
+
     beforeEach(() => {
       writeFact(
         join(projectRoot, '.overdeck', 'memory'),
