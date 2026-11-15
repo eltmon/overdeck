@@ -137,8 +137,10 @@ export function ConversationHeaderMenu({
     toast.success('Transcript exported');
   }, [agentId, conversation.title, conversation.name]);
 
-  // The session file id, kept reachable now that the status line no longer shows it (D1-4).
-  const sessionId = conversation.sessionFile?.split('/').pop()?.replace('.jsonl', '') ?? null;
+  // The session id, kept reachable now that the status line no longer shows it (D1-4).
+  // Reads claudeSessionId (what /api/conversations rows actually carry, PAN-5334),
+  // falling back to the session file basename for rows that only have that.
+  const sessionId = conversation.claudeSessionId ?? conversation.sessionFile?.split('/').pop()?.replace('.jsonl', '') ?? null;
 
   const handleCopyLink = useCallback(() => {
     const params = new URLSearchParams();
