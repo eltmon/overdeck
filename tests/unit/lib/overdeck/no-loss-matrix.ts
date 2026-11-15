@@ -283,6 +283,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/conversations/:name/diffs/full',                  kind: 'http', disposition: 'RELOCATE',    door: 'Diffs' },
   { surface: 'GET /api/conversations/:name/diffs/:turnId',               kind: 'http', disposition: 'RELOCATE',    door: 'Diffs' },
   { surface: 'GET /api/conversations/:name/changes',                     kind: 'http', disposition: 'RELOCATE',    door: 'Diffs' },
+  { surface: 'GET /api/conversations/:name/changes/lines',               kind: 'http', disposition: 'RELOCATE',    door: 'Diffs' },
   { surface: 'GET /api/projects/:projectKey/changes',                    kind: 'http', disposition: 'READ',        door: 'getProjectChanges (PAN-5288)' },
   { surface: 'GET /api/conversations/:name/diffs/vs-main',               kind: 'http', disposition: 'RELOCATE',    door: 'Diffs' },
   { surface: 'POST /api/conversations/:name/retitle',                    kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.retitle' },

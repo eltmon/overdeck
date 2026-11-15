@@ -205,6 +205,7 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/conversations/:name/diffs', scope: 'read:conversations' },
   { method: 'GET', path: '/api/conversations/:name/diffs/:turnId', scope: 'read:conversations' },
   { method: 'GET', path: '/api/conversations/:name/changes', scope: 'read:conversations' },
+  { method: 'GET', path: '/api/conversations/:name/changes/lines', scope: 'read:conversations' },
   { method: 'POST', path: '/api/conversations/:name/upload-image', scope: 'tell' },
   // PAN-4835 D-7: the undo of upload-image.
   { method: 'POST', path: '/api/conversations/:name/delete-image', scope: 'tell' },
