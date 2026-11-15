@@ -14,7 +14,11 @@
  *      (Older SUBSET generations are NOT stale: a smaller batch off current
  *      main remains perfectly testable and promotable.)
  *   3. If no live generation matches the current desired set, assemble the
- *      next generation in the background. Single-flight per project; a failed
+ *      next generation in the background. PAN-5356: a generation whose base
+ *      main left behind still matches when every commit since its base
+ *      touches only bookkeeping paths (`BOOKKEEPING_PATH_GLOBS`, the same set
+ *      CI's `paths-ignore` skips) and none of the files it changes; any other
+ *      main move re-assembles. Single-flight per project; a failed
  *      assembly for the SAME desired signature backs off before retrying.
  *      PAN-3965: never for a single ready feature unless the project holds
  *      merges for UAT — a one-member batch is byte-identical to the PR branch
@@ -35,6 +39,7 @@
 import type { ReadyFeature, GenerationStorePort } from './uat-generation-engine.js';
 import type { UatGeneration } from '../overdeck/merge-sync.js';
 import type { BatchChoice } from './batch-window.js';
+import type { BaseMove } from './bookkeeping-paths.js';
 
 /**
  * An 'assembling' row with NO PROGRESS for this long is marked failed (train
@@ -99,6 +104,14 @@ export interface UatReconcilerDeps {
    * the single branch head SHA. Omit for monorepo.
    */
   getFeatureAnchor?(feature: ReadyFeature): Promise<string>;
+  /**
+   * PAN-5356: true when main moved from a generation's base by bookkeeping
+   * commits only (see `GenerationGitDeps.isBookkeepingOnlyBaseMove`), so the
+   * generation keeps its base. Monorepo only — ignored when `getBaseAnchor`
+   * is set, since composite anchors are not commits. Omitted, false or a
+   * rejection = the base moved (re-assemble, pre-PAN-5356 behavior).
+   */
+  isBookkeepingOnlyBaseMove?(move: BaseMove): Promise<boolean>;
   /** Positive merge evidence for a generation branch; omitted when unavailable. */
   isGenerationContainedInMain?(generation: UatGeneration): Promise<boolean>;
   store: GenerationStorePort;
@@ -189,21 +202,25 @@ function desiredSignature(features: readonly ReadyFeature[], headShas: ReadonlyM
   return `${mainSha}|${parts.join(',')}`;
 }
 
-function generationSignature(gen: UatGeneration): string {
+/**
+ * `base` is the generation's effective base: `gen.baseSha`, or main's head when
+ * main moved past it by bookkeeping commits only (PAN-5356), so a failed
+ * assembly still backs off across that churn.
+ */
+function generationSignature(gen: UatGeneration, base: string = gen.baseSha): string {
   const parts = [
     ...gen.members.map((m) => `${m.issueId.toUpperCase()}@${m.headSha}`),
     ...gen.heldOut.map((h) => `${h.issueId.toUpperCase()}@${h.headSha ?? 'held'}`),
   ].sort();
-  return `${gen.baseSha}|${parts.join(',')}`;
+  return `${base}|${parts.join(',')}`;
 }
 
-function liveSignatureMatches(
+/** Members, held-out features and branch heads match the desired set — everything but the base. */
+function liveMembersMatch(
   gen: UatGeneration,
   features: readonly ReadyFeature[],
   headShas: ReadonlyMap<string, string>,
-  mainSha: string,
 ): boolean {
-  if (gen.baseSha !== mainSha) return false;
   const desiredIds = new Set(features.map((f) => f.issueId.toUpperCase()));
   const genIds = new Set([
     ...gen.members.map((m) => m.issueId.toUpperCase()),
@@ -231,13 +248,14 @@ function liveSignatureMatches(
  * Deliberately NOT invalidation triggers (the first live run, 2026-06-10,
  * churned every ready batch to death within minutes):
  *  - main advancing past baseSha — an active flywheel run lands strike commits
- *    on main continuously; the batch tree is still perfectly testable. Base
- *    movement makes liveSignatureMatches() fail, so a FRESH superset assembles
- *    and supersedes this one when ready; promotion safety against a moved base
- *    is enforced at promote time (member-file overlap check + clean merge).
+ *    on main continuously; the batch tree is still perfectly testable. A base
+ *    move that touches code makes the live match fail, so a FRESH superset
+ *    assembles and supersedes this one when ready; a bookkeeping-only move
+ *    keeps it (PAN-5356). Promotion safety against a moved base is enforced
+ *    at promote time (member-file overlap check + clean merge).
  *  - held-out drift (departed / branch moved / metadata missing) — held-out
  *    features are not in the tree; their changes also flow through
- *    liveSignatureMatches() into a fresh assembly, never destruction of a
+ *    liveMembersMatch() into a fresh assembly, never destruction of a
  *    testable batch.
  */
 function isStale(
@@ -272,6 +290,8 @@ function isStale(
 const lastLoggedPerPr = new Map<string, string>();
 /** Per-project last-logged batch-window wait reason (PAN-4753), so it logs only on change. */
 const lastLoggedWait = new Map<string, string>();
+/** Per-project last-logged bookkeeping-only keep (PAN-5356), so it logs only on change. */
+const lastLoggedKeep = new Map<string, string>();
 
 /**
  * Partition the ready set into per-PR-owned ids and the batch-owned subset.
@@ -349,6 +369,24 @@ export async function reconcileUatGenerations(
     // isStale distinguishes via perPrIds before falling back to this check.
     const desiredIds = new Set(readySet.map((f) => f.issueId.toUpperCase()));
 
+    // PAN-5356: a generation's effective base — main's head when main moved
+    // past its base by bookkeeping commits only, else its own base. Asked at
+    // most once per generation per tick, and only for generations that
+    // otherwise match.
+    const bookkeepingOnly = deps.getBaseAnchor ? undefined : deps.isBookkeepingOnlyBaseMove;
+    const baseChecks = new Map<string, Promise<boolean>>();
+    const effectiveBase = async (gen: UatGeneration, batchBranch?: string): Promise<string> => {
+      if (gen.baseSha === mainSha || !bookkeepingOnly) return gen.baseSha;
+      let check = baseChecks.get(gen.name);
+      if (!check) {
+        check = bookkeepingOnly({ fromSha: gen.baseSha, toSha: mainSha, ...(batchBranch ? { batchBranch } : {}) })
+          .then((ok) => ok === true)
+          .catch(() => false);
+        baseChecks.set(gen.name, check);
+      }
+      return (await check) ? mainSha : gen.baseSha;
+    };
+
     // Promoted is terminal: stamp positive merge evidence before stale checks,
     // and never include promoted rows in the live list passed to isStale.
     const liveChain = deps.store.listChain(projectRoot, ['ready', 'superseded']);
@@ -419,7 +457,16 @@ export async function reconcileUatGenerations(
     const desired = desiredSignature(toAssemble, headShas, mainSha);
     if (!options.force) {
       const live = deps.store.listChain(projectRoot, ['ready', 'superseded']);
-      if (live.some((gen) => liveSignatureMatches(gen, toAssemble, headShas, mainSha))) {
+      for (const gen of live) {
+        if (!liveMembersMatch(gen, toAssemble, headShas)) continue;
+        // The batch's own files must stay clear of the move (promote's
+        // stale-base check), so a kept batch is always promotable.
+        if (await effectiveBase(gen, gen.name) !== mainSha) continue;
+        const keep = `${gen.name}@${mainSha}`;
+        if (gen.baseSha !== mainSha && lastLoggedKeep.get(key) !== keep) {
+          lastLoggedKeep.set(key, keep);
+          log(`[uat-reconciler] keeping ${gen.name}: main moved ${gen.baseSha.slice(0, 9)} → ${mainSha.slice(0, 9)} by bookkeeping commits only`);
+        }
         await deps.cleanup().catch(() => {});
         return { action: 'idle', invalidated, perPr };
       }
@@ -460,11 +507,18 @@ export async function reconcileUatGenerations(
         );
         return { action: 'assembly-blocked', invalidated, perPr };
       }
-      const failed = deps.store.listChain(projectRoot, ['failed']);
-      const recentFailure = failed.find((gen) =>
-        generationSignature(gen) === desired &&
-        now() - Date.parse(gen.updatedAt || gen.createdAt || '') < FAILED_RETRY_BACKOFF_MS,
-      );
+      // Window first: failed rows are kept as an audit trail, and only a
+      // recent one may cost a git read.
+      const recentFailed = deps.store.listChain(projectRoot, ['failed']).filter((gen) =>
+        now() - Date.parse(gen.updatedAt || gen.createdAt || '') < FAILED_RETRY_BACKOFF_MS);
+      let recentFailure: UatGeneration | undefined;
+      for (const gen of recentFailed) {
+        if (generationSignature(gen) === desired
+          || (generationSignature(gen, mainSha) === desired && await effectiveBase(gen) === mainSha)) {
+          recentFailure = gen;
+          break;
+        }
+      }
       if (recentFailure) {
         log(`[uat-reconciler] backing off — ${recentFailure.name} failed recently for the same input`);
         return { action: 'backoff', invalidated, perPr };

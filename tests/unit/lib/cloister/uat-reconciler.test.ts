@@ -17,6 +17,7 @@ import { makeUniqueUatCandidateName } from '../../../../src/lib/cloister/uat-can
 import { generationFolderName } from '../../../../src/lib/cloister/uat-generation-engine.js';
 import { chooseBatch } from '../../../../src/lib/cloister/batch-window.js';
 import { safeBranchName, safeGenerationWorktreePath } from '../../../../src/lib/cloister/uat-generation-deps.js';
+import { isBookkeepingOnlyMove, type BaseMove } from '../../../../src/lib/cloister/bookkeeping-paths.js';
 
 const MAIN = 'main-sha-1';
 const T0 = Date.parse('2026-06-10T12:00:00.000Z');
@@ -57,21 +58,39 @@ function makeDeps(projectRoot: string, options: {
   containedNames?: string[];
   holdsForUat?: boolean;
   mergesPerPr?: (feature: ReadyFeature) => boolean | Promise<boolean>;
+  /** PAN-5356 fake git: commits on main since a base SHA, each a list of touched paths. */
+  commitsSince?: Record<string, string[][]>;
+  /** PAN-5356 fake git: files each uat branch changes. */
+  batchFiles?: Record<string, string[]>;
+  baseMoveCheck?: UatReconcilerDeps['isBookkeepingOnlyBaseMove'];
 } = {}): UatReconcilerDeps & {
   rows: Map<string, UatGeneration>;
   assembled: ReadyFeature[][];
   teardowns: string[];
   cleanups: number[];
   logs: string[];
+  baseMoves: BaseMove[];
 } {
   const rows = new Map((options.rows ?? []).map((g) => [g.name, g]));
+  const baseMoves: BaseMove[] = [];
+  const commitsSince = options.commitsSince;
+  const fakeGitBaseMove = commitsSince
+    ? async (move: BaseMove) => {
+      baseMoves.push(move);
+      const commits = commitsSince[move.fromSha];
+      if (!commits || move.toSha !== MAIN) return false; // not an ancestor of main
+      const batch = move.batchBranch ? options.batchFiles?.[move.batchBranch] ?? [] : [];
+      return isBookkeepingOnlyMove(commits.flat(), batch);
+    }
+    : undefined;
+  const baseMoveCheck = options.baseMoveCheck ?? fakeGitBaseMove;
   const assembled: ReadyFeature[][] = [];
   const teardowns: string[] = [];
   const cleanups: number[] = [];
   const logs: string[] = [];
   let assembleSeq = 0;
   return {
-    rows, assembled, teardowns, cleanups, logs,
+    rows, assembled, teardowns, cleanups, logs, baseMoves,
     isEnabled: () => options.enabled ?? true,
     getReadySet: async () => options.readySet === undefined ? READY : options.readySet,
     getMainHeadSha: async () => MAIN,
@@ -102,6 +121,7 @@ function makeDeps(projectRoot: string, options: {
     cleanup: async () => { cleanups.push(1); },
     ...(options.holdsForUat !== undefined ? { holdsForUat: () => options.holdsForUat! } : {}),
     ...(options.mergesPerPr ? { mergesPerPr: options.mergesPerPr } : {}),
+    ...(baseMoveCheck ? { isBookkeepingOnlyBaseMove: baseMoveCheck } : {}),
     now: () => T0,
     log: (message) => { logs.push(message); },
   };
@@ -267,6 +287,129 @@ describe('growth and invalidation', () => {
     expect(result.invalidated).toEqual([]);
     expect(deps.rows.get('uat/pan-held-0610')!.status).toBe('ready');
     expect(result.action).toBe('assembled'); // retry chance for PAN-2 in a fresh generation
+  });
+});
+
+describe('PAN-5356 bookkeeping-only base moves', () => {
+  const SEQUENCE = ['.pan/backlog/sequence.md'];
+
+  it('keeps the live generation when main moved by .pan/** commits only', async () => {
+    const proj = freshProject();
+    const live = gen(proj, 'uat/pan-moss-1115-1', 'ready', { baseSha: 'b2869b1f9d' });
+    const deps = makeDeps(proj, {
+      rows: [live],
+      commitsSince: { b2869b1f9d: [SEQUENCE, SEQUENCE, ['.overdeck/memory/fact.md']] },
+      batchFiles: { 'uat/pan-moss-1115-1': ['src/lib/a.ts', '.pan/specs/pan-1.xbrief.json'] },
+    });
+
+    const result = await reconcileUatGenerations(proj, deps);
+
+    expect(result.action).toBe('idle');
+    expect(deps.assembled).toHaveLength(0);
+    expect(deps.rows.get('uat/pan-moss-1115-1')!.status).toBe('ready');
+    expect(deps.baseMoves).toEqual([{ fromSha: 'b2869b1f9d', toSha: MAIN, batchBranch: 'uat/pan-moss-1115-1' }]);
+    expect(deps.logs).toContain('[uat-reconciler] keeping uat/pan-moss-1115-1: main moved b2869b1f9 → main-sha- by bookkeeping commits only');
+  });
+
+  it('re-assembles when a commit since the base touches src/**', async () => {
+    const proj = freshProject();
+    const live = gen(proj, 'uat/pan-moss-1115-2', 'ready', { baseSha: 'b3c10e9a0e' });
+    const deps = makeDeps(proj, { rows: [live], commitsSince: { b3c10e9a0e: [['src/lib/cloister/uat-reconciler.ts']] } });
+
+    const result = await reconcileUatGenerations(proj, deps);
+
+    expect(result.action).toBe('assembled');
+    expect(result.invalidated).toEqual([]);
+    expect(deps.rows.get('uat/pan-moss-1115-2')!.status).toBe('ready');
+  });
+
+  it('re-assembles when bookkeeping and code commits are mixed', async () => {
+    const proj = freshProject();
+    const live = gen(proj, 'uat/pan-moss-1115-3', 'ready', { baseSha: '4cdae38f2d' });
+    const deps = makeDeps(proj, {
+      rows: [live],
+      commitsSince: { '4cdae38f2d': [SEQUENCE, ['.pan/specs/x.json', 'src/index.ts'], SEQUENCE] },
+    });
+
+    const result = await reconcileUatGenerations(proj, deps);
+
+    expect(result.action).toBe('assembled');
+  });
+
+  it('re-assembles when a bookkeeping commit touches a file the batch also changes (promote would refuse it)', async () => {
+    const proj = freshProject();
+    const live = gen(proj, 'uat/pan-moss-1115-4', 'ready', { baseSha: 'b96fbec622' });
+    const deps = makeDeps(proj, {
+      rows: [live],
+      commitsSince: { b96fbec622: [SEQUENCE] },
+      batchFiles: { 'uat/pan-moss-1115-4': ['src/a.ts', '.pan/backlog/sequence.md'] },
+    });
+
+    const result = await reconcileUatGenerations(proj, deps);
+
+    expect(result.action).toBe('assembled');
+  });
+
+  it('re-assembles when the base is no longer an ancestor of main (main rewound)', async () => {
+    const proj = freshProject();
+    const live = gen(proj, 'uat/pan-moss-1115-5', 'ready', { baseSha: 'orphan-base' });
+    const deps = makeDeps(proj, { rows: [live], commitsSince: {} });
+
+    const result = await reconcileUatGenerations(proj, deps);
+
+    expect(result.action).toBe('assembled');
+  });
+
+  it('re-assembles when the git check rejects, as before PAN-5356', async () => {
+    const proj = freshProject();
+    const live = gen(proj, 'uat/pan-moss-1115-6', 'ready', { baseSha: 'older-main' });
+    const deps = makeDeps(proj, { rows: [live], baseMoveCheck: async () => { throw new Error('fetch failed'); } });
+
+    const result = await reconcileUatGenerations(proj, deps);
+
+    expect(result.action).toBe('assembled');
+  });
+
+  it('skips the git check when members already differ', async () => {
+    const proj = freshProject();
+    const live = gen(proj, 'uat/pan-moss-1115-7', 'ready', { baseSha: '0929f7ec19' });
+    const deps = makeDeps(proj, {
+      rows: [live],
+      headShas: { 'feature/pan-1': 'h1-NEW' },
+      commitsSince: { '0929f7ec19': [SEQUENCE] },
+    });
+
+    await reconcileUatGenerations(proj, deps);
+
+    expect(deps.baseMoves).toEqual([]);
+  });
+
+  it('a recent failure still backs off across bookkeeping-only churn', async () => {
+    const proj = freshProject();
+    const failed = gen(proj, 'uat/pan-failed-1115', 'failed', {
+      baseSha: 'ad851b2807',
+      updatedAt: new Date(T0 - FAILED_RETRY_BACKOFF_MS / 2).toISOString(),
+    });
+    const deps = makeDeps(proj, { rows: [failed], commitsSince: { ad851b2807: [SEQUENCE] } });
+
+    const result = await reconcileUatGenerations(proj, deps);
+
+    expect(result.action).toBe('backoff');
+    // A failed row is never promoted, so no batch-file overlap is asked for.
+    expect(deps.baseMoves).toEqual([{ fromSha: 'ad851b2807', toSha: MAIN }]);
+  });
+
+  it('ignores the check for polyrepo composite anchors', async () => {
+    const proj = freshProject();
+    const live = gen(proj, 'uat/pan-poly-1115', 'ready', { baseSha: 'fe@old api@old' });
+    const deps = makeDeps(proj, { rows: [live], commitsSince: { 'fe@old api@old': [SEQUENCE] } });
+    deps.getBaseAnchor = async () => MAIN;
+    deps.getFeatureAnchor = async (f) => (f.branch === 'feature/pan-1' ? 'h1' : 'h2');
+
+    const result = await reconcileUatGenerations(proj, deps);
+
+    expect(result.action).toBe('assembled');
+    expect(deps.baseMoves).toEqual([]);
   });
 });
 

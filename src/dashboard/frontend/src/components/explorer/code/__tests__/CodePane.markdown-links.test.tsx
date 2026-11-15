@@ -10,6 +10,12 @@ import type { StageDeckContextValue } from '../../../Stage/StageDeckContext'
 
 const mocks = vi.hoisted(() => ({ readFile: vi.fn(), listDir: vi.fn() }))
 
+// PAN-5290: the header's root label reads the shared registry queries; no QueryClient in this test.
+vi.mock('../../rootForConversation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../rootForConversation')>()),
+  useRootLabel: (rootId: string | null) => rootId,
+}))
+
 vi.mock('../../explorer-rpc', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../explorer-rpc')>()),
   subscribeWatchStream: () => () => {},

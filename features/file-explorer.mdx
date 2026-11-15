@@ -59,7 +59,9 @@ The **Live** tab shows the conversations you popped into the dock, with needs-yo
 
 A file opens in a Monaco code pane. Your edits save automatically one second after you stop typing and when the editor loses focus, and `Ctrl/Cmd+S` saves at once. A single click on a file opens a preview tab, shown in italics, that the next single click replaces; a double click pins the tab.
 
-The **Changes** view compares your file with the last commit. `Alt+Z` toggles word wrap, and a Markdown file has a **Preview** tab.
+The header shows where the file lives as a breadcrumb: the project or workspace name, then each folder, then the file name. **File / Changes** switches between the file and the **Changes** view, which compares your file with the last commit. **Reveal in files** (the target icon) opens the dock's Files tab with the file selected. `Alt+Z` toggles word wrap, and a Markdown file has a **Preview** tab.
+
+When a conversation is open beside the file, a blue bar in the margin marks each line that conversation changed, whether it committed the change or not. Lines another session wrote in the same file get no bar. The marks follow the conversation's changes as it works.
 
 In Preview, a relative link opens the linked file in a preview tab, the same as a single click in the tree; a link to a folder shows it in Files; a `#heading` link scrolls the Preview to that heading; a link to a missing file is shown dashed and opens nothing; and web links open in a new browser tab.
 
@@ -81,17 +83,25 @@ Drop files from your computer onto a folder to upload them. You can download a f
 
 The explorer never changes a project's main checkout. When you first save a file or run a file action there, Overdeck creates an **edit workspace**: a git worktree on the branch `scratch/edit-<MMDD-HHMM>`, stored under the project's `workspaces/scratch-edit-*` directory and cut from the remote default branch. Your edit is saved there, and the dock and every code pane on the project switch to the edit workspace.
 
-While a project has an edit workspace that is not merged or closed, later edits reuse it. **New edit workspace** starts a second one and points the dock at it. A file that exists only in your main checkout, such as an untracked file or a commit you have not pushed, does not exist in the edit workspace, so the pane reports that the file no longer exists and keeps your text in memory.
+While a project has an edit workspace that is not merged or closed, later edits reuse it. **New edit workspace**, in the menu you open from the root name at the top of the Files tab, starts a second one and points the dock at it. On an edit workspace, the Files tab shows the same editor bar as a code tab, so **Create PR** and **Discard…** are there even when no file is open. A file that exists only in your main checkout, such as an untracked file or a commit you have not pushed, does not exist in the edit workspace, so the pane reports that the file no longer exists and keeps your text in memory.
 
-## Create PR and merge
+## Editing and PRs
 
-The banner on an edit workspace offers **Create PR**, **Discard** and **New edit workspace**. **Create PR** commits every change in the edit workspace with the title you enter. The default title is a conventional-commit subject, such as `chore: edit README.md`, because the repository's commit hooks run on this commit and may reject a plain sentence. If a hook refuses the commit, the dialog shows its output so you can fix the title.
+Every code tab on a project or an edit workspace has an **editor bar** under its header. On the main checkout it reads "This is the **main checkout**. Start typing and Overdeck moves your edits to a new edit workspace, so main never changes until a PR merges." **Start editing** creates the edit workspace now, and so does your first save. The tab moves to the edit workspace and your cursor, scroll position and focus stay where they were.
 
-You then choose how to ship the change. Both choices need a project with a GitHub repository:
+On an edit workspace the bar names it and its branch, counts the files you changed with the added and removed lines, and says **Saving…** or **All edits saved**. It offers **Discard…** and **Create PR**.
 
-- **Open PR** pushes the edit branch and opens a pull request to the default branch, optionally as a draft.
-- **Send through pipeline** creates a GitHub issue from the title and body, pushes the commit as that issue's feature branch, opens its PR, and hands it to Overdeck's review pipeline. It needs a project whose tracker is GitHub Issues and that has an issue prefix.
+**Create PR** opens a dialog. It names the edit workspace, its branch and the branch it lands in, and asks for a **Title** and an optional **Description**. The default title is a conventional-commit subject, such as `chore: edit README.md`, because the repository's commit hooks run on this commit and may reject a plain sentence. If a hook refuses the commit, the dialog shows its output so you can fix the title. **What will land** lists every file with its added and removed lines. **How should it land?** has two choices, and both need a project with a GitHub repository:
 
-While a PR is open, the dialog becomes **Commit and push**, which adds your newer edits to the same PR. The banner shows the PR with **Merge**, **Refresh** and **Push changes**. **Merge** squash-merges the PR only when GitHub reports it can merge and every edit is pushed; otherwise the button is disabled and the reason is shown, for example "Conflicts with the base branch" or "Required checks or reviews are not met". After a merge, the edit workspace is removed and the dock and panes return to the main checkout.
+- **Open a pull request**: you review and merge it yourself. When GitHub reports no conflicts, **Merge** appears in the editor bar. **Open as a draft** opens it as a draft.
+- **Send through the pipeline**: creates a GitHub issue and its PR, and Overdeck's review and test agents check it before it merges like any other issue. It needs a project whose tracker is GitHub Issues and that has an issue prefix.
 
-**Discard** lists the changes that will be lost and removes the edit workspace. While its PR is open, **Also close PR** (checked by default) closes the PR too.
+A choice the project cannot use is disabled, with the reason under it. The button is labelled by your choice: **Open pull request** or **Send through the pipeline**.
+
+While the PR is open, the bar follows it. It reads "PR #N is open" with GitHub's reason when the PR cannot merge yet, such as "Required checks or reviews are not met" or "Conflicts with the base branch", and **Merge** stays disabled with that reason. While GitHub is still deciding, the bar checks the PR again every 15 seconds; **Refresh** checks it now. **View on GitHub** opens the PR. If you edit after opening the PR, **Push changes** opens **Commit and push**, which lists the uncommitted files and adds them to the same PR. When GitHub reports no conflicts the bar reads "no conflicts" and **Merge** squash-merges the PR into the default branch. A PR merged or closed on GitHub has its own line in the bar.
+
+After **Merge**, the tab returns to the main checkout and the bar says the PR was merged and the edit workspace and its branch were removed. After **Send through the pipeline** it names the new issue and PR and offers **Open PR**. After **Discard…** it says the edit workspace was discarded. Each note has **Dismiss** and **Close tab**.
+
+**Discard…** lists the changes that will be lost and removes the edit workspace. While its PR is open, **Also close PR** (checked by default) closes the PR too.
+
+A tab whose edit workspace was merged or discarded elsewhere, such as in another tab or from the CLI, says "This edit workspace was merged or discarded." instead of an error. **Open on main** shows the same file on the main checkout, and **Close tab** closes it. A tab on an issue workspace that no longer exists says so the same way.

@@ -16,8 +16,10 @@ import { MarkdownTab } from '../../CommandDeck/ZoneCOverviewTabs/MarkdownTab'
 import { pickViewer } from '../viewers/viewer-router'
 import styles from '../../Stage/stage.module.css'
 import type { PaneWrapperProps } from '../../Stage/types'
-import { EditWorkspaceNote } from '../edit/EditWorkspaceBanner'
-import { useEditWorkspaceStore } from '../edit/edit-workspace-store'
+import { EditorBar } from '../edit/EditorBar'
+import { useStageDeck } from '../../Stage/StageDeckContext'
+import { useWorkDockStore } from '../../dock/workDockStore'
+import { useRootLabel } from '../rootForConversation'
 import { explorerErrorCode, explorerErrorMessage, parseRootId, readFile } from '../explorer-rpc'
 import { openCodePane } from '../openCodePane'
 import { draftKey, isDraftDirty, useCodeDrafts } from './code-drafts'
@@ -26,20 +28,20 @@ import { ChangesView } from './ChangesView'
 import { CodePaneHeader, isMarkdownPath, type CodePaneView } from './CodePaneHeader'
 import { ExternalChangeBanner } from './ExternalChangeBanner'
 import { useCodePaneSave } from './useCodePaneSave'
+import { ChangedLineMarks } from './useChangedLineMarks'
+import { registerCodeEditor, takeViewState } from './view-state-registry'
+import { isRootNotFound, StaleCodeTab } from './StaleCodeTab'
 import { readDisk, useExternalChange } from './useExternalChange'
 
 type LoadState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
+  | { status: 'stale' }
   | { status: 'ready'; result: ExplorerReadFileResult }
 
 // PAN-5188's viewer host: images, PDFs, audio, fonts, tables, archives and
 // large text. Its viewers lazy-load in turn (PAN-5188 D-1, the §6.7 seam).
 const FileViewer = lazy(() => import('../viewers/FileViewer'))
-
-/** PAN-5191: the note on a project root, whose saves go to an edit workspace. */
-export const PROJECT_EDIT_NOTE = 'Edits here are saved to an edit workspace. The main checkout is never changed.'
-export const CREATING_EDIT_NOTE = 'Creating edit workspace…'
 
 function Placeholder({ title, hint, testId }: { title: string; hint?: string; testId: string }) {
   return (
@@ -80,9 +82,17 @@ function CodePaneForFile({
   const diffEditor = useRef<CodeEditorInstance | null>(null)
   const carriedPosition = useRef<CodePosition | null>(null)
   const [editor, setEditor] = useState<CodeEditorInstance | null>(null)
+  // The editor bar found the edit workspace gone (C-D13b). A retarget remounts the pane, so it resets.
+  const [statusStale, setStatusStale] = useState(false)
+  const markStale = useCallback(() => setStatusStale(true), [])
   const text = useCodeDrafts((s) => s.drafts[key]?.text)
   const external = useExternalChange(rootId, path)
   const { setState: setExternal } = external
+  const rootLabel = useRootLabel(rootId) ?? rootId
+  const deck = useStageDeck()
+  // PAN-5290 FR-6: mark the lines the conversation beside this pane changed (plain editor only).
+  const conversation = deck?.conversationBeside?.(pane.paneId) ?? null
+  const dirty = useCodeDrafts((s) => isDraftDirty(s.drafts[key]))
 
   useEffect(() => {
     let cancelled = false
@@ -100,6 +110,11 @@ function CodePaneForFile({
       })
       .catch((error: unknown) => {
         if (cancelled) return
+        // PAN-5290 FR-13: the root is gone (a merged or discarded edit workspace).
+        if (isRootNotFound(error)) {
+          setLoad({ status: 'stale' })
+          return
+        }
         const message =
           explorerErrorCode(error) === 'NOT_FOUND' ? 'This file no longer exists.' : explorerErrorMessage(error)
         setLoad({ status: 'error', message })
@@ -123,6 +138,22 @@ function CodePaneForFile({
     editor.focus()
   }, [editor, revealLine, revealColumn, revealNonce])
 
+  // PAN-5290 C-D12: a root switch carried this file's cursor, scroll and focus
+  // from the pane that showed it on the old root; restore them once, then
+  // register the editor so the next switch can carry them on.
+  useEffect(() => {
+    if (!editor) return
+    const carried = takeViewState(key)
+    if (carried) {
+      editor.restoreViewState(carried.viewState as Parameters<CodeEditorInstance['restoreViewState']>[0])
+      if (carried.focused) editor.focus()
+    }
+    return registerCodeEditor(key, editor)
+  }, [editor, key])
+  // While the diff is open its modified side is the live editor.
+  const diffRegistration = useRef<(() => void) | null>(null)
+  useEffect(() => () => diffRegistration.current?.(), [])
+
   // Back from the diff: put the cursor where it was on the modified side.
   useEffect(() => {
     const position = carriedPosition.current
@@ -135,7 +166,6 @@ function CodePaneForFile({
 
   const rootRef = parseRootId(rootId)
   const isProjectRoot = rootRef?.kind === 'project'
-  const creatingEdit = useEditWorkspaceStore((s) => (isProjectRoot && rootRef ? s.creating[rootRef.key] === true : false))
   // PAN-5191: a project root is editable; the first save moves the edit to an edit workspace.
   const writable = load.status === 'ready' && load.result.kind === 'text' && (load.result.writable || isProjectRoot)
   const preview = pane.explorerPreview === true
@@ -144,7 +174,11 @@ function CodePaneForFile({
   const switchDiff = useCallback(
     (next: 'head' | 'disk' | null) => {
       carriedPosition.current = (diff ? diffEditor.current : editor)?.getPosition() ?? null
-      if (diff) diffEditor.current = null
+      if (diff) {
+        diffEditor.current = null
+        diffRegistration.current?.()
+        diffRegistration.current = null
+      }
       if (!diff && next) setEditor(null)
       setView('edit')
       setDiff(next)
@@ -152,9 +186,14 @@ function CodePaneForFile({
     [diff, editor],
   )
   const toggleChanges = useCallback(() => switchDiff(diff === 'head' ? null : 'head'), [diff, switchDiff])
-  const onDiffMount = useCallback((instance: CodeEditorInstance) => {
-    diffEditor.current = instance
-  }, [])
+  const onDiffMount = useCallback(
+    (instance: CodeEditorInstance) => {
+      diffEditor.current = instance
+      diffRegistration.current?.()
+      diffRegistration.current = registerCodeEditor(key, instance)
+    },
+    [key],
+  )
   const keepOpen = useCallback(
     () => usePanesStore.getState().updatePane(workspaceId, pane.paneId, { explorerPreview: false }),
     [workspaceId, pane.paneId],
@@ -209,10 +248,26 @@ function CodePaneForFile({
     if (diff === 'disk' && externalState.kind !== 'changed') switchDiff(null)
   }, [diff, externalState.kind, switchDiff])
   const onCompare = useCallback(() => switchDiff(diff === 'disk' ? null : 'disk'), [diff, switchDiff])
+  // PAN-5290 FR-4: inside a Stage the renamed file opens beside the chat like every other open.
   const onOpenRenamed = useCallback(
-    (newPath: string) => openCodePane(workspaceId, { rootId, path: newPath }),
-    [workspaceId, rootId],
+    (newPath: string) => {
+      if (deck?.openBeside) deck.openBeside({ rootId, path: newPath })
+      else openCodePane(workspaceId, { rootId, path: newPath })
+    },
+    [deck, workspaceId, rootId],
   )
+  // PAN-5290 FR-3: make this pane active and show its file in the dock's Files tab.
+  const onReveal = useMemo(() => {
+    const openDock = deck?.openDock
+    if (!openDock) return undefined
+    return () => {
+      usePanesStore.getState().setActivePane(workspaceId, pane.paneId)
+      // The Files tab ignores a reveal on another root: a dock pinned elsewhere follows this file first.
+      const override = useWorkDockStore.getState().byDeck[workspaceId]?.rootOverride
+      if (override !== undefined && override !== rootId) useWorkDockStore.getState().setRootOverride(workspaceId, rootId, pane.paneId)
+      openDock({ tab: 'files', reveal: { rootId, path } })
+    }
+  }, [deck, workspaceId, pane.paneId, rootId, path])
   const onPaneKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
@@ -226,6 +281,9 @@ function CodePaneForFile({
   // PAN-5337: the Preview tab's document-relative links resolve against this.
   const docLocation = useMemo(() => ({ rootId, path }), [rootId, path])
 
+  if (load.status === 'stale' || statusStale) {
+    return <StaleCodeTab rootId={rootId} path={path} deckKey={workspaceId} paneId={pane.paneId} />
+  }
   if (load.status === 'loading') return <Placeholder title="Loading…" testId="code-pane-loading" />
   if (load.status === 'error') return <Placeholder title="Couldn’t open file" hint={load.message} testId="code-pane-error" />
   const { result } = load
@@ -252,6 +310,8 @@ function CodePaneForFile({
     <div className="flex h-full min-h-0 flex-col" data-testid="code-pane" onKeyDown={onPaneKeyDown}>
       <CodePaneHeader
         path={path}
+        rootLabel={rootLabel}
+        onReveal={onReveal}
         previewable={previewable}
         view={view}
         onView={setView}
@@ -271,12 +331,10 @@ function CodePaneForFile({
         onOverwrite={onOverwrite}
         onOpen={onOpenRenamed}
       />
-      {isProjectRoot ? (
-        <div className="border-b border-border px-3 py-1.5 text-xs text-muted-foreground" data-testid="code-pane-project-note">
-          {creatingEdit ? CREATING_EDIT_NOTE : PROJECT_EDIT_NOTE}
-        </div>
+      {/* PAN-5290 C-D9: the editor bar on project and edit-workspace roots only. */}
+      {isProjectRoot || rootRef?.kind === 'workspace' ? (
+        <EditorBar rootId={rootId} deckKey={workspaceId} path={path} paneId={pane.paneId} onStale={markStale} />
       ) : null}
-      {rootRef?.kind === 'workspace' ? <EditWorkspaceNote rootId={rootId} /> : null}
       {diff === 'head' || diskDiff !== undefined ? (
         <div className="min-h-0 flex-1" data-testid="code-pane-changes">
           <ChangesView
@@ -318,6 +376,7 @@ function CodePaneForFile({
             onToggleWrap={toggleWrap}
             onMount={setEditor}
           />
+          {conversation ? <ChangedLineMarks editor={editor} rootId={rootId} path={path} conversation={conversation} dirty={dirty} /> : null}
         </div>
       )}
     </div>
