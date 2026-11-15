@@ -110,7 +110,7 @@ export function ProjectHome({
     t === 'terminal'
       ? api.toggleTerminal()
       : t === 'files' && projectKey
-        ? api.openPane({ paneType: 'files', label: 'Files', explorerRootId: `project:${projectKey}` })
+        ? api.openDock?.({ tab: 'files' })
         : api.openPane({ paneType: 'browser', label: 'Web' })
 
   const onAgentSelected = async (id: string, message?: string) => {

@@ -206,14 +206,16 @@ describe('ProjectHome', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5))
   })
 
-  it('opens Files on the project explorer root (PAN-5186)', () => {
+  it('opens the work dock on Files (PAN-5289)', () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({})))
     const openPane = vi.fn()
-    render(<ProjectHome projectName="Overdeck" projectKey="overdeck" api={api({ openPane })} />)
+    const openDock = vi.fn()
+    render(<ProjectHome projectName="Overdeck" projectKey="overdeck" api={api({ openPane, openDock })} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Files' }))
 
-    expect(openPane).toHaveBeenCalledWith({ paneType: 'files', label: 'Files', explorerRootId: 'project:overdeck' })
+    expect(openDock).toHaveBeenCalledWith({ tab: 'files' })
+    expect(openPane).not.toHaveBeenCalled()
   })
 
   it('renders no Files button without a project key', () => {

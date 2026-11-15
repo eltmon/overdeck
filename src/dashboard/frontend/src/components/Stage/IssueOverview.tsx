@@ -92,7 +92,9 @@ export function IssueOverview({
   const onAction = (t: PaneType) => {
     if (t === 'terminal') return api.toggleTerminal()
     if (t === 'browser') return api.openPane({ paneType: 'browser', label: 'Web' })
-    api.openPane({ paneType: t, label: ISSUE_PANE_LABELS[t] ?? 'Pane', issueId, agentId, ...(t === 'files' ? { explorerRootId: `issue:${issueId}` } : {}) })
+    // PAN-5289: Files opens the work dock, which follows this issue tab.
+    if (t === 'files') return api.openDock?.({ tab: 'files' })
+    api.openPane({ paneType: t, label: ISSUE_PANE_LABELS[t] ?? 'Pane', issueId, agentId })
   }
 
   const launcher = (

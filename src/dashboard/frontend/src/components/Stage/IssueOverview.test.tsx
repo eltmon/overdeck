@@ -35,17 +35,13 @@ function deferred<T>() {
 }
 
 describe('IssueOverview', () => {
-  it('opens Files on the issue explorer root (PAN-5186)', () => {
+  it('opens the work dock on Files, which follows the issue tab (PAN-5289)', () => {
     const openPane = vi.fn()
-    render(<IssueOverview issueId="PAN-2773" title="Explorer" agentId="agent-pan-2773" api={api({ openPane })} />)
+    const openDock = vi.fn()
+    render(<IssueOverview issueId="PAN-2773" title="Explorer" agentId="agent-pan-2773" api={api({ openPane, openDock })} />)
     fireEvent.click(screen.getByRole('button', { name: 'Files' }))
-    expect(openPane).toHaveBeenCalledWith({
-      paneType: 'files',
-      label: 'Files',
-      issueId: 'PAN-2773',
-      agentId: 'agent-pan-2773',
-      explorerRootId: 'issue:PAN-2773',
-    })
+    expect(openDock).toHaveBeenCalledWith({ tab: 'files' })
+    expect(openPane).not.toHaveBeenCalled()
   })
 
   it('renders conversation creation errors inline without opening a pane', async () => {

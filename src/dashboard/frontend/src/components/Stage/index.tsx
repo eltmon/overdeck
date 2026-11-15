@@ -29,7 +29,7 @@ import {
   type SplitPath,
 } from '../../lib/paneLayout'
 import { ForkModal } from '../CommandDeck/ForkModal'
-import { Bot, Terminal as TerminalIcon, Globe } from 'lucide-react'
+import { Bot, Terminal as TerminalIcon, Globe, FolderTree, GitCompare, Search } from 'lucide-react'
 import { PaneBar, type NewPaneAction } from './PaneBar'
 import { useStageShortcuts } from './useStageShortcuts'
 import { TerminalDrawer } from '../terminal/TerminalDrawer'
@@ -48,6 +48,8 @@ import { StageDeckProvider, type StageDeckContextValue, type OpenBesideInput, ty
 import { openCodePane } from '../explorer/openCodePane'
 import { useWorkDockStore } from '../dock/workDockStore'
 import { WorkDock } from '../dock/WorkDock'
+import { useRootContext } from '../explorer/rootForConversation'
+import { findRegisteredProject } from '../CommandDeck/UnknownProjectState'
 import styles from './stage.module.css'
 
 export type { StageContext, PaneWrapperProps, StageApi } from './types'
@@ -312,9 +314,13 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
     [deckKey, setActivePane, addPane, updatePane],
   )
 
+  // The mounted WorkDock reads the store (PAN-5289).
+  const openDock = useCallback((input: OpenDockInput) => {
+    useWorkDockStore.getState().openDock(deckKey, input)
+  }, [deckKey])
   const api: StageApi = useMemo(
-    () => ({ deckKey, openPane, openTypedPane, openIssue, openOrFocusAgentPane, toggleTerminal, openTerminalDrawer }),
-    [deckKey, openPane, openTypedPane, openIssue, openOrFocusAgentPane, toggleTerminal, openTerminalDrawer],
+    () => ({ deckKey, openPane, openTypedPane, openIssue, openOrFocusAgentPane, toggleTerminal, openTerminalDrawer, openDock }),
+    [deckKey, openPane, openTypedPane, openIssue, openOrFocusAgentPane, toggleTerminal, openTerminalDrawer, openDock],
   )
 
   const ctx: StageContext = useMemo(
@@ -446,6 +452,8 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
   // PAN-1561: the "+" opens a menu of what to create, so it's explicit rather
   // than guessing. Fallback (⌘T / no menu) toggles the terminal drawer.
   const handleAddPane = useCallback(() => toggleTerminal(), [toggleTerminal])
+  // B-D11: the deck's project, found by key or name.
+  const deckProject = findRegisteredProject(useRootContext().projects, deckKey)
   const newActions = useMemo<NewPaneAction[]>(() => {
     const actions: NewPaneAction[] = []
     if (onCreateConversation) {
@@ -472,8 +480,22 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
       icon: Globe,
       onSelect: () => openPane({ paneType: 'browser', label: 'Web' }),
     })
+    // PAN-5289 (§6.10, FR-3): the work dock's entry points.
+    actions.push({ key: 'files', label: 'Files', icon: FolderTree, onSelect: () => openDock({ tab: 'files' }) })
+    if (deckProject) {
+      actions.push({
+        key: 'changes',
+        label: `Changes in ${deckProject.name || deckProject.key}`,
+        icon: GitCompare,
+        onSelect: () => {
+          useWorkDockStore.getState().setRootOverride(deckKey, `project:${deckProject.key}`, activeId || undefined)
+          openDock({ tab: 'changes' })
+        },
+      })
+    }
+    actions.push({ key: 'go-to-file', label: 'Go to file…', icon: Search, onSelect: () => useWorkDockStore.getState().setQuickOpen(deckKey, true) })
     return actions
-  }, [onCreateConversation, openOrFocusAgentPane, setTerminalOpen, deckKey, openPane])
+  }, [onCreateConversation, openOrFocusAgentPane, setTerminalOpen, deckKey, openPane, openDock, deckProject, activeId])
 
   // Display panes: drop `terminal` panes (drawer-only now) and resolve agent
   // tab labels from the live conversation title so tabs are distinguishable
@@ -558,10 +580,6 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
     },
     [deckKey, activeId, layout, panesById, setActivePane, setLayout],
   )
-  // The mounted WorkDock reads the store (PAN-5289).
-  const openDock = useCallback((input: OpenDockInput) => {
-    useWorkDockStore.getState().openDock(deckKey, input)
-  }, [deckKey])
   const deckContextValue: StageDeckContextValue = useMemo(
     () => ({ deckKey, openOrFocusEditorPane, openOrFocusAgentPane, revealPane, openBeside, openDock }),
     [deckKey, openOrFocusEditorPane, openOrFocusAgentPane, revealPane, openBeside, openDock],
