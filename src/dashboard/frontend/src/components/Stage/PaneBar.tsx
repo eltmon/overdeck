@@ -124,13 +124,14 @@ export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, on
       setMenuPos(null)
     }
     const dismiss = () => setMenuPos(null)
+    const onScroll = (e: Event) => { if (!menuRef.current?.contains(e.target as Node)) setMenuPos(null) }
     document.addEventListener('mousedown', onDoc)
     window.addEventListener('resize', dismiss)
-    window.addEventListener('scroll', dismiss, true)
+    window.addEventListener('scroll', onScroll, true)
     return () => {
       document.removeEventListener('mousedown', onDoc)
       window.removeEventListener('resize', dismiss)
-      window.removeEventListener('scroll', dismiss, true)
+      window.removeEventListener('scroll', onScroll, true)
     }
   }, [menuOpen])
 

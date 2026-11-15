@@ -8,7 +8,7 @@ import type { ConversationMutations } from './useConversationMutations';
 import { fetchRegisteredProjects } from './UnknownProjectState';
 import { resolveEffectiveProjectKey } from './projectsData';
 import { useConfirm } from '../DialogProvider';
-import { MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
+import { isScrollInsideMenu, MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
 import { PullRequestMenuItems } from './PullRequestMenuItems';
 import { ScheduleMenuItem } from '../chat/ConversationScheduleDialog';
 import { TriageMenuItems } from './TriageMenuItems';
@@ -57,12 +57,13 @@ export function ConversationActionMenu({ conversation, mutations, position, onCl
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented) onClose(); };
     const dismiss = () => onClose();
+    const onScroll = (e: Event) => { if (!isScrollInsideMenu(e)) onClose(); };
     window.addEventListener('keydown', onKey);
-    window.addEventListener('scroll', dismiss, true);
+    window.addEventListener('scroll', onScroll, true);
     window.addEventListener('resize', dismiss);
     return () => {
       window.removeEventListener('keydown', onKey);
-      window.removeEventListener('scroll', dismiss, true);
+      window.removeEventListener('scroll', onScroll, true);
       window.removeEventListener('resize', dismiss);
     };
   }, [onClose]);
