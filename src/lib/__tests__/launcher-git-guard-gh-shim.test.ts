@@ -136,6 +136,12 @@ describe('grant-label deny (PAN-4343)', () => {
     [['api', '--method=post', 'repos/o/r/issues/1/labels', '-f', 'labels[]=AUTO-MERGE']],
     [['api', 'repos/o/r/issues', '-f', 'title=t', '-f', 'labels[]=released']],
     [['api', '-X', 'PATCH', 'repos/o/r/issues/1', '-F', 'labels[]=hold-for-uat']],
+    [['issue', 'edit', '1', '--add-label', 'vetoed']],
+    [['issue', 'edit', '1', '--remove-label', 'Vetoed']],
+    [['issue', 'edit', '1', '--add-label=bug,vetoed']],
+    [['pr', 'create', '-lvetoed']],
+    [['api', 'repos/o/r/issues/1/labels', '-f', 'labels[]=vetoed']],
+    [['api', '-X', 'DELETE', 'repos/o/r/issues/1/labels/vetoed']],
   ])('refuses gh %j without running gh or counting it', async (args) => {
     const before = ledgerLines().length;
     const result = await runShim(args);
