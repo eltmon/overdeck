@@ -48,6 +48,7 @@ describe('pan memory sync (PAN-4578 W7)', () => {
       sync: vi.fn(async () => synced()),
       setup: vi.fn(async () => ({ migrated: [], kept: [], outcome: synced() })),
       status: vi.fn(async () => STATUS),
+      refreshVectors: vi.fn(async () => ({ ok: true as const, embedded: 0, reused: 0 })),
       ...overrides,
     };
   }
@@ -97,6 +98,22 @@ describe('pan memory sync (PAN-4578 W7)', () => {
       sync: async () => ({ status: 'failed', dir: DIR, error: 'boom' }),
     }))).rejects.toThrow('exit(1)');
     expect(output()).toContain('Operator memory sync failed: boom');
+  });
+
+  it('sync refreshes operator vectors after a synced outcome', async () => {
+    const refreshVectors = vi.fn(async () => ({ ok: true as const, embedded: 1, reused: 0 }));
+    await memorySyncCommand({}, deps({ sync: async () => synced(), refreshVectors }));
+    expect(refreshVectors).toHaveBeenCalledTimes(1);
+    expect(refreshVectors).toHaveBeenCalledWith({ stores: [{ dir: expect.any(String), scope: 'user' }] });
+  });
+
+  it('sync skips the refresh when offline', async () => {
+    const refreshVectors = vi.fn(async () => ({ ok: true as const, embedded: 0, reused: 0 }));
+    await expect(memorySyncCommand({}, deps({
+      sync: async () => ({ status: 'offline', dir: DIR, error: 'fetch failed: x', committed: true, heldBack: [] }),
+      refreshVectors,
+    }))).rejects.toThrow('exit(1)');
+    expect(refreshVectors).not.toHaveBeenCalled();
   });
 
   it('--setup and --status together exit 1', async () => {

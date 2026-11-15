@@ -348,7 +348,7 @@ Changing the transport does not disable a user's native instructions.
 | Bundled rules | `sync-sources/rules/*.md` | Applicable scope and enabled rules, each labeled with its source path |
 | Project context | `<project>/.overdeck/context/project.md` | Resolved from the registered project at launch |
 | Workspace context | `<workspace>/.overdeck/context/workspace.md` | Issue metadata, memory, and status |
-| Project memory | `<planHome>/.overdeck/memory/*.md` | Rendered index (one line per active fact) after the project layer, every harness |
+| Project memory | `<planHome>/.overdeck/memory/*.md` | Rendered index (one line per active fact) after the project layer, every harness; non-`always` facts are also ranked and injected with their bodies at prompt time (Claude Code, Pi, and every agent's first prompt), up to 6 under a 1,500-token budget |
 | Operator memory | `~/.overdeck/context/memory/*.md` | Rendered index after project memory, every harness; synced across machines when set up |
 | Machine memory | `~/.overdeck/context/machine-memory/*.md` | Rendered index after operator memory, every harness on this machine |
 | Legacy context paths | `.pan/context/project.md`, `.pan/context/workspace.md` | Read fallback only when the canonical file is absent |

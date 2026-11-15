@@ -10,6 +10,18 @@ import { buildPromptKeywordQuery, searchMemory, type MemorySearchHit } from './s
 import { isMemoryKnowledgeIndexEnabled, isMemoryPromptTimeInjectionEnabled } from './settings.js';
 import { findProjectByPath, getProjectSync, loadProjectsConfigSync, resolveProjectFromIssueSync, resolveProjectPath } from '../projects.js';
 import { getProjectByKey, listPinnedDocs } from '../workspaces/resolver.js';
+import { rankFactsForQuery, type RankedFact } from './facts/rank.js';
+import {
+  isActiveFact,
+  machineMemoryDir,
+  projectMemoryDir,
+  readMemoryFactsSync,
+  userMemoryDir,
+  type MemoryFact,
+  type MemoryFactScope,
+} from './facts/store.js';
+import { readFactVectorsForFacts } from './facts/vectors.js';
+import { loadConfigSync } from '../config-yaml.js';
 
 export const PROMPT_TIME_MEMORY_BUDGETS = {
   status: 2000,
@@ -17,7 +29,12 @@ export const PROMPT_TIME_MEMORY_BUDGETS = {
   summaries: 500,
   sibling: 1500,
   knowledgeIndex: 1500,
+  facts: 1500,
 } as const;
+
+const FACT_BODY_TRUNCATE_CHARS = 1200;
+const FACT_SCOPE_FLAG: Record<MemoryFactScope, string> = { project: '', user: '--user ', machine: '--machine ' };
+const FACT_SCOPE_LABEL: Record<MemoryFactScope, string> = { project: 'project', user: 'operator', machine: 'machine' };
 
 const PROMPT_TIME_EXPANSION_TIMEOUT_MS = 750;
 
@@ -34,6 +51,7 @@ export interface PromptTimeMemoryInjectionInput {
   loadKnowledgeIndexEnabled?: () => boolean | Promise<boolean>;
   loadKnowledgeIndex?: (identity: MemoryIdentity) => Promise<string | null>;
   loadPinnedDocs?: (identity: MemoryIdentity) => Promise<CandidateContext[]>;
+  loadFacts?: (identity: MemoryIdentity, query: string) => Promise<CandidateContext[]>;
   loadStatus?: (projectId: string, workspaceId: string) => Promise<MemoryStatus | null>;
   search?: typeof searchMemory;
   logDecision?: (entry: PromptTimeRagDecisionLogEntry) => Promise<void>;
@@ -47,6 +65,7 @@ export interface PromptTimeRagDecisionLogEntry extends RagDecision {
     summaries: number;
     sibling: number;
     knowledgeIndex: number;
+    facts: number;
   };
   budgets: MemoryBudgets;
   allocationBytes: MemoryAllocations;
@@ -60,7 +79,7 @@ export interface PromptTimeMemoryInjectionResult {
   decision: PromptTimeRagDecisionLogEntry;
 }
 
-type BudgetKey = 'status' | 'observations' | 'summaries' | 'sibling' | 'knowledgeIndex';
+type BudgetKey = 'status' | 'observations' | 'summaries' | 'sibling' | 'knowledgeIndex' | 'facts';
 type MemoryBudgets = Record<BudgetKey, number>;
 type MemoryAllocations = Record<BudgetKey, number>;
 
@@ -70,6 +89,9 @@ interface CandidateContext {
   title: string;
   text: string;
 }
+
+/** `CandidateContext`, exported under a stable name for callers of `loadFacts`/`loadPinnedDocs`. */
+export type PromptTimeMemoryCandidate = CandidateContext;
 
 export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInput): Promise<PromptTimeMemoryInjectionResult> {
   const now = input.now ?? new Date();
@@ -99,7 +121,7 @@ export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInp
   const search = input.search ?? searchMemory;
   const knowledgeEnabled = await (input.loadKnowledgeIndexEnabled ?? isMemoryKnowledgeIndexEnabled)();
   const { issueId } = input.identity;
-  const [status, knowledgeIndex, pinnedDocs, sameProjectHits, siblingHits] = await Promise.all([
+  const [status, knowledgeIndex, pinnedDocs, factCandidates, sameProjectHits, siblingHits] = await Promise.all([
     (input.loadStatus ?? readStatus)(input.identity.projectId, input.identity.workspaceId).catch(() => null),
     knowledgeEnabled
       ? (input.loadKnowledgeIndex ?? readKnowledgeIndex)(input.identity).catch(() => null)
@@ -107,6 +129,7 @@ export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInp
     knowledgeEnabled
       ? (input.loadPinnedDocs ?? readPinnedDocCandidates)(input.identity).catch(() => [])
       : Promise.resolve([]),
+    (input.loadFacts ?? readFactCandidates)(input.identity, expansion.query).catch(() => []),
     search({
       query: searchQuery,
       projectId: input.identity.projectId,
@@ -145,10 +168,11 @@ export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInp
     ...status ? [statusCandidate(status, input.identity)] : [],
     ...knowledgeIndex ? [knowledgeIndexCandidate(knowledgeIndex, input.identity)] : [],
     ...pinnedDocs,
+    ...factCandidates,
     ...sameProjectHits.map(hitCandidate),
     ...siblingHits.map(siblingCandidate),
   ];
-  const hitCounts = countHits(status, knowledgeIndex, pinnedDocs, sameProjectHits, siblingHits);
+  const hitCounts = countHits(status, knowledgeIndex, pinnedDocs, sameProjectHits, siblingHits, factCandidates.length);
 
   if (candidates.length === 0) {
     return finalize(input, now, budgets, {
@@ -305,6 +329,68 @@ function siblingCandidate(hit: MemorySearchHit): CandidateContext {
       tokens: estimateTokens(text),
     },
   };
+}
+
+function factCandidate(ranked: RankedFact): CandidateContext {
+  const fact = ranked.fact;
+  const truncatedBody =
+    fact.body.length > FACT_BODY_TRUNCATE_CHARS ? `${fact.body.slice(0, FACT_BODY_TRUNCATE_CHARS)}…` : fact.body;
+  const text = [
+    fact.description,
+    truncatedBody,
+    `Full fact: pan memory show ${FACT_SCOPE_FLAG[fact.scope]}${fact.id}`,
+  ].filter(Boolean).join('\n\n');
+
+  return {
+    key: 'facts',
+    title: `Memory fact (${FACT_SCOPE_LABEL[fact.scope]}): ${fact.type}/${fact.id}`,
+    text,
+    source: {
+      id: `fact:${fact.scope}:${fact.id}`,
+      docType: 'fact',
+      scope: fact.scope,
+      score: Math.round(ranked.score * 1e6) / 1e6,
+      tokens: estimateTokens(text),
+    },
+  };
+}
+
+/**
+ * Default fact loader (FR-1, FR-7): reads active, non-always facts from the
+ * project store of the identity's primary checkout, the operator store and
+ * the machine store, each in its own try so a missing or unreadable store
+ * never fails or delays injection, then ranks them against the full query
+ * text (not the 12-term searchQuery, which truncates a long prompt).
+ */
+async function readFactCandidates(identity: MemoryIdentity, query: string): Promise<CandidateContext[]> {
+  const stores: Array<{ dir: string; scope: MemoryFactScope }> = [];
+  const projectPath = getProjectByKey(identity.projectId)?.primaryPath;
+  if (projectPath) stores.push({ dir: projectMemoryDir(projectPath), scope: 'project' });
+  stores.push({ dir: userMemoryDir(), scope: 'user' });
+  stores.push({ dir: machineMemoryDir(), scope: 'machine' });
+
+  const facts: MemoryFact[] = [];
+  for (const store of stores) {
+    try {
+      const { facts: storeFacts } = readMemoryFactsSync(store.dir, store.scope);
+      for (const fact of storeFacts) {
+        if (fact.always || !isActiveFact(fact)) continue;
+        facts.push(fact);
+      }
+    } catch {
+      // best-effort per store (FR-7): a broken store yields zero facts from it.
+    }
+  }
+  if (facts.length === 0) return [];
+
+  let vectors: ReadonlyMap<string, Float32Array> | undefined;
+  try {
+    vectors = await readFactVectorsForFacts(facts, loadConfigSync().config.docs.embedding);
+  } catch {
+    // FR-7: a broken vector cache never blocks lexical ranking.
+  }
+
+  return rankFactsForQuery({ facts, query, vectors }).map(factCandidate);
 }
 
 function knowledgeIndexCandidate(text: string, identity: MemoryIdentity): CandidateContext {
@@ -642,22 +728,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function countHits(status: MemoryStatus | null, knowledgeIndex: string | null, pinnedDocs: CandidateContext[], sameProjectHits: MemorySearchHit[], siblingHits: MemorySearchHit[]): PromptTimeRagDecisionLogEntry['hitCounts'] {
+function countHits(status: MemoryStatus | null, knowledgeIndex: string | null, pinnedDocs: CandidateContext[], sameProjectHits: MemorySearchHit[], siblingHits: MemorySearchHit[], factCount: number): PromptTimeRagDecisionLogEntry['hitCounts'] {
   return {
     status: status ? 1 : 0,
     knowledgeIndex: (knowledgeIndex ? 1 : 0) + pinnedDocs.length,
     observations: sameProjectHits.filter((hit) => hit.docType !== 'summary').length,
     summaries: sameProjectHits.filter((hit) => hit.docType === 'summary').length,
     sibling: siblingHits.length,
+    facts: factCount,
   };
 }
 
 function emptyAllocations(): MemoryAllocations {
-  return { status: 0, observations: 0, summaries: 0, sibling: 0, knowledgeIndex: 0 };
+  return { status: 0, observations: 0, summaries: 0, sibling: 0, knowledgeIndex: 0, facts: 0 };
 }
 
 function emptyHitCounts(): PromptTimeRagDecisionLogEntry['hitCounts'] {
-  return { status: 0, observations: 0, summaries: 0, sibling: 0, knowledgeIndex: 0 };
+  return { status: 0, observations: 0, summaries: 0, sibling: 0, knowledgeIndex: 0, facts: 0 };
 }
 
 function estimateTokens(text: string): number {

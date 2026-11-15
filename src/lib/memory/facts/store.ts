@@ -26,7 +26,7 @@ export const MACHINE_PATH_PATTERN = /\/home\/[^/\s]+\/|\/Users\/[^/\s]+\/|\b[A-Z
 export const MEMORY_FACT_STATUSES = ['active', 'superseded', 'retired'] as const;
 export type MemoryFactStatus = (typeof MEMORY_FACT_STATUSES)[number];
 const KNOWN_FRONTMATTER_KEYS: readonly string[] = [
-  'type', 'title', 'description', 'tags', 'created', 'updated', 'source', 'status', 'supersedes', 'superseded_by', 'review',
+  'type', 'title', 'description', 'tags', 'always', 'created', 'updated', 'source', 'status', 'supersedes', 'superseded_by', 'review',
 ];
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -48,11 +48,12 @@ export interface MemoryFact {
   readonly extra: Readonly<Record<string, unknown>>;
   readonly body: string;
   readonly file: string; // absolute
+  readonly always: boolean;
 }
 
-/** Write input: the new fields are optional and default to an active, unlinked fact. */
-export type MemoryFactInput = Omit<MemoryFact, 'file' | 'scope' | 'created' | 'status' | 'supersedes' | 'supersededBy' | 'extra'>
-  & Partial<Pick<MemoryFact, 'created' | 'status' | 'supersedes' | 'supersededBy' | 'extra'>>;
+/** Write input: the new fields are optional and default to an active, unlinked, non-always fact. */
+export type MemoryFactInput = Omit<MemoryFact, 'file' | 'scope' | 'created' | 'status' | 'supersedes' | 'supersededBy' | 'extra' | 'always'>
+  & Partial<Pick<MemoryFact, 'created' | 'status' | 'supersedes' | 'supersededBy' | 'extra' | 'always'>>;
 
 export interface MemoryFactProblem {
   readonly file: string;
@@ -192,6 +193,12 @@ export function parseMemoryFact(file: string, raw: string, scope: MemoryFactScop
   const title = typeof frontmatter.title === 'string' ? frontmatter.title : defaultFactTitle(id);
   const body = raw.slice(frontmatterMatch[0].length).trim();
 
+  let always = false;
+  if (frontmatter.always !== undefined) {
+    if (typeof frontmatter.always !== 'boolean') return { file, reason: 'always must be true or false' };
+    always = frontmatter.always;
+  }
+
   if (scope === 'project' || scope === 'user') {
     const haystack = [title, description, ...tags, body].join('\n');
     const machineMatch = haystack.match(MACHINE_PATH_PATTERN);
@@ -204,7 +211,7 @@ export function parseMemoryFact(file: string, raw: string, scope: MemoryFactScop
   }
 
   return {
-    id, scope, type, title, description, tags, created, updated, source, status, supersedes, supersededBy, review, extra, body, file,
+    id, scope, type, title, description, tags, created, updated, source, status, supersedes, supersededBy, review, extra, body, file, always,
   };
 }
 
@@ -232,6 +239,7 @@ export function serializeMemoryFact(fact: MemoryFactInput): string {
   if (fact.title !== defaultFactTitle(fact.id)) frontmatter.title = fact.title;
   frontmatter.description = fact.description;
   if (fact.tags.length > 0) frontmatter.tags = fact.tags;
+  if (fact.always) frontmatter.always = true;
   if (fact.created != null) frontmatter.created = fact.created;
   if (fact.updated !== null) frontmatter.updated = fact.updated;
   if (fact.source !== null) frontmatter.source = fact.source;

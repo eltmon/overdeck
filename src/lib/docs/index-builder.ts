@@ -354,6 +354,17 @@ async function embedDocsWithOpenAI(input: DocsEmbeddingInput): Promise<DocsEmbed
   };
 }
 
+/** PAN-5358: embed one text with the docs embedding config; returns a normalised vector. */
+export async function embedText(text: string, config: NormalizedDocsConfig['embedding']): Promise<Float32Array> {
+  const output = await createDocsEmbeddingFunction(config)({
+    chunk: { docPath: '', docKind: 'docs', sectionHeading: null, sectionAnchor: null, headingPath: [], content: text, tokenCount: 0 },
+    dimensions: config.dimensions,
+    model: config.model,
+    provider: config.provider,
+  });
+  return normalizeFloat32Embedding(resolveDocsEmbeddingOutput(output).embedding, config.dimensions);
+}
+
 export function normalizeFloat32Embedding(embedding: Float32Array, dimensions: number): Float32Array {
   if (embedding.length !== dimensions) {
     throw new Error(`embedding dimension mismatch: expected ${dimensions}, got ${embedding.length}`);

@@ -9,10 +9,20 @@ import {
   buildDocsIndex,
   bufferToFloat32Array,
   DEFAULT_DOCS_INDEX_PATH,
+  embedText,
   float32ArrayToBuffer,
   validateDocsIndex,
 } from '../index-builder.js';
 import { deterministicDocsTestEmbedding } from '../../../../tests/helpers/docs-test-embedding.js';
+
+// embedText's 'local' provider path loads @huggingface/transformers; mock the
+// extractor so these tests never download or run a real model.
+const { extractorMock } = vi.hoisted(() => ({
+  extractorMock: vi.fn(async () => ({ data: new Float32Array() })),
+}));
+vi.mock('@huggingface/transformers', () => ({
+  pipeline: vi.fn(async () => extractorMock),
+}));
 
 let rootDir: string;
 let syncSourcesRoot: string;
@@ -238,5 +248,25 @@ describe('docs index builder', { timeout: 30_000 }, () => {
 
     expect(DEFAULT_DOCS_INDEX_PATH.split(sep).slice(-2)).toEqual(['dist', 'docs-index.sqlite']);
     await expect(stat(outputPath)).resolves.toMatchObject({ size: expect.any(Number) });
+  });
+
+  describe('embedText (PAN-5358)', () => {
+    it('normalises the provider output', async () => {
+      extractorMock.mockResolvedValueOnce({ data: new Float32Array([3, 4, 0, 0]) });
+      const config = docsConfig({ embedding: { provider: 'local', model: 'test-embed-model-norm' } }).embedding;
+
+      const result = await embedText('hello world', config);
+
+      expect(result).toHaveLength(4);
+      const norm = Math.sqrt(Array.from(result).reduce((sum, value) => sum + value * value, 0));
+      expect(norm).toBeCloseTo(1, 6);
+    });
+
+    it('rejects a dimension mismatch', async () => {
+      extractorMock.mockResolvedValueOnce({ data: new Float32Array([1, 2, 3]) });
+      const config = docsConfig({ embedding: { provider: 'local', model: 'test-embed-model-mismatch' } }).embedding;
+
+      await expect(embedText('hello world', config)).rejects.toThrow('embedding dimension mismatch');
+    });
   });
 });

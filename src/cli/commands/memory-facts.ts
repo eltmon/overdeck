@@ -28,6 +28,7 @@ import {
   syncOperatorMemory,
   type OperatorMemorySyncOutcome,
 } from '../../lib/memory/facts/operator-sync.js';
+import { refreshStoreVectorsBestEffort } from '../../lib/memory/facts/vectors.js';
 import { findProjectByPath, getProjectSync } from '../../lib/projects.js';
 import { resolvePlanHome } from '../../lib/pan-dir/paths.js';
 import { exitCli } from '../exit.js';
@@ -207,6 +208,7 @@ export interface MemoryFactAddOptions extends FactTargetFlags {
   body?: string;
   bodyFile?: string;
   tags?: string;
+  always?: boolean;
   /** PAN-5360: free-text attribution (who or what made the rule, and when). */
   source?: string;
   /** PAN-5360: comma-separated ids of facts this one replaces, in the same store. */
@@ -216,6 +218,8 @@ export interface MemoryFactAddOptions extends FactTargetFlags {
   checkIgnored?: (root: string, relativePath: string) => Promise<boolean>;
   /** Injectable for tests; defaults to `syncOperatorMemory` (PAN-4578 D11.4). */
   syncOperator?: () => Promise<OperatorMemorySyncOutcome>;
+  /** Injectable for tests; defaults to `refreshStoreVectorsBestEffort` (PAN-5358 FR-13). */
+  refreshVectors?: typeof refreshStoreVectorsBestEffort;
 }
 
 function parseTags(tags: string | undefined): string[] {
@@ -265,6 +269,7 @@ export async function memoryFactAddCommand(id: string, options: MemoryFactAddOpt
     source: options.source ?? null,
     review: [],
     body,
+    always: options.always === true,
   };
   let file: string;
   let supersededFiles: string[] = [];
@@ -279,10 +284,21 @@ export async function memoryFactAddCommand(id: string, options: MemoryFactAddOpt
     return exitCli(1);
   }
 
+  const refreshResult = await (options.refreshVectors ?? refreshStoreVectorsBestEffort)({
+    stores: [{ dir: target.dir, scope: target.scope }],
+  });
+  warnIfVectorRefreshFailed(refreshResult);
+
   const sync = await syncAfterUserWrite(target, options.syncOperator);
   printWriteResult(file, 'Wrote', options.json, sync, supersedes.length > 0 ? supersededFiles : undefined);
-  if (options.json) return;
-  if (target.scope === 'project') console.log(projectCommitHint(target.root, [file, ...supersededFiles]));
+  if (!options.json && target.scope === 'project') console.log(projectCommitHint(target.root, [file, ...supersededFiles]));
+  if (!refreshResult.ok && refreshResult.timedOut) return exitCli(0);
+}
+
+function warnIfVectorRefreshFailed(result: Awaited<ReturnType<typeof refreshStoreVectorsBestEffort>>): void {
+  if (!result.ok) {
+    console.error(chalk.yellow(`vector index not refreshed: ${result.reason}; run pan memory reindex`));
+  }
 }
 
 export interface MemoryFactEditOptions extends FactTargetFlags {
@@ -297,9 +313,12 @@ export interface MemoryFactEditOptions extends FactTargetFlags {
   /** PAN-5360: comma-separated ids appended to the fact's supersedes list; each is marked superseded. */
   supersedes?: string;
   clearReview?: boolean;
+  always?: boolean;
   json?: boolean;
   /** Injectable for tests; defaults to `syncOperatorMemory` (PAN-4578 D11.4). */
   syncOperator?: () => Promise<OperatorMemorySyncOutcome>;
+  /** Injectable for tests; defaults to `refreshStoreVectorsBestEffort` (PAN-5358 FR-13). */
+  refreshVectors?: typeof refreshStoreVectorsBestEffort;
 }
 
 export async function memoryFactEditCommand(id: string, options: MemoryFactEditOptions): Promise<void> {
@@ -310,7 +329,7 @@ export async function memoryFactEditCommand(id: string, options: MemoryFactEditO
 
   const hasChange = options.type !== undefined || options.title !== undefined || options.description !== undefined
     || options.body !== undefined || options.bodyFile !== undefined || options.tags !== undefined || options.clearReview === true
-    || options.source !== undefined || options.supersedes !== undefined;
+    || options.always !== undefined || options.source !== undefined || options.supersedes !== undefined;
   if (!hasChange) {
     console.error(chalk.red('nothing to change; pass a field flag or edit <path> directly'));
     return exitCli(1);
@@ -350,6 +369,7 @@ export async function memoryFactEditCommand(id: string, options: MemoryFactEditO
     supersededBy: existing.supersededBy,
     review: options.clearReview ? [] : existing.review,
     extra: existing.extra,
+    always: options.always ?? existing.always,
     body,
   };
 
@@ -366,10 +386,15 @@ export async function memoryFactEditCommand(id: string, options: MemoryFactEditO
     return exitCli(1);
   }
 
+  const refreshResult = await (options.refreshVectors ?? refreshStoreVectorsBestEffort)({
+    stores: [{ dir: target.dir, scope: target.scope }],
+  });
+  warnIfVectorRefreshFailed(refreshResult);
+
   const sync = await syncAfterUserWrite(target, options.syncOperator);
   printWriteResult(file, 'Wrote', options.json, sync, supersedes.length > 0 ? supersededFiles : undefined);
-  if (options.json) return;
-  if (target.scope === 'project') console.log(projectCommitHint(target.root, [file, ...supersededFiles]));
+  if (!options.json && target.scope === 'project') console.log(projectCommitHint(target.root, [file, ...supersededFiles]));
+  if (!refreshResult.ok && refreshResult.timedOut) return exitCli(0);
 }
 
 export interface MemoryFactRetireOptions extends FactTargetFlags {
@@ -491,6 +516,7 @@ export function registerMemoryFactCommands(memory: Command): void {
     .option('--body <text>', 'Fact body')
     .option('--body-file <path>', 'Read the fact body from a file')
     .option('--tags <a,b>', 'Comma-separated tags')
+    .option('--always', 'List this fact first in every launch index and leave it out of prompt-time retrieval')
     .option('--source <text>', 'Who or what made this rule, and when (for example "twitch:alice 2026-11-10 14:20")')
     .option('--supersedes <ids>', 'Comma-separated ids of facts this one replaces; marks them superseded (same store)')
     .option('--project <key>', 'Project key (defaults to the project owning the cwd)')
@@ -511,6 +537,8 @@ export function registerMemoryFactCommands(memory: Command): void {
     .option('--source <text>', 'Replace who or what made this rule, and when')
     .option('--supersedes <ids>', 'Comma-separated ids of facts this one replaces; marks them superseded (same store)')
     .option('--clear-review', 'Remove the review marker, re-activating the fact')
+    .option('--always', 'List this fact first in every launch index and leave it out of prompt-time retrieval')
+    .option('--no-always', 'Clear the always flag')
     .option('--project <key>', 'Project key (defaults to the project owning the cwd)')
     .option('--user', 'Edit the operator store (travels with you; synced when set up)')
     .option('--machine', 'Edit the machine store (this machine only)')

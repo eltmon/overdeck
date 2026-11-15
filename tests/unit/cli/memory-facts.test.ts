@@ -19,6 +19,13 @@ vi.mock('../../../src/lib/memory/cli.js', async (importOriginal) => {
   return { ...actual, searchMemory: searchMemoryMock };
 });
 
+// PAN-5358: add/edit now refresh fact vectors best-effort by default. Mock the
+// module so no test loads a real embedding model; tests of the refresh itself
+// inject their own `refreshVectors` stub via command options.
+vi.mock('../../../src/lib/memory/facts/vectors.js', () => ({
+  refreshStoreVectorsBestEffort: vi.fn().mockResolvedValue({ ok: true, embedded: 0, reused: 0 }),
+}));
+
 import { readMemoryFactsSync } from '../../../src/lib/memory/facts/store.js';
 import { renderManagedMemorySections } from '../../../src/lib/memory/facts/render.js';
 import {
@@ -453,6 +460,43 @@ describe('pan memory curated-fact commands (PAN-3957)', () => {
       expect(readMemoryFactsSync(dir, 'machine').facts.map((f) => f.id)).toEqual(['path-fact']);
       expect(logSpy.mock.calls.flat().join('\n')).not.toContain('Commit it:');
     });
+
+    it('add --always writes always: true', async () => {
+      await memoryFactAddCommand('always-fact', baseAddOptions({ always: true }));
+      const { facts } = readMemoryFactsSync(join(projectRoot, '.overdeck', 'memory'), 'project');
+      expect(facts.find((f) => f.id === 'always-fact')?.always).toBe(true);
+    });
+
+    it("add refreshes the written store's vectors", async () => {
+      const refreshVectors = vi.fn().mockResolvedValue({ ok: true, embedded: 1, reused: 0 });
+      await memoryFactAddCommand('refreshed-fact', baseAddOptions({ refreshVectors }));
+
+      expect(refreshVectors).toHaveBeenCalledTimes(1);
+      expect(refreshVectors).toHaveBeenCalledWith({
+        stores: [{ dir: join(projectRoot, '.overdeck', 'memory'), scope: 'project' }],
+      });
+    });
+
+    it('add still exits 0 and prints JSON unchanged when the refresh fails', async () => {
+      const refreshVectors = vi.fn().mockResolvedValue({ ok: false, reason: 'embedding provider unreachable', timedOut: false });
+      await memoryFactAddCommand('refresh-failed-fact', baseAddOptions({ refreshVectors, json: true }));
+
+      expect(exitCodes).toEqual([]);
+      const output = JSON.parse(logSpy.mock.calls.flat().join('\n'));
+      expect(output.file).toContain('refresh-failed-fact.md');
+      expect(errorSpy.mock.calls.flat().join('\n')).toContain(
+        'vector index not refreshed: embedding provider unreachable; run pan memory reindex',
+      );
+    });
+
+    it('add exits 0 through exitCli after a refresh timeout', async () => {
+      const refreshVectors = vi.fn().mockResolvedValue({ ok: false, reason: 'timed out after 30000ms', timedOut: true });
+      await expect(memoryFactAddCommand('timed-out-fact', baseAddOptions({ refreshVectors }))).rejects.toThrow();
+
+      expect(exitCodes).toEqual([0]);
+      const { facts } = readMemoryFactsSync(join(projectRoot, '.overdeck', 'memory'), 'project');
+      expect(facts.map((f) => f.id)).toContain('timed-out-fact');
+    });
   });
 
   describe('post-write operator sync (PAN-4578 W8)', () => {
@@ -641,6 +685,35 @@ describe('pan memory curated-fact commands (PAN-3957)', () => {
       await memoryFactEditCommand('marked-fact', { clearReview: true });
       const { facts } = readMemoryFactsSync(join(projectRoot, '.overdeck', 'memory'), 'project');
       expect(facts.find((f) => f.id === 'marked-fact')?.review).toEqual([]);
+    });
+
+    it('edit --no-always clears the flag', async () => {
+      writeFact(
+        join(projectRoot, '.overdeck', 'memory'),
+        'always-fact',
+        '---\ntype: feedback\ndescription: Original description.\nalways: true\n---\nOriginal body.\n',
+      );
+      await memoryFactEditCommand('always-fact', { always: false });
+      const text = readFileSync(join(projectRoot, '.overdeck', 'memory', 'always-fact.md'), 'utf8');
+      expect(text).not.toContain('always');
+      const { facts } = readMemoryFactsSync(join(projectRoot, '.overdeck', 'memory'), 'project');
+      expect(facts.find((f) => f.id === 'always-fact')?.always).toBe(false);
+    });
+
+    it('edit --always alone counts as a change', async () => {
+      await memoryFactEditCommand('be-decisive', { always: true });
+      const { facts } = readMemoryFactsSync(join(projectRoot, '.overdeck', 'memory'), 'project');
+      expect(facts.find((f) => f.id === 'be-decisive')?.always).toBe(true);
+    });
+
+    it("edit refreshes the written store's vectors", async () => {
+      const refreshVectors = vi.fn().mockResolvedValue({ ok: true, embedded: 0, reused: 1 });
+      await memoryFactEditCommand('be-decisive', { description: 'Edited.', refreshVectors });
+
+      expect(refreshVectors).toHaveBeenCalledTimes(1);
+      expect(refreshVectors).toHaveBeenCalledWith({
+        stores: [{ dir: join(projectRoot, '.overdeck', 'memory'), scope: 'project' }],
+      });
     });
   });
 
