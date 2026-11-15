@@ -6,7 +6,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 const {
   mockPostStrikeMergePayload, mockGetMergeTrainBoard, mockInvalidateBoard, mockGetProjectSync,
-  mockResolveProjectFromIssueSync, mockResolveGitHubIssue, mockVerifyAccessToken,
+  mockResolveProjectFromIssueSync, mockResolveGitHubIssue, mockResolveTrackerType, mockVerifyAccessToken,
 } = vi.hoisted(() => ({
   mockPostStrikeMergePayload: vi.fn(),
   mockGetMergeTrainBoard: vi.fn(),
@@ -14,6 +14,7 @@ const {
   mockGetProjectSync: vi.fn(),
   mockResolveProjectFromIssueSync: vi.fn(),
   mockResolveGitHubIssue: vi.fn(),
+  mockResolveTrackerType: vi.fn(),
   mockVerifyAccessToken: vi.fn(),
 }));
 
@@ -30,6 +31,7 @@ vi.mock('../../../../lib/projects.js', async (importOriginal) => ({
 vi.mock('../../../../lib/tracker-utils.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../lib/tracker-utils.js')>()),
   resolveGitHubIssue: mockResolveGitHubIssue,
+  resolveTrackerType: mockResolveTrackerType,
 }));
 vi.mock('../../../../lib/access-tokens.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../../../lib/access-tokens.js')>();
@@ -144,6 +146,7 @@ describe('POST /api/merge-train/policy/:issueId', () => {
     mockResolveProjectFromIssueSync.mockReturnValue({ projectKey: 'overdeck', projectPath: '/repo' });
     mockGetProjectSync.mockReturnValue({ name: 'overdeck', path: '/repo', github_repo: 'eltmon/overdeck' });
     mockResolveGitHubIssue.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 9 });
+    mockResolveTrackerType.mockReturnValue('github');
   });
 
   it.each([
@@ -176,6 +179,14 @@ describe('POST /api/merge-train/policy/:issueId', () => {
   it('returns 501 when the id does not resolve to a GitHub issue', async () => {
     mockResolveGitHubIssue.mockReturnValue({ isGitHub: false });
     const res = await postPolicy('PAN-9', { policy: 'hold' });
+    expect(res.status).toBe(501);
+    expect(labelCalls).toEqual([]);
+  });
+
+  // IssueLifecycle skips the write when the id resolves to another tracker; the route must not report 200.
+  it('returns 501 when the lifecycle would resolve the id to another tracker', async () => {
+    mockResolveTrackerType.mockReturnValue('jira');
+    const res = await postPolicy('PAN-9', { policy: 'auto' });
     expect(res.status).toBe(501);
     expect(labelCalls).toEqual([]);
   });

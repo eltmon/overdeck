@@ -39,7 +39,7 @@ import {
 import { isFlywheelRequireUatBeforeMerge } from '../../../lib/overdeck/control-settings.js';
 import { tryResolveProjectTrackerType } from '../../../lib/project-tracker-type.js';
 import { getProjectSync, resolveProjectFromIssueSync, type ProjectConfig } from '../../../lib/projects.js';
-import { resolveGitHubIssue } from '../../../lib/tracker-utils.js';
+import { resolveGitHubIssue, resolveTrackerType } from '../../../lib/tracker-utils.js';
 import { IssueLifecycle } from './issue-lifecycle.js';
 import { getSharedIssueService } from './issue-service-singleton.js';
 import { invalidateMergeTrainBoardCache } from './merge-train-board.js';
@@ -90,7 +90,8 @@ function defaultDeps(): MergePolicyWriteDeps {
       const config = resolved ? getProjectSync(resolved.projectKey) : null;
       return resolved && config ? { projectKey: resolved.projectKey, config } : null;
     },
-    isGitHubIssue: (issueId) => resolveGitHubIssue(issueId).isGitHub,
+    // The same two questions IssueLifecycle asks before it writes, so a 200 is never a silent no-op.
+    isGitHubIssue: (issueId) => resolveTrackerType(issueId) === 'github' && resolveGitHubIssue(issueId).isGitHub,
     cachedLabels: (issueId) => getSharedIssueService().getTrackerIssue(issueId)?.labels ?? null,
     // Strings are the normalized label shape of every cached tracker row.
     patchCachedLabels: (issueId, labels) => getSharedIssueService().patchIssue(issueId, { labels }),
