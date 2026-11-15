@@ -10,9 +10,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-vi.mock('../../hooks/useTheme', () => ({
-  useTheme: () => ({ resolvedTheme: 'dark' }),
-}));
+// DiffPanel now pulls in ChatMarkdown (via DiffMarkdownPreview → MarkdownTab),
+// whose useColorTheme module needs a real zustand store (getState, subscribe)
+// from useTheme — a plain stub is not enough, so this uses the real store,
+// same as DiffPanel.compare.test.tsx (PAN-5338).
 
 vi.mock('../../hooks/useDiffPreferences', () => ({
   useDiffPreferences: () => ({
