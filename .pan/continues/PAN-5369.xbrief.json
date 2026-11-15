@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5369",
   "created": "2026-11-15T17:54:40.939Z",
-  "updated": "2026-11-15T17:56:37.231Z",
+  "updated": "2026-11-15T17:56:53.830Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
     "locator-index.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T17:56:37.231Z"
+    },
+    "lookup-query-rewrite": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5369",
+      "claimedAt": "2026-11-15T17:56:53.829Z"
     }
   }
 }
