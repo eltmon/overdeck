@@ -4,17 +4,17 @@
     "created": "2026-11-15T13:29:21Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5348: Composer: sending bare /pan fails with 404 'Missing an Overdeck command... Type /pan to list available commands'",
-    "updated": "2026-11-15T13:33:34.138Z"
+    "updated": "2026-11-15T13:34:29.733Z"
   },
   "plan": {
     "id": "pan-5348",
     "title": "Composer: sending bare /pan fails with 404 'Missing an Overdeck command... Type /pan to list available commands'",
-    "status": "proposed",
+    "status": "running",
     "uid": "99cf6435-e589-4f72-9785-98f0a7db97ed",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T13:29:21Z",
-    "updated": "2026-11-15T13:33:34.138Z",
+    "updated": "2026-11-15T13:34:29.733Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5348",
@@ -585,5 +585,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
