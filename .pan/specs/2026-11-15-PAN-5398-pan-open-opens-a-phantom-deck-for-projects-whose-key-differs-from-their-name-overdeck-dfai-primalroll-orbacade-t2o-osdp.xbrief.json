@@ -1,0 +1,474 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T20:43:22Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5398: pan open opens a phantom deck for projects whose key differs from their name (overdeck, DFAI, PrimalRoll, Orbacade, T2O-OSDP)",
+    "updated": "2026-11-15T20:45:14.816Z"
+  },
+  "plan": {
+    "id": "pan-5398",
+    "title": "pan open opens a phantom deck for projects whose key differs from their name (overdeck, DFAI, PrimalRoll, Orbacade, T2O-OSDP)",
+    "status": "proposed",
+    "uid": "20dfbf3e-8f09-43f2-81d9-aa4f57424675",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-15T20:43:22Z",
+    "updated": "2026-11-15T20:45:14.816Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5398",
+        "label": "PAN-5398",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-5398.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "pan-open",
+      "dashboard",
+      "command-deck",
+      "cli",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "The dashboard keys every deck by the project's display name (name ?? key), but the open-path resolution from POST /api/ui/open carries only the registered key (UiOpenResolution.projectKey). openPathInDeck and the /open link host use that key as the deck key, so for the 5 projects whose key differs from their name (panopticon-cli/overdeck, primalroll/PrimalRoll, orbacade/Orbacade, dfai/DFAI, t2o-osdp/T2O-OSDP) pan open opens the path in an empty phantom deck named after the key, and the CLI prints the key instead of the project's name.",
+      "Proposal": "Add a required deckKey field to UiOpenResolution, which the server sets to projectDeckKey(registeredProject) = name ?? key for the project whose key equals root.projectKey; projectKey and rootId keep the registered key. openPathInDeck uses resolution.deckKey for every deck call, the /open host redirects to /command-deck/<deckKey>, and the CLI line and the dashboard toast both use a shared uiOpenSummary(resolution) sentence that names the project by display name and an issue workspace by its issue id. projectsData.ts switches to the same projectDeckKey helper so the switcher and the resolver share one rule. Docs and a changelog entry describe the change. Full detail, before/after snippets and decisions D-1..D-8 are in .pan/drafts/pan-5398.md.",
+      "NonGoals": "- The no-root error sentence (`<path> is inside <project> but not in a feature or scratch workspace`) keeps naming the registered key in the CLI and the /open toast; only the success line changes.\n- No migration or cleanup of existing phantom decks in localStorage (e.g. pan-panes:panopticon-cli).\n- No change to how decks are keyed (they stay keyed by display name) or to explorer root ids (they stay keyed by registered key: project:<key>, issue:<ID>, workspace:<id>).\n- No change to resolvePathRoot, resolveExplorerRoot, the UI command hub, the leader-tab logic, or the outside-projects flow.\n- No new HTTP route, RPC method, or stored state.\n- No static value import of @overdeck/contracts added to src/cli/commands/open.ts (it stays lazy)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "The server computes deckKey as name ?? key for the registered project whose key equals root.projectKey, falling back to root.projectKey when none matches.",
+        "rationale": "The issue's Decision 1 prescribes this; root.projectKey is always the registered key, while resolvePathRoot's hit.projectKey can be '' for a scratch workspace outside every project."
+      },
+      {
+        "summary": "A shared pure projectDeckKey(project) helper in packages/contracts/src/ui-commands.ts is used by both the server and the frontend fetchProjects, with the ?? rule (not ||).",
+        "rationale": "The bug is two places disagreeing about the deck key; one function used by both removes the chance of drift, and ?? matches today's switcher behaviour exactly."
+      },
+      {
+        "summary": "The success sentence is derived from the resolution by a shared uiOpenSummary helper: relPath → 'Opened <relPath> in <deckKey>'; empty relPath with an issue:<ID> root → 'Opened the <ID> workspace in <deckKey>'; else 'Opened root folder in <deckKey>'.",
+        "rationale": "The toast never sees the CLI's parsed target, so deriving the issue case from rootId is the only way the CLI and the toast print the same text, which the issue requires."
+      },
+      {
+        "summary": "The dashboard toast becomes exactly the CLI sentence and drops the 'from pan open' suffix.",
+        "rationale": "The issue says the toast says the same; the /open link uses the same toast, where 'from pan open' was already inaccurate."
+      },
+      {
+        "summary": "The CLI falls back to projectKey when the dashboard response has no deckKey.",
+        "rationale": "A newer CLI may talk to an older running dashboard; the frontend needs no fallback because the server serves its own bundle."
+      },
+      {
+        "summary": "The no-root error message is left unchanged and listed in NonGoals.",
+        "rationale": "The issue scopes the wording change to the success line; widening it would add untested surface without an operator ask."
+      },
+      {
+        "summary": "OpenPathHost's URL redirect to /command-deck/<deckKey> is included although the issue's list of deck calls omits it.",
+        "rationale": "App.tsx handleSelectProject writes /command-deck/<projectName>, so the URL segment is the deck name; without this, the /open link and pan open --new-tab still land on the phantom deck."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Small surface: 13 files across contracts, one server route, three frontend modules, one CLI command, and docs.",
+      "canonicalFilename": "2026-11-15-PAN-5398-pan-open-opens-a-phantom-deck-for-projects-whose-key-differs-from-their-name-overdeck-dfai-primalroll-orbacade-t2o-osdp.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "resolution-deck-key",
+        "title": "UiOpenResolution carries deckKey, filled by POST /api/ui/open, plus projectDeckKey and uiOpenSummary helpers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T20:43:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5398",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "open-path-in-deck-uses-deck-key",
+            "open-link-host-deck-route",
+            "cli-open-success-line",
+            "switcher-uses-project-deck-key"
+          ],
+          "files_scope": [
+            "packages/contracts/src/ui-commands.ts",
+            "packages/contracts/src/__tests__/ui-commands.test.ts",
+            "src/dashboard/server/routes/ui-open.ts",
+            "src/dashboard/server/routes/__tests__/ui-open.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner packages/contracts/src/__tests__/ui-commands.test.ts src/dashboard/server/routes/__tests__/ui-open.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ui-commands.test.ts and ui-open.test.ts pass, including the panopticon-cli/overdeck case",
+            "npm run typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 (.pan/drafts/pan-5398.md). In packages/contracts/src/ui-commands.ts add `deckKey: Schema.String` to UiOpenResolution directly after projectKey (with doc comments), and add the pure exports `projectDeckKey(project: { readonly key: string; readonly name?: string | null }): string` (returns project.name ?? project.key) and `uiOpenSummary(resolution: Pick<UiOpenResolution, 'deckKey' | 'rootId' | 'relPath'>): string` (relPath non-empty → `Opened ${relPath} in ${deckKey}`; relPath '' and rootId starting 'issue:' → `Opened the ${id} workspace in ${deckKey}`; else `Opened root folder in ${deckKey}`). Add packages/contracts/src/__tests__/ui-commands.test.ts with the cases in PRD WI-1 step 3. In src/dashboard/server/routes/ui-open.ts widen UiOpenDeps.listProjects to `{ key; name?; path }`, map `name: p.config.name` in defaultDeps, keep the raw project rows (projectRows) alongside the realpath-filtered ones, and set `deckKey: registered ? projectDeckKey(registered) : root.projectKey` where `registered = projectRows.find((p) => p.key === root.projectKey)`. Do not change projectKey, rootId, or the no-root/outside-projects bodies. Update the exact toEqual at ui-open.test.ts line 40 to include deckKey: 'demo' and add the two new tests from PRD WI-1 step 5."
+        },
+        "items": [
+          {
+            "id": "resolution-deck-key.ac1",
+            "title": "Given a registered project { key: 'panopticon-cli', name: 'overdeck' }, when POST /api/ui/open resolves a file in it, then the response returns deckKey 'overdeck', projectKey 'panopticon-cli' and rootId 'project:panopticon-cli', and the published open-path command carries the same deckKey and projectKey (ui-open.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolution-deck-key.ac2",
+            "title": "Given a registered project with no name, when POST /api/ui/open resolves a path in it, then the response returns deckKey equal to the registered key (ui-open.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolution-deck-key.ac3",
+            "title": "projectDeckKey returns 'overdeck' for { key: 'panopticon-cli', name: 'overdeck' } and 'demo' for { key: 'demo' } and { key: 'demo', name: null } (ui-commands.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolution-deck-key.ac4",
+            "title": "uiOpenSummary returns exactly 'Opened features/mission-control.mdx in overdeck', 'Opened the PAN-5295 workspace in overdeck' (rootId 'issue:PAN-5295', relPath '') and 'Opened root folder in overdeck' (rootId 'project:panopticon-cli', relPath '') (ui-commands.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "open-path-in-deck-uses-deck-key",
+        "title": "openPathInDeck uses resolution.deckKey for every deck call and toasts uiOpenSummary",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T20:43:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5398",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/uiCommands/openPathInDeck.ts",
+            "src/dashboard/frontend/src/lib/uiCommands/openPathInDeck.test.ts",
+            "src/dashboard/frontend/src/lib/uiCommands/useUiCommands.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/lib/uiCommands/openPathInDeck.test.ts src/lib/uiCommands/useUiCommands.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "openPathInDeck.test.ts and useUiCommands.test.tsx pass, including the panopticon-cli/overdeck case",
+            "npm run typecheck:frontend exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In src/dashboard/frontend/src/lib/uiCommands/openPathInDeck.ts change the destructure `const { projectKey: deckKey, ... } = resolution` to `const { deckKey, ... } = resolution`, import `uiOpenSummary` (value import) alongside the UiOpenResolution type from '@overdeck/contracts', and replace the toast with `toast(uiOpenSummary(resolution))`. Every existing deck call (ensureHome, openInDeck, openCodePane, openDock, setRootOverride, selectActivePaneId, the useActiveDock deckKey comparison) then receives the name; rootId is untouched. In openPathInDeck.test.ts add deckKey: 'demo' to the dir helper (line 14) and the inline file fixture (line 68), change the toast expectations to 'Opened docs in demo' and 'Opened root folder in demo', and add the two panopticon-cli/overdeck tests from PRD WI-2 step 2. Add deckKey: 'demo' to the fixture at useUiCommands.test.tsx line 46."
+        },
+        "items": [
+          {
+            "id": "open-path-in-deck-uses-deck-key.ac1",
+            "title": "Given a file resolution { projectKey: 'panopticon-cli', deckKey: 'overdeck', rootId: 'project:panopticon-cli' }, when openPathInDeck runs, then ensureHome is called with 'overdeck', openInDeck with { projectKey: 'overdeck' }, openCodePane with 'overdeck' and rootId 'project:panopticon-cli', openDock with 'overdeck', and no spy receives 'panopticon-cli' as its deck argument",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-path-in-deck-uses-deck-key.ac2",
+            "title": "Given that file resolution with relPath 'features/mission-control.mdx', when openPathInDeck runs, then toast is called with exactly 'Opened features/mission-control.mdx in overdeck'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-path-in-deck-uses-deck-key.ac3",
+            "title": "Given an active dock { deckKey: 'overdeck', rootId: 'project:panopticon-cli' } and a folder resolution for that root with deckKey 'overdeck', when openPathInDeck runs, then setRootOverride is not called and openDock is called with ('overdeck', { tab: 'files', reveal: { rootId: 'project:panopticon-cli', path: 'docs' } })",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "open-link-host-deck-route",
+        "title": "The /open link host redirects to /command-deck/<deckKey>",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T20:43:22Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5398",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/open/OpenPathHost.tsx",
+            "src/dashboard/frontend/src/components/open/OpenPathHost.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/open/OpenPathHost.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "OpenPathHost.test.tsx passes with a fixture whose projectKey differs from deckKey",
+            "npm run typecheck:frontend exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ],
+          "acJustification": "A one-line change; two criteria cover the redirect and the unchanged hand-off to openPathInDeck."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In src/dashboard/frontend/src/components/open/OpenPathHost.tsx line 72 change `encodeURIComponent(resolution.projectKey)` to `encodeURIComponent(resolution.deckKey)` in the replaceState URL. In OpenPathHost.test.tsx test 'opens the resolved path with dryRun and moves the URL to the project deck' (line 44) change the fixture to { projectKey: 'demo-key', deckKey: 'demo app', rootId: 'project:demo-key', relPath: 'docs', kind: 'dir', delivered: 0 }, keep `expect(window.location.pathname).toBe('/command-deck/demo%20app')`, and change the line-53 toMatchObject to { projectKey: 'demo-key', deckKey: 'demo app', relPath: 'docs' }."
+        },
+        "items": [
+          {
+            "id": "open-link-host-deck-route.ac1",
+            "title": "Given the /open link resolves to { projectKey: 'demo-key', deckKey: 'demo app' }, when OpenPathHost finishes, then window.location.pathname is '/command-deck/demo%20app' (it would be '/command-deck/demo-key' if projectKey were used)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-link-host-deck-route.ac2",
+            "title": "Given the same resolution, when OpenPathHost finishes, then openPathInDeck receives a resolution matching { projectKey: 'demo-key', deckKey: 'demo app', relPath: 'docs' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-open-success-line",
+        "title": "pan open success line names the project by display name and an issue workspace by its id",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T20:43:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5398",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/open.ts",
+            "tests/unit/cli/open-command.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/cli/open-command.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "open-command.test.ts passes, including the issue-workspace and older-dashboard fallback tests",
+            "npm run typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. In openInDashboard in src/cli/commands/open.ts replace the two lines that build relPath and log `Opened ${relPath} in ${String(body['projectKey'])}` with a lazy `const { uiOpenSummary } = await import('@overdeck/contracts');` and `deps.log(uiOpenSummary({ relPath: text(body['relPath']), rootId: text(body['rootId']), deckKey: text(body['deckKey']) || text(body['projectKey']) }))`, where text(v) returns v when it is a string and '' otherwise. Do not add a static value import from @overdeck/contracts and do not change the error branches. In tests/unit/cli/open-command.test.ts update the 'opens in the listening tab and opens no browser' fixture to { projectKey: 'panopticon-cli', deckKey: 'overdeck', rootId: 'project:panopticon-cli', relPath: 'docs', kind: 'dir', delivered: 1 } expecting ['Opened docs in overdeck'], and add the issue-workspace and no-deckKey fallback tests from PRD WI-4 step 2 (both call `await runOpen('docs', {}, deps)` like the neighbouring tests)."
+        },
+        "items": [
+          {
+            "id": "cli-open-success-line.ac1",
+            "title": "Given the dashboard answers { projectKey: 'panopticon-cli', deckKey: 'overdeck', relPath: 'docs', delivered: 1 }, when runOpen finishes, then it logs exactly ['Opened docs in overdeck']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-open-success-line.ac2",
+            "title": "Given the dashboard answers { deckKey: 'overdeck', rootId: 'issue:PAN-5295', relPath: '', delivered: 1 }, when runOpen finishes, then it logs exactly ['Opened the PAN-5295 workspace in overdeck']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-open-success-line.ac3",
+            "title": "Given an older dashboard answers { projectKey: 'demo', rootId: 'project:demo', relPath: 'docs', delivered: 1 } with no deckKey, when runOpen finishes, then it falls back to projectKey and logs ['Opened docs in demo']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "switcher-uses-project-deck-key",
+        "title": "fetchProjects derives the switcher's deck key with projectDeckKey",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T20:43:22Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "refactor",
+          "issueLabel": "pan-5398",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/CommandDeck/projectsData.test.ts src/components/CommandDeck/__tests__/projectsData.origin.test.ts",
+            "npm run typecheck:frontend",
+            "grep -c 'proj.name ?? proj.key' src/dashboard/frontend/src/components/CommandDeck/projectsData.ts"
+          ],
+          "expected_outputs": [
+            "projectsData.test.ts and projectsData.origin.test.ts pass unchanged",
+            "npm run typecheck:frontend exits 0",
+            "the grep prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ],
+          "acJustification": "A one-line behaviour-preserving swap; two criteria cover the shared helper and the unchanged switcher output."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. In src/dashboard/frontend/src/components/CommandDeck/projectsData.ts change the line-7 import to `import { compareIssueIds, projectDeckKey } from '@overdeck/contracts';` and in fetchProjects replace `const name = proj.name ?? proj.key;` with `const name = projectDeckKey(proj);`. Behaviour must not change; the existing projectsData tests must pass without edits."
+        },
+        "items": [
+          {
+            "id": "switcher-uses-project-deck-key.ac1",
+            "title": "projectsData.ts calls projectDeckKey(proj) inside fetchProjects and contains no remaining 'proj.name ?? proj.key' (grep returns 0 matches)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switcher-uses-project-deck-key.ac2",
+            "title": "Given the existing projectsData tests, when they run after the change, then they pass without any test edits, so the switcher still produces name ?? key for each registered project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-open-deck-key",
+        "title": "Document deckKey, the /command-deck/<deckKey> redirect and the success sentence; add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T20:43:22Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5398",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "features/open-in-overdeck.mdx",
+            "changelog.d/pan-5398.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'deckKey' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'Opened the <issue> workspace' features/open-in-overdeck.mdx",
+            "grep -n '#### Fixed' changelog.d/pan-5398.md"
+          ],
+          "expected_outputs": [
+            "npm run lint:docs exits 0",
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6. In docs/DASHBOARD-ARCHITECTURE.md section '## UI commands (PAN-5349)': add `deckKey` to the UiOpenResolution field list in the Stream bullet plus the sentence that projectKey and rootId use the registered key while deckKey is the project's name or its key when it has none (projectDeckKey), because decks are keyed by name (PAN-5398); change '/command-deck/<project>' to '/command-deck/<deckKey>' in the Link bullet; and state that the toast and the CLI success line are both uiOpenSummary(resolution). In features/open-in-overdeck.mdx add, at the end of '### Which tab opens it', the paragraph from PRD WI-6 step 2 about `Opened <path> in <project>` and `Opened the <issue> workspace in <project>`. Create changelog.d/pan-5398.md with the '#### Fixed' bullet from PRD WI-6 step 3, then run npm run lint:docs."
+        },
+        "items": [
+          {
+            "id": "docs-open-deck-key.ac1",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md after the change, when `grep -n deckKey` runs on it, then it returns the UiOpenResolution field list containing deckKey, the sentence that deckKey is the project's name or key while projectKey and rootId use the registered key, and the Link bullet naming /command-deck/<deckKey>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-open-deck-key.ac2",
+            "title": "features/open-in-overdeck.mdx renders a paragraph stating that pan open prints `Opened <path> in <project>` (project named as the switcher shows it) or `Opened the <issue> workspace in <project>`, and that the dashboard shows the same message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-open-deck-key.ac3",
+            "title": "changelog.d/pan-5398.md exists with one '#### Fixed' heading and a bullet linking #5398, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "resolution-deck-key",
+        "to": "open-path-in-deck-uses-deck-key",
+        "type": "blocks"
+      },
+      {
+        "from": "resolution-deck-key",
+        "to": "open-link-host-deck-route",
+        "type": "blocks"
+      },
+      {
+        "from": "resolution-deck-key",
+        "to": "cli-open-success-line",
+        "type": "blocks"
+      },
+      {
+        "from": "resolution-deck-key",
+        "to": "switcher-uses-project-deck-key",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
