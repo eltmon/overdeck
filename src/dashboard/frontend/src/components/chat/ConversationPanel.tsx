@@ -171,6 +171,8 @@ export function ConversationPanel({
   const { enabled: streamMessagesEnabled, receivedFirstPayload } = useConversationMessagesStream(conversation);
   const httpFallbackDue = useMessagesHttpFallback(streamMessagesEnabled, receivedFirstPayload, conversation.name);
   const [aboutOpen, setAboutOpen] = useState(false);
+  // Bumped by the header's ⋯ → Subagents item; SubagentRail flips on each change (PAN-5291 D1-6).
+  const [railToggle, setRailToggle] = useState(0);
 
   useEffect(() => {
     setAboutOpen(false);
@@ -505,6 +507,8 @@ export function ConversationPanel({
           hideToolCalls={hideToolCalls} onToggleHideToolCalls={toggleHideToolCalls}
           convMutations={convMutations} archivePending={archivePending}
           onArchive={onArchived ? handleArchive : undefined}
+          subagentCount={subagents.length}
+          onToggleSubagents={() => setRailToggle(n => n + 1)}
         />
       )}
       {!embedded && <ConversationMachineBanner conversation={conversation} />}
@@ -608,6 +612,7 @@ export function ConversationPanel({
           subagents={subagents}
           selectedAgentId={selectedSubagentId}
           defaultCollapsed={subagentRailCollapsed}
+          toggleSignal={railToggle}
         />
       </div>
 

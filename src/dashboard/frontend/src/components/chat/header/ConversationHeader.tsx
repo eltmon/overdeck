@@ -35,6 +35,9 @@ export interface ConversationHeaderProps {
   archivePending: boolean;
   /** Present when the panel may archive (today's `onArchived`); runs `handleArchive`. */
   onArchive?: () => void;
+  /** Subagents the rail lists; ⋯ → Subagents shows only when > 0 (D1-6). */
+  subagentCount: number;
+  onToggleSubagents: () => void;
 }
 
 /**
@@ -60,6 +63,8 @@ export function ConversationHeader({
   convMutations,
   archivePending,
   onArchive,
+  subagentCount,
+  onToggleSubagents,
 }: ConversationHeaderProps) {
   const queryClient = useQueryClient();
   const native = isNativeShell(); // The phone app (PAN-4837): hide what its phone token cannot do.
@@ -263,6 +268,8 @@ export function ConversationHeader({
               onToggleAbout={onToggleAbout}
               hideToolCalls={hideToolCalls}
               onToggleHideToolCalls={onToggleHideToolCalls}
+              subagentCount={subagentCount}
+              onToggleSubagents={onToggleSubagents}
               retitlePending={retitleMutation.isPending}
               onRetitle={() => retitleMutation.mutate()}
             />

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type RefObject } from 'react';
-import { Archive, Copy, Download, ExternalLink, FileText, GitBranchPlus, Hash, Info, Loader2, MonitorSmartphone, Share2, Sparkles, Square, Star, Wrench } from 'lucide-react';
+import { Archive, Copy, Download, ExternalLink, FileText, GitBranchPlus, Hash, Info, Loader2, MonitorSmartphone, Share2, Sparkles, Square, Star, Users, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Conversation } from '../../CommandDeck/ConversationList';
 import type { useConversationMutations } from '../../CommandDeck/useConversationMutations';
@@ -57,6 +57,8 @@ export interface ConversationHeaderMenuProps {
   onToggleAbout: () => void;
   hideToolCalls: boolean;
   onToggleHideToolCalls: () => void;
+  subagentCount: number;
+  onToggleSubagents: () => void;
   /** Regenerate title — the mutation lives in the header, whose title shows its pending state. */
   retitlePending: boolean;
   onRetitle: () => void;
@@ -78,6 +80,8 @@ export function ConversationHeaderMenu({
   onToggleAbout,
   hideToolCalls,
   onToggleHideToolCalls,
+  subagentCount,
+  onToggleSubagents,
   retitlePending,
   onRetitle,
 }: ConversationHeaderMenuProps) {
@@ -197,6 +201,13 @@ export function ConversationHeaderMenu({
           <span>Show tool calls</span>
           <span className="ml-auto text-muted-foreground">{hideToolCalls ? 'off' : 'on'}</span>
         </MenuItemButton>
+        {subagentCount > 0 && (
+          <MenuItemButton onClick={() => { onToggleSubagents(); onClose(); }}>
+            <Users size={14} />
+            <span>Subagents</span>
+            <span className="ml-auto tabular-nums text-muted-foreground">{subagentCount}</span>
+          </MenuItemButton>
+        )}
 
         {/* Group 2 — copy and open (visible in the phone app too). */}
         <MenuSeparator />

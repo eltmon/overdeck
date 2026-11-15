@@ -272,3 +272,55 @@ describe('SubagentRail narrow pane (PAN-5329)', () => {
     expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toBeInTheDocument();
   });
 });
+
+describe('SubagentRail toggleSignal (PAN-5291 ⋯ → Subagents)', () => {
+  beforeEach(() => {
+    window.history.replaceState({}, '', '/conv/42');
+    localStorage.removeItem('overdeck.ui.agentsRailCollapsed');
+  });
+
+  it('never toggles on the mount value', () => {
+    render(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} toggleSignal={5} />);
+
+    expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toBeInTheDocument();
+    expect(localStorage.getItem('overdeck.ui.agentsRailCollapsed')).toBeNull();
+  });
+
+  it('collapses an open rail on 0 → 1 and opens it again on 1 → 2, storing each state', () => {
+    const { rerender } = render(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} toggleSignal={0} />);
+    expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toBeInTheDocument();
+
+    rerender(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} toggleSignal={1} />);
+    expect(screen.queryByRole('complementary', { name: 'Conversation agents' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show agents rail' })).toBeInTheDocument();
+    expect(localStorage.getItem('overdeck.ui.agentsRailCollapsed')).toBe('true');
+
+    rerender(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} toggleSignal={2} />);
+    expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toBeInTheDocument();
+    expect(localStorage.getItem('overdeck.ui.agentsRailCollapsed')).toBe('false');
+  });
+
+  it('flips the rail but stores nothing while defaultCollapsed is set', () => {
+    const { rerender } = render(
+      <SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} defaultCollapsed toggleSignal={0} />,
+    );
+    expect(screen.getByRole('button', { name: 'Show agents rail' })).toBeInTheDocument();
+
+    rerender(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} defaultCollapsed toggleSignal={1} />);
+    expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toBeInTheDocument();
+    expect(localStorage.getItem('overdeck.ui.agentsRailCollapsed')).toBeNull();
+  });
+
+  it('flips only the pane-local state on a narrow pane', () => {
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+    resizeCallbacks = [];
+    const { rerender } = render(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} toggleSignal={0} />);
+    resize(NARROW_PANE_PX - 100);
+    expect(screen.getByRole('button', { name: 'Show agents rail' })).toBeInTheDocument();
+
+    rerender(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} toggleSignal={1} />);
+    expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toBeInTheDocument();
+    expect(localStorage.getItem('overdeck.ui.agentsRailCollapsed')).toBeNull();
+    vi.unstubAllGlobals();
+  });
+});

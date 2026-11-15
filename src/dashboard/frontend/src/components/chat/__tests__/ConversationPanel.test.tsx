@@ -368,6 +368,28 @@ describe('ConversationPanel rename flow', () => {
     expect(keybindingsMock.useEditorOpenFavoriteShortcut).toHaveBeenLastCalledWith(mockConversation.cwd);
   });
 
+  it('lists ⋯ → Subagents only when the conversation has subagents, and toggles the rail from it (PAN-5291)', () => {
+    renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    expect(screen.queryByRole('menuitem', { name: /^Subagents/ })).toBeNull();
+    cleanup();
+
+    const subagent = (agentId: string) => ({ agentId, agentType: 'Explore', description: `Task ${agentId}`, toolUseId: `toolu_${agentId}`, spawnDepth: 1, status: 'done' });
+    renderPanel(mockConversation, {}, {
+      messages: [{ id: 'm-1', role: 'user', text: 'hello', createdAt: '2026-08-04T14:00:00Z' }],
+      workLog: [],
+      streaming: false,
+      subagents: [subagent('a1'), subagent('b2')],
+    } as Parameters<typeof makeClient>[0]);
+    expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    const item = screen.getByRole('menuitem', { name: /^Subagents/ });
+    expect(item).toHaveTextContent(/Subagents\s*2/);
+    fireEvent.click(item);
+    expect(screen.queryByRole('complementary', { name: 'Conversation agents' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show agents rail' })).toBeInTheDocument();
+  });
+
   it('keeps About, Tools and Bookmarks out of row 1 (PAN-5291)', () => {
     renderPanel();
     for (const name of ['Show about this conversation', 'Hide tool calls', 'Show tool calls', 'Show bookmarks']) {
