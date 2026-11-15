@@ -4,10 +4,12 @@
  * train, the idle footer, filter chips that filter and persist (ported from
  * the retired view's tests). Project: one card in `#merge-train`.
  */
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, renderHook, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MERGE_TRAIN_PROJECT_FILTER_KEY, MergeTrain, isIdleProject } from '../MergeTrain';
-import { normalizeBoard, trainTotals } from '../useMergeTrainBoard';
+import { MERGE_TRAIN_BOARD_KEY, normalizeBoard, trainTotals, useApplyProjectTrainWrite } from '../useMergeTrainBoard';
+import type { MergeTrainBoard } from '../boardTypes';
 import { board, car, gen, mockFetch, project, renderWithClient, strike } from './fixtures';
 
 vi.mock('../../../DialogProvider', () => ({ useConfirm: () => vi.fn(async () => true) }));
@@ -145,5 +147,106 @@ describe('MergeTrain with a malformed board answer', () => {
       projects: [{ projectKey: 'p', window: null, notices: [], cars: [], strikes: [], batches: [], recent: [] }],
     });
     expect(normalizeBoard(null)).toEqual({ masterEnabled: true, projects: [] });
+  });
+});
+
+/** PAN-5363: the Train switch shows the confirmed write without flickering back to a stale board read. */
+describe('Train switch writes (PAN-5363)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function deferredPromise<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((r) => { resolve = r; });
+    return { promise, resolve };
+  }
+
+  /** Each GET of `/api/merge-train/board` consumes the next queued value; past the queue, it hangs forever. */
+  function stubFetchWithBoardQueue(queue: Array<MergeTrainBoard | Promise<MergeTrainBoard>>): ReturnType<typeof vi.fn> {
+    let next = 0;
+    const fn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+      if (url.includes('/api/dashboard/session')) {
+        return { ok: true, status: 200, json: async () => ({ csrfToken: 'test-csrf-token' }) } as Response;
+      }
+      if (method === 'POST' && url.includes('/api/projects/overdeck/merge-train')) {
+        return { ok: true, status: 200, json: async () => ({ value: 'disabled', effective: false }) } as Response;
+      }
+      if (method === 'GET' && url.includes('/api/merge-train/board')) {
+        const entry = queue[next++] ?? new Promise<MergeTrainBoard>(() => {});
+        const value = await entry;
+        return { ok: true, status: 200, json: async () => value } as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({}) } as Response;
+    });
+    vi.stubGlobal('fetch', fn);
+    return fn;
+  }
+
+  const boardOn = () => board([project({ override: null, enabled: true })]);
+  const boardOff = () => board([project({ override: 'disabled', enabled: false })]);
+  const switchNode = () => screen.getByTestId('merge-train-switch-overdeck') as HTMLButtonElement;
+
+  it('the switch stays off after the POST while the board refetch is pending', async () => {
+    stubFetchWithBoardQueue([boardOn()]);
+    renderWithClient(<MergeTrain placement="project" projectKey="overdeck" />);
+    await screen.findByTestId('merge-train-project-overdeck');
+
+    fireEvent.click(switchNode());
+    // The mutation's success and the board-cache patch land via separate scheduled
+    // notifications, so both conditions must be polled together, not asserted once
+    // right after the first one passes.
+    await waitFor(() => {
+      expect(switchNode().disabled).toBe(false);
+      expect(switchNode().getAttribute('aria-checked')).toBe('false');
+    });
+    expect(screen.getByTestId('train-off-banner-overdeck')).toBeTruthy();
+  });
+
+  it('a board read in flight at the click is discarded', async () => {
+    const d1 = deferredPromise<MergeTrainBoard>();
+    const d2 = deferredPromise<MergeTrainBoard>();
+    stubFetchWithBoardQueue([boardOn(), d1.promise, d2.promise]);
+    const { client } = renderWithClient(<MergeTrain placement="project" projectKey="overdeck" />);
+    await screen.findByTestId('merge-train-project-overdeck');
+
+    await act(async () => { void client.refetchQueries({ queryKey: MERGE_TRAIN_BOARD_KEY }); });
+
+    fireEvent.click(switchNode());
+    await waitFor(() => {
+      expect(switchNode().disabled).toBe(false);
+      expect(switchNode().getAttribute('aria-checked')).toBe('false');
+    });
+
+    d1.resolve(boardOn());
+    await act(async () => { await d1.promise; });
+    await waitFor(() => expect(switchNode().getAttribute('aria-checked')).toBe('false'));
+
+    d2.resolve(boardOff());
+    await act(async () => { await d2.promise; });
+    await waitFor(() => expect(switchNode().getAttribute('aria-checked')).toBe('false'));
+  });
+
+  it('useApplyProjectTrainWrite patches every board placement and the settings query', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    client.setQueryData(['merge-train', 'board', 'all'], board([
+      project({ projectKey: 'overdeck' }),
+      project({ projectKey: 'myn', projectName: 'mind-your-now' }),
+    ]));
+    client.setQueryData(['merge-train', 'board', 'overdeck'], board([project({ projectKey: 'overdeck' })]));
+
+    const { result } = renderHook(() => useApplyProjectTrainWrite(), {
+      wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+    });
+    await act(async () => { await result.current('overdeck', { value: 'disabled', effective: false }); });
+
+    const all = client.getQueryData<MergeTrainBoard>(['merge-train', 'board', 'all']);
+    const scoped = client.getQueryData<MergeTrainBoard>(['merge-train', 'board', 'overdeck']);
+    expect(all?.projects.find((p) => p.projectKey === 'overdeck')).toMatchObject({ override: 'disabled', enabled: false });
+    expect(all?.projects.find((p) => p.projectKey === 'myn')).toMatchObject({ override: null, enabled: true });
+    expect(scoped?.projects.find((p) => p.projectKey === 'overdeck')).toMatchObject({ override: 'disabled', enabled: false });
+    expect(client.getQueryData(['project-merge-train', 'overdeck'])).toEqual({ value: 'disabled', effective: false });
   });
 });

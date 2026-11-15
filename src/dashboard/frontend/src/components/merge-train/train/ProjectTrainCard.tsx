@@ -38,7 +38,14 @@ import {
   shortName,
   trainOffBanner,
 } from './trainCopy';
-import { inLiveHeroBatch, useInvalidateBoard, useNow, type LiveMergeRun } from './useMergeTrainBoard';
+import {
+  inLiveHeroBatch,
+  useApplyProjectTrainWrite,
+  useInvalidateBoard,
+  useNow,
+  type LiveMergeRun,
+  type ProjectTrainWrite,
+} from './useMergeTrainBoard';
 
 /** The hero batch: newest assembling/ready, else newest superseded. Batches arrive newest first. */
 export function pickHeroBatch(batches: readonly UatGenerationPayload[]): UatGenerationPayload | null {
@@ -56,15 +63,17 @@ export interface ProjectTrainCardProps {
 
 export function ProjectTrainCard({ project, masterEnabled, runs, onNavigateIssue }: ProjectTrainCardProps) {
   const invalidate = useInvalidateBoard();
+  const applyTrainWrite = useApplyProjectTrainWrite();
   const waiting = project.window?.waiting ?? 0;
   const now = useNow(30_000, waiting > 0);
 
   const trainSwitch = useMutation({
-    mutationFn: (on: boolean) => postJson<{ value: string | null; effective: boolean }>(
+    mutationFn: (on: boolean) => postJson<ProjectTrainWrite>(
       `/api/projects/${encodeURIComponent(project.projectKey)}/merge-train`,
       { value: on ? null : 'disabled' },
     ),
-    onSuccess: () => invalidate(),
+    // Returned, so the switch shows `variables` until the confirmed value is in the cache (PAN-5363).
+    onSuccess: (write) => applyTrainWrite(project.projectKey, write),
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not change the merge train'),
   });
 
