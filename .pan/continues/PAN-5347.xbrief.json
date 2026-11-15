@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5347",
   "created": "2026-11-15T13:35:45.395Z",
-  "updated": "2026-11-15T13:44:03.397Z",
+  "updated": "2026-11-15T13:50:37.547Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,30 @@
       "doneAt": "2026-11-15T13:43:39.348Z"
     },
     "server-conversation-skill-scope": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5347",
-      "claimedAt": "2026-11-15T13:44:03.397Z"
+      "claimedAt": "2026-11-15T13:44:03.397Z",
+      "doneAt": "2026-11-15T13:50:37.546Z"
+    },
+    "server-conversation-skill-scope.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:50:37.546Z"
+    },
+    "server-conversation-skill-scope.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:50:37.546Z"
+    },
+    "server-conversation-skill-scope.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:50:37.546Z"
+    },
+    "server-conversation-skill-scope.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:50:37.546Z"
+    },
+    "server-conversation-skill-scope.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:50:37.546Z"
     }
   }
 }
