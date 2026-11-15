@@ -43,14 +43,14 @@ Managed Codex sessions use an isolated `CODEX_HOME`. On initialization and resum
 
 ## Steering a running turn
 
-Pressing **Enter** in the dashboard composer queues your message while the agent is busy: Claude Code feeds it to the model at the next tool boundary, or after the turn ends. To change course now, **steer**. Press **Ctrl+Enter** (**Cmd+Enter** on macOS), or choose **Steer** in the composer delivery selector, which then applies to Enter as well. From a shell, `pan tell --steer <id> "<message>"` does the same.
+Pressing **Enter** in the dashboard composer queues your message while the agent is busy: Claude Code feeds it to the model at the next tool boundary, or after the turn ends. To change course now, **steer**. Press **Ctrl+Enter** (**Cmd+Enter** on macOS), or choose **Send: interrupt now** in the composer's Send menu, which then applies to Enter as well. From a shell, `pan tell --steer <id> "<message>"` does the same.
 
 | Harness | Delivery modes | What Steer does |
 | --- | --- | --- |
-| Claude Code | Auto, Steer | Interrupts the running turn and sends the message at once, like the TUI's Ctrl+Enter. Under the hood Overdeck types the message and presses Claude Code's send-now chord, Ctrl+X Ctrl+S. An idle agent just receives the message. |
-| Pi (`pi`), oh-my-pi (`ohmypi`) | Auto, Steer, Follow-up | Steers over the Pi control channel. Conversations only. |
-| Codex | Auto | Not yet; see [PAN-4303](https://github.com/eltmon/overdeck/issues/4303). |
-| ACP, OpenCode, Grok Build, Kimi Code, Muse Code, Prime Agent | Auto | None. |
+| Claude Code | normally, interrupt now | Interrupts the running turn and sends the message at once, like the TUI's Ctrl+Enter. Under the hood Overdeck types the message and presses Claude Code's send-now chord, Ctrl+X Ctrl+S. An idle agent just receives the message. |
+| Pi (`pi`), oh-my-pi (`ohmypi`) | normally, interrupt now, after this turn | Steers over the Pi control channel. Conversations only. |
+| Codex | normally (no Send menu) | Not yet; see [PAN-4303](https://github.com/eltmon/overdeck/issues/4303). |
+| ACP, OpenCode, Grok Build, Kimi Code, Muse Code, Prime Agent | normally (no Send menu) | None. |
 
 A steer never falls back silently to a queued message. A harness without steer answers `steer-unsupported` and delivers nothing. A Claude Code agent launched before steer support has a PTY supervisor that presses Enter instead, and the delivery reports that it went out as a normal submit.
 

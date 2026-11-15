@@ -71,12 +71,16 @@ The ⋯ menu lists, in groups:
 
 1. **About this conversation**, **Bookmarks**, **Show tool calls** (on or off),
    and **Subagents** (with their count, only when the conversation has some)
-   to show or hide the agents rail.
+   to show or hide the agents rail. The rail starts collapsed to a narrow
+   **Agents** strip until you open it; the dashboard then remembers your
+   choice in this browser.
 2. **Open folder in** an editor, one item for each editor on this machine (a linked
    conversation lists the editors that work over remote SSH), **Copy
    conversation id** (the conversation's name), **Copy session id** (the agent's
    session id, shown only when it differs from the name), **Copy link**,
-   and **Open in new window**.
+   **Open in new window**, and **Full diff in a new window**, which opens the
+   [diff window](#reviewing-changes-in-the-diff-window) for the conversation.
+   A linked conversation or a read-only vault copy does not show it.
 3. **Favorite**, **Regenerate title**, and the pull request items.
 4. **Hand off to new conversation**, **Create summary fork**, **Export
    transcript**, pulling the conversation here, **Continue on another device**,
@@ -86,6 +90,80 @@ The ⋯ menu lists, in groups:
 
 `⌘⇧O` (`Ctrl Shift O`) still opens the conversation's folder in your favorite
 editor while the menu is closed.
+
+### The turn card
+
+When a turn changes files, a card under the turn's last reply shows what
+changed. A turn is everything from one message you send to the next one. The
+card shows how many files changed, the lines added and removed (`+86 −1`), and
+then, only when there are any: **N commits pushed**, **N commits not
+pushed**, and **N not committed**. **N not committed** is the only amber tag,
+because those edits are not saved in git yet. Below the header each file has
+one row; the first eight show, and **Show all N files** shows the rest. A file
+that the turn both committed and still has uncommitted edits shows once, as
+not committed, and the `+/−` on the card adds up those rows.
+
+Inside a Command Deck tab:
+
+- **Review** opens the side panel's Changes tab on the turn's first file. `J`
+  and `K` step through the turn's files, and **Back** shows the This
+  conversation list.
+- **Show in files** opens the Files tab with **Only what this conversation
+  changed** selected.
+- Click a row to open that file's diff. Hover a row for **Open the file beside
+  the chat** and **Reveal in files**.
+
+Outside a Command Deck tab (a popped-out window, a drawer or the phone app),
+the card shows the same files and counts, and **Review** and the rows open the
+[diff window](#reviewing-changes-in-the-diff-window). There is no side panel
+there, so **Show in files** and the row's beside and reveal actions are not
+shown.
+
+### File paths in replies
+
+A file path in a reply, or in a tool's output (for example "The file
+/home/you/repo/src/app.ts has been updated."), shows as a chip. A path in
+`code` formatting stays plain text. Inside a Command Deck tab,
+when the path is inside the conversation's repository:
+
+- a file the conversation changed opens its diff in the side panel;
+- any other file opens beside the chat, at the line the path names;
+- a Markdown file the conversation did not change opens where you last chose
+  to open Markdown files.
+
+Right-click a chip for **Open diff** (changed files only), **Open beside** and
+**Reveal in files** at the top of the menu, followed by the usual editor,
+browser, folder and copy items. Outside a Command Deck tab, and for a path
+outside the repository, a click opens the file in your editor as before. The
+path that a Read, Write or Edit row shows when you expand it is plain text;
+the chip is in the tool's output.
+
+### Sending to a busy agent
+
+The composer's **Send** menu sets how your next message reaches an agent that
+is busy with a turn. It reads `Send: <mode>`:
+
+- **normally**: the message is delivered the usual way for this agent.
+- **interrupt now**: the current turn stops and the message is sent at once
+  (`Ctrl Enter`, or `⌘ Enter` on a Mac, does this for one message).
+- **after this turn**: the message waits until the current turn ends. Pi
+  conversations only.
+- **when the limit resets**: the server holds the message until your usage
+  limit resets. Shown only when Overdeck can tell when the limit resets.
+
+The menu shows for harnesses that can steer (Claude Code and Pi); see
+[Steering a running turn](/configuration/harnesses#steering-a-running-turn).
+⋯ → **Advanced** → **Delivery method** is a different setting: it sets how
+Overdeck types into a Claude Code session, not when the message arrives.
+
+The effort button next to it reads `Thinking: <level>`, for example
+`Thinking: high`. Hover it to see where the level came from.
+
+On a conversation that has started, the model button cannot change the model.
+Click it to see why: the model is fixed once a conversation starts, so hand
+off to a new conversation (⋯ → **Hand off to new conversation**) to use
+another model. An agent's
+model is fixed when the agent starts.
 
 A new conversation's effort is chosen with an effort picker next to the model picker, both on the Home composer and in the left column's **New conversation** caret menu. The **New conversation with options…** dialog (below) has its own effort field, which defaults to the effort the conversation would get anyway and shows where that default comes from, for example `Default: high (default)` or `Default: medium (project)`.
 
@@ -105,9 +183,9 @@ Pick a level in the composer's effort picker while the session runs. For Claude
 Code, Overdeck sends `/effort <level>` to the session and keeps the new level
 only after Claude Code confirms it in the transcript; a session that is mid-turn
 is refused, so try again when it is idle. While the change applies the picker
-reads `Applying…`, and then it shows the level and where it came from, such as
-`High · default` or `Low · set`. `terminal` means the session was changed with
-`/effort` in the native CLI. Claude Code also saves `low` through `xhigh` as the
+reads `Applying…`, and then it reads the level, such as `Thinking: high`. Hover
+it to see where the level came from, such as `Source: default` or `Source: set`.
+`terminal` means the session was changed with `/effort` in the native CLI. Claude Code also saves `low` through `xhigh` as the
 default for your own new sessions of that model in `~/.claude/settings.json`;
 Overdeck's sessions always launch with an explicit effort, so they are not
 affected.
@@ -929,12 +1007,15 @@ pan conv reclaim conv-20261101-1234 --force  # even when the other machine canno
 `reclaim` answers `still-running-there` while the other machine lists the conversation
 live (pull it back instead) and `target-offline` when it cannot be asked.
 
-## Reviewing changes in the diff panel
+## Reviewing changes in the diff window
 
-Open the diff panel from a conversation to review what changed. Besides
-**All turns**, **vs main** and the per-turn chips, it has a **Compare…** view
-for any two points in the conversation's repository. It works in a local-only
-repository too: no remote and no pull request are needed.
+Open ⋯ → **Full diff in a new window** to review everything a conversation
+changed. The diff window opens beside the dashboard; it no longer opens as a
+panel beside the chat. A turn card outside a Command Deck tab opens the same
+window (see [The turn card](#the-turn-card)). Besides **All turns**, **vs
+main** and the per-turn chips, the window has a **Compare…** view for any two
+points in the conversation's repository. It works in a local-only repository
+too: no remote and no pull request are needed.
 
 1. Click **Compare…**.
 2. Pick a **base** and a **head**. Each box suggests branches, tags and recent
@@ -943,23 +1024,23 @@ repository too: no remote and no pull request are needed.
    only the head's changes since the two diverged.
 4. Click **Compare** (or press Enter), then pick a file to read its diff.
 
-The selection is part of the page URL. Use the pop-out button to open the
-comparison in its own window, and bookmark that URL to come back to the same
-comparison later.
+The selection is part of the window's URL, so you can bookmark it to come back
+to the same comparison later.
 
-The **ignore whitespace** toggle in the panel header hides changes that only
+The **ignore whitespace** toggle in the window header hides changes that only
 re-indent or re-space lines, so a reformatted block no longer hides the real
-change. It applies to the diff in every view, and the panel remembers it in this
-browser. A turn's file list can still name a file whose only change was
+change. It applies to the diff in every view, and the window remembers it in
+this browser. A turn's file list can still name a file whose only change was
 whitespace; opening it then shows no net changes.
 
 When you pick a Markdown file, the bar above its diff shows a **Diff** and
 **Preview** switch. Preview renders the document as text, as it is after the
 change: the current file for All turns and a turn, and the committed file for
 vs main. In Compare it shows the current file with the note "Showing the
-current file", since Compare can point at an arbitrary ref the panel cannot
+current file", since Compare can point at an arbitrary ref the window cannot
 read directly. A deleted file has no Preview. The bar's **Open file** action
-opens the file beside the chat — it is not available in the pop-out window.
+is not available in the diff window; inside a Command Deck tab, use the turn
+card's rows or a file path in the reply to open a file beside the chat.
 Relative links in the preview show as plain text for now, until they resolve
 to files.
 

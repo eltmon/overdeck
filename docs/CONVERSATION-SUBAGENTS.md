@@ -194,7 +194,8 @@ these as `subagent` entries under their parent (`src/dashboard/server/services/a
 ## Agents rail collapse (PAN-4222)
 
 `SubagentRail`'s collapsed state persists to `localStorage['overdeck.ui.agentsRailCollapsed']`,
-read on mount and written on every toggle — except when the rail is given
+read on mount and written on every toggle. An unset key means collapsed (PAN-5295 D2-15): only a
+stored `'false'` opens the rail on mount, and a stored `'true'` keeps it collapsed — except when the rail is given
 `defaultCollapsed`: it then starts at that state instead of reading localStorage, and toggling it
 never writes back. The Agents page preview (Live's preview pane, and History's detail pane)
 passes `defaultCollapsed`, so it always starts with the rail collapsed at its default 1280px

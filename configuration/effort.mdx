@@ -209,8 +209,9 @@ session-only). Overdeck does not change that file. Its own sessions always
 launch with `--effort`, so they are not affected, but your own interactive
 `claude` sessions of that model start at the saved level.
 
-**The effort chip.** For a running session the picker reads
-`<Level> · <source>`, for example `High · default` or `Low · set`. The source
+**The effort chip.** The picker reads `Thinking: <level>`, for example
+`Thinking: high`. For a running session its tooltip also names the source as
+`Source: <source>`, for example `Source: default` or `Source: set`. The source
 is the layer the level came from: `set` (an explicit choice), `item`, `plan`,
 `tier`, `sub-role`, `role`, `project`, or `default`. `terminal` means the
 session transcript shows a different level than Overdeck launched or stored,
