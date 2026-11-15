@@ -2,10 +2,7 @@ import { useEffect, useState, useCallback, useMemo, type DragEvent } from 'react
 import { useShortcut, type ShortcutDef } from '../lib/shortcuts/registry';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
-  Home, LayoutGrid, Bot, Server,
-  Terminal, BarChart3, DollarSign, HeartPulse, Cpu, Settings,
-  Zap, Compass, GitBranch, GitMerge, ChevronsLeft, ChevronsRight, Sun, Moon, Menu,
-  Hammer, Loader2, History, Mic, FileText, BookOpen, ChevronDown, ChevronRight, MoreHorizontal, Shield, ListOrdered, Activity,
+  Home, Settings, GitBranch, ChevronsLeft, ChevronsRight, Sun, Moon, Menu, Hammer, Loader2, FileText, BookOpen, ChevronDown, ChevronRight, MoreHorizontal, Activity,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { fetchRegisteredProjects } from './CommandDeck/UnknownProjectState';
@@ -29,6 +26,7 @@ import { MachinesNavItem } from './sidebar/MachinesNavItem';
 import { OwnerGroupHeader } from './sidebar/OwnerGroupHeader';
 import { groupProjectsByOwner, OTHER_OWNER_KEY, useCollapsedOwners } from './sidebar/projectOwners';
 import { isRailWorkspace, sortWorkspaces, type WorkspaceRegistryRow } from './frame/workspaceRows';
+import { MORE_GROUPS, type NavItem } from './frame/navGroups';
 
 type PipelineIssuePhase = 'ship' | 'review' | 'work' | 'plan' | 'todo';
 const PIPELINE_PHASES: PipelineIssuePhase[] = ['todo', 'plan', 'work', 'review', 'ship'];
@@ -69,18 +67,6 @@ function setPipelineFilterUrl(key: 'phase' | 'projects', value: string | null) {
 
 const SIDEBAR_STORAGE_KEY = 'overdeck.ui.sidebarCollapsed';
 
-interface NavItem {
-  id: Tab;
-  label: string;
-  icon: LucideIcon;
-  title?: string;
-}
-
-interface NavGroup {
-  label: string;
-  items: NavItem[];
-}
-
 // PAN-1561: the primary rail is Home · Flywheel · Order Book · Projects (PAN-3964). Everything else
 // moves into the collapsible "More" section (MORE_GROUPS) below the Projects
 // list — every route stays reachable, no feature is lost.
@@ -88,48 +74,6 @@ const PRIMARY_ITEMS: NavItem[] = [
   { id: 'home' as Tab, label: 'Home', icon: Home },
   { id: 'flywheel' as Tab, label: 'Flywheel', icon: Activity },
   { id: 'orders' as Tab, label: 'Order Book', icon: BookOpen },
-];
-
-const MORE_GROUPS: NavGroup[] = [
-  {
-    label: 'Operations',
-    items: [
-      { id: 'backlog' as Tab, label: 'Backlog', icon: ListOrdered },
-      { id: 'command-deck' as Tab, label: 'Command Deck', icon: Compass },
-      { id: 'kanban' as Tab, label: 'Board', icon: LayoutGrid },
-      { id: 'pipeline' as Tab, label: 'Pipeline', icon: GitBranch },
-      { id: 'awaiting-merge' as Tab, label: 'Awaiting Merge', icon: GitMerge },
-      { id: 'agents' as Tab, label: 'Agents', icon: Bot },
-      { id: 'autopreso' as Tab, label: 'AutoPreso', icon: Mic },
-    ],
-  },
-  {
-    label: 'Infrastructure',
-    items: [
-      { id: 'resources' as Tab, label: 'Resources', icon: Server },
-    ],
-  },
-  {
-    label: 'Observability',
-    items: [
-      { id: 'activity' as Tab, label: 'Activity', icon: Terminal },
-      { id: 'sessions' as Tab, label: 'Sessions', icon: History },
-      { id: 'metrics' as Tab, label: 'Metrics', icon: BarChart3 },
-      { id: 'costs' as Tab, label: 'Costs', icon: DollarSign },
-      { id: 'health' as Tab, label: 'Health', icon: HeartPulse },
-      { id: 'deacon' as Tab, label: 'Deacon', icon: Shield },
-    ],
-  },
-  {
-    label: 'System',
-    items: [
-      { id: 'knowledge' as Tab, label: 'Knowledge', icon: BookOpen },
-      { id: 'skills' as Tab, label: 'Skills', icon: Cpu },
-      { id: 'context' as Tab, label: 'Context', icon: FileText },
-      { id: 'settings' as Tab, label: 'Settings', icon: Settings },
-      { id: 'god-view' as Tab, label: 'God View', icon: Zap },
-    ],
-  },
 ];
 
 const MORE_COLLAPSED_KEY = 'overdeck.ui.sidebarMoreCollapsed';
