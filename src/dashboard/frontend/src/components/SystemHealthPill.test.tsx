@@ -287,6 +287,17 @@ describe('SystemHealthPill', () => {
     expect(screen.queryByRole('dialog', { name: 'System health' })).not.toBeInTheDocument();
   });
 
+  it('stays open for any pointer-down while an alertdialog is up', () => {
+    setSnapshot('healthy');
+    const { rerender } = render(<div />);
+    renderPill();
+
+    fireEvent.click(screen.getByTestId('system-health-pill'));
+    rerender(<div role="alertdialog" aria-label="Confirm" />);
+    fireEvent.pointerDown(document.body);
+    expect(screen.getByRole('dialog', { name: 'System health' })).toBeInTheDocument();
+  });
+
   it('reaches the Cloister system controls through the health dot', () => {
     setSnapshot('healthy');
     renderPill(newQueryClient(), <CloisterStatusBar />);
