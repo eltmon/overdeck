@@ -1,0 +1,632 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T15:11:29Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5361: bare-host-linux idle check fails ~3% of runs: pid-net counts machine-wide runner bursts that one 30 s baseline cannot cancel",
+    "updated": "2026-11-15T15:28:35.357Z"
+  },
+  "plan": {
+    "id": "pan-5361",
+    "title": "bare-host-linux idle check fails ~3% of runs: pid-net counts machine-wide runner bursts that one 30 s baseline cannot cancel",
+    "status": "proposed",
+    "uid": "1cba09be-41ee-49c5-bfae-98bc57f569b2",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-15T15:11:29Z",
+    "updated": "2026-11-15T15:28:35.357Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5361",
+        "label": "PAN-5361",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-5361.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "ci",
+      "bare-host-smoke",
+      "flaky-check",
+      "linux"
+    ],
+    "narratives": {
+      "Problem": "The bare-host-linux idle check (pid-net) subtracts one 30 s baseline sample of machine-wide PID consumption from one 30 s idle sample. The kernel PID counter counts every process and thread on the runner, and the hosted runner produces random bursts of about +20 and +60 PIDs in about 5-7% of windows on both sides. A burst in the idle window fails the check (7 failures in 211 runs, all with the standard 6 traced Overdeck calls); a burst in the baseline window drives the net negative and would hide a real regression of up to about 60 PIDs.",
+      "Proposal": "On Linux take 3 back-to-back baseline windows and 3 idle windows and decide pid-net on min(idle) - min(baseline), so one burst in any one window cannot move the verdict. macOS keeps exactly one window per side and its traced-cost rule. Move the verdict program out of the inline node -e into scripts/bare-host-smoke/result.mjs with pure exports and a unit test. Record the dashboard tree's process and task counts from /proc at window boundaries with bash builtins only, and print a heuristic excess-source attribution on a Linux failure. Add --idle-spawner-ms and a gated bare-host-linux-spawner-canary CI job as the positive control. Calibrate the Linux budget with the D14 rule on 20+ runs from a temporary push-triggered workflow that is deleted before done. Update the script comments, RELEASING.md, PIPELINE-GATES.md and conventions.md. Full detail: .pan/drafts/pan-5361.md.",
+      "NonGoals": "- Changing the macOS measure, window count, timing, budget or traced-cost formula.\n- Changing any Overdeck idle behaviour (pollers, CLIProxy download, systemd helpers).\n- Raising IDLE_BUDGET_LINUX above 30.\n- Exact per-process PID attribution via PID namespaces, cgroups, eBPF or process accounting.\n- Catching idle work whose period is longer than one 30 s window; min-of-N can miss it (accepted limit).\n- Naming the runner process behind the bursts.\n- Leaving the temporary calibration workflow or a matrix on bare-host-linux in the final diff.\n- A changelog.d entry (CI-only change)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Estimator is min(idle) - min(baseline) over 3 windows per side on Linux.",
+        "rationale": "The issue names it as its first option; a steady regression shows in every idle window so the minimum keeps it, while min-of-3 survives up to two bursts per side."
+      },
+      {
+        "summary": "macOS stays at one window per side with today's stamps.",
+        "rationale": "AC5 requires the macOS traced-cost rule unchanged and the known-bad job reads its fields; extra macOS windows would only cost queue time."
+      },
+      {
+        "summary": "The spawner canary uses 500 ms, not the issue's 2 s example.",
+        "rationale": "2 s adds about +15 per window, giving a net of about 21, which passes the budget of 30 under both the old and new measure; 500 ms adds about +60 and fails clearly."
+      },
+      {
+        "summary": "The controlled run is a permanent --idle-spawner-ms flag plus a CI job gated on smoke changes.",
+        "rationale": "The smoke cannot run on a host with a live dashboard (port guard), so evidence must come from CI; a permanent gated canary mirrors bare-host-macos-known-bad and keeps proving the estimator catches steady spawners."
+      },
+      {
+        "summary": "Calibration runs on a temporary push-triggered workflow smoking @overdeck/core@0.86.0, deleted before done.",
+        "rationale": "ci.yml runs only on PRs and main with cancel-in-progress concurrency, and workflow_dispatch needs the file on main; the published package has the same idle profile and needs no build."
+      },
+      {
+        "summary": "Linux budget is recalculated with the D14 rule from the 20 calibration nets; fallback N=5 if any run bursts in every window of one side.",
+        "rationale": "D14 is the documented calibration rule; later idle windows are uncharted, so an explicit stop rule guards the choice of N."
+      },
+      {
+        "summary": "Attribution is a heuristic: shell calls weigh 2, plus tree task growth; source is dashboard-tree when 2 x attributed >= excess.",
+        "rationale": "/proc has no per-process fork counter; weighting shell calls as an upper bound biases toward blaming the dashboard, the safer side."
+      }
+    ],
+    "items": [
+      {
+        "id": "result-module",
+        "title": "Move the verdict into scripts/bare-host-smoke/result.mjs with the min-of-N estimator",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T15:11:29Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5361",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "multi-window-measure",
+            "tree-snapshot",
+            "spawner-canary-job",
+            "calibration"
+          ],
+          "files_scope": [
+            "scripts/bare-host-smoke/result.mjs",
+            "scripts/bare-host-smoke.sh",
+            "tests/unit/scripts/bare-host-smoke-result.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/bare-host-smoke-result.test.ts",
+            "bash -n scripts/bare-host-smoke.sh"
+          ],
+          "expected_outputs": [
+            "bare-host-smoke-result.test.ts passes with all named tests",
+            "bash -n exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-6"
+          ],
+          "acJustification": "Six criteria: the estimator, its failure case, the frozen macOS path, attribution, the shell wiring and the no-window failure path are separate behaviours a reviewer checks separately."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1. Add SCRIPT_DIR after set -u. Create scripts/bare-host-smoke/result.mjs (ESM, isMain guard like scripts/windows-smoke/summarize.mjs) exporting summarizeSpawns, decideIdle, renderLines and renderStepSummary, ported from the inline node -e program at scripts/bare-host-smoke.sh:174-270 plus the min-of-N estimator, per-window fields and the FR-6 attribution. Replace the node -e body of write_result with node \"$SCRIPT_DIR/bare-host-smoke/result.mjs\" using the PRD env contract, and shim the single-window values into R_BASELINE_WINDOWS/R_IDLE_WINDOWS/R_IDLE_FROM/R_IDLE_TO in measure_idle until multi-window-measure lands. Write tests/unit/scripts/bare-host-smoke-result.test.ts with the named tests in the PRD. When there are no idle windows, spawns, idleNew, net, value and attribution are null, pass is false and result.json is still written."
+        },
+        "items": [
+          {
+            "id": "result-module.ac1",
+            "title": "Given baseline windows [7, 72, 6] and idle windows [13, 12, 14] on linux, decideIdle returns net 6 and pass true at budget 30; given idle [13, 77, 12] with baseline [7, 8, 6] it also returns net 6",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "result-module.ac2",
+            "title": "Given idle windows [47, 46, 48] and baseline [7, 8, 6] on linux, decideIdle returns rule pid-net, value 40 and pass false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "result-module.ac3",
+            "title": "Given os darwin with one window per side, decideIdle returns rule traced-cost with value = count + 5 x spawnErrors and net = idle - baseline, the same numbers the old inline program produces",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "result-module.ac4",
+            "title": "decideIdle returns attribution.source dashboard-tree for 60 traced direct calls in the deciding window and unattributed for 6 traced calls with an excess of 38",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "result-module.ac5",
+            "title": "write_result in scripts/bare-host-smoke.sh contains no node -e and runs result.mjs via SCRIPT_DIR; bash -n exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "result-module.ac6",
+            "title": "Given no idle windows (boot failure or setup error), decideIdle returns spawns null and pass false, and renderLines prints n/a instead of throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "multi-window-measure",
+        "title": "Take 3 windows per side on Linux and 1 on macOS through one take_windows function",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T15:11:29Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-5361",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/bare-host-smoke.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash -n scripts/bare-host-smoke.sh",
+            "grep -c 'take_windows' scripts/bare-host-smoke.sh",
+            "npx vitest run tests/unit/scripts/bare-host-smoke-result.test.ts"
+          ],
+          "expected_outputs": [
+            "bash -n exits 0",
+            "take_windows appears at least 3 times",
+            "bare-host-smoke-result.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. Add WINDOWS_PER_SIDE_LINUX=3 and WINDOWS_PER_SIDE_MACOS=1, set WINDOWS_PER_SIDE in parse_args, replace window_count and idle_window with one take_windows function used for both sides (Linux ms stamps via date +%s%3N, darwin the existing second stamps, retake once on a negative count), leave new_pids byte-identical, drop the result-module shim, and add a shell flag to the spawn tracer records. Keep every construct bash 3.2 compatible."
+        },
+        "items": [
+          {
+            "id": "multi-window-measure.ac1",
+            "title": "scripts/bare-host-smoke.sh contains a take_windows function called once for the baseline side and once for the idle side, and contains no window_count or idle_window function",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "multi-window-measure.ac2",
+            "title": "new_pids preserves its pre-change body (lines 137-143) byte for byte, so only sleep runs between its two sh counter reads",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "multi-window-measure.ac3",
+            "title": "parse_args sets WINDOWS_PER_SIDE to 3 when uname is Linux and 1 when it is Darwin, and the darwin branch of take_windows keeps the $(date +%s)000 and $(date +%s)999 stamps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "multi-window-measure.ac4",
+            "title": "The spawn tracer records shell true for exec, execSync and shell-option calls, and bash -n scripts/bare-host-smoke.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tree-snapshot",
+        "title": "Snapshot the dashboard tree's procs and tasks from /proc at Linux idle window boundaries",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:11:29Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-5361",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/bare-host-smoke.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash -n scripts/bare-host-smoke.sh",
+            "awk '/^tree_snapshot\\(\\)/,/^}/' scripts/bare-host-smoke.sh | grep -c -E '\\$\\(|`|\\|' || true"
+          ],
+          "expected_outputs": [
+            "bash -n exits 0",
+            "the awk/grep count prints 0 (no forks in tree_snapshot)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. Add tree_snapshot <root_pid> that sets TREE_PROCS and TREE_TASKS from /proc/[0-9]*/stat (ppid field 4, num_threads field 20) and /proc/<pid>/cmdline matches of \"$WORK_DIR/home/\" or \"$WORK_DIR/tools/\", using only builtins and indexed arrays, then call it on Linux before the first idle window and after every idle window, outside the counter reads, appending procs:tasks to R_IDLE_TREE for result.mjs. Snapshots are per window, not shared: when a negative count forces a retake, take a fresh start snapshot immediately before the retake's from stamp and replace the old start; R_IDLE_TREE holds one startProcs:startTasks:endProcs:endTasks entry per window."
+        },
+        "items": [
+          {
+            "id": "tree-snapshot.ac1",
+            "title": "The tree_snapshot function body contains no command substitution, backtick or pipe, so it spawns no process",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tree-snapshot.ac2",
+            "title": "tree_snapshot is called only when OS_NAME is linux, before each idle window's from stamp and after its to stamp, and appends one startProcs:startTasks:endProcs:endTasks entry per window to R_IDLE_TREE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tree-snapshot.ac3",
+            "title": "tree_snapshot counts the server pid, its ppid descendants and processes whose cmdline contains $WORK_DIR/home/ or $WORK_DIR/tools/; bash -n exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tree-snapshot.ac4",
+            "title": "When a negative count forces a retake, take_windows calls tree_snapshot again before the retake's from stamp and replaces that window's start snapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawner-flag",
+        "title": "Add --idle-spawner-ms to inject a steady spawner into the idle dashboard server",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:11:29Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5361",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/bare-host-smoke.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash -n scripts/bare-host-smoke.sh",
+            "bash scripts/bare-host-smoke.sh --tarball x --work-dir \"$PWD/.tmp/never\" --idle-spawner-ms 10; test $? -eq 64"
+          ],
+          "expected_outputs": [
+            "bash -n exits 0",
+            "the --idle-spawner-ms 10 call exits 64 with a usage error"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4 steps 1-3. Parse --idle-spawner-ms <n> inside the parse_args case loop (whole number, at least 50, else bad_usage, so it exits 64 before any setup check), document it in usage(), write $WORK_DIR/tools/idle-spawner.cjs guarded to argv[1] ending in dist/dashboard/server.js, load it after the tracer in the idle dashboard's NODE_OPTIONS with OVERDECK_SMOKE_SPAWNER_MS, and export R_IDLE_SPAWNER_MS so result.json records idle.injectedSpawnerMs."
+        },
+        "items": [
+          {
+            "id": "spawner-flag.ac1",
+            "title": "bare-host-smoke.sh --idle-spawner-ms 10 exits 64 and prints the usage text, before any setup check",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawner-flag.ac2",
+            "title": "usage() documents --idle-spawner-ms and write_result exports R_IDLE_SPAWNER_MS so result.json records idle.injectedSpawnerMs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawner-flag.ac3",
+            "title": "The generated idle-spawner.cjs spawns true only when argv[1] ends in dist/dashboard/server.js, and NODE_OPTIONS loads it after spawn-trace.cjs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawner-canary-job",
+        "title": "Add the bare-host-linux-spawner-canary CI job and path filters for scripts/bare-host-smoke/**",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:11:29Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5361",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/ci.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"require('yaml').parse(require('fs').readFileSync('.github/workflows/ci.yml','utf8'))\""
+          ],
+          "expected_outputs": [
+            "ci.yml parses as YAML with exit 0",
+            "bare-host-linux-spawner-canary concludes success on the PR head"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4 step 4. Add '- scripts/bare-host-smoke/**' to both the macos and smoke filters of bare-host-changes, and add the bare-host-linux-spawner-canary job (needs build and bare-host-changes, if smoke == 'true', runs the smoke with --idle-spawner-ms 500 under set +e, asserts rc 1, panUp and enoent pass, rule pid-net, value above budget, injectedSpawnerMs 500 and attribution.source dashboard-tree, uploads bare-host-linux-spawner-canary-logs). Push workflow edits over SSH."
+        },
+        "items": [
+          {
+            "id": "spawner-canary-job.ac1",
+            "title": "ci.yml parses as YAML and contains a bare-host-linux-spawner-canary job with needs build and bare-host-changes and if needs.bare-host-changes.outputs.smoke == 'true'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawner-canary-job.ac2",
+            "title": "The canary assertion step fails the job when the smoke exit code is not 1, result.json reports pass true, rule other than pid-net, value not above budget, or attribution.source other than dashboard-tree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawner-canary-job.ac3",
+            "title": "The bare-host-changes macos and smoke filters both contain scripts/bare-host-smoke/** so a result.mjs-only change routes to the macOS and canary jobs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "calibration",
+        "title": "Calibrate the Linux budget on 20+ runs from a temporary workflow, then delete it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T15:11:29Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-5361",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/bare-host-calibration.yml",
+            "scripts/bare-host-smoke.sh",
+            ".pan/drafts/pan-5361.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test ! -e .github/workflows/bare-host-calibration.yml",
+            "grep -n 'IDLE_BUDGET_LINUX=' scripts/bare-host-smoke.sh",
+            "grep -n '## Calibration evidence' .pan/drafts/pan-5361.md"
+          ],
+          "expected_outputs": [
+            "the calibration workflow file is absent",
+            "IDLE_BUDGET_LINUX equals the D14 result",
+            "the PRD contains the calibration table"
+          ],
+          "readiness": "sequential",
+          "readinessReason": "It drives live CI runs on the feature branch and must not overlap another push, because the evidence run would be cancelled or mixed with other commits.",
+          "traces": [
+            "FR-9",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. Commit .github/workflows/bare-host-calibration.yml (push trigger on feature/pan-5361; 20 plain Linux runs, 2 at 2000 ms and 2 at 500 ms against @overdeck/core@0.86.0 or newer, one macOS 0.86.0 leg and one macOS known-bad 0.81.0 leg; unique artifact names), push over SSH, wait for the whole run without pushing again, rerun setup-error jobs, download every result.json, tabulate every window into the PRD Calibration evidence section, apply the CP-1 and check stop rules (stop and pan tell flywheel-orchestrator on a miss), set IDLE_BUDGET_LINUX by the D14 rule and update the calibration comment, then git rm the workflow in the same commit as the budget and evidence and push once."
+        },
+        "items": [
+          {
+            "id": "calibration.ac1",
+            "title": "The PRD Calibration evidence section records at least 20 plain Linux runs with every baseline and idle window count, and none of them fails or reports a negative net",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "calibration.ac2",
+            "title": "The PRD records both 500 ms spawner runs failing pid-net with attribution.source dashboard-tree, plus the 2000 ms values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "calibration.ac3",
+            "title": "The PRD records the macOS 0.86.0 leg passing with windowsPerSide 1 and the macOS 0.81.0 leg failing with a tmux forbidden-tool line and traced-cost above budget",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "calibration.ac4",
+            "title": "IDLE_BUDGET_LINUX in scripts/bare-host-smoke.sh equals max(10, min(30, 3 x highest plain net)) and the comment above it records the date and the 20 nets",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "calibration.ac5",
+            "title": "The final tree contains no .github/workflows/bare-host-calibration.yml and bare-host-linux in ci.yml contains no strategy block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the min-of-3 Linux measure, its calibration and the spawner canary",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:11:29Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5361",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/bare-host-smoke.sh",
+            "docs/RELEASING.md",
+            "docs/PIPELINE-GATES.md",
+            ".overdeck/context/codebase/conventions.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "bash -n scripts/bare-host-smoke.sh",
+            "grep -n 'bare-host-linux-spawner-canary' docs/PIPELINE-GATES.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "bash -n exits 0",
+            "PIPELINE-GATES.md names the canary job"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6. Rewrite the script header (lines 9-16) and usage() text, docs/RELEASING.md item 2 and the Budgets paragraph, the docs/PIPELINE-GATES.md Bare-host checks section (four jobs, canary bullet) and .overdeck/context/codebase/conventions.md lines 90-92 to state the min-of-3 Linux measure, the macOS single window, the heuristic excess-source attribution, the canary and the calibration numbers from the calibration item. Leave the conventions.md last-verified line unchanged."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/RELEASING.md states that Linux decides on min(idle) - min(baseline) over 3 windows per side and contains the calibration date, the 20 nets and the resulting budget",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "docs/PIPELINE-GATES.md says four CI jobs run the smoke and contains a bullet for bare-host-linux-spawner-canary with its trigger and pass condition",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "The script header comment and usage() --budget text describe the min-of-3 Linux net and the single-window macOS traced cost; npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": ".overdeck/context/codebase/conventions.md lists all four bare-host jobs and contains the min-of-3 Linux PID net, with its last-verified line unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "result-module",
+        "to": "multi-window-measure",
+        "type": "blocks"
+      },
+      {
+        "from": "multi-window-measure",
+        "to": "tree-snapshot",
+        "type": "blocks"
+      },
+      {
+        "from": "tree-snapshot",
+        "to": "spawner-flag",
+        "type": "blocks"
+      },
+      {
+        "from": "spawner-flag",
+        "to": "spawner-canary-job",
+        "type": "blocks"
+      },
+      {
+        "from": "spawner-flag",
+        "to": "calibration",
+        "type": "blocks"
+      },
+      {
+        "from": "calibration",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "spawner-canary-job",
+        "to": "calibration",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Nine files, one feature: the subsystem count comes from directory spread (the smoke script, its new helper module, its test, two workflow files, the PRD evidence section and three doc files), not from separate concerns. Every item edits or depends on the one smoke script's measurement contract, so sibling issues could not ship or be verified on their own.",
+      "canonicalFilename": "2026-11-15-PAN-5361-bare-host-linux-idle-check-fails-3-of-runs-pid-net-counts-machine-wide-runner-bursts-that-one-30-s-baseline-cannot-cancel.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
