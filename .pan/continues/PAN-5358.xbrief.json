@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5358",
   "created": "2026-11-15T16:13:08.101Z",
-  "updated": "2026-11-15T17:31:29.918Z",
+  "updated": "2026-11-15T17:31:49.856Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,11 @@
     "cli-always-flag.ac2": {
       "status": "completed",
       "doneAt": "2026-11-15T17:31:29.917Z"
+    },
+    "embed-text-export": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5358",
+      "claimedAt": "2026-11-15T17:31:49.855Z"
     }
   }
 }
