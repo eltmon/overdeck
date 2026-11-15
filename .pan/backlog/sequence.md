@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T15:34:10.482324Z · model: claude-opus-5-5 · open: 903_
+_Last sequenced: 2026-11-15T15:36:44.402282Z · model: claude-opus-5-5 · open: 904_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -9,6 +9,7 @@ _Last sequenced: 2026-11-15T15:34:10.482324Z · model: claude-opus-5-5 · open: 
 | 4 | PAN-5337 | S | high | ok |  |  | In pipeline: every relative link in a Markdown preview opens a 404 /conv/<file> URL instead of the linked file. |
 | 4 | PAN-5356 | M | critical | ok |  |  | Merge train re-assembles on every bookkeeping-only main commit, so batches never live long enough for CI; skip .pan/** moves. |
 | 5 | PAN-5338 | M | medium | ok |  |  | In pipeline: conversation diff view gets a rendered Markdown Preview and an Open file action. |
+| 7 | PAN-5363 | S | high | ok |  |  | In pipeline: merge train board Train switch flips back on after off; board cache not dropped on write, optimistic value lost. |
 | 8 | PAN-5357 | S | critical | ok |  |  | Sequencer commits sequence.md every 1-3 min with timestamp-only diffs; skip the commit when the ranking is unchanged and rate-limit runs. |
 | 9 | PAN-5361 | S | critical | ok |  |  | In pipeline: bare-host-linux idle check fails ~3% of runs; pid-net counts machine-wide runner PID bursts one baseline can't cancel. |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
@@ -927,6 +928,10 @@ New critical substrate bug: it is why the approved PAN-5290/5294/5348 batch cann
 
 New in-pipeline enhancement, pinned at a freed top slot. Its reusable preview body is what PAN-5341 reuses in the dock diff view.
 
+### PAN-5363 (rank 7)
+
+Back in the manifest after dropping out of the last two passes; restored with its prior node. In-pipeline bug with a file:line root cause (switch falls back to a stale 5 s server board cache after the POST settles). Placed in a free top-tier slot near PAN-5364, which edits the same ProjectTrainCard.tsx; high rather than critical because the write itself succeeds.
+
 ### PAN-5357 (rank 8)
 
 New critical substrate bug: 41 no-op sequence commits in 3 hours churn main, feeding the merge-train starvation in PAN-5356 and forcing every worktree to merge noise. Small, self-contained fix in the write-sequence path, ranked right after PAN-5356.
@@ -1227,10 +1232,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
 
 New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts through a new generation's 138-second boot warm phase and killed it anyway, producing four restarts in ten minutes, racing spawns on port 3012, and a WATCHDOG GIVING UP. Each restart re-triggered docker stack rebuilds, feeding the storm. The probe budget has to know the difference between starved and starting.
 
-### PAN-3314 (rank 81)
-
-New this pass. Every agent pane is a child of one transient tmux-server unit, so agent memory is the unit's memory and systemd-oomd's kill decision is all-or-nothing: one hungry agent takes the entire fleet with it. That has now happened twice, the second time killing seven work agents, four strikes and a live review convoy. Blast-radius containment is a different fix from choosing a better victim.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1238,10 +1239,10 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T15:34:10.482324Z",
+  "generatedAt": "2026-11-15T15:36:44.402282Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 903,
+  "openCount": 904,
   "nodes": [
     {
       "issue": "PAN-5337",
@@ -12485,6 +12486,19 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "why": "Record of two UI fixes made inline on main (orbiting logo, unclipped Home project menu). Verify and close.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-5363",
+      "rank": 7,
+      "size": "S",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: merge train board Train switch flips back on after off; board cache not dropped on write, optimistic value lost.",
+      "rationale": "Back in the manifest after dropping out of the last two passes; restored with its prior node. In-pipeline bug with a file:line root cause (switch falls back to a stale 5 s server board cache after the POST settles). Placed in a free top-tier slot near PAN-5364, which edits the same ProjectTrainCard.tsx; high rather than critical because the write itself succeeds.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13733,6 +13747,13 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-5363",
+      "to": "PAN-5364",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
