@@ -1,0 +1,763 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T11:26:35Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5337: Markdown preview: every relative link opens a 404 dashboard URL (/conv/fort3d.md) instead of the linked file",
+    "updated": "2026-11-15T11:34:58.345Z"
+  },
+  "plan": {
+    "id": "pan-5337",
+    "title": "Markdown preview: every relative link opens a 404 dashboard URL (/conv/fort3d.md) instead of the linked file",
+    "status": "proposed",
+    "uid": "19019077-d684-4aed-8b10-6c34bc290b6a",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-15T11:26:35Z",
+    "updated": "2026-11-15T11:34:58.345Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5337",
+        "label": "PAN-5337",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-5337.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "markdown",
+      "explorer",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "Every relative link in a Markdown preview (code pane Preview, editor pane Preview, Docs pane, cockpit dig tabs) renders as <a href=\"fort3d.md\" target=\"_blank\">, because MarkdownTab passes no cwd, resolveMarkdownFileLinkTarget returns null for relative paths without one, and ChatMarkdown falls through to TranscriptLink. The browser resolves the href against /conv/<id> and opens a 404 tab. The operator's repro (chat chip -> editor pane -> Preview -> fort3d.md) hits this on all 93 links of a docs index.",
+      "Proposal": "Add a total href classifier and a root-relative path resolver (pure), a guard in ChatMarkdown that renders unresolved document-relative hrefs as inert text, and a docLocation { rootId, path } prop on MarkdownTab/ChatMarkdown. With a location, relative links render MarkdownDocLink, which checks existence with one cached listDir per folder and opens files through deck.openBeside({ rootId, path, line, preview: true }) like a single click in the Files tree, reveals folders in the Files dock, and shows missing/outside targets as not found. Headings get data-heading-slug and #fragment links scroll inside the preview. The code pane passes its rootId/path; the editor pane maps its absolute path to an explorer root with a new explorerLocationForPath. Full detail: .pan/drafts/pan-5337.md.",
+      "NonGoals": "- Exposing PRD/STATE document paths from the server so Docs pane and dig-tab links resolve (they stay inert)\n- Resolving root-relative links ('/docs/x.md') against the explorer root inside a file preview\n- Changing how chat file chips (MarkdownFileLink) open files (PAN-5284 child D2)\n- Scrolling a newly opened target to its #heading\n- Link handling inside the experimental Streamdown renderer beyond the chat guard\n- Image sources in previews\n- Opening a Markdown link target in its Preview view (PAN-5340)\n- Any new server route, RPC, contract schema or npm dependency\n- Writing location.hash or otherwise changing the page URL on any preview link click\n- Adding rules to components/CommandDeck/styles/command-deck.module.css"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Previews get a new docLocation prop on MarkdownTab/ChatMarkdown instead of a cwd (issue's fallback 'resolveLink' option, specialized).",
+        "rationale": "A cwd turns links into chat file chips, runs bare-text path detection over prose and sends one RPC per token, and the path regexes reject 'levels/' and names with spaces."
+      },
+      {
+        "summary": "Links open through deck.openBeside with preview: true, the call the Files tree's single click makes.",
+        "rationale": "The issue requires 'the same way the Files tree opens it'; PAN-5287 already merged openBeside, so PAN-5290 is not a dependency."
+      },
+      {
+        "summary": "Opening a Markdown link target in its Preview view is split out to PAN-5340; this plan opens targets exactly as the Files tree does (Edit view).",
+        "rationale": "It needs a new pane field across six more files (over the 25-file plan limit and into PAN-5290's lines) and must not apply when the link carries a line, because the line reveal needs Monaco mounted."
+      },
+      {
+        "summary": "The editor pane maps its absolute path to an explorer root on the client (explorerLocationForPath, rules 4-5 of rootIdForConversation); no match means inert links.",
+        "rationale": "The operator's repro goes through the editor pane; the mapping reuses the existing rules and needs no server change."
+      },
+      {
+        "summary": "Existence is checked eagerly with one listDir per (root, folder), cached 10 s.",
+        "rationale": "The not-found state must show before a click (requirement 7) and no new RPC is allowed; listDir also tells files from folders."
+      },
+      {
+        "summary": "Docs pane and dig tabs (no file location) render relative links as inert text; the PRD path is not exposed from the server.",
+        "rationale": "Requirement 8 allows plain text when the location is unknown; PlanningResponse carries no path."
+      },
+      {
+        "summary": "Root-relative hrefs (/conv/123) count as absolute in the chat guard.",
+        "rationale": "Transcripts link dashboard routes; treating them as relative would break working links."
+      },
+      {
+        "summary": "Heading slugs are a local GitHub-style function plus a remark plugin, applied only to located previews; fragment clicks scroll inside the preview and never set location.hash.",
+        "rationale": "No slug library is installed (NFR-2) and requirement 2 forbids changing the page URL."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-15-PAN-5337-markdown-preview-every-relative-link-opens-a-404-dashboard-url-conv-fort3d-md-instead-of-the-linked-file.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "doc-href-classifier",
+        "title": "Add the pure href classifier and root-relative path resolver (markdownDocLinks.ts)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T11:26:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5337",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/markdownDocLinks.ts",
+            "src/dashboard/frontend/src/lib/__tests__/markdownDocLinks.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/markdownDocLinks.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "markdownDocLinks.test.ts passes with 14 tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "FR-11",
+            "NFR-2",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "chat-relative-guard",
+            "doc-link-component",
+            "chat-doc-location-mode"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/pan-5337.md). Create src/dashboard/frontend/src/lib/markdownDocLinks.ts exporting DocHref, classifyDocHref, isDocumentRelativeHref, ResolvedDocPath, resolveDocPath and docDirOf with exactly the rules in WI-1 (trim, unwrap <>, '#' -> fragment, leading '/' or Windows drive -> absolute, a 'scheme:' prefix -> absolute EXCEPT when the rest after the first ':' is only digits[:digits] (so 'fort3d.md:12' stays a relative file with line 12, as hasExternalScheme does in markdown-links.ts), everything else relative with ?query dropped, #hash split, :line[:col] suffix, #L<n>C<m> fallback, trailingSlash flag; resolveDocPath skips '' and '.', '..' pops or returns outside, a leading '~' segment returns outside). No React imports. Write the 14 named tests from WI-1 and add src/lib/__tests__/markdownDocLinks.test.ts to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "doc-href-classifier.ac1",
+            "title": "Given href 'fort3d.md', classifyDocHref returns kind 'relative' with path 'fort3d.md'; given '/conv/123', 'https://x' or 'mailto:a@b' it returns kind 'absolute'; given '#Install' it returns kind 'fragment' with slug 'Install'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doc-href-classifier.ac2",
+            "title": "Given 'fort3d.md:12', classifyDocHref returns kind 'relative' with path 'fort3d.md' and line 12 (not 'absolute'); given 'x.md:12:3' or 'x.md#L12C3' it returns path 'x.md', line 12, column 3; given 'x.md#intro' it returns path 'x.md' with no line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doc-href-classifier.ac3",
+            "title": "resolveDocPath('docs', 'fort3d.md') returns { kind: 'inside', path: 'docs/fort3d.md' }, resolveDocPath('docs/x', '../a.md') returns 'docs/a.md', and resolveDocPath('docs', '../../a.md') and resolveDocPath('docs', '~/a.md') return { kind: 'outside' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doc-href-classifier.ac4",
+            "title": "The test file is listed in scripts/frontend-test-subset.txt and `npx vitest run src/lib/__tests__/markdownDocLinks.test.ts` exits 0 from src/dashboard/frontend",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "heading-slugs",
+        "title": "Add GitHub-style heading slugs as a remark plugin (remarkHeadingSlugs.ts)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T11:26:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5337",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/remarkHeadingSlugs.ts",
+            "src/dashboard/frontend/src/lib/__tests__/remarkHeadingSlugs.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/remarkHeadingSlugs.test.ts"
+          ],
+          "expected_outputs": [
+            "remarkHeadingSlugs.test.ts passes with 4 tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/dashboard/frontend/src/lib/remarkHeadingSlugs.ts exporting headingSlug(text) (lowercase, strip /[^\\p{L}\\p{N}\\s_-]/gu, each whitespace -> '-') and remarkHeadingSlugs() which walks mdast heading nodes, collects text and inlineCode descendants, de-duplicates (intro, intro-1, intro-2) and sets node.data.hProperties['data-heading-slug']. No new npm dependency. Add the test file to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "heading-slugs.ac1",
+            "title": "headingSlug('Fort 3D — Supply!') returns 'fort-3d--supply' and headingSlug('Über Café') returns 'über-café'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "heading-slugs.ac2",
+            "title": "Given a tree with three '## Intro' headings, remarkHeadingSlugs stores data-heading-slug values 'intro', 'intro-1' and 'intro-2' in each heading's hProperties",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "heading-slugs.ac3",
+            "title": "The test file is listed in scripts/frontend-test-subset.txt and its vitest run exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "chat-relative-guard",
+        "title": "Render document-relative hrefs that nothing resolved as inert text in ChatMarkdown",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T11:26:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5337",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ChatMarkdown.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.relative-links.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ChatMarkdown.relative-links.test.tsx src/components/chat/__tests__/ChatMarkdown.test.tsx src/components/chat/__tests__/ChatMarkdown.issue-links.test.tsx src/components/chat/__tests__/ChatMarkdown.pull-request-links.test.tsx"
+          ],
+          "expected_outputs": [
+            "all four ChatMarkdown test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-8",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3, the guard part (decision D9). In makeComponents().a in src/dashboard/frontend/src/components/chat/ChatMarkdown.tsx, after the unchanged resolveMarkdownFileLinkMeta/MaybeFileLinkChip branch and before the safeHref/TranscriptLink return (search `return <TranscriptLink href={safeHref}`), add: if isDocumentRelativeHref(href) return <span data-testid=\"markdown-inert-link\">{children}</span>. Root-relative ('/conv/123') and scheme hrefs keep the TranscriptLink path. Create ChatMarkdown.relative-links.test.tsx with the tests 'renders a relative link without cwd as inert text', 'keeps /conv/123 as a TranscriptLink', 'keeps https links with target _blank', and add it to scripts/frontend-test-subset.txt. This alone removes the 404 tab from every MarkdownTab caller."
+        },
+        "items": [
+          {
+            "id": "chat-relative-guard.ac1",
+            "title": "Given ChatMarkdown text '[levels](levels/) [Fort](fort3d.md)' with no cwd, the render contains no <a> element and two [data-testid=\"markdown-inert-link\"] spans",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chat-relative-guard.ac2",
+            "title": "Given '[conv](/conv/123)', the render contains an <a href=\"/conv/123\">; given '[web](https://example.com)', the render contains an <a> with target \"_blank\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chat-relative-guard.ac3",
+            "title": "Each of the existing ChatMarkdown.test.tsx, ChatMarkdown.issue-links.test.tsx and ChatMarkdown.pull-request-links.test.tsx still passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doc-link-component",
+        "title": "Add MarkdownDocLink and its listDir existence cache (file, folder, missing, outside)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T11:26:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5337",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/MarkdownDocLink.tsx",
+            "src/dashboard/frontend/src/components/chat/docLinkTargets.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/MarkdownDocLink.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/MarkdownDocLink.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MarkdownDocLink.test.tsx passes with 6 tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3, component part (decisions D3, D5, D6, D12). Create components/chat/docLinkTargets.ts (useDocLinkTarget(rootId, path) -> 'loading'|'file'|'dir'|'missing'|'unknown' via listDir(rootId, docDirOf(path)), module-level promise cache keyed rootId+'\\0'+parentDir with a 10 s Date.now() expiry, clearDocLinkTargetCache for tests; '' -> 'dir' without a request) and components/chat/MarkdownDocLink.tsx (props rootId, fromDir, target, children; outside/missing -> span data-doc-link-state with Tailwind classes text-muted-foreground underline decoration-dashed, aria-disabled, title 'Link target not found: <path>'; loading -> inert span; file/unknown -> <a role=\"link\" tabIndex={0}> with no href/target, click or Enter calls deck.openBeside({ rootId, path, line, preview: true }) (line omitted when the link has none) or openCodePane(deck.deckKey, { rootId, path, line, preview: true }) when openBeside is absent; dir -> setRootOverride when useActiveDock's rootId differs, then deck.openDock({ tab: 'files', reveal: { rootId, path } }); no deck -> inert span). No CSS-module edits. Write the 6 named tests from WI-3 with listDir mocked and a StageDeckProvider value of vi.fn() openBeside/openDock; add the test file to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "doc-link-component.ac1",
+            "title": "Given listDir('project:dfai','docs') returns a file entry 'docs/fort3d.md', clicking the link for target 'fort3d.md' from fromDir 'docs' calls openBeside once with { rootId: 'project:dfai', path: 'docs/fort3d.md', preview: true } and the rendered <a> has no href attribute; a target 'fort3d.md:12' adds line 12",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doc-link-component.ac2",
+            "title": "Given a target 'levels/' whose entry is a dir, clicking it calls openDock with { tab: 'files', reveal: { rootId: 'project:dfai', path: 'docs/levels' } } and does not call openBeside",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doc-link-component.ac3",
+            "title": "Given a target absent from the listing, or '../../x.md' from 'docs', the link renders a span with data-doc-link-state 'missing' or 'outside' and a click calls neither openBeside nor openDock",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doc-link-component.ac4",
+            "title": "Given ten links to files in the same folder, listDir is called exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "chat-doc-location-mode",
+        "title": "Add the docLocation prop to ChatMarkdown: relative links via MarkdownDocLink, heading slugs and in-preview fragment scroll",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T11:26:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5337",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ChatMarkdown.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.relative-links.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ChatMarkdown.relative-links.test.tsx src/components/chat/__tests__/ChatMarkdown.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both ChatMarkdown test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-6",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3, wiring part (decisions D1, D7, D8). Add `docLocation?: { rootId: string; path: string }` to ChatMarkdownProps; pass it to makeComponents and add docLocation?.rootId/docLocation?.path to the useMemo deps. In the a component, before the existing resolveMarkdownFileLinkMeta branch: classifyDocHref(href); when docLocation is set and kind is 'relative' return <MarkdownDocLink rootId fromDir={docDirOf(docLocation.path)} target>; when docLocation is set and kind is 'fragment' return <a href={`#${slug}`} className={styles.mdLink} onClick={scrollToHeading(slug)}>, where scrollToHeading is a module-level helper in ChatMarkdown.tsx (preventDefault; closest [data-testid='markdown-tab'] from event.currentTarget; query [data-heading-slug=CSS.escape(slug)] then headingSlug(slug); scrollIntoView({ block: 'start' }); never touch location.hash). Add remarkHeadingSlugs to remarkPlugins only when docLocation is set. Follow the WI-2 implementation checkpoint if the data-heading-slug attribute does not reach the DOM. Extend ChatMarkdown.relative-links.test.tsx with 'adds data-heading-slug to headings in a located preview', 'adds no data-heading-slug in chat', 'scrolls to the heading on a fragment click without changing location.hash', 'routes a relative link to MarkdownDocLink when docLocation is set'."
+        },
+        "items": [
+          {
+            "id": "chat-doc-location-mode.ac1",
+            "title": "Given docLocation { rootId: 'project:p', path: 'docs/index.md' } and text '## Install', the rendered h2 has data-heading-slug 'install'; given the same text without docLocation, no element has data-heading-slug",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chat-doc-location-mode.ac2",
+            "title": "Given docLocation and '[go](#install)', a click calls scrollIntoView on the h2 with data-heading-slug 'install' and window.location.hash is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chat-doc-location-mode.ac3",
+            "title": "Given docLocation and '[Fort](fort3d.md)', the render contains a [data-doc-link-state] element and no <a href=\"fort3d.md\">",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "markdown-tab-location",
+        "title": "Pass a document location through MarkdownTab",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T11:26:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5337",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/MarkdownTab.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/__tests__/MarkdownTab.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/ZoneCOverviewTabs/__tests__/MarkdownTab.test.tsx"
+          ],
+          "expected_outputs": [
+            "MarkdownTab.test.tsx passes with 2 tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 (decision D11). Add `docLocation?: { rootId: string; path: string }` to MarkdownTabProps; render `<ChatMarkdown text={body} cwd={undefined} docLocation={docLocation} {...(docLocation ? { useStreamdown: false } : {})} />`; update the header comment. Create MarkdownTab.test.tsx with 'renders relative links inert without a document location' and 'passes the document location so a relative link resolves' (listDir mocked); add it to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "markdown-tab-location.ac1",
+            "title": "Given MarkdownTab body '[Fort](fort3d.md)' with no docLocation, the render has a [data-testid=\"markdown-inert-link\"] span and no <a> element",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "markdown-tab-location.ac2",
+            "title": "Given the same body with docLocation { rootId: 'project:p', path: 'docs/index.md' }, the render has an element with a data-doc-link-state attribute",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "code-pane-preview-links",
+        "title": "Pass the code pane's root and path to its Markdown Preview",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T11:26:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5337",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/code/CodePane.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/CodePane.markdown-links.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/code/__tests__/CodePane.markdown-links.test.tsx src/components/explorer/code/__tests__/CodePane.test.tsx"
+          ],
+          "expected_outputs": [
+            "both CodePane test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In CodePane.tsx (CodePaneForFile) add `const docLocation = useMemo(() => ({ rootId, path }), [rootId, path])` above the early returns and change line 302 to `<MarkdownTab body={text ?? result.text ?? ''} docLocation={docLocation} />`. Create CodePane.markdown-links.test.tsx reusing the mock set-up of CodePane.test.tsx, mocking listDir, wrapping in StageDeckProvider with vi.fn() openBeside; add it to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "code-pane-preview-links.ac1",
+            "title": "Given a code pane on 'docs/index.md' in root 'project:p' whose text is '[Fort](fort3d.md) [Web](https://example.com)', after switching to Preview and clicking 'Fort', openBeside is called with { rootId: 'project:p', path: 'docs/fort3d.md', preview: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "code-pane-preview-links.ac2",
+            "title": "In that Preview, the render contains exactly one a[target='_blank'] element (the https://example.com anchor) and no anchor with href 'fort3d.md'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "code-pane-preview-links.ac3",
+            "title": "UAT (test role, isolated Playwright profile, same fixture as editor-pane-preview-links): when docs/index.md is opened from the Files tree and the code pane is switched to Preview, clicking Fort opens docs/fort3d.md in the root's preview tab with no new browser tab and an unchanged page URL, Levels reveals docs/levels in the Files dock, Down scrolls ## Details into view, and Gone renders dashed and opens nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "explorer-location-for-path",
+        "title": "Map an absolute file path to its explorer root and root-relative path",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T11:26:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5337",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/rootForConversation.ts",
+            "src/dashboard/frontend/src/components/explorer/__tests__/rootForConversation.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/__tests__/rootForConversation.test.ts src/components/dock/__tests__/dockScope.test.ts"
+          ],
+          "expected_outputs": [
+            "rootForConversation.test.ts passes including every pre-existing case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 (decision D2). Export explorerLocationForPath(absPath, ctx): { rootId, path } | null from components/explorer/rootForConversation.ts implementing rules 4 and 5 of rootIdForConversation (feature workspace under <project.path>/workspaces/feature-<slug>/ -> issue:<SLUG>, a non-feature workspaces child -> null; else the longest registered project path -> project:<key> with the rest as path, '' at the root; else null). Make rootIdForConversation's rules 4-5 call it (`explorerLocationForPath(cwd, ctx)?.rootId ?? null`). Add the four named tests from WI-7."
+        },
+        "items": [
+          {
+            "id": "explorer-location-for-path.ac1",
+            "title": "Given project { key: 'dfai', path: '/home/u/Projects/dfai' }, explorerLocationForPath('/home/u/Projects/dfai/docs/index.md') returns { rootId: 'project:dfai', path: 'docs/index.md' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "explorer-location-for-path.ac2",
+            "title": "Given '/home/u/Projects/dfai/workspaces/feature-dfai-12/docs/a.md', it returns { rootId: 'issue:DFAI-12', path: 'docs/a.md' }; given '/home/u/other/a.md', it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "explorer-location-for-path.ac3",
+            "title": "Every pre-existing rootIdForConversation test still passes without modification",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "editor-pane-preview-links",
+        "title": "Resolve editor pane Preview links through its explorer location",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T11:26:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5337",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/panes/EditorPane.tsx",
+            "src/dashboard/frontend/src/components/Stage/panes/EditorPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/panes/EditorPane.test.tsx"
+          ],
+          "expected_outputs": [
+            "EditorPane.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. In EditorPane.tsx, above the early returns, add `const rootContext = useRootContext()` and `const docLocation = useMemo(() => (filePath ? explorerLocationForPath(filePath, rootContext) ?? undefined : undefined), [filePath, rootContext])`; change line 236 to `<MarkdownTab body={draft} docLocation={docLocation} />`. Extend EditorPane.test.tsx (mock useRootContext and listDir, provide a StageDeckProvider with vi.fn() openBeside) with the two named tests from WI-8. This is the operator's repro path (chat chip -> editor pane -> Preview)."
+        },
+        "items": [
+          {
+            "id": "editor-pane-preview-links.ac1",
+            "title": "Given an editor pane on '/home/u/Projects/dfai/docs/index.md' with registered project dfai at '/home/u/Projects/dfai', clicking 'fort3d.md' in Preview calls openBeside with { rootId: 'project:dfai', path: 'docs/fort3d.md', preview: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "editor-pane-preview-links.ac2",
+            "title": "Given an editor pane on a file outside every registered project, its Preview renders relative links as [data-testid=\"markdown-inert-link\"] spans and no <a> with a relative href",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "editor-pane-preview-links.ac3",
+            "title": "UAT (test role, isolated Playwright profile, branch build, fixture per PRD AC-10: scratch repo ~/Projects/pan-5337-uat registered with pan project add, docs/index.md with [Fort](fort3d.md) [Levels](levels/) [Down](#details) [Gone](missing.md) [Web](https://example.com) and a below-the-fold ## Details, plus docs/fort3d.md and docs/levels/a.md; a conversation in it prints the absolute path of docs/index.md): when the chat file chip is clicked and the editor pane is switched to Preview, clicking Fort opens a code pane on docs/fort3d.md with no new browser tab and an unchanged page URL, Levels opens the Files dock with docs/levels selected, Down scrolls ## Details into view, Gone renders dashed and opens nothing, and Web opens a new tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-preview-links",
+        "title": "Document Markdown preview links in the editor-pane doc, the file explorer page and the changelog",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T11:26:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5337",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MARKDOWN-EDITOR-PANE.md",
+            "features/file-explorer.mdx",
+            "changelog.d/pan-5337.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-7",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Add '## Links in the Preview (PAN-5337)' to docs/MARKDOWN-EDITOR-PANE.md after the 'Citing from the Preview' section; add one paragraph to features/file-explorer.mdx after the sentence ending 'a Markdown file has a **Preview** tab.'; create changelog.d/pan-5337.md with the exact '#### Fixed' bullet given in WI-9. Run npm run lint:docs."
+        },
+        "items": [
+          {
+            "id": "docs-preview-links.ac1",
+            "title": "docs/MARKDOWN-EDITOR-PANE.md contains a '## Links in the Preview (PAN-5337)' section that names explorerLocationForPath, openBeside with preview: true, the Files dock reveal for folders, in-preview #heading scrolling, the not-found state and inert links for files outside every registered project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-preview-links.ac2",
+            "title": "features/file-explorer.mdx contains a paragraph after the Preview sentence stating that a relative link opens the linked file in a preview tab, a folder link shows it in Files, a #heading link scrolls, a missing target is shown dashed and opens nothing, and web links open a new browser tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-preview-links.ac3",
+            "title": "changelog.d/pan-5337.md contains one '#### Fixed' heading with a bullet linking https://github.com/eltmon/overdeck/issues/5337, and `npm run lint:docs` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "doc-href-classifier",
+        "to": "chat-relative-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "doc-href-classifier",
+        "to": "doc-link-component",
+        "type": "blocks"
+      },
+      {
+        "from": "chat-relative-guard",
+        "to": "chat-doc-location-mode",
+        "type": "blocks"
+      },
+      {
+        "from": "doc-link-component",
+        "to": "chat-doc-location-mode",
+        "type": "blocks"
+      },
+      {
+        "from": "heading-slugs",
+        "to": "chat-doc-location-mode",
+        "type": "blocks"
+      },
+      {
+        "from": "chat-doc-location-mode",
+        "to": "markdown-tab-location",
+        "type": "blocks"
+      },
+      {
+        "from": "markdown-tab-location",
+        "to": "code-pane-preview-links",
+        "type": "blocks"
+      },
+      {
+        "from": "markdown-tab-location",
+        "to": "editor-pane-preview-links",
+        "type": "blocks"
+      },
+      {
+        "from": "explorer-location-for-path",
+        "to": "editor-pane-preview-links",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
