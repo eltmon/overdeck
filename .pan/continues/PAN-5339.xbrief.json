@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5339",
+  "created": "2026-11-15T11:44:33.269Z",
+  "updated": "2026-11-15T11:44:33.269Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "ref-patterns": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5339",
+      "claimedAt": "2026-11-15T11:44:33.269Z"
+    }
+  }
+}
