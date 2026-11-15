@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5295",
   "created": "2026-11-15T19:39:19.043Z",
-  "updated": "2026-11-15T19:57:02.228Z",
+  "updated": "2026-11-15T19:57:05.740Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,11 @@
     "composer-toolbar-extract.ac2": {
       "status": "completed",
       "doneAt": "2026-11-15T19:57:02.228Z"
+    },
+    "send-mode-menu": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5295",
+      "claimedAt": "2026-11-15T19:57:05.740Z"
     }
   }
 }
