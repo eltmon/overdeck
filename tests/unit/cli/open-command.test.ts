@@ -52,13 +52,27 @@ afterEach(() => {
 
 describe('pan open', () => {
   it('opens in the listening tab and opens no browser', async () => {
-    const deps = makeDeps(json({ projectKey: 'demo', rootId: 'project:demo', relPath: 'docs', kind: 'dir', delivered: 1 }));
+    const deps = makeDeps(json({ projectKey: 'panopticon-cli', deckKey: 'overdeck', rootId: 'project:panopticon-cli', relPath: 'docs', kind: 'dir', delivered: 1 }));
     await runOpen('docs', {}, deps);
     expect(deps.callDashboard).toHaveBeenCalledWith('/api/ui/open', {
       method: 'POST',
       body: { path: join(dir, 'docs'), line: undefined, column: undefined, dryRun: false },
     });
     expect(deps.openBrowser).not.toHaveBeenCalled();
+    expect(logs).toEqual(['Opened docs in overdeck']);
+  });
+
+  it('names an issue workspace by its issue id', async () => {
+    const deps = makeDeps(
+      json({ projectKey: 'panopticon-cli', deckKey: 'overdeck', rootId: 'issue:PAN-5295', relPath: '', kind: 'dir', delivered: 1 }),
+    );
+    await runOpen('docs', {}, deps);
+    expect(logs).toEqual(['Opened the PAN-5295 workspace in overdeck']);
+  });
+
+  it('falls back to projectKey when an older dashboard sends no deckKey', async () => {
+    const deps = makeDeps(json({ projectKey: 'demo', rootId: 'project:demo', relPath: 'docs', delivered: 1 }));
+    await runOpen('docs', {}, deps);
     expect(logs).toEqual(['Opened docs in demo']);
   });
 

@@ -5,7 +5,10 @@ import { Schema } from "effect"
 
 /** The server's answer for a path: which deck, root and file or folder to show. */
 export const UiOpenResolution = Schema.Struct({
+  /** The registered project key (`projects.yaml`), as root ids use it. */
   projectKey: Schema.String,
+  /** The deck the dashboard keys this project by: its name, or its key when it has none (PAN-5398). */
+  deckKey: Schema.String,
   rootId: Schema.String,
   /** POSIX path relative to the root folder; `''` for the root itself. */
   relPath: Schema.String,
@@ -14,6 +17,19 @@ export const UiOpenResolution = Schema.Struct({
   column: Schema.optional(Schema.Number),
 })
 export type UiOpenResolution = typeof UiOpenResolution.Type
+
+/** The deck key the project switcher selects for a registered project: its name, or its key (PAN-5398). */
+export function projectDeckKey(project: { readonly key: string; readonly name?: string | null }): string {
+  return project.name ?? project.key
+}
+
+/** The sentence `pan open` prints and the dashboard toasts after an open (PAN-5398). */
+export function uiOpenSummary(resolution: Pick<UiOpenResolution, "deckKey" | "rootId" | "relPath">): string {
+  const { deckKey, rootId, relPath } = resolution
+  if (relPath) return `Opened ${relPath} in ${deckKey}`
+  if (rootId.startsWith("issue:")) return `Opened the ${rootId.slice("issue:".length)} workspace in ${deckKey}`
+  return `Opened root folder in ${deckKey}`
+}
 
 /** One UI command. `id` is a random UUID that tabs use to dedupe handling. */
 export const UiCommand = Schema.Struct({

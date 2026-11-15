@@ -11,7 +11,13 @@ import { useWorkDockStore } from '../../components/dock/workDockStore'
 import { usePanesStore } from '../panesStore'
 import { openPathInDeck } from './openPathInDeck'
 
-const dir = (relPath: string, rootId = 'project:demo'): UiOpenResolution => ({ projectKey: 'demo', rootId, relPath, kind: 'dir' })
+const dir = (relPath: string, rootId = 'project:demo'): UiOpenResolution => ({
+  projectKey: 'demo',
+  deckKey: 'demo',
+  rootId,
+  relPath,
+  kind: 'dir',
+})
 
 function activeDock(partial: Partial<ActiveDock>): ActiveDock {
   return { deckKey: 'demo', activePaneId: 'pane-1', rootId: 'issue:PAN-1', changedPaths: new Set(), openFile: vi.fn(), revealFile: vi.fn(), ...partial }
@@ -34,7 +40,7 @@ describe('openPathInDeck', () => {
     openPathInDeck(dir('docs'), navigation)
     expect(usePanesStore.getState().ensureHome).toHaveBeenCalledWith('demo')
     expect(navigation.openInDeck).toHaveBeenCalledWith({ projectKey: 'demo' })
-    expect(toast).toHaveBeenCalledWith('Opened docs from pan open')
+    expect(toast).toHaveBeenCalledWith('Opened docs in demo')
   })
 
   it('overrides the dock root for a folder on another root, anchored on the active pane, then reveals it', () => {
@@ -61,13 +67,56 @@ describe('openPathInDeck', () => {
   it('opens the dock with no reveal for the root folder itself', () => {
     openPathInDeck(dir(''), navigation)
     expect(openDock).toHaveBeenCalledWith('demo', { tab: 'files', reveal: undefined })
-    expect(toast).toHaveBeenCalledWith('Opened root folder from pan open')
+    expect(toast).toHaveBeenCalledWith('Opened root folder in demo')
   })
 
   it('opens a file in a code pane at its position, then reveals it with no override', () => {
-    openPathInDeck({ projectKey: 'demo', rootId: 'issue:PAN-1', relPath: 'src/a.ts', kind: 'file', line: 10, column: 3 }, navigation)
+    openPathInDeck(
+      { projectKey: 'demo', deckKey: 'demo', rootId: 'issue:PAN-1', relPath: 'src/a.ts', kind: 'file', line: 10, column: 3 },
+      navigation,
+    )
     expect(openCodePane).toHaveBeenCalledWith('demo', { rootId: 'issue:PAN-1', path: 'src/a.ts', line: 10, column: 3 })
     expect(openDock).toHaveBeenCalledWith('demo', { tab: 'files', reveal: { rootId: 'issue:PAN-1', path: 'src/a.ts' } })
     expect(setRootOverride).not.toHaveBeenCalled()
+  })
+
+  it('uses deckKey, not projectKey, for every deck call when they differ', () => {
+    openPathInDeck(
+      {
+        projectKey: 'panopticon-cli',
+        deckKey: 'overdeck',
+        rootId: 'project:panopticon-cli',
+        relPath: 'features/mission-control.mdx',
+        kind: 'file',
+        line: 84,
+      },
+      navigation,
+    )
+    expect(usePanesStore.getState().ensureHome).toHaveBeenCalledWith('overdeck')
+    expect(navigation.openInDeck).toHaveBeenCalledWith({ projectKey: 'overdeck' })
+    expect(openCodePane).toHaveBeenCalledWith('overdeck', {
+      rootId: 'project:panopticon-cli',
+      path: 'features/mission-control.mdx',
+      line: 84,
+      column: undefined,
+    })
+    expect(openDock).toHaveBeenCalledWith('overdeck', {
+      tab: 'files',
+      reveal: { rootId: 'project:panopticon-cli', path: 'features/mission-control.mdx' },
+    })
+    expect(toast).toHaveBeenCalledWith('Opened features/mission-control.mdx in overdeck')
+    for (const spy of [usePanesStore.getState().ensureHome, navigation.openInDeck, openCodePane, openDock]) {
+      expect((spy as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).not.toBe('panopticon-cli')
+    }
+  })
+
+  it('compares the active dock by deckKey for a folder', () => {
+    useActiveDock.setState({ current: activeDock({ deckKey: 'overdeck', rootId: 'project:panopticon-cli' }) })
+    openPathInDeck(
+      { projectKey: 'panopticon-cli', deckKey: 'overdeck', rootId: 'project:panopticon-cli', relPath: 'docs', kind: 'dir' },
+      navigation,
+    )
+    expect(setRootOverride).not.toHaveBeenCalled()
+    expect(openDock).toHaveBeenCalledWith('overdeck', { tab: 'files', reveal: { rootId: 'project:panopticon-cli', path: 'docs' } })
   })
 })

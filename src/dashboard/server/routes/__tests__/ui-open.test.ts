@@ -37,7 +37,7 @@ describe('POST /api/ui/open', () => {
   it('resolves a folder in a project to a POSIX relPath and publishes once', async () => {
     const result = await call({ path: join(project, 'docs', 'guide') });
     expect(result.status).toBe(200);
-    expect(result.body).toEqual({ projectKey: 'demo', rootId: 'project:demo', relPath: 'docs/guide', kind: 'dir', delivered: 3 });
+    expect(result.body).toEqual({ projectKey: 'demo', deckKey: 'demo', rootId: 'project:demo', relPath: 'docs/guide', kind: 'dir', delivered: 3 });
     expect(result.publish).toHaveBeenCalledTimes(1);
     expect(result.publish).toHaveBeenCalledWith(expect.objectContaining({ type: 'open-path', resolution: expect.objectContaining({ relPath: 'docs/guide' }) }));
   });
@@ -130,5 +130,32 @@ describe('POST /api/ui/open', () => {
     );
     expect(result.status).toBe(200);
     expect(result.body).toMatchObject({ rootId: 'project:demo', relPath: 'docs' });
+  });
+
+  it('sets deckKey to the project name when the key differs, keeping projectKey and rootId on the key', async () => {
+    const result = await call(
+      { path: join(project, 'README.md'), line: 84 },
+      {
+        listProjects: async () => [{ key: 'panopticon-cli', name: 'overdeck', path: project }],
+        resolveRoot: async (rootId) => ({ absPath: project, projectKey: rootId.slice('project:'.length) }),
+      },
+    );
+    expect(result.body).toEqual({
+      projectKey: 'panopticon-cli',
+      deckKey: 'overdeck',
+      rootId: 'project:panopticon-cli',
+      relPath: 'README.md',
+      kind: 'file',
+      line: 84,
+      delivered: 3,
+    });
+    expect(result.publish).toHaveBeenCalledWith(
+      expect.objectContaining({ resolution: expect.objectContaining({ deckKey: 'overdeck', projectKey: 'panopticon-cli' }) }),
+    );
+  });
+
+  it('falls back to the key for deckKey when the project has no name', async () => {
+    const result = await call({ path: join(project, 'docs') });
+    expect(result.body).toMatchObject({ deckKey: 'demo' });
   });
 });

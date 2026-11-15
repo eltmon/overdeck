@@ -12,7 +12,7 @@ import { dirname, isAbsolute, relative, sep } from 'node:path';
 
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, type HttpServerResponse } from 'effect/unstable/http';
-import { resolvePathRoot, type UiCommand, type UiOpenResolution } from '@overdeck/contracts';
+import { projectDeckKey, resolvePathRoot, type UiCommand, type UiOpenResolution } from '@overdeck/contracts';
 
 import { listProjectsAsync } from '../../../lib/projects.js';
 import { listWorkspaces } from '../../../lib/workspaces/resolver.js';
@@ -22,7 +22,7 @@ import { publishUiCommand } from '../services/ui-commands.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 
 export interface UiOpenDeps {
-  listProjects: () => Promise<readonly { key: string; path: string }[]>;
+  listProjects: () => Promise<readonly { key: string; name?: string; path: string }[]>;
   listScratch: () => Promise<readonly { id: string; path: string }[]>;
   realpath: (path: string) => Promise<string>;
   stat: (path: string) => Promise<{ isDirectory(): boolean }>;
@@ -31,7 +31,7 @@ export interface UiOpenDeps {
 }
 
 const defaultDeps: UiOpenDeps = {
-  listProjects: async () => (await listProjectsAsync()).map((p) => ({ key: p.key, path: p.config.path })),
+  listProjects: async () => (await listProjectsAsync()).map((p) => ({ key: p.key, name: p.config.name, path: p.config.path })),
   listScratch: async () =>
     listWorkspaces({ kind: 'scratch' })
       .filter((row) => !row.isArchived)
@@ -78,9 +78,10 @@ export async function handleUiOpen(
     return jsonResponse({ error: 'not-found', path }, { status: 404 });
   }
 
+  const [projectRows, scratchRows] = await Promise.all([deps.listProjects(), deps.listScratch()]);
   const [projects, scratch] = await Promise.all([
-    deps.listProjects().then((rows) => realCandidates(rows, deps.realpath)),
-    deps.listScratch().then((rows) => realCandidates(rows, deps.realpath)),
+    realCandidates(projectRows, deps.realpath),
+    realCandidates(scratchRows, deps.realpath),
   ]);
   let hit = resolvePathRoot(realPath, projects, scratch);
   // A scratch row may point at the primary checkout or outside the workspaces dir,
@@ -109,8 +110,11 @@ export async function handleUiOpen(
   const rel = relative(root.absPath, realPath);
   if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return noRoot();
 
+  // Decks are keyed by the project's name, root ids by its registered key (PAN-5398).
+  const registered = projectRows.find((p) => p.key === root.projectKey);
   const resolution: UiOpenResolution = {
     projectKey: root.projectKey,
+    deckKey: registered ? projectDeckKey(registered) : root.projectKey,
     rootId: target.rootId,
     relPath: rel.split(sep).join('/'),
     kind,

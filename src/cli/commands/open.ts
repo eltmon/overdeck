@@ -189,8 +189,14 @@ export async function openInDashboard(
     await deps.openBrowser(url);
     return;
   }
-  const relPath = typeof body['relPath'] === 'string' && body['relPath'] ? body['relPath'] : 'root folder';
-  deps.log(`Opened ${relPath} in ${String(body['projectKey'])}`);
+  const { uiOpenSummary } = await import('@overdeck/contracts');
+  const text = (value: unknown): string => (typeof value === 'string' ? value : '');
+  // An older dashboard sends no deckKey; its projectKey is the best name it has (PAN-5398).
+  deps.log(uiOpenSummary({
+    relPath: text(body['relPath']),
+    rootId: text(body['rootId']),
+    deckKey: text(body['deckKey']) || text(body['projectKey']),
+  }));
 }
 
 /** The issue's feature workspace path, or null after printing why. */

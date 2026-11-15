@@ -4,7 +4,7 @@
  * workspace) read this via the same react-query key `command-deck-projects`,
  * so the network request is deduped and both surfaces agree on the list.
  */
-import { compareIssueIds } from '@overdeck/contracts';
+import { compareIssueIds, projectDeckKey } from '@overdeck/contracts';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
@@ -256,7 +256,7 @@ export async function fetchProjects(): Promise<ProjectData[]> {
 
   // Preserve stable keys when registered projects already have grouped issues.
   for (const proj of registered) {
-    const name = proj.name ?? proj.key;
+    const name = projectDeckKey(proj);
     const existing = projectMap.get(name);
     const repos = { githubRepo: proj.githubRepo ?? null, gitlabRepo: proj.gitlabRepo ?? null, owner: proj.owner ?? null };
     projectMap.set(name, existing

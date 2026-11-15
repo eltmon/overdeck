@@ -43,7 +43,7 @@ let visibility: DocumentVisibilityState = 'visible'
 const command: UiCommand = {
   id: 'cmd-1',
   type: 'open-path',
-  resolution: { projectKey: 'demo', rootId: 'project:demo', relPath: 'docs', kind: 'dir' },
+  resolution: { projectKey: 'demo', deckKey: 'demo', rootId: 'project:demo', relPath: 'docs', kind: 'dir' },
 }
 const navigation = { openInDeck: vi.fn() }
 
