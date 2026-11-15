@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T20:06:38.300093Z · model: claude-opus-5-5 · open: 900_
+_Last sequenced: 2026-11-15T20:10:44.961533Z · model: claude-opus-5-5 · open: 899_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,7 +8,6 @@ _Last sequenced: 2026-11-15T20:06:38.300093Z · model: claude-opus-5-5 · open: 
 | 1 | PAN-5392 | XS | low | ok |  |  | In pipeline: docs PR from the file explorer noting Mission Control recent changes refresh every minute. |
 | 2 | PAN-5395 | S | critical | ok |  |  | In pipeline: single-repo workspaces read untracked Overdeck sync output as dirty, so work agents are refused and never start. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
-| 4 | PAN-5394 | XS | high | ok |  |  | In pipeline: admission test asserts after a fixed 10 ms drive and flakes under CI load, turning main red; wait on the condition. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
@@ -403,7 +402,7 @@ _Last sequenced: 2026-11-15T20:06:38.300093Z · model: claude-opus-5-5 · open: 
 | 397 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
 | 400 | PAN-5366 | M | medium | ok |  |  | Conversation page cannot show whether per-turn memory injection reaches it; add a state route and a status-line part. |
 | 401 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
-| 401 | PAN-5358 | M | medium | ok |  |  | Curated memory facts reach agents only via a budget-cut launch index (89 of 171 dropped in dfai); add facts to per-turn relevance injection. |
+| 401 | PAN-5358 | M | medium | ok |  |  | Merged to main and verifying; memory facts now selected by relevance into prompts instead of only a budget-cut launch list. |
 | 402 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
 | 403 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
 | 404 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
@@ -920,10 +919,6 @@ New since the prior run and already in the pipeline, so it is pinned near the to
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
 
-### PAN-5394 (rank 4)
-
-New since the prior run and already in the pipeline, so it is pinned near the top; a red main empties the merge gate, so this test-only flake fix unblocks merges.
-
 ### PAN-5385 (rank 8)
 
 New issue. Phones (iOS, Android) and the connector cannot reach the machine at all, directly or through the relay, because RtcTransport.accept awaits ICE servers before registering the signalling session and drops trickle candidates that arrive in that window. The root cause and the fix (buffer candidates from offer acceptance) are stated in the body and touch only the dashboard server, so this is a small, well-defined fix for a full outage of a shipped feature. It takes the open rank-8 slot ahead of the remaining pipeline-substrate bugs.
@@ -1228,6 +1223,10 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
 
 New substrate bug placed in a freed high-tier slot. With several workspace stacks up, browser checks hit the wrong backend and flake, which corrupts verification.
 
+### PAN-3234 (rank 84)
+
+Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1235,10 +1234,10 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T20:06:38.300093Z",
+  "generatedAt": "2026-11-15T20:10:44.961533Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 900,
+  "openCount": 899,
   "nodes": [
     {
       "issue": "PAN-5392",
@@ -1276,19 +1275,6 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
       "dependsOn": [],
       "why": "Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned.",
       "rationale": "Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5394",
-      "rank": 4,
-      "size": "XS",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: admission test asserts after a fixed 10 ms drive and flakes under CI load, turning main red; wait on the condition.",
-      "rationale": "New since the prior run and already in the pipeline, so it is pinned near the top; a red main empties the merge gate, so this test-only flake fix unblocks merges.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6271,8 +6257,8 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
       "score": 58,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Curated memory facts reach agents only via a budget-cut launch index (89 of 171 dropped in dfai); add facts to per-turn relevance injection.",
-      "rationale": "New memory feature with a concrete, measured gap; placed beside the other mid-tier context-delivery work.",
+      "why": "Merged to main and verifying; memory facts now selected by relevance into prompts instead of only a budget-cut launch list.",
+      "rationale": "Its PR merged and the issue left the pipeline, so it keeps its prior rank and awaits close-out; no rank change.",
       "gate": "auto",
       "planning": "auto"
     },
