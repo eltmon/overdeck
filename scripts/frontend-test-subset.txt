@@ -121,6 +121,7 @@ src/components/Stage/cockpit/IssueMissionControl.header-title.test.tsx
 src/components/Stage/cockpit/IssueMissionControl.render-count.test.tsx
 src/components/Stage/cockpit/IssueMissionControl.sections.test.tsx
 src/components/Stage/cockpit/IssueMissionControl.test.tsx
+src/components/Stage/cockpit/StatusNarrative.test.ts
 src/components/Stage/launcherFocusStore.test.ts
 src/components/Stage/panes/EditorPane.test.tsx
 src/components/Stage/useStageShortcuts.test.tsx
