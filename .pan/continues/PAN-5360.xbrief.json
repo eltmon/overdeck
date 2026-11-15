@@ -1,0 +1,269 @@
+{
+  "version": "1",
+  "issueId": "PAN-5360",
+  "created": "2026-11-15T15:42:12.629Z",
+  "updated": "2026-11-15T17:19:54.651Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "w1-fact-schema": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5360",
+      "claimedAt": "2026-11-15T15:42:12.629Z",
+      "doneAt": "2026-11-15T16:18:09.868Z"
+    },
+    "w1-fact-schema.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:18:09.868Z"
+    },
+    "w1-fact-schema.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:18:09.868Z"
+    },
+    "w1-fact-schema.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:18:09.868Z"
+    },
+    "w1-fact-schema.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:18:09.868Z"
+    },
+    "w1-fact-schema.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:18:09.868Z"
+    },
+    "w2-supersede-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5360",
+      "claimedAt": "2026-11-15T16:18:17.487Z",
+      "doneAt": "2026-11-15T16:24:18.074Z"
+    },
+    "w2-supersede-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:24:18.074Z"
+    },
+    "w2-supersede-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:24:18.074Z"
+    },
+    "w2-supersede-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:24:18.074Z"
+    },
+    "w2-supersede-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:24:18.074Z"
+    },
+    "w2-supersede-store.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:24:18.074Z"
+    },
+    "w3-cli-add": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5360",
+      "claimedAt": "2026-11-15T16:24:25.592Z",
+      "doneAt": "2026-11-15T16:31:21.868Z"
+    },
+    "w3-cli-add.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:31:21.868Z"
+    },
+    "w3-cli-add.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:31:21.868Z"
+    },
+    "w3-cli-add.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:31:21.868Z"
+    },
+    "w3-cli-add.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:31:21.868Z"
+    },
+    "w4-cli-edit": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5360",
+      "claimedAt": "2026-11-15T16:31:30.060Z",
+      "doneAt": "2026-11-15T16:40:16.768Z"
+    },
+    "w4-cli-edit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:40:16.768Z"
+    },
+    "w4-cli-edit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:40:16.768Z"
+    },
+    "w4-cli-edit.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:40:16.768Z"
+    },
+    "w4-cli-edit.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:40:16.768Z"
+    },
+    "w4-cli-edit.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:40:16.768Z"
+    },
+    "w5-cli-show": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5360",
+      "claimedAt": "2026-11-15T16:40:27.105Z",
+      "doneAt": "2026-11-15T16:44:43.198Z"
+    },
+    "w5-cli-show.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:44:43.198Z"
+    },
+    "w5-cli-show.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:44:43.198Z"
+    },
+    "w6-cli-list": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5360",
+      "claimedAt": "2026-11-15T16:44:51.500Z",
+      "doneAt": "2026-11-15T16:49:54.267Z"
+    },
+    "w6-cli-list.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:49:54.267Z"
+    },
+    "w6-cli-list.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:49:54.267Z"
+    },
+    "w6-cli-list.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:49:54.267Z"
+    },
+    "w6-cli-list.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:49:54.267Z"
+    },
+    "w7-lint-links": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5360",
+      "claimedAt": "2026-11-15T16:50:02.849Z",
+      "doneAt": "2026-11-15T16:55:03.694Z"
+    },
+    "w7-lint-links.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:55:03.694Z"
+    },
+    "w7-lint-links.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:55:03.694Z"
+    },
+    "w7-lint-links.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:55:03.694Z"
+    },
+    "w8-lint-similarity": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5360",
+      "claimedAt": "2026-11-15T16:55:14.774Z",
+      "doneAt": "2026-11-15T16:58:34.339Z"
+    },
+    "w8-lint-similarity.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:58:34.339Z"
+    },
+    "w8-lint-similarity.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:58:34.339Z"
+    },
+    "w8-lint-similarity.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:58:34.339Z"
+    },
+    "w9-lint-contradictions": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5360",
+      "claimedAt": "2026-11-15T16:58:42.511Z",
+      "doneAt": "2026-11-15T17:04:41.765Z"
+    },
+    "w9-lint-contradictions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:04:41.765Z"
+    },
+    "w9-lint-contradictions.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:04:41.765Z"
+    },
+    "w9-lint-contradictions.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:04:41.765Z"
+    },
+    "w9-lint-contradictions.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:04:41.765Z"
+    },
+    "w10-lint-orchestrator": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5360",
+      "claimedAt": "2026-11-15T17:04:55.838Z",
+      "doneAt": "2026-11-15T17:11:30.790Z"
+    },
+    "w10-lint-orchestrator.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:11:30.790Z"
+    },
+    "w10-lint-orchestrator.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:11:30.790Z"
+    },
+    "w10-lint-orchestrator.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:11:30.790Z"
+    },
+    "w11-cli-lint": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5360",
+      "claimedAt": "2026-11-15T17:11:33.621Z",
+      "doneAt": "2026-11-15T17:18:36.749Z"
+    },
+    "w11-cli-lint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:18:36.749Z"
+    },
+    "w11-cli-lint.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:18:36.749Z"
+    },
+    "w11-cli-lint.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:18:36.749Z"
+    },
+    "w11-cli-lint.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:18:36.749Z"
+    },
+    "w12-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5360",
+      "claimedAt": "2026-11-15T17:18:45.428Z",
+      "doneAt": "2026-11-15T17:19:54.650Z"
+    },
+    "w12-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:19:54.650Z"
+    },
+    "w12-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:19:54.650Z"
+    },
+    "w12-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:19:54.650Z"
+    },
+    "w12-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:19:54.650Z"
+    }
+  }
+}

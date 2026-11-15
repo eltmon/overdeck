@@ -115,6 +115,8 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'ALTER TABLE `pending_auto_merges` ADD COLUMN `head_sha` text');
   // PAN-4753: why a batch became superseded or invalidated, so the train UI can show it.
   runSchemaTopUp(db, 'ALTER TABLE `uat_generations` ADD COLUMN `status_reason` text');
+  // PAN-5364: the batch whose promote voided this one, so the board can fold it under that merge.
+  runSchemaTopUp(db, 'ALTER TABLE `uat_generations` ADD COLUMN `voided_by` text');
   // PAN-4753: what was scheduled — a feature PR or a strike PR.
   runSchemaTopUp(db, "ALTER TABLE `pending_auto_merges` ADD COLUMN `kind` text NOT NULL DEFAULT 'feature'");
   // PAN-4185: bare conversations (no Overdeck-injected context) and the

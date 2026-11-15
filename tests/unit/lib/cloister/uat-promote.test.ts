@@ -147,9 +147,12 @@ describe('promoteUatGeneration — success', () => {
     expect(deps.map.get('uat/pan-newest-0610')!.status).toBe('invalidated');
     // PAN-4753 WI-3: the sibling says why.
     expect(deps.map.get('uat/pan-newest-0610')!.statusReason).toBe('uat/pan-older-0610 was merged to main');
+    // PAN-5364: and names the merged batch in a structured field.
+    expect(deps.map.get('uat/pan-newest-0610')!.voidedBy).toBe('uat/pan-older-0610');
     expect(deps.map.get('uat/pan-older-0610')!.status).toBe('promoted');
     // already-invalidated rows untouched
     expect(deps.map.get('uat/pan-dead-0610')!.status).toBe('invalidated');
+    expect(deps.map.get('uat/pan-dead-0610')!.voidedBy ?? null).toBeNull();
     expect(deps.teardowns).toEqual(expect.arrayContaining(['uat/pan-older-0610', 'uat/pan-newest-0610']));
   });
 

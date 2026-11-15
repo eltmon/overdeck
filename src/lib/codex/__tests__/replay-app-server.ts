@@ -100,6 +100,7 @@ export async function startCodexReplay(fixture: string | ProtocolFixture, deps: 
     effort: typeof hostOptions.effort === 'string' ? hostOptions.effort : 'low',
     stdout,
     recordActivity,
+    promptMemory: async ({ prompt }) => ({ text: prompt, contextChars: 0 }),
   });
   await manager.start();
   return { replay, manager, host, lines, recordActivity, activity };

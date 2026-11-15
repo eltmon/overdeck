@@ -13,8 +13,9 @@ vi.mock('../../../../src/lib/projects.js', () => ({
   listProjectsSync: hoistedMockListProjects,
 }));
 
-import { backfillIssueWorkspaces, rebuildMainAndScratchWorkspaces, seedProjectsFromYaml } from '../../../../src/lib/workspaces/rebuild.js';
+import { backfillIssueWorkspaces, backfillMainWorkspaces, rebuildMainAndScratchWorkspaces, seedProjectsFromYaml } from '../../../../src/lib/workspaces/rebuild.js';
 import { getProjectByKey, getWorkspaceById, listWorkspaces } from '../../../../src/lib/workspaces/resolver.js';
+import * as writer from '../../../../src/lib/workspaces/writer.js';
 import { createWorkspace, upsertProjectFromConfig } from '../../../../src/lib/workspaces/writer.js';
 
 let odb: OverdeckTestDb;
@@ -207,5 +208,72 @@ describe('rebuildMainAndScratchWorkspaces (PAN-1990)', () => {
 
     expect(result.created).toBe(0);
     expect(getWorkspaceById(id)).toBeNull();
+  });
+});
+
+describe('backfillMainWorkspaces (PAN-5359)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('creates exactly one kind=main row named main at the project primary path', async () => {
+    upsertProjectFromConfig('overdeck', { name: 'overdeck', path: projectRoot });
+
+    const created = await backfillMainWorkspaces();
+
+    expect(created).toHaveLength(1);
+    const rows = listWorkspaces({ projectId: 'overdeck', kind: 'main' });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.name).toBe('main');
+    expect(rows[0]?.path).toBe(projectRoot);
+  });
+
+  it('is idempotent: a second run creates nothing and the main row count stays 1', async () => {
+    upsertProjectFromConfig('overdeck', { name: 'overdeck', path: projectRoot });
+
+    await backfillMainWorkspaces();
+    const second = await backfillMainWorkspaces();
+
+    expect(second).toEqual([]);
+    expect(listWorkspaces({ projectId: 'overdeck', kind: 'main' })).toHaveLength(1);
+  });
+
+  it('skips a project whose primary path does not exist', async () => {
+    upsertProjectFromConfig('missing', { name: 'missing', path: join(projectRoot, 'does-not-exist') });
+
+    const created = await backfillMainWorkspaces();
+
+    expect(created).toEqual([]);
+    expect(listWorkspaces({ projectId: 'missing' })).toHaveLength(0);
+  });
+
+  it('leaves a project that already has a main row unchanged', async () => {
+    upsertProjectFromConfig('overdeck', { name: 'overdeck', path: projectRoot });
+    const existingId = await createWorkspace({ projectId: 'overdeck', kind: 'main', name: 'main', path: projectRoot });
+
+    const created = await backfillMainWorkspaces();
+
+    expect(created).toEqual([]);
+    const rows = listWorkspaces({ projectId: 'overdeck', kind: 'main' });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.id).toBe(existingId);
+  });
+
+  it('skips a project whose createWorkspace call throws, and still creates the other project\'s row', async () => {
+    const otherRoot = mkdtempSync(join(tmpdir(), 'pan-5359-main-backfill-'));
+    upsertProjectFromConfig('broken', { name: 'broken', path: projectRoot });
+    upsertProjectFromConfig('overdeck', { name: 'overdeck', path: otherRoot });
+
+    const spy = vi.spyOn(writer, 'createWorkspace').mockImplementationOnce(async () => {
+      throw new Error('simulated write failure');
+    });
+
+    await expect(backfillMainWorkspaces()).resolves.not.toThrow();
+
+    expect(spy).toHaveBeenCalled();
+    expect(listWorkspaces({ projectId: 'broken', kind: 'main' })).toHaveLength(0);
+    expect(listWorkspaces({ projectId: 'overdeck', kind: 'main' })).toHaveLength(1);
+
+    rmSync(otherRoot, { recursive: true, force: true });
   });
 });

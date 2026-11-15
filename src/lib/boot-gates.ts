@@ -74,13 +74,14 @@ export function resolveBootGates(
           source: deaconSource ?? (deaconEnvDisabled ? 'env' as const : 'default' as const),
         };
 
-  // The resume gate is ON by default. It no longer resumes anything: the deacon
-  // auto-resume ladder and the boot `hold_all` reconciliation were deleted. A
-  // stopped conversation comes back only on a trigger (a queued or scheduled
-  // message, native /compact, `pan flywheel resume`, a Resume action). A dashboard
-  // restart never touches live sessions. `--no-resume` / OVERDECK_NO_RESUME=1
-  // still marks a human-driven boot: no autonomous backlog sequencer pass runs and
-  // `pan status` reports it. Conversations a terminal-backend restart stopped
+  // The resume gate is ON by default. The deacon auto-resume ladder and the boot
+  // `hold_all` reconciliation were deleted. A stopped conversation comes back
+  // only on a trigger (a queued or scheduled message, native /compact,
+  // `pan flywheel resume`, a Resume action). A dashboard restart never touches
+  // live sessions. A work agent that crashed (no recorded stop) is resumed by
+  // the deacon-lite routine resumeCrashedWorkAgents (PAN-5354). `--no-resume` /
+  // OVERDECK_NO_RESUME=1 marks a human-driven boot: that routine resumes nothing,
+  // no autonomous backlog sequencer pass runs, and `pan status` reports it. Conversations a terminal-backend restart stopped
   // are offered, never resumed, as one Needs-you row (PAN-5091).
   const resume = options.resume === true
     ? { enabled: true, source: 'flag' as const }

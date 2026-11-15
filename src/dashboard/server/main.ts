@@ -112,7 +112,7 @@ import { startServerBootTelemetry } from './telemetry.js';
 import { hostsMachineLinks, isPeerDashboardProcess } from '../../lib/boot-gates.js';
 import { isSmeeConfigured, startSmeeProcess } from '../../lib/smee.js';
 import { listProjectsSync } from '../../lib/projects.js';
-import { backfillIssueWorkspaces, migrateMemoryHomesToWorkspacesOnce, seedProjectsFromYaml } from '../../lib/workspaces/rebuild.js';
+import { backfillIssueWorkspaces, backfillMainWorkspaces, migrateMemoryHomesToWorkspacesOnce, seedProjectsFromYaml } from '../../lib/workspaces/rebuild.js';
 import { broadcastServerRestarting } from './ws-terminal.js';
 
 declare const Bun: unknown;
@@ -557,6 +557,7 @@ console.log('[overdeck] Workspaces boot seeding started');
 void (async () => {
   try {
     await backfillIssueWorkspaces();
+    await backfillMainWorkspaces();
   } catch (err) {
     console.warn('[workspaces] issue-worktree backfill failed:', (err as Error)?.message ?? err);
     return;

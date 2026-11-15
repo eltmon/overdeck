@@ -55,6 +55,10 @@ const KNOWN_CALL_SITES = new Set([
   // PAN-3965: the generic CI-failure message reads the delivery outcome; a CI
   // test-gate failure goes through the verification door (verification-escalation).
   'lib/cloister/ci-failure-feedback.ts|const outcome = await messageAgent(agentId, message, \'internal\', {});',
+  // PAN-5354: deacon-lite resumes a crashed work agent once its gates pass; a
+  // refused or failed resume raises one Needs-you item and is not retried.
+  'lib/cloister/crashed-work-resume.ts|resumeAgent: async (agentId) => (await import(\'../agents/resume.js\')).resumeAgent(agentId, undefined, { resumeCause: \'system\' }),',
+  'lib/cloister/crashed-work-resume.ts|result = await deps.resumeAgent(agent.id);',
   'lib/cloister/deacon-api-recovery.ts|await deliverAgentMessage(pane.agentId, CONTINUE_MSG, \'deacon-lite:checkApiErrorAgents\');',
   'lib/cloister/deacon-lite.ts|await deliverAgentMessage(',
   'lib/cloister/deacon-swarm-completion.ts|await messageAgent(',

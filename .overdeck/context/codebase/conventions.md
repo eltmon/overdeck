@@ -98,6 +98,10 @@
 - Phone-app (`apps/mobile`) acceptance evidence goes in one file per issue,
   `apps/mobile/acceptance/PAN-<n>.md`, never a new section in `apps/mobile/ACCEPTANCE.md`;
   union cannot merge sectioned markdown safely (PAN-5054).
+- A new HTTP route needs a `no-loss-matrix.ts` row (the scanner reads only top-level files in
+  `src/dashboard/server/routes/`); a new `route-scopes.ts` row also needs its path in
+  `TELEMETRY_PROPERTY_DOMAINS.client_route` (`packages/contracts/src/telemetry.ts`) and in
+  `docs/TELEMETRY.md`, or `route-scopes.test.ts` / `telemetry-docs.test.ts` fail.
 - Changelog entries go in one file per issue, `changelog.d/<issue>.md`, never in `changelog.mdx`;
   `pan release stable` folds them and `lint:docs` rejects an Upcoming block (PAN-5137).
 - Frontend typecheck skips tests: `src/dashboard/frontend/tsconfig.json` excludes `src/**/*.test.*` and

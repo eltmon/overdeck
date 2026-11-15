@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -16,6 +16,7 @@ import {
   matchMemoryFacts,
   MemoryFactExistsError,
   MemoryFactSensitiveError,
+  MemoryFactSupersedeError,
   MEMORY_FACT_DESCRIPTION_MAX,
   type MemoryFact,
   parseMemoryFact,
@@ -25,6 +26,7 @@ import {
   serializeMemoryFact,
   userMemoryDir,
   writeMemoryFact,
+  writeSupersedingFact,
 } from '../../../../../src/lib/memory/facts/store.js';
 
 describe('memory facts store', () => {
@@ -51,9 +53,14 @@ describe('memory facts store', () => {
       title: defaultFactTitle(id),
       description: 'A description.',
       tags: [],
+      created: null,
       updated: '2026-10-20',
       source: null,
+      status: 'active',
+      supersedes: [],
+      supersededBy: null,
       review: [],
+      extra: {},
       body: 'Body text.',
     };
   }
@@ -269,6 +276,108 @@ describe('memory facts store', () => {
     });
   });
 
+  describe('PAN-5360 schema fields', () => {
+    it('parses created, status, supersedes and superseded_by', () => {
+      const file = join(tmpRoot, 'mid-fact.md');
+      const raw = [
+        '---',
+        'type: project',
+        'description: A fact in the middle of a chain.',
+        'created: 2026-11-01',
+        'updated: 2026-11-10',
+        'source: twitch:alice 2026-11-10 14:20',
+        'status: superseded',
+        'supersedes: [old-fact]',
+        'superseded_by: new-fact',
+        '---',
+        '',
+        'Body.',
+        '',
+      ].join('\n');
+      const result = parseMemoryFact(file, raw, 'project');
+      expect('reason' in result).toBe(false);
+      const fact = result as MemoryFact;
+      expect(fact.created).toBe('2026-11-01');
+      expect(fact.status).toBe('superseded');
+      expect(fact.supersedes).toEqual(['old-fact']);
+      expect(fact.supersededBy).toBe('new-fact');
+      expect(fact.source).toBe('twitch:alice 2026-11-10 14:20');
+      expect(fact.extra).toEqual({});
+    });
+
+    it('rejects an invalid status, a non-id supersedes entry and a multi-line source as problems', () => {
+      const dir = join(tmpRoot, 'memory');
+      mkdirSync(dir, { recursive: true });
+      const files: Record<string, string> = {
+        'bad-status': '---\ntype: feedback\ndescription: x\nstatus: archived\n---\nbody\n',
+        'bad-supersedes': '---\ntype: feedback\ndescription: x\nsupersedes: [Not An Id]\n---\nbody\n',
+        'bad-superseded-by': '---\ntype: feedback\ndescription: x\nsuperseded_by: [a, b]\n---\nbody\n',
+        'bad-source': '---\ntype: feedback\ndescription: x\nsource: "line one\\nline two"\n---\nbody\n',
+        'long-source': `---\ntype: feedback\ndescription: x\nsource: ${'s'.repeat(MEMORY_FACT_DESCRIPTION_MAX + 1)}\n---\nbody\n`,
+        'bad-created': '---\ntype: feedback\ndescription: x\ncreated: yesterday\n---\nbody\n',
+        'good-fact': '---\ntype: feedback\ndescription: x\n---\nbody\n',
+      };
+      for (const [id, raw] of Object.entries(files)) writeFileSync(join(dir, `${id}.md`), raw, 'utf8');
+
+      const { facts, problems } = readMemoryFactsSync(dir, 'project');
+      expect(facts.map((fact) => fact.id)).toEqual(['good-fact']);
+      const reasons = Object.fromEntries(problems.map((problem) => [problem.file.replace(`${dir}/`, ''), problem.reason]));
+      expect(reasons).toEqual({
+        'bad-status.md': 'invalid status "archived"',
+        'bad-supersedes.md': 'supersedes must be a list of fact ids',
+        'bad-superseded-by.md': 'invalid superseded_by',
+        'bad-source.md': 'source must be one line of at most 200 characters',
+        'long-source.md': 'source must be one line of at most 200 characters',
+        'bad-created.md': 'invalid created date',
+      });
+    });
+
+    it('a legacy fact without any new key parses as active and re-serializes byte-identical', () => {
+      const file = join(tmpRoot, 'legacy-fact.md');
+      const raw = '---\ntype: feedback\ndescription: A legacy fact.\ntags:\n  - workflow\nupdated: 2026-09-23\nsource: claude:abc\n---\n\nLegacy body.\n';
+      const fact = parseMemoryFact(file, raw, 'project') as MemoryFact;
+      expect(fact.status).toBe('active');
+      expect(fact.created).toBeNull();
+      expect(fact.supersedes).toEqual([]);
+      expect(fact.supersededBy).toBeNull();
+      expect(isActiveFact(fact)).toBe(true);
+      expect(serializeMemoryFact(fact)).toBe(raw);
+    });
+
+    it('round-trips unknown frontmatter keys through parse and serialize', () => {
+      const file = join(tmpRoot, 'extra-fact.md');
+      const raw = '---\nowner: bob\ntype: feedback\ndescription: A fact with extra keys.\nweight: 3\n---\n\nBody.\n';
+      const fact = parseMemoryFact(file, raw, 'project') as MemoryFact;
+      expect(fact.extra).toEqual({ owner: 'bob', weight: 3 });
+      const text = serializeMemoryFact(fact);
+      expect(text).toBe('---\ntype: feedback\ndescription: A fact with extra keys.\nowner: bob\nweight: 3\n---\n\nBody.\n');
+      const reparsed = parseMemoryFact(file, text, 'project') as MemoryFact;
+      expect(reparsed.extra).toEqual({ owner: 'bob', weight: 3 });
+    });
+
+    it('writes status only when not active, and the new keys in D3 order', () => {
+      const text = serializeMemoryFact({
+        ...baseFact('ordered-new'),
+        created: '2026-11-01',
+        source: 'operator',
+        status: 'superseded',
+        supersedes: ['older'],
+        supersededBy: 'newer',
+        review: ['unindexed'],
+        extra: { owner: 'bob' },
+      });
+      const keys = text
+        .split('---')[1]
+        .split('\n')
+        .map((line) => line.match(/^(\w+):/)?.[1])
+        .filter((key): key is string => Boolean(key));
+      expect(keys).toEqual([
+        'type', 'description', 'created', 'updated', 'source', 'status', 'supersedes', 'superseded_by', 'review', 'owner',
+      ]);
+      expect(serializeMemoryFact({ ...baseFact('active-one'), status: 'active' })).not.toContain('status:');
+    });
+  });
+
   describe('writeMemoryFact', () => {
     it('writes and reads back a fact', async () => {
       const dir = join(tmpRoot, 'memory');
@@ -346,6 +455,121 @@ describe('memory facts store', () => {
     });
   });
 
+  describe('writeSupersedingFact', () => {
+    const today = '2026-11-15';
+
+    function readOne(dir: string, id: string): MemoryFact {
+      const found = readMemoryFactsSync(dir, 'project').facts.find((entry) => entry.id === id);
+      if (!found) throw new Error(`no fact ${id}`);
+      return found;
+    }
+
+    it('marks the old fact superseded and links both ways without deleting it', async () => {
+      const dir = join(tmpRoot, 'memory');
+      await writeMemoryFact(dir, 'project', { ...baseFact('old-rule'), source: 'operator', extra: { owner: 'bob' } });
+
+      const result = await writeSupersedingFact(dir, 'project', baseFact('new-rule'), ['old-rule'], { overwrite: false, today });
+      expect(result).toEqual({ file: join(dir, 'new-rule.md'), supersededFiles: [join(dir, 'old-rule.md')] });
+
+      const next = readOne(dir, 'new-rule');
+      const old = readOne(dir, 'old-rule');
+      expect(next.supersedes).toEqual(['old-rule']);
+      expect(isActiveFact(next)).toBe(true);
+      expect(old.status).toBe('superseded');
+      expect(old.supersededBy).toBe('new-rule');
+      expect(old.updated).toBe(today);
+      expect(old.source).toBe('operator');
+      expect(old.extra).toEqual({ owner: 'bob' });
+      expect(old.body).toBe('Body text.');
+      expect(isActiveFact(old)).toBe(false);
+    });
+
+    it('refuses a missing id, a self id and a fact superseded by another id, writing nothing', async () => {
+      const dir = join(tmpRoot, 'memory');
+      await writeMemoryFact(dir, 'project', baseFact('old-rule'));
+      await writeMemoryFact(dir, 'project', { ...baseFact('taken-rule'), status: 'superseded', supersededBy: 'other-rule' });
+      writeFileSync(join(dir, 'broken-rule.md'), '---\ntype: feedback\n---\nno description\n', 'utf8');
+      const snapshot = () => Object.fromEntries(readdirSync(dir).sort().map((name) => [name, readFileSync(join(dir, name), 'utf8')]));
+      const before = snapshot();
+      const run = (ids: string[]) => writeSupersedingFact(dir, 'project', baseFact('new-rule'), ids, { overwrite: false, today });
+
+      await expect(run(['missing-rule'])).rejects.toThrow(`no fact "missing-rule" in ${dir}`);
+      await expect(run(['new-rule'])).rejects.toThrow('a fact cannot supersede itself');
+      await expect(run(['old-rule', 'taken-rule'])).rejects.toThrow('"taken-rule" is already superseded by "other-rule"');
+      await expect(run(['broken-rule'])).rejects.toThrow('fact "broken-rule" cannot be parsed (missing description); fix it first');
+      await expect(run(['missing-rule'])).rejects.toBeInstanceOf(MemoryFactSupersedeError);
+
+      expect(snapshot()).toEqual(before);
+    });
+
+    it('is idempotent when the old fact is already superseded by the same id', async () => {
+      const dir = join(tmpRoot, 'memory');
+      await writeMemoryFact(dir, 'project', baseFact('old-rule'));
+      await writeSupersedingFact(dir, 'project', baseFact('new-rule'), ['old-rule'], { overwrite: false, today: '2026-11-01' });
+
+      const oldBefore = readFileSync(join(dir, 'old-rule.md'), 'utf8');
+
+      const again = await writeSupersedingFact(
+        dir, 'project', readOne(dir, 'new-rule'), ['old-rule'], { overwrite: true, today },
+      );
+      expect(again.supersededFiles).toEqual([]);
+      expect(readFileSync(join(dir, 'old-rule.md'), 'utf8')).toBe(oldBefore);
+      expect(readOne(dir, 'new-rule').supersedes).toEqual(['old-rule']);
+    });
+
+    it("refuses before any write when the old fact's rewrite trips the secret scanner", async () => {
+      const dir = join(tmpRoot, 'memory');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(
+        join(dir, 'old-rule.md'),
+        '---\ntype: feedback\ndescription: Old rule.\n---\n\nKey is sk-ant-abcdef1234567890.\n',
+        'utf8',
+      );
+
+      await expect(
+        writeSupersedingFact(dir, 'project', baseFact('new-rule'), ['old-rule'], { overwrite: false, today }),
+      ).rejects.toBeInstanceOf(MemoryFactSensitiveError);
+      expect(existsSync(join(dir, 'new-rule.md'))).toBe(false);
+      expect(readOne(dir, 'old-rule').status).toBe('active');
+    });
+
+    it('edit mode appends to an existing supersedes list without duplicates', async () => {
+      const dir = join(tmpRoot, 'memory');
+      await writeMemoryFact(dir, 'project', baseFact('rule-a'));
+      await writeMemoryFact(dir, 'project', baseFact('rule-b'));
+      await writeSupersedingFact(dir, 'project', baseFact('new-rule'), ['rule-a'], { overwrite: false, today });
+
+      const existing = readOne(dir, 'new-rule');
+      expect(existing.supersedes).toEqual(['rule-a']);
+      await writeSupersedingFact(dir, 'project', existing, ['rule-b', 'rule-a'], { overwrite: true, today });
+
+      expect(readOne(dir, 'new-rule').supersedes).toEqual(['rule-a', 'rule-b']);
+      expect(readOne(dir, 'rule-b').supersededBy).toBe('new-rule');
+    });
+
+    it('refuses to edit a fact that is itself superseded', async () => {
+      const dir = join(tmpRoot, 'memory');
+      await writeMemoryFact(dir, 'project', baseFact('rule-a'));
+      await writeMemoryFact(dir, 'project', baseFact('mid-rule'));
+      await writeSupersedingFact(dir, 'project', baseFact('top-rule'), ['mid-rule'], { overwrite: false, today });
+
+      await expect(
+        writeSupersedingFact(dir, 'project', readOne(dir, 'mid-rule'), ['rule-a'], { overwrite: true, today }),
+      ).rejects.toThrow('"mid-rule" is superseded by "top-rule"; edit that fact instead');
+      expect(readOne(dir, 'rule-a').status).toBe('active');
+    });
+
+    it('refuses a new id that already exists when not overwriting', async () => {
+      const dir = join(tmpRoot, 'memory');
+      await writeMemoryFact(dir, 'project', baseFact('old-rule'));
+      await writeMemoryFact(dir, 'project', baseFact('new-rule'));
+      await expect(
+        writeSupersedingFact(dir, 'project', baseFact('new-rule'), ['old-rule'], { overwrite: false, today }),
+      ).rejects.toBeInstanceOf(MemoryFactExistsError);
+      expect(readOne(dir, 'old-rule').status).toBe('active');
+    });
+  });
+
   describe('removeMemoryFact', () => {
     it('removes an existing fact', async () => {
       const dir = join(tmpRoot, 'memory');
@@ -369,14 +593,28 @@ describe('memory facts store', () => {
         title: 'X',
         description: 'd',
         tags: [],
+        created: null,
         updated: null,
         source: null,
+        status: 'active',
+        supersedes: [],
+        supersededBy: null,
         review: [],
+        extra: {},
         body: '',
         file: join(tmpRoot, 'x.md'),
       };
       expect(isActiveFact(fact)).toBe(true);
       expect(isActiveFact({ ...fact, review: ['unindexed'] })).toBe(false);
+    });
+
+    it('isActiveFact is false for superseded, retired, superseded_by-set and review-marked facts', () => {
+      const fact = parseMemoryFact(join(tmpRoot, 'x.md'), '---\ntype: feedback\ndescription: d\n---\nbody\n', 'project') as MemoryFact;
+      expect(isActiveFact(fact)).toBe(true);
+      expect(isActiveFact({ ...fact, status: 'superseded', supersededBy: 'y' })).toBe(false);
+      expect(isActiveFact({ ...fact, status: 'retired' })).toBe(false);
+      expect(isActiveFact({ ...fact, supersededBy: 'y' })).toBe(false);
+      expect(isActiveFact({ ...fact, review: ['sync-conflict'] })).toBe(false);
     });
   });
 
@@ -389,9 +627,14 @@ describe('memory facts store', () => {
         title: defaultFactTitle(id),
         description,
         tags,
+        created: null,
         updated: null,
         source: null,
+        status: 'active',
+        supersedes: [],
+        supersededBy: null,
         review: [],
+        extra: {},
         body,
         file: `/tmp/${id}.md`,
       };

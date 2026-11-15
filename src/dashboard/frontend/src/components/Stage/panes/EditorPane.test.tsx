@@ -1,12 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react'
-import { PanRpcError, WS_METHODS } from '@overdeck/contracts'
+import { PanRpcError, WS_METHODS, type ExplorerListDirResult } from '@overdeck/contracts'
 import { EditorPane } from './EditorPane'
-import { useStageDeck, type StageDeckContextValue } from '../StageDeckContext'
+import { useStageDeck, StageDeckProvider, type StageDeckContextValue } from '../StageDeckContext'
 import { getConversationCitations, resetCitationStore } from '../../../lib/composerCitations'
 import type { StageContext } from '../types'
 import type { WorkspacePane } from '../../../lib/panesStore'
+import type { RootContext } from '../../explorer/rootForConversation'
 import { installWorkDockFetchMock } from '../../../test-utils/strictFetchMock'
+import { clearDocLinkTargetCache } from '../../chat/docLinkTargets'
 
 // PAN-5289: the Stage mounts the work dock, which loads the project and workspace registries.
 let workDockFetch: ReturnType<typeof installWorkDockFetchMock>
@@ -28,12 +30,34 @@ const wsTransportMock = vi.hoisted(() => ({
 
 const toastMock = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn() }))
 
+// PAN-5337: most tests in this file stub MarkdownTab to a passthrough so they
+// stay focused on editor-pane persistence; the two document-location tests
+// below flip this flag to exercise the real renderer (and its MarkdownDocLink
+// routing) instead.
+const markdownTabMode = vi.hoisted(() => ({ real: false }))
+const rootContextMock = vi.hoisted(() => ({
+  value: { projects: [], workspaces: [] } as RootContext,
+}))
+const rpc = vi.hoisted(() => ({ listDir: vi.fn() }))
+
 vi.mock('../../../lib/wsTransport', () => ({
   getTransport: () => wsTransportMock,
 }))
 vi.mock('sonner', () => ({ toast: toastMock }))
-vi.mock('../../CommandDeck/ZoneCOverviewTabs/MarkdownTab', () => ({
-  MarkdownTab: ({ body }: { body?: string | null }) => <div data-testid="md">{body}</div>,
+vi.mock('../../CommandDeck/ZoneCOverviewTabs/MarkdownTab', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../CommandDeck/ZoneCOverviewTabs/MarkdownTab')>()
+  return {
+    MarkdownTab: (props: Parameters<typeof actual.MarkdownTab>[0]) =>
+      markdownTabMode.real ? <actual.MarkdownTab {...props} /> : <div data-testid="md">{props.body}</div>,
+  }
+})
+vi.mock('../../explorer/rootForConversation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../explorer/rootForConversation')>()),
+  useRootContext: () => rootContextMock.value,
+}))
+vi.mock('../../explorer/explorer-rpc', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../explorer/explorer-rpc')>()),
+  listDir: rpc.listDir,
 }))
 // The Stage self-heal test below mounts the full Stage (index.tsx), which
 // statically imports AgentPane/TerminalDrawer — stub them out (same as
@@ -58,6 +82,10 @@ const pane = (over: Partial<WorkspacePane> = {}): WorkspacePane => ({
 beforeEach(() => {
   localStorage.clear()
   resetCitationStore()
+  markdownTabMode.real = false
+  rootContextMock.value = { projects: [], workspaces: [] }
+  rpc.listDir.mockReset()
+  clearDocLinkTargetCache()
   toastMock.error.mockReset()
   toastMock.success.mockReset()
   wsTransportMock.readFileAtPath.mockReset()
@@ -314,6 +342,73 @@ describe('EditorPane', () => {
 
     await waitFor(() => expect(screen.getByTestId('editor-pane-textarea')).toHaveValue('original'))
     expect(screen.queryByTestId('editor-pane-readonly-note')).not.toBeInTheDocument()
+  })
+})
+
+// PAN-5337, WI-8 — the Preview tab resolves document-relative links through
+// explorerLocationForPath(filePath, rootContext), the operator's repro path
+// (chat chip -> editor pane -> Preview).
+describe('EditorPane Preview document location (PAN-5337)', () => {
+  function listing(entries: ExplorerListDirResult['entries']): ExplorerListDirResult {
+    return { entries, truncated: false, absPath: '/abs' }
+  }
+
+  it('resolves a relative link in a registered project through openBeside', async () => {
+    markdownTabMode.real = true
+    rootContextMock.value = { projects: [{ key: 'dfai', path: '/home/u/Projects/dfai' }], workspaces: [] }
+    rpc.listDir.mockResolvedValue(
+      listing([{ name: 'fort3d.md', path: 'docs/fort3d.md', kind: 'file', mtimeMs: 0, ignored: false }]),
+    )
+    wsTransportMock.readFileAtPath.mockResolvedValue({
+      text: '[Fort](fort3d.md)',
+      lang: 'markdown',
+      mtimeMs: 100,
+      totalLines: 1,
+      writable: true,
+    })
+    const openBeside = vi.fn()
+
+    render(
+      <StageDeckProvider
+        value={{
+          deckKey: 'p',
+          openOrFocusEditorPane: vi.fn(),
+          openOrFocusAgentPane: vi.fn(),
+          openBeside,
+          openDock: vi.fn(),
+        }}
+      >
+        <EditorPane pane={pane({ editorFilePath: '/home/u/Projects/dfai/docs/index.md' })} ctx={ctx} />
+      </StageDeckProvider>,
+    )
+
+    await waitFor(() => expect(screen.getByTestId('editor-pane-textarea')).toHaveValue('[Fort](fort3d.md)'))
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+
+    const link = await screen.findByRole('link', { name: 'Fort' })
+    fireEvent.click(link)
+    expect(openBeside).toHaveBeenCalledWith({ rootId: 'project:dfai', path: 'docs/fort3d.md', preview: true })
+  })
+
+  it('renders relative links inert for a file outside every registered project', async () => {
+    markdownTabMode.real = true
+    rootContextMock.value = { projects: [{ key: 'dfai', path: '/home/u/Projects/dfai' }], workspaces: [] }
+    wsTransportMock.readFileAtPath.mockResolvedValue({
+      text: '[Fort](fort3d.md)',
+      lang: 'markdown',
+      mtimeMs: 100,
+      totalLines: 1,
+      writable: true,
+    })
+
+    render(<EditorPane pane={pane({ editorFilePath: '/home/u/elsewhere/notes.md' })} ctx={ctx} />)
+
+    await waitFor(() => expect(screen.getByTestId('editor-pane-textarea')).toHaveValue('[Fort](fort3d.md)'))
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+
+    expect(await screen.findByTestId('markdown-inert-link')).toBeInTheDocument()
+    expect(document.querySelector('a[href="fort3d.md"]')).toBeNull()
+    expect(rpc.listDir).not.toHaveBeenCalled()
   })
 })
 

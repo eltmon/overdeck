@@ -9,7 +9,10 @@
  * (PAN-4433, in silent-reviewer-recovery.ts) and `retryDeferredHandoffs`
  * (PAN-4155, in deferred-handoff.ts). The last, `reapFinishedRemoteAgents`
  * (PAN-4295, in remote-reap-routine.ts), hands finished Fly remote agents to
- * review. See docs/PIPELINE-GATES.md and the PAN-3917 PRD ("The patrol loop",
+ * review. `resumeCrashedWorkAgents` (PAN-5354, in crashed-work-resume.ts)
+ * resumes a work agent that `reconcileAgentLiveness` confirmed dead with no
+ * recorded stop. Every routine's action lines go to deacon.log. See
+ * docs/PIPELINE-GATES.md and the PAN-3917 PRD ("The patrol loop",
  * FR-11, D1/D4/D5/D6/D7).
  *
  * No heartbeat file, no patrol-result aggregation, no firing budgets, no
@@ -39,8 +42,10 @@ import { recoverUndispatchedReviews } from './undispatched-review-recovery.js';
 import { recoverSilentReviewers } from './silent-reviewer-recovery.js';
 import { reapFinishedRemoteAgents } from './remote-reap-routine.js';
 import { recoverAdvisoryFollowups } from './advisory-followup-patrol.js';
+import { resumeCrashedWorkAgents } from './crashed-work-resume.js';
+import { logDeaconEvent } from '../persistent-logger.js';
 
-export { checkApiErrorAgents, retryDeferredHandoffs, recoverUndispatchedReviews, recoverSilentReviewers };
+export { checkApiErrorAgents, retryDeferredHandoffs, recoverUndispatchedReviews, recoverSilentReviewers, resumeCrashedWorkAgents };
 
 // ============================================================================
 // checkStuckWorkAgents (FR-11): a work agent idle for N minutes whose feature
@@ -111,7 +116,8 @@ export async function checkStuckWorkAgents(now = Date.now()): Promise<string[]> 
 // same notifier seam deacon.ts used to wire to the server's event-sourced
 // read model (src/dashboard/server/main.ts). Never writes a record or a
 // state file itself. Each confirmed death is reported once per launch
-// generation (PAN-4300); see `reportedDeadAgents`.
+// generation (PAN-4300); see `reportedDeadAgents`. The next routine,
+// `resumeCrashedWorkAgents` (PAN-5354), decides whether to resume it.
 // ============================================================================
 
 type AgentStoppedNotifier = (agentId: string) => void;
@@ -593,25 +599,35 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
 // The patrol loop
 // ============================================================================
 
+/**
+ * PAN-5354: every action line a routine returns goes to deacon.log. These
+ * lines used to be dropped, so a confirmed death or a recovery left no trace.
+ */
+function logActions(actions: readonly string[]): void {
+  for (const action of actions) logDeaconEvent(`[deacon-lite] ${action}`);
+}
+
 export async function runDeaconLite(): Promise<void> {
   // D7 keeps DeaconPauseToggle / pan admin cloister pause — honor it here so
   // a manual "run patrol now" and the interval both respect it. Host hygiene
   // is unaffected (FR-11 runs it outside deacon-lite).
   if (isDeaconGloballyPaused()) return;
-  await checkStuckWorkAgents();
-  await checkApiErrorAgents();
-  await reconcileAgentLiveness();
-  await reapClosedIssueAgents();
-  await recoverStalledReviews();
-  await recoverUndispatchedReviews();
+  logActions(await checkStuckWorkAgents());
+  logActions(await checkApiErrorAgents());
+  logActions(await reconcileAgentLiveness());
+  // PAN-5354: resume a work agent the liveness pass above confirmed dead.
+  logActions(await resumeCrashedWorkAgents());
+  logActions(await reapClosedIssueAgents());
+  logActions(await recoverStalledReviews());
+  logActions(await recoverUndispatchedReviews());
   // PAN-4433: re-dispatch a reviewer that was dispatched but never produced output.
-  await recoverSilentReviewers();
+  logActions(await recoverSilentReviewers());
   // PAN-4155: re-send a planning hand-off a spawn guardrail refused.
-  await retryDeferredHandoffs();
+  logActions(await retryDeferredHandoffs());
   // PAN-4295: hand finished Fly remote agents to review (the PAN-1676 patrol call the Cut dropped).
-  await reapFinishedRemoteAgents();
+  logActions(await reapFinishedRemoteAgents());
   // PAN-5218: file advisory follow-ups the post-merge kick missed (restart, or a relay that finished after the merge).
-  await recoverAdvisoryFollowups();
+  logActions(await recoverAdvisoryFollowups());
 }
 
 // ============================================================================

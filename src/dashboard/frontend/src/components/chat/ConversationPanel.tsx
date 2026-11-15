@@ -26,7 +26,7 @@ import {
 } from '../../lib/composerStore';
 import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, isConversationWorking, type WorkingPhase } from '../../lib/workingPhase';
 import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
-import type { ReviewerRoundMetadata } from '@overdeck/contracts';
+import { getHarnessBehavior, type ReviewerRoundMetadata } from '@overdeck/contracts';
 import { DiffPanel } from '../DiffPanel';
 import { DiffWorkerPoolProvider } from '../DiffWorkerPoolProvider';
 import { rootIdForConversation, useRootContext } from '../explorer/rootForConversation';
@@ -998,6 +998,8 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
           conversationName={conversation.name}
           cwd={conversation.cwd}
           issueId={conversation.issueId}
+          sendNowAvailable={agentBusy && getHarnessBehavior(conversation.harness ?? 'claude-code').steerKind === 'send-now-keys'}
+          agentId={agentId}
           subagentByToolUseId={subagentByToolUseId}
           onOpenSubagent={handleOpenSubagent}
           turnDiffSummaryByAssistantMessageId={turnDiffSummaryByAssistantMessageId}
