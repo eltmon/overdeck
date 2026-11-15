@@ -4,17 +4,17 @@
     "created": "2026-11-15T06:37:40Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5329: Workflow redesign B follow-up: Ctrl+Shift+F focus, unreadable Go to file highlight, squeezed chat, .git in tree, tag overflow",
-    "updated": "2026-11-15T06:43:39.635Z"
+    "updated": "2026-11-15T06:44:49.215Z"
   },
   "plan": {
     "id": "pan-5329",
     "title": "Workflow redesign B follow-up: Ctrl+Shift+F focus, unreadable Go to file highlight, squeezed chat, .git in tree, tag overflow",
-    "status": "proposed",
+    "status": "running",
     "uid": "ec7ea336-5476-446e-bb0f-45e62e702cce",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T06:37:40Z",
-    "updated": "2026-11-15T06:43:39.635Z",
+    "updated": "2026-11-15T06:44:49.215Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5329",
@@ -494,5 +494,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
