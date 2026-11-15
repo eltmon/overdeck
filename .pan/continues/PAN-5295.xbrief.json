@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5295",
   "created": "2026-11-15T19:39:19.043Z",
-  "updated": "2026-11-15T20:03:22.947Z",
+  "updated": "2026-11-15T20:04:11.603Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,11 @@
     "thinking-label.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T20:03:22.946Z"
+    },
+    "model-locked-reason": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5295",
+      "claimedAt": "2026-11-15T20:04:11.603Z"
     }
   }
 }
