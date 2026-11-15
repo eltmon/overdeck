@@ -38,6 +38,8 @@ Before PAN-5349, `pan open <issue>` opened the issue's workspace in an editor. T
 
 When several dashboard tabs are open, the tab you focused last opens the path, and its window comes to the front. If that tab is gone (it crashed or its record is older than a day), any visible tab opens it after a short wait. When no dashboard tab is open, `pan open` opens the link below in your browser instead.
 
+When a dashboard tab opens the path, `pan open` prints `Opened <path> in <project>`, naming the project as the project switcher shows it, or `Opened the <issue> workspace in <project>` for an issue workspace. The dashboard shows the same message.
+
 ### The `/open` link
 
 `<dashboard>/open?path=<absolute path>[&line=<n>&column=<n>]` opens the same thing in the tab that loads it, then moves that tab to the project's deck. `pan open` builds this link for you (`pan open --new-tab` always uses it). The dashboard address comes from `OVERDECK_DASHBOARD_URL`, or `http://localhost:3011` by default.

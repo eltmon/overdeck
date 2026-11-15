@@ -69,7 +69,7 @@ export function OpenPathHost() {
           const resolution = body as unknown as UiOpenResolution
           openPathInDeck(resolution, navigationRef.current)
           if (window.location.pathname === OPEN_PATHNAME) {
-            window.history.replaceState(null, '', `/command-deck/${encodeURIComponent(resolution.projectKey)}`)
+            window.history.replaceState(null, '', `/command-deck/${encodeURIComponent(resolution.deckKey)}`)
           }
           return
         }

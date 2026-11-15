@@ -42,7 +42,7 @@ afterEach(() => {
 
 describe('OpenPathHost', () => {
   it('opens the resolved path with dryRun and moves the URL to the project deck', async () => {
-    const resolution = { projectKey: 'demo app', rootId: 'project:demo app', relPath: 'docs', kind: 'dir', delivered: 0 }
+    const resolution = { projectKey: 'demo-key', deckKey: 'demo app', rootId: 'project:demo-key', relPath: 'docs', kind: 'dir', delivered: 0 }
     fetchMock.mockResolvedValue(json(resolution))
     renderAt('/open?path=%2Fp%2Fdocs&line=4')
     await waitFor(() => expect(openPathInDeck).toHaveBeenCalledTimes(1))
@@ -50,7 +50,7 @@ describe('OpenPathHost', () => {
     expect(url).toBe('/api/ui/open')
     expect(JSON.parse(String(init.body))).toEqual({ path: '/p/docs', line: 4, dryRun: true })
     expect(init.headers).toMatchObject({ 'x-csrf': 't' })
-    expect(openPathInDeck.mock.calls[0]?.[0]).toMatchObject({ projectKey: 'demo app', relPath: 'docs' })
+    expect(openPathInDeck.mock.calls[0]?.[0]).toMatchObject({ projectKey: 'demo-key', deckKey: 'demo app', relPath: 'docs' })
     expect(window.location.pathname).toBe('/command-deck/demo%20app')
   })
 
