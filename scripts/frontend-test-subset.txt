@@ -62,6 +62,7 @@ src/components/frame/__tests__/LeftColumn.test.tsx
 src/components/frame/__tests__/LeftColumnFooter.test.tsx
 src/components/frame/__tests__/LeftNav.test.tsx
 src/components/frame/__tests__/NewConversationButton.test.tsx
+src/components/frame/__tests__/ProjectMark.test.tsx
 src/components/frame/__tests__/ProjectSwitcher.test.tsx
 src/components/frame/__tests__/WorkspacesSection.test.tsx
 src/components/frame/__tests__/newConversationSummary.test.ts

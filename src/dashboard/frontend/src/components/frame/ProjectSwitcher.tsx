@@ -22,6 +22,9 @@ import { MenuOverlay, MenuSeparator, PopoverSurface } from '../shared/ContextMen
 import { OwnerGroupHeader } from '../sidebar/OwnerGroupHeader';
 import { OtherMachineProjects, ProjectMachineCount } from '../sidebar/OtherMachineProjects';
 import { groupProjectsByOwner, OTHER_OWNER_KEY, useCollapsedOwners } from '../sidebar/projectOwners';
+import { ProjectMark } from './ProjectMark';
+
+export { projectInitials } from './ProjectMark';
 
 /** Above this many projects the menu shows a filter input. */
 export const PROJECT_FILTER_THRESHOLD = 8;
@@ -33,13 +36,6 @@ export interface ProjectSwitcherProps {
   onNewWorkspace: (projectKey?: string) => void;
   /** The collapsed column shows only the mark. */
   collapsed: boolean;
-}
-
-/** Two-letter initials: the first letters of the first two words, else the first two letters. */
-export function projectInitials(name: string): string {
-  const words = name.split(/[^A-Za-z0-9]+/).filter(Boolean);
-  if (words.length >= 2) return `${words[0]![0]}${words[1]![0]}`.toUpperCase();
-  return (words[0] ?? name).slice(0, 2).toUpperCase();
 }
 
 /** A path with the home directory (/home/<user>, /Users/<user>) shortened to ~. */
@@ -66,17 +62,6 @@ function ProjectStatusWord({ project }: { project: ProjectData }) {
   return (
     <span className="ml-auto shrink-0 text-[11px] text-muted-foreground" data-testid={`project-status-${project.name}`}>
       {word}
-    </span>
-  );
-}
-
-function ProjectMark({ name, muted = false }: { name: string; muted?: boolean }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md font-mono text-[11px] font-medium ${muted ? 'bg-muted text-muted-foreground' : 'bg-foreground text-background'}`}
-    >
-      {muted ? '–' : projectInitials(name)}
     </span>
   );
 }
@@ -119,6 +104,7 @@ export function ProjectSwitcher({ selectedProject, onSelectProject, onNewProject
       aria-current={project.name === selectedProject ? 'true' : undefined}
       className={`list-row flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-medium ${project.name === selectedProject ? 'text-foreground' : 'text-body-foreground'}`}
     >
+      <ProjectMark size="sm" name={project.name} projectKey={project.key} />
       <span className="truncate">{project.name}</span>
       <ProjectMachineCount projectKey={project.key} />
       <ProjectStatusWord project={project} />
@@ -154,7 +140,7 @@ export function ProjectSwitcher({ selectedProject, onSelectProject, onNewProject
         onClick={() => (open ? close() : setOpen(true))}
         className={`list-row flex w-full items-center gap-2 rounded-md text-left ${collapsed ? 'justify-center p-1' : 'px-2 py-1.5'}`}
       >
-        <ProjectMark name={label} muted={!selected} />
+        {selected ? <ProjectMark name={selected.name} projectKey={selected.key} /> : <ProjectMark name={label} muted />}
         {!collapsed && (
           <>
             <span className="min-w-0 flex-1">
@@ -200,6 +186,7 @@ export function ProjectSwitcher({ selectedProject, onSelectProject, onNewProject
               aria-current={isNoProject ? 'true' : undefined}
               className="list-row flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-medium italic text-body-foreground"
             >
+              <ProjectMark size="sm" name={NO_PROJECT_LABEL} muted />
               {NO_PROJECT_LABEL}
             </button>
             <OtherMachineProjects />
