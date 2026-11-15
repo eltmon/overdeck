@@ -7,13 +7,11 @@ import { useTheme } from '../../hooks/useTheme';
 import { useConversationUiState } from '../../hooks/useConversationUiState';
 import { markTerminalClick, useNeedsTerminalAutoSwitch, type ViewMode } from './useNeedsTerminalAutoSwitch';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, Archive, Sparkles, Info, FileText, FileX, ExternalLink, RotateCcw, ArrowRight, MoreVertical, Star, Share2, Download, Square, MonitorSmartphone } from 'lucide-react';
+import { Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, RotateCcw, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConversationTerminalView } from './ConversationTerminalView';
 import { ConversationAboutDrawer } from './ConversationAboutDrawer';
-import { continueTargetOf, openContinueOnDevice } from './continueOnDevice/continueOnDeviceStore';
 import type { Conversation } from '../CommandDeck/ConversationList';
-import { updateConversationTitle } from '../CommandDeck/ConversationList';
 import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
 import { ConversationResumeControls } from './ConversationResumeControls';
@@ -31,21 +29,17 @@ import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
 import type { ReviewerRoundMetadata } from '@overdeck/contracts';
 import { DiffPanel } from '../DiffPanel';
 import { DiffWorkerPoolProvider } from '../DiffWorkerPoolProvider';
-import { PanOpenInPicker } from '../PanOpenInPicker';
-import { acceptsInput, ConversationMachineBanner, ConversationMachineChip, conversationHeaderStatus, conversationMachineState, isLiveMachineState, PullHereButton, RemoteHeaderActions, runsHere } from './ConversationMachineBanner';
-import { ConversationBranchMeta } from './ConversationBranchMeta';
-import { ShareConversationMenuItem } from './sharing/ShareDialog';
+import { acceptsInput, ConversationMachineBanner, conversationHeaderStatus, conversationMachineState } from './ConversationMachineBanner';
+import { ConversationHeader } from './header/ConversationHeader';
 import { ConversationPullRequestProvider } from './TranscriptPullRequestLink';
 import { ConversationBookmarksProvider } from './bookmarks/ConversationBookmarks';
-import { BookmarksToggle, BookmarksDrawer } from './bookmarks/BookmarksDrawer';
-import { PullRequestMenuItems } from '../CommandDeck/PullRequestMenuItems';
+import { BookmarksDrawer } from './bookmarks/BookmarksDrawer';
 import { parseDiffRouteSearch } from '../../lib/diffRouteSearch';
 import { isNativeShell } from '../../lib/nativeShell';
-import { useConfirm } from '../DialogProvider';
 import { useConversationMutations } from '../CommandDeck/useConversationMutations';
 import { ForkModal } from '../CommandDeck/ForkModal';
 import { conversationMessagesQueryKey, useConversationMessagesStream } from './useConversationMessagesStream';
-import { buildMessagesQueryFn, fetchFullTranscript, type MessagesResponse } from './messagesQuery';
+import { buildMessagesQueryFn, type MessagesResponse } from './messagesQuery';
 import { useOlderHistory } from './useOlderHistory';
 import { ToolBodyLoaderContext, toolBodyLoaderFor } from './messagesTimeline/toolBodyLoader';
 import { useMessagesHttpFallback } from './useMessagesHttpFallback';
@@ -57,8 +51,6 @@ import { useHeldKickoff } from './heldKickoff';
 import { scheduledToChatMessages, useScheduledMessages } from './scheduledMessages';
 import { TranscriptLoadingSkeleton } from './TranscriptLoadingSkeleton';
 import { useComposerDeliveryState } from './useComposerDeliveryState';
-import { ViewToggle } from '../shared/ViewToggle';
-import { MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // PAN-1635: a turn that has shown no transcript progress for this long is
@@ -136,23 +128,6 @@ interface ConversationPanelProps {
   subagentRailCollapsed?: boolean;
 }
 
-// ─── API helpers ──────────────────────────────────────────────────────────────
-
-async function updateConversationDeliveryMethod(
-  name: string,
-  deliveryMethod: 'auto' | 'channels' | 'tmux',
-): Promise<void> {
-  const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/delivery-method`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ deliveryMethod }),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`Failed to update delivery method (${res.status})${body ? `: ${body}` : ''}`);
-  }
-}
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function ConversationPanel({
@@ -184,10 +159,6 @@ export function ConversationPanel({
   // conversation gets its resume bar back instead of a read-only composer.
   const [resumedAwaitingConfirm, setResumedAwaitingConfirm] = useState(false);
   const [sendResumeContract, setSendResumeContract] = useState(true);
-  const [copied, setCopied] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuTriggerRef = useRef<HTMLButtonElement>(null);
-  const confirm = useConfirm();
   // Self-hosted mutations + ForkModal so the header can favorite / stop / hand
   // off / fork without threading callbacks through every embed site.
   const convMutations = useConversationMutations(conversation.name, () => {});
@@ -195,17 +166,10 @@ export function ConversationPanel({
   // See ComposerFooter for rationale — never seed an existing conversation's
   // harness from the global localStorage default.
   const [selectedHarness, setSelectedHarness] = useState<Harness>(() => conversation.harness ?? 'claude-code');
-  const [editingTitle, setEditingTitle] = useState(false);
-  const [draftTitle, setDraftTitle] = useState('');
-  const titleInputRef = useRef<HTMLInputElement>(null);
-  const draftTitleRef = useRef('');
-  const committingRef = useRef(false);
   const queryClient = useQueryClient();
   const messagesQueryKey = useMemo(() => conversationMessagesQueryKey(conversation.name), [conversation.name]);
   const { enabled: streamMessagesEnabled, receivedFirstPayload } = useConversationMessagesStream(conversation);
   const httpFallbackDue = useMessagesHttpFallback(streamMessagesEnabled, receivedFirstPayload, conversation.name);
-  const [deliveryMethod, setDeliveryMethod] = useState(conversation.deliveryMethod ?? 'auto');
-  const [deliveryMethodSaving, setDeliveryMethodSaving] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
 
   useEffect(() => {
@@ -228,13 +192,6 @@ export function ConversationPanel({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation.harness]);
-
-  useEffect(() => {
-    if (conversation.deliveryMethod && conversation.deliveryMethod !== deliveryMethod) {
-      setDeliveryMethod(conversation.deliveryMethod);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversation.deliveryMethod]);
 
   // The resume latch is spent once the poll confirms the resumed session came
   // alive. Clearing on endedAt instead would let a stale pre-resume row
@@ -466,48 +423,6 @@ export function ConversationPanel({
     },
   });
 
-  const abortMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/abort`, {
-        method: 'POST',
-      });
-      if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        throw new Error(`Failed to stop turn (${res.status})${body ? `: ${body}` : ''}`);
-      }
-    },
-    onError: (err: Error) => {
-      toast.error(err.message, { duration: 6000 });
-    },
-  });
-
-  const renameMutation = useMutation({
-    mutationFn: (title: string) => updateConversationTitle(conversation.name, title),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
-    },
-  });
-
-  // Regenerate the title from the whole conversation (not just the first message).
-  const retitleMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(
-        `/api/conversations/${encodeURIComponent(conversation.name)}/retitle`,
-        { method: 'POST' },
-      );
-      const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error || 'Failed to regenerate title');
-      return data as { title: string };
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      toast.success(`Renamed to "${data.title}"`, { duration: 4000 });
-    },
-    onError: (err: Error) => {
-      toast.error(err.message, { duration: 6000 });
-    },
-  });
-
   // "About" drawer summary — fetched lazily, only while the drawer is open.
   const aboutQuery = useQuery({
     queryKey: ['conversation-about', conversation.name],
@@ -541,33 +456,6 @@ export function ConversationPanel({
     },
   });
 
-  const startEditingTitle = useCallback(() => {
-    committingRef.current = false;
-    const initial = conversation.title ?? conversation.name;
-    draftTitleRef.current = initial;
-    setDraftTitle(initial);
-    setEditingTitle(true);
-    setTimeout(() => {
-      titleInputRef.current?.select();
-    }, 0);
-  }, [conversation.title, conversation.name]);
-
-  const commitTitleRename = useCallback(() => {
-    if (committingRef.current) return;
-    committingRef.current = true;
-    const trimmed = draftTitleRef.current.trim();
-    const original = conversation.title ?? conversation.name;
-    setEditingTitle(false);
-    if (trimmed && trimmed !== original) {
-      renameMutation.mutate(trimmed);
-    }
-  }, [conversation.title, conversation.name, renameMutation]);
-
-  const cancelTitleEditing = useCallback(() => {
-    setEditingTitle(false);
-    setDraftTitle('');
-  }, []);
-
   const handleResume = useCallback(() => {
     resumeMutation.mutate();
   }, [resumeMutation]);
@@ -578,51 +466,10 @@ export function ConversationPanel({
     convMutations.archive(conversation.name, { onSuccess: onArchived });
   }, [convMutations, conversation.name, onArchived]);
 
-  const handleExportTranscript = useCallback(async () => {
-    // PAN-4558: the panel holds a window; export reads the whole transcript.
-    let messages: MessagesResponse['messages'];
-    try {
-      messages = (await fetchFullTranscript(conversation.name, agentId)).messages;
-    } catch {
-      toast.error('Failed to export transcript');
-      return;
-    }
-    if (messages.length === 0) {
-      toast.error('No messages to export yet');
-      return;
-    }
-    const md = messages
-      .map((m) => `## ${m.role}\n\n${m.text ?? ''}\n`)
-      .join('\n');
-    const header = `# ${conversation.title ?? conversation.name}\n\n`;
-    const blob = new Blob([header + md], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${(conversation.title ?? conversation.name).replace(/[^\w.-]+/g, '-')}.md`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-    toast.success('Transcript exported');
-  }, [agentId, conversation.title, conversation.name]);
-
   const handleViewMode = useCallback((mode: ViewMode) => {
     if (mode === 'terminal') markTerminalClick(conversation.name);
     onViewModeChange?.(mode);
   }, [onViewModeChange, conversation.name]);
-
-  const handleDeliveryMethodChange = useCallback(async (method: 'auto' | 'channels' | 'tmux') => {
-    setDeliveryMethodSaving(true);
-    try {
-      await updateConversationDeliveryMethod(conversation.name, method);
-      setDeliveryMethod(method);
-    } catch (err) {
-      console.error('[ConversationPanel] Failed to update delivery method:', err);
-    } finally {
-      setDeliveryMethodSaving(false);
-    }
-  }, [conversation.name]);
 
   // Per-conversation UI state (client-only, localStorage). Embedded agent
   // panes pass controlled props from their own header toggle; when absent
@@ -630,42 +477,6 @@ export function ConversationPanel({
   const uiToolState = useConversationUiState(conversation.name);
   const hideToolCalls = controlledHideToolCalls ?? uiToolState.hideToolCalls;
   const toggleHideToolCalls = onToggleHideToolCalls ?? uiToolState.toggleHideToolCalls;
-
-  const handleCopyLink = useCallback(() => {
-    const params = new URLSearchParams();
-    if (viewMode === 'terminal') {
-      params.set('view', 'terminal');
-    }
-    const query = params.toString();
-    const url = `${window.location.origin}/conv/${conversation.id}${query ? `?${query}` : ''}`;
-    void navigator.clipboard.writeText(url).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }, [conversation.id, viewMode]);
-
-  // Open the conversation in a new browser window — the "detach" affordance
-  // matching the ⋮ → "Pop out to window" menu item, lifted into the header so
-  // it's discoverable next to Copy link. Mirrors Stage's drag-off-to-detach so
-  // both entry points land on the same /popout/conversation/<id> route — a bare
-  // conversation view with no dashboard chrome (sidebar, awareness rail, etc.).
-  const handleDetach = useCallback(() => {
-    const params = new URLSearchParams();
-    if (viewMode === 'terminal') params.set('view', 'terminal');
-    const query = params.toString();
-    const url = `/popout/conversation/${conversation.id}${query ? `?${query}` : ''}`;
-    window.open(url, '_blank', 'popup=yes,width=920,height=1040');
-  }, [conversation.id, viewMode]);
-
-  const openHandoffDoc = useCallback(() => {
-    window.open(`/api/conversations/${encodeURIComponent(conversation.name)}/handoff-doc`, '_blank', 'noopener,noreferrer');
-  }, [conversation.name]);
-
-  const openHandoffTarget = useCallback(() => {
-    if (conversation.handoffTargetConvId) {
-      window.location.href = `/conv/${conversation.handoffTargetConvId}`;
-    }
-  }, [conversation.handoffTargetConvId]);
 
   const showTerminal = conversation.sessionAlive || resumedAwaitingConfirm;
   // Diff deep-links are transcript-oriented. If this pane was previously left in
@@ -680,329 +491,21 @@ export function ConversationPanel({
   const isSpawningHeader = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed && isWithinSpawnWindow(conversation.createdAt);
   const { color: statusColor, label: statusLabel, hollow: statusHollow } = conversationHeaderStatus(conversation, { forking: isForkingHeader, spawning: isSpawningHeader, failed: isForkFailedHeader || isSpawnFailed });
   const machineState = conversationMachineState(conversation); // PAN-4650: which machine runs it (D-6 title bar states)
-  const showPiAbort = isWorking && (conversation.harness === 'ohmypi' || conversation.harness === 'pi');
   return (
     <ConversationPullRequestProvider conversation={conversation}><ConversationBookmarksProvider conversationName={conversation.name}><div className={styles.conversationTerminal}>
-      {/* Header — hidden in embedded mode (ZoneB already shows session info).
-          Three-tier layout: row 1 = title + primary actions, row 2 = read-only
-          metadata, long-tail/config/destructive actions live in the ⋮ menu. */}
       {!embedded && (
-        <div
-          className={`${styles.conversationHeaderShell} ${styles.conversationHeaderContainer}`} data-machine-state={machineState}
-          onContextMenu={(e) => {
-            // Right-click the header → open the ⋮ menu. Skip while renaming so
-            // the native copy/paste menu still works in the title input.
-            if (editingTitle) return;
-            e.preventDefault();
-            setMenuOpen(true);
-          }}
-        >
-          {/* Row 1 — title + primary actions */}
-          <div className={styles.conversationHeaderPrimary}>
-            <span className={styles.conversationTerminalTitle}>
-              {isWorking && (
-                <span title={workingLabel} style={{ display: 'contents' }}>
-                  <WorkingIcon
-                    size={14}
-                    className={workingIconClass}
-                    aria-label={workingLabel}
-                  />
-                </span>
-              )}
-              {editingTitle ? (
-                <input
-                  ref={titleInputRef}
-                  className={styles.conversationTitleInput}
-                  value={draftTitle}
-                  onChange={e => { setDraftTitle(e.target.value); draftTitleRef.current = e.target.value; }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') commitTitleRename();
-                    if (e.key === 'Escape') cancelTitleEditing();
-                  }}
-                  onBlur={commitTitleRename}
-                  aria-label={`Rename ${conversation.name}`}
-                />
-              ) : (
-                <>
-                  <span className={`${styles.conversationTerminalTitleText} ${retitleMutation.isPending ? styles.titleRegenerating : ''}`}>
-                    {conversation.title ?? conversation.name}
-                  </span>
-                  {conversation.transcriptMissing && (
-                    <span
-                      title="Transcript missing — this conversation had activity, but its history file no longer exists on disk. The history cannot be recovered."
-                      aria-label="Transcript missing"
-                      style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--warning)', flexShrink: 0 }}
-                    >
-                      <FileX size={13} />
-                    </span>
-                  )}
-                  <button
-                    className={styles.conversationTitleEditBtn} hidden={native || !isLiveMachineState(machineState)}
-                    onClick={startEditingTitle}
-                    title="Rename conversation"
-                    aria-label={`Rename ${conversation.name}`}
-                  >
-                    <Pencil size={12} />
-                  </button>
-                </>
-              )}
-            </span>
-
-            <div className={styles.conversationHeaderActions}>
-              {/* View toggle — only when session is live */}
-              {showTerminal && isLiveMachineState(machineState) && (
-                <ViewToggle
-                  ariaLabel="Conversation view"
-                  value={effectiveViewMode}
-                  onChange={handleViewMode}
-                  options={[
-                    { id: 'conversation', label: 'Conversation' },
-                    { id: 'terminal', label: 'Terminal' },
-                  ]}
-                />
-              )}
-
-              <RemoteHeaderActions conversation={conversation} />
-              <button
-                className={`${styles.conversationAboutToggle} ${aboutOpen ? styles.conversationAboutToggleActive : ''}`}
-                onClick={() => setAboutOpen(v => !v)}
-                title={aboutOpen ? 'Hide conversation summary' : 'Show conversation summary'}
-                aria-label={aboutOpen ? 'Hide about this conversation' : 'Show about this conversation'}
-                aria-pressed={aboutOpen}
-              >
-                <Info size={14} />
-                <span>About</span>
-              </button>
-
-              <button
-                className={`${styles.conversationAboutToggle} ${hideToolCalls ? styles.conversationAboutToggleActive : ''}`}
-                onClick={toggleHideToolCalls}
-                title={hideToolCalls ? 'Show tool calls' : 'Hide tool calls'}
-                aria-label={hideToolCalls ? 'Show tool calls' : 'Hide tool calls'}
-                aria-pressed={hideToolCalls}
-              >
-                <Wrench size={14} />
-                <span>Tools</span>
-              </button>
-
-              <BookmarksToggle />
-
-              {showPiAbort && (
-                <button
-                  className={`${styles.conversationAboutToggle} ${abortMutation.isPending ? styles.conversationAboutToggleActive : ''}`}
-                  onClick={() => abortMutation.mutate()}
-                  disabled={abortMutation.isPending}
-                  title="Stop current turn"
-                  aria-label="Stop current turn"
-                >
-                  {abortMutation.isPending ? <Loader2 size={14} className={styles.spinnerIcon} /> : <Square size={14} />}
-                  <span>{abortMutation.isPending ? 'Stopping…' : 'Stop'}</span>
-                </button>
-              )}
-
-              {(archivePending || convMutations.isStopPending(conversation.name)) && (
-                <span className={styles.conversationAboutToggle} role="status" aria-live="polite" aria-label={archivePending ? 'Archiving conversation' : 'Stopping conversation'}>
-                  <Loader2 size={14} className={styles.spinnerIcon} /><span>{archivePending ? 'Archiving…' : 'Stopping…'}</span>
-                </span>
-              )}
-              {/* Copy link */}
-              <button
-                className={styles.copyLinkButton}
-                onClick={handleCopyLink}
-                title="Copy link to conversation"
-                aria-label="Copy link to conversation"
-              >
-                {copied ? <Check size={14} /> : <Copy size={14} />}
-              </button>
-
-              {/* Detach — open the conversation in a new browser window. Same
-                  target as the ⋮ → "Pop out to window" item, exposed here so
-                  the action is discoverable next to Copy link. */}
-              <button
-                className={styles.copyLinkButton}
-                onClick={handleDetach}
-                title="Detach conversation"
-                aria-label="Detach conversation"
-              >
-                <ExternalLink size={14} />
-              </button>
-
-              {/* Overflow menu — long-tail / prefs / config / destructive */}
-              <div className={styles.headerMenuWrap}>
-                <button
-                  ref={menuTriggerRef}
-                  className={styles.copyLinkButton}
-                  onClick={() => setMenuOpen(v => !v)}
-                  title="More actions"
-                  aria-label="More conversation actions"
-                  aria-haspopup="menu"
-                  aria-expanded={menuOpen}
-                >
-                  <MoreVertical size={16} />
-                </button>
-                {menuOpen && (
-                  <>
-                    <MenuOverlay onClick={() => setMenuOpen(false)} />
-                    <MenuSurface
-                      aria-label="Conversation actions"
-                      onClose={() => setMenuOpen(false)}
-                      returnFocusRef={menuTriggerRef}
-                      className="absolute right-0 top-full z-[1000] mt-1 min-w-[220px]"
-                    >
-                      {!native && (<>
-                      <MenuItemButton
-                        active={conversation.isFavorited}
-                        onClick={() => { convMutations.toggleFavorite({ name: conversation.name, favorited: !!conversation.isFavorited }); setMenuOpen(false); }}
-                      >
-                        <Star size={14} style={{ fill: conversation.isFavorited ? 'currentColor' : 'none' }} />
-                        {conversation.isFavorited ? 'Unfavorite' : 'Favorite'}
-                      </MenuItemButton>
-
-                      <MenuItemButton
-                        onClick={() => { retitleMutation.mutate(); setMenuOpen(false); }}
-                        disabled={retitleMutation.isPending}
-                      >
-                        {retitleMutation.isPending
-                          ? <Loader2 size={14} className={styles.spinnerIcon} />
-                          : <Sparkles size={14} />}
-                        Regenerate title
-                      </MenuItemButton>
-                      <PullRequestMenuItems conversation={conversation} mutations={convMutations} onClose={() => setMenuOpen(false)} />
-
-                      {conversation.harness === 'claude-code' && (
-                        <div className={styles.headerMenuDeliveryRow}>
-                          <span>Delivery method</span>
-                          <select
-                            className={styles.deliveryMethodSelect}
-                            value={deliveryMethod}
-                            onChange={(e) => handleDeliveryMethodChange(e.target.value as 'auto' | 'channels' | 'tmux')}
-                            disabled={deliveryMethodSaving}
-                            title="Message delivery method"
-                            aria-label="Message delivery method"
-                          >
-                            <option value="auto">Auto</option>
-                            <option value="channels">Channels</option>
-                            <option value="tmux">Tmux</option>
-                          </select>
-                        </div>
-                      )}
-
-                      <MenuSeparator />
-                      {conversation.claudeSessionId && (
-                        <MenuItemButton
-                          onClick={() => { convMutations.openForkModal(conversation, { mode: 'handoff' }); setMenuOpen(false); }}
-                        >
-                          <Share2 size={14} />
-                          Hand off to new conversation
-                        </MenuItemButton>
-                      )}
-                      {conversation.claudeSessionId && conversation.harness !== 'pi' && (
-                        <MenuItemButton
-                          onClick={() => { convMutations.openForkModal(conversation); setMenuOpen(false); }}
-                        >
-                          <GitBranchPlus size={14} />
-                          Create summary fork
-                        </MenuItemButton>
-                      )}
-                      <MenuItemButton
-                        onClick={() => { void handleExportTranscript(); setMenuOpen(false); }}
-                      >
-                        <Download size={14} />
-                        Export transcript
-                      </MenuItemButton>
-                      <PullHereButton conversation={conversation} menu onDone={() => setMenuOpen(false)} />
-                      {runsHere(conversation) && (
-                        <MenuItemButton onClick={() => { openContinueOnDevice(continueTargetOf(conversation, viewMode === 'terminal' ? 'terminal' : 'conversation')); setMenuOpen(false); }}>
-                          <MonitorSmartphone size={14} />
-                          Continue on another device
-                        </MenuItemButton>
-                      )}
-                      <ShareConversationMenuItem conversation={conversation} onDone={() => setMenuOpen(false)} />
-
-                      {(conversation.handoffDocPath || conversation.handoffTargetConvId) && (
-                        <MenuSeparator />
-                      )}
-                      {conversation.handoffDocPath && (
-                        <MenuItemButton
-                          onClick={() => { openHandoffDoc(); setMenuOpen(false); }}
-                        >
-                          <FileText size={14} />
-                          Open handoff doc
-                        </MenuItemButton>
-                      )}
-                      {conversation.handoffTargetConvId && (
-                        <MenuItemButton
-                          onClick={() => { openHandoffTarget(); setMenuOpen(false); }}
-                        >
-                          <ExternalLink size={14} />
-                          Open handoff target
-                        </MenuItemButton>
-                      )}
-                      </>)}
-
-                      {(conversation.sessionAlive || onArchived) && (
-                        <MenuSeparator />
-                      )}
-                      {conversation.sessionAlive && (
-                        <MenuItemButton
-                          onClick={() => { convMutations.stop(conversation.name); setMenuOpen(false); }}
-                        >
-                          <Square size={14} />
-                          Stop agent
-                        </MenuItemButton>
-                      )}
-                      {onArchived && !native && (
-                        <MenuItemButton
-                          destructive
-                          disabled={archivePending}
-                          onClick={async () => {
-                            setMenuOpen(false);
-                            const ok = await confirm({
-                              title: conversation.isFavorited ? 'Archive favorited conversation' : 'Archive conversation',
-                              message: conversation.isFavorited
-                                ? `"${conversation.title ?? conversation.name}" is favorited.\n\nArchiving will remove the favorite, end the session, and move it to the archive.`
-                                : `Archive "${conversation.title ?? conversation.name}"? This ends the session and moves it to the archive.`,
-                              confirmLabel: 'Archive',
-                              cancelLabel: 'Cancel',
-                              variant: 'destructive',
-                            });
-                            if (ok) handleArchive();
-                          }}
-                        >
-                          {archivePending ? <Loader2 size={14} className={styles.spinnerIcon} /> : <Archive size={14} />}
-                          {archivePending ? 'Archiving…' : 'Archive conversation'}
-                        </MenuItemButton>
-                      )}
-                    </MenuSurface>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Row 2 — read-only metadata */}
-          <div className={styles.conversationMetaRow}>
-            <span className={styles.conversationTerminalStatus}>
-              <Circle size={7} style={{ fill: statusHollow ? 'transparent' : statusColor, color: statusColor }} />
-              {statusLabel}
-            </span>
-            <ConversationBranchMeta conversation={conversation} />
-            <ConversationMachineChip conversation={conversation} />
-            {!native && <><span className={styles.conversationMetaSep} aria-hidden>·</span><PanOpenInPicker openInCwd={conversation.cwd} remote={conversation.origin === 'linked' ? { conversation: conversation.name } : undefined} /></>}
-            {conversation.totalCost !== undefined && conversation.totalCost > 0 && (
-              <>
-                <span className={styles.conversationMetaSep} aria-hidden>·</span>
-                <span className={styles.featureCost}>
-                  {conversation.totalCost < 0.01 ? '<$0.01' : `$${conversation.totalCost.toFixed(2)}`}
-                </span>
-              </>
-            )}
-            <span className={styles.conversationMetaSep} aria-hidden>·</span>
-            <span className={styles.conversationSessionId}>
-              {conversation.sessionFile?.split('/').pop()?.replace('.jsonl', '') ?? conversation.name}
-            </span>
-          </div>
-        </div>
+        <ConversationHeader
+          conversation={conversation} agentId={agentId}
+          viewMode={viewMode} effectiveViewMode={effectiveViewMode} onViewMode={handleViewMode}
+          showTerminal={showTerminal} isWorking={isWorking}
+          working={{ label: workingLabel, Icon: WorkingIcon, iconClass: workingIconClass }}
+          status={{ color: statusColor, label: statusLabel, hollow: statusHollow }}
+          machineState={machineState}
+          aboutOpen={aboutOpen} onToggleAbout={() => setAboutOpen(v => !v)}
+          hideToolCalls={hideToolCalls} onToggleHideToolCalls={toggleHideToolCalls}
+          convMutations={convMutations} archivePending={archivePending}
+          onArchive={onArchived ? handleArchive : undefined}
+        />
       )}
       {!embedded && <ConversationMachineBanner conversation={conversation} />}
 
