@@ -79,6 +79,12 @@ const NON_AGENT_PREFIXES = ['conv-', 'inspect-', 'planning-'];
 // transcript's first lines at creation, so a definitive negative never flips.
 const notOrphanJsonlPaths = new Set<string>();
 
+// PAN-5369: a short (provisionally-ambiguous) transcript's `size:mtimeMs` at
+// its last read. Re-read it only when that stat changes, instead of every
+// tick — short transcripts (5 lines or fewer) are the common case that never
+// becomes definitive, since the sentinel search window never fills.
+const provisionalJsonlStat = new Map<string, string>();
+
 // PAN-4739: sessions whose census verdict the conversation-liveness door
 // contradicted. Warn once per episode; cleared when the census agrees again.
 const censusDisagreementWarned = new Set<string>();
@@ -558,11 +564,26 @@ async function detectOrphanedClaudeCodeSessions(activeConvs: Conversation[]): Pr
       // orphan-detect pass that adopted it).
       if (ownedLocators.has(sessionId)) continue;
 
+      let statKey: string;
+      try {
+        const info = await stat(jsonlPath);
+        statKey = `${info.size}:${info.mtimeMs}`;
+      } catch {
+        continue; // transcript gone mid-scan
+      }
+      if (provisionalJsonlStat.get(jsonlPath) === statKey) continue;
+
       const { clearTs: firstClearTs, definitive } = await readFirstClearTimestamp(jsonlPath);
       if (firstClearTs === null) {
-        if (definitive) notOrphanJsonlPaths.add(jsonlPath);
+        if (definitive) {
+          notOrphanJsonlPaths.add(jsonlPath);
+          provisionalJsonlStat.delete(jsonlPath);
+        } else {
+          provisionalJsonlStat.set(jsonlPath, statKey);
+        }
         continue; // not a /clear orphan
       }
+      provisionalJsonlStat.delete(jsonlPath);
 
       // Parent attribution: among active convs in this cwd, pick the one whose
       // own JSONL's mtime is the highest value strictly less than firstClearTs.

@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync, mkdirSync, utimesSync } from 'fs';
+import { mkdtempSync, writeFileSync, mkdirSync, utimesSync, appendFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { Effect } from 'effect';
@@ -1100,6 +1100,94 @@ describe('ConversationLifecycleService — detectOrphanedClaudeCodeSessions (PAN
     mockCreateConversation.mockReturnValue({ id: 999, name: 'sibling' });
 
     const { pollConversations } = await import('../conversation-lifecycle.js');
+    await pollConversations();
+
+    expect(mockCreateConversation).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-reads an unowned short transcript only when its stat changes (PAN-5369)', async () => {
+    const parentSessionId = 'short-parent-aaaa-aaaa-aaaaaaaaaaaa';
+    const shortOrphanSessionId = 'short-orphan-bbbb-bbbb-bbbbbbbbbbbb';
+
+    writeJsonl(
+      `${parentSessionId}.jsonl`,
+      [{ type: 'user', message: { role: 'user', content: 'hi' }, timestamp: '2026-05-24T19:30:00.000Z' }],
+      Date.parse('2026-05-24T19:48:00.000Z'),
+    );
+    const shortPath = writeJsonl(
+      `${shortOrphanSessionId}.jsonl`,
+      [
+        { type: 'user', message: { role: 'user', content: 'line 1' }, timestamp: '2026-05-24T19:50:00.000Z' },
+        { type: 'user', message: { role: 'user', content: 'line 2' }, timestamp: '2026-05-24T19:50:05.000Z' },
+      ],
+      Date.parse('2026-05-24T19:50:30.000Z'),
+    );
+
+    mockListConversations.mockReturnValue([
+      { id: 1, name: 'p', tmuxSession: 'conv-p', status: 'active', cwd, claudeSessionId: parentSessionId, harness: 'claude-code', title: 'parent' },
+    ]);
+    mockListSessionNames.mockReturnValue(Effect.succeed(['conv-p']));
+    mockListConversationLocators.mockReturnValue(new Set([parentSessionId]));
+
+    const { readFirstClearTimestamp } = await import('../../../../lib/overdeck/conversation-fork-adoption.js');
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+    await pollConversations();
+    await pollConversations();
+
+    let reads = vi.mocked(readFirstClearTimestamp).mock.calls.filter(([path]) => path === shortPath);
+    expect(reads).toHaveLength(1);
+
+    appendFileSync(
+      shortPath,
+      '\n' + JSON.stringify({ type: 'user', message: { role: 'user', content: 'line 3' }, timestamp: '2026-05-24T19:50:10.000Z' }),
+    );
+    const laterMtimeSec = Date.parse('2026-05-24T19:50:40.000Z') / 1000;
+    utimesSync(shortPath, laterMtimeSec, laterMtimeSec);
+
+    await pollConversations();
+
+    reads = vi.mocked(readFirstClearTimestamp).mock.calls.filter(([path]) => path === shortPath);
+    expect(reads).toHaveLength(2);
+    expect(mockCreateConversation).not.toHaveBeenCalled();
+  });
+
+  it('adopts a short transcript once it gains the /clear sentinel after a stat change (PAN-5369)', async () => {
+    const parentSessionId = 'short-adopt-parent-aaaa-aaaaaaaaaaaa';
+    const orphanSessionId = 'short-adopt-orphan-bbbb-bbbbbbbbbbbb';
+
+    writeJsonl(
+      `${parentSessionId}.jsonl`,
+      [{ type: 'user', message: { role: 'user', content: 'hi' }, timestamp: '2026-05-24T19:30:00.000Z' }],
+      Date.parse('2026-05-24T19:48:00.000Z'),
+    );
+    const orphanPath = writeJsonl(
+      `${orphanSessionId}.jsonl`,
+      [{ type: 'user', message: { role: 'user', content: 'not yet cleared' }, timestamp: '2026-05-24T19:50:00.000Z' }],
+      Date.parse('2026-05-24T19:50:05.000Z'),
+    );
+
+    mockListConversations.mockReturnValue([
+      { id: 1, name: 'parent-conv', tmuxSession: 'conv-parent', status: 'active', cwd, claudeSessionId: parentSessionId, harness: 'claude-code', title: 'Original work' },
+    ]);
+    mockListSessionNames.mockReturnValue(Effect.succeed(['conv-parent']));
+    mockListConversationLocators.mockReturnValue(new Set([parentSessionId]));
+    mockCreateConversation.mockReturnValue({ id: 321, name: 'parent-conv-post-clear' });
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+    await pollConversations();
+    expect(mockCreateConversation).not.toHaveBeenCalled();
+
+    appendFileSync(
+      orphanPath,
+      '\n' + JSON.stringify({
+        type: 'user',
+        message: { role: 'user', content: '<command-name>/clear</command-name>\n<command-message>clear</command-message>' },
+        timestamp: '2026-05-24T19:50:30.000Z',
+      }),
+    );
+    const clearedMtimeSec = Date.parse('2026-05-24T19:50:45.000Z') / 1000;
+    utimesSync(orphanPath, clearedMtimeSec, clearedMtimeSec);
+
     await pollConversations();
 
     expect(mockCreateConversation).toHaveBeenCalledTimes(1);
