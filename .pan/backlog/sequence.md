@@ -1,11 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T22:57:10.199155Z · model: claude-opus-5-5 · open: 896_
+_Last sequenced: 2026-11-15T23:27:33.766833Z · model: claude-opus-5-5 · open: 898_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-5401 | S | critical | ok |  |  | In pipeline: close-out DoD row 1 reads only reviewDecision, rejecting comment verdicts the merge door accepts. |
+| 2 | PAN-5402 | XS | medium | ok |  |  | In pipeline: re-vendor the OKF skill at eltmon/okf v0.1.1 so the bundled skill gains okf publish. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 5 | PAN-5398 | S | medium | ok |  |  | In pipeline: pan open uses the project key as deck key, opening a phantom deck where key differs from name. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
@@ -901,12 +902,17 @@ _Last sequenced: 2026-11-15T22:57:10.199155Z · model: claude-opus-5-5 · open: 
 | 901 | PAN-5181 | XS | low | ok |  |  | Fix shipped in PR #5179 (merged 2026-11-13); the body says it closes on merge. Verify and close. |
 | 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
 | 903 | PAN-5235 | XS | low | ok |  |  | Fix already applied: terminal-dialog toast now navigates to the agent's terminal tab. Verify and close. |
+| 904 | PAN-5405 | S | medium | ok |  | PAN-5295 | CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus. |
 
 ## Rationale detail
 
 ### PAN-5401 (rank 1)
 
 New in-pipeline substrate bug: the merge door and close-out disagree on the same review, so comment-posted verdicts force a manual --accept-review override; pinned into the rank freed by closed PAN-5396.
+
+### PAN-5402 (rank 2)
+
+New in-pipeline chore already in review; a scripted re-vendor plus changelog entry, pinned into the free rank 2.
 
 ### PAN-5013 (rank 3)
 
@@ -1220,10 +1226,6 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
 
 New substrate bug placed in a freed high-tier slot. With several workspace stacks up, browser checks hit the wrong backend and flake, which corrupts verification.
 
-### PAN-3234 (rank 84)
-
-Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1231,10 +1233,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T22:57:10.199155Z",
+  "generatedAt": "2026-11-15T23:27:33.766833Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 896,
+  "openCount": 898,
   "nodes": [
     {
       "issue": "PAN-5401",
@@ -1246,6 +1248,19 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "dependsOn": [],
       "why": "In pipeline: close-out DoD row 1 reads only reviewDecision, rejecting comment verdicts the merge door accepts.",
       "rationale": "New in-pipeline substrate bug: the merge door and close-out disagree on the same review, so comment-posted verdicts force a manual --accept-review override; pinned into the rank freed by closed PAN-5396.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5402",
+      "rank": 2,
+      "size": "XS",
+      "importance": "medium",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: re-vendor the OKF skill at eltmon/okf v0.1.1 so the bundled skill gains okf publish.",
+      "rationale": "New in-pipeline chore already in review; a scripted re-vendor plus changelog entry, pinned into the free rank 2.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12381,6 +12396,21 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "why": "Fix already applied: terminal-dialog toast now navigates to the agent's terminal tab. Verify and close.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-5405",
+      "rank": 904,
+      "size": "S",
+      "importance": "medium",
+      "score": 46,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5295"
+      ],
+      "why": "CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus.",
+      "rationale": "New CodeRabbit follow-up from the merged PAN-5295 PR; one Major and four Minor frontend findings, ranked with comparable follow-ups.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13529,6 +13559,13 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "from": "PAN-5295",
       "to": "PAN-5343",
       "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5295",
+      "to": "PAN-5405",
+      "type": "informs",
       "source": "github-ref",
       "confidence": 1
     },
