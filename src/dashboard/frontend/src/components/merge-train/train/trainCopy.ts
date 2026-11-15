@@ -240,11 +240,31 @@ export function batchStatusText(gen: Pick<UatGenerationPayload, 'status' | 'ship
     case 'invalidated': return 'voided';
     case 'failed': return 'assembly failed';
     case 'promoted': {
+      // PAN-5364 D6: without version sync there is no version to ship, so the merge is the whole outcome.
+      if (gen.versionSyncConfigured !== true) return 'merged';
       const version = gen.shipStatus?.status === 'passed' ? gen.shipStatus.version : undefined;
       return version ? `merged · v${version} shipped` : 'merged · version not shipped';
     }
     default: return gen.status;
   }
+}
+
+/** FR-5 (PAN-5364): "merged to main · 8ed9e9e · 6m ago". */
+export function outcomeLine(gen: Pick<UatGenerationPayload, 'repos' | 'updatedAt'>, mergedAt: string | null, now: number): string {
+  const merged = (gen.repos ?? []).filter((repo) => repo.mergeSha);
+  const head = merged.length === 1
+    ? `merged to ${merged[0]!.targetBranch} · ${merged[0]!.mergeSha!.slice(0, 7)}`
+    : merged.length > 1
+      ? `merged · ${merged.map((repo) => `${repo.repoKey}@${repo.mergeSha!.slice(0, 7)}`).join(' · ')}`
+      : 'merged to main';
+  const ago = formatAgo(mergedAt ?? gen.updatedAt, now);
+  return ago ? `${head} · ${ago}` : head;
+}
+
+/** FR-6 (PAN-5364): the line naming the rebuilds the outcome's merge voided. */
+export function foldedRebuildsLine(names: readonly string[]): string {
+  const n = names.length;
+  return `${n} rebuild${n === 1 ? '' : 's'} voided when this merged: ${names.map(shortName).join(', ')}`;
 }
 
 /** The one-word status an older batch row names. */
@@ -258,6 +278,7 @@ export function olderBatchStatus(status: UatGenerationPayload['status']): string
 }
 
 export const SHOW_LABEL = 'show';
+export const HIDE_LABEL = 'hide';
 export const HIDE_OLDER_LABEL = 'hide older batch';
 
 export function builtAgo(createdAt: string, now: number): string | null {

@@ -38,6 +38,15 @@ describe('BatchCard', () => {
     expect(screen.queryByTestId('batch-merge-min-otter-1101-4')).toBeNull();
   });
 
+  it('a merged batch reads "merged" without version sync, and keeps the ship text with it (PAN-5364)', () => {
+    mockFetch({});
+    const { unmount } = renderCard(gen({ status: 'promoted', versionSyncConfigured: false }), false);
+    expect(screen.getByTestId('batch-status-min-otter-1101-4').textContent).toBe('merged');
+    unmount();
+    renderCard(gen({ status: 'promoted', versionSyncConfigured: true, shipStatus: null }), false);
+    expect(screen.getByTestId('batch-status-min-otter-1101-4').textContent).toBe('merged · version not shipped');
+  });
+
   it('a superseded batch is still testable and promotable and shows its reason', () => {
     mockFetch({});
     renderCard(gen({ status: 'superseded', statusReason: 'replaced by uat/min-otter-1101-5' }), false);

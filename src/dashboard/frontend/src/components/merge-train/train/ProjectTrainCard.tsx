@@ -7,10 +7,12 @@
  * queue, and the recent merges strip.
  *
  * D4: auto projects batch too (the window lane), so the batch section renders
- * for any project with batches. The hero batch is the newest `assembling` or
- * `ready` batch, else the newest `superseded` one; every other batch in the
- * chain is an `OlderBatchRow` (none is hidden, FR-7). Cars that belong to a
- * live `ready`/`assembling` batch render as its member chips, not as rows.
+ * for any project with batches. The hero is the live batch (the newest
+ * `assembling` or `ready` batch, else the newest `superseded` one), else the
+ * merged outcome with the rebuilds its merge voided folded under it
+ * (PAN-5364, `batchSections.ts`). Other batches are `OlderBatchRow`s. Cars
+ * that belong to a live `ready`/`assembling` batch render as its member
+ * chips, not as rows.
  */
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -22,6 +24,7 @@ import type { BoardProject } from './boardTypes';
 import { BatchCard } from './BatchCard';
 import { Pill } from './CarStatusPill';
 import { OlderBatchRow } from './OlderBatchRow';
+import { OutcomeBatch } from './OutcomeBatch';
 import { RecentMergesStrip } from './RecentMergesStrip';
 import { StrikeLane } from './StrikeLane';
 import { TrainCarRow } from './TrainCarRow';
@@ -39,7 +42,7 @@ import {
   trainOffBanner,
 } from './trainCopy';
 import { inLiveHeroBatch, useInvalidateBoard, useNow, type LiveMergeRun } from './useMergeTrainBoard';
-import { pickHeroBatch } from './batchSections';
+import { buildBatchSections } from './batchSections';
 
 export { pickHeroBatch } from './batchSections';
 
@@ -67,8 +70,9 @@ export function ProjectTrainCard({ project, masterEnabled, runs, onNavigateIssue
   const switchOn = trainSwitch.isPending && trainSwitch.variables !== undefined
     ? trainSwitch.variables
     : project.override !== 'disabled';
-  const hero = pickHeroBatch(project.batches);
-  const older = project.batches.filter((b) => b !== hero);
+  const sections = buildBatchSections(project.batches);
+  const hero = sections.hero;
+  const older = sections.rows.flatMap((row) => (row.kind === 'single' ? [row.gen] : row.gens));
   const cars = project.cars.filter((car) => !inLiveHeroBatch(car, project.batches));
   const nextLine = nextBatchLine(project.window, now);
   const banner = !masterEnabled ? masterOffBanner(project.mode) : !project.enabled ? trainOffBanner(project.mode) : null;
@@ -155,9 +159,20 @@ export function ProjectTrainCard({ project, masterEnabled, runs, onNavigateIssue
             </div>
           )}
 
-          {hero && (
+          {hero ? (
             <div className="space-y-2" data-testid={`hero-batch-${project.projectKey}`}>
               <BatchCard gen={hero} projectKey={project.projectKey} projectName={project.projectName} hero mergeEnabled={trainOn} onNavigateIssue={onNavigateIssue} />
+            </div>
+          ) : sections.outcome && (
+            <div className="space-y-2" data-testid={`hero-batch-${project.projectKey}`} data-outcome="true">
+              <OutcomeBatch
+                gen={sections.outcome}
+                folded={sections.folded}
+                projectKey={project.projectKey}
+                projectName={project.projectName}
+                mergeEnabled={trainOn}
+                onNavigateIssue={onNavigateIssue}
+              />
             </div>
           )}
           {older.length > 0 && (
