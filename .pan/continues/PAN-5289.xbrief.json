@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5289",
   "created": "2026-11-15T02:58:13.006Z",
-  "updated": "2026-11-15T03:47:45.610Z",
+  "updated": "2026-11-15T03:48:43.031Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,9 +134,10 @@
       "doneAt": "2026-11-15T03:47:45.609Z"
     },
     "patch-files": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5289",
-      "claimedAt": "2026-11-15T03:43:01.205Z"
+      "claimedAt": "2026-11-15T03:43:01.205Z",
+      "doneAt": "2026-11-15T03:48:43.030Z"
     },
     "live-tab": {
       "status": "in_progress",
@@ -194,6 +195,18 @@
     "file-match.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T03:47:45.609Z"
+    },
+    "patch-files.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T03:48:43.030Z"
+    },
+    "patch-files.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T03:48:43.030Z"
+    },
+    "patch-files.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T03:48:43.030Z"
     }
   }
 }
