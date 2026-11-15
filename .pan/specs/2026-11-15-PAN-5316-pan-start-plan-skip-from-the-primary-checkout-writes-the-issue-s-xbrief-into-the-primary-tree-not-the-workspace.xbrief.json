@@ -4,17 +4,17 @@
     "created": "2026-11-15T04:50:15Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5316: pan start --plan skip from the primary checkout writes the issue's xBRIEF into the primary tree, not the workspace",
-    "updated": "2026-11-15T04:58:49.888Z"
+    "updated": "2026-11-15T05:00:08.105Z"
   },
   "plan": {
     "id": "pan-5316",
     "title": "pan start --plan skip from the primary checkout writes the issue's xBRIEF into the primary tree, not the workspace",
-    "status": "proposed",
+    "status": "running",
     "uid": "e7666a4d-038b-4ec5-a0ec-a0cdcbcf273c",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T04:50:15Z",
-    "updated": "2026-11-15T04:58:49.888Z",
+    "updated": "2026-11-15T05:00:08.105Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5316",
@@ -288,5 +288,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
