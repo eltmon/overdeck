@@ -7,6 +7,7 @@
 
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { resolvePathRoot } from '@overdeck/contracts'
 import { fetchRegisteredProjects } from '../CommandDeck/UnknownProjectState'
 import { useDashboardStore, selectIssues } from '../../lib/store'
 
@@ -28,10 +29,6 @@ function trimSlash(path: string): string {
   return path.length > 1 ? path.replace(/\/+$/, '') : path
 }
 
-function isAtOrUnder(path: string, base: string): boolean {
-  return path === base || path.startsWith(`${base}/`)
-}
-
 /** Map a conversation to its explorer root id, or null (rules in §6.4, first match wins). */
 export function rootIdForConversation(conv: RootConversation, ctx: RootContext): string | null {
   // 1. The explorer reads this machine's disk; a linked conversation runs elsewhere.
@@ -48,23 +45,10 @@ export function rootIdForConversation(conv: RootConversation, ctx: RootContext):
     }
   }
   if (!conv.cwd) return null
-  const cwd = trimSlash(conv.cwd)
-  // 4. A feature workspace lives inside its project folder, so check it before rule 5.
-  for (const project of ctx.projects) {
-    const workspacesDir = `${trimSlash(project.path)}/workspaces`
-    if (!cwd.startsWith(`${workspacesDir}/`)) continue
-    const first = cwd.slice(workspacesDir.length + 1).split('/')[0]
-    const slug = first.startsWith('feature-') ? first.slice('feature-'.length) : ''
-    return slug ? `issue:${slug.toUpperCase()}` : null
-  }
-  // 5. The primary checkout or any folder under it; the longest project path wins.
-  let best: { key: string; length: number } | null = null
-  for (const project of ctx.projects) {
-    const path = trimSlash(project.path)
-    if (isAtOrUnder(cwd, path) && (!best || path.length > best.length)) best = { key: project.key, length: path.length }
-  }
-  // 6. Outside every project.
-  return best ? `project:${best.key}` : null
+  // 4–6. Feature workspace, then the longest project path, else outside (shared rules,
+  // PAN-5349). No scratch rows: they carry no path here, so rule 3 covers them.
+  const hit = resolvePathRoot(trimSlash(conv.cwd), ctx.projects, [])
+  return hit.kind === 'root' ? hit.rootId : null
 }
 
 const TITLE_MAX = 40
