@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5361",
   "created": "2026-11-15T15:33:26.300Z",
-  "updated": "2026-11-15T16:07:02.865Z",
+  "updated": "2026-11-15T16:07:16.007Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,6 +100,11 @@
     "spawner-flag.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T16:07:02.865Z"
+    },
+    "spawner-canary-job": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5361",
+      "claimedAt": "2026-11-15T16:07:16.007Z"
     }
   }
 }
