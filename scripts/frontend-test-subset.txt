@@ -499,6 +499,7 @@ src/lib/shortcuts/__tests__/registry.test.ts
 src/lib/shortcuts/__tests__/ShortcutsSheet.test.tsx
 src/lib/simple/uiMode.test.ts
 src/lib/simple/useSimpleActions.test.tsx
+src/lib/uiCommands/leaderTab.test.ts
 src/pages/HomePage.test.tsx
 src/pages/__tests__/FlywheelPage.test.tsx
 src/pages/__tests__/NewProjectPage.no-loss.test.tsx
