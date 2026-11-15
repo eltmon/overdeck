@@ -277,6 +277,7 @@ src/components/explorer/actions/__tests__/useExplorerActions.test.ts
 src/components/explorer/actions/__tests__/useOsFileDrop.test.ts
 src/components/explorer/actions/__tests__/useTreeActionKeys.test.ts
 src/components/explorer/actions/__tests__/useTreeDragMove.test.tsx
+src/components/explorer/code/__tests__/CodePane.markdown-links.test.tsx
 src/components/explorer/code/__tests__/CodePane.save.test.tsx
 src/components/explorer/code/__tests__/CodePane.test.tsx
 src/components/explorer/code/__tests__/CodePaneHeader.test.tsx

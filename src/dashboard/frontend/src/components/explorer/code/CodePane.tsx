@@ -10,7 +10,7 @@
  * state, so unsaved edits survive the pane unmounting.
  */
 import type { ExplorerReadFileResult } from '@overdeck/contracts'
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { usePanesStore } from '../../../lib/panesStore'
 import { MarkdownTab } from '../../CommandDeck/ZoneCOverviewTabs/MarkdownTab'
 import { pickViewer } from '../viewers/viewer-router'
@@ -223,6 +223,9 @@ function CodePaneForFile({
     [saveNow],
   )
 
+  // PAN-5337: the Preview tab's document-relative links resolve against this.
+  const docLocation = useMemo(() => ({ rootId, path }), [rootId, path])
+
   if (load.status === 'loading') return <Placeholder title="Loading…" testId="code-pane-loading" />
   if (load.status === 'error') return <Placeholder title="Couldn’t open file" hint={load.message} testId="code-pane-error" />
   const { result } = load
@@ -299,7 +302,7 @@ function CodePaneForFile({
         </div>
       ) : showPreview ? (
         <div className="min-h-0 flex-1 overflow-auto" data-testid="code-pane-markdown">
-          <MarkdownTab body={text ?? result.text ?? ''} />
+          <MarkdownTab body={text ?? result.text ?? ''} docLocation={docLocation} />
         </div>
       ) : (
         <div className="min-h-0 flex-1">
