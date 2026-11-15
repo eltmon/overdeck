@@ -28,6 +28,12 @@ import {
   type CommitCheckRuns,
   type IssuePullRequestData,
 } from '../overdeck/pull-requests.js';
+import {
+  approvalProvenAtHead,
+  getPrFacts,
+  parseVerdictMarker,
+  type PrFacts,
+} from '../cloister/pr-facts.js';
 import { getForgeAdapter } from '../forge.js';
 import { resolveProjectReposForIssue } from '../project-repos.js';
 import {
@@ -68,6 +74,11 @@ type Awaitable<T> = T | Promise<T>;
 export interface DodStatusRowDeps {
   readPullRequest: (issueId: string) => Awaitable<IssuePullRequestData | null>;
   readVerification: (issueId: string) => Awaitable<VerificationArtifact | null>;
+  /**
+   * PAN-5401: the merge gate's PR-facts reader, run on the PR row 1 already read,
+   * so a trusted verdict comment approving the head passes row 1 as it passes the merge gate.
+   */
+  readReviewFacts?: (issueId: string, pr: IssuePullRequestData) => Promise<PrFacts>;
 }
 
 /** Landing evidence the verdict rows need; `checkMergedRow` computes it from git and the forge. */
@@ -317,12 +328,18 @@ const defaultDeployRowDeps: DeployRowDeps = {
   },
 };
 
+/** PAN-5401: injected `fetchGitHubPr` reuses the PR already read and bypasses the PR-facts cache. */
+function readReviewFactsFromPr(issueId: string, pr: IssuePullRequestData): Promise<PrFacts> {
+  return getPrFacts(issueId, { fetchGitHubPr: async () => ({ issueId, pr }) });
+}
+
 const defaultDeps: DodStatusRowDeps = {
   readPullRequest: issueId => readPullRequestWithRetry(fetchIssuePullRequest, issueId),
   readVerification: issueId => {
     const workspacePath = getIssueWorkspacePath(issueId);
     return workspacePath ? readVerificationArtifact(workspacePath) : null;
   },
+  readReviewFacts: readReviewFactsFromPr,
 };
 
 /** The PR's check-run rollup, collapsed to the one question row 2 asks. */
@@ -396,6 +413,32 @@ function terminalVerdictSettlement(
   return null;
 }
 
+/**
+ * PAN-5401: the merge gate's approval evidence for a PR with no forge decision — a trusted
+ * `overdeck-verdict: APPROVED` comment whose `sha=` names the head. Read only when some comment
+ * carries a verdict marker; a failed read is reported, never a pass.
+ */
+async function commentApprovalAtHead(
+  issueId: string,
+  pr: IssuePullRequestData,
+  deps: DodStatusRowDeps,
+): Promise<{ approved: true; head: string } | { approved: false; note?: string }> {
+  if (!(pr.comments ?? []).some(comment => parseVerdictMarker(comment.body) !== null)) {
+    return { approved: false };
+  }
+  try {
+    const facts = await (deps.readReviewFacts ?? readReviewFactsFromPr)(issueId, pr);
+    if (facts.error) return { approved: false, note: `review verdict comment unreadable: ${facts.error}` };
+    if (approvalProvenAtHead(facts) && facts.headSha) return { approved: true, head: facts.headSha };
+    return { approved: false };
+  } catch (error) {
+    return {
+      approved: false,
+      note: `review verdict comment unreadable: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
 async function checkVerdict(
   issueId: string,
   id: 'review' | 'tests',
@@ -436,9 +479,16 @@ async function checkVerdict(
   }
 
   if (id === 'review') {
-    const decision = pr.reviewDecision ?? 'none';
-    const observed = `PR #${pr.number} reviewDecision: ${decision}`;
+    const decision = pr.reviewDecision || 'none';
+    let observed = `PR #${pr.number} reviewDecision: ${decision}`;
     if (decision === 'APPROVED') return result('review', 'pass', observed);
+    if (decision !== 'CHANGES_REQUESTED') {
+      const comment = await commentApprovalAtHead(issueId, pr, deps);
+      if (comment.approved) {
+        return result('review', 'pass', `${observed}; Overdeck verdict comment approved head ${comment.head.slice(0, 12)}`);
+      }
+      if (comment.note) observed = `${observed}; ${comment.note}`;
+    }
     if (landing?.strikeLanded && decision !== 'CHANGES_REQUESTED') {
       return result('review', 'skip', `${observed}; skipped by the strike path — ${STRIKE_BYPASS_NOTE.review}`);
     }
