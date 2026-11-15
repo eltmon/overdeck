@@ -870,3 +870,9 @@
 .addMenuItem:hover {
   background: var(--accent);
 }
+
+.addMenuSeparator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}

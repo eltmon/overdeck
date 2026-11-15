@@ -112,12 +112,12 @@ describe('Stage', () => {
     expect(screen.getAllByRole('tab')).toHaveLength(2)
   })
 
-  it('the + menu offers New terminal which opens the drawer (PAN-1561)', () => {
+  it('the + menu offers Terminal which opens the drawer (PAN-1561)', () => {
     renderStage(<Stage deckKey={DECK} renderHome={renderHome} renderIssue={renderIssue} />)
     expect(screen.queryByTestId('terminal-drawer')).toBeNull()
     // "+" opens a menu of what to create, rather than guessing.
     fireEvent.click(screen.getByLabelText('Open new tab'))
-    fireEvent.click(screen.getByRole('menuitem', { name: /New terminal/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Terminal$/ }))
     expect(screen.getByTestId('terminal-drawer')).toBeTruthy()
   })
 

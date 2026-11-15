@@ -1,15 +1,21 @@
-import { memo, useEffect, useRef, useState } from 'react'
+import { Fragment, memo, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Home, CircleDot, Bot, Terminal, FileCode, GitCommit, ListTodo, FileText, Globe, Pencil, Plus, X, ChevronDown, type LucideIcon } from 'lucide-react'
 import type { PaneType, WorkspacePane, PaneId } from '../../lib/panesStore'
 import { CodeTabDirtyDot } from '../explorer/code/CodeTabDirtyDot'
 import styles from './stage.module.css'
+import { useShortcutList } from '../../lib/shortcuts/registry'
+import { currentPlatform, formatSpec } from '../../lib/shortcuts/keys'
 
 export interface NewPaneAction {
   key: string
   label: string
   icon: LucideIcon
   onSelect: () => void
+  /** Registry id whose keycap shows beside the item (PAN-5295 D2-17); none when unbound on this platform. */
+  shortcutId?: string
+  /** Draw a separator above this item. */
+  separatorBefore?: boolean
 }
 
 const PANE_ICONS: Record<PaneType, typeof Home> = {
@@ -62,6 +68,14 @@ export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, on
   const menuRef = useRef<HTMLDivElement>(null)
   const barRef = useRef<HTMLDivElement>(null)
   const menuOpen = menu !== null
+  const shortcuts = useShortcutList()
+  const keycapOf = (id: string | undefined): { text: string; aria: string } | null => {
+    if (!id) return null
+    const platform = currentPlatform()
+    const spec = shortcuts.find((def) => def.id === id)?.keys[platform]
+    // aria-keyshortcuts names Ctrl "Control"; a chord's steps are space-separated.
+    return spec ? { text: formatSpec(spec, platform), aria: spec.replace(/\bCtrl\b/g, 'Control') } : null
+  }
 
   // The tab strip scrolls horizontally on overflow, but its scrollbar is hidden
   // (a visible one bonks the tab height). Translate a vertical mouse wheel into
@@ -226,17 +240,22 @@ export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, on
           >
             {newActions.map((a) => {
               const ActionIcon = a.icon
+              const keycap = keycapOf(a.shortcutId)
               return (
-                <button
-                  key={a.key}
-                  type="button"
-                  role="menuitem"
-                  className={styles.addMenuItem}
-                  onClick={() => { setMenu(null); a.onSelect() }}
-                >
-                  <ActionIcon size={14} />
-                  {a.label}
-                </button>
+                <Fragment key={a.key}>
+                  {a.separatorBefore && <div role="separator" className={styles.addMenuSeparator} />}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={styles.addMenuItem}
+                    aria-keyshortcuts={keycap?.aria}
+                    onClick={() => { setMenu(null); a.onSelect() }}
+                  >
+                    <ActionIcon size={14} />
+                    {a.label}
+                    {keycap && <kbd className={`${styles.kbd} ml-auto`} aria-hidden="true">{keycap.text}</kbd>}
+                  </button>
+                </Fragment>
               )
             })}
           </div>,

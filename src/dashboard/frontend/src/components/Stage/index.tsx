@@ -454,6 +454,8 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
   const handleAddPane = useCallback(() => toggleTerminal(), [toggleTerminal])
   // B-D11: the deck's project, found by key or name.
   const deckProject = findRegisteredProject(useRootContext().projects, deckKey)
+  // PAN-5295 D2-17: create actions first, then a separator, then the drawers;
+  // each shows its registered shortcut's keycap for this platform.
   const newActions = useMemo<NewPaneAction[]>(() => {
     const actions: NewPaneAction[] = []
     if (onCreateConversation) {
@@ -461,6 +463,7 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
         key: 'conversation',
         label: 'New conversation',
         icon: Bot,
+        shortcutId: 'deck.new-conversation',
         onSelect: () => {
           void onCreateConversation('claude-code').then((result) => {
             if ('name' in result) openOrFocusAgentPane(result.name, 'Agent')
@@ -468,32 +471,35 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
         },
       })
     }
-    actions.push({
-      key: 'terminal',
-      label: 'New terminal',
-      icon: TerminalIcon,
-      onSelect: () => setTerminalOpen(deckKey, true),
-    })
-    actions.push({
-      key: 'web',
-      label: 'Web',
-      icon: Globe,
-      onSelect: () => openPane({ paneType: 'browser', label: 'Web' }),
-    })
     // PAN-5289 (§6.10, FR-3): the work dock's entry points.
-    actions.push({ key: 'files', label: 'Files', icon: FolderTree, onSelect: () => openDock({ tab: 'files' }) })
+    actions.push({ key: 'files', label: 'Files', icon: FolderTree, shortcutId: 'dock.files', onSelect: () => openDock({ tab: 'files' }) })
     if (deckProject) {
       actions.push({
         key: 'changes',
         label: `Changes in ${deckProject.name || deckProject.key}`,
         icon: GitCompare,
+        shortcutId: 'dock.changes',
         onSelect: () => {
           useWorkDockStore.getState().setRootOverride(deckKey, `project:${deckProject.key}`, activeId || undefined)
           openDock({ tab: 'changes' })
         },
       })
     }
-    actions.push({ key: 'go-to-file', label: 'Go to file…', icon: Search, onSelect: () => useWorkDockStore.getState().setQuickOpen(deckKey, true) })
+    actions.push({ key: 'go-to-file', label: 'Go to file…', icon: Search, shortcutId: 'explorer.quick-open', onSelect: () => useWorkDockStore.getState().setQuickOpen(deckKey, true) })
+    actions.push({
+      key: 'terminal',
+      label: 'Terminal',
+      icon: TerminalIcon,
+      shortcutId: 'stage.toggle-terminal',
+      separatorBefore: true,
+      onSelect: () => setTerminalOpen(deckKey, true),
+    })
+    actions.push({
+      key: 'web',
+      label: 'Web page',
+      icon: Globe,
+      onSelect: () => openPane({ paneType: 'browser', label: 'Web' }),
+    })
     return actions
   }, [onCreateConversation, openOrFocusAgentPane, setTerminalOpen, deckKey, openPane, openDock, deckProject, activeId])
 

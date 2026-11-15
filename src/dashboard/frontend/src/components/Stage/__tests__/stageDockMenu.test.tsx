@@ -88,3 +88,34 @@ describe('Stage + menu dock entries (PAN-5289)', () => {
     expect(await screen.findByTestId('quick-open')).toHaveTextContent('project:workflow-fixture')
   })
 })
+
+describe('Stage + menu order and keycaps (PAN-5295)', () => {
+  it('lists New conversation, Files, Changes in <project>, Go to file…, Terminal, Web page in order', async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={qc}>
+        <Stage
+          deckKey={DECK}
+          renderHome={() => <div data-testid="home" />}
+          renderIssue={(id: string) => <div>{id}</div>}
+          onCreateConversation={vi.fn(async () => ({ error: 'unused' }))}
+        />
+      </QueryClientProvider>,
+    )
+    await openMenu()
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent?.replace(/\s*(Ctrl|⌘).*$/, ''))).toEqual([
+      'New conversation', 'Files', 'Changes in Workflow fixture', 'Go to file…', 'Terminal', 'Web page',
+    ])
+    expect(screen.getAllByRole('separator')).toHaveLength(1)
+  })
+
+  it('shows the registered keycap for this platform and none for an unbound shortcut', async () => {
+    vi.stubGlobal('navigator', { ...navigator, platform: 'Linux x86_64' })
+    renderStage()
+    await openMenu()
+    const files = screen.getByRole('menuitem', { name: /^Files$/ })
+    await waitFor(() => expect(files).toHaveTextContent('Ctrl Shift E'))
+    expect(files).toHaveAttribute('aria-keyshortcuts', 'Control+Shift+E')
+    expect(screen.getByRole('menuitem', { name: /^Terminal$/ }).querySelector('kbd')).toBeNull()
+  })
+})
