@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T13:44:52.157265Z · model: claude-opus-5-5 · open: 895_
+_Last sequenced: 2026-11-15T13:51:41.477977Z · model: claude-opus-5-5 · open: 895_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -425,7 +425,7 @@ _Last sequenced: 2026-11-15T13:44:52.157265Z · model: claude-opus-5-5 · open: 
 | 417 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
 | 418 | PAN-5227 | S | medium | ok |  |  | Closed-issue reaper re-checks every issue's state every 60 s, spending ~25% of the GitHub App REST bucket while idle. |
 | 419 | PAN-5349 | L | medium | ok |  |  | pan open <path> opens files/folders in the dashboard; opt-in OS file-manager 'Open in Overdeck'. PRD in .pan/drafts/pan-5349.md |
-| 420 | PAN-5342 | L | medium | ok |  |  | Safe shutdown: pan shutdown drains agents at a tool boundary, banner while draining, resume offer after boot. |
+| 420 | PAN-5342 | L | medium | ok |  |  | Safe shutdown: drain agents at a tool boundary before reboot; PRD landed; item 16 of workflow-redesign order book. |
 | 421 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
 | 422 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
 | 423 | PAN-1627 | M | medium | ok |  |  | Substrate: Claude Code's native .claude/** settings-edit protection wedges in-scope work agents (un-overridable by PreToolUse auto-appr… |
@@ -1230,7 +1230,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T13:44:52.157265Z",
+  "generatedAt": "2026-11-15T13:51:41.477977Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 895,
@@ -6517,10 +6517,11 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
       "rank": 420,
       "size": "L",
       "importance": "medium",
-      "score": 56,
+      "score": 60,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Safe shutdown: pan shutdown drains agents at a tool boundary, banner while draining, resume offer after boot.",
+      "why": "Safe shutdown: drain agents at a tool boundary before reboot; PRD landed; item 16 of workflow-redesign order book.",
+      "rationale": "PRD landed and the issue joined the workflow-redesign order book as its last item, so score rises slightly; rank holds beside its order-book neighbours.",
       "gate": "auto",
       "planning": "auto"
     },
