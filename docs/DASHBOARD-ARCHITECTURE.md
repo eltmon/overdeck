@@ -838,6 +838,14 @@ door that does not exist; a real record read door would be a separate change.
   restart-all restarts each live session once, through its owner; plan-action,
   permission and pane-choice answers on a superseded row return 409. There is no
   boot-time conversation auto-resume.
+- The `/clear`-orphan scan and fork adoption's backgrounding-marker scan check
+  transcript ownership with `listConversationLocators()`/`isConversationLocatorOwned()`
+  (`src/lib/overdeck/conversation-batch-lookup.ts`, PAN-5369) instead of
+  `getConversationByClaudeSessionId` per transcript: the orphan scan loads every
+  owned locator into a `Set` once per 10s tick and re-checks one session with the
+  point query just before adopting it, and `conv_files_locator_idx` on
+  `conversation_files(locator)` backs both. A short transcript (5 lines or fewer)
+  is re-read only when its `size:mtimeMs` stat changes, not on every tick.
 - A human conversation's Claude session is its current locator: the newest
   `conversation_files` row (PAN-2652). The launcher pin (`--session-id`/`--resume` in
   `launcher.sh`) is only the fallback for a chain head that has no locator. A superseded
