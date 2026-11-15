@@ -976,6 +976,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'pan.subscribeConversationMessages', kind: 'rpc', disposition: 'READ',     door: 'TranscriptsResolver.streamMessages' },
   { surface: 'pan.subscribeProjectSessionTree', kind: 'rpc', disposition: 'READ',       door: 'ConversationsResolver.sessionTree' },
   { surface: 'pan.subscribeFlywheelStatus',    kind: 'rpc', disposition: 'READ',        door: 'SettingsResolver.getFlywheelRuntime (live)' },
+  { surface: 'pan.subscribeUiCommands',        kind: 'rpc', disposition: 'OUT_OF_SCOPE', door: 'UI command channel (PAN-5349): transient open-path commands, never stored' },
 
   // Snapshot / replay — ObservabilityRpcGroup
   { surface: 'pan.getSnapshot',                kind: 'rpc', disposition: 'READ',        door: 'Observability.getSnapshot' },

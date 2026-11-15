@@ -261,6 +261,7 @@ export const RPC_METHOD_SCOPES: Readonly<Record<string, AccessTokenScope>> = {
   'pan.replayEvents': 'read:events',
   'pan.subscribeConversationMessages': 'read:conversations',
   'pan.subscribeDomainEvents': 'read:events',
+  'pan.subscribeUiCommands': 'read:events',
 };
 export const WS_RPC_UPGRADE_SCOPES: ReadonlyArray<AccessTokenScope> = ['read:events', 'read:conversations'];
 
