@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5310",
   "created": "2026-11-14T22:39:01.503Z",
-  "updated": "2026-11-15T00:31:11.132Z",
+  "updated": "2026-11-15T00:31:24.616Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,11 @@
     "fe-actions-closed-reopen-only.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T00:31:11.132Z"
+    },
+    "fe-ship-merged-only": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5310",
+      "claimedAt": "2026-11-15T00:31:24.616Z"
     }
   }
 }
