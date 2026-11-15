@@ -4,17 +4,17 @@
     "created": "2026-11-15T23:04:09Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5401: Close-out rejects comment-posted review verdicts that the merge door accepts (DoD row 1 reads only reviewDecision)",
-    "updated": "2026-11-15T23:16:12.368Z"
+    "updated": "2026-11-15T23:17:42.204Z"
   },
   "plan": {
     "id": "pan-5401",
     "title": "Close-out rejects comment-posted review verdicts that the merge door accepts (DoD row 1 reads only reviewDecision)",
-    "status": "proposed",
+    "status": "running",
     "uid": "b93aba63-6f47-47c7-a273-38f88b4eae2b",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T23:04:09Z",
-    "updated": "2026-11-15T23:16:12.368Z",
+    "updated": "2026-11-15T23:17:42.204Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5401",
@@ -300,5 +300,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
