@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5357",
   "created": "2026-11-15T15:33:34.867Z",
-  "updated": "2026-11-15T16:34:41.183Z",
+  "updated": "2026-11-15T16:34:52.583Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,11 @@
     "spawn-skip-unchanged.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T16:34:41.183Z"
+    },
+    "auto-trigger-interval": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5357",
+      "claimedAt": "2026-11-15T16:34:52.583Z"
     }
   }
 }
