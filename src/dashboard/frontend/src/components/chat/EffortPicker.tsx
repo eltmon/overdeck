@@ -45,7 +45,7 @@ interface EffortPickerProps {
   value: EffortLevel;
   onChange: (effort: EffortLevel) => void;
   disabled?: boolean;
-  /** PAN-4255: a running session's effective level and its source; the button reads `<Level> · <source>`. */
+  /** PAN-4255: a running session's effective level and its source; the button reads `Thinking: <level>`, the source is in its title (PAN-5295). */
   chip?: EffortChip | null;
   /** A live change is in flight. */
   pending?: boolean;
@@ -89,11 +89,9 @@ export function EffortPicker({ value, onChange, disabled = false, availableLevel
     setOpen(false);
   }
 
-  const buttonLabel = pending
-    ? 'Applying…'
-    : chip
-      ? `${SHORT_LABELS[chip.level]}${chip.source ? ` · ${EFFORT_SOURCE_LABELS[chip.source]}` : ''}`
-      : selected.label;
+  // PAN-5295 D2-12: "Thinking: <level>"; the source moves to the tooltip.
+  const buttonLabel = pending ? 'Applying…' : `Thinking: ${SHORT_LABELS[chip ? chip.level : selected.id].toLowerCase()}`;
+  const buttonTitle = [title, chip?.source ? `Source: ${EFFORT_SOURCE_LABELS[chip.source]}` : null].filter(Boolean).join(' · ') || undefined;
 
   if (noEffort) {
     return (
@@ -109,7 +107,7 @@ export function EffortPicker({ value, onChange, disabled = false, availableLevel
         className={styles.pickerBtn}
         onClick={() => setOpen((o) => !o)}
         disabled={disabled}
-        title={title}
+        title={buttonTitle}
         type="button"
         data-testid="effort-chip"
         data-observed={chip ? String(chip.observed) : undefined}
