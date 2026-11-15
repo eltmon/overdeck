@@ -37,6 +37,11 @@ vi.mock('../lib/store', () => ({
 
 function renderPanel(fetchImpl = vi.fn().mockResolvedValue({ ok: true, json: async () => [] })) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  // PAN-5293 F-D21: the log streams sit behind the experimental setting and
+  // Feed opens first; these cases cover the Activity Log stream.
+  client.setQueryDefaults(['settings', 'experimental-features'], { staleTime: Infinity });
+  client.setQueryData(['settings', 'experimental-features'], true);
+  localStorage.setItem('overdeck.ui.activityStream', 'normal');
   vi.stubGlobal('fetch', fetchImpl);
   return render(
     <QueryClientProvider client={client}>
@@ -123,7 +128,7 @@ describe('ActivityPanel', () => {
     });
     renderPanel(fetchMock);
 
-    fireEvent.click(screen.getByRole('button', { name: 'TTS' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'TTS' }));
     expect(screen.getByText('PAN-829 is ready to merge')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('tts-activity-replay-tts-1'));
 
@@ -150,7 +155,7 @@ describe('ActivityPanel', () => {
     });
     renderPanel(fetchMock);
 
-    fireEvent.click(screen.getByRole('button', { name: 'TTS' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'TTS' }));
     fireEvent.click(screen.getByTestId('tts-activity-replay-tts-1'));
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Failed to replay TTS: TTS did not speak (muted)'));
