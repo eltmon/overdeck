@@ -1,13 +1,15 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T20:10:44.961533Z · model: claude-opus-5-5 · open: 899_
+_Last sequenced: 2026-11-15T20:41:28.315345Z · model: claude-opus-5-5 · open: 898_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-5392 | XS | low | ok |  |  | In pipeline: docs PR from the file explorer noting Mission Control recent changes refresh every minute. |
+| 1 | PAN-5396 | S | critical | ok |  |  | In pipeline: post-merge pause/close skipped when verifying_on_main transition throws; merged issues keep live agents. |
 | 2 | PAN-5395 | S | critical | ok |  |  | In pipeline: single-repo workspaces read untracked Overdeck sync output as dirty, so work agents are refused and never start. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
+| 4 | PAN-5394 | XS | high | ok |  |  | In pipeline: admission test asserts after a fixed 10 ms drive; turned main CI red. Wait on the predicate instead. |
+| 5 | PAN-5398 | S | medium | ok |  |  | In pipeline: pan open uses the project key as deck key, opening a phantom deck where key differs from name. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
@@ -223,7 +225,6 @@ _Last sequenced: 2026-11-15T20:10:44.961533Z · model: claude-opus-5-5 · open: 
 | 219 | PAN-5371 | S | medium | ok |  |  | Simple Home headline (18) and top bar Needs-you (8) count different things; pick one rule so both agree (epic D-8). |
 | 220 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time with no production-reach check, so members read shipped while prod serves the old build. |
 | 221 | PAN-3130 | S | high | ok |  |  | Identifier-joined write paths have no containment assertion, so a crafted issue or agent id could redirect a canonical write. |
-| 221 | PAN-5335 | M | high | ok |  |  | Workflow redesign F follow-up: collapse handoff groups, unclipped cost, footer label, one current nav item, keep project. |
 | 222 | PAN-3047 | XS | high | ok |  |  | Strike-branch teardown uses --is-ancestor, which cannot see a squash merge, so all 96 strike/* branches survive as residue. |
 | 223 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
 | 224 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
@@ -402,7 +403,6 @@ _Last sequenced: 2026-11-15T20:10:44.961533Z · model: claude-opus-5-5 · open: 
 | 397 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
 | 400 | PAN-5366 | M | medium | ok |  |  | Conversation page cannot show whether per-turn memory injection reaches it; add a state route and a status-line part. |
 | 401 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
-| 401 | PAN-5358 | M | medium | ok |  |  | Merged to main and verifying; memory facts now selected by relevance into prompts instead of only a budget-cut launch list. |
 | 402 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
 | 403 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
 | 404 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
@@ -429,7 +429,6 @@ _Last sequenced: 2026-11-15T20:10:44.961533Z · model: claude-opus-5-5 · open: 
 | 425 | PAN-5386 | XS | medium | ok |  |  | CodeRabbit follow-up for PAN-5361 (PR #5373): 1 Major finding, baseline burst can hide an idle regression in bare-host smoke |
 | 426 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
 | 427 | PAN-5227 | S | medium | ok |  |  | Closed-issue reaper re-checks every issue's state every 60 s, spending ~25% of the GitHub App REST bucket while idle. |
-| 427 | PAN-5349 | L | medium | ok |  |  | pan open <path> opens files/folders in the dashboard; opt-in OS file-manager 'Open in Overdeck'. PRD in .pan/drafts/pan-5349.md |
 | 428 | PAN-5342 | L | medium | ok |  |  | Safe shutdown: drain agents at a tool boundary before reboot; PRD landed; item 16 of workflow-redesign order book. |
 | 429 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
 | 430 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
@@ -437,7 +436,7 @@ _Last sequenced: 2026-11-15T20:10:44.961533Z · model: claude-opus-5-5 · open: 
 | 432 | PAN-1624 | S | medium | ok |  |  | pan handoff --author external: authored doc is socket_write-ten but never submitted |
 | 433 | PAN-3901 | S | medium | ok |  |  | test-skip gate has no audited exemption for opt-in live suites (skipIf on env/binary); allowlist row with justification |
 | 434 | PAN-3852 | S | medium | ok |  |  | Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping |
-| 435 | PAN-5343 | L | medium | ok |  | PAN-5335, PAN-5295 | Workflow redesign H: All projects deck listing conversations across projects, 1-4 side by side. Waits on four siblings. |
+| 435 | PAN-5343 | L | medium | ok |  | PAN-5295 | Workflow redesign H: All projects deck listing conversations across projects, 1-4 side by side. Waits on four siblings. |
 | 436 | PAN-3862 | L | medium | needs-refinement |  |  | /agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model |
 | 437 | PAN-1572 | M | medium | needs-refinement |  |  | Settings permission-mode can desync from the resolved mode; body cites the removed DSP flag and a renamed symbol — rewrite first |
 | 438 | PAN-4627 | S | medium | ok |  |  | Homebrew Claude Code installs get a copy-only upgrade banner; make the brew plan runnable and auto-upgrade outdated runnable installs. |
@@ -907,9 +906,9 @@ _Last sequenced: 2026-11-15T20:10:44.961533Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
-### PAN-5392 (rank 1)
+### PAN-5396 (rank 1)
 
-New since the prior run and already in review with a live workspace, so it is pinned at the top per the in-pipeline rule; it is a docs-only change with no dependencies.
+New in-pipeline substrate bug: a throw in the post-merge lifecycle leaves work agents alive after merge and blocks close-out; pinned into the rank freed by closed PAN-5392.
 
 ### PAN-5395 (rank 2)
 
@@ -918,6 +917,14 @@ New since the prior run and already in the pipeline, so it is pinned near the to
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
+
+### PAN-5394 (rank 4)
+
+New in-pipeline test-only flake fix that turned main CI red; pinned into a free top rank so it is not displaced.
+
+### PAN-5398 (rank 5)
+
+New in-pipeline bug from the PAN-5349 live check, added to the workflow-redesign order book; pinned into a free top rank.
 
 ### PAN-5385 (rank 8)
 
@@ -1219,14 +1226,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
 
 Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.
 
-### PAN-5330 (rank 83)
-
-New substrate bug placed in a freed high-tier slot. With several workspace stacks up, browser checks hit the wrong backend and flake, which corrupts verification.
-
-### PAN-3234 (rank 84)
-
-Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1234,21 +1233,21 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T20:10:44.961533Z",
+  "generatedAt": "2026-11-15T20:41:28.315345Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 899,
+  "openCount": 898,
   "nodes": [
     {
-      "issue": "PAN-5392",
+      "issue": "PAN-5396",
       "rank": 1,
-      "size": "XS",
-      "importance": "low",
-      "score": 30,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
       "condition": "ok",
       "dependsOn": [],
-      "why": "In pipeline: docs PR from the file explorer noting Mission Control recent changes refresh every minute.",
-      "rationale": "New since the prior run and already in review with a live workspace, so it is pinned at the top per the in-pipeline rule; it is a docs-only change with no dependencies.",
+      "why": "In pipeline: post-merge pause/close skipped when verifying_on_main transition throws; merged issues keep live agents.",
+      "rationale": "New in-pipeline substrate bug: a throw in the post-merge lifecycle leaves work agents alive after merge and blocks close-out; pinned into the rank freed by closed PAN-5392.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1275,6 +1274,32 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "dependsOn": [],
       "why": "Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned.",
       "rationale": "Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5394",
+      "rank": 4,
+      "size": "XS",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: admission test asserts after a fixed 10 ms drive; turned main CI red. Wait on the predicate instead.",
+      "rationale": "New in-pipeline test-only flake fix that turned main CI red; pinned into a free top rank so it is not displaced.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5398",
+      "rank": 5,
+      "size": "S",
+      "importance": "medium",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: pan open uses the project key as deck key, opening a phantom deck where key differs from name.",
+      "rationale": "New in-pipeline bug from the PAN-5349 live check, added to the workflow-redesign order book; pinned into a free top rank.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4034,19 +4059,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "planning": "auto"
     },
     {
-      "issue": "PAN-5335",
-      "rank": 221,
-      "size": "M",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Workflow redesign F follow-up: collapse handoff groups, unclipped cost, footer label, one current nav item, keep project.",
-      "rationale": "New follow-up to the merged child F of PAN-5284, placed in a freed high-tier slot; it is a prerequisite for PAN-5343.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3047",
       "rank": 222,
       "size": "XS",
@@ -6250,19 +6262,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "planning": "auto"
     },
     {
-      "issue": "PAN-5358",
-      "rank": 401,
-      "size": "M",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Merged to main and verifying; memory facts now selected by relevance into prompts instead of only a budget-cut launch list.",
-      "rationale": "Its PR merged and the issue left the pipeline, so it keeps its prior rank and awaits close-out; no rank change.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3829",
       "rank": 402,
       "size": "L",
@@ -6581,19 +6580,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "planning": "auto"
     },
     {
-      "issue": "PAN-5349",
-      "rank": 427,
-      "size": "L",
-      "importance": "medium",
-      "score": 56,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan open <path> opens files/folders in the dashboard; opt-in OS file-manager 'Open in Overdeck'. PRD in .pan/drafts/pan-5349.md",
-      "rationale": "New feature with a PRD on main: needs a server-to-browser command channel plus per-OS file-manager integrations, so it is large but self-contained; ranked with other medium features of clear value.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-5342",
       "rank": 428,
       "size": "L",
@@ -6688,10 +6674,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "score": 58,
       "condition": "ok",
       "dependsOn": [
-        "PAN-5335",
         "PAN-5295"
       ],
       "why": "Workflow redesign H: All projects deck listing conversations across projects, 1-4 side by side. Waits on four siblings.",
+      "rationale": "Dependency PAN-5335 merged and closed, so it is dropped from dependsOn; rank unchanged while PAN-5295 remains open.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13541,13 +13527,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "from": "PAN-5284",
-      "to": "PAN-5335",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5284",
       "to": "PAN-5343",
       "type": "contains",
       "source": "github-ref",
@@ -13580,34 +13559,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-5335",
-      "to": "PAN-5343",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5358",
-      "to": "PAN-1121",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-5358",
-      "to": "PAN-293",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-5358",
-      "to": "PAN-4373",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
     },
     {
       "from": "PAN-750",
