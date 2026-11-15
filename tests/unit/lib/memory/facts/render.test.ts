@@ -84,6 +84,44 @@ describe('renderMemoryIndexSection', () => {
     expect(ids).toEqual(['fb-new', 'fb-aaa', 'fb-old', 'fb-none', 'proj-a', 'ref-a']);
   });
 
+  it('lists always facts before other facts regardless of type', () => {
+    const facts = [
+      fact({ id: 'fb-a', type: 'feedback', updated: '2026-06-01' }),
+      fact({ id: 'ref-always', type: 'reference', updated: '2020-01-01', always: true }),
+      fact({ id: 'fb-b', type: 'feedback', updated: '2026-01-01' }),
+    ];
+    const section = renderMemoryIndexSection({ scope: 'project', dir: '/repo/.overdeck/memory', facts, budget: PROJECT_MEMORY_CHAR_BUDGET });
+    const ids = section
+      .split('\n')
+      .filter((line) => line.startsWith('- '))
+      .map((line) => line.match(/\/([a-z0-9-]+):/)?.[1]);
+    expect(ids).toEqual(['ref-always', 'fb-a', 'fb-b']);
+  });
+
+  it('keeps an always fact when the budget omits later facts', () => {
+    const filler = Array.from({ length: 300 }, (_, i) =>
+      fact({
+        id: `filler-fact-${String(i).padStart(3, '0')}`,
+        type: 'feedback',
+        description: `Filler fact number ${i} about everyday workspace housekeeping and routine upkeep tasks.`,
+      }),
+    );
+    // Sorts last on type/updated/id alone (reference, no updated date) — only
+    // the always-first rule keeps it on the page under a tight budget.
+    const always = fact({
+      id: 'always-last-sort',
+      type: 'reference',
+      updated: null,
+      always: true,
+      description: 'Always fact description that must survive the budget cut.',
+    });
+    const facts = [...filler, always];
+
+    const section = renderMemoryIndexSection({ scope: 'project', dir: '/repo/.overdeck/memory', facts, budget: PROJECT_MEMORY_CHAR_BUDGET });
+    expect(section).toContain('always-last-sort');
+    expect(section).toMatch(/- … \d+ more facts: run `pan memory list`/);
+  });
+
   it('excludes facts with a review marker', () => {
     const facts = [
       fact({ id: 'active-fact' }),

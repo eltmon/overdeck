@@ -5,7 +5,8 @@
  * across machines when it is a git checkout, PAN-4578) and machine (never
  * synced). The launch path never touches the network. Memory never breaks a
  * launch (D9): every reader error is caught and reported with console.warn,
- * and rendering returns ''.
+ * and rendering returns ''. Always facts (PAN-5358 FR-9) lead each store's
+ * list, ahead of the existing type/updated/id order.
  */
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -64,6 +65,7 @@ function sectionText(scope: MemoryFactScope, dir: string): SectionText {
 const TYPE_RANK: Record<MemoryFactType, number> = { feedback: 0, project: 1, reference: 2, user: 3 };
 
 function compareFacts(a: MemoryFact, b: MemoryFact): number {
+  if (a.always !== b.always) return a.always ? -1 : 1;
   if (TYPE_RANK[a.type] !== TYPE_RANK[b.type]) return TYPE_RANK[a.type] - TYPE_RANK[b.type];
   if (a.updated !== b.updated) {
     if (a.updated === null) return 1;
