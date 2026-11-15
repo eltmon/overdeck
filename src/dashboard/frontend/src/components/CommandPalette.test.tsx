@@ -7,6 +7,14 @@ import { useNewConversationDialogStore } from './newConversation/newConversation
 import { installStrictFetchMock } from '../test-utils/strictFetchMock';
 import type { Agent, Issue } from '../types';
 import { CommandPalette, PALETTE_CONVERSATIONS_NEWEST_FIRST_KEY } from './CommandPalette';
+import { useActiveDock } from './dock/activeDock';
+
+// PAN-5289: the Files scope asks the explorer RPC; stubbed here, never reached without a mounted dock.
+const explorerRpc = vi.hoisted(() => ({ searchFiles: vi.fn() }));
+vi.mock('./explorer/explorer-rpc', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./explorer/explorer-rpc')>()),
+  searchFiles: explorerRpc.searchFiles,
+}));
 
 /** PAN-4651: the palette also asks `/api/fleet/search`; these tests run with no linked machines. */
 const installPaletteFetchMock: typeof installStrictFetchMock = (handler) => installStrictFetchMock((request) =>
@@ -1033,5 +1041,51 @@ describe('CommandPalette conversations scope chip (PAN-3705)', () => {
 
     expect(screen.getByText('Search unavailable (HTTP 401): sign in again / try again')).toBeInTheDocument();
     expect(screen.queryByText(/No results for/)).toBeNull();
+  });
+});
+
+describe('CommandPalette Files scope (PAN-5289)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    window.history.replaceState(null, '', '/');
+    useDashboardStore.setState({
+      drawer: { issueId: null, tab: 'overview' },
+      issuesRaw: [],
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    explorerRpc.searchFiles.mockReset();
+    explorerRpc.searchFiles.mockResolvedValue({ paths: ['src/fuzzy-zap.ts'] });
+  });
+
+  afterEach(() => {
+    useActiveDock.setState({ current: null });
+    vi.useRealTimers();
+  });
+
+  it('shows the mounted dock files under a Files chip even when the label does not contain the query', async () => {
+    const openFile = vi.fn();
+    useActiveDock.setState({
+      current: { deckKey: 'p', activePaneId: 'a1', rootId: 'project:p', changedPaths: new Set(['src/fuzzy-zap.ts']), openFile, revealFile: vi.fn() },
+    });
+    renderCommandPalette();
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'fza' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+    const row = getOptionByValue('file-src/fuzzy-zap.ts');
+    expect(row).toHaveTextContent('changed here');
+    expect(screen.getByRole('button', { name: 'Files' })).toBeInTheDocument();
+    selectPaletteResult(row);
+    expect(openFile).toHaveBeenCalledWith('src/fuzzy-zap.ts');
+  });
+
+  it('lists no files without a mounted dock', async () => {
+    renderCommandPalette();
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'fza' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+    expect(document.querySelector('[role="option"][data-value^="file-"]')).toBeNull();
+    expect(explorerRpc.searchFiles).not.toHaveBeenCalled();
   });
 });

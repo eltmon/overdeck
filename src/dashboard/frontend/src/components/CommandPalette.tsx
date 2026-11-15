@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import { openNewConversationDialog } from './newConversation/newConversationDialogStore';
 import { useFleetSearchActions } from './palette-fleet-hits';
+import { useFileProviderActions } from './palette/fileProvider';
 import { anywherePaletteActions, ANYWHERE_PALETTE_GROUP } from './palette-anywhere-actions';
 import { rememberRunSession } from './workspace/WorkspaceActionBand';
 import { isAgentRunningStatus } from '../lib/pipeline-state';
@@ -175,11 +176,12 @@ export function compareConversationActionsNewestFirst(a: PaletteAction, b: Palet
 
 // ─── Result-type scoping (filter chips) ─────────────────────────────────────────
 
-type PaletteScope = 'all' | 'actions' | 'commands' | 'issues' | 'workspaces' | 'conversations' | 'memory';
+type PaletteScope = 'all' | 'actions' | 'files' | 'commands' | 'issues' | 'workspaces' | 'conversations' | 'memory';
 
 const SCOPE_LABEL: Record<PaletteScope, string> = {
   all: 'All',
   actions: 'Actions',
+  files: 'Files',
   commands: 'Commands',
   issues: 'Issues',
   workspaces: 'Workspaces',
@@ -195,6 +197,7 @@ const PINNED_SCOPES: Exclude<PaletteScope, 'all'>[] = ['conversations'];
 
 /** Map a result group heading to the scope chip it belongs under. */
 function groupScope(group: string): Exclude<PaletteScope, 'all'> {
+  if (group === 'Files') return 'files'; // PAN-5289: the mounted work dock's files
   if (group === 'Conversations' || group.startsWith('On ')) return 'conversations';
   if (group.startsWith('Commands · ')) return 'commands';
   // PAN-1990: the workspaces-registry rail, distinct from the legacy "Active
@@ -767,6 +770,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
   // ─── Filter + group ───────────────────────────────────────────────────────
 
   const fleetActions = useFleetSearchActions(isOpen, debouncedQuery); // PAN-4651: hits from linked machines, "On <label>"
+  const fileActions = useFileProviderActions(isOpen, debouncedQuery); // PAN-5289: files of the mounted work dock's root
   const allActions = useMemo<PaletteAction[]>(() => [
     ...staticActions,
     ...commandActions,
@@ -775,7 +779,8 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     ...agentActions,
     ...memoryActions,
     ...fleetActions,
-  ], [staticActions, commandActions, workspaceActions, issueActions, agentActions, memoryActions, fleetActions]);
+    ...fileActions,
+  ], [staticActions, commandActions, workspaceActions, issueActions, agentActions, memoryActions, fleetActions, fileActions]);
 
   const filtered = useMemo(() => {
     const trimmed = query.trim();
@@ -788,7 +793,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     return allActions.filter((action) => {
       // Server-side search results are pre-matched against the query, so
       // include them unconditionally (sort handles ranking).
-      if (action.group === 'Conversations' || action.group === 'Memory' || action.group === 'Observations' || action.group === 'Memory · Summaries') {
+      if (action.group === 'Files' || action.group === 'Conversations' || action.group === 'Memory' || action.group === 'Observations' || action.group === 'Memory · Summaries') {
         return true;
       }
       return (
@@ -807,7 +812,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
   const groupOrder = useMemo(() => {
     const seen = new Set(filtered.map((a) => a.group));
     const ordered: string[] = [];
-    const preferred = ['Actions', 'Orchestration', 'Navigation', ANYWHERE_PALETTE_GROUP, 'Workspaces', 'Active Workspaces', 'Issues', 'Running Agents'];
+    const preferred = ['Files', 'Actions', 'Orchestration', 'Navigation', ANYWHERE_PALETTE_GROUP, 'Workspaces', 'Active Workspaces', 'Issues', 'Running Agents'];
     for (const g of preferred) if (seen.has(g)) { ordered.push(g); seen.delete(g); }
     const commandGroups = [...seen].filter((g) => g.startsWith('Commands · ')).sort();
     for (const g of commandGroups) { ordered.push(g); seen.delete(g); }
@@ -825,7 +830,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     // to be offered even when nothing else of that type is listed.
     for (const action of filtered) for (const s of action.alsoScopes ?? []) present.add(s);
     for (const s of PINNED_SCOPES) present.add(s);
-    const ordered = (['actions', 'commands', 'workspaces', 'issues', 'conversations', 'memory'] as const).filter((s) => present.has(s));
+    const ordered = (['actions', 'files', 'commands', 'workspaces', 'issues', 'conversations', 'memory'] as const).filter((s) => present.has(s));
     return ordered.length > 1 || PINNED_SCOPES.some((s) => present.has(s)) ? ['all', ...ordered] : [];
   }, [groupOrder, filtered]);
 

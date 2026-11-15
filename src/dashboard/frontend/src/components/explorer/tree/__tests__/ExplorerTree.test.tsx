@@ -68,6 +68,55 @@ describe('ExplorerTree', () => {
     expect(item('lib')).toHaveAttribute('aria-expanded', 'false')
   })
 
+  it('shows an extension label in place of the generic file glyph (PAN-5289)', () => {
+    renderTree({ rows: [row('x.ts'), row('notes')] })
+    expect(item('x.ts').textContent).toContain('TS')
+    expect(item('x.ts').querySelector('svg')).toBeNull()
+    expect(item('notes').querySelector('svg')).not.toBeNull()
+  })
+
+  it('indents 16 px per level and draws one guide per level (PAN-5289)', () => {
+    renderTree({ rows: [row('a/b/c.ts')] })
+    expect(item('c.ts')).toHaveStyle({ paddingLeft: '38px' })
+    const guides = item('c.ts').querySelectorAll('[data-indent-guide]')
+    expect(guides).toHaveLength(2)
+    expect((guides[0] as HTMLElement).style.left).toBe('13px')
+    expect((guides[1] as HTMLElement).style.left).toBe('29px')
+  })
+
+  it('leads folders with a chevron and files with a same-width spacer', () => {
+    renderTree()
+    expect(item('src').querySelector('[data-chevron="down"]')).not.toBeNull()
+    expect(item('lib').querySelector('[data-chevron="right"]')).not.toBeNull()
+    const spacer = item('a.ts').querySelector('[data-chevron-spacer]')
+    expect(spacer).not.toBeNull()
+    expect(spacer).toHaveClass('h-3.5', 'w-3.5')
+    expect(item('src').querySelector('[data-chevron]')).toHaveClass('h-3.5', 'w-3.5')
+  })
+
+  it('puts the git letter right after the name', () => {
+    renderTree({
+      decorations: buildDecorations({ entries: [{ path: 'src/a.ts', status: 'modified', staged: false }], committed: [] }),
+    })
+    const name = item('a.ts').querySelector('[data-row-name]')
+    expect(name?.nextElementSibling).toHaveAttribute('aria-label', 'git modified')
+    expect(name?.nextElementSibling).toHaveTextContent('M')
+    expect(name).not.toHaveClass('flex-1')
+  })
+
+  it('dots a file the conversation changed and the folders above it', () => {
+    renderTree({ changedPaths: new Set(['src/a.ts']) })
+    expect(item('a.ts').querySelector('[aria-label="Changed by this conversation"]')).toHaveClass('bg-primary', 'h-1.5', 'w-1.5')
+    expect(item('src').querySelector('[aria-label="Contains files this conversation changed"]')).not.toBeNull()
+    expect(item('b.ts').querySelector('[data-changed-here]')).toBeNull()
+    expect(item('lib').querySelector('[data-changed-here]')).toBeNull()
+  })
+
+  it('shows no dot without changed paths', () => {
+    renderTree({ changedPaths: new Set() })
+    expect(document.querySelectorAll('[data-changed-here]')).toHaveLength(0)
+  })
+
   it('colors a modified file with its letter and its folder in the warning color', () => {
     renderTree({
       decorations: buildDecorations({ entries: [{ path: 'src/a.ts', status: 'modified', staged: false }], committed: [] }),

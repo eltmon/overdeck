@@ -13,7 +13,6 @@ import { CommandPalette, type ConversationPaletteOpenRequest } from './component
 import { NO_PROJECT_KEY } from './components/CommandDeck/projectsData';
 import { IssueDrawer } from './components/drawer/IssueDrawer';
 import { IssueDrawerAvailableContext } from './components/drawer/issueDrawerAvailableContext';
-import { ConversationDock } from './components/dock/ConversationDock';
 import { ResumableSessionDialog } from './components/ResumableSessionDialog';
 import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar';
 import type { CreatedProject } from './components/project/new/useProjectCreateIntent';
@@ -846,8 +845,6 @@ export default function App() {
       <XBriefFullscreen />
       <TasksViewerHost />
       <PrdViewerHost />
-      {/* PAN-2908 C-CONVO: persistent conversation dock (level 2 · talk). */}
-      <ConversationDock />
       {/* Resume-session recovery: the 409 "has a resumable session" becomes a
           real dialog (Resume / Start fresh) instead of a CLI-text alert. */}
       <ResumableSessionDialog />

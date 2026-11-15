@@ -9,8 +9,12 @@
  *   2. explorer and code panes are retargeted (or closed when the deck
  *      already has the same pane on the edit root);
  *   3. the expanded-folder set is copied.
+ * A work-dock root override on the old root moves with them, keeping its anchor
+ * pane (PAN-5289 B-D16, B-D17), and the mounted dock follows a project root it
+ * was showing onto the edit root.
  * `leaveEditWorkspace` is the way back after a merge, discard or pipeline
- * send: it drops the edit root's drafts and points its panes at the project.
+ * send: it drops the edit root's drafts, clears dock overrides on the edit
+ * root and points its panes at the project.
  */
 import { toast } from 'sonner'
 
@@ -18,6 +22,8 @@ import { usePanesStore, type WorkspacePane } from '../../../lib/panesStore'
 import { draftKey, isDraftDirty, useCodeDrafts } from '../code/code-drafts'
 import { beginEdit, explorerErrorMessage, parseRootId, rootLabel } from '../explorer-rpc'
 import { useExplorerStore } from '../explorerStore'
+import { useActiveDock } from '../../dock/activeDock'
+import { useWorkDockStore } from '../../dock/workDockStore'
 import { useEditWorkspaceStore } from './edit-workspace-store'
 
 function splitDraftKey(key: string): { rootId: string; path: string } {
@@ -49,7 +55,16 @@ function retargetPanes(fromRootId: string, toRootId: string): void {
   }
 }
 
-/** Moves drafts, panes and the expanded set from one root to another. */
+/** Every deck whose dock override is `fromRootId` gets `toRootId` (undefined clears it); a moved override keeps its anchor. */
+function moveDockOverrides(fromRootId: string, toRootId: string | undefined): void {
+  const dock = useWorkDockStore.getState()
+  for (const [deckKey, state] of Object.entries(dock.byDeck)) {
+    if (state.rootOverride !== fromRootId) continue
+    dock.setRootOverride(deckKey, toRootId, toRootId === undefined ? undefined : state.rootOverrideAnchor)
+  }
+}
+
+/** Moves drafts, panes, dock overrides and the expanded set from one root to another. */
 export function switchRoot(fromRootId: string, toRootId: string, opts: { name?: string } = {}): void {
   const drafts = useCodeDrafts.getState()
   const name = opts.name ?? rootLabel(toRootId)
@@ -71,6 +86,7 @@ export function switchRoot(fromRootId: string, toRootId: string, opts: { name?: 
   }
 
   retargetPanes(fromRootId, toRootId)
+  moveDockOverrides(fromRootId, toRootId)
 
   const explorer = useExplorerStore.getState()
   const expanded = explorer.roots[fromRootId]?.expanded ?? []
@@ -101,6 +117,12 @@ export function ensureEditRoot(projectRootId: string, opts: { forceNew?: boolean
       const result = await beginEdit(projectKey, forceNew)
       if (!forceNew) switchRoot(projectRootId, result.rootId, { name: result.name })
       useEditWorkspaceStore.getState().setActive(projectKey, result.rootId)
+      // B-D16: a mounted dock showing the project root follows it onto the edit root,
+      // so a file created in the Files tab stays visible.
+      const mounted = useActiveDock.getState().current
+      if (!forceNew && mounted && mounted.rootId === projectRootId) {
+        useWorkDockStore.getState().setRootOverride(mounted.deckKey, result.rootId, mounted.activePaneId ?? undefined)
+      }
       return result.rootId
     } catch (error) {
       toast.error(`Couldn't create an edit workspace: ${explorerErrorMessage(error)}`)
@@ -119,10 +141,10 @@ export function ensureEditRoot(projectRootId: string, opts: { forceNew?: boolean
   return run
 }
 
-/** New edit workspace: points only this explorer pane at a fresh edit root (FR-13). */
-export async function openNewEditWorkspace(projectKey: string, deckKey: string, paneId: string): Promise<string> {
+/** New edit workspace: points only this deck's work dock at a fresh edit root (FR-13). */
+export async function openNewEditWorkspace(projectKey: string, deckKey: string): Promise<string> {
   const rootId = await ensureEditRoot(`project:${projectKey}`, { forceNew: true })
-  usePanesStore.getState().updatePane(deckKey, paneId, { explorerRootId: rootId })
+  useWorkDockStore.getState().setRootOverride(deckKey, rootId)
   return rootId
 }
 
@@ -131,6 +153,8 @@ export function leaveEditWorkspace(editRootId: string, projectKey: string): void
   for (const key of Object.keys(useCodeDrafts.getState().drafts)) {
     if (splitDraftKey(key).rootId === editRootId) useCodeDrafts.getState().drop(key)
   }
+  // Cleared, not moved: the dock follows the active tab again.
+  moveDockOverrides(editRootId, undefined)
   retargetPanes(editRootId, `project:${projectKey}`)
   if (useEditWorkspaceStore.getState().active[projectKey] === editRootId) {
     useEditWorkspaceStore.getState().setActive(projectKey, null)

@@ -8,7 +8,9 @@
  * context exists for semantic checks). Keybindings are registered per editor with `addAction`, never
  * `addCommand` (global across editors). App-level shortcuts go through
  * lib/shortcuts/registry.ts, whose capture-phase listener runs before Monaco
- * and wins over it (PAN-5287).
+ * and wins over it (PAN-5287). The four work-dock keys (Ctrl/⌘+Shift+E,
+ * Ctrl/⌘+Shift+G, Ctrl/⌘+Shift+F, Ctrl/⌘+P) are registry global shortcuts
+ * that win over Monaco by design (PAN-5284 D-7, PAN-5289).
  */
 import Editor, { type OnMount } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api.js'

@@ -65,7 +65,6 @@ function unsavedPathsIn(drafts: Record<string, CodeDraft>, rootId: string): stri
 export interface EditWorkspaceBannerProps {
   rootId: string
   deckKey: string
-  paneId: string
   /** Git status paths: uncommitted entries, then committed ones. */
   changedPaths: readonly string[]
   /** Git status shows uncommitted changes. */
@@ -79,7 +78,6 @@ export interface EditWorkspaceBannerProps {
 export function EditWorkspaceBanner({
   rootId,
   deckKey,
-  paneId,
   changedPaths,
   hasChanges,
   uncommittedPaths,
@@ -159,7 +157,7 @@ export function EditWorkspaceBanner({
   }
 
   const newWorkspace = () => {
-    void openNewEditWorkspace(projectKey, deckKey, paneId).catch(() => {}) // ensureEditRoot shows the toast
+    void openNewEditWorkspace(projectKey, deckKey).catch(() => {}) // ensureEditRoot shows the toast
   }
 
   return (

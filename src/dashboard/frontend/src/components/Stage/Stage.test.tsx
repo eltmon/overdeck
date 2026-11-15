@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactElement } from 'react'
@@ -6,6 +6,17 @@ import { Stage, type StageApi } from './index'
 import { usePanesStore } from '../../lib/panesStore'
 import { useTerminalStateStore, selectThreadTerminalState } from '../terminal/terminalStateStore'
 import { writePendingTerminal } from '../home/pendingTerminal'
+import { installWorkDockFetchMock } from '../../test-utils/strictFetchMock'
+
+// PAN-5289: the Stage mounts the work dock, which loads the project and workspace registries.
+let workDockFetch: ReturnType<typeof installWorkDockFetchMock>
+beforeEach(() => {
+  workDockFetch = installWorkDockFetchMock()
+})
+afterEach(async () => {
+  await workDockFetch.assertNoUnexpectedRequests()
+  vi.unstubAllGlobals()
+})
 
 // AgentPane pulls in ConversationPanel (heavy, needs many providers); stub it so
 // this test stays focused on the Stage's pane open/switch mechanics.

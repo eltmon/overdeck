@@ -29,7 +29,7 @@ import {
   type SplitPath,
 } from '../../lib/paneLayout'
 import { ForkModal } from '../CommandDeck/ForkModal'
-import { Bot, Terminal as TerminalIcon, Globe } from 'lucide-react'
+import { Bot, Terminal as TerminalIcon, Globe, FolderTree, GitCompare, Search } from 'lucide-react'
 import { PaneBar, type NewPaneAction } from './PaneBar'
 import { useStageShortcuts } from './useStageShortcuts'
 import { TerminalDrawer } from '../terminal/TerminalDrawer'
@@ -40,7 +40,6 @@ import { CommitsPane } from './panes/CommitsPane'
 import { PlanPane } from './panes/PlanPane'
 import { DocsPane } from './panes/DocsPane'
 import { AgentPane } from './panes/AgentPane'
-import { ExplorerPane } from '../explorer/ExplorerPane'
 import { BrowserPane } from './panes/BrowserPane'
 import { EditorPane } from './panes/EditorPane'
 import { CodePaneSlot } from '../explorer/code/CodePaneSlot'
@@ -48,6 +47,9 @@ import type { StageContext, PaneWrapperProps, StageApi } from './types'
 import { StageDeckProvider, type StageDeckContextValue, type OpenBesideInput, type OpenDockInput } from './StageDeckContext'
 import { openCodePane } from '../explorer/openCodePane'
 import { useWorkDockStore } from '../dock/workDockStore'
+import { WorkDock } from '../dock/WorkDock'
+import { useRootContext } from '../explorer/rootForConversation'
+import { findRegisteredProject } from '../CommandDeck/UnknownProjectState'
 import styles from './stage.module.css'
 
 export type { StageContext, PaneWrapperProps, StageApi } from './types'
@@ -117,8 +119,6 @@ function renderPane(pane: WorkspacePane, ctx: StageContext) {
       return <DocsPane pane={pane} ctx={ctx} />
     case 'agent':
       return <AgentPane pane={pane} ctx={ctx} />
-    case 'files':
-      return <ExplorerPane pane={pane} ctx={ctx} />
     case 'browser':
       return <BrowserPane pane={pane} ctx={ctx} />
     case 'editor':
@@ -220,17 +220,19 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
     const current = usePanesStore.getState().panesByWorkspace[deckKey] ?? []
     const seenConversationIds = new Set<string>()
     const ISSUE_SCOPED = new Set<PaneType>(['commits', 'plan', 'docs'])
+    let migratedRoot: string | null = null
     for (const p of current) {
       // Terminals are drawer-only now.
       if (p.paneType === 'terminal') {
         closePane(deckKey, p.paneId)
         continue
       }
-      // PAN-5186: the Files pane is the explorer, keyed by root. Migrate the
-      // legacy issue-scoped pane; close one with neither field.
-      if (p.paneType === 'files' && !p.explorerRootId) {
-        if (p.issueId) updatePane(deckKey, p.paneId, { explorerRootId: `issue:${p.issueId}` })
-        else closePane(deckKey, p.paneId)
+      // PAN-5289 (PAN-5284 D-3): the explorer is the dock's Files tab. Close every
+      // persisted Files pane; the last one with a root becomes the dock's root.
+      if (p.paneType === 'files') {
+        const root = p.explorerRootId ?? (p.issueId ? `issue:${p.issueId}` : null)
+        closePane(deckKey, p.paneId)
+        if (root) migratedRoot = root
         continue
       }
       // Issue-scoped panes created at project scope (no issueId) were broken —
@@ -245,7 +247,13 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
         else seenConversationIds.add(p.conversationId)
       }
     }
-  }, [deckKey, closePane, updatePane])
+    // The override belongs to the pane that is active after the closes (B-D17).
+    if (migratedRoot) {
+      const anchor = selectActivePaneId(deckKey)(usePanesStore.getState()) ?? undefined
+      useWorkDockStore.getState().setRootOverride(deckKey, migratedRoot, anchor)
+      useWorkDockStore.getState().openDock(deckKey, { tab: 'files' })
+    }
+  }, [deckKey, closePane])
 
   useStageShortcuts(deckKey)
 
@@ -306,9 +314,13 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
     [deckKey, setActivePane, addPane, updatePane],
   )
 
+  // The mounted WorkDock reads the store (PAN-5289).
+  const openDock = useCallback((input: OpenDockInput) => {
+    useWorkDockStore.getState().openDock(deckKey, input)
+  }, [deckKey])
   const api: StageApi = useMemo(
-    () => ({ deckKey, openPane, openTypedPane, openIssue, openOrFocusAgentPane, toggleTerminal, openTerminalDrawer }),
-    [deckKey, openPane, openTypedPane, openIssue, openOrFocusAgentPane, toggleTerminal, openTerminalDrawer],
+    () => ({ deckKey, openPane, openTypedPane, openIssue, openOrFocusAgentPane, toggleTerminal, openTerminalDrawer, openDock }),
+    [deckKey, openPane, openTypedPane, openIssue, openOrFocusAgentPane, toggleTerminal, openTerminalDrawer, openDock],
   )
 
   const ctx: StageContext = useMemo(
@@ -440,6 +452,8 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
   // PAN-1561: the "+" opens a menu of what to create, so it's explicit rather
   // than guessing. Fallback (⌘T / no menu) toggles the terminal drawer.
   const handleAddPane = useCallback(() => toggleTerminal(), [toggleTerminal])
+  // B-D11: the deck's project, found by key or name.
+  const deckProject = findRegisteredProject(useRootContext().projects, deckKey)
   const newActions = useMemo<NewPaneAction[]>(() => {
     const actions: NewPaneAction[] = []
     if (onCreateConversation) {
@@ -466,8 +480,22 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
       icon: Globe,
       onSelect: () => openPane({ paneType: 'browser', label: 'Web' }),
     })
+    // PAN-5289 (§6.10, FR-3): the work dock's entry points.
+    actions.push({ key: 'files', label: 'Files', icon: FolderTree, onSelect: () => openDock({ tab: 'files' }) })
+    if (deckProject) {
+      actions.push({
+        key: 'changes',
+        label: `Changes in ${deckProject.name || deckProject.key}`,
+        icon: GitCompare,
+        onSelect: () => {
+          useWorkDockStore.getState().setRootOverride(deckKey, `project:${deckProject.key}`, activeId || undefined)
+          openDock({ tab: 'changes' })
+        },
+      })
+    }
+    actions.push({ key: 'go-to-file', label: 'Go to file…', icon: Search, onSelect: () => useWorkDockStore.getState().setQuickOpen(deckKey, true) })
     return actions
-  }, [onCreateConversation, openOrFocusAgentPane, setTerminalOpen, deckKey, openPane])
+  }, [onCreateConversation, openOrFocusAgentPane, setTerminalOpen, deckKey, openPane, openDock, deckProject, activeId])
 
   // Display panes: drop `terminal` panes (drawer-only now) and resolve agent
   // tab labels from the live conversation title so tabs are distinguishable
@@ -552,10 +580,6 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
     },
     [deckKey, activeId, layout, panesById, setActivePane, setLayout],
   )
-  // Writes the dock store only until the dock UI lands (PAN-5287 S-D2).
-  const openDock = useCallback((input: OpenDockInput) => {
-    useWorkDockStore.getState().openDock(deckKey, input)
-  }, [deckKey])
   const deckContextValue: StageDeckContextValue = useMemo(
     () => ({ deckKey, openOrFocusEditorPane, openOrFocusAgentPane, revealPane, openBeside, openDock }),
     [deckKey, openOrFocusEditorPane, openOrFocusAgentPane, revealPane, openBeside, openDock],
@@ -688,36 +712,39 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
   return (
     <StageDeckProvider value={deckContextValue}>
       <div className={styles.stage}>
-        <PaneBar
-          panes={displayPanes}
-          activePaneId={activePane?.paneId ?? activePaneId}
-          onSelect={handleSelectPane}
-          onClose={handleClosePane}
-          onAdd={handleAddPane}
-          newActions={newActions}
-          onPaneContextMenu={handlePaneContextMenu}
-          onTabDragStart={setDraggingPaneId}
-          onTabDragEnd={() => setDraggingPaneId(null)}
-          onTabDetach={handleTabDetach}
-        />
-        <div className={styles.paneArea}>
-          {effectiveLayout && (
-            <PaneLayoutView
-              node={effectiveLayout}
-              path={[]}
-              panesById={panesById}
-              renderPaneContent={renderPaneContent}
-              focusedPaneId={focusedPaneId}
-              showHeaders={splitActive}
-              draggingPaneId={draggingPaneId}
-              onFocus={(id) => setActivePane(deckKey, id)}
-              onCloseLeaf={closeLeaf}
-              onRatioChange={onRatioChange}
-              onDropTab={onDropTab}
-            />
-          )}
+        <div className={styles.stageMain}>
+          <PaneBar
+            panes={displayPanes}
+            activePaneId={activePane?.paneId ?? activePaneId}
+            onSelect={handleSelectPane}
+            onClose={handleClosePane}
+            onAdd={handleAddPane}
+            newActions={newActions}
+            onPaneContextMenu={handlePaneContextMenu}
+            onTabDragStart={setDraggingPaneId}
+            onTabDragEnd={() => setDraggingPaneId(null)}
+            onTabDetach={handleTabDetach}
+          />
+          <div className={styles.paneArea}>
+            {effectiveLayout && (
+              <PaneLayoutView
+                node={effectiveLayout}
+                path={[]}
+                panesById={panesById}
+                renderPaneContent={renderPaneContent}
+                focusedPaneId={focusedPaneId}
+                showHeaders={splitActive}
+                draggingPaneId={draggingPaneId}
+                onFocus={(id) => setActivePane(deckKey, id)}
+                onCloseLeaf={closeLeaf}
+                onRatioChange={onRatioChange}
+                onDropTab={onDropTab}
+              />
+            )}
+          </div>
+          {terminalOpen && <TerminalDrawer threadId={deckKey} cwd={terminalCwd} />}
         </div>
-        {terminalOpen && <TerminalDrawer threadId={deckKey} cwd={terminalCwd} />}
+        <WorkDock deckKey={deckKey} activePane={activePane} layoutLeafIds={layoutLeafIds} panesById={panesById} conversations={conversations} />
 
         {tabMenu && tabMenuConv && (
           <ConversationActionMenu

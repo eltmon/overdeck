@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { PanRpcError, WS_METHODS } from '@overdeck/contracts'
 import { EditorPane } from './EditorPane'
@@ -6,6 +6,17 @@ import { useStageDeck, type StageDeckContextValue } from '../StageDeckContext'
 import { getConversationCitations, resetCitationStore } from '../../../lib/composerCitations'
 import type { StageContext } from '../types'
 import type { WorkspacePane } from '../../../lib/panesStore'
+import { installWorkDockFetchMock } from '../../../test-utils/strictFetchMock'
+
+// PAN-5289: the Stage mounts the work dock, which loads the project and workspace registries.
+let workDockFetch: ReturnType<typeof installWorkDockFetchMock>
+beforeEach(() => {
+  workDockFetch = installWorkDockFetchMock()
+})
+afterEach(async () => {
+  await workDockFetch.assertNoUnexpectedRequests()
+  vi.unstubAllGlobals()
+})
 
 const wsTransportMock = vi.hoisted(() => ({
   request: vi.fn(),

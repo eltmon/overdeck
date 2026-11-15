@@ -113,4 +113,37 @@ describe('ContentSearch', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close search' }))
     expect(props.onClose).toHaveBeenCalled()
   })
+
+  it('has no close button and ignores Escape without onClose (PAN-5289)', () => {
+    const { input } = renderSearch({ onClose: undefined })
+    expect(screen.queryByRole('button', { name: 'Close search' })).toBeNull()
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(screen.getByRole('textbox', { name: 'Search in files' })).toBeInTheDocument()
+  })
+
+  it('dots the result files the conversation changed', async () => {
+    rpc.searchContent.mockResolvedValue({
+      matches: [
+        { path: 'src/a.ts', line: 3, column: 5, preview: 'const foo = 1' },
+        { path: 'src/b.ts', line: 1, column: 1, preview: 'foo()' },
+      ],
+      truncated: false,
+    })
+    const { input } = renderSearch({ changedPaths: new Set(['src/a.ts']) })
+    type(input, 'foo')
+    await act(() => vi.advanceTimersByTimeAsync(300))
+    const [a, b] = screen.getAllByRole('group')
+    expect(within(a).getByLabelText('Changed by this conversation')).toHaveClass('bg-primary')
+    expect(within(b).queryByLabelText('Changed by this conversation')).toBeNull()
+  })
+
+  it('focuses the input when focusSignal changes', () => {
+    const props: ContentSearchProps = { rootId: 'issue:PAN-1', onScopeClear: vi.fn(), onPick: vi.fn(), focusSignal: 1 }
+    const { rerender } = render(<ContentSearch {...props} />)
+    const input = screen.getByRole('textbox', { name: 'Search in files' })
+    input.blur()
+    expect(document.activeElement).not.toBe(input)
+    rerender(<ContentSearch {...props} focusSignal={2} />)
+    expect(document.activeElement).toBe(input)
+  })
 })

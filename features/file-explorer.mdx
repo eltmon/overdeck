@@ -5,21 +5,51 @@ description: Browse, edit and ship changes to any project's files from the dashb
 
 # File explorer
 
-The file explorer shows a project's files in a tree beside your conversations. You can read any file, edit it in a full code editor, and turn your edits into a pull request without leaving the dashboard. The main checkout of a project is never changed by the explorer: edits made there go to a separate edit workspace.
+The file explorer shows a project's files in a panel beside your conversations. You can read any file, edit it in a full code editor, and turn your edits into a pull request without leaving the dashboard. The main checkout of a project is never changed by the explorer: edits made there go to a separate edit workspace.
 
-## Opening the explorer
+## Opening Files
 
-Click **Files** on a project home to browse the project's main checkout, or **Files** on an issue tab to browse that issue's workspace. Each deck keeps one explorer per root, so clicking **Files** again focuses the explorer that is already open instead of opening a second one.
+The explorer lives in the work dock, a panel on the right of the Command Deck's tab area. The dock has four tabs: **Files**, **Changes**, **Search** and **Live**. It keeps your conversation on screen, and a file you open from it opens beside the chat.
+
+Open the dock in any of these ways:
+
+- the Stage **+** menu: **Files**, **Changes in** your project, or **Go to file…**;
+- the **Files** button on a project home or on an issue overview;
+- `Ctrl+Shift+E` (`⌘⇧E` on macOS) to show or hide Files, `Ctrl+Shift+G` (`⌘⇧G`) to show or hide Changes, and `Ctrl+Shift+F` (`⌘⇧F`) to open Search.
+
+The dock follows the tab you are on. A conversation tab shows that conversation's folder, an issue tab shows the issue's workspace, a code tab shows its file's root and selects the file, and every other tab shows the project's main checkout. The line under the tabs names what the dock shows. Click the root name in the Files header to pin the dock to the main checkout or to one of the project's edit workspaces; **Follow the active tab** (or **Follow tab** on that line) undoes the pin. Drag the dock's left edge to resize it; the dock remembers its width and whether it was open.
+
+A conversation that runs on another machine, or in a folder outside every project, has no files here. The dock says so and offers **Open project files**.
 
 ## The tree
 
-Folders load when you expand them, so a large repository opens quickly. The eye button shows or hides dotfiles, and the **Changed** filter shows only the files git reports as changed.
+Folders load when you expand them, so a large repository opens quickly. Each file shows its type, folders show a chevron, and indent guides mark the depth. Git-ignored files are hidden until you turn them on.
 
-Files carry git colors and a status letter: `U` untracked, `A` added, `M` modified, `D` deleted, `R` renamed and `C` copied. A folder takes the color of its most important changed child, so you can find a change without expanding every folder. Ignored files and folders are dimmed.
+The **⋯ View options** menu holds the view choices: **Show all files**, **Only changed files**, **Only what this conversation changed** (on a conversation tab), **Show git-ignored files** and **Show dotfiles**, then **New folder**, **Expand all folders** and **Refresh**. A filtered tree shows a line such as "Showing changed files" with **Show all**.
+
+Files carry git colors and a status letter after the name: `U` untracked, `A` added, `M` modified, `D` deleted, `R` renamed and `C` copied. A folder takes the color of its most important changed child, so you can find a change without expanding every folder. A small dot marks the files the current conversation changed, and the folders that hold them.
 
 ## Search
 
-Press `Ctrl+P` (`⌘P` on macOS) to open quick open and jump to a file by name. Press `Ctrl+Shift+F` (`⌘⇧F` on macOS) to search file contents, or right-click a folder and choose **Find in folder** to search only inside it. Content search has toggles for case sensitivity and regular expressions, and a result opens the file at the matching line. See [Keyboard shortcuts](/features/keyboard-shortcuts).
+Press `Ctrl+P` (`⌘P` on macOS) anywhere in the Command Deck to open **Go to file**. An exact file name ranks first, then a name that starts with what you typed, a name that contains it, a path that contains it, and last a fuzzy match. Within each of those, files changed here rank first and carry a **changed here** tag. `Enter` opens the file beside the chat and `Shift+Enter` reveals it in Files. The `Ctrl+K` command palette also lists these files under **Files**.
+
+The **Search** tab searches file contents, with toggles for case sensitivity and regular expressions; a result opens the file at the matching line. Right-click a folder and choose **Find in folder** to search only inside it. See [Keyboard shortcuts](/features/keyboard-shortcuts).
+
+## Changes
+
+The **Changes** tab lists what changed in the dock's scope.
+
+- On a conversation tab, chips pick **This conversation**, **Last turn**, **Not committed** or **All of main today**. A **Not committed yet** group comes first, then one group per commit with its short hash, subject, whether it is pushed, and the time. In **All of main today** each commit names who made it.
+- On an issue or edit workspace, the groups are **Not committed yet** and **Committed on** the branch.
+- On a project, the tab lists today's commits on the default branch, plus the main checkout's uncommitted files.
+
+Each file row offers **Open diff**, **Open beside** and **Reveal in files**. An uncommitted file that other sessions also changed carries a note, for example "Shared file. 612 other uncommitted lines come from … Only this conversation's lines are counted."
+
+The diff view shows one file with previous and next buttons; `J` and `K` move through the list when you are not typing. Back returns to the list.
+
+## Live
+
+The **Live** tab shows the conversations you popped into the dock, with needs-you items first. It replaces the floating conversation dock, and it appears only when there is something to watch.
 
 ## Editing files
 
@@ -43,9 +73,9 @@ Drop files from your computer onto a folder to upload them. You can download a f
 
 ## Edit workspaces
 
-The explorer never changes a project's main checkout. When you first save a file or run a file action there, Overdeck creates an **edit workspace**: a git worktree on the branch `scratch/edit-<MMDD-HHMM>`, stored under the project's `workspaces/scratch-edit-*` directory and cut from the remote default branch. Your edit is saved there, and every explorer and code pane on the project switches to the edit workspace.
+The explorer never changes a project's main checkout. When you first save a file or run a file action there, Overdeck creates an **edit workspace**: a git worktree on the branch `scratch/edit-<MMDD-HHMM>`, stored under the project's `workspaces/scratch-edit-*` directory and cut from the remote default branch. Your edit is saved there, and the dock and every code pane on the project switch to the edit workspace.
 
-While a project has an edit workspace that is not merged or closed, later edits reuse it. **New edit workspace** starts a second one for the explorer pane you are in. A file that exists only in your main checkout, such as an untracked file or a commit you have not pushed, does not exist in the edit workspace, so the pane reports that the file no longer exists and keeps your text in memory.
+While a project has an edit workspace that is not merged or closed, later edits reuse it. **New edit workspace** starts a second one and points the dock at it. A file that exists only in your main checkout, such as an untracked file or a commit you have not pushed, does not exist in the edit workspace, so the pane reports that the file no longer exists and keeps your text in memory.
 
 ## Create PR and merge
 
@@ -56,6 +86,6 @@ You then choose how to ship the change. Both choices need a project with a GitHu
 - **Open PR** pushes the edit branch and opens a pull request to the default branch, optionally as a draft.
 - **Send through pipeline** creates a GitHub issue from the title and body, pushes the commit as that issue's feature branch, opens its PR, and hands it to Overdeck's review pipeline. It needs a project whose tracker is GitHub Issues and that has an issue prefix.
 
-While a PR is open, the dialog becomes **Commit and push**, which adds your newer edits to the same PR. The banner shows the PR with **Merge**, **Refresh** and **Push changes**. **Merge** squash-merges the PR only when GitHub reports it can merge and every edit is pushed; otherwise the button is disabled and the reason is shown, for example "Conflicts with the base branch" or "Required checks or reviews are not met". After a merge, the edit workspace is removed and the panes return to the main checkout.
+While a PR is open, the dialog becomes **Commit and push**, which adds your newer edits to the same PR. The banner shows the PR with **Merge**, **Refresh** and **Push changes**. **Merge** squash-merges the PR only when GitHub reports it can merge and every edit is pushed; otherwise the button is disabled and the reason is shown, for example "Conflicts with the base branch" or "Required checks or reviews are not met". After a merge, the edit workspace is removed and the dock and panes return to the main checkout.
 
 **Discard** lists the changes that will be lost and removes the edit workspace. While its PR is open, **Also close PR** (checked by default) closes the PR too.

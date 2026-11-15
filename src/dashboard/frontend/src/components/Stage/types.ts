@@ -1,6 +1,7 @@
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts'
 import type { WorkspacePane, WorkspaceId, PaneSpec, PaneType } from '../../lib/panesStore'
 import type { Conversation } from '../CommandDeck/ConversationList'
+import type { OpenDockInput } from '../dock/workDockStore'
 
 /** Backing data for an agent pane, resolved by the Stage mount point. */
 export interface AgentPaneData {
@@ -36,6 +37,8 @@ export interface StageApi {
   /** Open (never toggle closed) the terminal drawer (PAN-4280 D5a) — used
    * after writing a terminal hand-off so the drawer is guaranteed visible. */
   openTerminalDrawer: () => void
+  /** Open the work dock on a tab (PAN-5289); absent outside a Stage. */
+  openDock?: (input: OpenDockInput) => void
 }
 
 /**

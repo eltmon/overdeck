@@ -3,7 +3,8 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { PanRpcError } from '@overdeck/contracts';
 import type { ExplorerRoot } from '../roots.js';
-import { fuzzyScore, invalidateFileListCache, searchContent, searchFiles } from '../search.js';
+import { fileMatchTier, fuzzyScore, invalidateFileListCache, searchContent, searchFiles } from '../search.js';
+import fileMatchCases from '../../../../frontend/src/components/explorer/search/__tests__/file-match-cases.json';
 import { makeFixtureRepo, type FixtureRepo } from './fixture-repo.js';
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -81,6 +82,30 @@ describe('fuzzyScore and searchFiles', () => {
     await writeFile(join(repo.dir, 'three.txt'), '');
     now += 31_000;
     expect((await searchFiles(root, 'three', 50, clock)).paths).toEqual(['three.txt']);
+  });
+});
+
+describe('match tiers (PAN-5289 §6.6)', () => {
+  it.each(fileMatchCases as Array<{ path: string; query: string; tier: number | null }>)(
+    'agrees with the shared case table: $path ~ "$query" → $tier',
+    ({ path, query, tier }) => {
+      expect(fileMatchTier(path, query)).toBe(tier);
+    },
+  );
+
+  it('puts an exact file name before a shorter prefix match', async () => {
+    const { root } = await fixture({ 'src/a/b/c/foo.ts': '', 'foo.tsx': '', 'src/foo.tsx.snap': '' });
+    const { paths } = await searchFiles(root, 'foo.ts', 50);
+    expect(paths[0]).toBe('src/a/b/c/foo.ts');
+    expect(paths).toEqual(['src/a/b/c/foo.ts', 'foo.tsx', 'src/foo.tsx.snap']);
+  });
+
+  it('matches a slash query by path and keeps the fuzzy fallback', async () => {
+    const { root } = await fixture({ 'src/foo.ts': '', 'lib/src-foo.md': '', 'misc/zzz.txt': '' });
+    expect((await searchFiles(root, 'src/foo', 50)).paths).toEqual(['src/foo.ts']);
+    const fuzzy = (await searchFiles(root, 'sfo', 50)).paths;
+    expect(fuzzy).toEqual(expect.arrayContaining(['src/foo.ts', 'lib/src-foo.md']));
+    expect(fuzzy).not.toContain('misc/zzz.txt');
   });
 });
 

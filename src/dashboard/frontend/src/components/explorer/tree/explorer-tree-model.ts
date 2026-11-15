@@ -57,8 +57,10 @@ export function projectRows(input: {
   dirs: Readonly<Record<string, DirState>>
   expanded: ReadonlySet<string>
   showDotfiles: boolean
+  /** Git-ignored files and folders show only when true (PAN-5289). */
+  showIgnored: boolean
 }): ExplorerTreeItem[] {
-  const { dirs, expanded, showDotfiles } = input
+  const { dirs, expanded, showDotfiles, showIgnored } = input
   const rows: ExplorerTreeItem[] = []
 
   const walk = (dirPath: string, depth: number): void => {
@@ -67,6 +69,7 @@ export function projectRows(input: {
     const entries = [...dir.entries].sort(compareEntries)
     for (const entry of entries) {
       if (!showDotfiles && isDotName(entry.name)) continue
+      if (!showIgnored && entry.ignored) continue
       const isDir = entry.kind === 'dir'
       const open = isDir && expanded.has(entry.path)
       const child = dirs[entry.path]

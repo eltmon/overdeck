@@ -159,7 +159,7 @@ export interface MenuItemButtonProps extends ButtonHTMLAttributes<HTMLButtonElem
 }
 
 export const MenuItemButton = forwardRef<HTMLButtonElement, MenuItemButtonProps>(function MenuItemButton(
-  { children, className = '', destructive = false, active = false, type = 'button', ...props },
+  { children, className = '', destructive = false, active = false, type = 'button', role = 'menuitem', ...props },
   ref,
 ) {
   return (
@@ -167,7 +167,7 @@ export const MenuItemButton = forwardRef<HTMLButtonElement, MenuItemButtonProps>
       {...props}
       ref={ref}
       type={type}
-      role="menuitem"
+      role={role}
       className={classes(MENU_ITEM_CLASS, destructive ? MENU_DESTRUCTIVE_ITEM_CLASS : active ? 'text-primary' : MENU_ITEM_TEXT_CLASS, className)}
     >
       {children}
