@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5357",
   "created": "2026-11-15T15:33:34.867Z",
-  "updated": "2026-11-15T16:42:49.956Z",
+  "updated": "2026-11-15T16:44:26.358Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,9 +116,22 @@
       "doneAt": "2026-11-15T16:42:40.494Z"
     },
     "docs-sequencer-churn": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5357",
-      "claimedAt": "2026-11-15T16:42:49.955Z"
+      "claimedAt": "2026-11-15T16:42:49.955Z",
+      "doneAt": "2026-11-15T16:44:26.358Z"
+    },
+    "docs-sequencer-churn.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:44:26.358Z"
+    },
+    "docs-sequencer-churn.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:44:26.358Z"
+    },
+    "docs-sequencer-churn.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:44:26.358Z"
     }
   }
 }
