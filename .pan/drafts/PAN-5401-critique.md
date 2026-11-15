@@ -1,0 +1,7 @@
+plan-digest: 368d5e9ceed2a77276438fb412bedc0d8983674f477f531298b41ce4118f3213
+
+## blocks-the-design: Comment rejection can still close as skipped
+
+The PRD's Decision 4 and WI-1 explicitly leave `CHANGES_REQUESTED` comments out of row 1's negative verdict. In the proposed flow, a PR with raw `reviewDecision: ''` and a trusted `CHANGES_REQUESTED` marker has no `APPROVED` marker, so FR-5 skips `getPrFacts`; row 1 then treats the review as absent. If the tracker is closed and work has landed, `terminalVerdictSettlement` returns `skip` for that absent verdict (`src/lib/lifecycle/dod-gate.ts:375-387, 438-446`). A PR with an older APPROVED marker followed by a trusted CHANGES_REQUESTED marker also skips: `getPrFacts` selects the newest trusted marker and sets `facts.changesRequested` (`src/lib/cloister/pr-facts.ts:333-350, 417-442`), but WI-1 discards that result and falls through to settlement. The merge approval rule explicitly rejects `changesRequested` (`src/lib/cloister/approval-at-head.ts:42-45`). Thus the planned row can close work whose latest review verdict rejects it, while claiming to use the merge gate's review evidence.
+
+Smallest fix: read PR facts when either verdict marker is present; when the reader reports `facts.changesRequested`, pass `failed` to the existing settlement check and return `miss` unless explicitly accepted. Add tests for a CHANGES_REQUESTED-only comment and an APPROVED comment followed by CHANGES_REQUESTED, both with tracker-closed, landed-work settlement. Keep the current fallback for an unreadable facts result.

@@ -1,0 +1,304 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T23:04:09Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5401: Close-out rejects comment-posted review verdicts that the merge door accepts (DoD row 1 reads only reviewDecision)",
+    "updated": "2026-11-15T23:16:12.368Z"
+  },
+  "plan": {
+    "id": "pan-5401",
+    "title": "Close-out rejects comment-posted review verdicts that the merge door accepts (DoD row 1 reads only reviewDecision)",
+    "status": "proposed",
+    "uid": "b93aba63-6f47-47c7-a273-38f88b4eae2b",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-15T23:04:09Z",
+    "updated": "2026-11-15T23:16:12.368Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5401",
+        "label": "PAN-5401",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "close-out",
+      "dod-gate",
+      "review-verdict",
+      "pr-facts",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "Close-out DoD row 1 (checkVerdict review branch in src/lib/lifecycle/dod-gate.ts, line ~438) passes only on the raw PR's reviewDecision === 'APPROVED'. When the review agent cannot submit a formal GitHub review it posts '<!-- overdeck-verdict: APPROVED sha=<head> -->' as a comment. The merge gate reads that comment through getPrFacts (approvedAtHead) and merges, but row 1 still misses ('PR #12 reviewDecision: ; MISS' for OKF-11), so the Flywheel needs the operator-only --accept-review override for a review that really passed.",
+      "Proposal": "When the raw reviewDecision is neither APPROVED nor CHANGES_REQUESTED and some comment carries a verdict marker, row 1 runs the PR it already read through the merge gate's reader — getPrFacts(issueId, { fetchGitHubPr: async () => ({ issueId, pr }) }) — and passes when approvalProvenAtHead(facts) is true (trusted APPROVED marker whose sha= names the head). The reader is injected as an optional DodStatusRowDeps.readReviewFacts dep. A newest trusted CHANGES_REQUESTED comment (facts.changesRequested) is a negative verdict like a forge CHANGES_REQUESTED: no strike skip, no settlement skip, miss. A failed read appends 'review verdict comment unreadable: <error>' to observed and falls through to today's strike/settlement/miss logic. A null or empty reviewDecision renders as 'none'. pr-facts.ts is not changed (991/1000 lines). Docs: dod.ts row 1 expected text, a docs/MERGE-WORKFLOW.md paragraph, and changelog.d/pan-5401.md. Full detail with before/after code is in .pan/drafts/PAN-5401.md.",
+      "NonGoals": "- Row 1 must not read the pipeline journal's review.verdict entry.\n- Row 6 (main-verify) required-check defaults for non-Overdeck projects are not changed.\n- No line is added to or removed from src/lib/cloister/pr-facts.ts; the merge gate, getPrFacts, and marker trust rules are not changed.\n- Rows 2-9 and the --accept-* flags are not changed.\n- GitLab row 1 behavior (forgeMerge landing path) is not changed.\n- No second verdict parser or regex is written."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Accept only the PR comment marker evidence (approvalProvenAtHead via getPrFacts); do not read the pipeline journal.",
+        "rationale": "The issue offered the journal as an alternative, but the merge gate does not read it and CLAUDE.md makes the journal never authority; matching the merge gate's evidence exactly is the fix."
+      },
+      {
+        "summary": "Reuse the reader by calling getPrFacts with an injected fetchGitHubPr that returns the PR row 1 already read, instead of exporting a new helper from pr-facts.ts.",
+        "rationale": "pr-facts.ts is 991 lines against the 1000-line file-size ceiling with no allowlist row; injected deps also bypass the PR-facts cache and avoid a second gh call."
+      },
+      {
+        "summary": "A newest trusted CHANGES_REQUESTED verdict comment is row 1's negative verdict (revised after plan critique round 1).",
+        "rationale": "Row 1 claims the merge gate's evidence, and the merge gate refuses a PR whose newest trusted marker requests changes; letting settlement or the strike path skip it would close out rejected work."
+      },
+      {
+        "summary": "A failed verdict read falls through to today's row logic with the error appended to observed, rather than failing closed.",
+        "rationale": "The marker read only adds evidence; today's behavior is the floor. The PR-read failure path (PAN-4821) still fails closed because it runs earlier."
+      },
+      {
+        "summary": "Row 6 required-checks follow-up from the issue is out of scope.",
+        "rationale": "The issue labels it a follow-up worth considering and says okf's config was already fixed."
+      }
+    ],
+    "items": [
+      {
+        "id": "dod-review-comment-verdict",
+        "title": "Row 1 passes on a trusted APPROVED verdict comment naming the PR head, read through getPrFacts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T23:04:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5401",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod-gate.ts",
+            "tests/unit/lib/lifecycle/dod-gate-review-marker.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-gate-review-marker.test.ts tests/unit/lib/lifecycle/dod-gate.test.ts tests/unit/lib/lifecycle/dod-gate-pr-read.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size",
+            "npm run lint:circular",
+            "git diff --stat origin/main...HEAD -- src/lib/cloister/pr-facts.ts"
+          ],
+          "expected_outputs": [
+            "all three dod-gate test files pass, including tests T1-T5 in dod-gate-review-marker.test.ts",
+            "typecheck completes without errors",
+            "file-size guard passed",
+            "circular-deps check reports no new cycle",
+            "git diff --stat prints nothing for src/lib/cloister/pr-facts.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 (.pan/drafts/PAN-5401.md) exactly. In src/lib/lifecycle/dod-gate.ts: import approvalProvenAtHead, getPrFacts, parseVerdictMarker and type PrFacts from '../cloister/pr-facts.js'; add optional readReviewFacts?: (issueId, pr: IssuePullRequestData) => Promise<PrFacts> to DodStatusRowDeps; add readReviewFactsFromPr(issueId, pr) = getPrFacts(issueId, { fetchGitHubPr: async () => ({ issueId, pr }) }) and set it as defaultDeps.readReviewFacts; add commentApprovalAtHead(issueId, pr, deps) that returns not-approved without any read unless some comment's parseVerdictMarker(body) !== null (APPROVED or CHANGES_REQUESTED), then passes only when approvalProvenAtHead(facts) && facts.headSha, and reports facts.error or a thrown error as note 'review verdict comment unreadable: <message>'. In the checkVerdict review block change `pr.reviewDecision ?? 'none'` to `pr.reviewDecision || 'none'`, make observed a let, and when decision is neither APPROVED nor CHANGES_REQUESTED call commentApprovalAtHead: on approval return pass with observed `${observed}; Overdeck verdict comment approved head ${head.slice(0, 12)}`, else append the note (if any) and continue to the unchanged strike/settlement/miss logic. Never use facts.approved or facts.reviewDecision as the pass predicate. Add tests/unit/lib/lifecycle/dod-gate-review-marker.test.ts with tests T1-T5 as named in the PRD, mocking '../../../../src/lib/github-app-installations.js' appCoversRepo to false and injecting readReviewFacts built from the real getPrFacts with fetchGitHubPr and isAppConfigured: () => false injected. T5 must use T1's PR fixture so the APPROVED-marker guard lets the read run, with readReviewFacts resolving emptyPrFacts(id, 'boom'). Do not modify src/lib/cloister/pr-facts.ts or the existing dod-gate.test.ts."
+        },
+        "items": [
+          {
+            "id": "dod-review-comment-verdict.ac1",
+            "title": "Given a merged PR with reviewDecision '' and a trusted OWNER comment '<!-- overdeck-verdict: APPROVED sha=<head> -->' newer than the head commit, when checkReviewRow runs, then it returns status 'pass' with observed 'PR #12 reviewDecision: none; Overdeck verdict comment approved head <first 12 hex of head>' (test T1).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-review-comment-verdict.ac2",
+            "title": "Given the same PR but the APPROVED comment's sha= names a different commit, when checkReviewRow runs, then it returns status 'miss' with observed exactly 'PR #12 reviewDecision: none' (test T2).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-review-comment-verdict.ac3",
+            "title": "Given no comment whose first line is a verdict marker, or a forge reviewDecision of APPROVED or CHANGES_REQUESTED, when checkReviewRow runs, then the injected readReviewFacts mock is never called, forge APPROVED returns 'pass', and forge CHANGES_REQUESTED with a head-matching APPROVED comment returns 'miss' (tests T3, T4).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-review-comment-verdict.ac4",
+            "title": "Given T1's PR (head-matching APPROVED comment present) and readReviewFacts resolving emptyPrFacts(id, 'boom') or throwing Error('gh down'), when checkReviewRow runs, then it returns 'miss' with observed ending 'review verdict comment unreadable: boom' / '... gh down', and on a strike landing it returns 'skip' (test T5).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-review-comment-verdict.ac5",
+            "title": "git diff --stat origin/main...HEAD -- src/lib/cloister/pr-facts.ts prints nothing, npm run lint:file-size and npm run lint:circular exit 0, and the unchanged tests/unit/lib/lifecycle/dod-gate.test.ts passes with its existing observed-string assertions.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dod-review-comment-rejection",
+        "title": "A newest trusted CHANGES_REQUESTED verdict comment is row 1's negative verdict",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T23:04:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5401",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod-gate.ts",
+            "tests/unit/lib/lifecycle/dod-gate-review-marker.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-gate-review-marker.test.ts tests/unit/lib/lifecycle/dod-gate.test.ts tests/unit/lib/lifecycle/dod-gate-pr-read.test.ts",
+            "npm run typecheck",
+            "git diff --stat origin/main...HEAD -- src/lib/cloister/pr-facts.ts"
+          ],
+          "expected_outputs": [
+            "all three dod-gate test files pass, including tests T6-T9",
+            "typecheck completes without errors",
+            "git diff --stat prints nothing for src/lib/cloister/pr-facts.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 (.pan/drafts/PAN-5401.md). In src/lib/lifecycle/dod-gate.ts rename commentApprovalAtHead to commentReviewVerdict returning { kind: 'approved'; head } | { kind: 'changes-requested' } | { kind: 'none'; note? }, returning 'changes-requested' when facts.changesRequested (checked after facts.error, before approvalProvenAtHead). In the checkVerdict review block set `let rejected = decision === 'CHANGES_REQUESTED'`; when the comment verdict is 'changes-requested' set rejected = true and append '; Overdeck verdict comment requested changes' to observed; gate the strike skip on !rejected and pass `rejected ? 'failed' : undefined` to terminalVerdictSettlement. Use the exact final code block in the PRD. Add tests T6-T9 to tests/unit/lib/lifecycle/dod-gate-review-marker.test.ts using the real getPrFacts reader as in WI-1."
+        },
+        "items": [
+          {
+            "id": "dod-review-comment-rejection.ac1",
+            "title": "Given reviewDecision '' and only a trusted CHANGES_REQUESTED verdict comment, with settlement { trackerClosed: true, landedWork: true, mainVerifyStatus: 'pass' }, when checkReviewRow runs, then it returns status 'miss' with observed exactly 'PR #12 reviewDecision: none; Overdeck verdict comment requested changes' (test T6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-review-comment-rejection.ac2",
+            "title": "Given an APPROVED sha=<head> comment followed by a newer trusted CHANGES_REQUESTED comment and the same settlement, when checkReviewRow runs, then it returns status 'miss' (test T7).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-review-comment-rejection.ac3",
+            "title": "Given the CHANGES_REQUESTED-only PR and landing { strikeLanded: true }, when checkReviewRow runs, then it returns status 'miss', not 'skip' (test T8).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-review-comment-rejection.ac4",
+            "title": "Given the OKF-11 comment order (CHANGES_REQUESTED sha=<old> at 20:34:07, then APPROVED sha=<head> at 20:39:17), when checkReviewRow runs, then it returns status 'pass' (test T9).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dod-review-docs",
+        "title": "Row 1 expected text, MERGE-WORKFLOW paragraph, and changelog entry describe the comment-verdict evidence",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:04:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5401",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod.ts",
+            "docs/MERGE-WORKFLOW.md",
+            "changelog.d/pan-5401.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "npm run typecheck",
+            "grep -n 'PAN-5401' docs/MERGE-WORKFLOW.md",
+            "grep -n 'trusted Overdeck verdict comment approving the PR head' src/lib/lifecycle/dod.ts"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "typecheck completes without errors",
+            "grep finds the new MERGE-WORKFLOW paragraph",
+            "grep finds the new row 1 expected text in dod.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. (1) In src/lib/lifecycle/dod.ts DOD_ROWS row 'review', replace expected with 'review passed (forge approval, or a trusted Overdeck verdict comment approving the PR head), or tracker-closed with landed work and no negative review verdict'. (2) In docs/MERGE-WORKFLOW.md, directly after the paragraph beginning \"Close-out's DoD rows 1 (review) and 2 (tests) read the issue's PR from the forge, retrying once\", add the PRD's paragraph explaining that row 1 falls back to getPrFacts/approvalProvenAtHead (a trusted APPROVED sha=<head> comment), that a comment for another commit does not pass, that forge CHANGES_REQUESTED is never overridden, that a newest trusted CHANGES_REQUESTED comment is a negative verdict that neither the strike path nor settlement skips, that the journal is not read, and that a failed read falls back to strike/settlement rules, citing PAN-5401. (3) Create changelog.d/pan-5401.md with the '#### Fixed' bullet from the PRD."
+        },
+        "items": [
+          {
+            "id": "dod-review-docs.ac1",
+            "title": "DOD_ROWS row 'review' expected string in src/lib/lifecycle/dod.ts contains 'trusted Overdeck verdict comment approving the PR head', so pan close's gate table renders that text in the expected column.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-review-docs.ac2",
+            "title": "docs/MERGE-WORKFLOW.md contains a paragraph after the rows 1/2 PR-read paragraph that names approvalProvenAtHead, states a verdict comment for another commit does not pass row 1, and cites PAN-5401.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-review-docs.ac3",
+            "title": "changelog.d/pan-5401.md exists with a single '#### Fixed' heading and one bullet linking issue #5401, and npm run lint:docs exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "dod-review-comment-verdict",
+        "to": "dod-review-comment-rejection",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-15-PAN-5401-close-out-rejects-comment-posted-review-verdicts-that-the-merge-door-accepts-dod-row-1-reads-only-reviewdecision.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
