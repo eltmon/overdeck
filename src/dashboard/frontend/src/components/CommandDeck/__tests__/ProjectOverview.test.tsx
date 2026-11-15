@@ -215,37 +215,69 @@ describe('ProjectOverview', () => {
     expect(screen.getByText('Agents').parentElement).toHaveTextContent('3');
   });
 
-  it('renders pipeline rows with issue id, title, cost and session count', () => {
-    render(
-      <ProjectOverview
-        projectName="overdeck"
-        features={[
-          makeFeature({ issueId: 'PAN-1', title: 'First issue' }),
-          makeFeature({
-            issueId: 'PAN-2',
-            title: 'Second issue',
-            sessions: [{ type: 'work', presence: 'active', model: 'claude-sonnet-4-6' }] as ProjectFeature['sessions'],
-          }),
-        ]}
-        issueCosts={{ 'PAN-1': 1.25, 'PAN-2': 12.5 }}
-        onSelectFeature={() => {}}
-      />,
-    );
+  // PAN-5294 G-D8: full-width rows — id, full title, stage tag, who, age; no
+  // avatar, cost or session columns (per-issue spend moved to the tooltip).
+  it('renders pipeline rows with issue id, full title, stage tag, who and age', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-15T12:00:00Z'));
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: {
+        'PAN-1': derived({ issueId: 'PAN-1', state: 'working' }),
+        'PAN-2': derived({
+          issueId: 'PAN-2',
+          state: 'in-review',
+          pr: { url: 'https://example.com/pr/5127', number: 5127, reviewState: 'approved', checks: 'green', mergeable: true },
+        }),
+      },
+    });
+    try {
+      render(
+        <ProjectOverview
+          projectName="overdeck"
+          features={[
+            makeFeature({
+              issueId: 'PAN-1',
+              title: 'First issue with a long full title',
+              taskTotals: { total: 7, closed: 4, inProgress: 1, lastUpdated: '2026-11-15T11:00:00Z' },
+              sessions: [{
+                type: 'work',
+                presence: 'active',
+                model: 'claude-sonnet-4-6',
+                startedAt: '2026-11-15T10:00:00Z',
+              }] as ProjectFeature['sessions'],
+            }),
+            makeFeature({ issueId: 'PAN-2', title: 'Second issue' }),
+          ]}
+          issueCosts={{ 'PAN-1': 1.25 }}
+          onSelectFeature={() => {}}
+        />,
+      );
 
-    const row1 = rowFor('PAN-1');
-    expect(row1).toHaveTextContent('First issue');
-    expect(row1).toHaveTextContent('$1.25');
-    expect(row1).toHaveTextContent('0 sessions');
+      const row1 = rowFor('PAN-1');
+      expect(row1).toHaveAttribute('data-lane', 'building');
+      expect(within(row1).getByText('PAN-1')).toBeInTheDocument();
+      expect(within(row1).getByText('First issue with a long full title')).toBeInTheDocument();
+      expect(within(row1).getByText('building')).toBeInTheDocument();
+      expect(within(row1).getByText('sonnet-4-6 · 4 of 7 items')).toBeInTheDocument();
+      expect(within(row1).getByText('1 h')).toBeInTheDocument();
+      expect(row1.getAttribute('title')).toContain('spent $1.25');
+      expect(row1).not.toHaveTextContent('$1.25');
+      expect(row1).not.toHaveTextContent('sessions');
 
-    const row2 = rowFor('PAN-2');
-    expect(row2).toHaveTextContent('Second issue');
-    expect(row2).toHaveTextContent('$12.50');
-    expect(row2).toHaveTextContent('1 sessions');
+      const row2 = rowFor('PAN-2');
+      expect(row2).toHaveAttribute('data-lane', 'review');
+      expect(within(row2).getByText('in review')).toBeInTheDocument();
+      expect(within(row2).getByText('PR #5127 · checks green')).toBeInTheDocument();
+      expect(within(row2).getByText('—')).toBeInTheDocument();
+      expect(row2.getAttribute('title')).not.toContain('spent');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('calls onSelectFeature when a pipeline row is clicked', () => {
     const onSelectFeature = vi.fn();
-    const feature = makeFeature({ issueId: 'PAN-1', title: 'Click me' });
+    const feature = makeFeature({ issueId: 'PAN-1', title: 'Click me', agentStatus: 'running' });
     render(
       <ProjectOverview
         projectName="overdeck"
@@ -336,11 +368,15 @@ describe('ProjectOverview', () => {
       />,
     );
 
-    expect(screen.queryByRole('region', { name: /needs you pipeline stage/i })).not.toBeInTheDocument();
-    expect(rowFor('PAN-1')).toHaveTextContent('planning');
+    const row = rowFor('PAN-1');
+    expect(row).toHaveAttribute('data-needs-you', 'false');
+    expect(row).not.toHaveTextContent('needs you');
+    expect(row).toHaveTextContent('planning');
   });
 
-  it('shows stuck reasons as the row subline for blocked issues', () => {
+  // PAN-5294 G-D6/G-D8: the blocked tag is the row's one signal; the stuck
+  // reason stays one hover away in the row tooltip.
+  it('shows a blocked tag and the stuck reason in the row tooltip', () => {
     useDashboardStore.setState({
       derivedIssueStateByIssueId: {
         'PAN-1': derived({
@@ -364,8 +400,10 @@ describe('ProjectOverview', () => {
       />,
     );
 
-    expect(rowFor('PAN-1')).toHaveTextContent('Checks failing on the pull request');
-    expect(rowFor('PAN-2')).toHaveTextContent('Provider errors — the agent cannot make a call');
+    expect(within(rowFor('PAN-1')).getByText('blocked')).toBeInTheDocument();
+    expect(rowFor('PAN-1').getAttribute('title')).toBe('Checks failing on the pull request');
+    expect(within(rowFor('PAN-2')).getByText('blocked')).toBeInTheDocument();
+    expect(rowFor('PAN-2').getAttribute('title')).toBe('Provider errors — the agent cannot make a call');
   });
 
   it('summarizes current CI health from the forge', () => {
