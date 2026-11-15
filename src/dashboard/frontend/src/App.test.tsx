@@ -669,6 +669,54 @@ describe('App remembers the last project (PAN-5335 WI-5)', () => {
 
     expect(window.localStorage.getItem('overdeck.ui.lastProjectKey')).toBe('panopticon-cli');
   });
+
+  // Review finding (PAN-5335): validation checks the storage-derived key, not
+  // whatever is selected when the query resolves — an operator pick made in
+  // the meantime must not be clobbered.
+  it('keeps an operator pick made before the registered-projects query resolves', async () => {
+    window.localStorage.setItem('overdeck.ui.lastProjectKey', 'gone');
+    window.history.replaceState(null, '', '/flywheel');
+    let resolveRegistered!: (response: Response) => void;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/version') return new Response(JSON.stringify({ version: '0.5.0' }), { status: 200 });
+      if (url === '/api/tracker-status') return new Response(JSON.stringify({ primary: 'github', configured: [] }), { status: 200 });
+      if (url === '/api/confirmations') return new Response(JSON.stringify([]), { status: 200 });
+      if (url === '/api/registered-projects') return new Promise<Response>((resolve) => { resolveRegistered = resolve; });
+      return new Response(JSON.stringify([]), { status: 200 });
+    }));
+
+    renderApp();
+    fireEvent.click(screen.getByText('Left column conversation'));
+    expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli');
+
+    await act(async () => {
+      resolveRegistered(new Response(JSON.stringify([{ key: 'panopticon-cli', name: 'panopticon-cli', path: '/p' }]), { status: 200 }));
+    });
+
+    expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli');
+  });
+
+  // Review finding (PAN-5335): a registered-projects query error must not
+  // leave the validation pending forever, nor clear a stored selection it
+  // never got to check.
+  it('leaves a stored selection in place when the registered-projects query errors', async () => {
+    window.localStorage.setItem('overdeck.ui.lastProjectKey', 'panopticon-cli');
+    window.history.replaceState(null, '', '/activity');
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/version') return new Response(JSON.stringify({ version: '0.5.0' }), { status: 200 });
+      if (url === '/api/tracker-status') return new Response(JSON.stringify({ primary: 'github', configured: [] }), { status: 200 });
+      if (url === '/api/confirmations') return new Response(JSON.stringify([]), { status: 200 });
+      if (url === '/api/registered-projects') return new Response(JSON.stringify({ error: 'boom' }), { status: 500 });
+      return new Response(JSON.stringify([]), { status: 200 });
+    }));
+
+    renderApp();
+
+    await waitFor(() => expect(screen.getByTestId('activity-panel')).toHaveTextContent('panopticon-cli'));
+    expect(window.localStorage.getItem('overdeck.ui.lastProjectKey')).toBe('panopticon-cli');
+  });
 });
 
 describe('App kanban issue details', () => {
