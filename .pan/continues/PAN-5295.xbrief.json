@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5295",
   "created": "2026-11-15T19:39:19.043Z",
-  "updated": "2026-11-15T20:32:28.141Z",
+  "updated": "2026-11-15T20:32:33.319Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -286,6 +286,11 @@
     "rail-closed-default.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T20:32:28.141Z"
+    },
+    "tab-strip": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5295",
+      "claimedAt": "2026-11-15T20:32:33.319Z"
     }
   }
 }
