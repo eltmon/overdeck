@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5310",
   "created": "2026-11-14T22:39:01.503Z",
-  "updated": "2026-11-15T00:44:20.576Z",
+  "updated": "2026-11-15T00:44:28.439Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,11 @@
     "fe-issue-view-closed-now-release.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T00:44:20.576Z"
+    },
+    "fe-status-narrative-closed": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5310",
+      "claimedAt": "2026-11-15T00:44:28.439Z"
     }
   }
 }
