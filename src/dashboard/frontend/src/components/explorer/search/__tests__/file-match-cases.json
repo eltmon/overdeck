@@ -1,0 +1,17 @@
+[
+  { "path": "src/foo.ts", "query": "foo.ts", "tier": 0 },
+  { "path": "foo", "query": "foo", "tier": 0 },
+  { "path": "src/components/QuickOpen.tsx", "query": "quickopen.tsx", "tier": 0 },
+  { "path": "src/foo.ts", "query": "foo", "tier": 1 },
+  { "path": "src/FooBar.ts", "query": "FOOB", "tier": 1 },
+  { "path": "src/FooBar.ts", "query": "bar", "tier": 2 },
+  { "path": "docs/README.md", "query": "  adme ", "tier": 2 },
+  { "path": "src/foo/index.ts", "query": "foo", "tier": 3 },
+  { "path": "src/lib/foo.ts", "query": "lib/foo", "tier": 3 },
+  { "path": "src/lib/foo.ts", "query": "src/", "tier": 3 },
+  { "path": "src/components/explorer/QuickOpen.tsx", "query": "cmpqo", "tier": 4 },
+  { "path": "src/lib/foo.ts", "query": "s l f", "tier": 4 },
+  { "path": "src/lib/foo.ts", "query": "sl/f", "tier": 4 },
+  { "path": "src/foo.ts", "query": "zzz", "tier": null },
+  { "path": "src/foo.ts", "query": "   ", "tier": null }
+]
