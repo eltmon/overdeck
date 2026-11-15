@@ -769,6 +769,21 @@ describe('ConversationPanel rename flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
     expect(screen.queryByRole('menuitem', { name: /^Copy session id/ })).toBeNull();
   });
+
+  it('offers Copy session id from claudeSessionId when the row has no session file (PAN-5334)', async () => {
+    renderPanel({ ...mockConversation, claudeSessionId: 'abc12345-0000-0000-0000-000000000000' });
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    const item = screen.getByRole('menuitem', { name: /^Copy session id/ });
+    expect(item).toHaveTextContent('abc12345');
+    fireEvent.click(item);
+    expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith('abc12345-0000-0000-0000-000000000000');
+  });
+
+  it('hides Copy session id when claudeSessionId equals the name (PAN-5334)', () => {
+    renderPanel({ ...mockConversation, claudeSessionId: 'test-conv' });
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    expect(screen.queryByRole('menuitem', { name: /^Copy session id/ })).toBeNull();
+  });
 });
 
 describe('ConversationPanel resume message control', () => {

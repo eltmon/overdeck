@@ -1,0 +1,319 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T10:29:23Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5334: Workflow redesign D1 follow-up: commits wrongly 'not pushed' in detached worktrees, branch reads HEAD, Copy session id never shows",
+    "updated": "2026-11-15T10:33:16.514Z"
+  },
+  "plan": {
+    "id": "pan-5334",
+    "title": "Workflow redesign D1 follow-up: commits wrongly 'not pushed' in detached worktrees, branch reads HEAD, Copy session id never shows",
+    "status": "running",
+    "uid": "97cb03fd-84c3-478d-a114-00872abd0b71",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-15T10:29:23Z",
+    "updated": "2026-11-15T10:33:16.514Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5334",
+        "label": "PAN-5334",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5334/.pan/drafts/pan-5334.md",
+        "label": "PRD draft (.pan/drafts/pan-5334.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "conversation-header",
+      "git",
+      "dashboard",
+      "workflow-redesign"
+    ],
+    "narratives": {
+      "Problem": "Three defects in the PAN-5291 conversation header. (1) listLocalShas in src/lib/overdeck/conversation-change-commits.ts runs `git rev-list @{u}..HEAD`; a detached HEAD has no upstream, so every commit reports pushed:false and the status line says 'N commits not pushed' for commits already on origin (handoff worktrees are detached on purpose). (2) ConversationBranchMeta.tsx renders branch 'HEAD' literally for a detached checkout. (3) ConversationHeaderMenu.tsx derives the Copy session id value from conversation.sessionFile, which /api/conversations never sends, so the item never renders even though rows carry claudeSessionId.",
+      "Proposal": "Follow the PRD .pan/drafts/pan-5334.md decisions D-1..D-3. In listLocalShas, when @{u} fails and `git remote` lists at least one remote, fall back to `git rev-list HEAD --not --remotes` and return hasUpstream:true; with no remote keep hasUpstream:false. In ConversationBranchMeta render 'detached' with title 'Detached HEAD · <cwd>' when branch === 'HEAD'. In ConversationHeaderMenu compute sessionId = claudeSessionId ?? sessionFile basename ?? null, keeping the show-only-when-differs-from-name rule. Update features/conversations.mdx, docs/DASHBOARD-ARCHITECTURE.md and add changelog.d/pan-5334.md.",
+      "NonGoals": "- Do not change listLocalShas behaviour when @{u} resolves; `git rev-list @{u}..HEAD` stays the first query.\n- Do not rename the hasUpstream field or change the ChangeCommit contract.\n- Do not show which remote branch holds a detached HEAD's commits.\n- Do not change the ⋯ menu height or layout.\n- Do not change COMMIT_RESULT_LINE to match git's `[detached HEAD <sha>]` line; tool-output detection of commits made while detached is a separate follow-up.\n- Do not add sessionFile to /api/conversations rows; the fix reads claudeSessionId on the client.\n- No execSync anywhere; async execFile only.\n- Do not edit changelog.mdx directly."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Lowered the existing PRD .pan/drafts/pan-5334.md after verifying every file/line reference and the live /api/conversations row for 20261115-4cbc (claudeSessionId present, sessionFile absent, branch 'HEAD').",
+        "rationale": "The PRD was accurate against feature/pan-5334 at 93f8cc05d8f; rewriting it would add no information."
+      },
+      {
+        "summary": "WI-3 extends src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx instead of adding a new ConversationHeaderMenu test file.",
+        "rationale": "That file already holds the PAN-5291 Copy session id cases and is already in scripts/frontend-test-subset.txt, so no subset-list edit is needed and the fallback case stays next to the new cases."
+      },
+      {
+        "summary": "PRD AC-5 (live check on :3011) is a post-deploy check for the epic owner, not an item acceptance criterion.",
+        "rationale": "It needs a merged and deployed build; a pending item AC the work agent cannot close would block pan done."
+      },
+      {
+        "summary": "No dependency edges between the four items.",
+        "rationale": "They touch disjoint files and none consumes another's output, so they may run in parallel."
+      }
+    ],
+    "items": [
+      {
+        "id": "push-fallback",
+        "title": "listLocalShas falls back to --not --remotes when HEAD has no upstream",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T10:29:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5334",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-change-commits.ts",
+            "tests/unit/lib/overdeck/conversation-change-commits.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-change-commits.test.ts tests/unit/lib/overdeck/conversation-changes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-change-commits.test.ts and conversation-changes.test.ts pass, including the new detached-HEAD case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/lib/overdeck/conversation-change-commits.ts, function listLocalShas (grep `export async function listLocalShas`), keep the first try (`git rev-list @{u}..HEAD`, hasUpstream:true). Replace the catch body with a nested try: run `git(repoRoot, ['remote'])`, split on newlines and drop blank lines; if none, return { shas: new Set(), hasUpstream: false }; otherwise run `git(repoRoot, ['rev-list', 'HEAD', '--not', '--remotes'])` and return { shas: <trimmed non-empty lines>, hasUpstream: true }. If either fallback command throws, return { shas: new Set(), hasUpstream: false }. Use the existing async `git` helper only (no execSync). Update the JSDoc on listLocalShas and the module header line that reads `` `pushed` is \"not in `git rev-list @{u}..HEAD`\"; without an upstream every commit is local. `` to say: without an upstream, a commit counts as pushed when any remote-tracking ref contains it (`git rev-list HEAD --not --remotes`); with no remote every commit is local; hasUpstream means the shas set is meaningful. Do not change callers (conversation-change-commits.ts `pushed: local.hasUpstream && ...` and conversation-changes.ts line ~276). In tests/unit/lib/overdeck/conversation-change-commits.test.ts add `it('counts a commit on a remote-tracking ref as pushed when HEAD is detached', …)` inside describe('listConversationCommits'): commit `first` with trailer `Overdeck-Conversation: conv-detached`, init a bare origin under `root`, `git remote add origin`, `git push --quiet -u origin main`, commit `second` with the same trailer (not pushed), then `git checkout --quiet --detach` (temp test repo, the file already strips git-guard from PATH). Assert listLocalShas(repo) returns hasUpstream true and shas equal [second.sha], and listConversationCommits({ repoRoot: repo, sessionName: 'conv-detached', since: SINCE, parsed: null }).commits mapped to [sha, pushed] equals [[second.sha, false], [first.sha, true]]. The existing 'marks commits on the upstream pushed …; without an upstream every commit is local' test must pass unchanged (its no-upstream step has no remote). Check how the existing tests reset the repo between cases (beforeEach) and follow it."
+        },
+        "items": [
+          {
+            "id": "push-fallback.ac1",
+            "title": "Given a detached HEAD whose parent commit is on origin/main and whose tip is unpushed, when listLocalShas runs, then it returns hasUpstream true and a shas set containing only the tip sha",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-fallback.ac2",
+            "title": "Given the same detached repo, listConversationCommits returns [[second.sha, false], [first.sha, true]] for sha/pushed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-fallback.ac3",
+            "title": "Given a repo with no remote and no upstream, listLocalShas still returns hasUpstream false and every commit reports pushed false, and the existing push test keeps its assertions unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-fallback.ac4",
+            "title": "conversation-change-commits.ts uses only the async execFile-based git helper for the fallback; `grep -n execSync src/lib/overdeck/conversation-change-commits.ts` returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "detached-label",
+        "title": "Status line renders 'detached' instead of the branch name HEAD",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T10:29:23Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5334",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ConversationBranchMeta.tsx",
+            "src/dashboard/frontend/src/components/chat/header/__tests__/ConversationStatusLine.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/header/__tests__/ConversationStatusLine.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConversationStatusLine.test.tsx passes, including the new branch 'HEAD' case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In src/dashboard/frontend/src/components/chat/ConversationBranchMeta.tsx add `const detached = conversation.branch === 'HEAD';`. Render the inner truncate span text as `{detached ? 'detached' : conversation.branch}` and set the outer span title to `detached ? `Detached HEAD · ${conversation.cwd}` : `${conversation.isWorktree ? 'Worktree' : 'Local'} · ${conversation.cwd}``. Keep the GitFork icon rule unchanged. Update the component's JSDoc to mention the detached label. In src/dashboard/frontend/src/components/chat/header/__tests__/ConversationStatusLine.test.tsx add a case next to `it('shows the branch in mono with the Local/Worktree word in its tooltip'`: render with branch 'HEAD'; assert getByText('detached') exists, its parent element's title starts with 'Detached HEAD · ', and queryByText('HEAD') is null. Every other branch value renders unchanged (existing test stays green)."
+        },
+        "items": [
+          {
+            "id": "detached-label.ac1",
+            "title": "Given conversation.branch === 'HEAD', the status line renders the text 'detached' and no element with text 'HEAD'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detached-label.ac2",
+            "title": "Given conversation.branch === 'HEAD' and cwd '/x', the branch span's title attribute equals 'Detached HEAD · /x'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detached-label.ac3",
+            "title": "Given branch 'main' on a worktree, the existing tooltip test still passes with title 'Worktree · <cwd>' and text 'main'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "session-id-source",
+        "title": "Copy session id reads claudeSessionId with a sessionFile fallback",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T10:29:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5334",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/header/ConversationHeaderMenu.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/ConversationPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConversationPanel.test.tsx passes, including the two new PAN-5334 Copy session id cases and the two existing PAN-5291 cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In src/dashboard/frontend/src/components/chat/header/ConversationHeaderMenu.tsx replace `const sessionId = conversation.sessionFile?.split('/').pop()?.replace('.jsonl', '') ?? null;` with `const sessionId = conversation.claudeSessionId ?? conversation.sessionFile?.split('/').pop()?.replace('.jsonl', '') ?? null;` and update the comment above it to say the value comes from claudeSessionId (which /api/conversations rows carry), falling back to the session file basename. Leave the render rule `sessionId && sessionId !== conversation.name` unchanged. In src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx, next to `it('offers Copy session id only when the session file id differs from the name (PAN-5291)'`, add: (a) `it('offers Copy session id from claudeSessionId when the row has no session file (PAN-5334)'` rendering `{ ...mockConversation, claudeSessionId: 'abc12345-0000-0000-0000-000000000000' }`, opening the button named 'More conversation actions', asserting the menuitem /^Copy session id/ has text 'abc12345', clicking it and asserting navigator.clipboard.writeText was last called with the full id; (b) `it('hides Copy session id when claudeSessionId equals the name (PAN-5334)'` rendering `{ ...mockConversation, claudeSessionId: 'test-conv' }` and asserting the menuitem is absent. Do not create a new test file and do not edit scripts/frontend-test-subset.txt (the file is already listed)."
+        },
+        "items": [
+          {
+            "id": "session-id-source.ac1",
+            "title": "Given a row with claudeSessionId 'abc12345-…' and no sessionFile, opening ⋯ renders a 'Copy session id' menuitem showing 'abc12345', and clicking it copies the full claudeSessionId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-id-source.ac2",
+            "title": "Given claudeSessionId equal to conversation.name, the ⋯ menu renders no 'Copy session id' menuitem",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-id-source.ac3",
+            "title": "Given only sessionFile '/x/abc12345-0000.jsonl', the existing PAN-5291 test still passes: the item falls back to the basename and copies 'abc12345-0000'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-changelog",
+        "title": "Document the detached label, pushed fallback and session id source; add changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T10:29:23Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5334",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "changelog.d/pan-5334.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. (1) features/conversations.mdx, section '### The header and status line': at the end of the paragraph that starts 'The second row is the status line.' add the sentences: 'In a detached checkout the branch reads **detached**. When the checkout has no upstream branch, as in a detached checkout, a commit counts as pushed when any remote branch has it.' In the ⋯ menu list change '(the agent's session file id, shown only when it differs from the name)' to '(the agent's session id, shown only when it differs from the name)'. (2) docs/DASHBOARD-ARCHITECTURE.md, section '## Conversation header (PAN-5291)': after the paragraph starting '**One shared query.**' add a paragraph starting '**Pushed without an upstream (PAN-5334).**' stating that listLocalShas uses `git rev-list @{u}..HEAD`, and when @{u} does not resolve and the repo has a remote it falls back to `git rev-list HEAD --not --remotes`; with no remote every commit is not pushed; a detached checkout's branch renders as `detached`; Copy session id reads `claudeSessionId`, falling back to the `sessionFile` basename. (3) Create changelog.d/pan-5334.md per changelog.d/README.md: a single '#### Fixed' heading with three '- **Bold lead:** …' bullets (commits already on a remote no longer show as not pushed in a detached worktree; a detached checkout's branch reads detached instead of HEAD; ⋯ → Copy session id now appears), each ending with '([#5334](https://github.com/eltmon/overdeck/issues/5334))'. Do not edit changelog.mdx."
+        },
+        "items": [
+          {
+            "id": "docs-changelog.ac1",
+            "title": "features/conversations.mdx contains the sentence 'In a detached checkout the branch reads **detached**.' and the ⋯ list describes Copy session id as 'the agent's session id'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a paragraph starting '**Pushed without an upstream (PAN-5334).**' that names `git rev-list HEAD --not --remotes` and `claudeSessionId`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac3",
+            "title": "changelog.d/pan-5334.md exists with one '#### Fixed' heading and three bullets linking #5334, and `npm run lint:docs` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-11-15-PAN-5334-workflow-redesign-d1-follow-up-commits-wrongly-not-pushed-in-detached-worktrees-branch-reads-head-copy-session-id-never-shows.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}
