@@ -1525,8 +1525,12 @@ lands only in `spawn.log`.
 Auto-resume is intentionally suppressible:
 
 - **Boot no-resume:** `OVERDECK_NO_RESUME=1`, `pan dev --no-resume`, or
-  `pan up --no-resume` disables orphan recovery and stopped-agent
-  auto-resume for that dashboard boot only.
+  `pan up --no-resume` marks a human-driven boot. For that dashboard boot
+  only, the deacon-lite routine `resumeCrashedWorkAgents` (PAN-5354, see
+  "Deacon-lite: nine routines") resumes no crashed work agent, and no
+  autonomous backlog sequencer pass runs. Nothing else auto-resumes a stopped
+  agent: the orphan recovery and stopped-agent auto-resume this flag used to
+  disable were deleted in PAN-3917.
 - **Manual pause:** `pan pause <id> [--reason <text>]` persists `paused`
   fields in `~/.overdeck/agents/<agent-id>/state.json` and stops the agent
   if it is running. `pan unpause <id>` clears the gate without spawning.
@@ -2174,10 +2178,14 @@ Every surface reads that one rule:
 The journal dies with the workspace, so an issue whose workspace is gone has no
 open decision.
 
-## Deacon-lite: eight routines
+## Deacon-lite: nine routines
 
-`runDeaconLite()` runs on a 60s tick and holds eight routines, all of which only
-observe and nudge — none reconciles a stored copy of anything:
+`runDeaconLite()` runs on a 60s tick and holds the routines below. None
+reconciles a stored copy of anything. Most only observe and nudge; the
+recovery routines re-dispatch or resume, each behind its own gates. Every
+action line a routine returns is written to `~/.overdeck/logs/deacon.log`
+with a `[deacon-lite]` prefix (PAN-5354), so a confirmed death or a recovery
+leaves a trace:
 
 1. `checkStuckWorkAgents` — one nudge per hour to an idle work agent with
    unpushed commits.
@@ -2218,9 +2226,31 @@ observe and nudge — none reconciles a stored copy of anything:
    never produced output, and escalates a second failure to the operator.
    It only considers a reviewer that is actually live; a rejected kickoff
    (PAN-4506) never started one, so this routine never sees it.
+9. `resumeCrashedWorkAgents` (`cloister/crashed-work-resume.ts`, PAN-5354) —
+   runs right after `reconcileAgentLiveness` and resumes, through
+   `resumeAgent`, a work agent whose harness died with no recorded stop (a
+   host crash, an OOM of the terminal-backend unit, power loss). Its
+   candidates come from `detectCrashedAgents`. It resumes an agent only when
+   every guard holds:
+   - The agent is confirmed dead on two consecutive ticks at least 60 s
+     apart, and is absent from the selected backend's inventory. A null
+     inventory or a `runtime-indeterminate` verdict is not a death.
+   - No deliberate stop is recorded for its launch generation
+     (`readRecordedAgentStopAt`).
+   - The `autonomous` resume gate proceeds. A paused, troubled,
+     stopped-by-user or failure-backoff agent is never resumed; a
+     stopped-by-user agent raises one Needs-you item.
+   - The issue is open and not merged.
+   - The deacon is not frozen and the boot is not `--no-resume`.
+   - The memory governor admits (`assessMemoryPressure()` band `ok`).
+
+   It attempts at most one resume per tick and per minute, oldest
+   `lastActivity` first. Each launch generation gets one automatic attempt;
+   a failed attempt raises one Needs-you item naming the agent and the reason,
+   and the routine does not retry it. The stall sweeper stays report-only.
 
 While the Deacon is frozen (`deacon.globally_paused`), `runDeaconLite()`
-returns before any of the eight routines run — none of them fires at all
+returns before any of the routines run — none of them fires at all
 until it thaws (PAN-4210).
 
 `recoverStalledReviews` reads the journal and the issue pause gate
