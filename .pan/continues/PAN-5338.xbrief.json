@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5338",
   "created": "2026-11-15T11:36:37.856Z",
-  "updated": "2026-11-15T14:29:32.477Z",
+  "updated": "2026-11-15T14:29:40.187Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,6 +72,11 @@
     "preview-body.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T14:29:32.477Z"
+    },
+    "file-bar": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5338",
+      "claimedAt": "2026-11-15T14:29:40.187Z"
     }
   },
   "agentModel": "claude-sonnet-5"
