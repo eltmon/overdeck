@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5394",
   "created": "2026-11-15T20:23:02.963Z",
-  "updated": "2026-11-15T20:25:09.489Z",
+  "updated": "2026-11-15T20:25:34.046Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,6 +40,11 @@
     "fairness-siblings-wait.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T20:25:09.489Z"
+    },
+    "memory-admission-wait": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5394",
+      "claimedAt": "2026-11-15T20:25:34.045Z"
     }
   }
 }
