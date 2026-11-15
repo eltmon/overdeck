@@ -168,4 +168,12 @@ describe('expandAll', () => {
     const load = async (path: string) => (path === '' ? [dirEntry('a'), dirEntry('b'), dirEntry('c')] : [])
     expect(await expandAll({ start: '', load, showDotfiles: true, cap: 2 })).toEqual({ expanded: ['a', 'b'], capped: true })
   })
+
+  it('never expands .git even with showDotfiles true (PAN-5329)', async () => {
+    const load = vi.fn(async (path: string) => (path === '' ? [dirEntry('.git'), dirEntry('.github')] : []))
+    const out = await expandAll({ start: '', load, showDotfiles: true })
+    expect(out.expanded).toContain('.github')
+    expect(out.expanded).not.toContain('.git')
+    expect(load).not.toHaveBeenCalledWith('.git')
+  })
 })
