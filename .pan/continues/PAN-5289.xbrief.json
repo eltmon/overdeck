@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5289",
   "created": "2026-11-15T02:58:13.006Z",
-  "updated": "2026-11-15T03:24:29.398Z",
+  "updated": "2026-11-15T03:24:37.353Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -108,6 +108,11 @@
     "dock-shell.ac5": {
       "status": "completed",
       "doneAt": "2026-11-15T03:24:29.398Z"
+    },
+    "files-pane-migration": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5289",
+      "claimedAt": "2026-11-15T03:24:37.353Z"
     }
   }
 }
