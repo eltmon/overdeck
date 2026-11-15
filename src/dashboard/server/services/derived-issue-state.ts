@@ -42,7 +42,6 @@ export {
   forgeForProject,
   issueIdFromBranch,
   listOpenPullRequestsForProject,
-  listReadyIssuesForProject,
   listRepoPullRequests,
   listRepoPullRequestsStaleOk,
   loadIssueStateFacts,
@@ -60,9 +59,9 @@ export {
   type IssueStateFacts,
   type IssueStateLoaderDeps,
   type LoadedPr,
-  type ReadyIssue,
   type TrackerIssueFacts,
 } from '../../../lib/overdeck/derived-issue-state.js';
+export { listReadyIssuesForProject, type ReadyIssue } from '../../../lib/overdeck/ready-set.js';
 
 /** The cached tracker row for one issue, or null when no tracker has it. */
 function cachedTrackerIssue(issueId: string): TrackerIssueFacts | null {
