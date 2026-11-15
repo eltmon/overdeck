@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   discardEditWorkspace: vi.fn(),
   createEditWorkspacePr: vi.fn(),
   leaveEditWorkspace: vi.fn(),
-  openNewEditWorkspace: vi.fn(),
+  beginEdit: vi.fn(),
   toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn() }),
 }))
 
@@ -20,13 +20,20 @@ vi.mock('../edit-workspace-http', async (importOriginal) => ({
   discardEditWorkspace: mocks.discardEditWorkspace,
   createEditWorkspacePr: mocks.createEditWorkspacePr,
 }))
-vi.mock('../edit-workspace-switch', () => ({
+// PAN-5289: New edit workspace runs the real openNewEditWorkspace (it moves the dock root);
+// only the server call is stubbed.
+vi.mock('../edit-workspace-switch', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../edit-workspace-switch')>()),
   leaveEditWorkspace: mocks.leaveEditWorkspace,
-  openNewEditWorkspace: mocks.openNewEditWorkspace,
+}))
+vi.mock('../../explorer-rpc', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../explorer-rpc')>()),
+  beginEdit: mocks.beginEdit,
 }))
 
 import { draftKey, useCodeDrafts } from '../../code/code-drafts'
 import { EditWorkspaceBanner } from '../EditWorkspaceBanner'
+import { useWorkDockStore } from '../../../dock/workDockStore'
 
 const SENTENCE = 'Editing in edit workspace edit-1113-1405 (branch scratch/edit-1113-1405). The main checkout is not changed.'
 const OPEN_PR = {
@@ -51,7 +58,7 @@ function renderBanner() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={client}>
-      <EditWorkspaceBanner rootId="workspace:w1" deckKey="deck" paneId="f1" changedPaths={['README.md']} hasChanges={false} uncommittedPaths={[]} />
+      <EditWorkspaceBanner rootId="workspace:w1" deckKey="deck" changedPaths={['README.md']} hasChanges={false} uncommittedPaths={[]} />
     </QueryClientProvider>,
   )
 }
@@ -63,11 +70,14 @@ function answerStatus(body: unknown, statusCode = 200) {
 
 beforeEach(() => {
   vi.stubGlobal('fetch', (url: string) => mocks.fetchEditWorkspaceStatus(url))
-  for (const fn of [mocks.fetchEditWorkspaceStatus, mocks.mergeEditWorkspace, mocks.discardEditWorkspace, mocks.createEditWorkspacePr, mocks.leaveEditWorkspace, mocks.openNewEditWorkspace]) fn.mockReset()
+  for (const fn of [mocks.fetchEditWorkspaceStatus, mocks.mergeEditWorkspace, mocks.discardEditWorkspace, mocks.createEditWorkspacePr, mocks.leaveEditWorkspace, mocks.beginEdit]) fn.mockReset()
   mocks.toast.mockReset()
   mocks.toast.success.mockReset()
   mocks.toast.error.mockReset()
-  mocks.openNewEditWorkspace.mockResolvedValue('workspace:w2')
+  mocks.beginEdit.mockResolvedValue({
+    rootId: 'workspace:w2', workspaceId: 'w2', name: 'edit-2', branch: 'scratch/edit-2', path: '/p/workspaces/scratch-edit-2', created: true,
+  })
+  useWorkDockStore.setState({ byDeck: {} })
   useCodeDrafts.setState({ drafts: {} })
 })
 
@@ -79,7 +89,8 @@ describe('EditWorkspaceBanner', () => {
     expect(screen.getByRole('button', { name: 'Create PR' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Discard' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'New edit workspace' }))
-    expect(mocks.openNewEditWorkspace).toHaveBeenCalledWith('p', 'deck', 'f1')
+    expect(mocks.beginEdit).toHaveBeenCalledWith('p', true)
+    await waitFor(() => expect(useWorkDockStore.getState().byDeck.deck?.rootOverride).toBe('workspace:w2'))
   })
 
   it('renders nothing for a workspace that is not an edit workspace', async () => {

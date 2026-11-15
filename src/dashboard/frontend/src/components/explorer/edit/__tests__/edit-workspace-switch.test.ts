@@ -16,7 +16,9 @@ import { selectPanesForWorkspace, usePanesStore } from '../../../../lib/panesSto
 import { draftKey, isDraftDirty, useCodeDrafts } from '../../code/code-drafts'
 import { useExplorerStore } from '../../explorerStore'
 import { useEditWorkspaceStore } from '../edit-workspace-store'
-import { ensureEditRoot, leaveEditWorkspace, switchRoot } from '../edit-workspace-switch'
+import { ensureEditRoot, leaveEditWorkspace, openNewEditWorkspace, switchRoot } from '../edit-workspace-switch'
+import { useWorkDockStore } from '../../../dock/workDockStore'
+import { useActiveDock, type ActiveDock } from '../../../dock/activeDock'
 
 const DECK = 'deck-1'
 const PROJECT = 'project:p'
@@ -50,6 +52,8 @@ beforeEach(() => {
   useCodeDrafts.setState({ drafts: {} })
   useExplorerStore.setState({ roots: {} })
   useEditWorkspaceStore.setState({ creating: {}, active: {}, pending: {} })
+  useWorkDockStore.setState({ byDeck: {} })
+  useActiveDock.setState({ current: null })
 })
 
 describe('switchRoot', () => {
@@ -174,5 +178,55 @@ describe('switchRoot with a clean source', () => {
     expect(useCodeDrafts.getState().drafts[draftKey(EDIT, 'README.md')]?.text).toBe('unsaved in edit root\n')
     expect(useCodeDrafts.getState().drafts[draftKey(PROJECT, 'README.md')]).toBeUndefined()
     expect(mocks.warning).not.toHaveBeenCalled()
+  })
+})
+
+describe('work dock overrides follow edit workspaces (PAN-5289 B-D16)', () => {
+  const result = {
+    rootId: EDIT,
+    workspaceId: 'w1',
+    name: 'edit-1113-1405',
+    branch: 'scratch/edit-1113-1405',
+    path: '/p/workspaces/scratch-edit-1113-1405',
+    created: true,
+  }
+  const dock = () => useWorkDockStore.getState().byDeck[DECK]
+  function mounted(rootId: string | null): ActiveDock {
+    return { deckKey: DECK, activePaneId: 'chat-1', rootId, changedPaths: new Set(), openFile: () => {}, revealFile: () => {} }
+  }
+
+  it('moves an override on the old root with its anchor, and leaving clears it', () => {
+    useWorkDockStore.getState().setRootOverride(DECK, PROJECT, 'pane-a')
+    switchRoot(PROJECT, EDIT)
+    expect(dock()).toMatchObject({ rootOverride: EDIT, rootOverrideAnchor: 'pane-a' })
+    leaveEditWorkspace(EDIT, 'p')
+    expect(dock().rootOverride).toBeUndefined()
+    expect(dock().rootOverrideAnchor).toBeUndefined()
+  })
+
+  it('leaves another root override alone', () => {
+    useWorkDockStore.getState().setRootOverride(DECK, 'issue:X')
+    switchRoot(PROJECT, EDIT)
+    expect(dock().rootOverride).toBe('issue:X')
+  })
+
+  it('points a mounted dock showing the project root at the edit root, anchored to its active pane', async () => {
+    mocks.beginEdit.mockResolvedValue(result)
+    useActiveDock.getState().set(mounted(PROJECT))
+    await ensureEditRoot(PROJECT)
+    expect(dock()).toMatchObject({ rootOverride: EDIT, rootOverrideAnchor: 'chat-1' })
+  })
+
+  it('does not touch a mounted dock showing another root', async () => {
+    mocks.beginEdit.mockResolvedValue(result)
+    useActiveDock.getState().set(mounted('issue:X'))
+    await ensureEditRoot(PROJECT)
+    expect(dock()?.rootOverride).toBeUndefined()
+  })
+
+  it('New edit workspace sets the deck dock override to the fresh root', async () => {
+    mocks.beginEdit.mockResolvedValue({ ...result, rootId: 'workspace:w2', workspaceId: 'w2' })
+    expect(await openNewEditWorkspace('p', DECK)).toBe('workspace:w2')
+    expect(dock().rootOverride).toBe('workspace:w2')
   })
 })

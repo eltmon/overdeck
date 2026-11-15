@@ -505,8 +505,6 @@ export function ExplorerFiles({ rootId, deckKey, onFindInFolder }: ExplorerFiles
         <EditWorkspaceBanner
           rootId={rootId}
           deckKey={deckKey}
-          // edit-workspace-dock drops paneId: a new edit workspace moves the dock root instead.
-          paneId=""
           changedPaths={changedPaths}
           hasChanges={uncommittedPaths.length > 0}
           uncommittedPaths={uncommittedPaths}
