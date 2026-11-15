@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T15:52:52.948155Z · model: claude-opus-5-5 · open: 904_
+_Last sequenced: 2026-11-15T15:55:01.403534Z · model: claude-opus-5-5 · open: 906_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -22,6 +22,7 @@ _Last sequenced: 2026-11-15T15:52:52.948155Z · model: claude-opus-5-5 · open: 
 | 15 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
 | 16 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 17 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
+| 18 | PAN-5369 | M | critical | ok |  |  | Dashboard main thread pinned at 100%: orphan scan re-queries SQLite for 4000 transcripts per tick; cost/usage routes never answer. |
 | 20 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 21 | PAN-5347 | S | medium | ok |  |  | In pipeline: composer / menu lists no skills; add them from /api/skills/overrides under a labeled Skills group |
 | 21 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
@@ -222,6 +223,7 @@ _Last sequenced: 2026-11-15T15:52:52.948155Z · model: claude-opus-5-5 · open: 
 | 215 | PAN-4364 | S | medium | ok |  |  | GPT-6 catalog: gpt-6-sol misclassed frontier and OpenAI tierModels still remap to GPT-5.6; prerequisites have closed |
 | 216 | PAN-3196 | S | high | ok |  |  | Root-owned container residue makes close-out die on EACCES after passing every DoD row; same family as PAN-3570. |
 | 217 | PAN-3186 | XS | high | ok |  |  | One configured non-git member (auricle/infra) blanks pipeline membership for the whole project the resolver claims it can answer. |
+| 218 | PAN-5370 | S | medium | ok |  |  | Workflow-redesign live-check fixes: Issues header overlap, breadcrumb clips file name, Spend fact never times out, More wraps. |
 | 219 | PAN-3185 | XS | high | ok |  |  | Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail. |
 | 220 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time with no production-reach check, so members read shipped while prod serves the old build. |
 | 221 | PAN-5335 | M | high | ok |  |  | Workflow redesign F follow-up: collapse handoff groups, unclipped cost, footer label, one current nav item, keep project. |
@@ -980,6 +982,10 @@ Operator decision 2026-10-04 after the Flywheel closed 19 deployed issues by han
 
 pan spawn is the foreman's pane-only item worker, so parallel waves cannot run any item through it on either backend. The test suite never asserts argv, so it stayed green. Small fix with a clear expected behavior.
 
+### PAN-5369 (rank 18)
+
+New issue with a profiled root cause: 42% of main-thread CPU goes to an unindexed per-transcript lookup on every conversation poll tick, which starves /api/costs/summary, /api/fleet/usage and /api/health. It degrades every dashboard surface and blocks PAN-5370 item 3 from being observable, so it ranks beside the other event-loop fix PAN-4544.
+
 ### PAN-4544 (rank 20)
 
 Follow-up to PAN-4543, which fixed the summary route. The Pipeline view polls this route in the background, so every poll freezes all HTTP and WebSocket traffic for ~1.6 s and can fail DoD health probes. The async reader already exists, so the fix is small.
@@ -1228,10 +1234,6 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
 
 New this pass. A completed-handoff agent owed rework after a blocked verdict cannot be started at all: pan start refuses and recommends --fresh, --fresh gives the identical refusal, and reset-session is refused too because the durable plane reconstructs the session pointer. The refusal message names an action the operator cannot take, which is the self-contradictory-deadlock family PAN-3526 opened.
 
-### PAN-3522 (rank 80)
-
-New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts through a new generation's 138-second boot warm phase and killed it anyway, producing four restarts in ten minutes, racing spawns on port 3012, and a WATCHDOG GIVING UP. Each restart re-triggered docker stack rebuilds, feeding the storm. The probe budget has to know the difference between starved and starting.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1239,10 +1241,10 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T15:52:52.948155Z",
+  "generatedAt": "2026-11-15T15:55:01.403534Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 904,
+  "openCount": 906,
   "nodes": [
     {
       "issue": "PAN-5337",
@@ -12499,6 +12501,32 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "rationale": "Back in the manifest after dropping out of the last two passes; restored with its prior node. In-pipeline bug with a file:line root cause (switch falls back to a stale 5 s server board cache after the POST settles). Placed in a free top-tier slot near PAN-5364, which edits the same ProjectTrainCard.tsx; high rather than critical because the write itself succeeds.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-5369",
+      "rank": 18,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Dashboard main thread pinned at 100%: orphan scan re-queries SQLite for 4000 transcripts per tick; cost/usage routes never answer.",
+      "rationale": "New issue with a profiled root cause: 42% of main-thread CPU goes to an unindexed per-transcript lookup on every conversation poll tick, which starves /api/costs/summary, /api/fleet/usage and /api/health. It degrades every dashboard surface and blocks PAN-5370 item 3 from being observable, so it ranks beside the other event-loop fix PAN-4544.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5370",
+      "rank": 218,
+      "size": "S",
+      "importance": "medium",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Workflow-redesign live-check fixes: Issues header overlap, breadcrumb clips file name, Spend fact never times out, More wraps.",
+      "rationale": "New child of epic PAN-5284 with four concrete UI defects and testable acceptance; placed just ahead of the epic node with its sibling children.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13751,6 +13779,27 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     {
       "from": "PAN-5363",
       "to": "PAN-5364",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-5284",
+      "to": "PAN-5370",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5369",
+      "to": "PAN-5370",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4544",
+      "to": "PAN-5369",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
