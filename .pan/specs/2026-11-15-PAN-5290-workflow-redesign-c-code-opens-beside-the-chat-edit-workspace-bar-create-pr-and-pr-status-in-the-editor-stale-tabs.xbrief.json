@@ -4,17 +4,17 @@
     "created": "2026-11-15T11:12:43Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5290: Workflow redesign C: code opens beside the chat; edit-workspace bar, Create PR and PR status in the editor; stale tabs",
-    "updated": "2026-11-15T11:22:49.624Z"
+    "updated": "2026-11-15T11:23:58.936Z"
   },
   "plan": {
     "id": "pan-5290",
     "title": "Workflow redesign C: code opens beside the chat; edit-workspace bar, Create PR and PR status in the editor; stale tabs",
-    "status": "proposed",
+    "status": "running",
     "uid": "fef233a1-ac8e-43c1-8007-aca6d67da9a2",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T11:12:43Z",
-    "updated": "2026-11-15T11:22:49.624Z",
+    "updated": "2026-11-15T11:23:58.936Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5290",
@@ -1139,5 +1139,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
