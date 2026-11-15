@@ -176,6 +176,16 @@ test('Review opens the dock diff view on the turn\'s first file with i/N', async
   await expect(dock(page).getByTestId('dock-diff-position')).toHaveText(`1/${numbers.files}`, { timeout: 30_000 });
 });
 
+test('Show in files opens the Files tab filtered to this conversation', async ({ page }) => {
+  await openDeck(page);
+  await openConversation(page);
+  await closeDock(page);
+
+  await card(page).getByRole('button', { name: 'Show in files' }).click();
+  await expect(dock(page).getByRole('tab', { name: /^Files/ })).toHaveAttribute('aria-selected', 'true', { timeout: 30_000 });
+  await expect(dock(page).getByTestId('explorer-filter-line')).toContainText('Showing files this conversation changed', { timeout: 30_000 });
+});
+
 test('the docs/shared.md chip in a tool row opens its diff in the dock', async ({ page }) => {
   await openDeck(page);
   await openConversation(page);
@@ -223,6 +233,12 @@ test('tabs show no shortcut chip or Chat <id> label, and N tabs lists them', asy
     expect(text).not.toContain('⌘');
     expect(text).not.toMatch(/^Chat /);
   }
+  // D2-16: a conversation tab clamps to 120–230 px.
+  const widths = await page.getByRole('tab', { name: /Fixture conversation/ }).first().evaluate((el) => {
+    const style = getComputedStyle(el);
+    return { min: style.minWidth, max: style.maxWidth };
+  });
+  expect(widths).toEqual({ min: '120px', max: '230px' });
   await page.getByRole('button', { name: `${count} tabs, list all tabs` }).click();
   await expect(page.getByRole('menu', { name: 'All tabs' }).getByRole('menuitemradio')).toHaveCount(count);
   await page.keyboard.press('Escape');
