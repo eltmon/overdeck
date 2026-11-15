@@ -140,8 +140,17 @@
       "reVerify": false,
       "addedAt": "2026-11-15T10:25:17.937Z",
       "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5335",
+      "lane": "A",
+      "order": 13,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-15T10:54:14.777Z",
+      "addedBy": "conv-20261113-6031"
     }
   ],
   "createdAt": "2026-11-14T19:17:57.102Z",
-  "updatedAt": "2026-11-15T10:25:17.937Z"
+  "updatedAt": "2026-11-15T10:54:14.777Z"
 }
