@@ -1,0 +1,327 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T15:27:08Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5363: Merge train board: per-project Train switch flips back on after turning it off, then off again (board cache not dropped on write)",
+    "updated": "2026-11-15T15:35:32.175Z"
+  },
+  "plan": {
+    "id": "pan-5363",
+    "title": "Merge train board: per-project Train switch flips back on after turning it off, then off again (board cache not dropped on write)",
+    "status": "running",
+    "uid": "285b775c-f0a3-42d8-81cf-3ddaaa227e67",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-15T15:27:08Z",
+    "updated": "2026-11-15T15:35:32.175Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5363",
+        "label": "PAN-5363",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5363.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "merge-train",
+      "dashboard",
+      "react-query",
+      "cache",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "Turning a project's Train switch off on the merge train board shows off, flips back on, then off again. The switch falls back to the stale cached board as soon as the POST resolves (onSuccess does not wait or patch), and the refetch is served from a server board cache (5 s TTL, single-flight) that POST /api/projects/:projectKey/merge-train never drops, so it returns a read that started before the write. The project settings disclosure writes the same field but refreshes only its own query, so the two surfaces disagree until their own polls.",
+      "Proposal": "Server: call invalidateMergeTrainBoardCache() right after setProjectMergeTrain in projects-merge-train.ts (drops cached and in-flight reads). Client: add useApplyProjectTrainWrite to useMergeTrainBoard.ts that cancels in-flight board and settings reads, patches override/enabled for the project in every cached board placement from the POST answer {value, effective}, sets ['project-merge-train', key], then invalidates both keys without awaiting. The board Train switch and the project settings disclosure both return this helper from onSuccess. Regression tests render MergeTrain through the board query. Docs: docs/MERGE-TRAIN.md and changelog.d/pan-5363.md.",
+      "NonGoals": "- Another browser tab's in-flight board read still shows the old value until that tab's next poll.\n- CLI writes from another process are not pushed to the dashboard; they show after the 5 s board TTL.\n- The project auto-merge-default write (stale board mode) is not changed.\n- No subscription of the board cache to subscribeProjectsConfigInvalidation.\n- No local 'hold the clicked value until the board agrees' state in ProjectTrainCard.\n- No change to the master switch, GET /api/merge-train/config, or the POST request/response shape.\n- No new HTTP route."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Server fix: invalidateMergeTrainBoardCache() after setProjectMergeTrain in the route, as the issue proposes.",
+        "rationale": "It mirrors merge-policy-write.ts:98, uses the existing includeInFlight drop, and is the narrowest change; subscribing to projects-config invalidation is broader and still misses cross-process CLI writes."
+      },
+      {
+        "summary": "Client fix: patch caches from the POST answer in onSuccess (cancel, patch, invalidate), not in onMutate and not by awaiting the refetch.",
+        "rationale": "The issue recommends patching as safer. The answer {value, effective} maps 1:1 to the board row {override, enabled}, so no rollback is needed; awaiting the refetch would disable the switch for up to ~11 s."
+      },
+      {
+        "summary": "Regression tests model the real race (post-write refetch pending; a read in flight at click time resolving stale) rather than the issue's literal 'refetch after the POST returns the old override'.",
+        "rationale": "A board response fetched after the write is authoritative once the server drops its cache; holding a local value against it could stick forever. Recorded as PRD D7."
+      },
+      {
+        "summary": "One shared helper in useMergeTrainBoard.ts used by both writers.",
+        "rationale": "Both writers already import that module, so there is no new import edge; two hand-rolled copies would drift."
+      }
+    ],
+    "items": [
+      {
+        "id": "server-drop-board-cache",
+        "title": "Drop the board cache after POST /api/projects/:projectKey/merge-train writes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T15:27:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5363",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/projects-merge-train.ts",
+            "src/dashboard/server/routes/__tests__/projects-merge-train.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/projects-merge-train.test.ts",
+            "npm run lint:circular",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "projects-merge-train.test.ts: 3 tests pass",
+            "lint:circular reports no new cycle",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 (.pan/drafts/PAN-5363.md). In src/dashboard/server/routes/projects-merge-train.ts add `import { invalidateMergeTrainBoardCache } from '../services/merge-train-board.js';` and call `invalidateMergeTrainBoardCache();` on the line right after `yield* Effect.promise(() => setProjectMergeTrain(key, v));` (currently line 49), with a PAN-5363 comment. Never call it before the write or on the 400/404/auth paths. Update the header comment. Checkpoint: run `npm run lint:circular`; if it reports a new cycle, switch to the dynamic import `const { invalidateMergeTrainBoardCache } = yield* Effect.promise(() => import('../services/merge-train-board.js'));` like the existing merge-sync import. Create src/dashboard/server/routes/__tests__/projects-merge-train.test.ts modeled on merge-train-lanes.test.ts (vi.hoisted mocks; requests carry `Content-Type: application/json` plus `[INTERNAL_TOKEN_HEADER]: 'test-token'` with OVERDECK_INTERNAL_TOKEN='test-token' - rejectUnsafeDashboardMutationRequest in dashboard-auth.ts accepts the internal-token credential and skips Origin/CSRF checks, and returns 400 without the JSON content type; env reset, HttpRouter.toHttpEffect(projectsMergeTrainRouteLayer) helper). Mock merge-train-board.js (invalidateMergeTrainBoardCache), projects.js (spread original; getProjectSync, setProjectMergeTrain), merge-sync.js (spread original; isMergeTrainEnabledForProject: p => p?.merge_train !== 'disabled'). Three named tests: 'POST drops the board cache after writing the override', 'POST with null clears the override and drops the board cache', 'POST does not drop the board cache when it does not write'. Never write a test that reads source files (lint:source-introspection fails it)."
+        },
+        "items": [
+          {
+            "id": "server-drop-board-cache.ac1",
+            "title": "Given a known project, when POST {value:'disabled'} is sent with internal-token auth, then the route returns 200 {value:'disabled', effective:false}, calls setProjectMergeTrain('overdeck','disabled'), and calls invalidateMergeTrainBoardCache exactly once with an invocationCallOrder later than the write",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-drop-board-cache.ac2",
+            "title": "Given a known project, when POST {value:null} is sent, then the route returns 200 {value:null, effective:true} and invalidateMergeTrainBoardCache is called once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-drop-board-cache.ac3",
+            "title": "Given a bad value (400), an unknown project (404), or a request without auth headers (non-2xx), when POST is sent, then neither setProjectMergeTrain nor invalidateMergeTrainBoardCache is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "client-train-write-helper",
+        "title": "Add useApplyProjectTrainWrite and apply the board Train switch write through it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T15:27:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5363",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "settings-disclosure-uses-helper"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/merge-train/train/useMergeTrainBoard.ts",
+            "src/dashboard/frontend/src/components/merge-train/train/ProjectTrainCard.tsx",
+            "src/dashboard/frontend/src/components/merge-train/train/__tests__/MergeTrain.test.tsx",
+            "src/dashboard/frontend/src/components/merge-train/train/__tests__/ProjectTrainCard.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/merge-train/train/__tests__/MergeTrain.test.tsx src/components/merge-train/train/__tests__/ProjectTrainCard.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MergeTrain.test.tsx and ProjectTrainCard.test.tsx pass, including the three 'Train switch writes (PAN-5363)' tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In useMergeTrainBoard.ts export `ProjectTrainWrite`, `projectTrainQueryKey(projectKey)` (returns ['project-merge-train', projectKey]) and `useApplyProjectTrainWrite()` exactly as the PRD snippet: await cancelQueries for MERGE_TRAIN_BOARD_KEY and the settings key FIRST (cancelQueries defaults to revert:true and would undo an earlier patch), then setQueriesData on MERGE_TRAIN_BOARD_KEY patching only the matching project's override=write.value and enabled=write.effective, then setQueryData(settingsKey, write), then `void` invalidateQueries for both keys (do not await the refetch). Update the module header sentence about invalidation. In ProjectTrainCard.tsx type the POST as postJson<ProjectTrainWrite> and set `onSuccess: (write) => applyTrainWrite(project.projectKey, write)` (returning the promise so isPending holds through the patch); keep `invalidate` for retryAssembly and leave switchOn unchanged. Tests: new describe 'Train switch writes (PAN-5363)' in MergeTrain.test.tsx with a local fetch stub (answer /api/dashboard/session with {csrfToken:'test-csrf-token'}, POST with {value:'disabled', effective:false}, board GETs from a queue of controllable deferreds, and every other URL with an ok {} response as fixtures.tsx mockFetch does, since MergeTrain also reads /api/merge-train/merge-backend and /api/merge-queue) rendering <MergeTrain placement=\"project\" projectKey=\"overdeck\" />: (1) 'the switch stays off after the POST while the board refetch is pending', (2) 'a board read in flight at the click is discarded', (3) 'useApplyProjectTrainWrite patches every board placement and the settings query' (renderHook, seeded QueryClient, no observers). Extend ProjectTrainCard.test.tsx 'the Train switch posts the project override' to assert client.getQueryData(['project-merge-train','overdeck']) equals the write. Wrap cache writes and deferred resolutions in await act(async () => ...); no real setTimeout waits. Never write a test that reads source files (lint:source-introspection fails it)."
+        },
+        "items": [
+          {
+            "id": "client-train-write-helper.ac1",
+            "title": "Given the board refetch after the POST is still pending, when the operator clicks the Train switch off and the POST resolves, then the switch renders aria-checked='false', is no longer disabled, and train-off-banner-overdeck renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-train-write-helper.ac2",
+            "title": "Given a board GET already in flight at click time, when it resolves with the old override (null) after the POST succeeded, then the switch still renders aria-checked='false', and it stays 'false' after the post-write refetch resolves with override 'disabled'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-train-write-helper.ac3",
+            "title": "Given cached boards under ['merge-train','board','all'] and ['merge-train','board','overdeck'], when useApplyProjectTrainWrite applies ('overdeck', {value:'disabled', effective:false}), then both entries show override 'disabled' and enabled false for overdeck, other projects are unchanged, and ['project-merge-train','overdeck'] returns the write",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-train-write-helper.ac4",
+            "title": "Given the ProjectTrainCard switch POST succeeds, when the mutation settles, then client.getQueryData(['project-merge-train','overdeck']) returns {value:'disabled', effective:false}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-disclosure-uses-helper",
+        "title": "Apply the project settings Merge train write through useApplyProjectTrainWrite",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:27:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5363",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectSettingsDisclosure.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectSettingsDisclosure.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/CommandDeck/__tests__/ProjectSettingsDisclosure.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ProjectSettingsDisclosure.test.tsx passes, including 'the Merge train control refreshes the merge train board (PAN-5363)' and 'a failed Merge train write leaves the board alone (PAN-5363)'",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In ProjectSettingsDisclosure.tsx change line 7 to import `useApplyProjectTrainWrite, useMergeTrainBoard, type ProjectTrainWrite` from '../merge-train/train/useMergeTrainBoard'. In the mergeTrainMutation (lines ~337-349) add `const applyTrainWrite = useApplyProjectTrainWrite();` above it, type mutationFn as returning Promise<ProjectTrainWrite> (`return res.json() as Promise<ProjectTrainWrite>;`), and replace `onSuccess: () => queryClient.invalidateQueries({ queryKey: ['project-merge-train', projectKey] })` with `onSuccess: (write) => applyTrainWrite(projectKey, write)` plus a PAN-5363 comment. Do not touch the swarm or auto-merge-default mutations. In the test file make renderDisclosure return `{ ...rtlRender(...), client }` and add 'the Merge train control refreshes the merge train board (PAN-5363)': record the count of board GETs (fetchControl.fetchMock calls whose URL starts with /api/merge-train/board) after first render settles, click 'Merge train: Disabled', then await waitFor that the count increased and client.getQueryData(['project-merge-train','overdeck']) has value 'disabled'. Add a second test 'a failed Merge train write leaves the board alone (PAN-5363)': add a test-scoped flag (for example `mergeTrainPostFails`) so the strict mock answers POST /api/projects/overdeck/merge-train with status 500; click 'Merge train: Disabled'; await waitFor that the POST was sent; assert the board GET count is unchanged and getQueryData(['project-merge-train','overdeck']) still has value null. Never write a test that reads source files (lint:source-introspection fails it)."
+        },
+        "items": [
+          {
+            "id": "settings-disclosure-uses-helper.ac1",
+            "title": "Given the project settings disclosure is rendered, when the operator clicks 'Merge train: Disabled' and the POST succeeds, then a new GET /api/merge-train/board request is issued and ['project-merge-train','overdeck'] returns value 'disabled'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-disclosure-uses-helper.ac2",
+            "title": "Given the merge-train POST answers 500, when the operator clicks 'Merge train: Disabled', then no new GET /api/merge-train/board request is issued and ['project-merge-train','overdeck'] still returns value null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-project-override-writes",
+        "title": "Document project override writes in MERGE-TRAIN.md and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T15:27:08Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5363",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MERGE-TRAIN.md",
+            "changelog.d/pan-5363.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. In docs/MERGE-TRAIN.md: (a) in 'The board read model', after the sentence about the 5 second board cache, add that both the issue-policy write and the project override write (POST /api/projects/:projectKey/merge-train, PAN-5363) drop that cache, cached and in-flight reads alike; (b) add a '## Project override writes' section directly before '## The master switch' describing the request body, the route writing projects.yaml then dropping the board cache, the dashboard applying {value, effective} through useApplyProjectTrainWrite (cancel in-flight board and settings reads, patch override/enabled in every board placement and the settings query, refetch both), and that a CLI write from another process shows after the 5 s TTL; (c) change the Routes row for GET/POST /api/projects/:projectKey/merge-train to 'Read and set the project override; the POST drops the board cache'. Create changelog.d/pan-5363.md with the exact '#### Fixed' bullet from the PRD."
+        },
+        "items": [
+          {
+            "id": "docs-project-override-writes.ac1",
+            "title": "Given docs/MERGE-TRAIN.md, when read, then it contains a '## Project override writes' section that names useApplyProjectTrainWrite and states the POST drops the board cache, placed before '## The master switch'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-project-override-writes.ac2",
+            "title": "Given the Routes table in docs/MERGE-TRAIN.md, when read, then the GET/POST /api/projects/:projectKey/merge-train row says the POST drops the board cache",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-project-override-writes.ac3",
+            "title": "Given changelog.d/pan-5363.md exists with one '#### Fixed' bullet linking issue #5363, when npm run lint:docs runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "client-train-write-helper",
+        "to": "settings-disclosure-uses-helper",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-15-PAN-5363-merge-train-board-per-project-train-switch-flips-back-on-after-turning-it-off-then-off-again-board-cache-not-dropped-on-write.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

@@ -1,0 +1,85 @@
+{
+  "version": "1",
+  "issueId": "PAN-5363",
+  "created": "2026-11-15T15:36:22.110Z",
+  "updated": "2026-11-15T17:05:09.699Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "server-drop-board-cache": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5363",
+      "claimedAt": "2026-11-15T15:36:22.110Z",
+      "doneAt": "2026-11-15T15:59:36.245Z"
+    },
+    "server-drop-board-cache.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T15:59:36.245Z"
+    },
+    "server-drop-board-cache.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T15:59:36.245Z"
+    },
+    "server-drop-board-cache.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T15:59:36.245Z"
+    },
+    "client-train-write-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5363",
+      "claimedAt": "2026-11-15T15:59:47.074Z",
+      "doneAt": "2026-11-15T16:45:04.206Z"
+    },
+    "client-train-write-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:45:04.206Z"
+    },
+    "client-train-write-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:45:04.206Z"
+    },
+    "client-train-write-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:45:04.206Z"
+    },
+    "client-train-write-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T16:45:04.206Z"
+    },
+    "settings-disclosure-uses-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5363",
+      "claimedAt": "2026-11-15T16:45:11.664Z",
+      "doneAt": "2026-11-15T17:03:37.083Z"
+    },
+    "settings-disclosure-uses-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:03:37.083Z"
+    },
+    "settings-disclosure-uses-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:03:37.083Z"
+    },
+    "docs-project-override-writes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5363",
+      "claimedAt": "2026-11-15T17:03:41.770Z",
+      "doneAt": "2026-11-15T17:05:09.699Z"
+    },
+    "docs-project-override-writes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:05:09.699Z"
+    },
+    "docs-project-override-writes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:05:09.699Z"
+    },
+    "docs-project-override-writes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:05:09.699Z"
+    }
+  }
+}

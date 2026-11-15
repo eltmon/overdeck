@@ -5,7 +5,11 @@
  * per placement (`all` or one project key), polled every 15 s while the
  * surface is on screen. The board's batch part runs one UAT stack probe per
  * batch, so it never polls faster. Every mutation invalidates the
- * `['merge-train','board']` prefix so every placement refreshes.
+ * `['merge-train','board']` prefix so every placement refreshes. The project
+ * train write (Train switch, project settings Merge train control) instead
+ * goes through `useApplyProjectTrainWrite` (PAN-5363), which patches the
+ * board and settings caches with the server-confirmed value before
+ * invalidating them, so the switch never flickers back to a stale read.
  *
  * `useMergeRuns` polls `GET /api/merge-queue` every 3 s, and only while a car
  * or strike is merging, so the step tracker advances between board polls.
@@ -77,6 +81,41 @@ export function useInvalidateBoard(): () => void {
   const queryClient = useQueryClient();
   return () => {
     void queryClient.invalidateQueries({ queryKey: MERGE_TRAIN_BOARD_KEY });
+  };
+}
+
+/** The answer of `POST /api/projects/:key/merge-train`. */
+export interface ProjectTrainWrite { value: 'enabled' | 'disabled' | null; effective: boolean }
+
+/** The project settings disclosure's read of the same override. */
+export function projectTrainQueryKey(projectKey: string): readonly string[] {
+  return ['project-merge-train', projectKey];
+}
+
+/**
+ * PAN-5363: shows a confirmed project train write in every cached read of it.
+ * Cancels in-flight board and settings reads first (cancelQueries reverts a
+ * query to its pre-fetch state, which would undo an earlier patch), patches
+ * the project's `override`/`enabled` in every board placement, sets the
+ * settings query, then invalidates both without waiting for the refetch.
+ */
+export function useApplyProjectTrainWrite(): (projectKey: string, write: ProjectTrainWrite) => Promise<void> {
+  const queryClient = useQueryClient();
+  return async (projectKey, write) => {
+    const settingsKey = projectTrainQueryKey(projectKey);
+    await Promise.all([
+      queryClient.cancelQueries({ queryKey: MERGE_TRAIN_BOARD_KEY }),
+      queryClient.cancelQueries({ queryKey: settingsKey }),
+    ]);
+    queryClient.setQueriesData<MergeTrainBoard>({ queryKey: MERGE_TRAIN_BOARD_KEY }, (board) => board && {
+      ...board,
+      projects: board.projects.map((p) => (p.projectKey === projectKey
+        ? { ...p, override: write.value, enabled: write.effective }
+        : p)),
+    });
+    queryClient.setQueryData<ProjectTrainWrite>(settingsKey, write);
+    void queryClient.invalidateQueries({ queryKey: MERGE_TRAIN_BOARD_KEY });
+    void queryClient.invalidateQueries({ queryKey: settingsKey });
   };
 }
 

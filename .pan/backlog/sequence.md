@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T18:17:46.585475Z · model: claude-opus-5-5 · open: 901_
+_Last sequenced: 2026-11-15T18:24:35.591048Z · model: claude-opus-5-5 · open: 899_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -400,11 +400,10 @@ _Last sequenced: 2026-11-15T18:17:46.585475Z · model: claude-opus-5-5 · open: 
 | 395 | PAN-3164 | XS | medium | ok |  |  | probeUatStack reports readiness from container count, so the UI offers 'Open UAT frontend' while the API is still resolving Maven deps. |
 | 396 | PAN-3121 | S | medium | ok |  |  | The failed-send outbox never reconciles against the transcript, so a delivered message keeps a Retry twin that would double-send. |
 | 397 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
-| 400 | PAN-5366 | M | medium | ok |  | PAN-5359 | Conversation page cannot show whether per-turn memory injection reaches it; add a state route and a status-line part. Needs PAN-5359. |
+| 400 | PAN-5366 | M | medium | ok |  |  | Conversation page cannot show whether per-turn memory injection reaches it; add a state route and a status-line part. |
 | 401 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
 | 401 | PAN-5358 | M | medium | ok |  |  | Curated memory facts reach agents only via a budget-cut launch index (89 of 171 dropped in dfai); add facts to per-turn relevance injection. |
 | 402 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
-| 402 | PAN-5359 | M | medium | ok |  |  | Per-turn memory injection skips project-root conversations and every Codex conversation; install the hook there and add a Codex turn path. |
 | 403 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
 | 404 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
 | 405 | PAN-2069 | XS | medium | ok |  |  | caveman: follow-up gaps |
@@ -751,9 +750,8 @@ _Last sequenced: 2026-11-15T18:17:46.585475Z · model: claude-opus-5-5 · open: 
 | 746 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
 | 747 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
 | 749 | PAN-962 | M | low | needs-refinement |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
-| 750 | PAN-5360 | L | low | ok |  |  | Memory facts lack source, created date and supersession; add frontmatter, --supersedes, and an advisory duplicate/contradiction lint. |
 | 750 | PAN-961 | M | low | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
-| 751 | PAN-5365 | S | low | needs-refinement |  | PAN-5360 | MCP memory_add gains a source param after PAN-5360; the supersedes-on-agent-surface decision is still open. |
+| 751 | PAN-5365 | S | low | needs-refinement |  |  | MCP memory_add gains a source param now that PAN-5360 shipped; the supersedes-on-agent-surface decision is still open. |
 | 752 | PAN-943 | M | low | ok |  |  | Add memory file review and management command |
 | 753 | PAN-908 | M | low | ok |  |  | PAN-908: Make work-agent spawn limits configurable and overridable |
 | 754 | PAN-898 | M | low | ok |  |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
@@ -1236,10 +1234,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T18:17:46.585475Z",
+  "generatedAt": "2026-11-15T18:24:35.591048Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 901,
+  "openCount": 899,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -6232,11 +6230,9 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "importance": "medium",
       "score": 52,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5359"
-      ],
-      "why": "Conversation page cannot show whether per-turn memory injection reaches it; add a state route and a status-line part. Needs PAN-5359.",
-      "rationale": "New issue split from PAN-5359; it reuses that issue's conversation identity resolver, so it ranks directly after it.",
+      "dependsOn": [],
+      "why": "Conversation page cannot show whether per-turn memory injection reaches it; add a state route and a status-line part.",
+      "rationale": "Its dependency PAN-5359 merged, so it is now unblocked; rank is unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6276,19 +6272,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "dependsOn": [],
       "why": "Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main)",
       "rationale": "New this run: medium/58 — Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main).",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5359",
-      "rank": 402,
-      "size": "M",
-      "importance": "medium",
-      "score": 56,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Per-turn memory injection skips project-root conversations and every Codex conversation; install the hook there and add a Codex turn path.",
-      "rationale": "New harness-coverage gap for memory injection; companion to PAN-5358, ranked right after it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -10540,19 +10523,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "planning": "auto"
     },
     {
-      "issue": "PAN-5360",
-      "rank": 750,
-      "size": "L",
-      "importance": "low",
-      "score": 44,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Memory facts lack source, created date and supersession; add frontmatter, --supersedes, and an advisory duplicate/contradiction lint.",
-      "rationale": "New memory-governance feature; speculative LLM lint portion keeps it low, placed next to the related PAN-943 review tooling.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-961",
       "rank": 750,
       "size": "M",
@@ -10571,11 +10541,9 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "importance": "low",
       "score": 40,
       "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-5360"
-      ],
-      "why": "MCP memory_add gains a source param after PAN-5360; the supersedes-on-agent-surface decision is still open.",
-      "rationale": "Split out of PAN-5360 planning; it cannot start until PAN-5360 ships the frontmatter fields, so it ranks directly after PAN-5360. Condition is needs-refinement because the body leaves the supersedes policy (allow, project-only, or CLI-only) as an open decision.",
+      "dependsOn": [],
+      "why": "MCP memory_add gains a source param now that PAN-5360 shipped; the supersedes-on-agent-surface decision is still open.",
+      "rationale": "Its dependency PAN-5360 merged, so it is unblocked, but the supersedes policy is still an open decision, so it stays needs-refinement at the same rank.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13652,41 +13620,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     {
       "from": "PAN-5358",
       "to": "PAN-4373",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-5358",
-      "to": "PAN-5359",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-5359",
-      "to": "PAN-5366",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5360",
-      "to": "PAN-5358",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-5360",
-      "to": "PAN-5365",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5360",
-      "to": "PAN-943",
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.8
