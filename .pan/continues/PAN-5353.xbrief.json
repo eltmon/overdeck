@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5353",
   "created": "2026-11-15T14:41:35.965Z",
-  "updated": "2026-11-15T14:48:23.966Z",
+  "updated": "2026-11-15T14:48:45.687Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "pane-chord.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T14:48:23.965Z"
+    },
+    "agent-door": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5353",
+      "claimedAt": "2026-11-15T14:48:45.687Z"
     }
   }
 }
