@@ -1054,7 +1054,6 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
           onSendFailed={handleSendFailed}
           agentId={agentId}
           contextWindowUsage={contextWindowUsage}
-          agentBusy={agentBusy}
           subagentNotice={subagentNotice}
           observedEffort={contextWindowUsage?.lastEffort ?? data?.observedEffort ?? null}
           effortResolution={data?.effortResolution ?? null}

@@ -92,6 +92,21 @@ vi.mock('../../CommandDeck/styles/command-deck.module.css', () => ({
   default: new Proxy({}, { get: (_target, prop) => String(prop) }),
 }));
 
+/** PAN-5295 WI-7: the Send menu replaced the delivery-mode select. */
+const sendModeButton = (): HTMLElement => screen.getByRole('button', { name: /^Send:/ });
+const sendModeItem = (label: string): HTMLElement => screen.getByRole('menuitemradio', { name: new RegExp(`^${label}`) });
+function chooseSendMode(label: string): void {
+  fireEvent.click(sendModeButton());
+  fireEvent.click(sendModeItem(label));
+}
+/** The Send menu's item labels, in order (opens and closes the menu). */
+function sendModeLabels(): string[] {
+  fireEvent.click(sendModeButton());
+  const labels = screen.getAllByRole('menuitemradio').map((item) => item.querySelector('.font-medium')?.textContent ?? '');
+  fireEvent.click(sendModeButton());
+  return labels;
+}
+
 const conversation = {
   id: 1,
   name: 'test-conv',
@@ -756,9 +771,9 @@ describe('ComposerFooter attachments', () => {
     const onSendAcknowledged = vi.fn();
     const piConversation = { ...conversation, harness: 'pi' as const };
 
-    render(<ComposerFooter conversation={piConversation} agentBusy onSendAcknowledged={onSendAcknowledged} />);
+    render(<ComposerFooter conversation={piConversation} onSendAcknowledged={onSendAcknowledged} />);
 
-    fireEvent.change(screen.getByLabelText('Pi delivery mode'), { target: { value: 'follow_up' } });
+    chooseSendMode('after this turn');
     fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'hello pi' } });
     fireEvent.click(screen.getByTitle('Send message (Enter)'));
 
@@ -780,7 +795,7 @@ describe('ComposerFooter attachments', () => {
 
     render(<ComposerFooter conversation={piConversation} onSendAcknowledged={onSendAcknowledged} />);
 
-    expect(screen.getByLabelText('Pi delivery mode')).toHaveValue('auto');
+    expect(sendModeButton()).toHaveTextContent('Send: normally');
     fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'hello pi' } });
     fireEvent.click(screen.getByTitle('Send message (Enter)'));
 
@@ -797,28 +812,25 @@ describe('ComposerFooter attachments', () => {
   it('offers Auto and Steer for a Claude Code conversation (PAN-4292)', () => {
     render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} />);
 
-    const select = screen.getByLabelText('Delivery mode');
-    expect(Array.from(select.querySelectorAll('option')).map((option) => option.getAttribute('value'))).toEqual(['auto', 'steer']);
+    expect(sendModeLabels()).toEqual(['normally', 'interrupt now']);
   });
 
   it('offers the delivery selector on a Claude Code agent session (PAN-4292)', () => {
     render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} agentId="agent-pan-4292" />);
 
-    expect(screen.getByLabelText('Delivery mode')).toBeInTheDocument();
+    expect(sendModeButton()).toBeInTheDocument();
   });
 
   it('keeps Auto, Steer and Follow-up for a Pi conversation (PAN-4292)', () => {
     render(<ComposerFooter conversation={{ ...conversation, harness: 'ohmypi' as const }} />);
 
-    const select = screen.getByLabelText('Pi delivery mode');
-    expect(Array.from(select.querySelectorAll('option')).map((option) => option.getAttribute('value'))).toEqual(['auto', 'steer', 'follow_up']);
+    expect(sendModeLabels()).toEqual(['normally', 'interrupt now', 'after this turn']);
   });
 
   it('renders no delivery selector for a Codex conversation (PAN-4292)', () => {
     render(<ComposerFooter conversation={{ ...conversation, harness: 'codex' as const }} />);
 
-    expect(screen.queryByLabelText('Delivery mode')).toBeNull();
-    expect(screen.queryByLabelText('Pi delivery mode')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Send:/ })).toBeNull();
   });
 
   it('posts deliverAs steer when Steer is chosen on a Claude Code conversation (PAN-4292)', async () => {
@@ -826,10 +838,13 @@ describe('ComposerFooter attachments', () => {
     fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
     const onSendAcknowledged = vi.fn();
 
-    render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} agentBusy onSendAcknowledged={onSendAcknowledged} />);
+    render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} onSendAcknowledged={onSendAcknowledged} />);
 
-    fireEvent.change(screen.getByLabelText('Delivery mode'), { target: { value: 'steer' } });
-    expect(screen.getByLabelText('Delivery mode')).toHaveAttribute('title', expect.stringContaining('interrupt the current turn'));
+    chooseSendMode('interrupt now');
+    expect(sendModeButton()).toHaveTextContent('Send: interrupt now');
+    fireEvent.click(sendModeButton());
+    expect(sendModeItem('interrupt now')).toHaveAttribute('title', expect.stringContaining('interrupt the current turn'));
+    fireEvent.click(sendModeButton());
     fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'change course' } });
     fireEvent.click(screen.getByTitle('Send message (Enter)'));
 
@@ -850,7 +865,7 @@ describe('ComposerFooter attachments', () => {
 
     render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} agentId="agent-pan-4292" onSendAcknowledged={onSendAcknowledged} />);
 
-    fireEvent.change(screen.getByLabelText('Delivery mode'), { target: { value: 'steer' } });
+    chooseSendMode('interrupt now');
     fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'change course' } });
     fireEvent.click(screen.getByTitle('Send message (Enter)'));
 
@@ -868,10 +883,12 @@ describe('ComposerFooter attachments', () => {
     fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
     const onSendAcknowledged = vi.fn();
 
-    render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} agentBusy onSendAcknowledged={onSendAcknowledged} />);
+    render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} onSendAcknowledged={onSendAcknowledged} />);
 
-    expect(screen.getByLabelText('Delivery mode')).toHaveValue('auto');
-    expect(screen.getByRole('option', { name: /Steer \((Ctrl|⌘)\+Enter\)/ })).toBeInTheDocument();
+    expect(sendModeButton()).toHaveTextContent('Send: normally');
+    fireEvent.click(sendModeButton());
+    expect(sendModeItem('interrupt now')).toHaveTextContent(/(Ctrl|⌘) Enter/);
+    fireEvent.click(sendModeButton());
     fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'change course' } });
     editorState.onCommandKeyDown?.('SteerEnter');
 
@@ -909,11 +926,11 @@ describe('ComposerFooter attachments', () => {
     const onSendAcknowledged = vi.fn();
 
     const view = render(<ComposerFooter conversation={{ ...conversation, harness: 'ohmypi' as const }} onSendAcknowledged={onSendAcknowledged} />);
-    fireEvent.change(screen.getByLabelText('Pi delivery mode'), { target: { value: 'follow_up' } });
+    chooseSendMode('after this turn');
 
     view.rerender(<ComposerFooter conversation={{ ...secondConversation, harness: 'claude-code' as const }} onSendAcknowledged={onSendAcknowledged} />);
 
-    await waitFor(() => expect(screen.getByLabelText('Delivery mode')).toHaveValue('auto'));
+    await waitFor(() => expect(sendModeButton()).toHaveTextContent('Send: normally'));
     fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'plain message' } });
     fireEvent.click(screen.getByTitle('Send message (Enter)'));
 
@@ -932,7 +949,7 @@ describe('ComposerFooter attachments', () => {
     ));
     const onSendAcknowledged = vi.fn();
 
-    render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} agentBusy onSendAcknowledged={onSendAcknowledged} />);
+    render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} onSendAcknowledged={onSendAcknowledged} />);
     fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'change course' } });
     editorState.onCommandKeyDown?.('SteerEnter');
 

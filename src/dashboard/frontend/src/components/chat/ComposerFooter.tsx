@@ -31,7 +31,7 @@ import { saveStoredHarness, saveStoredModel } from './ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import { modelSupportsImages, findModelDef } from '../Settings/modelCatalog';
-import type { DeliverAs } from './DeliveryModeSelect';
+import type { DeliverAs } from './SendModeMenu';
 import { LimitResetNotice } from './LimitResetNotice';
 import { useScheduledMessages } from './scheduledMessages';
 import { useComposerEffort, type EffortResolution } from './useComposerEffort';
@@ -87,8 +87,6 @@ interface ComposerFooterProps {
    * placement (right side, just before the send button).
    */
   contextWindowUsage?: ContextWindowSnapshot | null;
-  /** True while the runtime is mid-turn. Used to choose Pi delivery defaults. */
-  agentBusy?: boolean;
   /** Claude Code's agent selector shows a subagent, not the main agent,
    * receiving typed input (PAN-4268). */
   subagentNotice?: SubagentRoutingNotice;
@@ -125,7 +123,6 @@ function ComposerFooterInput({
   onSendFailed,
   agentId,
   contextWindowUsage = null,
-  agentBusy = false,
   subagentNotice = null,
   observedEffort = null,
   effortResolution = null,
@@ -183,7 +180,6 @@ function ComposerFooterInput({
   // carries; Claude Code steers with send-now keys on both routes.
   const steerKind = getHarnessBehavior(harness).steerKind;
   const showDeliverySelector = steerKind === 'send-now-keys' || (steerKind === 'control-channel' && !agentId);
-  const steerOptionLabel = navigator.platform.toLowerCase().includes('mac') ? 'Steer (⌘+Enter)' : 'Steer (Ctrl+Enter)';
   const isDisabled = !conversation.sessionAlive || sending;
   // The phone app (PAN-4837): no model picker (admin reads) and no voice input (its own session mint).
   const native = isNativeShell();
@@ -822,8 +818,6 @@ function ComposerFooterInput({
           deliverAs={deliverAs}
           setDeliverAs={setDeliverAs}
           steerKind={steerKind}
-          agentBusy={agentBusy}
-          steerOptionLabel={steerOptionLabel}
           scheduleSupported={scheduleSupported}
           piConversation={piConversation}
           compactPending={compactPending}

@@ -233,6 +233,7 @@ src/components/chat/__tests__/ModelPicker.test.tsx
 src/components/chat/__tests__/OpenPreviewPopover.test.tsx
 src/components/chat/__tests__/PullHereDialog.test.tsx
 src/components/chat/__tests__/ScheduledMessageRow.test.tsx
+src/components/chat/__tests__/SendModeMenu.test.tsx
 src/components/chat/__tests__/VaultBrowseCopy.test.tsx
 src/components/chat/__tests__/VaultContinueDialog.test.tsx
 src/components/chat/__tests__/composerHeldMessages.test.tsx

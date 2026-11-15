@@ -8,7 +8,7 @@ import type { HarnessSteerKind } from '@overdeck/contracts';
 import { ModelPicker, MODEL_EFFORT_SUPPORT } from './ModelPicker';
 import { pickerEffortLevels, type Harness } from '../shared/ModelPicker';
 import { EffortPicker } from './EffortPicker';
-import { DeliveryModeSelect, type DeliverAs } from './DeliveryModeSelect';
+import { SendModeMenu, type DeliverAs } from './SendModeMenu';
 import { ContextWindowMeter } from './ContextWindowMeter';
 import type { ComposerEffort } from './useComposerEffort';
 import type { ContextWindowSnapshot } from '../../lib/contextWindow';
@@ -32,8 +32,6 @@ export interface ComposerToolbarProps {
   deliverAs: DeliverAs;
   setDeliverAs: (value: DeliverAs) => void;
   steerKind: HarnessSteerKind;
-  agentBusy: boolean;
-  steerOptionLabel: string;
   scheduleSupported: boolean;
   piConversation: boolean;
   compactPending: boolean;
@@ -63,8 +61,6 @@ export function ComposerToolbar({
   deliverAs,
   setDeliverAs,
   steerKind,
-  agentBusy,
-  steerOptionLabel,
   scheduleSupported,
   piConversation,
   compactPending,
@@ -109,7 +105,7 @@ export function ComposerToolbar({
       <EffortPicker chip={effort.chip} pending={effort.pending} title={effort.title} value={effort.effort} onChange={effort.onChange} disabled={effort.pending || !effort.liveChangeEnabled} availableLevels={pickerEffortLevels(model) ?? MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
 
       {showDeliverySelector && (
-        <DeliveryModeSelect value={deliverAs} onChange={setDeliverAs} steerKind={steerKind} agentBusy={agentBusy} sessionAlive={conversation.sessionAlive} steerOptionLabel={steerOptionLabel} scheduleAvailable={scheduleSupported && !agentId} />
+        <SendModeMenu value={deliverAs} onChange={setDeliverAs} steerKind={steerKind} sessionAlive={conversation.sessionAlive} scheduleAvailable={scheduleSupported && !agentId} />
       )}
       {piConversation && !agentId && (
         <>
