@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { derivePipelineState, hasLivePane, isPaneLive } from '../issuePipelineState';
+import { userFacingDisplay } from '../simple/userFacingState';
 import type { BackendPane, DerivedIssueState, DerivedIssueStateName } from '../../types';
 
 const derived = (state: DerivedIssueStateName, over: Partial<DerivedIssueState> = {}): DerivedIssueState => ({
@@ -86,5 +87,22 @@ describe('derivePipelineState (PAN-3917)', () => {
 
   it('only the tracker separates canceled from done', () => {
     expect(derivePipelineState({ derived: derived('closed'), issueCanonicalState: 'canceled' })).toBe('canceled');
+  });
+
+  // PAN-5310: before (or without) a derived state, a tracker-closed issue is
+  // done — never "Not started".
+  it('falls back to the tracker\'s done when there is no derived state', () => {
+    expect(derivePipelineState({ derived: null, issueCanonicalState: 'done' })).toBe('done');
+    expect(derivePipelineState({ derived: null, issueCanonicalState: 'Done' })).toBe('done');
+    expect(derivePipelineState({ derived: null, issueCanonicalState: 'in_progress' })).toBe('generic');
+  });
+
+  it('a derived-less tracker-done issue reads as Done, not Not started', () => {
+    const display = userFacingDisplay({
+      pipelineState: derivePipelineState({ derived: null, issueCanonicalState: 'done' }),
+    });
+    expect(display.title).toBe('Done');
+    expect(display.state).toBe('done');
+    expect(display.primaryAction).not.toBe('Start work');
   });
 });

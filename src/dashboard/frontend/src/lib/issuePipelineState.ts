@@ -47,8 +47,11 @@ export function hasLivePane(panes: readonly BackendPane[] | undefined, role: Bac
 
 export function derivePipelineState(input: PipelineStateInput): PipelineState {
   const { derived, panes } = input;
-  if (normalizeCanonicalState(input.issueCanonicalState) === 'canceled') return 'canceled';
-  if (!derived) return 'generic';
+  const canonical = normalizeCanonicalState(input.issueCanonicalState);
+  if (canonical === 'canceled') return 'canceled';
+  // PAN-5310: before (or without) a derived state, a tracker-closed issue is
+  // done — never "Not started".
+  if (!derived) return canonical === 'done' ? 'done' : 'generic';
 
   switch (derived.state) {
     case 'merged':
