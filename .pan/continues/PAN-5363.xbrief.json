@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5363",
   "created": "2026-11-15T15:36:22.110Z",
-  "updated": "2026-11-15T16:45:04.206Z",
+  "updated": "2026-11-15T16:45:11.664Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,11 @@
     "client-train-write-helper.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T16:45:04.206Z"
+    },
+    "settings-disclosure-uses-helper": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5363",
+      "claimedAt": "2026-11-15T16:45:11.664Z"
     }
   }
 }
