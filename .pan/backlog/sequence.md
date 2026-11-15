@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T17:18:33.978991Z · model: claude-opus-5-5 · open: 905_
+_Last sequenced: 2026-11-15T17:20:07.934163Z · model: claude-opus-5-5 · open: 905_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1240,7 +1240,7 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T17:18:33.978991Z",
+  "generatedAt": "2026-11-15T17:20:07.934163Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 905,
