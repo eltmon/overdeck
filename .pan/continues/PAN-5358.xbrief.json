@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5358",
   "created": "2026-11-15T16:13:08.101Z",
-  "updated": "2026-11-15T17:23:51.605Z",
+  "updated": "2026-11-15T17:24:07.305Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,11 @@
     "launch-always-first.ac2": {
       "status": "completed",
       "doneAt": "2026-11-15T17:23:51.604Z"
+    },
+    "cli-always-flag": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5358",
+      "claimedAt": "2026-11-15T17:24:07.305Z"
     }
   }
 }
