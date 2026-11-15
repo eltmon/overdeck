@@ -1,6 +1,6 @@
-import { mkdtemp, readFile, rm, utimes, writeFile } from 'fs/promises';
+import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
-import { join } from 'path';
+import { dirname, join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MemoryIdentity, MemoryStatus } from '@overdeck/contracts';
 import { closeMemoryFtsDatabases, withMemoryFtsDatabase } from '../../../src/lib/memory/fts-db.js';
@@ -21,6 +21,31 @@ import {
   userMemoryDir,
   writeMemoryFact,
 } from '../../../src/lib/memory/facts/store.js';
+import { factContentHash, factVectorCachePath } from '../../../src/lib/memory/facts/vectors.js';
+import { float32ArrayToBuffer } from '../../../src/lib/docs/index-builder.js';
+
+// The vector-rerank test seeds a cache for a fixed embedding config rather
+// than depending on whatever docs.embedding this machine's real config.yaml
+// resolves to (PAN-5358 WI-8).
+const { factEmbeddingConfigRef } = vi.hoisted(() => ({
+  factEmbeddingConfigRef: { current: null as null | { provider: string; model: string; dimensions: number } },
+}));
+vi.mock('../../../src/lib/config-yaml.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/config-yaml.js')>();
+  return {
+    ...actual,
+    loadConfigSync: () =>
+      factEmbeddingConfigRef.current
+        ? { config: { docs: { embedding: factEmbeddingConfigRef.current } } }
+        : actual.loadConfigSync(),
+  };
+});
+
+// embedText's 'local' provider path loads @huggingface/transformers; the
+// vector-rerank test asserts this never fires when vectors are read from
+// a seeded cache.
+const { transformersPipelineMock } = vi.hoisted(() => ({ transformersPipelineMock: vi.fn() }));
+vi.mock('@huggingface/transformers', () => ({ pipeline: transformersPipelineMock }));
 
 // Background AI is off-by-default since PAN-1589 (cheapMode). These tests drive
 // the prompt-time query-expansion path, which only runs when the feature gate
@@ -81,6 +106,7 @@ beforeEach(async () => {
 afterEach(async () => {
   closeMemoryFtsDatabases();
   factProjectPathRef.current = null;
+  factEmbeddingConfigRef.current = null;
   if (originalHome === undefined) delete process.env.OVERDECK_HOME;
   else process.env.OVERDECK_HOME = originalHome;
   if (tempDir) await rm(tempDir, { recursive: true, force: true });
@@ -1051,6 +1077,52 @@ describe('prompt-time memory injection', () => {
       expect(factSources.map((source: { id: string }) => source.id)).not.toEqual(
         expect.arrayContaining([expect.stringMatching(/^fact:project:boiler-/)]),
       );
+    });
+
+    it('re-ranks facts with stored vectors without loading a model', async () => {
+      factEmbeddingConfigRef.current = { provider: 'local', model: 'gte-small', dimensions: 4 };
+      const projectDir = await mkdtemp(join(tmpdir(), 'pan-memory-fact-vectors-'));
+      factProjectPathRef.current = projectDir;
+      const dir = projectMemoryDir(projectDir);
+
+      await writeMemoryFact(dir, 'project', fact({
+        id: 'anchor-fact',
+        description: 'Describes the thornwick migration anchor topic for this test.',
+      }));
+      await writeMemoryFact(dir, 'project', fact({
+        id: 'vector-only-fact',
+        description: 'Covers an unrelated subject with no lexical overlap at all.',
+      }));
+
+      const { facts: written } = readMemoryFactsSync(dir, 'project');
+      const anchor = written.find((f) => f.id === 'anchor-fact')!;
+      const vectorOnly = written.find((f) => f.id === 'vector-only-fact')!;
+      const sharedVector = new Float32Array([1, 0, 0, 0]);
+
+      const cachePath = factVectorCachePath();
+      await mkdir(dirname(cachePath), { recursive: true });
+      await writeFile(cachePath, JSON.stringify({
+        version: 1,
+        provider: 'local',
+        model: 'gte-small',
+        dimensions: 4,
+        vectors: {
+          [factContentHash(anchor)]: float32ArrayToBuffer(sharedVector).toString('base64'),
+          [factContentHash(vectorOnly)]: float32ArrayToBuffer(sharedVector).toString('base64'),
+        },
+      }), 'utf8');
+
+      const { decision } = await injectWithLog({
+        prompt: 'explain the thornwick migration anchor topic',
+        identity,
+        now: new Date('2026-05-16T22:30:00.000Z'),
+        id: 'vector-rerank-1',
+        expansion: extractionFailed,
+      });
+
+      const factSources = decision.sources.filter((source: { docType: string }) => source.docType === 'fact');
+      expect(factSources.map((source: { id: string }) => source.id)).toContain('fact:project:vector-only-fact');
+      expect(transformersPipelineMock).not.toHaveBeenCalled();
     });
   });
 });

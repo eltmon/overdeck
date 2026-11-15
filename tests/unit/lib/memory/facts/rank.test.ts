@@ -182,4 +182,56 @@ describe('rankFactsForQuery', () => {
       expect(ranked.map((r) => r.fact.id)).toContain('elevenlabs-fact');
     });
   });
+
+  describe('vector re-ranking (PAN-5358 WI-8)', () => {
+    const query = 'alphamarker betamarker gammamarker';
+
+    function buildFixture(): MemoryFact[] {
+      return [
+        makeFact({ id: 'fact-a', title: 'alphamarker topic' }),
+        makeFact({ id: 'fact-b', title: 'betamarker topic' }),
+        makeFact({ id: 'fact-c', title: 'gammamarker topic' }),
+        makeFact({ id: 'vector-good', title: 'unrelated vector match' }),
+        makeFact({ id: 'vector-bad', title: 'unrelated vector mismatch' }),
+      ];
+    }
+
+    function buildVectors(facts: readonly MemoryFact[]): Map<string, Float32Array> {
+      const byId = new Map(facts.map((fact) => [fact.id, fact]));
+      return new Map([
+        [byId.get('fact-a')!.file, new Float32Array([1, 0, 0])],
+        [byId.get('fact-b')!.file, new Float32Array([1, 0, 0])],
+        [byId.get('fact-c')!.file, new Float32Array([1, 0, 0])],
+        [byId.get('vector-good')!.file, new Float32Array([1, 0, 0])],
+        [byId.get('vector-bad')!.file, new Float32Array([0, 1, 0])],
+      ]);
+    }
+
+    it('adds a vector-only fact that clears the similarity bar', () => {
+      const facts = buildFixture();
+      const ranked = rankFactsForQuery({ facts, query, vectors: buildVectors(facts) });
+      expect(ranked.map((r) => r.fact.id)).toContain('vector-good');
+    });
+
+    it('ignores vector-only facts below the bar', () => {
+      const facts = buildFixture();
+      const ranked = rankFactsForQuery({ facts, query, vectors: buildVectors(facts) });
+      expect(ranked.map((r) => r.fact.id)).not.toContain('vector-bad');
+    });
+
+    it('equals the lexical result when no vectors exist', () => {
+      const facts = buildFixture();
+      const withoutVectors = rankFactsForQuery({ facts, query });
+      expect(withoutVectors.map((r) => r.fact.id).sort()).toEqual(['fact-a', 'fact-b', 'fact-c']);
+      expect(withoutVectors.every((r) => r.similarity === undefined)).toBe(true);
+    });
+
+    it('equals the lexical result when no eligible fact has a vector', () => {
+      const facts = buildFixture();
+      const lexicalOnly = rankFactsForQuery({ facts, query });
+      const vectorsForIneligibleOnly = new Map([[facts.find((f) => f.id === 'vector-good')!.file, new Float32Array([1, 0, 0])]]);
+      const fused = rankFactsForQuery({ facts, query, vectors: vectorsForIneligibleOnly });
+      expect(fused).toEqual(lexicalOnly);
+    });
+  });
 });

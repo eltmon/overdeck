@@ -1,9 +1,11 @@
 /**
- * Lexical ranking of curated memory facts against a prompt (PAN-5358 FR-2, FR-3).
+ * Ranking of curated memory facts against a prompt (PAN-5358 FR-2, FR-3, FR-12).
  * Pure, no I/O: BM25 over id/title/description/tags (head, double-weighted) and
  * body, gated by a head/rarity floor so a stray common-word match never surfaces
- * an unrelated fact. The `vectors` input is accepted but not yet used; vector
- * re-ranking lands in a later work item.
+ * an unrelated fact. When a `vectors` map is supplied, the lexical ranking is
+ * fused by reciprocal-rank with a vector ranking against the pseudo-relevance
+ * centroid of the top eligible lexical facts, so a fact the floor would reject
+ * can still surface on vector similarity alone.
  */
 import { PROMPT_KEYWORD_STOPWORDS } from '../search.js';
 import type { MemoryFact } from './store.js';
@@ -105,24 +107,42 @@ function compareFacts(a: MemoryFact, b: MemoryFact): number {
   return 0;
 }
 
-export function rankFactsForQuery(input: {
-  facts: readonly MemoryFact[];
-  /** The full expansion/prompt text — not the 12-term search query. */
-  query: string;
-  /** Keyed by fact.file; declared for the vector re-ranking work item, ignored here. */
-  vectors?: ReadonlyMap<string, Float32Array>;
-  limit?: number;
-}): RankedFact[] {
-  const { facts, query, limit = FACT_RETRIEVAL_LIMIT } = input;
-  if (facts.length === 0) return [];
+const RRF_K = 60;
 
-  const queryTerms = extractQueryTerms(query);
-  if (queryTerms.length === 0) return [];
+function dot(a: Float32Array, b: Float32Array): number {
+  let sum = 0;
+  for (let i = 0; i < a.length; i += 1) sum += a[i] * b[i];
+  return sum;
+}
 
-  const indices = facts.map(buildFactIndex);
+function centroidOf(vectors: readonly Float32Array[]): Float32Array | null {
+  if (vectors.length === 0) return null;
+  const dimensions = vectors[0].length;
+  const sum = new Float32Array(dimensions);
+  for (const vector of vectors) {
+    for (let i = 0; i < dimensions; i += 1) sum[i] += vector[i];
+  }
+  for (let i = 0; i < dimensions; i += 1) sum[i] /= vectors.length;
+
+  let norm = 0;
+  for (const value of sum) norm += value * value;
+  norm = Math.sqrt(norm);
+  if (norm === 0) return sum;
+  for (let i = 0; i < dimensions; i += 1) sum[i] /= norm;
+  return sum;
+}
+
+interface ScoredFact {
+  readonly index: FactIndex;
+  readonly bm25: number;
+  readonly headMatches: number;
+  readonly eligible: boolean;
+}
+
+function scoreFacts(indices: readonly FactIndex[], queryTerms: readonly string[]): ScoredFact[] {
   const totalLen = indices.reduce((sum, index) => sum + index.len, 0);
   const avgLen = totalLen === 0 ? 1 : totalLen / indices.length;
-  const factCount = facts.length;
+  const factCount = indices.length;
 
   const documentFrequency = new Map<string, number>();
   for (const term of queryTerms) {
@@ -142,8 +162,7 @@ export function rankFactsForQuery(input: {
   const discriminatingThreshold = Math.ceil(factCount / 2);
   const rareThreshold = Math.max(2, Math.ceil(factCount * 0.02));
 
-  const eligible: Array<{ index: FactIndex; bm25: number; headMatches: number }> = [];
-  for (const index of indices) {
+  return indices.map((index) => {
     let bm25 = 0;
     let headMatches = 0;
     let rareHeadMatch = false;
@@ -157,20 +176,97 @@ export function rankFactsForQuery(input: {
       if (df <= discriminatingThreshold) headMatches += 1;
       if (df <= rareThreshold) rareHeadMatch = true;
     }
-    if (bm25 > 0 && (headMatches >= 2 || rareHeadMatch)) {
-      eligible.push({ index, bm25, headMatches });
+    return { index, bm25, headMatches, eligible: bm25 > 0 && (headMatches >= 2 || rareHeadMatch) };
+  });
+}
+
+export function rankFactsForQuery(input: {
+  facts: readonly MemoryFact[];
+  /** The full expansion/prompt text — not the 12-term search query. */
+  query: string;
+  /** Keyed by fact.file. Fuses a vector ranking into the lexical result when present. */
+  vectors?: ReadonlyMap<string, Float32Array>;
+  limit?: number;
+}): RankedFact[] {
+  const { facts, query, vectors, limit = FACT_RETRIEVAL_LIMIT } = input;
+  if (facts.length === 0) return [];
+
+  const queryTerms = extractQueryTerms(query);
+  if (queryTerms.length === 0) return [];
+
+  const scored = scoreFacts(facts.map(buildFactIndex), queryTerms);
+
+  const lexicalOrder = scored
+    .filter((entry) => entry.eligible)
+    .sort((a, b) => (b.bm25 !== a.bm25 ? b.bm25 - a.bm25 : compareFacts(a.index.fact, b.index.fact)));
+
+  const centroidInputs: Float32Array[] = [];
+  for (const entry of lexicalOrder) {
+    if (centroidInputs.length === 3) break;
+    const vector = vectors?.get(entry.index.fact.file);
+    if (vector) centroidInputs.push(vector);
+  }
+  const centroid = vectors ? centroidOf(centroidInputs) : null;
+
+  if (!centroid) {
+    return lexicalOrder.slice(0, limit).map(({ index, bm25, headMatches }) => ({
+      fact: index.fact,
+      score: bm25,
+      bm25,
+      headMatches,
+    }));
+  }
+
+  const eligibleFiles = new Set(lexicalOrder.map((entry) => entry.index.fact.file));
+  const similarityByFile = new Map<string, number>();
+  for (const entry of scored) {
+    const vector = vectors?.get(entry.index.fact.file);
+    if (vector) similarityByFile.set(entry.index.fact.file, dot(centroid, vector));
+  }
+
+  const vectorOrder = scored
+    .filter((entry) => {
+      const similarity = similarityByFile.get(entry.index.fact.file);
+      return similarity !== undefined && (similarity >= VECTOR_ONLY_MIN_SIMILARITY || eligibleFiles.has(entry.index.fact.file));
+    })
+    .sort((a, b) => {
+      const similarityDelta = (similarityByFile.get(b.index.fact.file) ?? 0) - (similarityByFile.get(a.index.fact.file) ?? 0);
+      if (similarityDelta !== 0) return similarityDelta;
+      if (b.bm25 !== a.bm25) return b.bm25 - a.bm25;
+      return compareFacts(a.index.fact, b.index.fact);
+    });
+
+  const lexicalRank = new Map<string, number>();
+  lexicalOrder.forEach((entry, i) => lexicalRank.set(entry.index.fact.file, i + 1));
+  const vectorRank = new Map<string, number>();
+  vectorOrder.forEach((entry, i) => vectorRank.set(entry.index.fact.file, i + 1));
+
+  const byFile = new Map<string, ScoredFact>();
+  for (const entry of scored) {
+    if (lexicalRank.has(entry.index.fact.file) || vectorRank.has(entry.index.fact.file)) {
+      byFile.set(entry.index.fact.file, entry);
     }
   }
 
-  eligible.sort((a, b) => {
-    if (b.bm25 !== a.bm25) return b.bm25 - a.bm25;
-    return compareFacts(a.index.fact, b.index.fact);
+  const union = Array.from(byFile.values()).map((entry) => {
+    const file = entry.index.fact.file;
+    const lr = lexicalRank.get(file);
+    const vr = vectorRank.get(file);
+    const score = (lr !== undefined ? 1 / (RRF_K + lr) : 0) + (vr !== undefined ? 1 / (RRF_K + vr) : 0);
+    return { entry, score };
   });
 
-  return eligible.slice(0, limit).map(({ index, bm25, headMatches }) => ({
-    fact: index.fact,
-    score: bm25,
-    bm25,
-    headMatches,
+  union.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (b.entry.bm25 !== a.entry.bm25) return b.entry.bm25 - a.entry.bm25;
+    return compareFacts(a.entry.index.fact, b.entry.index.fact);
+  });
+
+  return union.slice(0, limit).map(({ entry, score }) => ({
+    fact: entry.index.fact,
+    score,
+    bm25: entry.bm25,
+    headMatches: entry.headMatches,
+    similarity: similarityByFile.get(entry.index.fact.file),
   }));
 }

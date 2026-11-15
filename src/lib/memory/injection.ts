@@ -20,6 +20,8 @@ import {
   type MemoryFact,
   type MemoryFactScope,
 } from './facts/store.js';
+import { readFactVectorsForFacts } from './facts/vectors.js';
+import { loadConfigSync } from '../config-yaml.js';
 
 export const PROMPT_TIME_MEMORY_BUDGETS = {
   status: 2000,
@@ -381,7 +383,14 @@ async function readFactCandidates(identity: MemoryIdentity, query: string): Prom
   }
   if (facts.length === 0) return [];
 
-  return rankFactsForQuery({ facts, query }).map(factCandidate);
+  let vectors: ReadonlyMap<string, Float32Array> | undefined;
+  try {
+    vectors = await readFactVectorsForFacts(facts, loadConfigSync().config.docs.embedding);
+  } catch {
+    // FR-7: a broken vector cache never blocks lexical ranking.
+  }
+
+  return rankFactsForQuery({ facts, query, vectors }).map(factCandidate);
 }
 
 function knowledgeIndexCandidate(text: string, identity: MemoryIdentity): CandidateContext {
