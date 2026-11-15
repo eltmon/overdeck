@@ -4,17 +4,17 @@
     "created": "2026-11-15T15:27:32Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5359: Per-turn memory injection for project-root conversations and Codex",
-    "updated": "2026-11-15T15:36:57.242Z"
+    "updated": "2026-11-15T15:41:45.443Z"
   },
   "plan": {
     "id": "pan-5359",
     "title": "Per-turn memory injection for project-root conversations and Codex",
-    "status": "proposed",
+    "status": "running",
     "uid": "b0285013-11b4-4e16-b6d1-efcdb4611b25",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T15:27:32Z",
-    "updated": "2026-11-15T15:36:57.242Z",
+    "updated": "2026-11-15T15:41:45.443Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5359",
@@ -557,5 +557,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
