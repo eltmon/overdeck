@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5347",
   "created": "2026-11-15T13:35:45.395Z",
-  "updated": "2026-11-15T13:35:45.395Z",
+  "updated": "2026-11-15T13:43:39.348Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,22 @@
   "sessionHistory": [],
   "items": {
     "capability-skill-slash-commands": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5347",
-      "claimedAt": "2026-11-15T13:35:45.395Z"
+      "claimedAt": "2026-11-15T13:35:45.395Z",
+      "doneAt": "2026-11-15T13:43:39.348Z"
+    },
+    "capability-skill-slash-commands.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:43:39.348Z"
+    },
+    "capability-skill-slash-commands.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:43:39.348Z"
+    },
+    "capability-skill-slash-commands.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T13:43:39.348Z"
     }
   }
 }
