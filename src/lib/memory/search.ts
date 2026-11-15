@@ -176,7 +176,7 @@ function extractQueryTerms(query: string): string[] {
 
 const KEYWORD_QUERY_MAX_TERMS = 12;
 const KEYWORD_MIN_LENGTH = 3;
-const KEYWORD_STOPWORDS = new Set([
+export const PROMPT_KEYWORD_STOPWORDS: ReadonlySet<string> = new Set([
   'the', 'and', 'are', 'but', 'can', 'could', 'did', 'does', 'for', 'from', 'had', 'has', 'have', 'how',
   'into', 'its', 'just', 'let', 'not', 'our', 'please', 'should', 'some', 'that', 'their', 'them', 'then',
   'there', 'these', 'they', 'this', 'was', 'were', 'what', 'when', 'where', 'which', 'who', 'why', 'will',
@@ -191,7 +191,7 @@ export function buildPromptKeywordQuery(text: string): string {
   const keywords: string[] = [];
   for (const term of extractQueryTerms(text)) {
     const lower = term.toLowerCase();
-    if (lower.length < KEYWORD_MIN_LENGTH || KEYWORD_STOPWORDS.has(lower) || seen.has(lower)) continue;
+    if (lower.length < KEYWORD_MIN_LENGTH || PROMPT_KEYWORD_STOPWORDS.has(lower) || seen.has(lower)) continue;
     seen.add(lower);
     keywords.push(lower);
     if (keywords.length === KEYWORD_QUERY_MAX_TERMS) break;

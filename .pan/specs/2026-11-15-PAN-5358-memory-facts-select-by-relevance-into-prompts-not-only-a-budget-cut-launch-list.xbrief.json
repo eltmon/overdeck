@@ -4,17 +4,17 @@
     "created": "2026-11-15T15:14:15Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5358: Memory facts: select by relevance into prompts, not only a budget-cut launch list",
-    "updated": "2026-11-15T15:25:18.193Z"
+    "updated": "2026-11-15T16:11:13.193Z"
   },
   "plan": {
     "id": "pan-5358",
     "title": "Memory facts: select by relevance into prompts, not only a budget-cut launch list",
-    "status": "proposed",
+    "status": "running",
     "uid": "4aee6745-0f31-47ea-8bd6-3404f421f823",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T15:14:15Z",
-    "updated": "2026-11-15T15:25:18.193Z",
+    "updated": "2026-11-15T16:11:13.193Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5358",
@@ -867,5 +867,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
