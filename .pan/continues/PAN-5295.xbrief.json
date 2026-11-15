@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5295",
   "created": "2026-11-15T19:39:19.043Z",
-  "updated": "2026-11-15T20:10:24.712Z",
+  "updated": "2026-11-15T20:10:32.714Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -216,6 +216,11 @@
     "turn-card.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T20:10:24.711Z"
+    },
+    "turn-card-wiring": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5295",
+      "claimedAt": "2026-11-15T20:10:32.713Z"
     }
   }
 }
