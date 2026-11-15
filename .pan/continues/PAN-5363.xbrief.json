@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5363",
+  "created": "2026-11-15T15:36:22.110Z",
+  "updated": "2026-11-15T15:36:22.110Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "server-drop-board-cache": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5363",
+      "claimedAt": "2026-11-15T15:36:22.110Z"
+    }
+  }
+}
