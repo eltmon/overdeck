@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ForkModal } from './ForkModal';
 import { ConversationRow } from './ConversationRow';
 import { HiddenMachinesFooter } from './LinkedConversationRow';
-import { buildConversationTree, groupSummary, isConversationActive, type ConversationTreeNode } from './conversation-tree';
+import { buildConversationTree, groupSummary, type ConversationTreeNode } from './conversation-tree';
 import { partitionConversationSections, SECTION_ORDER, snoozePresets, type ConversationSectionId } from './conversation-triage';
 import { useConversationMutations, type ConversationMutations } from './useConversationMutations';
 import { useDashboardStore } from '../../lib/store';
@@ -401,7 +401,10 @@ function ConversationListItemImpl({
           {`${collapsed ? '▸' : '▾'} ${groupSummaryText(node)}`}
         </button>
       )}
-      {!collapsed && node.descendants.map((child) => (
+      {(collapsed
+        ? node.descendants.filter((child) => child.conv.name === selectedConversation)
+        : node.descendants
+      ).map((child) => (
         <div
           key={child.conv.id}
           className={child.depth === 2 ? styles.convTreeDepth2 : styles.convTreeDepth1}
@@ -536,7 +539,7 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
   const isGroupCollapsed = useCallback((node: ConversationTreeNode<Conversation>) => {
     if (collapsedGroups.has(node.conv.name)) return true;
     if (expandedGroups.has(node.conv.name)) return false;
-    return !node.descendants.some((child) => isConversationActive(child.conv));
+    return !node.descendants.some((child) => (child.conv.pendingInputCount ?? 0) > 0);
   }, [collapsedGroups, expandedGroups]);
   const toggleGroup = useCallback((node: ConversationTreeNode<Conversation>) => {
     const name = node.conv.name;
