@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5370",
   "created": "2026-11-15T20:57:54.789Z",
-  "updated": "2026-11-15T23:20:54.389Z",
+  "updated": "2026-11-15T23:20:58.504Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,11 @@
     "breadcrumb-file-name.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T23:20:54.389Z"
+    },
+    "spend-timeout": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5370",
+      "claimedAt": "2026-11-15T23:20:58.504Z"
     }
   }
 }
