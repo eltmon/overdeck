@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5402",
   "created": "2026-11-15T23:07:41.060Z",
-  "updated": "2026-11-15T23:08:51.597Z",
+  "updated": "2026-11-15T23:09:26.341Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,9 +32,22 @@
       "doneAt": "2026-11-15T23:08:34.183Z"
     },
     "changelog-okf-publish": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5402",
-      "claimedAt": "2026-11-15T23:08:51.597Z"
+      "claimedAt": "2026-11-15T23:08:51.597Z",
+      "doneAt": "2026-11-15T23:09:26.341Z"
+    },
+    "changelog-okf-publish.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:09:26.341Z"
+    },
+    "changelog-okf-publish.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:09:26.341Z"
+    },
+    "changelog-okf-publish.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:09:26.341Z"
     }
   }
 }
