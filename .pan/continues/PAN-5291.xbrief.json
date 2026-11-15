@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5291",
   "created": "2026-11-15T08:32:27.661Z",
-  "updated": "2026-11-15T09:16:49.204Z",
+  "updated": "2026-11-15T09:16:59.585Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,11 @@
     "status-line-words.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T09:16:49.204Z"
+    },
+    "dock-chip-resync": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5291",
+      "claimedAt": "2026-11-15T09:16:59.584Z"
     }
   }
 }
