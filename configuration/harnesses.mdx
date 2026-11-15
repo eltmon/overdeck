@@ -52,6 +52,8 @@ Pressing **Enter** in the dashboard composer queues your message while the agent
 
 A steer never falls back silently to a queued message. A harness without steer answers `steer-unsupported` and delivers nothing. A Claude Code agent launched before steer support has a PTY supervisor that presses Enter instead, and the delivery reports that it went out as a normal submit.
 
+**Send now.** A message sent while Claude Code is busy waits in Claude Code's own queue, and its bubble reads *Sent · waiting for transcript*. Click **Send now** on that bubble, or press **Ctrl+Enter** (**Cmd+Enter** on macOS) on an empty composer, to interrupt the turn and send every queued message at once, like the TUI's Ctrl+Enter on an empty input box. Overdeck presses Claude Code's send-now chord, Ctrl+X Ctrl+S, and types no text. It works for conversations and workspace agents, Claude Code only. With nothing queued it does nothing. Text typed into the agent's input box in the Terminal tab is submitted with it.
+
 ## Supported harnesses
 
 ### Claude Code (default)
