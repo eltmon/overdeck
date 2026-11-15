@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5329",
   "created": "2026-11-15T06:45:07.358Z",
-  "updated": "2026-11-15T07:41:36.360Z",
+  "updated": "2026-11-15T07:51:48.993Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,14 @@
     "change-tag-truncate.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T07:41:36.360Z"
+    },
+    "chat-find-plain-ctrl-f.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T07:51:48.993Z"
+    },
+    "rail-narrow-auto-collapse.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-15T07:51:48.993Z"
     }
   }
 }
