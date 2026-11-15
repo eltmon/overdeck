@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5289",
   "created": "2026-11-15T02:58:13.006Z",
-  "updated": "2026-11-15T04:04:46.649Z",
+  "updated": "2026-11-15T04:05:04.397Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -264,6 +264,11 @@
     "edit-workspace-dock.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T04:04:46.649Z"
+    },
+    "tree-row-layout": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5289",
+      "claimedAt": "2026-11-15T04:05:04.397Z"
     }
   }
 }
