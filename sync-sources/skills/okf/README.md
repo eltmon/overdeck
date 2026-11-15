@@ -83,6 +83,7 @@ The skill remains portable. Its core scripts do not import Overdeck and require 
 | `/okf validate [--strict]` | Run the deterministic conformance gate. |
 | `/okf lint` | Run advisory semantic patrol. |
 | `/okf embed [--profile <name>]` | Update embedding shards and rebuild the local index. |
+| `/okf publish --out <dir> [--check]` | Build a public static site from public concepts, with redaction. |
 
 ## The Three Loops
 
@@ -97,6 +98,76 @@ Run `/okf sync [--topic "<focus>"]` when code or docs change. The pass maps diff
 ### Retro
 
 Run `/okf retro` after implementation. The pass asks what knowledge would have made the work easier, then files those answers as concepts through the knowledge PR flow.
+
+## Publishing a bundle
+
+`/okf publish` builds a read-only static site from the bundle's public concepts. The site has one page per public concept, an index page per published directory, and a client-side search page. It is plain HTML, CSS, one script and a JSON index, with no server code and no CDN, so any static host works. Deploying the site is outside the skill.
+
+```bash
+python3 <okf-skill-dir>/scripts/publish.py --bundle . --check
+python3 <okf-skill-dir>/scripts/publish.py --bundle . --out _site
+```
+
+**Visibility.** A concept is published only when its frontmatter says `x_visibility: public`, or when it has no `x_visibility` and the root `schema.md` sets `x_visibility_default: public`. Without `schema.md` or that key, every concept is private. Any value other than `public` or `private` stops the run with an error.
+
+```yaml
+# schema.md frontmatter
+x_visibility_default: public
+# a concept that must stay off the site
+x_visibility: private
+```
+
+A private concept has no page, no index line, no search record and no backlink. A link to it renders as plain text, and the link text stays, so do not put secrets in link text. `log.md`, non-Markdown files and dot-directories are never published.
+
+**Redaction profile.** Before rendering, `publish.py` rewrites every published string with regex rules. Built-in rules always apply unless you disable them: `home-path-unix`, `home-path-windows`, `ipv4`, `github-token`, `openai-style-key`, `aws-access-key`, `slack-token` and `private-key-block`. Add your own rules in `okf-publish.yaml` at the bundle root (start from `templates/okf-publish.yaml`):
+
+```yaml
+okf_publish_version: "0.1"
+disable_default_rules: []        # for example [ipv4] when version numbers trip it
+rules:
+  - id: stream-box-host
+    pattern: '\bstream-box\.lan\b'
+    replace: '[internal-host]'
+private_strings:                 # literal, case-insensitive, matches across line breaks
+  - Alice Example
+```
+
+Use `publish.py --bundle . --check` as the CI gate. It exits 2 when any rule matches text in a public concept or a published index page. It names the rule and the file line, never the matched text, because CI logs of public repos are public. Fix the source text, then rerun. A rule that matches a public concept ID or directory name is always an error, because URLs cannot be redacted.
+
+**Sample Cloudflare Pages setup.** This workflow checks the bundle and deploys `_site` on every push to `main`:
+
+```yaml
+name: Publish knowledge site
+on:
+  push:
+    branches: [main]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: eltmon/okf
+          ref: vX.Y.Z            # a release that includes scripts/publish.py
+          path: .okf-skill        # dot-directory: the publisher skips it
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python3 -m pip install PyYAML
+      - run: python3 .okf-skill/scripts/publish.py --bundle . --check
+      - run: python3 .okf-skill/scripts/publish.py --bundle . --out _site
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy _site --project-name=<your-pages-project>
+```
+
+For GitHub Pages, upload `_site` with `actions/upload-pages-artifact` and deploy it with `actions/deploy-pages`; every link is page-relative, so the site works under a project subpath. Search fetches `search-index.json`, so preview the site with `python3 -m http.server --directory _site` rather than opening the files directly. See [references/publish.md](references/publish.md) for the full rules.
 
 ## Reading Rules
 

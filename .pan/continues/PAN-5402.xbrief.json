@@ -1,0 +1,73 @@
+{
+  "version": "1",
+  "issueId": "PAN-5402",
+  "created": "2026-11-15T23:07:41.060Z",
+  "updated": "2026-11-15T23:25:09.920Z",
+  "gitState": {},
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Vendoring change verified by okf-vendor-pin CI check; no code logic changes requiring tests (b836519bd95)",
+      "recordedAt": "2026-11-15T23:25:09.919Z"
+    }
+  ],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "vendor-okf-v0-1-1": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5402",
+      "claimedAt": "2026-11-15T23:07:41.060Z",
+      "doneAt": "2026-11-15T23:08:34.183Z"
+    },
+    "vendor-okf-v0-1-1.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:08:34.183Z"
+    },
+    "vendor-okf-v0-1-1.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:08:34.183Z"
+    },
+    "vendor-okf-v0-1-1.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:08:34.183Z"
+    },
+    "vendor-okf-v0-1-1.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:08:34.183Z"
+    },
+    "changelog-okf-publish": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5402",
+      "claimedAt": "2026-11-15T23:08:51.597Z",
+      "doneAt": "2026-11-15T23:09:26.341Z"
+    },
+    "changelog-okf-publish.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:09:26.341Z"
+    },
+    "changelog-okf-publish.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:09:26.341Z"
+    },
+    "changelog-okf-publish.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:09:26.341Z"
+    },
+    "quality-gates": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5402",
+      "claimedAt": "2026-11-15T23:09:34.320Z",
+      "doneAt": "2026-11-15T23:24:50.312Z"
+    },
+    "quality-gates.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:24:50.312Z"
+    },
+    "quality-gates.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T23:24:50.312Z"
+    }
+  }
+}

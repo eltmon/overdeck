@@ -1,0 +1,273 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T23:03:55Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5402: Re-vendor the OKF skill at eltmon/okf v0.1.1 (adds okf publish)",
+    "updated": "2026-11-15T23:05:43.253Z"
+  },
+  "plan": {
+    "id": "pan-5402",
+    "title": "Re-vendor the OKF skill at eltmon/okf v0.1.1 (adds okf publish)",
+    "status": "proposed",
+    "uid": "0cb7e124-b634-447a-a1cc-ad86ea6e6d32",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-15T23:03:55Z",
+    "updated": "2026-11-15T23:05:43.253Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5402",
+        "label": "PAN-5402",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/okf/releases/tag/v0.1.1",
+        "label": "eltmon/okf v0.1.1",
+        "type": "release"
+      }
+    ],
+    "tags": [
+      "okf",
+      "vendored-skill",
+      "changelog"
+    ],
+    "narratives": {
+      "Problem": "Overdeck vendors the /okf skill from eltmon/okf at v0.1.0 (sync-sources/skills/okf/.okf-skill-version). eltmon/okf v0.1.1 adds the /okf publish command (OKF-11), so Overdeck users do not get it until the vendored tree moves to v0.1.1.",
+      "Proposal": "Run scripts/vendor-okf-skill.sh v0.1.1, which rewrites sync-sources/skills/okf to the v0.1.1 filtered tree and the pin file to v0.1.1. A dry run showed exactly 5 modified and 10 added paths, all inside the vendored tree. Add changelog.d/pan-5402.md under #### New. The PRD at .pan/drafts/PAN-5402.md holds the exact expected file list and changelog text.",
+      "NonGoals": "- Editing scripts/vendor-okf-skill.sh or .github/workflows/okf-vendor-pin.yml.\n- Hand-editing any file under sync-sources/skills/okf/.\n- Changing the v0.1.0 fixture literals in doctor-okf-skill.test.ts, vendored-skills.test.ts, sync-okf-convergence.test.ts or vendor-okf-skill.test.ts.\n- Editing configuration/knowledge.mdx or any other doc page.\n- Editing changelog.mdx.\n- Running the skill's selftest.sh or publish.py.\n- Running pan sync (post-merge host step)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "No change to configuration/knowledge.mdx; the changelog.d entry is the only documentation change.",
+        "rationale": "The issue limits the diff to the vendored tree plus the changelog entry, and knowledge.mdx 'Where the skill lives' names no tag or full command list, so the bump leaves it accurate."
+      },
+      {
+        "summary": "The changelog entry goes under #### New.",
+        "rationale": "/okf publish is a new command users can call, not an improvement to an existing one."
+      },
+      {
+        "summary": "Test fixtures that write v0.1.0 into temp dirs stay unchanged.",
+        "rationale": "None of them reads the real pin file; they are self-contained fixtures."
+      }
+    ],
+    "metadata": {
+      "docsJustification": "The only documented surface is the changelog: changelog.d/pan-5402.md (item changelog-okf-publish). configuration/knowledge.mdx describes vendoring generically and stays accurate.",
+      "canonicalFilename": "2026-11-15-PAN-5402-re-vendor-the-okf-skill-at-eltmon-okf-v0-1-1-adds-okf-publish.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "vendor-okf-v0-1-1",
+        "title": "Vendor eltmon/okf v0.1.1 into sync-sources/skills/okf with the vendor script",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T23:03:55Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-5402",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/okf/.okf-skill-version",
+            "sync-sources/skills/okf/README.md",
+            "sync-sources/skills/okf/SKILL.md",
+            "sync-sources/skills/okf/docs/USAGE.md",
+            "sync-sources/skills/okf/scripts/selftest.sh",
+            "sync-sources/skills/okf/references/publish.md",
+            "sync-sources/skills/okf/scripts/publish.py",
+            "sync-sources/skills/okf/scripts/publish_markdown.py",
+            "sync-sources/skills/okf/scripts/publish_model.py",
+            "sync-sources/skills/okf/scripts/publish_redact.py",
+            "sync-sources/skills/okf/scripts/publish_render.py",
+            "sync-sources/skills/okf/scripts/publish_search.py",
+            "sync-sources/skills/okf/scripts/publish_assets/search.js",
+            "sync-sources/skills/okf/scripts/publish_assets/style.css",
+            "sync-sources/skills/okf/templates/okf-publish.yaml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/vendor-okf-skill.sh --check",
+            "cat sync-sources/skills/okf/.okf-skill-version",
+            "git show --name-only --format= HEAD"
+          ],
+          "expected_outputs": [
+            "pin check exits 0 and prints 'okf skill matches eltmon/okf v0.1.1'",
+            "pin file prints v0.1.1",
+            "vendor commit lists exactly the 15 files_scope paths"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Confirm `git branch --show-current` prints feature/pan-5402. From the workspace root run `bash scripts/vendor-okf-skill.sh v0.1.1` (network). Run `git status --short --untracked-files=all sync-sources/skills/okf`: it must show exactly 5 modified files (.okf-skill-version, README.md, SKILL.md, docs/USAGE.md, scripts/selftest.sh) and 10 untracked files (references/publish.md, scripts/publish.py, scripts/publish_markdown.py, scripts/publish_model.py, scripts/publish_redact.py, scripts/publish_render.py, scripts/publish_search.py, scripts/publish_assets/search.js, scripts/publish_assets/style.css, templates/okf-publish.yaml). Any other path: do not commit; report with `pan tell flywheel-orchestrator`. Run `bash scripts/vendor-okf-skill.sh --check` (must exit 0). Stage only sync-sources/skills/okf, commit `chore(okf): vendor eltmon/okf v0.1.1` with trailer `Item: vendor-okf-v0-1-1`, push. Never hand-edit files under sync-sources/skills/okf; never commit __pycache__."
+        },
+        "items": [
+          {
+            "id": "vendor-okf-v0-1-1.ac1",
+            "title": "`cat sync-sources/skills/okf/.okf-skill-version` prints `v0.1.1`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vendor-okf-v0-1-1.ac2",
+            "title": "`bash scripts/vendor-okf-skill.sh --check` exits 0 and prints `okf skill matches eltmon/okf v0.1.1`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vendor-okf-v0-1-1.ac3",
+            "title": "Given the vendor commit, `git show --name-only --format=` produces exactly the 15 files_scope paths and no path outside sync-sources/skills/okf/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vendor-okf-v0-1-1.ac4",
+            "title": "Given the PR head contains the vendor commit, the PR's okf-vendor-pin check concludes success",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "changelog-okf-publish",
+        "title": "Add changelog.d/pan-5402.md announcing /okf publish in the bundled OKF skill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:03:55Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5402",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "changelog.d/pan-5402.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c '—' changelog.d/pan-5402.md"
+          ],
+          "expected_outputs": [
+            "docs lint passed with the new changelog entry counted",
+            "em dash count prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create changelog.d/pan-5402.md with exactly the content given in PRD WI-2: a `#### New` heading, a blank line, then one bullet starting `- **Publish a public knowledge site with \\`/okf publish\\`:**` that says the bundled OKF skill is now eltmon/okf v0.1.1, that `/okf publish --out <dir>` builds a static site from concepts marked public and applies redaction rules first, that `--check` shows which rule matches, and ends with `([#5402](https://github.com/eltmon/overdeck/issues/5402))`. No em dashes, no dollar signs. Do not edit changelog.mdx. Run `npm run lint:docs`. Commit `docs(changelog): note okf publish in the bundled OKF skill` with trailer `Item: changelog-okf-publish`, push."
+        },
+        "items": [
+          {
+            "id": "changelog-okf-publish.ac1",
+            "title": "changelog.d/pan-5402.md exists with a single `#### New` section whose bullet contains `/okf publish`, `v0.1.1` and `#5402`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changelog-okf-publish.ac2",
+            "title": "`npm run lint:docs` exits 0 with the new entry present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changelog-okf-publish.ac3",
+            "title": "`grep -c '—' changelog.d/pan-5402.md` prints 0 and `git diff origin/main -- changelog.mdx` produces no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "quality-gates",
+        "title": "Run typecheck and lint on the finished branch",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:03:55Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-5402",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/okf/SKILL.md",
+            "changelog.d/pan-5402.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:cli",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "build:cli writes dist/cli/index.js",
+            "typecheck exits 0",
+            "lint exits 0 including lint:skills, lint:no-state-layer, lint:slash-commands and lint:docs"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "After both other items are committed: run `npm run build:cli` (lint:slash-commands exits 2 without dist/cli/index.js), then `npm run typecheck` and `npm run lint`. Both must exit 0. This item changes no files; if a gate fails, investigate the root cause rather than editing vendored files. Record the result in an empty commit `chore: quality gates for PAN-5402` with trailer `Item: quality-gates`, push. Run no Vitest files and never the full npm test."
+        },
+        "items": [
+          {
+            "id": "quality-gates.ac1",
+            "title": "`npm run typecheck` exits 0 on the branch head",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quality-gates.ac2",
+            "title": "`npm run lint` exits 0 on the branch head after `npm run build:cli`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "vendor-okf-v0-1-1",
+        "to": "quality-gates",
+        "type": "blocks"
+      },
+      {
+        "from": "changelog-okf-publish",
+        "to": "quality-gates",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

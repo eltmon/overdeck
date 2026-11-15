@@ -1,0 +1,27 @@
+# OKF publish redaction profile. Copy this file to your bundle root.
+# publish.py applies the built-in rules, then `rules`, then `private_strings`
+# to every published string. `publish.py --check` fails when any rule matches
+# text in a public concept.
+#
+# Built-in rule ids (all on unless listed in disable_default_rules):
+#   - home-path-unix
+#   - home-path-windows
+#   - ipv4
+#   - github-token
+#   - openai-style-key
+#   - aws-access-key
+#   - slack-token
+#   - private-key-block
+okf_publish_version: "0.1"
+disable_default_rules: []
+
+# Example rule: replace an internal host name.
+# rules:
+#   - id: stream-box-host
+#     pattern: '\bstream-box\.lan\b'
+#     replace: '[internal-host]'
+
+# Example private string: matched literally and case-insensitively; a line break
+# or any run of whitespace between its words still matches.
+# private_strings:
+#   - Alice Example
