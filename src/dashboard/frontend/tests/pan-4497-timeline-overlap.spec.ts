@@ -376,16 +376,16 @@ test.describe('PAN-4497 timeline rows never overlap', () => {
     // transform), the image growth case is skipped above without failing
     // the spec — the other growth cases still run and assert.
 
-    // Tool toggle: collapse and re-expand tool calls via the header button.
-    // Its title flips between the two states, so it needs two locators.
-    const hideToggle = page.locator('button[title="Hide tool calls"]').first();
-    await expect(hideToggle).toBeVisible({ timeout: 20_000 });
-    await hideToggle.click();
+    // Tool toggle: collapse and re-expand tool calls via the header ⋯ menu
+    // (PAN-5291). The Show tool calls item flips its aria-checked state.
+    const menuTrigger = page.getByLabel('More conversation actions').first();
+    await expect(menuTrigger).toBeVisible({ timeout: 20_000 });
+    await menuTrigger.click();
+    await page.getByRole('menuitemcheckbox', { name: /Show tool calls/ }).click();
     await settle(page);
     await assertNoOverlap(page);
-    const showToggle = page.locator('button[title="Show tool calls"]').first();
-    await expect(showToggle).toBeVisible({ timeout: 20_000 });
-    await showToggle.click();
+    await menuTrigger.click();
+    await page.getByRole('menuitemcheckbox', { name: /Show tool calls/ }).click();
     await settle(page);
     await assertNoOverlap(page);
 
