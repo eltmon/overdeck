@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5291",
   "created": "2026-11-15T08:32:27.661Z",
-  "updated": "2026-11-15T09:11:51.031Z",
+  "updated": "2026-11-15T09:11:58.702Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,11 @@
     "menu-subagents.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T09:11:51.030Z"
+    },
+    "status-line-words": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5291",
+      "claimedAt": "2026-11-15T09:11:58.702Z"
     }
   }
 }
