@@ -1,14 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T16:54:38.069218Z · model: claude-opus-5-5 · open: 907_
+_Last sequenced: 2026-11-15T16:58:24.209807Z · model: claude-opus-5-5 · open: 905_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5337 | S | high | ok |  |  | In pipeline: every relative link in a Markdown preview opens a 404 /conv/<file> URL instead of the linked file. |
-| 4 | PAN-5356 | M | critical | ok |  |  | Merge train re-assembles on every bookkeeping-only main commit, so batches never live long enough for CI; skip .pan/** moves. |
-| 5 | PAN-5338 | M | medium | ok |  |  | In pipeline: conversation diff view gets a rendered Markdown Preview and an Open file action. |
 | 7 | PAN-5363 | S | high | ok |  |  | In pipeline: merge train board Train switch flips back on after off; board cache not dropped on write, optimistic value lost. |
 | 8 | PAN-5357 | S | critical | ok |  |  | Sequencer commits sequence.md every 1-3 min with timestamp-only diffs; skip the commit when the ranking is unchanged and rate-limit runs. |
 | 9 | PAN-5361 | S | critical | ok |  |  | In pipeline: bare-host-linux idle check fails ~3% of runs; pid-net counts machine-wide runner PID bursts one baseline can't cancel. |
@@ -458,7 +456,7 @@ _Last sequenced: 2026-11-15T16:54:38.069218Z · model: claude-opus-5-5 · open: 
 | 447 | PAN-5180 | M | medium | ok |  |  | Tab-open REST burst (~45 requests) delays every client 1.0-1.4 s; uncached prerequisite and status probes. |
 | 448 | PAN-5264 | M | medium | ok |  |  | Attribute the app-rest GitHub caller (1,422 untraced App REST calls/hour), then cut the largest path. |
 | 449 | PAN-5340 | S | medium | ok |  | PAN-5337 | A Preview link to another Markdown file should open it in Preview, not Edit. Follows PAN-5337. |
-| 450 | PAN-5341 | S | medium | ok |  | PAN-5338 | Dock Changes diff view gets the Markdown Preview switch from PAN-5338; matters once D2 moves diffs to the dock. |
+| 450 | PAN-5341 | S | medium | ok |  |  | Dock Changes diff view reuses the Markdown Preview that shipped in PAN-5338; matters once D2 moves diffs to the dock. |
 | 451 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
 | 452 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
 | 453 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
@@ -923,14 +921,6 @@ Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat 
 
 New in-pipeline bug, pinned at a freed top slot. All 93 links in a measured docs index were dead; PAN-5340 builds on its fix.
 
-### PAN-5356 (rank 4)
-
-New critical substrate bug: it is why the approved PAN-5290/5294/5348 batch cannot land today. Keeping a live generation when main moved only through CI-ignored bookkeeping paths unblocks the merge train; ranked just below the in-pipeline pins and PAN-5013.
-
-### PAN-5338 (rank 5)
-
-New in-pipeline enhancement, pinned at a freed top slot. Its reusable preview body is what PAN-5341 reuses in the dock diff view.
-
 ### PAN-5363 (rank 7)
 
 Back in the manifest after dropping out of the last two passes; restored with its prior node. In-pipeline bug with a file:line root cause (switch falls back to a stale 5 s server board cache after the POST settles). Placed in a free top-tier slot near PAN-5364, which edits the same ProjectTrainCard.tsx; high rather than critical because the write itself succeeds.
@@ -1235,6 +1225,14 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
 
 New this pass. A completed-handoff agent owed rework after a blocked verdict cannot be started at all: pan start refuses and recommends --fresh, --fresh gives the identical refusal, and reset-session is refused too because the durable plane reconstructs the session pointer. The refusal message names an action the operator cannot take, which is the self-contradictory-deadlock family PAN-3526 opened.
 
+### PAN-3522 (rank 80)
+
+New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts through a new generation's 138-second boot warm phase and killed it anyway, producing four restarts in ten minutes, racing spawns on port 3012, and a WATCHDOG GIVING UP. Each restart re-triggered docker stack rebuilds, feeding the storm. The probe budget has to know the difference between starved and starting.
+
+### PAN-3314 (rank 81)
+
+New this pass. Every agent pane is a child of one transient tmux-server unit, so agent memory is the unit's memory and systemd-oomd's kill decision is all-or-nothing: one hungry agent takes the entire fleet with it. That has now happened twice, the second time killing seven work agents, four strikes and a live review convoy. Blast-radius containment is a different fix from choosing a better victim.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1242,10 +1240,10 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T16:54:38.069218Z",
+  "generatedAt": "2026-11-15T16:58:24.209807Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 907,
+  "openCount": 905,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -1270,32 +1268,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "dependsOn": [],
       "why": "In pipeline: every relative link in a Markdown preview opens a 404 /conv/<file> URL instead of the linked file.",
       "rationale": "New in-pipeline bug, pinned at a freed top slot. All 93 links in a measured docs index were dead; PAN-5340 builds on its fix.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5356",
-      "rank": 4,
-      "size": "M",
-      "importance": "critical",
-      "score": 91,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Merge train re-assembles on every bookkeeping-only main commit, so batches never live long enough for CI; skip .pan/** moves.",
-      "rationale": "New critical substrate bug: it is why the approved PAN-5290/5294/5348 batch cannot land today. Keeping a live generation when main moved only through CI-ignored bookkeeping paths unblocks the merge train; ranked just below the in-pipeline pins and PAN-5013.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5338",
-      "rank": 5,
-      "size": "M",
-      "importance": "medium",
-      "score": 66,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: conversation diff view gets a rendered Markdown Preview and an Open file action.",
-      "rationale": "New in-pipeline enhancement, pinned at a freed top slot. Its reusable preview body is what PAN-5341 reuses in the dock diff view.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6951,10 +6923,9 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "importance": "medium",
       "score": 50,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5338"
-      ],
-      "why": "Dock Changes diff view gets the Markdown Preview switch from PAN-5338; matters once D2 moves diffs to the dock.",
+      "dependsOn": [],
+      "why": "Dock Changes diff view reuses the Markdown Preview that shipped in PAN-5338; matters once D2 moves diffs to the dock.",
+      "rationale": "Its dependency PAN-5338 merged, so it is no longer blocked; rank held because its value still waits on D2 moving diffs to the dock.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13645,13 +13616,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "confidence": 1
     },
     {
-      "from": "PAN-5338",
-      "to": "PAN-5341",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-5201",
       "to": "PAN-5202",
       "type": "unblocks",
@@ -13722,13 +13686,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "confidence": 0.4
     },
     {
-      "from": "PAN-5357",
-      "to": "PAN-5356",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-5358",
       "to": "PAN-293",
       "type": "informs",
@@ -13776,13 +13733,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-5356",
-      "to": "PAN-5364",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.7
     },
     {
       "from": "PAN-5359",
