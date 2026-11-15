@@ -32,7 +32,7 @@ export function IssuesFilterMenu({ filter, onFilterChange }: IssuesFilterMenuPro
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="list-row flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground"
+        className="list-row flex items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground"
       >
         <ListFilter aria-hidden className="h-3 w-3" />
         Filter: {FILTER_LABELS[filter]}

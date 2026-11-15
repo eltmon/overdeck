@@ -302,16 +302,18 @@ export function ProjectNode({ projectKey, name, features, selectedFeature, onSel
             onClick={toggleFrameSection}
             aria-expanded={expanded}
             data-testid="issues-section-toggle"
-            className="flex min-w-0 items-center gap-1 text-left"
+            className="flex shrink-0 items-center gap-1 text-left"
           >
             <ChevronRight className={`${styles.chevron} ${expanded ? styles.chevronOpen : ''}`} size={14} />
             {editingName ? renameField : <span className="eyebrow">Issues</span>}
             <span className={styles.featureCount} data-testid="issues-section-count">{visibleFeatures.length}</span>
           </button>
-          <ProjectCiChip projectKey={projectKey} />
-          <ProjectDeployChip projectKey={projectKey} />
-          <ProjectIdentityChip projectKey={projectKey} />
-          {headerActions && <span className="ml-auto flex items-center">{headerActions}</span>}
+          <span className={styles.frameHeaderChips} data-testid="issues-header-chips">
+            <ProjectCiChip projectKey={projectKey} />
+            <ProjectDeployChip projectKey={projectKey} />
+            <ProjectIdentityChip projectKey={projectKey} />
+          </span>
+          {headerActions && <span className="ml-auto flex shrink-0 items-center">{headerActions}</span>}
         </div>
       ) : (
       <button

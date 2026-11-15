@@ -224,6 +224,26 @@
   cursor: help;
 }
 
+/* PAN-5370: the left column's Issues header. The chips sit between the
+   eyebrow and the filter and give way first: the identity chip ellipsizes,
+   anything still too wide is clipped here, never drawn over its neighbours. */
+.frameHeaderChips {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.frameHeaderChips > .projectIdentityChip {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .projectAddConvBtn {
   display: flex;
   align-items: center;

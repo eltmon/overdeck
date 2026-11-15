@@ -126,4 +126,22 @@ describe('IssuesSection (PAN-5293 F-D17)', () => {
     renderSection();
     expect(screen.getByTestId('issues-section-toggle')).toHaveAttribute('aria-expanded', 'false');
   });
+
+  it('keeps the eyebrow, count and filter whole and puts the chips in a shrinkable container (PAN-5370)', () => {
+    renderSection();
+    const toggle = screen.getByTestId('issues-section-toggle');
+    expect(toggle).toHaveClass('shrink-0');
+    expect(toggle).not.toHaveClass('min-w-0');
+
+    const chips = screen.getByTestId('issues-header-chips');
+    expect(chips).toContainElement(screen.getByTestId('ci-chip'));
+    expect(chips).toContainElement(screen.getByTestId('deploy-chip'));
+    expect(chips).toContainElement(screen.getByTestId('identity-chip'));
+    expect(chips).not.toContainElement(screen.getByTestId('issues-section-toggle'));
+    expect(chips).not.toContainElement(screen.getByTestId('issues-filter'));
+
+    const filter = screen.getByTestId('issues-filter');
+    expect(filter).toHaveClass('whitespace-nowrap');
+    expect(filter.parentElement!.parentElement).toHaveClass('shrink-0');
+  });
 });
