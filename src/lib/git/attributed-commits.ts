@@ -114,6 +114,13 @@ export async function listAttributedCommits(opts: {
   return commits;
 }
 
+/** The files one commit changed (diff-tree against its first parent; root commits against the empty tree). */
+export async function listCommitFilesAt(repoPath: string, sha: string): Promise<AttributedCommitFile[]> {
+  const git = async (args: string[]): Promise<string> =>
+    (await execFileAsync('git', ['-C', repoPath, ...args], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })).stdout;
+  return listCommitFiles(git, sha);
+}
+
 async function listCommitFiles(git: (args: string[]) => Promise<string>, sha: string): Promise<AttributedCommitFile[]> {
   const base = ['diff-tree', '--root', '-r', '-M', '-z', '--no-commit-id'];
 
