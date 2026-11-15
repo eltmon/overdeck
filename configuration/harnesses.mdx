@@ -37,6 +37,8 @@ The dashboard reserves `/pan <verb> [args]` for Overdeck operator commands. The 
 
 Harness-native slash commands are a separate lane and are not uniform. The composer menu reads the active harness's verified capability list: for example, Claude Code exposes native commands such as `/model`, while a harness with no verified inventory shows no native entries. Overdeck commands appear in their own **Overdeck** group, so choosing a harness never changes the `/pan` control-plane surface.
 
+On a harness that declares the `skillSlashCommands` capability, the composer's `/` menu also lists every enabled installed skill as a `/<skill-name>` entry under a **Skills** group, because that harness runs a typed `/<skill>` command the same way Overdeck's own commands run. The list is scoped to the open conversation's own launch context (its cwd, issue, and per-conversation skill overrides), fetched from `GET /api/skills/overrides` only while the menu is open.
+
 Managed Codex sessions use an isolated `CODEX_HOME`. On initialization and resume, Overdeck copies the Agent Skills standard directories synced by `pan sync` from `~/.agents/skills` into that home's `skills/` directory. Managed skills are refreshed additively, per-agent-only skill directories are preserved, and Codex still keeps its sessions and configuration inside the isolated home.
 
 ## Steering a running turn
@@ -1285,6 +1287,7 @@ name. Every field is required, so a harness cannot leave a decision undeclared.
 | `askAnswerDelivery` | How the dashboard delivers an answer to a conversation's pending question: `message` sends it as a message; `pi-ask-modal` drives the open ask modal with keystrokes; `codex-approval` means it is really a numbered approval prompt, answered with `answer_codex_approval` (PAN-4944), not a question. |
 | `runsOnFlyMachine` | A conversation may be started on a Fly machine (`pan machines add-fly`). Only Claude Code declares it; other harnesses on Fly are #4296. |
 | `overdeckMcp` | Launches get the `overdeck` MCP server with a per-agent token. Claude Code, Codex, `acp` and `opencode` declare it. |
+| `skillSlashCommands` | The composer `/` menu lists installed skills as `/<skill-name>` under a Skills group, because this harness runs a typed `/<skill>` command. Only Claude Code declares it. |
 
 The rule for harness-specific code:
 
