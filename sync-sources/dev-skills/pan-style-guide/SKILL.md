@@ -273,6 +273,7 @@ compiles to no CSS — do not rebuild them from Tailwind opacity utilities.
 | `.list-group-bar` | A collapsible list group's header bar. |
 | `.list-row` | A single-line row inside a grouped list (hover tint). |
 | `.list-meta` | A metadata strip under an open group. |
+| `.match-mark` | A search/quick-open match `<mark>` highlight (legible in both themes, unlike the browser-default yellow). |
 | `.switch-track-on` | A checked `role="switch"` track. |
 | `.switch-track-locked` | A checked, non-interactive `role="switch"` track. |
 

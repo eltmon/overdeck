@@ -201,3 +201,11 @@ passes `defaultCollapsed`, so it always starts with the rail collapsed at its de
 width without disturbing whatever collapsed/expanded state the user left on the conversation's
 own full page.
 
+`SubagentRail` also watches its own host pane with a `ResizeObserver` (PAN-5329): below
+`NARROW_PANE_PX` (760 px) it auto-collapses to the 30 px strip regardless of the stored
+preference, so opening a file beside a narrow conversation doesn't starve the messages column.
+This auto-collapse never writes `overdeck.ui.agentsRailCollapsed` — clicking the strip open while
+narrow sets a pane-local override instead, which clears as soon as the host widens back to
+`NARROW_PANE_PX` or more, falling back to the stored preference. A reported width of `0` (not yet
+measured) is ignored rather than treated as narrow.
+
