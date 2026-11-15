@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5337",
   "created": "2026-11-15T11:36:29.093Z",
-  "updated": "2026-11-15T15:14:59.517Z",
+  "updated": "2026-11-15T15:22:51.329Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -163,6 +163,9 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-5337",
       "claimedAt": "2026-11-15T15:14:59.517Z"
+    },
+    "code-pane-preview-links.ac3": {
+      "status": "cancelled"
     }
   },
   "agentModel": "claude-sonnet-5"
