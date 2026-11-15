@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5293",
   "created": "2026-11-15T06:57:45.448Z",
-  "updated": "2026-11-15T07:09:00.678Z",
+  "updated": "2026-11-15T07:09:08.670Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "selection-store.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T07:09:00.677Z"
+    },
+    "deck-navigation": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5293",
+      "claimedAt": "2026-11-15T07:09:08.670Z"
     }
   }
 }
