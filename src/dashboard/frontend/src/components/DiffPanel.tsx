@@ -265,7 +265,7 @@ export function DiffPanel({
   // ?diff=1 param still gates the popout/sheet (sheet-mode) toggle path.
   const diffOpen = mode === 'inline' || effectiveParams.diff === '1'
   const selectedTurnId = effectiveParams.diffTurnId ?? null
-  const selectedFilePath = selectedTurnId !== null ? (effectiveParams.diffFilePath ?? null) : null
+  const selectedFilePath = effectiveParams.diffFilePath ?? null
 
   // The Diff/Preview choice belongs to the file (PAN-5338 D-4): it resets
   // when the selected file changes and survives a scope change for the

@@ -96,6 +96,19 @@ describe('DiffPanel zero-turn file lists (PAN-4501)', () => {
     );
   });
 
+  it('fetches the file-scoped full URL after clicking a file under All turns (PAN-5338 WI-10)', async () => {
+    mockFetchFiles([{ path: 'x.ts', additions: 1, deletions: 0 }]);
+
+    renderPanel();
+
+    const fileEntry = await screen.findByText('x.ts');
+    fireEvent.click(fileEntry);
+
+    await waitFor(() =>
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/conversations/c1/diffs/full?file=x.ts'),
+    );
+  });
+
   it('never renders "No completed turns yet." with zero turn summaries', async () => {
     mockFetchFiles([]);
 
