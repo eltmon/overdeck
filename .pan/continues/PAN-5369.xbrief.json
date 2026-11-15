@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5369",
   "created": "2026-11-15T17:54:40.939Z",
-  "updated": "2026-11-15T18:11:08.484Z",
+  "updated": "2026-11-15T18:21:15.971Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,9 +68,30 @@
       "doneAt": "2026-11-15T18:10:59.570Z"
     },
     "orphan-scan-locator-set": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5369",
-      "claimedAt": "2026-11-15T18:11:08.484Z"
+      "claimedAt": "2026-11-15T18:11:08.484Z",
+      "doneAt": "2026-11-15T18:21:15.970Z"
+    },
+    "orphan-scan-locator-set.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:21:15.970Z"
+    },
+    "orphan-scan-locator-set.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:21:15.970Z"
+    },
+    "orphan-scan-locator-set.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:21:15.970Z"
+    },
+    "orphan-scan-locator-set.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:21:15.970Z"
+    },
+    "orphan-scan-locator-set.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:21:15.970Z"
     }
   }
 }
