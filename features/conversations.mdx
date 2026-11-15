@@ -932,6 +932,16 @@ change. It applies to the diff in every view, and the panel remembers it in this
 browser. A turn's file list can still name a file whose only change was
 whitespace; opening it then shows no net changes.
 
+When you pick a Markdown file, the bar above its diff shows a **Diff** and
+**Preview** switch. Preview renders the document as text, as it is after the
+change: the current file for All turns and a turn, and the committed file for
+vs main. In Compare it shows the current file with the note "Showing the
+current file", since Compare can point at an arbitrary ref the panel cannot
+read directly. A deleted file has no Preview. The bar's **Open file** action
+opens the file beside the chat — it is not available in the pop-out window.
+Relative links in the preview show as plain text for now, until they resolve
+to files.
+
 ## Settling and snoozing conversations
 
 The conversation list groups rows into four sections, top to bottom: **Needs

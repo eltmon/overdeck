@@ -1,0 +1,192 @@
+{
+  "version": "1",
+  "issueId": "PAN-5338",
+  "created": "2026-11-15T11:36:37.856Z",
+  "updated": "2026-11-15T15:01:15.253Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-11-15T14:25:14.976Z"
+    }
+  ],
+  "items": {
+    "preview-source-helpers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5338",
+      "claimedAt": "2026-11-15T11:36:37.856Z",
+      "doneAt": "2026-11-15T11:42:48.843Z"
+    },
+    "preview-source-helpers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T11:42:48.843Z"
+    },
+    "preview-source-helpers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T11:42:48.843Z"
+    },
+    "preview-source-helpers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T11:42:48.843Z"
+    },
+    "preview-source-helpers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T11:42:48.843Z"
+    },
+    "relative-links-guard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5338",
+      "claimedAt": "2026-11-15T11:44:01.002Z",
+      "doneAt": "2026-11-15T11:59:13.164Z"
+    },
+    "relative-links-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T11:59:13.164Z"
+    },
+    "relative-links-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:26:33.127Z"
+    },
+    "relative-links-guard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:26:33.127Z"
+    },
+    "preview-body": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5338",
+      "claimedAt": "2026-11-15T14:26:41.005Z",
+      "doneAt": "2026-11-15T14:29:32.477Z"
+    },
+    "preview-body.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:29:32.477Z"
+    },
+    "preview-body.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:29:32.477Z"
+    },
+    "preview-body.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:29:32.477Z"
+    },
+    "file-bar": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5338",
+      "claimedAt": "2026-11-15T14:29:40.187Z",
+      "doneAt": "2026-11-15T14:31:24.248Z"
+    },
+    "file-bar.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:31:24.248Z"
+    },
+    "file-bar.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:31:24.248Z"
+    },
+    "file-bar.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:31:24.248Z"
+    },
+    "diffpanel-wire": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5338",
+      "claimedAt": "2026-11-15T14:31:32.306Z",
+      "doneAt": "2026-11-15T14:41:58.771Z"
+    },
+    "diffpanel-wire.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:41:58.771Z"
+    },
+    "diffpanel-wire.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:41:58.771Z"
+    },
+    "diffpanel-wire.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:41:58.771Z"
+    },
+    "diffpanel-wire.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:41:58.771Z"
+    },
+    "diffpanel-wire.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:41:58.771Z"
+    },
+    "conversation-root": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5338",
+      "claimedAt": "2026-11-15T14:42:07.287Z",
+      "doneAt": "2026-11-15T14:50:42.787Z"
+    },
+    "conversation-root.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:50:42.787Z"
+    },
+    "conversation-root.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:50:42.787Z"
+    },
+    "popout-root": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5338",
+      "claimedAt": "2026-11-15T14:50:49.194Z",
+      "doneAt": "2026-11-15T14:55:25.975Z"
+    },
+    "popout-root.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:55:25.975Z"
+    },
+    "popout-root.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:55:25.975Z"
+    },
+    "all-turns-file-select": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5338",
+      "claimedAt": "2026-11-15T14:55:34.359Z",
+      "doneAt": "2026-11-15T14:58:00.359Z"
+    },
+    "all-turns-file-select.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:58:00.359Z"
+    },
+    "all-turns-file-select.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:58:00.359Z"
+    },
+    "docs-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5338",
+      "claimedAt": "2026-11-15T14:58:08.000Z",
+      "doneAt": "2026-11-15T14:59:02.412Z"
+    },
+    "docs-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:59:02.412Z"
+    },
+    "docs-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:59:02.412Z"
+    },
+    "register-frontend-tests": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5338",
+      "claimedAt": "2026-11-15T14:59:10.796Z",
+      "doneAt": "2026-11-15T15:01:15.253Z"
+    },
+    "register-frontend-tests.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T15:01:15.253Z"
+    },
+    "register-frontend-tests.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T15:01:15.253Z"
+    }
+  },
+  "agentModel": "claude-sonnet-5"
+}

@@ -55,7 +55,7 @@ export function buildDiffFetchUrl(base: string, params: Record<string, string | 
 export function parseDiffRouteSearch(search: Record<string, unknown>): DiffRouteSearch {
   const diff = isDiffOpenValue(search.diff) ? '1' : undefined
   const diffTurnId = diff ? normalizeSearchString(search.diffTurnId) : undefined
-  const diffFilePath = diff && diffTurnId ? normalizeSearchString(search.diffFilePath) : undefined
+  const diffFilePath = diff ? normalizeSearchString(search.diffFilePath) : undefined
   const isCompare = diffTurnId === 'compare'
   const diffBase = isCompare ? normalizeSearchString(search.diffBase) : undefined
   const diffHead = isCompare ? normalizeSearchString(search.diffHead) : undefined
