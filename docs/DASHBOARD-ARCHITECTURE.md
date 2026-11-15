@@ -2351,6 +2351,44 @@ the text after the last `/`:
 `searchFiles` sorts by tier, then path length (tiers 0–3) or fuzzy score
 (tier 4). The client stable-sorts by tier, then files changed here first.
 
+## Project home (PAN-5294)
+
+The permanent `Home` tab of a project deck (`paneType: 'home'`), mounted by `CommandDeck/index.tsx` through `renderHome`. One component tree, three states:
+
+| State | What renders |
+| --- | --- |
+| No-project deck (`projectKey` undefined) | Title "No project" and the action row (New conversation, Terminal, More ▾ → Web page). |
+| Registered project, no issues loaded | Header with metadata line, action row, facts, Needs you (when non-empty), the merge train card, Recent changes. |
+| Registered project with issues | All of the above plus the Pipeline panel, with the merge train below it. |
+
+| File (under `src/dashboard/frontend/src/components/`) | Role |
+| --- | --- |
+| `Stage/ProjectHome.tsx` | Assembles Home: registered-project lookup, the shared selectors, the data hooks, refs for fact scrolling, the Start an issue dialog. `ProjectHomeProps` is the mount contract. |
+| `Stage/HomePane/HomeHeader.tsx` | Title (`display-lg`) with rename, repository subtitle, Settings modal (`ProjectSettingsSection`). |
+| `Stage/HomePane/HomeMetaLine.tsx` | Path · branch · release (popover with `ProjectReleasePanel`) · CI word · deploy chip · identity chip. |
+| `Stage/HomePane/HomeActions.tsx` | The action row and its New conversation and More ▾ menus. Registers no shortcut. |
+| `Stage/HomePane/StartIssueDialog.tsx`, `Stage/HomePane/startIssue.ts` | Plan or start an issue; `startIssue.ts` holds the `/api/agents` request sequence and returns a tagged result. |
+| `Stage/HomePane/useHomeData.ts` | `useProjectChanges` and `useProjectSpend`. |
+| `Stage/HomePane/HomeFacts.tsx` | The five facts; exports `landedSummary` and `formatCost`. |
+| `Stage/HomePane/HomeNeedsYou.tsx` | The Needs you panel. |
+| `Stage/HomePane/RecentChanges.tsx` | Recent changes on main with commit attribution. |
+| `Stage/HomePane/home.module.css` | Header, metadata line and page layout styles. |
+| `CommandDeck/ProjectOverview.tsx` | The Pipeline panel: header, `PipelineSection`, then `MergeTrain placement="project"`. |
+| `CommandDeck/PipelineSection.tsx` | One card with a lane bar and rows per lane. |
+| `CommandDeck/PipelineRow.tsx` | One row: id, title, tag, who, age; stuck reason and spend in the tooltip. |
+| `CommandDeck/pipeline-helpers.ts` | `bucketFeaturePhase`, `groupPipelineEntries`, `homeLaneFor`, `homeStageTag`, `homeWhoFor`, `formatAge`. |
+
+**Data sources.** Every number comes from a shared source, so Home never disagrees with the rest of the frame:
+
+- `useAgentsWorking({ projectKey })` (`lib/selectors/agentsWorking.ts`) — the Agents working fact, the same count as the project switcher.
+- `useNeedsYouItems({ projectKey })` (`lib/selectors/needsYou.ts`) — the Needs you fact and panel, and the `needs you` row tag (an issue is tagged when the list has key `issue:<ID>`).
+- `GET /api/projects/:key/changes?since=7d` (query key `['project-changes', key, '7d']`, 60 s poll) — the Landed fact, the metadata line's branch and Recent changes.
+- `GET /api/costs/summary?project=<prefix>` (query key `['project-recent-spend', prefix]`, 60 s poll) — the Spend fact. The prefix is the registered issue prefix, else the single prefix of the loaded issues.
+- `GET /api/projects/:key/release-status` (query key `['projectReleaseStatus', key]`, shared with `ProjectReleasePanel`) — the release word.
+- The project CI record, `selectProjectCi(key)` + `deriveProjectCi` — the CI word.
+
+**Lane rules** (`groupPipelineEntries`). Stalled claims first: an issue with `isStalledFeature` goes to Stalled and no other lane. Then Ready to merge takes `derived.state === 'ready'`, Building takes phase `plan` or `work`, and In review takes phase `review`. Todo, queued-for-pickup, merged and closed issues are not listed. Building, In review and Ready to merge always render with their count; Stalled renders only when non-empty. Rows sort by last activity, and the age cell is time since last activity because derived state has no state-entered time.
+
 ## File explorer server (PAN-5183)
 
 The file explorer's server half lives in `src/dashboard/server/services/explorer/`
