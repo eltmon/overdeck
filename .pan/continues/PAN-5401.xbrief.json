@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5401",
   "created": "2026-11-15T23:18:04.233Z",
-  "updated": "2026-11-15T23:29:28.457Z",
+  "updated": "2026-11-15T23:29:32.848Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
     "dod-review-comment-rejection.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T23:29:28.457Z"
+    },
+    "dod-review-docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5401",
+      "claimedAt": "2026-11-15T23:29:32.848Z"
     }
   }
 }
