@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5293",
   "created": "2026-11-15T06:57:45.448Z",
-  "updated": "2026-11-15T09:10:28.663Z",
+  "updated": "2026-11-15T09:10:29.796Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -474,6 +474,11 @@
     "dev-docs.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T09:10:28.663Z"
+    },
+    "user-docs-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5293",
+      "claimedAt": "2026-11-15T09:10:29.796Z"
     }
   }
 }
