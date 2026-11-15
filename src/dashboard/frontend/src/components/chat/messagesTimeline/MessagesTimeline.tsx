@@ -527,7 +527,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
+      if ((event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'f') {
         event.preventDefault();
         event.stopPropagation();
         setSearchOpen(true);

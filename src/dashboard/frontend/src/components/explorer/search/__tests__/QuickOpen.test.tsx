@@ -119,7 +119,10 @@ describe('QuickOpen', () => {
     const options = screen.getAllByRole('option')
     // Both foo.ts are tier 1 (b changed, so first); myfoo.ts is tier 2 even though changed.
     expect(options.map((o) => o.getAttribute('data-value'))).toEqual(['b/foo.ts', 'a/foo.ts', 'c/myfoo.ts'])
-    expect(options[0].querySelector('mark')).toHaveTextContent('foo')
+    const mark = options[0].querySelector('mark')
+    expect(mark).toHaveTextContent('foo')
+    expect(mark).toHaveClass('match-mark')
+    expect(mark?.className).not.toMatch(/bg-warning\//)
     expect(options[0]).toHaveTextContent('changed here')
     expect(options[1]).not.toHaveTextContent('changed here')
     expect(screen.getByText(/Shift Enter reveal in files/)).toBeInTheDocument()

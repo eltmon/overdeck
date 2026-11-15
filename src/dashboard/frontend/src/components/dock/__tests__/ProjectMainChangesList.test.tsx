@@ -87,4 +87,31 @@ describe('ProjectMainChangesList', () => {
     await screen.findByText('fix the gate')
     expect(screen.getAllByRole('group')[0]).toHaveAttribute('aria-label', 'Not committed yet')
   })
+
+  it('caps a long conversation-title tag at 25% width with a full-text title attribute (PAN-5329)', async () => {
+    const longTitle = 'x'.repeat(60)
+    fetchMock = vi.fn(async (url: string) => {
+      if (url === '/api/registered-projects') return Response.json([{ key: 'p', name: 'P', path: '/home/u/p' }])
+      if (url === '/api/workspace-registry') return Response.json({ workspaces: [] })
+      if (url.startsWith('/api/projects/p/changes')) {
+        return Response.json({
+          projectKey: 'p',
+          branch: 'main',
+          commits: [
+            { sha: 'cccc3333', shortSha: 'cccc333', subject: 'the long-tag commit', authoredAt: '2026-11-14T11:00:00Z', by: { kind: 'conversation', id: 'c2', title: longTitle } },
+          ],
+        })
+      }
+      return Response.json({ error: `unexpected ${url}` }, { status: 500 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderList()
+    const subject = await screen.findByText('the long-tag commit')
+    const tag = screen.getByText(longTitle)
+    expect(tag).toHaveClass('truncate')
+    expect(tag).toHaveClass('max-w-[25%]')
+    expect(tag).toHaveAttribute('title', longTitle)
+    expect(subject).toBeInTheDocument()
+  })
 })

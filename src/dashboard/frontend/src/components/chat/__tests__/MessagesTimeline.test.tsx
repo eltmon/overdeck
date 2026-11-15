@@ -991,6 +991,22 @@ describe('MessagesTimeline — older history (PAN-4558)', () => {
   });
 });
 
+describe('MessagesTimeline — find shortcut (PAN-5329)', () => {
+  it('opens the search input on plain Ctrl+F', () => {
+    render(<MessagesTimeline messages={[]} workLog={[]} streaming={false} />);
+    fireEvent.keyDown(window, { key: 'f', ctrlKey: true });
+    expect(screen.getByPlaceholderText('Search conversation…')).toBeInTheDocument();
+  });
+
+  it('leaves Ctrl+Shift+F unhandled so the dock shortcut can claim it', () => {
+    render(<MessagesTimeline messages={[]} workLog={[]} streaming={false} />);
+    const event = new KeyboardEvent('keydown', { key: 'F', ctrlKey: true, shiftKey: true, cancelable: true });
+    window.dispatchEvent(event);
+    expect(screen.queryByPlaceholderText('Search conversation…')).not.toBeInTheDocument();
+    expect(event.defaultPrevented).toBe(false);
+  });
+});
+
 describe('MessagesTimeline — bounded conversation notice (PAN-5211)', () => {
   const notice = /Large conversation: the dashboard keeps recent history in memory/;
 

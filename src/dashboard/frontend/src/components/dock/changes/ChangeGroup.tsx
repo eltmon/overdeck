@@ -39,7 +39,15 @@ export function ChangeGroup({ header, defaultOpen = true, onOpen, children, labe
 
 /** A neutral tag in a group header (pushed, not pushed, this chat, merged). */
 export function ChangeTag({ children }: { children: ReactNode }) {
-  return <span className="shrink-0 rounded border border-border px-1.5 font-mono text-[11px] leading-[18px] text-muted-foreground">{children}</span>
+  const title = typeof children === 'string' ? children : undefined
+  return (
+    <span
+      className="max-w-[25%] shrink-0 truncate rounded border border-border px-1.5 font-mono text-[11px] leading-[18px] text-muted-foreground"
+      title={title}
+    >
+      {children}
+    </span>
+  )
 }
 
 /** Commit time: hour:minute today, otherwise the date. */

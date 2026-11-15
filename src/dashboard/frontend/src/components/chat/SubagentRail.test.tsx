@@ -1,10 +1,34 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import type { SubagentSummary } from './chat-types';
 
-import { SubagentRail } from './SubagentRail';
+import { NARROW_PANE_PX, SubagentRail } from './SubagentRail';
+
+let resizeCallbacks: Array<(entries: Pick<ResizeObserverEntry, 'contentRect'>[]) => void> = [];
+
+class FakeResizeObserver {
+  private readonly callback: (entries: Pick<ResizeObserverEntry, 'contentRect'>[]) => void;
+
+  constructor(callback: (entries: Pick<ResizeObserverEntry, 'contentRect'>[]) => void) {
+    this.callback = callback;
+    resizeCallbacks.push(callback);
+  }
+
+  observe(): void {}
+  unobserve(): void {}
+
+  disconnect(): void {
+    resizeCallbacks = resizeCallbacks.filter((cb) => cb !== this.callback);
+  }
+}
+
+function resize(width: number): void {
+  act(() => {
+    for (const callback of resizeCallbacks) callback([{ contentRect: { width } }]);
+  });
+}
 
 const conversation: Conversation = {
   id: 42,
@@ -175,5 +199,76 @@ describe('SubagentRail defaultCollapsed (PAN-4222 embedded previews)', () => {
 
     expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toBeInTheDocument();
     expect(localStorage.getItem('overdeck.ui.agentsRailCollapsed')).toBe('false');
+  });
+});
+
+describe('SubagentRail narrow pane (PAN-5329)', () => {
+  beforeEach(() => {
+    window.history.replaceState({}, '', '/conv/42');
+    localStorage.removeItem('overdeck.ui.agentsRailCollapsed');
+    resizeCallbacks = [];
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps the stored strip when the host pane reports a width below the threshold (ac1)', () => {
+    localStorage.setItem('overdeck.ui.agentsRailCollapsed', 'false');
+    render(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} />);
+
+    resize(NARROW_PANE_PX - 1);
+
+    expect(screen.getByRole('button', { name: 'Show agents rail' })).toBeInTheDocument();
+    expect(localStorage.getItem('overdeck.ui.agentsRailCollapsed')).toBe('false');
+  });
+
+  it('opens on a strip click and collapses again on the X, without touching localStorage (ac2)', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem('overdeck.ui.agentsRailCollapsed', 'false');
+    render(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} />);
+    resize(NARROW_PANE_PX - 1);
+
+    await user.click(screen.getByRole('button', { name: 'Show agents rail' }));
+    expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toBeInTheDocument();
+    expect(localStorage.getItem('overdeck.ui.agentsRailCollapsed')).toBe('false');
+
+    await user.click(screen.getByRole('button', { name: 'Collapse agents rail' }));
+    expect(screen.getByRole('button', { name: 'Show agents rail' })).toBeInTheDocument();
+    expect(localStorage.getItem('overdeck.ui.agentsRailCollapsed')).toBe('false');
+  });
+
+  it('falls back to the stored collapsed strip once the pane widens past the threshold again (ac3)', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem('overdeck.ui.agentsRailCollapsed', 'true');
+    render(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} />);
+    resize(NARROW_PANE_PX - 1);
+    await user.click(screen.getByRole('button', { name: 'Show agents rail' }));
+    expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toBeInTheDocument();
+
+    resize(1000);
+
+    expect(screen.getByRole('button', { name: 'Show agents rail' })).toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Conversation agents' })).not.toBeInTheDocument();
+  });
+
+  it('renders the open rail after going narrow then wide while the stored preference is open (ac3)', () => {
+    localStorage.setItem('overdeck.ui.agentsRailCollapsed', 'false');
+    render(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} />);
+
+    resize(NARROW_PANE_PX - 1);
+    resize(1000);
+
+    expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toBeInTheDocument();
+  });
+
+  it('keeps the open rail when the observer reports an unmeasured width of 0 (ac4)', () => {
+    localStorage.setItem('overdeck.ui.agentsRailCollapsed', 'false');
+    render(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} />);
+
+    resize(0);
+
+    expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toBeInTheDocument();
   });
 });

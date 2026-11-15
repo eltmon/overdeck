@@ -81,6 +81,22 @@ describe('projectRows', () => {
     expect(paths(projectRows({ dirs, expanded: new Set(), showDotfiles: true, showIgnored: false }))).toEqual(['a.ts'])
     expect(paths(projectRows({ dirs, expanded: new Set(), showDotfiles: true, showIgnored: true }))).toEqual(['dist', 'a.ts', 'debug.log'])
   })
+
+  it('always hides .git even with showDotfiles true (PAN-5329)', () => {
+    const dirs = {
+      '': dir([entry('.git', 'dir'), entry('.github', 'dir'), entry('.gitignore'), entry('src', 'dir')]),
+      '.github': dir([]),
+      src: dir([entry('src/.git', 'file'), entry('src/index.ts')]),
+    }
+    const rows = paths(
+      projectRows({ dirs, expanded: new Set(['.github', 'src']), showDotfiles: true, showIgnored: true }),
+    )
+    expect(rows).toContain('.github')
+    expect(rows).toContain('src')
+    expect(rows).toContain('.gitignore')
+    expect(rows).not.toContain('.git')
+    expect(rows).not.toContain('src/.git')
+  })
 })
 
 describe('projectChangedRows', () => {
@@ -108,6 +124,21 @@ describe('projectChangedRows', () => {
   it('drops dot paths when showDotfiles is false', () => {
     const rows = projectChangedRows([{ path: '.github/ci.yml', isDeleted: false }, { path: 'a.ts', isDeleted: false }], false)
     expect(rows.map((r) => r.path)).toEqual(['a.ts'])
+  })
+
+  it('always drops .git paths even with showDotfiles true (PAN-5329)', () => {
+    const rows = projectChangedRows(
+      [
+        { path: '.git/config', isDeleted: false },
+        { path: 'a/.git/HEAD', isDeleted: false },
+        { path: '.github/ci.yml', isDeleted: false },
+      ],
+      true,
+    )
+    const paths_ = rows.map((r) => r.path)
+    expect(paths_.some((p) => p === '.git' || p.startsWith('.git/'))).toBe(false)
+    expect(paths_.some((p) => p === 'a/.git' || p.startsWith('a/.git/'))).toBe(false)
+    expect(paths_).toContain('.github/ci.yml')
   })
 })
 
