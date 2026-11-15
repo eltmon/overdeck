@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type RefObject } from 'react';
-import { Archive, Download, ExternalLink, FileText, GitBranchPlus, Loader2, MonitorSmartphone, Share2, Sparkles, Square, Star } from 'lucide-react';
+import { Archive, Download, ExternalLink, FileText, GitBranchPlus, Info, Loader2, MonitorSmartphone, Share2, Sparkles, Square, Star, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Conversation } from '../../CommandDeck/ConversationList';
 import type { useConversationMutations } from '../../CommandDeck/useConversationMutations';
@@ -8,6 +8,7 @@ import { useConfirm } from '../../DialogProvider';
 import { MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../../shared/ContextMenu';
 import { PullHereButton, runsHere } from '../ConversationMachineBanner';
 import { ShareConversationMenuItem } from '../sharing/ShareDialog';
+import { BookmarksMenuItem } from '../bookmarks/BookmarksDrawer';
 import { continueTargetOf, openContinueOnDevice } from '../continueOnDevice/continueOnDeviceStore';
 import { fetchFullTranscript, type MessagesResponse } from '../messagesQuery';
 import type { ViewMode } from '../useNeedsTerminalAutoSwitch';
@@ -44,12 +45,16 @@ export interface ConversationHeaderMenuProps {
   triggerRef: RefObject<HTMLButtonElement | null>;
   /** The phone app (PAN-4837): hide what its phone token cannot do. */
   native: boolean;
+  aboutOpen: boolean;
+  onToggleAbout: () => void;
+  hideToolCalls: boolean;
+  onToggleHideToolCalls: () => void;
   /** Regenerate title — the mutation lives in the header, whose title shows its pending state. */
   retitlePending: boolean;
   onRetitle: () => void;
 }
 
-/** The header's ⋯ menu: overlay plus the long-tail / prefs / config / destructive actions. */
+/** The header's ⋯ menu (PAN-5291 D1-3): view toggles, the conversation's actions, Advanced, and the end-of-life actions. */
 export function ConversationHeaderMenu({
   open,
   conversation,
@@ -61,6 +66,10 @@ export function ConversationHeaderMenu({
   onClose,
   triggerRef,
   native,
+  aboutOpen,
+  onToggleAbout,
+  hideToolCalls,
+  onToggleHideToolCalls,
   retitlePending,
   onRetitle,
 }: ConversationHeaderMenuProps) {
@@ -137,7 +146,29 @@ export function ConversationHeaderMenu({
         returnFocusRef={triggerRef}
         className="absolute right-0 top-full z-[1000] mt-1 min-w-[220px]"
       >
+        {/* Group 1 — what the pane shows (visible in the phone app too). */}
+        <MenuItemButton
+          role="menuitemcheckbox"
+          aria-checked={aboutOpen}
+          onClick={() => { onToggleAbout(); onClose(); }}
+        >
+          <Info size={14} />
+          About this conversation
+        </MenuItemButton>
+        <BookmarksMenuItem onDone={onClose} />
+        <MenuItemButton
+          role="menuitemcheckbox"
+          aria-checked={!hideToolCalls}
+          onClick={() => { onToggleHideToolCalls(); onClose(); }}
+        >
+          <Wrench size={14} />
+          <span>Show tool calls</span>
+          <span className="ml-auto text-muted-foreground">{hideToolCalls ? 'off' : 'on'}</span>
+        </MenuItemButton>
+
         {!native && (<>
+        {/* Group 3 — the conversation's own state. */}
+        <MenuSeparator />
         <MenuItemButton
           active={conversation.isFavorited}
           onClick={() => { convMutations.toggleFavorite({ name: conversation.name, favorited: !!conversation.isFavorited }); onClose(); }}
@@ -145,7 +176,6 @@ export function ConversationHeaderMenu({
           <Star size={14} style={{ fill: conversation.isFavorited ? 'currentColor' : 'none' }} />
           {conversation.isFavorited ? 'Unfavorite' : 'Favorite'}
         </MenuItemButton>
-
         <MenuItemButton
           onClick={() => { onRetitle(); onClose(); }}
           disabled={retitlePending}
@@ -157,24 +187,7 @@ export function ConversationHeaderMenu({
         </MenuItemButton>
         <PullRequestMenuItems conversation={conversation} mutations={convMutations} onClose={onClose} />
 
-        {conversation.harness === 'claude-code' && (
-          <div className={styles.headerMenuDeliveryRow}>
-            <span>Delivery method</span>
-            <select
-              className={styles.deliveryMethodSelect}
-              value={deliveryMethod}
-              onChange={(e) => handleDeliveryMethodChange(e.target.value as DeliveryMethod)}
-              disabled={deliveryMethodSaving}
-              title="Message delivery method"
-              aria-label="Message delivery method"
-            >
-              <option value="auto">Auto</option>
-              <option value="channels">Channels</option>
-              <option value="tmux">Tmux</option>
-            </select>
-          </div>
-        )}
-
+        {/* Group 4 — hand the work somewhere else. */}
         <MenuSeparator />
         {conversation.claudeSessionId && (
           <MenuItemButton
@@ -206,10 +219,6 @@ export function ConversationHeaderMenu({
           </MenuItemButton>
         )}
         <ShareConversationMenuItem conversation={conversation} onDone={onClose} />
-
-        {(conversation.handoffDocPath || conversation.handoffTargetConvId) && (
-          <MenuSeparator />
-        )}
         {conversation.handoffDocPath && (
           <MenuItemButton
             onClick={() => { openHandoffDoc(); onClose(); }}
@@ -226,18 +235,32 @@ export function ConversationHeaderMenu({
             Open handoff target
           </MenuItemButton>
         )}
+
+        {/* Group 5 — Advanced: the message transport, unchanged (parent PRD D-6). */}
+        {conversation.harness === 'claude-code' && (<>
+          <MenuSeparator />
+          <div className="eyebrow px-3 pb-0.5 pt-1">Advanced</div>
+          <div className={styles.headerMenuDeliveryRow}>
+            <span>Delivery method</span>
+            <select
+              className={styles.deliveryMethodSelect}
+              value={deliveryMethod}
+              onChange={(e) => handleDeliveryMethodChange(e.target.value as DeliveryMethod)}
+              disabled={deliveryMethodSaving}
+              title="Message delivery method"
+              aria-label="Message delivery method"
+            >
+              <option value="auto">Auto</option>
+              <option value="channels">Channels</option>
+              <option value="tmux">Tmux</option>
+            </select>
+          </div>
+        </>)}
         </>)}
 
-        {(conversation.sessionAlive || onArchive) && (
+        {/* Group 6 — end the conversation. */}
+        {((onArchive && !native) || conversation.sessionAlive) && (
           <MenuSeparator />
-        )}
-        {conversation.sessionAlive && (
-          <MenuItemButton
-            onClick={() => { convMutations.stop(conversation.name); onClose(); }}
-          >
-            <Square size={14} />
-            Stop agent
-          </MenuItemButton>
         )}
         {onArchive && !native && (
           <MenuItemButton
@@ -259,6 +282,14 @@ export function ConversationHeaderMenu({
           >
             {archivePending ? <Loader2 size={14} className={styles.spinnerIcon} /> : <Archive size={14} />}
             {archivePending ? 'Archiving…' : 'Archive conversation'}
+          </MenuItemButton>
+        )}
+        {conversation.sessionAlive && (
+          <MenuItemButton
+            onClick={() => { convMutations.stop(conversation.name); onClose(); }}
+          >
+            <Square size={14} />
+            Stop the agent
           </MenuItemButton>
         )}
       </MenuSurface>

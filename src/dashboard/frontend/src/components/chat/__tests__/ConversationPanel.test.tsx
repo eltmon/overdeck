@@ -323,23 +323,37 @@ describe('ConversationPanel rename flow', () => {
     });
 
     renderPanel();
-    const toggle = screen.getByRole('button', { name: 'Show about this conversation' });
-    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    const item = screen.getByRole('menuitemcheckbox', { name: 'About this conversation' });
+    expect(item).toHaveAttribute('aria-checked', 'false');
 
-    fireEvent.click(toggle);
+    fireEvent.click(item);
 
-    expect(screen.getByRole('button', { name: 'Hide about this conversation' })).toHaveAttribute('aria-pressed', 'true');
     expect(await screen.findByText('This conversation is about tightening dashboard behavior.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    expect(screen.getByRole('menuitemcheckbox', { name: 'About this conversation' })).toHaveAttribute('aria-checked', 'true');
   });
 
   it('shows Hide tool calls as a visible pressed-state toggle', () => {
     renderPanel();
-    const toggle = screen.getByRole('button', { name: 'Hide tool calls' });
-    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    const item = screen.getByRole('menuitemcheckbox', { name: /Show tool calls/ });
+    expect(item).toHaveAttribute('aria-checked', 'true');
+    expect(item).toHaveTextContent(/on$/);
 
-    fireEvent.click(toggle);
+    fireEvent.click(item);
 
-    expect(screen.getByRole('button', { name: 'Show tool calls' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    expect(screen.getByRole('menuitemcheckbox', { name: /Show tool calls/ })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('menuitemcheckbox', { name: /Show tool calls/ })).toHaveTextContent(/off$/);
+  });
+
+  it('keeps About, Tools and Bookmarks out of row 1 (PAN-5291)', () => {
+    renderPanel();
+    for (const name of ['Show about this conversation', 'Hide tool calls', 'Show tool calls', 'Show bookmarks']) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
+    }
+    expect(screen.getByRole('button', { name: 'More conversation actions' })).toHaveAttribute('aria-haspopup', 'menu');
   });
 
   it('shows a pi Stop button during a running turn and posts abort', async () => {
@@ -394,8 +408,11 @@ describe('ConversationPanel rename flow', () => {
     });
 
     const { rerender, client } = renderPanel();
-    fireEvent.click(screen.getByRole('button', { name: 'Show about this conversation' }));
-    expect(screen.getByRole('button', { name: 'Hide about this conversation' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'About this conversation' }));
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    expect(screen.getByRole('menuitemcheckbox', { name: 'About this conversation' })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
 
     const nextConversation = {
       ...mockConversation,
@@ -416,7 +433,8 @@ describe('ConversationPanel rename flow', () => {
       </DialogProvider>,
     );
 
-    expect(screen.getByRole('button', { name: 'Show about this conversation' })).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    expect(screen.getByRole('menuitemcheckbox', { name: 'About this conversation' })).toHaveAttribute('aria-checked', 'false');
   });
 
   it('does not mount the terminal when a diff deep-link opens a live terminal-mode conversation', () => {
@@ -1449,7 +1467,7 @@ describe('ConversationPanel archive (PAN-4584)', () => {
     renderPanel({ ...mockConversation, sessionAlive: true });
 
     fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Stop agent' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Stop the agent' }));
 
     expect(await screen.findByRole('status', { name: 'Stopping conversation' })).toHaveTextContent('Stopping…');
 

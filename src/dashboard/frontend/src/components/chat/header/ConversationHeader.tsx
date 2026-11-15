@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Check, Copy, ExternalLink, FileX, Info, Loader2, MoreVertical, Pencil, Square, Wrench, type LucideIcon } from 'lucide-react';
+import { Check, Copy, ExternalLink, FileX, Loader2, MoreHorizontal, Pencil, Square, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Conversation } from '../../CommandDeck/ConversationList';
 import { updateConversationTitle } from '../../CommandDeck/ConversationList';
@@ -8,7 +8,6 @@ import type { useConversationMutations } from '../../CommandDeck/useConversation
 import { ViewToggle } from '../../shared/ViewToggle';
 import { isNativeShell } from '../../../lib/nativeShell';
 import { conversationMachineState, isLiveMachineState, RemoteHeaderActions } from '../ConversationMachineBanner';
-import { BookmarksToggle } from '../bookmarks/BookmarksDrawer';
 import type { ViewMode } from '../useNeedsTerminalAutoSwitch';
 import { ConversationHeaderMenu } from './ConversationHeaderMenu';
 import { ConversationStatusLine } from './ConversationStatusLine';
@@ -40,7 +39,7 @@ export interface ConversationHeaderProps {
 /**
  * The conversation header (hidden in embedded mode). Three-tier layout:
  * row 1 = title + primary actions, row 2 = read-only metadata, long-tail /
- * config / destructive actions live in the ⋮ menu.
+ * config / destructive actions live in the ⋯ menu.
  */
 export function ConversationHeader({
   conversation,
@@ -240,30 +239,6 @@ export function ConversationHeader({
           )}
 
           <RemoteHeaderActions conversation={conversation} />
-          <button
-            className={`${styles.conversationAboutToggle} ${aboutOpen ? styles.conversationAboutToggleActive : ''}`}
-            onClick={onToggleAbout}
-            title={aboutOpen ? 'Hide conversation summary' : 'Show conversation summary'}
-            aria-label={aboutOpen ? 'Hide about this conversation' : 'Show about this conversation'}
-            aria-pressed={aboutOpen}
-          >
-            <Info size={14} />
-            <span>About</span>
-          </button>
-
-          <button
-            className={`${styles.conversationAboutToggle} ${hideToolCalls ? styles.conversationAboutToggleActive : ''}`}
-            onClick={onToggleHideToolCalls}
-            title={hideToolCalls ? 'Show tool calls' : 'Hide tool calls'}
-            aria-label={hideToolCalls ? 'Show tool calls' : 'Hide tool calls'}
-            aria-pressed={hideToolCalls}
-          >
-            <Wrench size={14} />
-            <span>Tools</span>
-          </button>
-
-          <BookmarksToggle />
-
           {showPiAbort && (
             <button
               className={`${styles.conversationAboutToggle} ${abortMutation.isPending ? styles.conversationAboutToggleActive : ''}`}
@@ -317,7 +292,7 @@ export function ConversationHeader({
               aria-haspopup="menu"
               aria-expanded={menuOpen}
             >
-              <MoreVertical size={16} />
+              <MoreHorizontal size={16} />
             </button>
             <ConversationHeaderMenu
               open={menuOpen}
@@ -330,6 +305,10 @@ export function ConversationHeader({
               onClose={closeMenu}
               triggerRef={menuTriggerRef}
               native={native}
+              aboutOpen={aboutOpen}
+              onToggleAbout={onToggleAbout}
+              hideToolCalls={hideToolCalls}
+              onToggleHideToolCalls={onToggleHideToolCalls}
               retitlePending={retitleMutation.isPending}
               onRetitle={() => retitleMutation.mutate()}
             />
@@ -346,7 +325,7 @@ export function ConversationHeader({
     <div
       className={`${styles.conversationHeaderShell} ${styles.conversationHeaderContainer}`} data-machine-state={machineState}
       onContextMenu={(e) => {
-        // Right-click the header → open the ⋮ menu. Skip while renaming so
+        // Right-click the header → open the ⋯ menu. Skip while renaming so
         // the native copy/paste menu still works in the title input.
         if (editingTitle) return;
         e.preventDefault();
