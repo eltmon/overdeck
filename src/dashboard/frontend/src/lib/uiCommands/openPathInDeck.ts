@@ -3,7 +3,7 @@
 // Uses only exported helpers; never edits the Stage.
 
 import { toast } from 'sonner'
-import type { UiOpenResolution } from '@overdeck/contracts'
+import { uiOpenSummary, type UiOpenResolution } from '@overdeck/contracts'
 import { openCodePane } from '../../components/explorer/openCodePane'
 import { useActiveDock } from '../../components/dock/activeDock'
 import { useWorkDockStore } from '../../components/dock/workDockStore'
@@ -11,7 +11,8 @@ import type { DeckNavigation } from '../../components/frame/deck/deckNavigation'
 import { selectActivePaneId, usePanesStore } from '../panesStore'
 
 export function openPathInDeck(resolution: UiOpenResolution, navigation: Pick<DeckNavigation, 'openInDeck'>): void {
-  const { projectKey: deckKey, rootId, relPath, kind, line, column } = resolution
+  // Decks are keyed by project name; rootId keeps the registered key (PAN-5398).
+  const { deckKey, rootId, relPath, kind, line, column } = resolution
   usePanesStore.getState().ensureHome(deckKey)
   navigation.openInDeck({ projectKey: deckKey })
 
@@ -29,5 +30,5 @@ export function openPathInDeck(resolution: UiOpenResolution, navigation: Pick<De
     }
     dock.openDock(deckKey, { tab: 'files', reveal: relPath === '' ? undefined : { rootId, path: relPath } })
   }
-  toast(`Opened ${relPath || 'root folder'} from pan open`)
+  toast(uiOpenSummary(resolution))
 }
