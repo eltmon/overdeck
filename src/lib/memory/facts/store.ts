@@ -35,6 +35,7 @@ export interface MemoryFact {
   readonly review: readonly string[];
   readonly body: string;
   readonly file: string; // absolute
+  readonly always: boolean;
 }
 
 export interface MemoryFactProblem {
@@ -134,6 +135,12 @@ export function parseMemoryFact(file: string, raw: string, scope: MemoryFactScop
   const title = typeof frontmatter.title === 'string' ? frontmatter.title : defaultFactTitle(id);
   const body = raw.slice(frontmatterMatch[0].length).trim();
 
+  let always = false;
+  if (frontmatter.always !== undefined) {
+    if (typeof frontmatter.always !== 'boolean') return { file, reason: 'always must be true or false' };
+    always = frontmatter.always;
+  }
+
   if (scope === 'project' || scope === 'user') {
     const haystack = [title, description, ...tags, body].join('\n');
     const machineMatch = haystack.match(MACHINE_PATH_PATTERN);
@@ -145,7 +152,7 @@ export function parseMemoryFact(file: string, raw: string, scope: MemoryFactScop
     }
   }
 
-  return { id, scope, type, title, description, tags, updated, source, review, body, file };
+  return { id, scope, type, title, description, tags, updated, source, review, body, file, always };
 }
 
 export function readMemoryFactsSync(dir: string, scope: MemoryFactScope): MemoryFactReadResult {
@@ -166,11 +173,12 @@ export function readMemoryFactsSync(dir: string, scope: MemoryFactScope): Memory
   return { facts, problems };
 }
 
-export function serializeMemoryFact(fact: Omit<MemoryFact, 'file' | 'scope'>): string {
+export function serializeMemoryFact(fact: Omit<MemoryFact, 'file' | 'scope' | 'always'> & { always?: boolean }): string {
   const frontmatter: Record<string, unknown> = { type: fact.type };
   if (fact.title !== defaultFactTitle(fact.id)) frontmatter.title = fact.title;
   frontmatter.description = fact.description;
   if (fact.tags.length > 0) frontmatter.tags = fact.tags;
+  if (fact.always) frontmatter.always = true;
   if (fact.updated !== null) frontmatter.updated = fact.updated;
   if (fact.source !== null) frontmatter.source = fact.source;
   if (fact.review.length > 0) frontmatter.review = fact.review;
@@ -182,7 +190,7 @@ export function serializeMemoryFact(fact: Omit<MemoryFact, 'file' | 'scope'>): s
 export async function writeMemoryFact(
   dir: string,
   scope: MemoryFactScope,
-  fact: Omit<MemoryFact, 'file' | 'scope'>,
+  fact: Omit<MemoryFact, 'file' | 'scope' | 'always'> & { always?: boolean },
   opts?: { overwrite?: boolean },
 ): Promise<string> {
   const file = join(dir, `${fact.id}.md`);

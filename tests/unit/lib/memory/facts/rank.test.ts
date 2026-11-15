@@ -17,6 +17,7 @@ function makeFact(overrides: Partial<MemoryFact> & { id: string }): MemoryFact {
     source: null,
     review: [],
     body: '',
+    always: false,
     file: `/facts/${overrides.id}.md`,
     ...overrides,
   };

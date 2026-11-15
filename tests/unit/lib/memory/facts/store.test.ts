@@ -55,6 +55,7 @@ describe('memory facts store', () => {
       source: null,
       review: [],
       body: 'Body text.',
+      always: false,
     };
   }
 
@@ -126,6 +127,11 @@ describe('memory facts store', () => {
           raw: '---\ntype: feedback\ndescription: x\nupdated: not-a-date\n---\nbody\n',
           scope: 'project',
           reason: 'invalid updated date',
+        },
+        {
+          raw: '---\ntype: feedback\ndescription: x\nalways: yes\n---\nbody\n',
+          scope: 'project',
+          reason: 'always must be true or false',
         },
       ];
 
@@ -211,6 +217,27 @@ describe('memory facts store', () => {
       const result = readMemoryFactsSync(join(tmpRoot, 'does-not-exist'), 'project');
       expect(result).toEqual({ facts: [], problems: [] });
     });
+
+    it('reads always: true, and defaults a missing always key to false', () => {
+      const dir = join(tmpRoot, 'memory-always');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(
+        join(dir, 'always-fact.md'),
+        '---\ntype: feedback\ndescription: Always injected.\nalways: true\n---\nBody.\n',
+        'utf8',
+      );
+      writeFileSync(
+        join(dir, 'default-fact.md'),
+        '---\ntype: feedback\ndescription: Not always injected.\n---\nBody.\n',
+        'utf8',
+      );
+
+      const { facts, problems } = readMemoryFactsSync(dir, 'project');
+      expect(problems).toHaveLength(0);
+      const byId = new Map(facts.map((fact) => [fact.id, fact]));
+      expect(byId.get('always-fact')?.always).toBe(true);
+      expect(byId.get('default-fact')?.always).toBe(false);
+    });
   });
 
   describe('serializeMemoryFact / parseMemoryFact round trip', () => {
@@ -256,6 +283,25 @@ describe('memory facts store', () => {
         .map((line) => line.match(/^(\w+):/)?.[1])
         .filter((key): key is string => Boolean(key));
       expect(keys).toEqual(['type', 'title', 'description', 'tags', 'updated', 'source', 'review']);
+    });
+
+    it('serializes always: true only when the flag is true', () => {
+      const alwaysOn = serializeMemoryFact({ ...baseFact('always-on-fact'), always: true });
+      expect(alwaysOn).toContain('always: true');
+
+      const alwaysOff = serializeMemoryFact({ ...baseFact('always-off-fact'), always: false });
+      expect(alwaysOff).not.toContain('always');
+
+      const alwaysOmitted = serializeMemoryFact(baseFact('always-omitted-fact'));
+      expect(alwaysOmitted).not.toContain('always');
+    });
+
+    it('round-trips always through write and read', async () => {
+      const dir = join(tmpRoot, 'memory-always-write');
+      await writeMemoryFact(dir, 'project', { ...baseFact('always-write-fact'), always: true });
+      const { facts, problems } = readMemoryFactsSync(dir, 'project');
+      expect(problems).toHaveLength(0);
+      expect(facts.find((fact) => fact.id === 'always-write-fact')?.always).toBe(true);
     });
 
     it('omits title when it equals the default, and omits empty tags/review and null updated/source', () => {
@@ -374,6 +420,7 @@ describe('memory facts store', () => {
         review: [],
         body: '',
         file: join(tmpRoot, 'x.md'),
+        always: false,
       };
       expect(isActiveFact(fact)).toBe(true);
       expect(isActiveFact({ ...fact, review: ['unindexed'] })).toBe(false);
@@ -394,6 +441,7 @@ describe('memory facts store', () => {
         review: [],
         body,
         file: `/tmp/${id}.md`,
+        always: false,
       };
     }
 

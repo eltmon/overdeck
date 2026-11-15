@@ -42,6 +42,7 @@ function fact(overrides: Partial<MemoryFact> & { id: string }): MemoryFact {
     source: null,
     review: [],
     body: '',
+    always: false,
     file: `/tmp/${overrides.id}.md`,
     ...overrides,
   };
