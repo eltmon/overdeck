@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5347",
   "created": "2026-11-15T13:35:45.395Z",
-  "updated": "2026-11-15T14:20:58.216Z",
+  "updated": "2026-11-15T14:23:00.631Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,9 +138,26 @@
       "doneAt": "2026-11-15T14:20:49.294Z"
     },
     "docs-skills-in-composer": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5347",
-      "claimedAt": "2026-11-15T14:20:58.216Z"
+      "claimedAt": "2026-11-15T14:20:58.216Z",
+      "doneAt": "2026-11-15T14:23:00.630Z"
+    },
+    "docs-skills-in-composer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:23:00.630Z"
+    },
+    "docs-skills-in-composer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:23:00.630Z"
+    },
+    "docs-skills-in-composer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:23:00.630Z"
+    },
+    "docs-skills-in-composer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:23:00.630Z"
     }
   }
 }
