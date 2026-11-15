@@ -22,6 +22,7 @@ import { runGitHubGraphql } from './github-graphql-run.js';
 import { withGitHubCaller } from './github-quota/caller-context.js';
 import { GitHubQuotaPausedError, GitHubRateLimitedError } from './github-quota/pause-gate.js';
 import { runGh } from './github-quota/run-gh.js';
+import { hasEpicLabel } from './backlog/pickup.js';
 import { STALE_PIPELINE_LABELS } from './cloister/label-reconciler.js';
 import { loadConfigSync } from './config.js';
 import { listSpecs } from './pan-dir/specs.js';
@@ -866,6 +867,7 @@ async function gatherProjectLensSignalsMetered(
     phaseLabel: STALE_PIPELINE_LABELS.find((label) => labelsByIssue.get(id)?.includes(label)) ?? null,
     hasXbriefSpec: specIssues.has(id),
     explicitlyReady: labelsByIssue.get(id)?.includes('ready') ?? false,
+    ...(hasEpicLabel(labelsByIssue.get(id)) ? { isEpic: true } : {}),
   }));
 }
 

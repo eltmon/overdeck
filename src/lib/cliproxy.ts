@@ -179,6 +179,32 @@ interface CliproxyCodexCredentials {
   type: 'codex';
   expired: string;
   disabled: boolean;
+  priority?: number;
+  weight?: number;
+}
+
+/** Operator-owned fields of codex-primary.json that a bridge rewrite keeps. */
+interface KeptCodexFields {
+  disabled?: boolean;
+  priority?: number;
+  weight?: number;
+}
+
+function keptCodexFields(raw: string | null): KeptCodexFields {
+  if (raw === null) return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return {};
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+  const record = parsed as Record<string, unknown>;
+  const kept: KeptCodexFields = {};
+  if (typeof record.disabled === 'boolean') kept.disabled = record.disabled;
+  if (Number.isInteger(record.priority)) kept.priority = record.priority as number;
+  if (Number.isInteger(record.weight)) kept.weight = record.weight as number;
+  return kept;
 }
 
 interface CliproxyGeminiCredentials {
@@ -202,7 +228,10 @@ export function decodeJwtPayload(token: string): Record<string, unknown> | null 
 
 /**
  * Read ~/.codex/auth.json and write cliproxy's credential file format into
- * ~/.overdeck/cliproxy/auth/codex-primary.json. Resolves true if the file was
+ * ~/.overdeck/cliproxy/auth/codex-primary.json. The rewrite keeps the existing
+ * file's `priority` and `weight` (integers) and `disabled` (boolean): the
+ * reset-first routing controller and the operator own those fields, not the
+ * bridge. Resolves true if the file was
  * written (including "already up-to-date"), false if the source was missing or
  * malformed or the write failed. Safe for the event loop.
  */
@@ -240,6 +269,17 @@ export async function bridgeCodexAuthToCliproxy(): Promise<boolean> {
     : (typeof idClaims.exp === 'number' ? idClaims.exp : Math.floor(Date.now() / 1000) + 3600);
   const expiredIso = new Date(expSec * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
 
+  await ensureDirsAsync();
+  const target = getCliproxyCodexCredPath();
+
+  let existing: string | null = null;
+  try {
+    existing = await readFile(target, 'utf8');
+  } catch {
+    existing = null;
+  }
+  const kept = keptCodexFields(existing);
+
   const creds: CliproxyCodexCredentials = {
     access_token: accessToken,
     id_token: idToken,
@@ -249,21 +289,13 @@ export async function bridgeCodexAuthToCliproxy(): Promise<boolean> {
     email,
     type: 'codex',
     expired: expiredIso,
-    disabled: false,
+    disabled: kept.disabled ?? false,
+    ...(kept.priority !== undefined ? { priority: kept.priority } : {}),
+    ...(kept.weight !== undefined ? { weight: kept.weight } : {}),
   };
 
-  await ensureDirsAsync();
-  const target = getCliproxyCodexCredPath();
-
   const serialized = JSON.stringify(creds, null, 2) + '\n';
-  if (existsSync(target)) {
-    try {
-      const existing = await readFile(target, 'utf8');
-      if (existing === serialized) return true;
-    } catch {
-      // fall through and overwrite
-    }
-  }
+  if (existing === serialized) return true;
 
   try {
     await writeFile(target, serialized, { mode: 0o600 });

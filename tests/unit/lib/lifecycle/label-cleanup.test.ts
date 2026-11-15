@@ -83,6 +83,24 @@ describe('cleanupMergedLabels', () => {
       expect(calls.some(c => c.includes('--add-label') && c.includes('"merged"'))).toBe(true);
     });
 
+    // PAN-5279: an open epic's slice merge strips workflow labels but never adds `merged`.
+    it('removes workflow labels without adding merged when addMergedLabel is false', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command.includes('gh issue view') && command.includes('--json labels')) {
+          return { stdout: 'in-review\nepic\n', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const result = await cleanupMergedLabels(ctx, { addMergedLabel: false });
+
+      const calls = mockExecAsync.mock.calls.map((c: any[]) => c[0] as string);
+      expect(calls.some(c => c.includes('--add-label'))).toBe(false);
+      expect(calls.some(c => c.includes('gh label create'))).toBe(false);
+      expect(calls.filter(c => c.includes('--remove-label'))).toEqual([expect.stringContaining('"in-review"')]);
+      expect(result.success).toBe(true);
+    });
+
     it('calls gh issue edit to remove workflow labels that are present on the issue', async () => {
       mockExecAsync.mockImplementation(async (command: string) => {
         if (command.includes('gh issue view') && command.includes('--json labels')) {

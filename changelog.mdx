@@ -10,6 +10,33 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: do not edit this page for an unreleased change. Each PR adds its bullets to changelog.d/<issue>.md (format: changelog.d/README.md), and pan release stable folds them into a dated <Update> block here. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so in its entry and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.86.0" description="2026-11-14">
+  #### New
+
+  - **Strike PRs merge on their own:** an open strike PR with green checks now gets one automatic quick review per head. When the review approves it, the merge train schedules it ahead of the queue with the usual 5-minute cancel window, even while the train batches other work. A strike the reviewer flags stops, with the review on its PR. A strike in a project that holds for UAT still waits for your Merge click. ([#5276](https://github.com/eltmon/overdeck/issues/5276))
+  - **Reset-first CLIProxy routing and an accounts panel:** when CLIProxy holds two or more logins for a provider, the host dashboard now sends new sessions to the account whose weekly quota resets soonest, so quota is not lost at the reset; running sessions stay on their account. Settings → Providers shows a CLIProxy accounts panel with each account's usage windows, reset times and rank. ([#5278](https://github.com/eltmon/overdeck/issues/5278))
+  - **Keyboard shortcuts sheet:** press `?` anywhere outside a text field to see every dashboard shortcut. Press `N` on the Command Deck to start a new conversation. ([#5287](https://github.com/eltmon/overdeck/issues/5287))
+
+  #### Improved
+
+  - **The sidebar logo shows when Overdeck is busy:** while an agent is running or a conversation is mid-turn, the satellite in the Overdeck mark orbits its ring, like the logo animation in the Overdeck videos. When everything is idle it rests in the normal logo pose. It stays still if your system asks for reduced motion. ([#5280](https://github.com/eltmon/overdeck/issues/5280))
+  - **Commits name the session that made them:** commits made by Overdeck agents and conversations now end with an `Overdeck-Agent` or `Overdeck-Conversation` trailer, so Overdeck can show exactly which commits each conversation made. ([#5281](https://github.com/eltmon/overdeck/issues/5281))
+  - **CLIProxy upgraded to v8.0.71:** Overdeck now writes the CLIProxy config in the v8 layout, keeps a conversation on one account (session affinity), turns on the management API on localhost with a key in `~/.overdeck/cliproxy/management-key`, and keeps Codex-aliased model names off Claude accounts. Your `config.extra.yaml` keeps working: legacy keys are converted. Run `pan restart --cliproxy` once after updating to move a running proxy to v8. ([#5282](https://github.com/eltmon/overdeck/issues/5282))
+  - **The Flywheel page is a live lane board:** the Status tab now shows every in-flight issue as a card in its lane (Plan, Build, Checks, Review, Merge, Deploy, Done today), with the full title, time in stage, cost, who drives it, its agent, and one plain sentence on why it is not moving, such as a typecheck queued for memory or CI failing on its PR. Needs-you items are action cards with why and since, a jump to the message, and a real control where one applies (the test-removal waiver, Start, Open). A health strip shows main CI, the deployed build against it, the gate queue, the next train batch and the last release, and a timeline lists what merged, deployed and released today. The header counts every card. ([#5283](https://github.com/eltmon/overdeck/issues/5283))
+  - **Tab shortcuts on Linux and Windows:** switch Stage tabs with `Ctrl+Alt+1` to `Ctrl+Alt+9` and close one with `Ctrl+Alt+W`, because the browser keeps `Ctrl+1` to `Ctrl+9` and `Ctrl+W`. macOS keeps `⌘1` to `⌘9` and `⌘W`. ([#5287](https://github.com/eltmon/overdeck/issues/5287))
+
+  #### Fixed
+
+  - **Needs-you rows are clickable:** on the Flywheel page, click anywhere on a Needs-you row to open the flywheel conversation at the message that raised it. Issue, PR and item links in the row still open their own target. ([#5275](https://github.com/eltmon/overdeck/issues/5275))
+  - **Open epics no longer look shipped after one slice merges:** the issue view used to show an open epic as Merged, tick every pipeline step, show the "Shipped" status and offer Close out as soon as one slice PR merged. Now the epic keeps its real state, the merged PR shows as a merged slice, Close out stays off, the merge agent no longer labels the epic `merged` or `verifying-on-main`, and `pan close` refuses an open epic unless the operator passes `--accept-merged`. ([#5279](https://github.com/eltmon/overdeck/issues/5279))
+  - **Long issue titles wrap in the issue view:** the Stage view's header title wraps to up to three lines instead of ending in an ellipsis. The drawer header still truncates. ([#5279](https://github.com/eltmon/overdeck/issues/5279))
+  - **Home project menu no longer cut off:** the "In: project" menu under the Home composer opened upward and was clipped by the page header. It now opens below or above the chip, whichever fits. ([#5280](https://github.com/eltmon/overdeck/issues/5280))
+  - **Live agents no longer read as "no agent":** a Herdr agent that finished its turn and waits at its prompt now counts as live on the Flywheel page and in `pan flywheel status`, and a handoff conversation or a queued quality gate counts as the issue's work in progress. ([#5283](https://github.com/eltmon/overdeck/issues/5283))
+  - **Quality gates no longer deadlock behind one gate that cannot fit in memory:** a gate that waits on memory no longer holds every gate behind it. A later gate that fits now starts, and a head that has waited 5 minutes runs alone once the other gates finish, as long as it leaves the governor's hard reserve free. A full `npm test` run no longer sets the memory estimate for single-file `vitest run` calls. Queued gates pick up a corrected estimate or a lowered `governor_soft_reserve_gb` without a restart, and every waiting gate prints why it waits and which gate is ahead of it. ([#5285](https://github.com/eltmon/overdeck/issues/5285))
+
+  [Compare v0.85.0...v0.86.0](https://github.com/eltmon/overdeck/compare/v0.85.0...v0.86.0)
+</Update>
+
 <Update label="v0.85.0" description="2026-11-14">
   #### Improved
 

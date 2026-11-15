@@ -1910,6 +1910,91 @@ transcripts under `<home>/.claude/projects/`. It refuses to run when
 `OVERDECK_HOME` is unset or is the operator's `~/.overdeck`, so point it at an
 isolated test home.
 
+## Conversation changes (PAN-5288)
+
+Two read routes say what a conversation changed and who made a project's
+recent commits. Children B, D1, D2, F and G of the workflow redesign
+(PAN-5284) render them; the types live in
+`packages/contracts/src/conversation-changes.ts`.
+
+### Routes
+
+- `GET /api/conversations/:name/changes?scope=&turnId=` returns a
+  `ConversationChanges` (scope `read:conversations`). Scopes:
+  - `conversation` (default): every commit and uncommitted file of the
+    conversation, each carrying its turn ids.
+  - `turn`: the commits whose `turnId` is the requested turn and the
+    uncommitted files whose `turnIds` include it. `turnId` may carry the
+    `conv-turn-` prefix the diffs API uses. Without one, the last turn that
+    has a commit or an uncommitted file is used.
+  - `uncommitted`: the uncommitted files only.
+  - `main`: first-parent commits on `HEAD` since the server's local midnight,
+    each with `by` (who made it) and `by.isThisConversation`.
+  An unknown conversation is 404, an unknown scope 400. A cwd outside any git
+  repository returns 200 with empty lists and zero totals.
+- `GET /api/projects/:projectKey/changes?since=` returns a `ProjectChanges`:
+  first-parent commits on `origin/<default branch>` (the local branch when
+  there is no remote), at most 500. `since` is `<n>d`, `<n>h` or any date
+  `Date.parse` accepts, at most 90 days back; the default is `7d`. Anything
+  else is 400, an unknown project 404. It has no route-scopes row, so it
+  stays `admin`.
+
+Per-file diffs reuse `GET /api/diffs/compare` and
+`GET /api/conversations/:name/diffs/full`; there is no third diff renderer.
+
+### Commits
+
+The code is split across `src/lib/overdeck/conversation-change-commits.ts`,
+`conversation-change-uncommitted.ts`, `project-changes.ts` and
+`conversation-changes.ts`.
+
+- A commit belongs to a conversation exactly when its final-paragraph
+  `Overdeck-Conversation` trailer is the conversation's session name
+  (`conv-<name>`), never the bare name (PAN-5281).
+- Older commits are found from the conversation's own `git commit` shell
+  results: the `[<branch> <sha>] <subject>` line git prints. A candidate is
+  kept only when it resolves and is reachable from `HEAD`, so an amended
+  commit's old sha drops even though the object exists until `git gc`.
+  These commits have `attribution: 'tool-output'`.
+- `pushed` is "not in `git rev-list @{u}..HEAD`". Without an upstream every
+  commit is local.
+
+### Uncommitted files and line attribution
+
+A file in `git status` is listed when the conversation's transcript records
+an edit of it: Claude Code's edit tracking, or an edit/write tool entry with a
+`file_path` or `path`. Edits made only through shell commands never appear,
+and Codex conversations, whose patch calls carry no file input, list none.
+
+A file with at least one edit record carrying the written text (Claude Code
+Edit, MultiEdit, Write, NotebookEdit) gets `attribution: 'lines'`:
+`otherLines` counts the working-tree plus-lines this conversation did not
+write, and `otherConversations` names other conversations whose edit text
+matches them. Other conversations are named only from parses already in the
+messages cache (`peekCachedMessages`); a cold transcript is never parsed for
+this. Every other file gets `attribution: 'file'` with no line counts. The
+rule is decided from the data, never from the harness name.
+
+### Cache and list totals
+
+One full result per conversation is cached for 30 s while the transcript's
+size and mtime and `git rev-parse HEAD` are unchanged; scopes `turn` and
+`uncommitted` filter it. Scope `main` has its own 30 s entry keyed on `HEAD`.
+
+Every full computation writes a totals map. `GET /api/conversations` stamps
+`changeTotals` on rows active in the last 24 h from that map only. The list
+never awaits a computation: missing or stale entries are computed in the
+background, at most 2 at once and 20 per list call.
+
+### Project commit attribution
+
+For each project commit, the first match wins: the final-paragraph
+`Overdeck-Conversation` trailer, the final-paragraph `Overdeck-Agent` trailer,
+then an `Overdeck-Conversation:` or `Overdeck-Agent:` line anywhere in the
+body. The body scan exists because GitHub squash merges move each
+sub-commit's trailers into the body and leave only `Co-authored-by:` lines in
+the final paragraph. Without a match the commit is `unattributed`.
+
 ## File explorer server (PAN-5183)
 
 The file explorer's server half lives in `src/dashboard/server/services/explorer/`

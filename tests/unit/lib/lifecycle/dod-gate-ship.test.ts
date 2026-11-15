@@ -110,6 +110,7 @@ describe('ship row gate integration', () => {
     ship: async () => row('ship', 'miss'),
     deploy: async () => row('deploy'),
     trackerClosed: async () => false,
+    openEpic: async () => false,
     now: () => '2026-07-31T02:00:00.000Z',
   };
 

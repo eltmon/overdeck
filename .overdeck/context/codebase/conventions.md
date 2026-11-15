@@ -71,7 +71,9 @@
 - Browser specs (`tests/e2e/*.spec.ts`: Vite dev server + Chromium) run inside the default unit
   shards. A fresh-context `page.goto` costs ~5–7 s on a loaded CI runner, so give each route its
   own `it` and keep an `it` to ≤3 page loads within its 45 s budget (PAN-4767); the serial
-  browser lane is PAN-4733.
+  browser lane is PAN-4733. Each harness passes a private `cacheDir` and the `pdfjs-dist-assets`
+  alias from `tests/e2e/fixtures/vite-harness.ts`; a shared `node_modules/.vite` lets one spec's
+  optimizer commit replace another's deps (PAN-5298).
 - Playwright specs under `src/dashboard/frontend/tests/` run in CI only when listed in the
   `test:playwright` script of `src/dashboard/frontend/package.json`. To put issues/agents in the
   store there, seed `localStorage['pan-snapshot-cache-v1']` with `addInitScript` and close

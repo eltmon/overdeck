@@ -249,6 +249,7 @@ export async function runDodGateConsumer(): Promise<unknown> {
         ship: async () => dodStubRow('ship', 7, 'Ship'),
         deploy: async () => dodStubRow('deploy', 8, 'Deploy'),
         trackerClosed: async () => false,
+        openEpic: async () => false,
         reconcileContainedStrike: async () => {},
         now: () => FIXED_NOW_ISO,
       },

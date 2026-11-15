@@ -1,0 +1,238 @@
+{
+  "version": "1",
+  "issueId": "PAN-5278",
+  "created": "2026-11-14T18:11:34.102Z",
+  "updated": "2026-11-14T23:40:11.884Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-14T23:08:27.870Z"
+    }
+  ],
+  "items": {
+    "config-affinity-mgmt": {
+      "status": "cancelled",
+      "claimedBy": "agent-pan-5278",
+      "claimedAt": "2026-11-14T18:11:34.102Z"
+    },
+    "config-affinity-mgmt.ac1": {
+      "status": "cancelled"
+    },
+    "config-affinity-mgmt.ac2": {
+      "status": "cancelled"
+    },
+    "config-affinity-mgmt.ac3": {
+      "status": "cancelled"
+    },
+    "config-affinity-mgmt.ac4": {
+      "status": "cancelled"
+    },
+    "config-affinity-mgmt.ac5": {
+      "status": "cancelled"
+    },
+    "bridge-keeps-fields": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5278",
+      "claimedAt": "2026-11-14T23:10:29.881Z",
+      "doneAt": "2026-11-14T23:16:56.715Z"
+    },
+    "bridge-keeps-fields.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:16:56.715Z"
+    },
+    "bridge-keeps-fields.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:16:56.715Z"
+    },
+    "bridge-keeps-fields.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:16:56.715Z"
+    },
+    "verify-priority-patch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5278",
+      "claimedAt": "2026-11-14T23:18:01.802Z",
+      "doneAt": "2026-11-14T23:18:20.764Z"
+    },
+    "verify-priority-patch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:18:20.764Z"
+    },
+    "verify-priority-patch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:18:20.764Z"
+    },
+    "pool-reader": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5278",
+      "claimedAt": "2026-11-14T23:21:29.368Z",
+      "doneAt": "2026-11-14T23:21:47.426Z"
+    },
+    "pool-reader.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:21:47.426Z"
+    },
+    "pool-reader.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:21:47.426Z"
+    },
+    "pool-reader.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:21:47.426Z"
+    },
+    "pool-reader.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:21:47.426Z"
+    },
+    "pool-reader.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:21:47.426Z"
+    },
+    "rank-priorities": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5278",
+      "claimedAt": "2026-11-14T23:21:48.587Z",
+      "doneAt": "2026-11-14T23:22:18.249Z"
+    },
+    "rank-priorities.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:22:18.249Z"
+    },
+    "rank-priorities.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:22:18.249Z"
+    },
+    "rank-priorities.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:22:18.249Z"
+    },
+    "rank-priorities.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:22:18.249Z"
+    },
+    "rank-priorities.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:22:18.249Z"
+    },
+    "routing-controller": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5278",
+      "claimedAt": "2026-11-14T23:22:19.571Z",
+      "doneAt": "2026-11-14T23:23:29.134Z"
+    },
+    "routing-controller.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:23:29.134Z"
+    },
+    "routing-controller.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:23:29.134Z"
+    },
+    "routing-controller.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:23:29.134Z"
+    },
+    "routing-controller.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:23:29.134Z"
+    },
+    "routing-controller.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:23:29.134Z"
+    },
+    "host-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5278",
+      "claimedAt": "2026-11-14T23:23:30.503Z",
+      "doneAt": "2026-11-14T23:24:17.615Z"
+    },
+    "host-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:24:17.615Z"
+    },
+    "host-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:24:17.615Z"
+    },
+    "host-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:24:17.615Z"
+    },
+    "accounts-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5278",
+      "claimedAt": "2026-11-14T23:24:18.841Z",
+      "doneAt": "2026-11-14T23:25:33.375Z"
+    },
+    "accounts-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:25:33.375Z"
+    },
+    "accounts-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:25:33.375Z"
+    },
+    "accounts-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:25:33.375Z"
+    },
+    "accounts-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:25:33.375Z"
+    },
+    "settings-panel": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5278",
+      "claimedAt": "2026-11-14T23:25:34.663Z",
+      "doneAt": "2026-11-14T23:39:19.299Z"
+    },
+    "settings-panel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:39:19.299Z"
+    },
+    "settings-panel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:39:19.299Z"
+    },
+    "settings-panel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:39:19.299Z"
+    },
+    "settings-panel.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:39:19.299Z"
+    },
+    "settings-panel.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:39:19.299Z"
+    },
+    "docs-and-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5278",
+      "claimedAt": "2026-11-14T23:39:20.339Z",
+      "doneAt": "2026-11-14T23:40:11.884Z"
+    },
+    "docs-and-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:40:11.884Z"
+    },
+    "docs-and-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:40:11.884Z"
+    },
+    "docs-and-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:40:11.884Z"
+    },
+    "docs-and-changelog.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-14T23:40:11.884Z"
+    }
+  },
+  "agentModel": "claude-opus-5-5"
+}

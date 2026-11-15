@@ -1345,6 +1345,7 @@ describe('assembled Definition-of-Done gate', () => {
       return makeRow('deploy', deployStatus);
     },
     trackerClosed: async () => false,
+    openEpic: async () => false,
     now: () => '2026-07-15T13:00:00Z',
   });
 
@@ -1352,6 +1353,32 @@ describe('assembled Definition-of-Done gate', () => {
     const gate = await evaluateDodGate(ctx, {}, deps());
     expect(gate.passed).toBe(true);
     expect(gate.rows.map(row => row.id)).toEqual(DOD_ROWS.slice(0, 8).map(row => row.id));
+  });
+
+  // PAN-5279: an epic lands in slices; a merged slice PR is not the epic landing.
+  it('close-out refuses an open epic without an override', async () => {
+    const gate = await evaluateDodGate(ctx, {}, { ...deps(), openEpic: async () => true });
+    expect(gate.passed).toBe(false);
+    expect(gate.misses).toEqual(['merged']);
+    const merged = gate.rows.find(row => row.id === 'merged')!;
+    expect(merged.observed).toContain(`${issueId} is an open epic`);
+    expect(merged.observed).toContain('--accept-merged');
+    // The epic check runs after row 4 fed the other rows, so they stay green.
+    expect(gate.rows.filter(row => row.id !== 'merged').every(row => row.status === 'pass' || row.status === 'skip')).toBe(true);
+  });
+
+  it('lets an operator close an epic out with --accept-merged, but never the flywheel', async () => {
+    const accepted = await evaluateDodGate(
+      ctx,
+      { acceptedRows: ['merged'], acceptedBy: 'operator' },
+      { ...deps(), openEpic: async () => true },
+    );
+    expect(accepted).toMatchObject({ passed: true, accepted: ['merged'] });
+    await expect(evaluateDodGate(
+      ctx,
+      { acceptedRows: ['merged'], acceptedBy: 'flywheel-orchestrator' },
+      { ...deps(), openEpic: async () => true },
+    )).rejects.toThrow('flywheel orchestrator cannot accept');
   });
 
   it('reads repo landing evidence once for a non-GitHub issue, and never for a GitHub issue (PAN-5209)', async () => {
@@ -1439,6 +1466,7 @@ describe('assembled Definition-of-Done gate', () => {
         calls.push('tracker-closed');
         return true;
       },
+      openEpic: async () => false,
       deploy: async () => makeRow('deploy'),
       now: () => '2026-07-15T13:00:00Z',
     });
@@ -1468,6 +1496,7 @@ describe('assembled Definition-of-Done gate', () => {
       mainVerify: async () => makeRow('main-verify'),
       ship: async () => makeRow('ship', 'skip'),
       deploy: async () => makeRow('deploy'),
+      openEpic: async () => false,
       now: () => '2026-07-15T13:00:00Z',
     });
 
@@ -1494,6 +1523,7 @@ describe('assembled Definition-of-Done gate', () => {
       mainVerify: async () => makeRow('main-verify', 'skip'),
       ship: async () => makeRow('ship', 'skip'),
       trackerClosed: async () => false,
+      openEpic: async () => false,
       deploy: deploySpy,
       now: () => '2026-07-15T13:00:00Z',
     });
@@ -1550,6 +1580,7 @@ describe('assembled Definition-of-Done gate', () => {
       mainVerify: async () => makeRow('main-verify', 'skip'),
       ship: async () => makeRow('ship', 'skip'),
       trackerClosed: async () => false,
+      openEpic: async () => false,
       deploy: async () => makeRow('deploy', 'skip'),
       now: () => '2026-07-15T13:00:00Z',
     });
@@ -1585,6 +1616,7 @@ describe('assembled Definition-of-Done gate', () => {
       mainVerify: async () => makeRow('main-verify'),
       ship: async () => makeRow('ship', 'skip'),
       trackerClosed: async () => false,
+      openEpic: async () => false,
       deploy: async () => makeRow('deploy'),
       now: () => '2026-07-26T23:00:00Z',
     });

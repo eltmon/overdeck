@@ -125,6 +125,30 @@ describe('getConversationDiffTurn', () => {
     const fullFiles = (fullResult.body as { files: Array<{ path: string }> }).files;
     expect(fullFiles.map((f) => f.path)).toContain('drafts/pan-2842.md');
   });
+
+  it('getConversationDiffTurn returns the patch when the conversation cwd is a subdirectory of the repository', async () => {
+    const repo = createRepo('subdir-repo', 'README.md', 'subdir repo\n');
+    const subdir = join(repo, 'sub');
+    mkdirSync(subdir, { recursive: true });
+    const sessionFile = join(testRoot, 'session-subdir.jsonl');
+    writeFileSync(sessionFile, '');
+
+    const { createConversation } = await import('../../../../src/lib/overdeck/conversations.js');
+    const { getConversationDiffTurn } = await import('../../../../src/lib/overdeck/conversation-diffs.js');
+    createConversation({ name: 'subdir-cwd', tmuxSession: 'conv-subdir-cwd', cwd: subdir });
+    writeFileSync(join(repo, 'README.md'), 'subdir repo\nworking-tree change\n');
+
+    const deps = {
+      resolveSessionFile: async () => sessionFile,
+      getCachedMessages: async () => ({ messages: [], workLog: [], fileEditsByAssistantId: new Map() }),
+    };
+    const result = await getConversationDiffTurn('subdir-cwd', 'conv-turn-assistant-1', undefined, deps);
+
+    expect(result.status).toBeUndefined();
+    const diff = (result.body as { diff: string }).diff;
+    expect(diff).toContain('README.md');
+    expect(diff).toContain('+working-tree change');
+  });
 });
 
 describe('getConversationDiffVsMain', () => {

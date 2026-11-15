@@ -30,6 +30,35 @@ export interface CliproxyStatus {
   checkedAt: string;
 }
 
+/** Frontend copy of the server's PoolSnapshot (src/lib/cliproxy-pool.ts, PAN-5278). */
+export interface CliproxyPoolWindow {
+  label: string;
+  usedPercent: number;
+  resetsAt: string | null;
+  windowSeconds: number | null;
+}
+
+export interface CliproxyPoolAccount {
+  name: string;
+  authIndex: string;
+  provider: string;
+  email: string | null;
+  plan: string | null;
+  disabled: boolean;
+  priority: number | null;
+  windows: CliproxyPoolWindow[];
+  weeklyResetsAt: string | null;
+  exhausted: boolean;
+  error: string | null;
+  usageRead: boolean;
+}
+
+export interface CliproxyPoolSnapshot {
+  checkedAt: string;
+  managementAvailable: boolean;
+  accounts: CliproxyPoolAccount[];
+}
+
 // Cached supervisor URL — populated by successful /api/version polls.
 // Used as a final fallback for Force Restart when the dashboard is dead.
 let cachedSupervisorUrl: string | null = null;
@@ -145,6 +174,13 @@ export async function respondToTerminalPermission(
 export async function fetchCliproxyStatus(): Promise<CliproxyStatus> {
   const res = await fetch('/api/cliproxy/status');
   if (!res.ok) throw new Error('Failed to fetch CLIProxy status');
+  return res.json();
+}
+
+/** The CLIProxy account pool; `refresh` asks the server for a fresh usage read. */
+export async function fetchCliproxyAccounts(refresh = false): Promise<CliproxyPoolSnapshot> {
+  const res = await fetch(`/api/cliproxy/accounts${refresh ? '?refresh=1' : ''}`);
+  if (!res.ok) throw new Error('Failed to fetch CLIProxy accounts');
   return res.json();
 }
 

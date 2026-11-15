@@ -50,7 +50,20 @@ vi.mock('../../../../src/lib/overdeck/pr-cache-policy.js', async (importOriginal
   return { ...actual, shouldListPullRequests: async () => true };
 });
 
-import { loadIssueStatesForProject } from '../../../../src/lib/overdeck/derived-issue-state.js';
+// PAN-5279: the single-issue loader's default forge read, fed from the same rows
+// a batch test passes to `listPullRequests`.
+const prListing = vi.hoisted(() => ({ rows: [] as unknown[] }));
+vi.mock('../../../../src/lib/overdeck/pr-listing.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/overdeck/pr-listing.js')>();
+  return { ...actual, listRepoPullRequests: async () => prListing.rows };
+});
+
+import {
+  choosePrForBranch,
+  getDerivedIssueState,
+  loadIssueStatesForProject,
+  type GhPrRow,
+} from '../../../../src/lib/overdeck/derived-issue-state.js';
 
 const sha = (ch: string) => ch.repeat(40);
 
@@ -350,5 +363,76 @@ describe('the batch door reads a merged PR for a backfilled issue (PAN-5310)', (
     });
 
     expect(readMergedPr).not.toHaveBeenCalled();
+  });
+});
+
+// PAN-5279: an epic's branch carries one PR per slice.
+describe('a branch with several PRs (an epic\'s slices)', () => {
+  const ISSUE = 'PAN-999901';
+  const BRANCH = 'feature/pan-999901';
+  const merged: GhPrRow = {
+    number: 5254, url: 'https://github.com/o/r/pull/5254', state: 'MERGED', mergedAt: '2026-11-13T00:00:00Z',
+    headRefName: BRANCH, headRefOid: sha('b'),
+  };
+  const open: GhPrRow = {
+    number: 5301, url: 'https://github.com/o/r/pull/5301', state: 'OPEN', headRefName: BRANCH, headRefOid: sha('c'),
+    mergeable: 'MERGEABLE', reviewDecision: '', statusCheckRollup: [{ status: 'IN_PROGRESS' }],
+  };
+  const closedUnmerged: GhPrRow = { number: 5400, state: 'CLOSED', headRefName: BRANCH, url: 'https://github.com/o/r/pull/5400' };
+  let projectPath: string;
+
+  beforeEach(() => {
+    projectPath = mkdtempSync(join(tmpdir(), 'derived-issue-state-slices-'));
+    git.handler = () => '';
+  });
+
+  afterEach(() => {
+    rmSync(projectPath, { recursive: true, force: true });
+    prListing.rows = [];
+  });
+
+  it('prefers the open PR, else the newest merged one, and never a closed-unmerged one', () => {
+    expect(choosePrForBranch([closedUnmerged, open, merged], BRANCH)?.number).toBe(5301);
+    const older = { ...merged, number: 5100, url: 'https://github.com/o/r/pull/5100' };
+    expect(choosePrForBranch([closedUnmerged, merged, older], BRANCH)?.number).toBe(5254);
+    expect(choosePrForBranch([older, merged], BRANCH)?.number).toBe(5254);
+    expect(choosePrForBranch([closedUnmerged], BRANCH)).toBeNull();
+  });
+
+  it('batch and single-issue loaders pick the same PR when a branch has a merged and an open PR', async () => {
+    // `combineListings` sorts PR numbers descending; feed both orders.
+    for (const rows of [[open, merged], [merged, open]]) {
+      prListing.rows = rows;
+      const batch = await loadIssueStatesForProject(projectPath, [ISSUE], {
+        panes: [], issues: openIssues([ISSUE]), listPullRequests: async () => rows,
+        approvalAtHead: () => undefined, isDeftPipeline: async () => false,
+      });
+      const single = await getDerivedIssueState(ISSUE, {
+        panes: [], issue: { open: true, labels: [] }, readBranch: async () => null, readPaneText: async () => '',
+        readWorkStart: () => null, approvalAtHead: () => undefined, isDeftPipeline: async () => false,
+        readPrOutsidePipeline: async () => undefined,
+      });
+      expect(batch.get(ISSUE)?.pr?.number).toBe(5301);
+      expect(single.pr?.number).toBe(5301);
+    }
+  });
+
+  it('open epic with a merged PR does not derive merged in the batch path', async () => {
+    const states = await loadIssueStatesForProject(projectPath, [ISSUE], {
+      panes: [], issues: { [ISSUE]: { open: true, labels: ['epic'] } }, listPullRequests: async () => [merged],
+      approvalAtHead: () => undefined, isDeftPipeline: async () => false,
+    });
+    const derived = states.get(ISSUE);
+    expect(derived?.state).not.toBe('merged');
+    expect(derived?.mergedSlice).toEqual({ number: 5254, url: merged.url });
+    expect(derived?.pr).toBeUndefined();
+  });
+
+  it('an open non-epic issue with a merged PR still derives merged in the batch path', async () => {
+    const states = await loadIssueStatesForProject(projectPath, [ISSUE], {
+      panes: [], issues: openIssues([ISSUE]), listPullRequests: async () => [merged],
+      approvalAtHead: () => undefined, isDeftPipeline: async () => false,
+    });
+    expect(states.get(ISSUE)?.state).toBe('merged');
   });
 });

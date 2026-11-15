@@ -209,6 +209,7 @@ const TELEMETRY_CLIENT_ROUTES = [
   "/api/conversations/:name/about",
   "/api/conversations/:name/attachments/:file",
   "/api/conversations/:name/bookmarks",
+  "/api/conversations/:name/changes",
   "/api/conversations/:name/compact",
   "/api/conversations/:name/delete-image",
   "/api/conversations/:name/diffs",

@@ -27,8 +27,15 @@
  * | in-review         | PR open (any review state but changes-requested), or a reviewer pane live |
  * | changes-requested | latest PR review state is `CHANGES_REQUESTED`                     |
  * | ready             | PR approved, checks green, `mergeable` true                       |
- * | merged            | PR merged                                                         |
+ * | merged            | PR merged (never for an open `epic` issue — see below)            |
  * | closed            | issue closed                                                      |
+ *
+ * PAN-5279: an epic lands in slices. On an open issue labeled `epic`, a merged
+ * PR is a merged slice, not the issue shipping: the state falls through to the
+ * rows below as if there were no PR, the PR is reported as `mergedSlice`
+ * instead of `pr`, and the feature branch's ahead-of-main count is ignored —
+ * a squash merge leaves the slice's own commits looking unmerged, so only a
+ * live pane means `working`.
  *
  * The rows overlap — an open issue can have a spec, a live pane, and an
  * approved PR all at once — so they resolve in one fixed precedence, highest
@@ -66,6 +73,7 @@ import type {
   PrReviewState,
 } from '@overdeck/contracts';
 
+import { hasEpicLabel } from '../backlog/pickup.js';
 import { isUnsupported } from '../terminal-backends/types.js';
 import type { BackendAgentSnapshot, TerminalBackend } from '../terminal-backends/types.js';
 import { createSettledTtlPromiseCache } from '../concurrency.js';
@@ -159,11 +167,21 @@ function isLive(pane: BackendPane): boolean {
   return pane.state !== 'exited' && pane.state !== 'done';
 }
 
+/**
+ * PAN-5279: the issue is open, labeled `epic`, and its PR merged — a slice
+ * landed, the epic did not. An unknown tracker (`issueOpen: null`) never
+ * qualifies: without the tracker there is no label to read.
+ */
+export function isOpenEpicWithMergedSlice(facts: Pick<IssueStateFacts, 'issueOpen' | 'labels' | 'prMerged'>): boolean {
+  return facts.issueOpen === true && facts.prMerged && hasEpicLabel(facts.labels);
+}
+
 function deriveState(facts: IssueStateFacts): IssueState {
   if (facts.issueOpen === false) return 'closed';
-  if (facts.prMerged) return 'merged';
+  const mergedSlice = isOpenEpicWithMergedSlice(facts);
+  if (facts.prMerged && !mergedSlice) return 'merged';
 
-  const pr = facts.pr;
+  const pr = mergedSlice ? undefined : facts.pr;
   const livePanes = facts.panes.filter(isLive);
 
   if (pr) {
@@ -187,7 +205,9 @@ function deriveState(facts: IssueStateFacts): IssueState {
   }
 
   if (livePanes.length > 0) return 'working';
-  if (facts.branch && facts.branch.aheadOfMain > 0) return 'working';
+  // A squash-merged slice leaves its own commits ahead of main, so for a
+  // merged-slice epic the branch says nothing about new work.
+  if (!mergedSlice && facts.branch && facts.branch.aheadOfMain > 0) return 'working';
 
   if (facts.labels.includes('parked') || facts.parkedListed) return 'parked';
   if (facts.specExists) return 'planned';
@@ -228,7 +248,8 @@ export function deriveIssueState(facts: IssueStateFacts): DerivedIssueState {
   };
   if (attention) derived.attention = attention;
   if (facts.issueOpen === null) derived.trackerUnknown = true;
-  if (facts.pr) derived.pr = facts.pr;
+  if (facts.pr && isOpenEpicWithMergedSlice(facts)) derived.mergedSlice = { number: facts.pr.number, url: facts.pr.url };
+  else if (facts.pr) derived.pr = facts.pr;
   if (facts.branch) derived.branch = facts.branch;
   if (facts.prOutsidePipeline && facts.issueOpen !== false) derived.prOutsidePipeline = facts.prOutsidePipeline;
   // PAN-4399: a post-planning auto-start's journal read only means anything
@@ -366,10 +387,26 @@ export function prFromGhRow(row: GhPrRow): LoadedPr | null {
   };
 }
 
+/**
+ * PAN-5279: the one PR a branch reports, for the single-issue and the batch
+ * loader alike. An epic's branch carries a PR per slice, so pick the open one
+ * (the slice in flight), else the newest merged one. A closed-unmerged row is
+ * not a candidate at all.
+ */
+export function choosePrForBranch(rows: readonly GhPrRow[], branch: string): LoadedPr | null {
+  let newestMerged: LoadedPr | null = null;
+  for (const row of rows) {
+    if (row.headRefName !== branch) continue;
+    const pr = prFromGhRow(row);
+    if (!pr) continue;
+    if (!pr.merged) return pr;
+    if (!newestMerged || pr.number > newestMerged.number) newestMerged = pr;
+  }
+  return newestMerged;
+}
+
 async function readPrWithGh(_issueId: string, projectPath: string, branch: string): Promise<LoadedPr | null> {
-  const rows = await listRepoPullRequests(projectPath);
-  const row = rows.find((candidate) => candidate.headRefName === branch);
-  return row ? prFromGhRow(row) : null;
+  return choosePrForBranch(await listRepoPullRequests(projectPath), branch);
 }
 
 /** PAN-5310: the per-issue merged-PR read for a backfilled issue the repo listing missed. */
@@ -870,10 +907,18 @@ export async function loadIssueStatesForProject(
   const rows = gitlab ? [] : await (deps.listPullRequests ?? listRepoPullRequests)(projectPath);
   const prByIssue = new Map<string, LoadedPr>();
   if (!gitlab) {
+    // PAN-5279: the same choice the single-issue loader makes for a branch
+    // that carries several PRs (an epic's slices).
+    const rowsByBranch = new Map<string, { issueId: string; rows: GhPrRow[] }>();
     for (const row of rows) {
       const issueId = issueIdFromBranch(row.headRefName);
-      const pr = issueId ? prFromGhRow(row) : null;
-      if (issueId && pr) prByIssue.set(issueId, pr);
+      if (!issueId || !row.headRefName) continue;
+      const group = rowsByBranch.get(row.headRefName);
+      if (group) group.rows.push(row); else rowsByBranch.set(row.headRefName, { issueId, rows: [row] });
+    }
+    for (const [branch, group] of rowsByBranch) {
+      const pr = choosePrForBranch(group.rows, branch);
+      if (pr) prByIssue.set(group.issueId, pr);
     }
   }
 

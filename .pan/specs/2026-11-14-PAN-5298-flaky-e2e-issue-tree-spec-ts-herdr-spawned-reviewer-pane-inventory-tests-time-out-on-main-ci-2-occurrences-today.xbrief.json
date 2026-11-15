@@ -1,0 +1,586 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-14T20:27:08Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5298: Flaky e2e: issue-tree.spec.ts 'Herdr-spawned reviewer' / 'pane inventory' tests time out on main CI (2 occurrences today)",
+    "updated": "2026-11-14T21:07:40.226Z"
+  },
+  "plan": {
+    "id": "pan-5298",
+    "title": "Flaky e2e: issue-tree.spec.ts 'Herdr-spawned reviewer' / 'pane inventory' tests time out on main CI (2 occurrences today)",
+    "status": "running",
+    "uid": "d41f2a33-1303-4916-8091-d7cbd4279871",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-14T20:27:08Z",
+    "updated": "2026-11-14T21:07:40.226Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5298",
+        "label": "PAN-5298",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5298.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "e2e",
+      "flaky-test",
+      "vite",
+      "ci",
+      "test-infra"
+    ],
+    "narratives": {
+      "Problem": "tests/e2e/issue-tree.spec.ts failed on main CI test-shard 4/4 in runs 43609143655 and 43629012750 on commits that change no code. All four attempts per run (2 tests x retry 1) waited out the full 20 s poll for the Details tab ([data-testid=\"drawer-tab-overview\"], lines 315/337), and test 2 loaded its page in about 4 s, so the Vite server stayed unusable rather than slow. In both runs styleguide-conformance and merge-train ran concurrently in the same shard. All e2e harnesses share Vite's default optimizer cache (src/dashboard/frontend/node_modules/.vite), and each optimizer commit replaces its deps/ folder; locally three harnesses committed to it five times in seven seconds. merge-train and styleguide-conformance also fail their dependency scan because they lack the pdfjs-dist-assets alias, so they re-optimize during page loads (504 Outdated Optimize Dep). Local probes could not make the issue-tree server fail from another server's commit, and the harness logs nothing about what the page received, so the CI failures left no evidence.",
+      "Proposal": "Add tests/e2e/fixtures/vite-harness.ts with createViteCacheDir/removeViteCacheDir (a private mkdtemp cacheDir under .cache/vite-e2e/, deleted in afterAll), pdfjsAssetsAlias, and createRecordingLogger (a Vite customLogger that records info+ lines and still prints errors). All four harnesses use a private cacheDir and the alias. issue-tree records failed requests, page errors and the Vite log, and throws them in its failure message when the Details tab does not appear; it also closes contexts in finally. Update docs/TESTING.md and the codebase conventions map. Record falsifiable evidence: a DEBUG=vite:deps isolation check that fails pre-fix, 20 issue-tree runs, and a before/after contention loop.",
+      "NonGoals": "- Moving the browser specs into a serial lane or out of the default shards (PAN-4733)\n- Un-quarantining tests/e2e/linked-conversation-title-bar.spec.ts or editing scripts/flaky-quarantine.txt (PAN-4733)\n- Raising renderPoll, test, hook or page.goto timeouts, or changing Vitest retry\n- Changing any expect(...) assertion or matcher in the four specs\n- Changing any frontend component under src/dashboard/frontend/src\n- Deduplicating the harnesses' other copied boot code (package resolution, ensureFrontendNodeModules, mock transport plugin)\n- Adding the diagnostic failure message to merge-train, styleguide-conformance or linked-conversation-title-bar\n- A changelog.d entry (test-infrastructure-only change)\n- Claiming in docs or the PR that the shared cache is the proven root cause"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix the shared optimizer cache and missing alias across all four e2e harnesses, not only issue-tree.",
+        "rationale": "The shared mutation is proven and symmetric: isolating only issue-tree would leave merge-train and styleguide-conformance committing into each other's deps folder."
+      },
+      {
+        "summary": "Use a unique mkdtemp cacheDir per run under <projectRoot>/.cache/vite-e2e/ rather than a stable per-spec folder.",
+        "rationale": "A stable folder collides when two Vitest runs share one checkout; .cache/ is gitignored and inside Vite's default fs.allow, which a planning probe verified."
+      },
+      {
+        "summary": "Add a diagnostic failure message to issue-tree instead of raising timeouts.",
+        "rationale": "Local probes did not reproduce the failure, and the CI logs hold no evidence; a self-describing failure lets a follow-up fix the true cause, while longer timeouts would mask it."
+      },
+      {
+        "summary": "Record before/after evidence under CPU contention (taskset -c 0-3) in addition to the issue's 20-run loop.",
+        "rationale": "The issue-tree-alone loop passes on the unfixed tree locally, so it cannot falsify the fix; the isolation check and contention loop can."
+      }
+    ],
+    "items": [
+      {
+        "id": "vite-harness-helper",
+        "title": "Add tests/e2e/fixtures/vite-harness.ts with cache-dir, alias and recording-logger helpers plus a unit test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T20:27:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5298",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/e2e/fixtures/vite-harness.ts",
+            "tests/unit/e2e-fixtures/vite-harness.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/e2e-fixtures/vite-harness.test.ts",
+            "bash scripts/lint-source-introspection.sh"
+          ],
+          "expected_outputs": [
+            "vite-harness.test.ts reports 4 passed tests",
+            "lint-source-introspection exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create tests/e2e/fixtures/vite-harness.ts exactly as PRD WI-1 shows. createViteCacheDir(projectRoot, label) makes <projectRoot>/.cache/vite-e2e/ recursively and returns mkdtemp(join(parent, `${label}-`)). removeViteCacheDir(dir) runs rm(dir, { recursive: true, force: true }) and no-ops on undefined. pdfjsAssetsAlias(resolvePackage) returns { find: 'pdfjs-dist-assets', replacement: dirname(realpathSync(resolvePackage('pdfjs-dist/package.json'))) }. createRecordingLogger(createLogger, lines) builds base = createLogger('error'), forwards every method (info, warn, warnOnce, error, clearScreen, hasErrorLogged) to base, and pushes 'info  <msg>', 'warn  <msg>', 'error <msg>' into lines, recording each warnOnce message only once. It exposes hasWarned through a getter and setter on base, writes the returned object member by member, and never spreads base. Create tests/unit/e2e-fixtures/vite-harness.test.ts with the four tests the PRD names, using a stub createLogger whose vi.fn() warn/warnOnce/error set base.hasWarned = true (vite does not resolve from the root suite) and an os.tmpdir() mkdtemp project root cleaned in afterEach. Read no source file in either file."
+        },
+        "items": [
+          {
+            "id": "vite-harness-helper.ac1",
+            "title": "Given a temp project root, when createViteCacheDir(root, 'issue-tree') is called twice, then it returns two different existing directories whose paths start with <root>/.cache/vite-e2e/issue-tree-",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vite-harness-helper.ac2",
+            "title": "When removeViteCacheDir(dir) resolves, existsSync(dir) returns false, and removeViteCacheDir(undefined) resolves without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vite-harness-helper.ac3",
+            "title": "Given a stub base logger, when the recording logger receives info('a'), warn('b'), warnOnce('c') twice and error('d'), then lines equals ['info  a', 'warn  b', 'warn  c', 'error d'], base.warnOnce is called twice, base.error is called once with 'd', and hasWarned returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vite-harness-helper.ac4",
+            "title": "A fresh recording logger returns hasWarned false, and still returns false after info('x')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issue-tree-isolation",
+        "title": "issue-tree.spec.ts uses a private Vite cacheDir and the shared pdfjs alias, and closes contexts in finally",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T20:27:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5298",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/e2e/issue-tree.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/e2e/issue-tree.spec.ts",
+            "git diff origin/main -- tests/e2e/issue-tree.spec.ts"
+          ],
+          "expected_outputs": [
+            "issue-tree.spec.ts reports 2 passed tests",
+            "the diff adds cacheDir: viteCacheDir, pdfjsAssetsAlias(resolvePackage), removeViteCacheDir(viteCacheDir) and two finally blocks, and changes no expect matcher or renderPoll"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 in tests/e2e/issue-tree.spec.ts. Import createViteCacheDir, removeViteCacheDir and pdfjsAssetsAlias from './fixtures/vite-harness.js'. Declare let viteCacheDir: string | undefined. In beforeAll, create it with label 'issue-tree' before createServer, pass cacheDir: viteCacheDir, and replace the inline alias block (lines 235-241) with resolve: { alias: [pdfjsAssetsAlias(resolvePackage)] } plus the two-line comment from the PRD. Remove the realpathSync/dirname imports only if grep shows no other use. In afterAll, call removeViteCacheDir(viteCacheDir) after vite?.close(). Wrap each test body after openCockpit() in try { ... } finally { await context.close(); } and delete the two trailing context.close() lines. Assertions keep their text and order."
+        },
+        "items": [
+          {
+            "id": "issue-tree-isolation.ac1",
+            "title": "When npx vitest run tests/e2e/issue-tree.spec.ts runs, both tests pass and the run leaves no directory under .cache/vite-e2e/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-tree-isolation.ac2",
+            "title": "The diff of issue-tree.spec.ts passes cacheDir: viteCacheDir and resolve.alias [pdfjsAssetsAlias(resolvePackage)] to createServer, and preserves every expect(...) matcher and renderPoll = { timeout: 20_000, interval: 100 }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-tree-isolation.ac3",
+            "title": "Each of the two tests closes its browser context in a finally block, so a thrown assertion still closes the context",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issue-tree-diagnostics",
+        "title": "issue-tree.spec.ts fails with the Vite log, failed requests and page errors when the Details tab never renders",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-14T20:27:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5298",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/e2e/issue-tree.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/e2e/issue-tree.spec.ts"
+          ],
+          "expected_outputs": [
+            "issue-tree.spec.ts reports 2 passed tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. Add a module-level const viteLog: string[] = []. In beforeAll, take createLogger from the same dynamic import(vitePath) as createServer, and replace logLevel: 'error' with logLevel: 'info', customLogger: createRecordingLogger(createLogger, viteLog). openCockpit() registers page.on('response') (status >= 400) and page.on('requestfailed') listeners into a failures array before page.goto, and returns it. Add waitForDetailsTab(page, failures, pageErrors) exactly as the PRD shows: it polls the Details tab count with renderPoll and on failure throws an Error whose message joins 'The Stage issue view never rendered its Details tab.', 'Failed requests (N):', 'Page errors (N):' and 'Vite log, last 40 lines (N):' sections, with { cause: error }. Both tests call it instead of the first poll, then keep the locator click and all later assertions unchanged. Implementation checkpoint: temporarily break the selector locally to confirm the message, restore it, and commit nothing from that check; if Vitest hides the message with cause set, drop cause and append String(error) as a last section."
+        },
+        "items": [
+          {
+            "id": "issue-tree-diagnostics.ac1",
+            "title": "Given the Details selector is temporarily changed to a missing test id (local only, not committed), when the spec runs, then it fails with a message containing 'Failed requests (', 'Page errors (' and 'Vite log, last 40 lines ('",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-tree-diagnostics.ac2",
+            "title": "With the committed selector, npx vitest run tests/e2e/issue-tree.spec.ts passes both tests and prints no Vite info lines to the console",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-tree-diagnostics.ac3",
+            "title": "The diff renders Vite through createRecordingLogger with logLevel 'info' and changes no expect matcher after the waitForDetailsTab call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-train-isolation",
+        "title": "merge-train.spec.ts uses a private Vite cacheDir and the pdfjs alias",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T20:27:08Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-5298",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/e2e/merge-train.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/e2e/merge-train.spec.ts"
+          ],
+          "expected_outputs": [
+            "merge-train.spec.ts reports 2 passed tests and the output contains no 'Failed to run dependency scan' line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4 in tests/e2e/merge-train.spec.ts. Import the three helpers from './fixtures/vite-harness.js'. Declare let viteCacheDir: string | undefined. In beforeAll, create it with label 'merge-train' before createServer (line 230). Add cacheDir: viteCacheDir and resolve: { alias: [pdfjsAssetsAlias(resolvePackage)] } beside configFile: false. In afterAll, call removeViteCacheDir(viteCacheDir) after vite?.close(). Change no test body."
+        },
+        "items": [
+          {
+            "id": "merge-train-isolation.ac1",
+            "title": "When npx vitest run tests/e2e/merge-train.spec.ts runs, both tests pass and the output contains no 'Failed to run dependency scan' line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-train-isolation.ac2",
+            "title": "The diff adds cacheDir: viteCacheDir, pdfjsAssetsAlias(resolvePackage) and removeViteCacheDir(viteCacheDir) in afterAll, and preserves every it(...) body unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "styleguide-isolation",
+        "title": "styleguide-conformance.spec.ts uses a private Vite cacheDir and the pdfjs alias",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T20:27:08Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-5298",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/e2e/styleguide-conformance.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/e2e/styleguide-conformance.spec.ts"
+          ],
+          "expected_outputs": [
+            "styleguide-conformance.spec.ts reports 9 passed tests and the output contains no 'Failed to run dependency scan' line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5 in tests/e2e/styleguide-conformance.spec.ts with label 'styleguide': import the three helpers, declare viteCacheDir, create it in beforeAll before createServer (line 363), add cacheDir: viteCacheDir and resolve: { alias: [pdfjsAssetsAlias(resolvePackage)] } beside configFile: false (line 365), and call removeViteCacheDir(viteCacheDir) after vite?.close() in afterAll (line 438). Change no test body."
+        },
+        "items": [
+          {
+            "id": "styleguide-isolation.ac1",
+            "title": "When npx vitest run tests/e2e/styleguide-conformance.spec.ts runs, all 9 tests pass and the output contains no 'Failed to run dependency scan' line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "styleguide-isolation.ac2",
+            "title": "The diff adds cacheDir: viteCacheDir, pdfjsAssetsAlias(resolvePackage) and removeViteCacheDir(viteCacheDir) in afterAll, and preserves every it(...) body unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "linked-title-bar-isolation",
+        "title": "linked-conversation-title-bar.spec.ts uses a private Vite cacheDir and the pdfjs alias",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T20:27:08Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-5298",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/e2e/linked-conversation-title-bar.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git diff origin/main -- tests/e2e/linked-conversation-title-bar.spec.ts",
+            "git diff origin/main -- scripts/flaky-quarantine.txt"
+          ],
+          "expected_outputs": [
+            "the spec diff adds cacheDir: viteCacheDir, an alias entry built by pdfjsAssetsAlias next to the unchanged dedupe list, and removeViteCacheDir(viteCacheDir) in afterAll, with no it(...) body changed",
+            "the quarantine diff is empty"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ],
+          "acJustification": "Diff-only verification: the quarantined spec hangs locally at its 180 s warm-up on the unchanged tree (observed during planning), so a run-based criterion cannot be met."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6 in tests/e2e/linked-conversation-title-bar.spec.ts with label 'linked-title-bar'. The spec has no resolvePackage, so pass (specifier) => require.resolve(specifier, { paths }) using the paths array in its beforeAll. Add cacheDir: viteCacheDir, merge alias: [pdfjsAssetsAlias(...)] into the existing resolve object next to dedupe (line 104), and call removeViteCacheDir(viteCacheDir) after vite?.close() in afterAll (line 120). Leave scripts/flaky-quarantine.txt untouched. Verify by diff only: during planning the spec hung for more than 400 s at its warm-up on the unchanged tree (the PAN-4733 symptom). Do not try to make it pass, and do not include it in the repeat-evidence runs."
+        },
+        "items": [
+          {
+            "id": "linked-title-bar-isolation.ac1",
+            "title": "The spec diff passes cacheDir: viteCacheDir to createServer, adds alias [pdfjsAssetsAlias((specifier) => require.resolve(specifier, { paths }))] beside the unchanged resolve.dedupe list, and calls removeViteCacheDir(viteCacheDir) in afterAll",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linked-title-bar-isolation.ac2",
+            "title": "The diff preserves every it(...) body and scripts/flaky-quarantine.txt still contains its tests/e2e/linked-conversation-title-bar.spec.ts line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-e2e-harness",
+        "title": "Document the private-cache and alias rules for e2e harnesses in docs/TESTING.md and the conventions map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T20:27:08Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5298",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TESTING.md",
+            ".overdeck/context/codebase/conventions.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "npm run lint:last-verified",
+            "grep -c 'last-verified' .overdeck/context/codebase/conventions.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "lint:last-verified exits 0",
+            "the grep count is 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7. In docs/TESTING.md, add the PRD's bullet right after the bullet that starts '- Browser specs under `tests/e2e/*.spec.ts` run inside the default unit shards.' (line 252). In .overdeck/context/codebase/conventions.md, append the PRD's one sentence to the bullet starting '- Browser specs (`tests/e2e/*.spec.ts`: Vite dev server + Chromium)' (lines 71-74). Keep the single <!-- last-verified: 2026-11-03 --> line unchanged. Do not describe the shared cache as the proven cause of the PAN-5298 failures."
+        },
+        "items": [
+          {
+            "id": "docs-e2e-harness.ac1",
+            "title": "docs/TESTING.md renders a bullet that names tests/e2e/fixtures/vite-harness.ts, createViteCacheDir, removeViteCacheDir and pdfjsAssetsAlias, and explains that a shared src/dashboard/frontend/node_modules/.vite lets one optimizer commit replace another spec's deps folder",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-e2e-harness.ac2",
+            "title": "conventions.md's browser-specs bullet ends with the sentence naming the private cacheDir and pdfjs-dist-assets alias from tests/e2e/fixtures/vite-harness.ts, and the file still contains exactly one last-verified line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-e2e-harness.ac3",
+            "title": "When npm run lint:docs and npm run lint:last-verified run on the branch, both exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "repeat-evidence",
+        "title": "Record isolation-check, 20-run and before/after contention-loop results in the PRD and PR",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-14T20:27:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5298",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/PAN-5298.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "DEBUG=vite:deps npx vitest run tests/e2e/issue-tree.spec.ts tests/e2e/merge-train.spec.ts tests/e2e/styleguide-conformance.spec.ts > .cache/pan-5298-isolation.log 2>&1; echo \"vitest exit: $?\"",
+            "grep -E \"renaming .* to .*/deps$\" .cache/pan-5298-isolation.log",
+            "grep -c \"src/dashboard/frontend/node_modules/.vite/deps\" .cache/pan-5298-isolation.log",
+            "grep -c \"Failed to run dependency scan\" .cache/pan-5298-isolation.log",
+            "ls .cache/vite-e2e/"
+          ],
+          "expected_outputs": [
+            "vitest exit: 0",
+            "at least one renaming line, every target under .cache/vite-e2e/",
+            "0",
+            "0",
+            ".cache/vite-e2e/ lists no directory"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-8 after every implementation item has landed. Run checks 1-3a once on the three CI-running specs, capturing the full output to .cache/pan-5298-isolation.log with Vitest's exit status, and grep that file separately for renaming targets, the shared-folder path and 'Failed to run dependency scan'. Never check the scan line against the renaming-filtered output. Leave linked-conversation-title-bar out because it hangs locally. Run 20 consecutive npx vitest run tests/e2e/issue-tree.spec.ts runs and record pass/fail counts and the slowest test duration. Run the 10-run contention loop `taskset -c 0-3 npx vitest run tests/e2e/issue-tree.spec.ts tests/e2e/merge-train.spec.ts tests/e2e/styleguide-conformance.spec.ts` on the branch and in a throwaway origin/main worktree at $HOME/Projects/hoff-pan-5298-base (run bun install and npm run build there, as CI does before the shards, then one clean npx vitest run tests/e2e/issue-tree.spec.ts before counting; remove it afterwards with git worktree remove and its literal path; never git checkout inside the feature workspace). Append the results table under '## Verification results' in .pan/drafts/PAN-5298.md, commit it, and paste the same table into the PR description. Report every failure as it happened; if neither side fails locally, say plainly that only post-merge CI can confirm the fix."
+        },
+        "items": [
+          {
+            "id": "repeat-evidence.ac1",
+            "title": "The captured three-spec DEBUG=vite:deps run exits 0, its log has at least one renaming line with every target under .cache/vite-e2e/, grep -c on the log returns 0 for the shared deps folder and 0 for 'Failed to run dependency scan', and .cache/vite-e2e/ is empty afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repeat-evidence.ac2",
+            "title": ".pan/drafts/PAN-5298.md contains a '## Verification results' section with the 20-run issue-tree pass/fail counts and slowest duration, and the branch vs origin/main counts of the 10-run contention loop",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repeat-evidence.ac3",
+            "title": "The PR description renders the same results table, and states that local runs cannot prove the CI flake is gone when neither side failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "vite-harness-helper",
+        "to": "issue-tree-isolation",
+        "type": "blocks"
+      },
+      {
+        "from": "vite-harness-helper",
+        "to": "merge-train-isolation",
+        "type": "blocks"
+      },
+      {
+        "from": "vite-harness-helper",
+        "to": "styleguide-isolation",
+        "type": "blocks"
+      },
+      {
+        "from": "vite-harness-helper",
+        "to": "linked-title-bar-isolation",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-tree-isolation",
+        "to": "issue-tree-diagnostics",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-tree-diagnostics",
+        "to": "repeat-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "merge-train-isolation",
+        "to": "repeat-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "styleguide-isolation",
+        "to": "repeat-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "linked-title-bar-isolation",
+        "to": "repeat-evidence",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-14-PAN-5298-flaky-e2e-issue-tree-spec-ts-herdr-spawned-reviewer-pane-inventory-tests-time-out-on-main-ci-2-occurrences-today.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}
