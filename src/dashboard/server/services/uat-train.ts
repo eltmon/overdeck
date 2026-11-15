@@ -588,6 +588,8 @@ export interface UatGenerationPayload {
   shipStatus: null;
   /** PAN-4753 WI-3: why the batch became superseded or invalidated; null otherwise. */
   statusReason: string | null;
+  /** PAN-5364: the batch whose merge voided this one (invalidated only); null otherwise. */
+  voidedBy: string | null;
   /**
    * Per-repo generation detail, additive (PAN-3093). Always present and
    * non-empty: a monorepo generation projects the single synthesized entry, so
@@ -770,6 +772,7 @@ export async function getUatGenerationsPayload(projectRootOverride?: string): Pr
       shipStatus: null,
       // A reason only explains a voided or replaced batch; a later promote keeps the column.
       statusReason: gen.status === 'superseded' || gen.status === 'invalidated' ? gen.statusReason ?? null : null,
+      voidedBy: gen.status === 'invalidated' ? gen.voidedBy ?? null : null,
       repos: (gen.repos ?? []).map((r) => ({
         repoKey: r.repoKey,
         branch: r.branch,

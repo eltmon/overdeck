@@ -293,6 +293,21 @@ describe('getUatGenerationsPayload', () => {
     ]);
   });
 
+  it('carries voidedBy for an invalidated batch only (PAN-5364)', async () => {
+    mocks.listUatGenerations.mockReturnValue([
+      { ...gen([]), name: 'uat/pan-voided-1115', status: 'invalidated', voidedBy: 'uat/a' } as UatGeneration,
+      { ...gen([]), name: 'uat/pan-merged-1115', status: 'promoted', voidedBy: 'uat/b' } as UatGeneration,
+    ]);
+    mocks.findXBriefByIssue.mockReturnValue(Effect.succeed(null));
+
+    const payload = await getUatGenerationsPayload('/repos/myn');
+
+    expect(payload.map((p) => [p.name, p.voidedBy])).toEqual([
+      ['uat/pan-voided-1115', 'uat/a'],
+      ['uat/pan-merged-1115', null],
+    ]);
+  });
+
   it('projects the synthesized single repo for a monorepo generation', async () => {
     // The store always yields at least one entry, so the payload shape is the
     // same whether or not the project is polyrepo.

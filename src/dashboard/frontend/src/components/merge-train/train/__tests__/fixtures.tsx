@@ -65,6 +65,7 @@ export function gen(over: Partial<UatGenerationPayload> = {}): UatGenerationPayl
     versionSyncConfigured: false,
     shipStatus: null,
     statusReason: null,
+    voidedBy: null,
     stack: { status: 'absent', frontendUrl: 'https://uat.example' },
     ...over,
   };
