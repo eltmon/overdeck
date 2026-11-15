@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5337",
   "created": "2026-11-15T11:36:29.093Z",
-  "updated": "2026-11-15T14:35:01.097Z",
+  "updated": "2026-11-15T14:44:31.136Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,9 +74,26 @@
       "doneAt": "2026-11-15T14:34:16.456Z"
     },
     "doc-link-component": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5337",
-      "claimedAt": "2026-11-15T14:35:01.097Z"
+      "claimedAt": "2026-11-15T14:35:01.097Z",
+      "doneAt": "2026-11-15T14:44:31.136Z"
+    },
+    "doc-link-component.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:44:31.136Z"
+    },
+    "doc-link-component.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:44:31.136Z"
+    },
+    "doc-link-component.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:44:31.136Z"
+    },
+    "doc-link-component.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:44:31.136Z"
     }
   },
   "agentModel": "claude-sonnet-5"
