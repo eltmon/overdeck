@@ -138,6 +138,14 @@ vi.mock('../../../../src/lib/terminal-backends/launch.js', () => ({
   closeIssuePanes: vi.fn(async () => []),
 }));
 
+// PAN-5396: a failed close is retried only for an agent whose pane is still live.
+const livePanes = vi.hoisted(() => new Set<string>());
+vi.mock('../../../../src/lib/agents/liveness.js', () => ({
+  isAlive: vi.fn(async (agentId: string) => (livePanes.has(agentId)
+    ? { alive: true, paneAlive: true }
+    : { alive: false, reason: 'no-session' })),
+}));
+
 vi.mock('../../../../src/lib/paths.js', () => ({
   OVERDECK_HOME: '/tmp/overdeck-test',
   AGENTS_DIR: '/tmp/overdeck-test/agents',
@@ -274,6 +282,7 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
     releaseStarted = false;
     mockTransitionState.shouldFail = false;
     agentStore.clear();
+    livePanes.clear();
     for (const id of ['agent-pan-399', 'strike-pan-399']) {
       agentStore.set(id, { id, issueId: ISSUE_ID, role: id.startsWith('agent-') ? 'work' : 'strike', status: 'running' });
     }
@@ -351,6 +360,59 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
     ).rejects.toThrow('tracker transition failed');
 
     expect(mockTeardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith(ISSUE_ID.toLowerCase());
+  });
+
+  // PAN-5396: the merge is the fact; a failed tracker write must not keep the agent alive.
+  it('pauses the merged agents and closes their terminals when the verifying-on-main transition fails', async () => {
+    mockTransitionState.shouldFail = true;
+
+    await expect(postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH)).rejects.toThrow('tracker transition failed');
+
+    expect(mockKillSession).toHaveBeenCalledWith('agent-pan-399');
+    for (const id of ['agent-pan-399', 'strike-pan-399']) {
+      expect(agentStore.get(id)).toMatchObject({ status: 'stopped', paused: true });
+    }
+  });
+
+  it('frees the merged agents before the Docker teardown step runs', async () => {
+    // A restart during teardown kills everything after it; the agent must already be free.
+    let stateAtTeardown: Record<string, unknown> | undefined;
+    mockTeardownWorkspaceDockerByNamePromise.mockImplementationOnce(async () => {
+      stateAtTeardown = { ...agentStore.get('agent-pan-399') };
+      return { networkRemoved: true, steps: ['Removed network'] };
+    });
+
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+
+    expect(stateAtTeardown).toMatchObject({ status: 'stopped', paused: true });
+  });
+
+  it('retries the close once when the pane is still live', async () => {
+    const { closeAgentPane } = await import('../../../../src/lib/terminal-backends/launch.js');
+    const close = vi.mocked(closeAgentPane);
+    livePanes.add('agent-pan-399');
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    close.mockResolvedValueOnce(false);
+    try {
+      await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+      expect(close.mock.calls.filter(([id]) => id === 'agent-pan-399')).toHaveLength(2);
+      expect(agentStore.get('agent-pan-399')).toMatchObject({ status: 'stopped', paused: true });
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('retrying once'));
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('does not retry the close for an agent with no live pane', async () => {
+    const { closeAgentPane } = await import('../../../../src/lib/terminal-backends/launch.js');
+    const close = vi.mocked(closeAgentPane);
+    mockSessionExists.mockImplementation((agentId: string) => Effect.succeed(agentId === 'strike-pan-399'));
+    try {
+      await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+      expect(close.mock.calls.filter(([id]) => id === 'agent-pan-399')).toHaveLength(1);
+    } finally {
+      mockSessionExists.mockImplementation((agentId: string) => Effect.succeed(agentStore.has(agentId)));
+    }
   });
 
   // PAN-5279: an open epic lands in slices; a slice merge must not mark it done.
