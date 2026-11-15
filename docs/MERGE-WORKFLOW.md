@@ -767,6 +767,19 @@ now means only that the forge answered and no PR exists. A failed read is never 
 path or by tracker-closed settlement. Each failed attempt prints a `[dod-gate] … pull request read
 failed (attempt n of 2)` warning. `fetchIssuePullRequest` never caches a failed read (PAN-4821).
 
+Row 1 passes on the forge's `reviewDecision: APPROVED`. When the forge reached no decision — the
+reviewer could not submit a formal GitHub review, so the review agent posted its verdict as a
+comment — row 1 runs the PR it already read through the merge gate's reader (`getPrFacts` in
+`src/lib/cloister/pr-facts.ts`) and passes when `approvalProvenAtHead` holds: the newest trusted
+`<!-- overdeck-verdict: APPROVED sha=… -->` comment names the PR head. That is the same evidence
+the merge door accepts, so a PR the merge gate merged on a comment verdict closes out without
+`--accept-review`. A verdict comment for another commit does not pass, a forge
+`CHANGES_REQUESTED` is never overridden by a comment, and the pipeline journal is not read. When
+the newest trusted verdict comment requests changes, row 1 treats it like a forge
+`CHANGES_REQUESTED`: neither the strike path nor tracker-closed settlement skips it, and the row
+misses with `Overdeck verdict comment requested changes`. A failed verdict read is appended to the
+observed text and the row falls back to its strike and settlement rules (PAN-5401).
+
 For an issue that is not tracked on GitHub (`ctx.github` unset) whose GitHub PR read answers "no PR",
 rows 1 and 2 fall back to repo landing evidence from `src/lib/lifecycle/dod-forge-merge.ts`: the forge is
 asked first for every required repo, with no ahead-count gate (unlike the Single Merge Oracle,
