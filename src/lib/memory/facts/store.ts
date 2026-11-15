@@ -22,6 +22,13 @@ export const MEMORY_FACT_DESCRIPTION_MAX = 200;
 // PAN-3957 D16 / PAN-4578 D3: a home-directory path cannot be true on another
 // machine, so it never belongs in the project or operator store.
 export const MACHINE_PATH_PATTERN = /\/home\/[^/\s]+\/|\/Users\/[^/\s]+\/|\b[A-Za-z]:\\Users\\/;
+// PAN-5360: a superseded or retired fact stays on disk but leaves every injection.
+export const MEMORY_FACT_STATUSES = ['active', 'superseded', 'retired'] as const;
+export type MemoryFactStatus = (typeof MEMORY_FACT_STATUSES)[number];
+const KNOWN_FRONTMATTER_KEYS: readonly string[] = [
+  'type', 'title', 'description', 'tags', 'created', 'updated', 'source', 'status', 'supersedes', 'superseded_by', 'review',
+];
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 export interface MemoryFact {
   readonly id: string;
@@ -30,12 +37,22 @@ export interface MemoryFact {
   readonly title: string;
   readonly description: string;
   readonly tags: readonly string[];
+  readonly created: string | null; // YYYY-MM-DD
   readonly updated: string | null; // YYYY-MM-DD
   readonly source: string | null;
+  readonly status: MemoryFactStatus; // 'active' when the key is absent
+  readonly supersedes: readonly string[];
+  readonly supersededBy: string | null; // frontmatter key: superseded_by
   readonly review: readonly string[];
+  /** Frontmatter keys this module does not know, preserved verbatim in parsed order. */
+  readonly extra: Readonly<Record<string, unknown>>;
   readonly body: string;
   readonly file: string; // absolute
 }
+
+/** Write input: the new fields are optional and default to an active, unlinked fact. */
+export type MemoryFactInput = Omit<MemoryFact, 'file' | 'scope' | 'created' | 'status' | 'supersedes' | 'supersededBy' | 'extra'>
+  & Partial<Pick<MemoryFact, 'created' | 'status' | 'supersedes' | 'supersededBy' | 'extra'>>;
 
 export interface MemoryFactProblem {
   readonly file: string;
@@ -126,11 +143,52 @@ export function parseMemoryFact(file: string, raw: string, scope: MemoryFactScop
   let updated: string | null = null;
   if (frontmatter.updated !== undefined && frontmatter.updated !== null) {
     const updatedText = String(frontmatter.updated);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(updatedText)) return { file, reason: 'invalid updated date' };
+    if (!DATE_PATTERN.test(updatedText)) return { file, reason: 'invalid updated date' };
     updated = updatedText;
   }
 
+  let created: string | null = null;
+  if (frontmatter.created !== undefined && frontmatter.created !== null) {
+    const createdText = String(frontmatter.created);
+    if (!DATE_PATTERN.test(createdText)) return { file, reason: 'invalid created date' };
+    created = createdText;
+  }
+
+  let status: MemoryFactStatus = 'active';
+  if (frontmatter.status !== undefined && frontmatter.status !== null) {
+    const rawStatus = frontmatter.status;
+    if (typeof rawStatus !== 'string' || !(MEMORY_FACT_STATUSES as readonly string[]).includes(rawStatus)) {
+      return { file, reason: `invalid status "${String(rawStatus)}"` };
+    }
+    status = rawStatus as MemoryFactStatus;
+  }
+
+  let supersedes: string[] = [];
+  if (frontmatter.supersedes !== undefined && frontmatter.supersedes !== null) {
+    if (!isStringArray(frontmatter.supersedes) || !frontmatter.supersedes.every((entry) => MEMORY_FACT_ID.test(entry))) {
+      return { file, reason: 'supersedes must be a list of fact ids' };
+    }
+    supersedes = frontmatter.supersedes;
+  }
+
+  let supersededBy: string | null = null;
+  if (frontmatter.superseded_by !== undefined && frontmatter.superseded_by !== null) {
+    if (typeof frontmatter.superseded_by !== 'string' || !MEMORY_FACT_ID.test(frontmatter.superseded_by)) {
+      return { file, reason: 'invalid superseded_by' };
+    }
+    supersededBy = frontmatter.superseded_by;
+  }
+
   const source = typeof frontmatter.source === 'string' ? frontmatter.source : null;
+  if (source !== null && (source.includes('\n') || source.length > MEMORY_FACT_DESCRIPTION_MAX)) {
+    return { file, reason: 'source must be one line of at most 200 characters' };
+  }
+
+  const extra: Record<string, unknown> = {};
+  for (const key of Object.keys(frontmatter)) {
+    if (!KNOWN_FRONTMATTER_KEYS.includes(key)) extra[key] = frontmatter[key];
+  }
+
   const title = typeof frontmatter.title === 'string' ? frontmatter.title : defaultFactTitle(id);
   const body = raw.slice(frontmatterMatch[0].length).trim();
 
@@ -145,7 +203,9 @@ export function parseMemoryFact(file: string, raw: string, scope: MemoryFactScop
     }
   }
 
-  return { id, scope, type, title, description, tags, updated, source, review, body, file };
+  return {
+    id, scope, type, title, description, tags, created, updated, source, status, supersedes, supersededBy, review, extra, body, file,
+  };
 }
 
 export function readMemoryFactsSync(dir: string, scope: MemoryFactScope): MemoryFactReadResult {
@@ -166,14 +226,22 @@ export function readMemoryFactsSync(dir: string, scope: MemoryFactScope): Memory
   return { facts, problems };
 }
 
-export function serializeMemoryFact(fact: Omit<MemoryFact, 'file' | 'scope'>): string {
+/** PAN-5360 D3: known keys in a fixed order, `status` only when not active, then unknown keys in parsed order. */
+export function serializeMemoryFact(fact: MemoryFactInput): string {
   const frontmatter: Record<string, unknown> = { type: fact.type };
   if (fact.title !== defaultFactTitle(fact.id)) frontmatter.title = fact.title;
   frontmatter.description = fact.description;
   if (fact.tags.length > 0) frontmatter.tags = fact.tags;
+  if (fact.created != null) frontmatter.created = fact.created;
   if (fact.updated !== null) frontmatter.updated = fact.updated;
   if (fact.source !== null) frontmatter.source = fact.source;
+  if (fact.status !== undefined && fact.status !== 'active') frontmatter.status = fact.status;
+  if (fact.supersedes && fact.supersedes.length > 0) frontmatter.supersedes = fact.supersedes;
+  if (fact.supersededBy != null) frontmatter.superseded_by = fact.supersededBy;
   if (fact.review.length > 0) frontmatter.review = fact.review;
+  for (const [key, value] of Object.entries(fact.extra ?? {})) {
+    if (!KNOWN_FRONTMATTER_KEYS.includes(key)) frontmatter[key] = value;
+  }
 
   const yamlText = stringifyYaml(frontmatter).trimEnd();
   return `---\n${yamlText}\n---\n\n${fact.body}\n`;
@@ -182,7 +250,7 @@ export function serializeMemoryFact(fact: Omit<MemoryFact, 'file' | 'scope'>): s
 export async function writeMemoryFact(
   dir: string,
   scope: MemoryFactScope,
-  fact: Omit<MemoryFact, 'file' | 'scope'>,
+  fact: MemoryFactInput,
   opts?: { overwrite?: boolean },
 ): Promise<string> {
   const file = join(dir, `${fact.id}.md`);
@@ -213,8 +281,9 @@ export async function removeMemoryFact(dir: string, id: string): Promise<string>
   return file;
 }
 
+/** PAN-5360 D2: `superseded_by` makes a fact inactive even when `status` still says active. */
 export function isActiveFact(fact: MemoryFact): boolean {
-  return fact.review.length === 0;
+  return fact.status === 'active' && fact.supersededBy === null && fact.review.length === 0;
 }
 
 export function matchMemoryFacts(facts: readonly MemoryFact[], query: string): MemoryFact[] {

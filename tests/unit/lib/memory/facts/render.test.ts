@@ -38,9 +38,14 @@ function fact(overrides: Partial<MemoryFact> & { id: string }): MemoryFact {
     title: overrides.id,
     description: `${overrides.id} description.`,
     tags: [],
+    created: null,
     updated: null,
     source: null,
+    status: 'active',
+    supersedes: [],
+    supersededBy: null,
     review: [],
+    extra: {},
     body: '',
     file: `/tmp/${overrides.id}.md`,
     ...overrides,
@@ -91,6 +96,19 @@ describe('renderMemoryIndexSection', () => {
     const section = renderMemoryIndexSection({ scope: 'project', dir: '/repo/.overdeck/memory', facts, budget: PROJECT_MEMORY_CHAR_BUDGET });
     expect(section).toContain('active-fact');
     expect(section).not.toContain('marked-fact');
+  });
+
+  it('excludes a superseded fact from the index and the active count', () => {
+    const facts = [
+      fact({ id: 'new-rule', supersedes: ['old-rule'] }),
+      fact({ id: 'old-rule', status: 'superseded', supersededBy: 'new-rule' }),
+      fact({ id: 'retired-rule', status: 'retired' }),
+    ];
+    const section = renderMemoryIndexSection({ scope: 'project', dir: '/repo/.overdeck/memory', facts, budget: PROJECT_MEMORY_CHAR_BUDGET });
+    expect(section).toContain('new-rule');
+    expect(section).not.toContain('old-rule:');
+    expect(section).not.toContain('retired-rule');
+    expect(section).toContain('(1 active facts,');
   });
 
   it("returns '' when no active facts", () => {
