@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5360",
   "created": "2026-11-15T15:42:12.629Z",
-  "updated": "2026-11-15T17:11:33.622Z",
+  "updated": "2026-11-15T17:18:36.750Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -222,9 +222,26 @@
       "doneAt": "2026-11-15T17:11:30.790Z"
     },
     "w11-cli-lint": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5360",
-      "claimedAt": "2026-11-15T17:11:33.621Z"
+      "claimedAt": "2026-11-15T17:11:33.621Z",
+      "doneAt": "2026-11-15T17:18:36.749Z"
+    },
+    "w11-cli-lint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:18:36.749Z"
+    },
+    "w11-cli-lint.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:18:36.749Z"
+    },
+    "w11-cli-lint.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:18:36.749Z"
+    },
+    "w11-cli-lint.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:18:36.749Z"
     }
   }
 }
