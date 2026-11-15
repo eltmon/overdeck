@@ -3,6 +3,8 @@
 // Searches 300 ms after the last change to the query or a toggle, when the
 // query has at least 2 characters, and at once on Enter (D-B14). Answers to
 // stale requests are dropped. Results group by file in first-seen order.
+// In the work dock's Search tab (PAN-5289) it has no close button, dots files
+// the scoped conversation changed, and focuses its input on `focusSignal`.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { X } from 'lucide-react'
@@ -24,8 +26,13 @@ export interface ContentSearchProps {
   rootId: string
   scopePath?: string
   onScopeClear(): void
-  onClose(): void
+  /** Absent: no close button, and Escape does nothing. */
+  onClose?(): void
   onPick(target: ContentSearchTarget): void
+  /** Root paths the scoped conversation changed: their result headers get a dot. */
+  changedPaths?: ReadonlySet<string>
+  /** Each change focuses the query input. */
+  focusSignal?: number
 }
 
 interface SearchState {
@@ -54,13 +61,18 @@ function Toggle({ label, title, pressed, onClick }: { label: string; title: stri
   )
 }
 
-export function ContentSearch({ rootId, scopePath, onScopeClear, onClose, onPick }: ContentSearchProps) {
+export function ContentSearch({ rootId, scopePath, onScopeClear, onClose, onPick, changedPaths, focusSignal }: ContentSearchProps) {
   const [query, setQuery] = useState('')
   const [caseSensitive, setCaseSensitive] = useState(false)
   const [regex, setRegex] = useState(false)
   const [state, setState] = useState<SearchState>(IDLE)
   const seq = useRef(0)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (focusSignal !== undefined) inputRef.current?.focus()
+  }, [focusSignal])
 
   const run = useCallback(() => {
     const q = query.trim()
@@ -120,6 +132,7 @@ export function ContentSearch({ rootId, scopePath, onScopeClear, onClose, onPick
     <section aria-label="Search in files" className="flex min-h-0 flex-1 flex-col border-t border-border">
       <div className="flex items-center gap-1 border-b border-border px-2 py-1.5">
         <input
+          ref={inputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
@@ -129,7 +142,7 @@ export function ContentSearch({ rootId, scopePath, onScopeClear, onClose, onPick
               if (timer.current !== null) clearTimeout(timer.current)
               timer.current = null
               run()
-            } else if (e.key === 'Escape') {
+            } else if (e.key === 'Escape' && onClose) {
               e.preventDefault()
               onClose()
             }
@@ -141,15 +154,17 @@ export function ContentSearch({ rootId, scopePath, onScopeClear, onClose, onPick
         />
         <Toggle label="Aa" title="Match case" pressed={caseSensitive} onClick={() => setCaseSensitive((v) => !v)} />
         <Toggle label=".*" title="Use regular expression" pressed={regex} onClick={() => setRegex((v) => !v)} />
-        <button
-          type="button"
-          title="Close search"
-          aria-label="Close search"
-          onClick={onClose}
-          className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
+        {onClose && (
+          <button
+            type="button"
+            title="Close search"
+            aria-label="Close search"
+            onClick={onClose}
+            className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
       {scopePath && (
         <div className="flex items-center gap-1 px-2 pt-1.5 text-[11px] text-muted-foreground">
@@ -170,6 +185,9 @@ export function ContentSearch({ rootId, scopePath, onScopeClear, onClose, onPick
               <div key={path} role="group" aria-label={path}>
                 <div className="flex items-center gap-2 px-3 pt-1.5 text-foreground">
                   <span className="min-w-0 truncate font-mono">{path}</span>
+                  {changedPaths?.has(path) && (
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-label="Changed by this conversation" data-changed-here="file" />
+                  )}
                   <span className="shrink-0 text-[11px] text-muted-foreground">{matches.length}</span>
                 </div>
                 {matches.map((m) => (
