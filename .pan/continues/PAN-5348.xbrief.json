@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5348",
   "created": "2026-11-15T13:34:43.139Z",
-  "updated": "2026-11-15T13:39:07.611Z",
+  "updated": "2026-11-15T13:39:17.708Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "parser-help-entry.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T13:39:07.611Z"
+    },
+    "help-list-builder": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5348",
+      "claimedAt": "2026-11-15T13:39:17.708Z"
     }
   }
 }
