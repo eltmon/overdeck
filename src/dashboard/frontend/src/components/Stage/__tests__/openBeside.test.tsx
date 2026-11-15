@@ -2,12 +2,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
+// The latest deck context an agent stub saw, so tests can call deck seams directly (PAN-5290 C-D3).
+const captured = vi.hoisted(() => ({ deck: null as import('../StageDeckContext').StageDeckContextValue | null }))
+
 // The agent stub calls the deck seams the way a chat file link will (PAN-5287 §6.2).
 vi.mock('../panes/AgentPane', async () => {
   const { useStageDeck } = await import('../StageDeckContext')
   return {
     AgentPane: () => {
       const deck = useStageDeck()
+      captured.deck = deck
       return (
         <div data-testid="agent-pane">
           <button type="button" onClick={() => deck?.openBeside?.({ rootId: 'project:overdeck', path: 'src/a.ts', preview: true })}>
@@ -40,6 +44,7 @@ import { useTerminalStateStore } from '../../terminal/terminalStateStore'
 import { useWorkDockStore } from '../../dock/workDockStore'
 import { collectLeafIds, type PaneLayout } from '../../../lib/paneLayout'
 import { installWorkDockFetchMock } from '../../../test-utils/strictFetchMock'
+import type { Conversation } from '../../CommandDeck/ConversationList'
 
 // PAN-5289: the Stage mounts the work dock, which loads the project and workspace registries.
 let workDockFetch: ReturnType<typeof installWorkDockFetchMock>
@@ -53,11 +58,11 @@ afterEach(async () => {
 
 const DECK = 'overdeck'
 
-function renderStage(): void {
+function renderStage(conversations?: Conversation[]): void {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={qc}>
-      <Stage deckKey={DECK} renderHome={() => <div data-testid="home" />} renderIssue={(id: string) => <div>{id}</div>} />
+      <Stage deckKey={DECK} conversations={conversations} renderHome={() => <div data-testid="home" />} renderIssue={(id: string) => <div>{id}</div>} />
     </QueryClientProvider>,
   )
 }
@@ -79,7 +84,23 @@ function split(a: string, b: string): void {
   localStorage.setItem(`pan-layout:${DECK}`, JSON.stringify(layout))
 }
 
+function conversation(name: string): Conversation {
+  return {
+    id: 1,
+    name,
+    tmuxSession: name,
+    status: 'active',
+    cwd: '/repo',
+    issueId: null,
+    createdAt: '2026-11-15T00:00:00.000Z',
+    endedAt: null,
+    lastAttachedAt: null,
+    sessionAlive: true,
+  } as Conversation
+}
+
 beforeEach(() => {
+  captured.deck = null
   localStorage.clear()
   usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} })
   useTerminalStateStore.setState({ terminalStateByThreadId: {} })
@@ -179,5 +200,46 @@ describe('Stage openBeside (PAN-5287)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'open dock' }))
 
     expect(useWorkDockStore.getState().byDeck[DECK]).toMatchObject({ open: true, tab: 'changes', changesScope: 'uncommitted' })
+  })
+})
+
+describe('Stage conversationBeside (PAN-5290 C-D3)', () => {
+  it('returns the conversation openBeside split beside a code pane', () => {
+    usePanesStore.getState().ensureHome(DECK)
+    const agent = addAgent()
+    usePanesStore.getState().setActivePane(DECK, agent)
+    const conv = conversation('conv-1')
+    renderStage([conv])
+
+    fireEvent.click(screen.getByRole('button', { name: 'open a.ts' }))
+
+    const [code] = codePanes()
+    expect(collectLeafIds(savedLayout())).toEqual([agent, code.paneId])
+    expect(captured.deck?.conversationBeside?.(code.paneId)).toBe(conv)
+  })
+
+  it('returns null when the deck is not split', () => {
+    const store = usePanesStore.getState()
+    store.ensureHome(DECK)
+    const agent = addAgent()
+    const code = store.addPane(DECK, { paneType: 'code', label: 'a.ts', explorerRootId: 'project:overdeck', explorerPath: 'src/a.ts' })
+    store.setActivePane(DECK, agent)
+    renderStage([conversation('conv-1')])
+
+    expect(captured.deck?.conversationBeside?.(code)).toBeNull()
+  })
+
+  it('returns null when the split shows two code panes', () => {
+    const store = usePanesStore.getState()
+    store.ensureHome(DECK)
+    const agent = addAgent()
+    const codeA = store.addPane(DECK, { paneType: 'code', label: 'a.ts', explorerRootId: 'project:overdeck', explorerPath: 'src/a.ts' })
+    const codeB = store.addPane(DECK, { paneType: 'code', label: 'b.ts', explorerRootId: 'project:overdeck', explorerPath: 'src/b.ts' })
+    store.setActivePane(DECK, agent)
+    split(codeA, codeB)
+    renderStage([conversation('conv-1')])
+
+    expect(captured.deck?.conversationBeside?.(codeA)).toBeNull()
+    expect(captured.deck?.conversationBeside?.(codeB)).toBeNull()
   })
 })

@@ -1,0 +1,1143 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T11:12:43Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5290: Workflow redesign C: code opens beside the chat; edit-workspace bar, Create PR and PR status in the editor; stale tabs",
+    "updated": "2026-11-15T11:23:58.936Z"
+  },
+  "plan": {
+    "id": "pan-5290",
+    "title": "Workflow redesign C: code opens beside the chat; edit-workspace bar, Create PR and PR status in the editor; stale tabs",
+    "status": "running",
+    "uid": "fef233a1-ac8e-43c1-8007-aca6d67da9a2",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-15T11:12:43Z",
+    "updated": "2026-11-15T11:23:58.936Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5290",
+        "label": "PAN-5290",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5290/.pan/drafts/pan-5290.md",
+        "label": "PRD draft (.pan/drafts/pan-5290.md)",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-5284.md",
+        "label": "Parent PRD PAN-5284 (child C)",
+        "type": "prd"
+      },
+      {
+        "uri": "docs/design/workflow-redesign-mockup.html",
+        "label": "Mockup screen 3 · Edit and PR",
+        "type": "design"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "explorer",
+      "edit-workspace",
+      "workflow-redesign",
+      "pan-5284"
+    ],
+    "narratives": {
+      "Problem": "Files already open beside the chat (child B), but the code pane shows a raw path and a lone Changes toggle, nothing marks the lines the conversation changed, the edit-workspace and PR flow lives in a Files-tab banner instead of the editor, the Create PR dialog shows neither the files nor the landing question, a tab of a merged or discarded edit workspace shows 'Couldn't open file', and the cursor jumps to line 1 when the first edit moves the pane to an edit workspace.",
+      "Proposal": "Per .pan/drafts/pan-5290.md: a breadcrumb/File-Changes/Reveal header; gutter marks from a new git-blame route GET /api/conversations/:name/changes/lines; an EditorBar in every code pane on a project or edit root that carries Start editing, the editing state with files and +/- from a new GET /api/explorer/edit-workspaces/:id/changes route, Discard, Create PR, PR states with a 15 s refresh while blocked, and landed notes after merge/pipeline/discard; a view-state registry so cursor, scroll and focus survive the root switch; a redesigned Create PR dialog; a stale-tab state; the banner removed from the Files tab with New edit workspace in its root menu; a fixture-backed Playwright spec with screenshots; docs and changelog.",
+      "NonGoals": "- Real-GitHub PR runs inside pipeline UAT (parent D-12; the epic owner runs them after merge)\n- Check counts ('3 of 9 done') or a merge sha in the merged note (C-D7; no contract data)\n- Chat file-path chips that open diffs or files (child D2, parent FR-4)\n- +/- counts in the dock Changes tab for issue or edit-workspace roots\n- Breadcrumb, editor bar or gutter marks for viewer-only files (images, PDFs, archives)\n- Gutter marks for issue-agent or project-main scopes, or inside the Changes diff view\n- Per-line attribution for non-Claude harnesses beyond attribution 'file' (parent D-5)\n- Persisting landed notes across a reload\n- Any polling faster than 15 s, or polling while no editor bar for that workspace is mounted\n- Ledger theme parity beyond not breaking\n- Raising any scripts/file-size-allowlist.txt row"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Gutter line numbers come from a new server route that uses git blame on the working tree (C-D2)",
+        "rationale": "Commit hunks carry line numbers as of their own commit and the written-line evidence is server-side only; blame plus written lines is exact for commits and for the shared-file case the fixture pins (21-24 vs 25-26)."
+      },
+      {
+        "summary": "Edit-workspace +/- counts come from a new GET /api/explorer/edit-workspaces/:id/changes route measured against the merge base with origin/<default> (C-D5)",
+        "rationale": "Git status carries no line counts; one cheap server call covers untracked and binary files, never calls gh, and matches what commitAll ships with git add -A."
+      },
+      {
+        "summary": "PR status refetches every 15 s only while an editor bar is mounted and the PR is open, not a draft, not mergeable, and GitHub reports UNKNOWN or BLOCKED (C-D6)",
+        "rationale": "FR-16 needs the state to advance by itself; each read calls gh, and a draft, conflicting or out-of-date PR cannot change without the operator, so polling it would only spend GitHub quota."
+      },
+      {
+        "summary": "Mockup details without data are replaced: no check counts, no merge sha, a save-state word instead of 'saved 1 s ago' (C-D7)",
+        "rationale": "EditWorkspacePr has no check counts and the merge route returns no sha; adding them is contract work the PRD's FRs do not require."
+      },
+      {
+        "summary": "Create PR keeps Description, push mode and per-choice disabled reasons (C-D8)",
+        "rationale": "Parent D-14: nothing is deleted without a home; these functions exist today and the mockup simply omits them."
+      },
+      {
+        "summary": "EditWorkspaceBanner and PrStatusRow are deleted; the Files tab mounts the same EditorBar on an edit root and gains New edit workspace in its root menu; their tests are ported to EditorBar.test.tsx (C-D10)",
+        "rationale": "Parent §7 moves the banner's functions to the editor bar; a tree-only edit creates an edit workspace with no code pane, so the Files tab must keep Create PR reachable (parent D-13/D-14); the test-skip gate counts deleted tests."
+      },
+      {
+        "summary": "A code pane's scoped conversation is the first other layout leaf bound to a conversation, exposed as StageDeckContext.conversationBeside (C-D3)",
+        "rationale": "It is the dock's own rule 5, and the dock's changed paths are empty while the dock is closed."
+      },
+      {
+        "summary": "The lines route caches its answer per conversation and file, keyed by HEAD, the file stat and the transcript stat (C-D2b)",
+        "rationale": "/changes refetches every 5 s while a conversation works and the client lines query follows it; without a cache every refetch would spawn git blame."
+      },
+      {
+        "summary": "Server and contract edits outside the stub's owned-file list are in scope (C-D14)",
+        "rationale": "Children A and B that own those files are merged and no open follow-up (PAN-5334, PAN-5335) touches them; the FRs cannot be met client-side."
+      },
+      {
+        "summary": "Browser UAT reaches PR states with page.route stubs; the edit workspace, changes route and stale tab run for real (C-D15)",
+        "rationale": "The workflow fixture has a bare origin and no GitHub repository, so PR creation and merge cannot happen for real in pipeline UAT."
+      }
+    ],
+    "metadata": {
+      "parentIssue": "PAN-5284",
+      "sizeJustification": "Child C of the PAN-5284 epic, already split from the epic by the operator's order book. The editor bar, the Create PR dialog, the stale tab and the removal of the Files-tab banner must ship together so the dashboard keeps a working Create PR path when this merges alone (parent D-13). The file count comes from one test file per new module, two small server routes that each need their route-scopes, no-loss and contract rows, twelve NFR-6 screenshots and three doc files; the work is split into 13 small items with explicit file scopes.",
+      "canonicalFilename": "2026-11-15-PAN-5290-workflow-redesign-c-code-opens-beside-the-chat-edit-workspace-bar-create-pr-and-pr-status-in-the-editor-stale-tabs.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "stage-conversation-beside",
+        "title": "Add conversationBeside(paneId) to the Stage deck context (WI-1)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:12:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5290",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/StageDeckContext.tsx",
+            "src/dashboard/frontend/src/components/Stage/index.tsx",
+            "src/dashboard/frontend/src/components/Stage/__tests__/openBeside.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/__tests__/openBeside.test.tsx"
+          ],
+          "expected_outputs": [
+            "openBeside.test.tsx passes, including the three new conversationBeside cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. Add the optional conversationBeside(paneId) field to StageDeckContextValue, implement it in Stage/index.tsx next to openBeside (first layout leaf other than paneId that is an agent pane bound to a known conversation), add it to deckContextValue and its deps, and extend openBeside.test.tsx."
+        },
+        "items": [
+          {
+            "id": "stage-conversation-beside.ac1",
+            "title": "Given a deck where openBeside split a conversation pane and a code pane, when conversationBeside(codePaneId) is called, then it returns that conversation object",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-conversation-beside.ac2",
+            "title": "Given an unsplit deck, conversationBeside returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-conversation-beside.ac3",
+            "title": "Given a split of two code panes, conversationBeside returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "code-header",
+        "title": "Code pane header: root-label breadcrumb, File/Changes tabs and Reveal in files (WI-2)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:12:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5290",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/code/CodePaneHeader.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/CodePane.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/CodePaneHeader.test.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/CodePane.test.tsx",
+            "src/dashboard/frontend/src/components/dock/__tests__/WorkDock.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/code/__tests__/CodePaneHeader.test.tsx src/components/explorer/code/__tests__/CodePane.test.tsx src/components/dock/__tests__/WorkDock.test.tsx"
+          ],
+          "expected_outputs": [
+            "CodePaneHeader, CodePane and WorkDock tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 steps 1-6 (C-D1). Breadcrumb from useRootLabel(rootId) with › separators and the last segment in text-foreground; a role=tablist aria-label=Mode with File and Changes tabs replacing the Changes toggle; a LocateFixed Reveal in files button that sets this pane active and calls deck.openDock({ tab: 'files', reveal: { rootId, path } }); onOpenRenamed through deck.openBeside with the openCodePane fallback. Audit that WorkDock/changes tests assert openBeside for tree, Go to file, Changes row and Search hit; add any missing assertion. Viewer-only files keep their current rendering (C-D9)."
+        },
+        "items": [
+          {
+            "id": "code-header.ac1",
+            "title": "Given label 'overdeck' and path 'docs/a.md', the header renders the breadcrumb 'overdeck › docs › a.md' with 'a.md' in text-foreground and never the project key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "code-header.ac2",
+            "title": "Clicking the Changes tab renders the ChangesView and clicking File returns to the plain editor; the old standalone Changes toggle button is no longer rendered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "code-header.ac3",
+            "title": "When Reveal in files is clicked, the pane becomes active and the dock opens on the Files tab with reveal { rootId, path }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "code-header.ac4",
+            "title": "When the ExternalChangeBanner's open-renamed action runs inside a Stage, it opens the new path through deck.openBeside({ rootId, path: newPath }), and outside a Stage it falls back to openCodePane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "changed-lines-route",
+        "title": "Server route GET /api/conversations/:name/changes/lines using git blame (WI-3)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T11:12:43Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-5290",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "packages/contracts/src/conversation-changes.ts",
+            "src/lib/overdeck/conversation-change-lines.ts",
+            "src/dashboard/server/routes/conversation-diffs.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "tests/unit/dashboard/server/routes/conversations-no-loss.test.ts",
+            "tests/unit/lib/overdeck/conversation-change-lines.test.ts",
+            "tests/unit/dashboard/server/routes/changes-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-change-lines.test.ts tests/unit/dashboard/server/routes/changes-routes.test.ts tests/unit/dashboard/server/routes/conversations-no-loss.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "gutter-marks",
+            "editor-uat"
+          ],
+          "parallelSafeReason": "Server-only files (contracts, src/lib, routes, server tests); the only shared files (route-scopes.ts, no-loss-matrix.ts) are ordered before edit-changes-route by an edge."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 steps 1-5 and decision C-D2 including its implementation checkpoint. Add ConversationChangedLines to the contracts; write getConversationChangedLines in src/lib/overdeck/conversation-change-lines.ts (lookup, file validation, getConversationChanges for commit shas and the uncommitted record, editedFiles writtenLines for attribution 'lines', async git blame --porcelain on the working tree, the untracked-file fallback, the marking rule, and the C-D2b cache keyed by HEAD, file stat and transcript stat with an injectable blame for tests); mount the route in conversation-diffs.ts next to getConversationChangesRoute with the same validateOrigin check; add the route-scopes, no-loss-matrix and EXPECTED_CONVERSATION_ROUTES rows. Async execFile only."
+        },
+        "items": [
+          {
+            "id": "changed-lines-route.ac1",
+            "title": "Given a repo where the conversation's trailer commit changed lines of a file and another commit changed others, the route returns only the trailer commit's working-tree line numbers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changed-lines-route.ac2",
+            "title": "Given uncommitted lines in a shared file written by this conversation (attribution 'lines') and by another session, the route returns this conversation's lines and rejects the others (the fixture's 21-24 vs 25-26 shape)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changed-lines-route.ac3",
+            "title": "Given attribution 'file', every uncommitted line of the file is returned; given an untracked new file the conversation wrote, its non-empty lines are returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changed-lines-route.ac4",
+            "title": "A file the conversation did not change returns 200 with lines []; file '../x' or an absolute path returns 400; an unknown conversation returns 404",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changed-lines-route.ac5",
+            "title": "Given a second call with HEAD, file and transcript unchanged, the route returns the cached lines and spawns no second blame; conversations-no-loss.test.ts and the no-loss matrix test pass with the route registered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gutter-marks",
+        "title": "Gutter marks for lines the scoped conversation changed (WI-4)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:12:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5290",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/code/changed-lines.ts",
+            "src/dashboard/frontend/src/components/explorer/code/useChangedLineMarks.ts",
+            "src/dashboard/frontend/src/components/explorer/code/CodePane.tsx",
+            "src/dashboard/frontend/src/index.css",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/changed-lines.test.ts",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/useChangedLineMarks.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/code/__tests__/changed-lines.test.ts src/components/explorer/code/__tests__/useChangedLineMarks.test.tsx src/components/explorer/code/__tests__/CodePane.test.tsx"
+          ],
+          "expected_outputs": [
+            "changed-lines, useChangedLineMarks and CodePane tests pass",
+            "both new test paths appear in scripts/frontend-test-subset.txt"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4 steps 1-5 (C-D3, C-D4). Pure toRepoPath and fetchChangedLines in changed-lines.ts; useChangedLineMarks reuses useScopeChangedPaths and useConversationChanges (same cache) and fetches FR-5 only for a file in the changes; one decorations collection per editor; no set while the draft is dirty; clear when the file leaves the changes or the conversation is null and on unmount. Wire it in CodePane with deck.conversationBeside(pane.paneId). Add the .monaco-editor .code-changed-line rule using var(--primary) to index.css."
+        },
+        "items": [
+          {
+            "id": "gutter-marks.ac1",
+            "title": "toRepoPath returns the path for equal roots, the prefixed path for a root inside the repo, and null for a root outside the repo or a different worktree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gutter-marks.ac2",
+            "title": "Given a scoped conversation whose /changes/lines answer is [21,22,23,24], the hook calls the decorations collection's set with four whole-line ranges carrying linesDecorationsClassName 'code-changed-line'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gutter-marks.ac3",
+            "title": "Given a file not in the conversation's changes, the hook never requests /changes/lines and renders no marks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gutter-marks.ac4",
+            "title": "Given a dirty draft the hook does not call set, and given a null conversation it calls clear",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "edit-changes-route",
+        "title": "Server route GET /api/explorer/edit-workspaces/:id/changes with per-file +/- and its client hook (WI-5)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:12:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5290",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/explorer.ts",
+            "src/dashboard/server/services/explorer/edit-workspace-changes.ts",
+            "src/dashboard/server/routes/explorer-edit-workspaces.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/services/explorer/__tests__/edit-workspace-changes.test.ts",
+            "src/dashboard/server/routes/__tests__/explorer-edit-workspaces.test.ts",
+            "src/dashboard/frontend/src/components/explorer/edit/edit-workspace-http.ts",
+            "src/dashboard/frontend/src/components/explorer/edit/__tests__/edit-workspace-http.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/edit-workspace-changes.test.ts src/dashboard/server/routes/__tests__/explorer-edit-workspaces.test.ts",
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/edit/__tests__/edit-workspace-http.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "service, route and client tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5 steps 1-5 (C-D5). Add EditWorkspaceChangedFile and EditWorkspaceChanges to contracts/explorer.ts; write getEditWorkspaceChanges with runGit only (merge-base with refs/remotes/origin/<default>, HEAD fallback; tracked numstat and name-status; untracked ls-files with a 2 MiB cap and the NUL-in-first-8192-bytes binary rule; uncommittedPaths from status porcelain v2); add handleEditWorkspaceChanges and the GET route to explorerEditWorkspacesRouteLayer; add the admin route-scopes row and the READ no-loss row; add fetchEditWorkspaceChanges and useEditWorkspaceChanges (invalidated on explorer watch batches of the edit root) to edit-workspace-http.ts."
+        },
+        "items": [
+          {
+            "id": "edit-changes-route.ac1",
+            "title": "Given an edit worktree with a modified, an added, a deleted, an untracked text file, an untracked PNG containing NUL bytes and a tracked binary plus a git-ignored file, the service returns the six files with additions/deletions (binary: true, 0/0 for both binaries) and omits the ignored file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "edit-changes-route.ac2",
+            "title": "Given a commit on the edit branch not yet on origin/<default>, its file appears in files counted against the merge base, and it is absent from uncommittedPaths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "edit-changes-route.ac3",
+            "title": "The route returns 401 without a credential, 404 ROOT_NOT_FOUND for an unknown workspace and 409 NOT_AN_EDIT_WORKSPACE for a non-edit row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "edit-changes-route.ac4",
+            "title": "fetchEditWorkspaceChanges requests /api/explorer/edit-workspaces/<id>/changes and throws ExplorerHttpError carrying the server code on a non-2xx answer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "view-state-carry",
+        "title": "Carry cursor, scroll and focus across the edit-workspace root switch (WI-6)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:12:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5290",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/code/view-state-registry.ts",
+            "src/dashboard/frontend/src/components/explorer/edit/edit-workspace-switch.ts",
+            "src/dashboard/frontend/src/components/explorer/code/CodePane.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/view-state-registry.test.ts",
+            "src/dashboard/frontend/src/components/explorer/edit/__tests__/edit-workspace-switch.test.ts",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/CodePane.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/code/__tests__/view-state-registry.test.ts src/components/explorer/edit/__tests__/edit-workspace-switch.test.ts src/components/explorer/code/__tests__/CodePane.test.tsx"
+          ],
+          "expected_outputs": [
+            "registry, switch and CodePane tests pass",
+            "view-state-registry.test.ts is listed in scripts/frontend-test-subset.txt"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6 steps 1-4 (C-D12). New view-state-registry.ts (registerCodeEditor, carryViewStates, takeViewState keyed by draftKey); switchRoot calls carryViewStates first and leaveEditWorkspace calls it before retargetPanes; CodePane restores a carried state and focus on editor mount and registers its current editor (the diff's modified editor while the diff is open)."
+        },
+        "items": [
+          {
+            "id": "view-state-carry.ac1",
+            "title": "Given a registered editor on project:p for docs/a.md, when switchRoot('project:p','workspace:w') runs, then takeViewState(draftKey('workspace:w','docs/a.md')) returns that editor's saveViewState() result and its focus flag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "view-state-carry.ac2",
+            "title": "carryViewStates ignores editors whose key is not under the from-root prefix, and takeViewState returns null on a second call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "view-state-carry.ac3",
+            "title": "Given a carried state with focused true, a CodePane that mounts on the new key calls restoreViewState with it and then focus()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "editor-bar-project",
+        "title": "Editor bar on project roots: main-checkout sentence, Start editing and landed notes (WI-7)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:12:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5290",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/edit/EditorBar.tsx",
+            "src/dashboard/frontend/src/components/explorer/edit/edit-workspace-store.ts",
+            "src/dashboard/frontend/src/components/explorer/code/CodePane.tsx",
+            "src/dashboard/frontend/src/components/explorer/edit/__tests__/EditorBar.test.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/CodePane.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/edit/__tests__/EditorBar.test.tsx src/components/explorer/code/__tests__/CodePane.test.tsx"
+          ],
+          "expected_outputs": [
+            "EditorBar and CodePane tests pass",
+            "EditorBar.test.tsx is listed in scripts/frontend-test-subset.txt"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-11",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7 steps 1-5 (C-D9, C-D11). Add LandedNote, landed and setLanded to edit-workspace-store (setCreating(key, true) clears landed[key]); create EditorBar.tsx with EditWorkspaceNote moved verbatim from EditWorkspaceBanner.tsx (re-export it from EditWorkspaceBanner.tsx until WI-9 deletes that file), the project-root states (read-only sentence with Lock icon and Start editing calling ensureEditRoot, 'Creating edit workspace…', the three landed notes with Dismiss, Close tab and Open PR for pipeline); mount EditorBar in CodePane for project and workspace roots in place of the project note and EditWorkspaceNote. The workspace-root branch renders EditWorkspaceNote until WI-8."
+        },
+        "items": [
+          {
+            "id": "editor-bar-project.ac1",
+            "title": "Given a project root, the bar renders 'This is the main checkout. Start typing and Overdeck moves your edits to a new edit workspace, so main never changes until a PR merges.' and Start editing calls ensureEditRoot('project:<key>')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "editor-bar-project.ac2",
+            "title": "While creating[projectKey] is true the bar renders 'Creating edit workspace…'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "editor-bar-project.ac3",
+            "title": "Given landed notes of kind merged, pipeline and discarded, the bar renders the FR-11 sentences; Dismiss clears landed[projectKey] and Close tab calls closePane(deckKey, paneId)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "editor-bar-project.ac4",
+            "title": "Given an issue root, CodePane renders no editor bar",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "editor-bar-workspace",
+        "title": "Editor bar on edit roots: files and +/-, Discard, Create PR, PR states with 15 s refresh (WI-8)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T11:12:43Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5290",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/edit/EditorBar.tsx",
+            "src/dashboard/frontend/src/components/explorer/edit/edit-workspace-http.ts",
+            "src/dashboard/frontend/src/components/explorer/edit/__tests__/EditorBar.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/edit/__tests__/EditorBar.test.tsx src/components/explorer/edit/__tests__/edit-workspace-http.test.ts"
+          ],
+          "expected_outputs": [
+            "EditorBar.test.tsx passes with at least 14 tests",
+            "edit-workspace-http.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "FR-11",
+            "NFR-2",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "files-tab-banner-out",
+            "create-pr-dialog",
+            "stale-tabs"
+          ],
+          "parallelSafeReason": "Touches only EditorBar.tsx, its test and edit-workspace-http.ts; every other item that edits those files is ordered before or after it by edges."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-8 steps 1-4 (C-D6, C-D7, C-D10). Add PR_STATUS_REFETCH_MS = 15_000, shouldPollPr (C-D6: open, not draft, not mergeable, and UNKNOWN or BLOCKED) and the poll option to useEditWorkspaceStatus; implement the workspace-root states of EditorBar (pending, NOT_AN_EDIT_WORKSPACE, ROOT_NOT_FOUND from the status or the changes query -> onStale, other error + Retry, editing sentence with files/+/-/save state, PR open blocked, PR mergeable, merged on GitHub, closed); move the banner's merge/PR-done/discard/new-workspace handlers and unsaved guard into EditorBar, setting the landed note before leaveEditWorkspace. Port all 7 EditWorkspaceBanner.test.tsx and all 7 PrStatusRow.test.tsx cases to EditorBar.test.tsx and add the new cases. Use vi.useFakeTimers for the refetch test."
+        },
+        "items": [
+          {
+            "id": "editor-bar-workspace.ac1",
+            "title": "Given an edit root with two changed files totalling +6 -2 and no PR, the bar renders 'Editing in <name> on <branch> · 2 files changed +6 −2' with Discard… and a primary Create PR",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "editor-bar-workspace.ac2",
+            "title": "Given an open PR with canMerge false and reason 'Required checks or reviews are not met', the bar renders 'PR #7 is open · Required checks or reviews are not met.' with Merge disabled and titled by the reason; given canMerge true and nothing uncommitted it renders 'no conflicts' with Merge enabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "editor-bar-workspace.ac3",
+            "title": "Given a successful Merge, the bar calls setLanded(projectKey, { kind: 'merged', ... }) and then leaveEditWorkspace(rootId, projectKey); pipeline and discard results set their notes the same way",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "editor-bar-workspace.ac4",
+            "title": "shouldPollPr returns true for an open non-draft PR whose mergeable or mergeStateStatus is UNKNOWN or whose mergeStateStatus is BLOCKED, and false for draft, DIRTY, BEHIND, mergeable and merged PRs; with fake timers the status query refetches after 15 000 ms for a BLOCKED PR and never for a DIRTY one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "editor-bar-workspace.ac5",
+            "title": "Given a status or changes query error with code ROOT_NOT_FOUND the bar calls onStale; given NOT_AN_EDIT_WORKSPACE it renders nothing; mounted without paneId it renders no Close tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "files-tab-banner-out",
+        "title": "Files tab: remove the edit-workspace banner and add New edit workspace to the root menu (WI-9)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:12:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5290",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/ExplorerPane.tsx",
+            "src/dashboard/frontend/src/components/explorer/edit/EditWorkspaceBanner.tsx",
+            "src/dashboard/frontend/src/components/explorer/edit/PrStatusRow.tsx",
+            "src/dashboard/frontend/src/components/explorer/edit/__tests__/EditWorkspaceBanner.test.tsx",
+            "src/dashboard/frontend/src/components/explorer/edit/__tests__/PrStatusRow.test.tsx",
+            "src/dashboard/frontend/src/components/explorer/__tests__/ExplorerPane.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/__tests__/ExplorerPane.test.tsx src/components/explorer/edit/__tests__/EditorBar.test.tsx",
+            "cd src/dashboard/frontend && ! grep -rnE \"^import .*(EditWorkspaceBanner|PrStatusRow)\" src --include=*.ts --include=*.tsx"
+          ],
+          "expected_outputs": [
+            "ExplorerPane and EditorBar tests pass",
+            "the grep finds no import line naming EditWorkspaceBanner or PrStatusRow"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-9 steps 1-4 (C-D10). In ExplorerFiles replace the EditWorkspaceBanner block with <EditorBar rootId deckKey /> from ./edit/EditorBar (no paneId, so no Close tab), which keeps Create PR and Discard reachable after a tree-only edit; add a separator and a New edit workspace item to RootMenu that calls openNewEditWorkspace(deckProject.key, deckKey); delete EditWorkspaceBanner.tsx, PrStatusRow.tsx and their two test files and remove their lines from scripts/frontend-test-subset.txt (their cases already live in EditorBar.test.tsx)."
+        },
+        "items": [
+          {
+            "id": "files-tab-banner-out.ac1",
+            "title": "Given an edit root without a PR in the Files tab, the tab renders the editor bar's 'Editing in' sentence with Create PR and Discard… and no Close tab button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "files-tab-banner-out.ac2",
+            "title": "When the root menu's New edit workspace is clicked, it creates an edit workspace through beginEdit(projectKey, true) and updates the deck's dock root override to the new root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "files-tab-banner-out.ac3",
+            "title": "Given the finished item, the grep for import lines naming EditWorkspaceBanner or PrStatusRow returns nothing and both files are deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "create-pr-dialog",
+        "title": "Create PR dialog lists what will land and asks 'How should it land?' (WI-10)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:12:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5290",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/edit/CreatePrDialog.tsx",
+            "src/dashboard/frontend/src/components/explorer/edit/editDialog.module.css",
+            "src/dashboard/frontend/src/components/explorer/edit/__tests__/CreatePrDialog.test.tsx",
+            "src/dashboard/frontend/src/components/explorer/edit/EditorBar.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/edit/__tests__/CreatePrDialog.test.tsx src/components/explorer/edit/__tests__/EditorBar.test.tsx"
+          ],
+          "expected_outputs": [
+            "CreatePrDialog and EditorBar tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-10 steps 1-4 (C-D8). Replace the changedPaths prop with changes: EditWorkspaceChanges | undefined (EditorBar passes useEditWorkspaceChanges data); heading, from/into line, Title, Description (optional), 'What will land · N files +a −d' list, a radiogroup 'How should it land?' with the two described choices (disabled with the support reason when unavailable), Open as a draft for direct only, one primary button labelled by the choice; push mode keeps 'Commit and push' and lists only uncommittedPaths."
+        },
+        "items": [
+          {
+            "id": "create-pr-dialog.ac1",
+            "title": "Given changes with two files, the dialog renders 'What will land · 2 files' and one row per file with its +/- counts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-pr-dialog.ac2",
+            "title": "When Send through the pipeline is selected, the primary button renders 'Send through the pipeline' and Open as a draft is hidden; when Open a pull request is selected, it renders 'Open pull request'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-pr-dialog.ac3",
+            "title": "Given pipelineSupport.available false, the pipeline choice is aria-disabled, shows its reason, and clicking it keeps the direct choice selected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-pr-dialog.ac4",
+            "title": "Given an open PR, the dialog renders 'Commit and push', lists only files in uncommittedPaths, and submits mode 'direct' with draft false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stale-tabs",
+        "title": "Stale code tabs: 'merged or discarded' state with Open on main and Close tab (WI-11)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:12:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5290",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/code/StaleCodeTab.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/CodePane.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/StaleCodeTab.test.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/CodePane.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/code/__tests__/StaleCodeTab.test.tsx src/components/explorer/code/__tests__/CodePane.test.tsx"
+          ],
+          "expected_outputs": [
+            "StaleCodeTab and CodePane tests pass",
+            "StaleCodeTab.test.tsx is listed in scripts/frontend-test-subset.txt"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-11 steps 1-3 (C-D13, C-D13b). New StaleCodeTab.tsx with isRootNotFound (PanRpcError and ExplorerHttpError) and the per-root-kind sentence, Open on main (retarget to project:<deck project key>, disabled with title 'This deck has no registered project' when none) and Close tab; CodePane renders it when readFile fails with ROOT_NOT_FOUND or when EditorBar calls onStale."
+        },
+        "items": [
+          {
+            "id": "stale-tabs.ac1",
+            "title": "Given readFile rejecting with a PanRpcError code ROOT_NOT_FOUND on a workspace root, the pane renders 'This edit workspace was merged or discarded.' (data-testid code-pane-stale) and not 'Couldn’t open file'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-tabs.ac2",
+            "title": "Clicking Open on main updates the pane's explorerRootId to project:<deck project key>; with no registered deck project the button is disabled and titled 'This deck has no registered project'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-tabs.ac3",
+            "title": "Clicking Close tab calls closePane(deckKey, paneId); an issue root renders 'This issue's workspace no longer exists.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-tabs.ac4",
+            "title": "A NOT_FOUND read still renders 'This file no longer exists.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "editor-uat",
+        "title": "Fixture-backed Playwright spec and light/dark NFR-6 screenshots for screen 3 (WI-12)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T11:12:43Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-5290",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-5290-editor-bar.spec.ts",
+            "docs/screenshots/pan-5290/readonly-bar-light.png",
+            "docs/screenshots/pan-5290/readonly-bar-dark.png",
+            "docs/screenshots/pan-5290/editing-bar-light.png",
+            "docs/screenshots/pan-5290/editing-bar-dark.png",
+            "docs/screenshots/pan-5290/create-pr-light.png",
+            "docs/screenshots/pan-5290/create-pr-dark.png",
+            "docs/screenshots/pan-5290/pr-open-light.png",
+            "docs/screenshots/pan-5290/pr-open-dark.png",
+            "docs/screenshots/pan-5290/merged-note-light.png",
+            "docs/screenshots/pan-5290/merged-note-dark.png",
+            "docs/screenshots/pan-5290/stale-tab-light.png",
+            "docs/screenshots/pan-5290/stale-tab-dark.png"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-5290-editor-bar.spec.ts",
+            "ls docs/screenshots/pan-5290/"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "pan-5290-editor-bar.spec.ts passes against an isolated fixture dashboard",
+            "twelve PNG files exist under docs/screenshots/pan-5290/"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-8",
+            "FR-10",
+            "FR-11",
+            "FR-12",
+            "FR-13",
+            "NFR-6"
+          ],
+          "parallelSafeReason": "Adds only a new spec file and screenshots; it runs last in the DAG after every UI item it exercises."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-12 steps 1-5 (C-D15). Model on tests/pan-5289-work-dock.spec.ts: isolated dashboard (own temp OVERDECK_HOME and fake HOME, never :3011, isolated Playwright browser profile), seed-workflow-fixture, DECK 'workflow-fixture', 1920x1000, serial, pageerror guard, header comment that it is not in CI's list. Real flow for the split, gutter lines (read .margin-view-overlays rows), Start editing with the cursor on line 15, the editing bar and the Create PR dialog; page.route stubs for PR open, mergeable and merge; a real discard plus reload for the stale tab. Save the twelve screenshots, open and inspect each against mockup screen 3, fix gaps, and attach them to the PR description."
+        },
+        "items": [
+          {
+            "id": "editor-uat.ac1",
+            "title": "Given conversation fixture-1 and docs/shared.md opened from the dock, both the conversation pane and the code pane are visible, and the margin rows carrying code-changed-line have line numbers exactly ['21','22','23','24']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "editor-uat.ac2",
+            "title": "Given the cursor on line 15 of a main-checkout file, clicking Start editing renders 'Editing in' in the bar, keeps the cursor on line 15, and the pane's root becomes workspace:",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "editor-uat.ac3",
+            "title": "Clicking Create PR renders the dialog listing docs/shared.md with +/- and both landing choices; with stubbed status and merge routes the bar shows the PR-open state, then Merge renders the 'Merged PR' note on a project: root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "editor-uat.ac4",
+            "title": "After the edit workspace is discarded and the page reloads, a code tab on it renders code-pane-stale with Open on main and Close tab, and all twelve screenshots are saved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-changelog",
+        "title": "Document the editor bar, Create PR, gutter marks and stale tabs; add changelog.d/pan-5290.md (WI-13)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:12:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5290",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/file-explorer.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "changelog.d/pan-5290.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-5",
+            "FR-7",
+            "FR-8",
+            "FR-12",
+            "FR-13",
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-13 steps 1-4. Rewrite features/file-explorer.mdx 'Create PR and merge' as 'Editing and PRs' for the editor bar, extend 'Editing files' and 'Edit workspaces'; add the /changes route and 15 s refetch to docs/DASHBOARD-ARCHITECTURE.md 'Edit workspaces and PR routes (PAN-5191)' and a new 'Editor bar and gutter marks (PAN-5290)' subsection; add changelog.d/pan-5290.md with the text in the PRD. Correct .overdeck/context/codebase/architecture.md only if a statement about the banner is now wrong (leave its last-verified date unchanged)."
+        },
+        "items": [
+          {
+            "id": "docs-changelog.ac1",
+            "title": "features/file-explorer.mdx contains an 'Editing and PRs' section that names Start editing, 'How should it land?', Merge, Open on main and Close tab, and no sentence saying a banner offers Create PR",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a 'Editor bar and gutter marks (PAN-5290)' subsection describing GET /api/conversations/:name/changes/lines and GET /api/explorer/edit-workspaces/:workspaceId/changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac3",
+            "title": "changelog.d/pan-5290.md exists with '#### Improved' and '#### Fixed' headings and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "stage-conversation-beside",
+        "to": "gutter-marks",
+        "type": "blocks"
+      },
+      {
+        "from": "changed-lines-route",
+        "to": "gutter-marks",
+        "type": "blocks"
+      },
+      {
+        "from": "code-header",
+        "to": "gutter-marks",
+        "type": "blocks"
+      },
+      {
+        "from": "gutter-marks",
+        "to": "view-state-carry",
+        "type": "blocks"
+      },
+      {
+        "from": "view-state-carry",
+        "to": "editor-bar-project",
+        "type": "blocks"
+      },
+      {
+        "from": "editor-bar-project",
+        "to": "editor-bar-workspace",
+        "type": "blocks"
+      },
+      {
+        "from": "edit-changes-route",
+        "to": "editor-bar-workspace",
+        "type": "blocks"
+      },
+      {
+        "from": "changed-lines-route",
+        "to": "edit-changes-route",
+        "type": "blocks"
+      },
+      {
+        "from": "editor-bar-workspace",
+        "to": "files-tab-banner-out",
+        "type": "blocks"
+      },
+      {
+        "from": "editor-bar-workspace",
+        "to": "create-pr-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "files-tab-banner-out",
+        "to": "create-pr-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "editor-bar-workspace",
+        "to": "stale-tabs",
+        "type": "blocks"
+      },
+      {
+        "from": "create-pr-dialog",
+        "to": "editor-uat",
+        "type": "blocks"
+      },
+      {
+        "from": "gutter-marks",
+        "to": "editor-uat",
+        "type": "blocks"
+      },
+      {
+        "from": "view-state-carry",
+        "to": "editor-uat",
+        "type": "blocks"
+      },
+      {
+        "from": "files-tab-banner-out",
+        "to": "editor-uat",
+        "type": "blocks"
+      },
+      {
+        "from": "stale-tabs",
+        "to": "editor-uat",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

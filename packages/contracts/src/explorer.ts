@@ -295,6 +295,26 @@ export type EditWorkspaceCreatePrResult =
   | { mode: 'direct'; url: string; number: number; created: boolean }
   | { mode: 'pipeline'; issueId: string; issueUrl: string; prUrl: string; prNumber: number }
 
+/** One file of what an edit workspace will land (PAN-5290 C-D5). Binary files count 0/0 with binary: true. */
+export interface EditWorkspaceChangedFile {
+  path: string
+  status: 'A' | 'M' | 'D'
+  additions: number
+  deletions: number
+  binary: boolean
+}
+
+/** GET /api/explorer/edit-workspaces/:workspaceId/changes (PAN-5290 C-D5). */
+export interface EditWorkspaceChanges {
+  /** The merge base with origin/<default branch>, or 'HEAD' when there is none. */
+  base: string
+  files: EditWorkspaceChangedFile[]
+  additions: number
+  deletions: number
+  /** Paths with uncommitted changes (untracked included). */
+  uncommittedPaths: string[]
+}
+
 // ─── Errors ───────────────────────────────────────────────────────────────────
 
 /** Values of PanRpcError.code that explorer methods return. */

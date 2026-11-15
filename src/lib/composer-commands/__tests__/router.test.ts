@@ -148,6 +148,31 @@ describe('conversation composer command routing', () => {
     expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
   });
 
+  it.each(['/pan', '/pan help', '/pan --help'])(
+    'answers %s with the command list without delivery',
+    async message => {
+      const deps = dependencies();
+      const response = await handleConversationMessage(
+        conversation.name,
+        { message },
+        deps,
+      );
+      const body = decodeJsonResponse(response);
+
+      expect(response.status).toBe(200);
+      expect(body).toMatchObject({
+        kind: 'captured',
+        status: 'completed',
+        command: '/pan help',
+      });
+      expect(body.output).toContain('Run in this composer');
+      expect(mocks.runCapturedCommand).not.toHaveBeenCalled();
+      expect(mocks.runDetachedCommand).not.toHaveBeenCalled();
+      expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
+      expect(mocks.deliverControl).not.toHaveBeenCalled();
+    },
+  );
+
   it.each([
     '/handoff make it fast',
     '/pan-handoff make it fast',

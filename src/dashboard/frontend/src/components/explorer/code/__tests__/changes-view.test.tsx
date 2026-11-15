@@ -10,6 +10,12 @@ const mocks = vi.hoisted(() => ({
   diffSetPosition: vi.fn(),
 }))
 
+// PAN-5290: the header's root label reads the shared registry queries; no QueryClient in this test.
+vi.mock('../../rootForConversation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../rootForConversation')>()),
+  useRootLabel: (rootId: string | null) => rootId,
+}))
+
 vi.mock('../../explorer-rpc', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../explorer-rpc')>()),
   // The pane subscribes to the watch hub; no server stream in unit tests.
@@ -115,7 +121,9 @@ async function openChanges() {
   render(<CodePane pane={pane} ctx={ctx} />)
   await screen.findByTestId('monaco')
   fireEvent.change(screen.getByTestId('monaco'), { target: { value: 'my draft\n' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Changes' }))
+  // PAN-5290 FR-2: the Mode tabs replace the old Changes toggle button.
+  expect(screen.queryByRole('button', { name: 'Changes' })).toBeNull()
+  fireEvent.click(screen.getByRole('tab', { name: 'Changes' }))
   return screen.findByTestId('diff')
 }
 
@@ -141,7 +149,7 @@ describe('Changes view', () => {
   it('goes back to the plain editor with the draft and the cursor preserved', async () => {
     await openChanges()
     fireEvent.change(screen.getByTestId('diff-modified'), { target: { value: 'edited in diff\n' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Changes' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'File' }))
     const editor = (await screen.findByTestId('monaco')) as HTMLTextAreaElement
     expect(editor.value).toBe('edited in diff\n')
     expect(screen.queryByTestId('diff')).toBeNull()
@@ -150,9 +158,9 @@ describe('Changes view', () => {
 
   it('reads HEAD again each time the view opens', async () => {
     await openChanges()
-    fireEvent.click(screen.getByRole('button', { name: 'Changes' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'File' }))
     await screen.findByTestId('monaco')
-    fireEvent.click(screen.getByRole('button', { name: 'Changes' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Changes' }))
     await screen.findByTestId('diff')
     expect(mocks.readFile.mock.calls.filter((c) => c[2] === 'HEAD')).toHaveLength(2)
   })

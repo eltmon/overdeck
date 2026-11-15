@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { COMPOSER_COMMAND_MANIFEST } from '@overdeck/contracts';
 import {
   ComposerCommandParseError,
   parseOverdeckComposerCommand,
@@ -54,11 +55,33 @@ describe('parseOverdeckComposerCommand', () => {
     ]);
   });
 
+  it('parses bare /pan and the help spellings into the help entry', () => {
+    for (const input of ['/pan', '/pan help', '/pan --help', '/pan -h', '/pan   ']) {
+      expect(parseOverdeckComposerCommand(input)).toMatchObject({
+        entry: { id: 'pan-help' },
+        argv: ['help'],
+      });
+    }
+  });
+
+  it('rejects extra tokens after /pan help', () => {
+    expect(parseError('/pan help start')).toMatchObject({
+      code: 'unknown-command',
+      token: 'start',
+      message: 'Unexpected token "start" for /pan help. Expected syntax: /pan help.',
+    });
+  });
+
+  it('keeps the help entry out of the generated manifest', () => {
+    expect(COMPOSER_COMMAND_MANIFEST.some(entry => entry.path[0] === 'help')).toBe(false);
+  });
+
   it('returns actionable typed validation errors', () => {
     expect(parseError('/pan frobnicate')).toMatchObject({
       code: 'unknown-command',
       token: 'frobnicate',
       expected: '/pan <command>',
+      message: 'Unknown Overdeck command "frobnicate". Type /pan to list available commands.',
     });
     expect(parseError('/pan start')).toMatchObject({
       code: 'missing-argument',

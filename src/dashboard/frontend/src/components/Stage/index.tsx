@@ -580,9 +580,23 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
     },
     [deckKey, activeId, layout, panesById, setActivePane, setLayout],
   )
+  // PAN-5290 C-D3: a code pane's scoped conversation is the first other layout leaf bound to a known conversation.
+  const conversationBeside = useCallback(
+    (paneId: string): Conversation | null => {
+      for (const leafId of layoutLeafIds) {
+        if (leafId === paneId) continue
+        const pane = panesById.get(leafId)
+        if (pane?.paneType !== 'agent' || !pane.conversationId) continue
+        const conv = conversations.find((c) => c.name === pane.conversationId)
+        if (conv) return conv
+      }
+      return null
+    },
+    [layoutLeafIds, panesById, conversations],
+  )
   const deckContextValue: StageDeckContextValue = useMemo(
-    () => ({ deckKey, openOrFocusEditorPane, openOrFocusAgentPane, revealPane, openBeside, openDock }),
-    [deckKey, openOrFocusEditorPane, openOrFocusAgentPane, revealPane, openBeside, openDock],
+    () => ({ deckKey, openOrFocusEditorPane, openOrFocusAgentPane, revealPane, openBeside, openDock, conversationBeside }),
+    [deckKey, openOrFocusEditorPane, openOrFocusAgentPane, revealPane, openBeside, openDock, conversationBeside],
   )
   // The focused leaf follows the active tab when it's in the layout.
   const focusedPaneId = splitActive

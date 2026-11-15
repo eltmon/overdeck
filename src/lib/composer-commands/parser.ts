@@ -34,7 +34,21 @@ interface OptionDefinition {
 
 const FORBIDDEN_TOKEN = /\$\(|[;|&<>`]/;
 
-function expectedSyntax(entry: ComposerCommandManifestEntry): string {
+/** Dashboard-owned entry for bare `/pan` and its help spellings (PAN-5348). Not a CLI command. */
+export const COMPOSER_HELP_ENTRY: ComposerCommandManifestEntry = {
+  id: 'pan-help',
+  path: ['help'],
+  display: '/pan help',
+  description: 'List the available Overdeck commands',
+  args: [],
+  options: [],
+  aliases: [],
+  category: 'Core',
+};
+
+const HELP_TOKENS = new Set(['help', '--help', '-h']);
+
+export function expectedSyntax(entry: ComposerCommandManifestEntry): string {
   const args = entry.args.map(argument => {
     const name = argument.variadic ? `${argument.name}...` : argument.name;
     return argument.required ? `<${name}>` : `[${name}]`;
@@ -108,6 +122,9 @@ function aliasesForPath(entry: ComposerCommandManifestEntry): string[][] {
 }
 
 function resolveEntry(tokens: readonly string[]): { entry: ComposerCommandManifestEntry; pathLength: number } {
+  if (tokens.length === 0) return { entry: COMPOSER_HELP_ENTRY, pathLength: 0 };
+  if (HELP_TOKENS.has(tokens[0])) return { entry: COMPOSER_HELP_ENTRY, pathLength: 1 };
+
   const matches = COMPOSER_COMMAND_MANIFEST.flatMap(entry =>
     aliasesForPath(entry)
       .filter(path => path.every((part, index) => tokens[index] === part))
@@ -118,9 +135,7 @@ function resolveEntry(tokens: readonly string[]): { entry: ComposerCommandManife
   const token = tokens[0] ?? '';
   throw new ComposerCommandParseError(
     'unknown-command',
-    token
-      ? `Unknown Overdeck command "${token}". Type /pan to list available commands.`
-      : 'Missing an Overdeck command after /pan. Type /pan to list available commands.',
+    `Unknown Overdeck command "${token}". Type /pan to list available commands.`,
     token,
     '/pan <command>',
   );
