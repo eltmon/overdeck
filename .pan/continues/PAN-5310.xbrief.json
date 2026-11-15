@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5310",
   "created": "2026-11-14T22:39:01.503Z",
-  "updated": "2026-11-15T00:02:14.962Z",
+  "updated": "2026-11-15T00:02:23.382Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,6 +100,11 @@
     "fe-pipeline-state-tracker-closed.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T00:02:14.961Z"
+    },
+    "fe-actions-closed-reopen-only": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5310",
+      "claimedAt": "2026-11-15T00:02:23.382Z"
     }
   }
 }
