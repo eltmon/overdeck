@@ -3,6 +3,10 @@
  * drag move, OS drop and duplicate, in a real browser against a real server,
  * each checked on disk.
  *
+ * Since PAN-5289 the explorer is the work dock's Files tab. The seeded legacy
+ * Files pane is closed on deck load and opens the dock on its root (FR-4), so
+ * this spec also exercises that migration.
+ *
  * Runs against an **isolated** dashboard (its own temp `OVERDECK_HOME`, never
  * the operator's live dashboard on :3011) in its own browser context. The temp
  * home registers one throwaway git project, `uat` (issue prefix UAT), with the
@@ -86,9 +90,9 @@ const tree = (page: Page): Locator => page.getByRole('tree');
 const ws = (...parts: string[]): string => path.join(workspace, ...parts);
 const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 
-/** In an unsplit deck an opened file takes over; go back to the Files tab. */
+/** Show the work dock's Files tab (the tree stays beside the opened file). */
 async function showFiles(page: Page): Promise<void> {
-  await page.getByRole('tab').filter({ hasText: 'Files' }).first().click();
+  await page.getByTestId('work-dock').getByRole('tab', { name: 'Files' }).click();
   await expect(tree(page)).toBeVisible();
 }
 

@@ -13,7 +13,9 @@
  *
  * Seeding: the pane store hydrates from `pan-panes:<deck>` localStorage, so a
  * Files pane for the root is seeded before navigation and the spec drives
- * the real tree from there.
+ * the real tree from there. Since PAN-5289 the explorer is the work dock's
+ * Files tab: the seeded legacy pane is closed on deck load and opens the dock
+ * on its root (FR-4).
  */
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -156,10 +158,10 @@ test('single clicks reuse one italic preview tab, and typing autosaves to disk a
   await openDeck(page);
 
   await treeItem(page, 'uat-fixture').click();
-  // In an unsplit deck a preview open activates the code tab, so go back to
-  // the Files tab before each click, as a user would.
+  // The dock keeps the tree beside the code pane; selecting its Files tab
+  // before each click is what a user who had switched tabs would do.
   for (const name of ['a.ts', 'b.ts', 'c.ts']) {
-    await page.getByRole('tab').filter({ hasText: 'Files' }).first().click();
+    await page.getByTestId('work-dock').getByRole('tab', { name: 'Files' }).click();
     await treeItem(page, name).click();
     await expect(codeTabs(page).first()).toContainText(name);
   }
@@ -265,7 +267,7 @@ test('real TypeScript and TSX files show no false error squiggles', async ({ pag
   await openDeck(page);
   await treeItem(page, 'uat-fixture').click();
   for (const name of ['real.ts', 'view.tsx']) {
-    await page.getByRole('tab').filter({ hasText: 'Files' }).first().click();
+    await page.getByTestId('work-dock').getByRole('tab', { name: 'Files' }).click();
     await treeItem(page, name).dblclick();
     const editor = page.locator('.monaco-editor').first();
     await expect(editor.locator('.view-lines')).toContainText('export');
@@ -280,7 +282,7 @@ test('a PNG, a PDF and a CSV render in code panes through the PAN-5188 viewers',
   await openDeck(page);
   await treeItem(page, 'uat-fixture').click();
   const open = async (name: string) => {
-    await page.getByRole('tab').filter({ hasText: 'Files' }).first().click();
+    await page.getByTestId('work-dock').getByRole('tab', { name: 'Files' }).click();
     await treeItem(page, name).dblclick();
   };
 
