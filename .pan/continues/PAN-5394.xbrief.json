@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5394",
   "created": "2026-11-15T20:23:02.963Z",
-  "updated": "2026-11-15T20:24:05.543Z",
+  "updated": "2026-11-15T20:24:19.320Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,6 +22,11 @@
     "soft-reserve-wait.ac2": {
       "status": "completed",
       "doneAt": "2026-11-15T20:24:05.543Z"
+    },
+    "fairness-siblings-wait": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5394",
+      "claimedAt": "2026-11-15T20:24:19.320Z"
     }
   }
 }
