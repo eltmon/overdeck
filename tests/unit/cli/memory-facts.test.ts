@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -317,6 +317,12 @@ describe('pan memory curated-fact commands (PAN-3957)', () => {
       expect(readMemoryFactsSync(dir, 'machine').facts.map((f) => f.id)).toEqual(['path-fact']);
       expect(logSpy.mock.calls.flat().join('\n')).not.toContain('Commit it:');
     });
+
+    it('add --always writes always: true', async () => {
+      await memoryFactAddCommand('always-fact', baseAddOptions({ always: true }));
+      const { facts } = readMemoryFactsSync(join(projectRoot, '.overdeck', 'memory'), 'project');
+      expect(facts.find((f) => f.id === 'always-fact')?.always).toBe(true);
+    });
   });
 
   describe('post-write operator sync (PAN-4578 W8)', () => {
@@ -446,6 +452,25 @@ describe('pan memory curated-fact commands (PAN-3957)', () => {
       await memoryFactEditCommand('marked-fact', { clearReview: true });
       const { facts } = readMemoryFactsSync(join(projectRoot, '.overdeck', 'memory'), 'project');
       expect(facts.find((f) => f.id === 'marked-fact')?.review).toEqual([]);
+    });
+
+    it('edit --no-always clears the flag', async () => {
+      writeFact(
+        join(projectRoot, '.overdeck', 'memory'),
+        'always-fact',
+        '---\ntype: feedback\ndescription: Original description.\nalways: true\n---\nOriginal body.\n',
+      );
+      await memoryFactEditCommand('always-fact', { always: false });
+      const text = readFileSync(join(projectRoot, '.overdeck', 'memory', 'always-fact.md'), 'utf8');
+      expect(text).not.toContain('always');
+      const { facts } = readMemoryFactsSync(join(projectRoot, '.overdeck', 'memory'), 'project');
+      expect(facts.find((f) => f.id === 'always-fact')?.always).toBe(false);
+    });
+
+    it('edit --always alone counts as a change', async () => {
+      await memoryFactEditCommand('be-decisive', { always: true });
+      const { facts } = readMemoryFactsSync(join(projectRoot, '.overdeck', 'memory'), 'project');
+      expect(facts.find((f) => f.id === 'be-decisive')?.always).toBe(true);
     });
   });
 

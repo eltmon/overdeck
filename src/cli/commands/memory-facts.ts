@@ -171,6 +171,7 @@ export interface MemoryFactAddOptions extends FactTargetFlags {
   body?: string;
   bodyFile?: string;
   tags?: string;
+  always?: boolean;
   json?: boolean;
   /** Injectable for tests; defaults to the real `git check-ignore` call (D11). */
   checkIgnored?: (root: string, relativePath: string) => Promise<boolean>;
@@ -224,6 +225,7 @@ export async function memoryFactAddCommand(id: string, options: MemoryFactAddOpt
       source: null,
       review: [],
       body,
+      always: options.always === true,
     });
   } catch (err) {
     console.error(chalk.red(err instanceof Error ? err.message : String(err)));
@@ -244,6 +246,7 @@ export interface MemoryFactEditOptions extends FactTargetFlags {
   bodyFile?: string;
   tags?: string;
   clearReview?: boolean;
+  always?: boolean;
   json?: boolean;
   /** Injectable for tests; defaults to `syncOperatorMemory` (PAN-4578 D11.4). */
   syncOperator?: () => Promise<OperatorMemorySyncOutcome>;
@@ -256,7 +259,8 @@ export async function memoryFactEditCommand(id: string, options: MemoryFactEditO
   }
 
   const hasChange = options.type !== undefined || options.title !== undefined || options.description !== undefined
-    || options.body !== undefined || options.bodyFile !== undefined || options.tags !== undefined || options.clearReview === true;
+    || options.body !== undefined || options.bodyFile !== undefined || options.tags !== undefined || options.clearReview === true
+    || options.always !== undefined;
   if (!hasChange) {
     console.error(chalk.red('nothing to change; pass a field flag or edit <path> directly'));
     return exitCli(1);
@@ -292,6 +296,7 @@ export async function memoryFactEditCommand(id: string, options: MemoryFactEditO
       source: existing.source,
       review: options.clearReview ? [] : existing.review,
       body,
+      always: options.always ?? existing.always,
     }, { overwrite: true });
   } catch (err) {
     console.error(chalk.red(err instanceof Error ? err.message : String(err)));
@@ -419,6 +424,7 @@ export function registerMemoryFactCommands(memory: Command): void {
     .option('--body <text>', 'Fact body')
     .option('--body-file <path>', 'Read the fact body from a file')
     .option('--tags <a,b>', 'Comma-separated tags')
+    .option('--always', 'List this fact first in every launch index and leave it out of prompt-time retrieval')
     .option('--project <key>', 'Project key (defaults to the project owning the cwd)')
     .option('--user', 'Write to the operator store (travels with you; synced when set up)')
     .option('--machine', 'Write to the machine store (this machine only)')
@@ -435,6 +441,8 @@ export function registerMemoryFactCommands(memory: Command): void {
     .option('--body-file <path>', 'Read the fact body from a file')
     .option('--tags <a,b>', 'Comma-separated tags')
     .option('--clear-review', 'Remove the review marker, re-activating the fact')
+    .option('--always', 'List this fact first in every launch index and leave it out of prompt-time retrieval')
+    .option('--no-always', 'Clear the always flag')
     .option('--project <key>', 'Project key (defaults to the project owning the cwd)')
     .option('--user', 'Edit the operator store (travels with you; synced when set up)')
     .option('--machine', 'Edit the machine store (this machine only)')
