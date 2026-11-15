@@ -68,6 +68,8 @@ export interface HarnessCapabilities {
   readonly runsOnFlyMachine: boolean
   /** Launches get the `overdeck` MCP server with a per-agent token (PAN-4927 D-13): Claude Code (PAN-4932), Codex (PAN-4933 W-INJ2) and the ACP harnesses (PAN-4934). */
   readonly overdeckMcp: boolean
+  /** The composer / menu lists skills as /<name> because the harness runs a typed /<skill> (PAN-5347). */
+  readonly skillSlashCommands: boolean
 }
 
 export const HARNESS_CAPABILITY_KEYS = [
@@ -93,6 +95,7 @@ export const HARNESS_CAPABILITY_KEYS = [
   "askAnswerDelivery",
   "runsOnFlyMachine",
   "overdeckMcp",
+  "skillSlashCommands",
 ] as const satisfies readonly (keyof HarnessCapabilities)[]
 
 export const CLAUDE_CODE_CAPABILITIES: HarnessCapabilities = {
@@ -118,6 +121,7 @@ export const CLAUDE_CODE_CAPABILITIES: HarnessCapabilities = {
   askAnswerDelivery: "message",
   runsOnFlyMachine: true,
   overdeckMcp: true,
+  skillSlashCommands: true,
 }
 
 export const OHMYPI_CAPABILITIES: HarnessCapabilities = {
@@ -143,6 +147,7 @@ export const OHMYPI_CAPABILITIES: HarnessCapabilities = {
   askAnswerDelivery: "pi-ask-modal",
   runsOnFlyMachine: false,
   overdeckMcp: false,
+  skillSlashCommands: false,
 }
 
 /**
@@ -181,6 +186,7 @@ export const CODEX_CAPABILITIES: HarnessCapabilities = {
   askAnswerDelivery: "codex-approval",
   runsOnFlyMachine: true,
   overdeckMcp: true,
+  skillSlashCommands: false,
 }
 
 export const ACP_CAPABILITIES: HarnessCapabilities = {
@@ -206,6 +212,7 @@ export const ACP_CAPABILITIES: HarnessCapabilities = {
   askAnswerDelivery: "message",
   runsOnFlyMachine: false,
   overdeckMcp: true,
+  skillSlashCommands: false,
 }
 
 export const KIMI_CODE_CAPABILITIES: HarnessCapabilities = {
@@ -231,6 +238,7 @@ export const KIMI_CODE_CAPABILITIES: HarnessCapabilities = {
   askAnswerDelivery: "message",
   runsOnFlyMachine: false,
   overdeckMcp: false,
+  skillSlashCommands: false,
 }
 
 export const OPENCODE_CAPABILITIES: HarnessCapabilities = {
@@ -256,6 +264,7 @@ export const OPENCODE_CAPABILITIES: HarnessCapabilities = {
   askAnswerDelivery: "message",
   runsOnFlyMachine: false,
   overdeckMcp: true,
+  skillSlashCommands: false,
 }
 
 export const GROK_CAPABILITIES: HarnessCapabilities = {
@@ -289,6 +298,7 @@ export const MUSE_CAPABILITIES: HarnessCapabilities = {
   askAnswerDelivery: "message",
   runsOnFlyMachine: false,
   overdeckMcp: false,
+  skillSlashCommands: false,
 }
 
 export const PRIME_AGENT_CAPABILITIES: HarnessCapabilities = {
@@ -314,4 +324,5 @@ export const PRIME_AGENT_CAPABILITIES: HarnessCapabilities = {
   askAnswerDelivery: "message",
   runsOnFlyMachine: false,
   overdeckMcp: false,
+  skillSlashCommands: false,
 }
