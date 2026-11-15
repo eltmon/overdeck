@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5295",
   "created": "2026-11-15T19:39:19.043Z",
-  "updated": "2026-11-15T19:53:28.461Z",
+  "updated": "2026-11-15T19:57:02.228Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,9 +106,18 @@
       "doneAt": "2026-11-15T19:53:25.037Z"
     },
     "composer-toolbar-extract": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5295",
-      "claimedAt": "2026-11-15T19:53:28.461Z"
+      "claimedAt": "2026-11-15T19:53:28.461Z",
+      "doneAt": "2026-11-15T19:57:02.228Z"
+    },
+    "composer-toolbar-extract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T19:57:02.228Z"
+    },
+    "composer-toolbar-extract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T19:57:02.228Z"
     }
   }
 }
