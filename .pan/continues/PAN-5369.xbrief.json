@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5369",
   "created": "2026-11-15T17:54:40.939Z",
-  "updated": "2026-11-15T18:05:56.338Z",
+  "updated": "2026-11-15T18:06:09.907Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,11 @@
     "lookup-query-rewrite.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T18:05:56.337Z"
+    },
+    "ownership-helpers": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5369",
+      "claimedAt": "2026-11-15T18:06:09.907Z"
     }
   }
 }
