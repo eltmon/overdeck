@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5364",
   "created": "2026-11-15T15:42:11.052Z",
-  "updated": "2026-11-15T16:07:23.632Z",
+  "updated": "2026-11-15T16:07:25.782Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
     "board-chain-selection.ac5": {
       "status": "completed",
       "doneAt": "2026-11-15T16:07:23.632Z"
+    },
+    "batch-sections": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5364",
+      "claimedAt": "2026-11-15T16:07:25.782Z"
     }
   }
 }
