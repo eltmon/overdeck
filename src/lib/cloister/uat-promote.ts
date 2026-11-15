@@ -136,7 +136,8 @@ export interface UatPromoteDeps {
   log?: (msg: string) => void;
 }
 
-export type PromoteFailureReason = 'not-found' | 'wrong-status' | 'member-not-ready' | 'stale-base' | 'merge-failed';
+/** `stack-unhealthy`: UAT is required and the stack is not running (PAN-4753 WI-9, `promote-stack-gate.ts`). */
+export type PromoteFailureReason = 'not-found' | 'wrong-status' | 'member-not-ready' | 'stale-base' | 'merge-failed' | 'stack-unhealthy';
 
 export type PromoteResult =
   | {

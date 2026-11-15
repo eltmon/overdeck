@@ -83,6 +83,7 @@ import { issueHoldsForUat } from '../../../lib/cloister/auto-merge-eligibility.j
 import { isFlywheelRequireUatBeforeMerge } from '../../../lib/overdeck/control-settings.js';
 import { memberSpecRoots } from './uat-member-spec-roots.js';
 import { getWorkspaceInfoForIssue } from '../routes/workspaces.js';
+import { promoteStackHealthRefusal, type StackHealthOverride } from './promote-stack-gate.js';
 
 const RECONCILE_INTERVAL_MS = 60_000;
 const CHAIN_PAYLOAD_LIMIT = 10;
@@ -856,6 +857,8 @@ export async function postUatGenerationPromotePayload(
   // layer without a type error.
   firePostMerge: UatPromoteDeps['firePostMerge'],
   shipVersion?: string,
+  /** PAN-4753 WI-9: merge despite an unhealthy UAT stack, with the operator's reason. */
+  overrideStackHealth?: StackHealthOverride,
 ): Promise<PromoteResult> {
   // PAN-4970: a stale/invalidated card's Merge batch click used to pay for a
   // round of per-member forge reads (the memberStates loop below) before
@@ -871,6 +874,10 @@ export async function postUatGenerationPromotePayload(
   // project_root, so a MIN generation must not be merged against the Overdeck repo.
   // For a generation belonging to this repo this resolves to the same path as before.
   const root = resolve(current.projectRoot ?? projectRoot());
+  const projectConfig = findProjectByPath(root);
+  // #3176: a batch that needs UAT promotes only from a running stack, before any forge read.
+  const stackRefusal = await promoteStackHealthRefusal(current, projectConfig, overrideStackHealth);
+  if (stackRefusal) return stackRefusal;
   // PAN-3917: promotion used to stamp a verification verdict onto every
   // member's record. The merge itself is the evidence — the generation's own
   // rows carry the merge sha, and readiness is re-derived from each PR.
@@ -901,7 +908,6 @@ export async function postUatGenerationPromotePayload(
   // A polyrepo generation merges into each member repo's own target branch, so
   // it needs per-repo promote git. Supplying it is what selects the two-phase
   // (trial-merge everything, then publish) path.
-  const projectConfig = findProjectByPath(root);
   const polyrepo = projectConfig?.workspace?.type === 'polyrepo';
   const storedRepos = polyrepo ? (current.repos ?? []) : [];
 

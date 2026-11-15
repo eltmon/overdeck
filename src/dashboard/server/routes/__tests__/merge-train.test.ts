@@ -380,6 +380,7 @@ describe('PAN-1696 merge-train-routes', () => {
         'uat/pan-otter-0610',
         expect.any(Function),
         '48.8.0',
+        undefined,
       );
 
       uatTrainMocks.postUatGenerationPromotePayload.mockClear();
@@ -389,6 +390,40 @@ describe('PAN-1696 merge-train-routes', () => {
       );
       expect(invalid).toEqual({ status: 400, body: { error: 'shipVersion must look like 48.8.0' } });
       expect(uatTrainMocks.postUatGenerationPromotePayload).not.toHaveBeenCalled();
+    });
+
+    // PAN-4753 WI-9 (#3176): merge anyway past an unhealthy UAT stack.
+    it('forwards a stack-health override with its trimmed reason', async () => {
+      const result = await requestMergeTrainRoute(
+        '/api/merge-train/generations/pan-otter-0610/promote',
+        authedInit({ overrideStackHealth: true, overrideReason: '  tested by hand  ' }),
+      );
+      expect(result.status).toBe(200);
+      expect(uatTrainMocks.postUatGenerationPromotePayload).toHaveBeenCalledWith(
+        'uat/pan-otter-0610',
+        expect.any(Function),
+        undefined,
+        { reason: 'tested by hand' },
+      );
+    });
+
+    it.each([
+      [{ overrideStackHealth: true }, 'overrideReason is required when overrideStackHealth is true'],
+      [{ overrideStackHealth: true, overrideReason: '   ' }, 'overrideReason is required when overrideStackHealth is true'],
+      [{ overrideStackHealth: 'yes', overrideReason: 'x' }, 'overrideStackHealth must be a boolean'],
+    ])('rejects override body %j with 400 without promoting', async (body, error) => {
+      const result = await requestMergeTrainRoute('/api/merge-train/generations/pan-otter-0610/promote', authedInit(body));
+      expect(result).toEqual({ status: 400, body: { error } });
+      expect(uatTrainMocks.postUatGenerationPromotePayload).not.toHaveBeenCalled();
+    });
+
+    it('maps a stack-unhealthy refusal to 409 with its reason', async () => {
+      uatTrainMocks.postUatGenerationPromotePayload.mockResolvedValueOnce({
+        success: false, reason: 'stack-unhealthy', message: 'UAT stack is degraded; start it and test, or merge anyway with a reason',
+      } as never);
+      const result = await requestMergeTrainRoute('/api/merge-train/generations/pan-otter-0610/promote', authedInit());
+      expect(result.status).toBe(409);
+      expect(result.body).toMatchObject({ reason: 'stack-unhealthy' });
     });
 
     it('ships a deferred version for a promoted batch', async () => {
