@@ -186,7 +186,9 @@
       "issue": "PAN-5370",
       "lane": "A",
       "order": 17,
-      "prereqs": [],
+      "prereqs": [
+        "PAN-5335"
+      ],
       "reVerify": false,
       "addedAt": "2026-11-15T15:53:50.788Z",
       "addedBy": "conv-20261113-6031"
@@ -199,8 +201,17 @@
       "reVerify": false,
       "addedAt": "2026-11-15T15:53:50.788Z",
       "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5391",
+      "lane": "A",
+      "order": 19,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-15T19:12:44.658Z",
+      "addedBy": "conv-20261113-6031"
     }
   ],
   "createdAt": "2026-11-14T19:17:57.102Z",
-  "updatedAt": "2026-11-15T15:53:50.789Z"
+  "updatedAt": "2026-11-15T19:12:44.659Z"
 }
