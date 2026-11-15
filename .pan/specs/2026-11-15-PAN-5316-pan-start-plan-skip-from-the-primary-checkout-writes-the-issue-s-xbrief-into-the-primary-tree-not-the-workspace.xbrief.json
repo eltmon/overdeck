@@ -1,0 +1,292 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T04:50:15Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5316: pan start --plan skip from the primary checkout writes the issue's xBRIEF into the primary tree, not the workspace",
+    "updated": "2026-11-15T04:58:49.888Z"
+  },
+  "plan": {
+    "id": "pan-5316",
+    "title": "pan start --plan skip from the primary checkout writes the issue's xBRIEF into the primary tree, not the workspace",
+    "status": "proposed",
+    "uid": "e7666a4d-038b-4ec5-a0ec-a0cdcbcf273c",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-15T04:50:15Z",
+    "updated": "2026-11-15T04:58:49.888Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5316",
+        "label": "PAN-5316",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-5316.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "xbrief",
+      "pan-start",
+      "plan-home",
+      "bugfix"
+    ],
+    "narratives": {
+      "Problem": "writeAutoStartXBrief (src/lib/xbrief/auto-synthesize.ts) ignores its `_workspacePath` argument and calls writeSpecForIssue(projectRoot, ...), so `pan start --plan skip`, the dashboard auto-start spawn route, and the Deft placeholder plan all write the synthesized spec into the primary checkout's .pan/specs/. The primary tree goes dirty (blocking `pan release stable`), and the issue workspace has no spec. findPlanSync's main-checkout fallback hides the bug, so the agent spawns anyway.",
+      "Proposal": "Change the signature to writeAutoStartXBrief(workspacePath, issue) and write through writeSpecForIssue(workspacePath, ...). That is the same plan home findPlanSync(workspace) reads first, and the same pattern planning-promotion.ts:209 uses. Add a guard that rejects with FsError and writes nothing unless workspacePath is the existing feature-<id> workspace of the issue. Collapse the duplicate result paths into one specPath field. Update the three callers. Gate the dashboard route's synthesis on the local workspace existing. Rewrite the two tests that pin the old location, add real-git regression tests, and update docs (PRD .pan/drafts/pan-5316.md).",
+      "NonGoals": "- Changing findPlanSync's fallback to the main checkout (merged specs legitimately live there)\n- Cleaning up stray auto-synthesized specs already left in a primary checkout by earlier runs\n- Changing when skip mode decides to synthesize, including why PAN-5095 had no findable spec\n- A full startCommand integration test (writer-seam test with real git topology instead)\n- Any change to remote start (start-remote.ts) or other writeSpecForIssue callers\n- Raising any file-size allowlist cap or growing src/cli/commands/start.ts"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The regression test drives writeAutoStartXBrief against a real git primary repo plus a real `git worktree add` workspace, instead of running the full startCommand skip path.",
+        "rationale": "The skip path reaches the synthesis call only after workspace resolution, branch checks, sync-main, state validation and a tracker fetch. Driving it would need about 20 mocks, and those mocks would replace the filesystem behavior under test. No code on this path reads process.cwd(), so 'from the primary root' is satisfied by passing the primary as projectRoot context. The new guard also makes a primary-root target fail outright."
+      },
+      {
+        "summary": "Remove the projectRoot parameter and collapse workspaceSpecPath/projectSpecPath into a single specPath field.",
+        "rationale": "The unused parameter is what caused the bug, and both result fields held the same path. The change is small: three callers plus tests already being edited."
+      },
+      {
+        "summary": "When the local workspace is missing, the dashboard spawn route skips synthesis and returns its existing 422 response.",
+        "rationale": "Without the gate, the writer guard would surface an FsError, or (without the guard) the recursive mkdir would fabricate workspaces/feature-<id>/.pan inside the primary. The case is reachable only for remote-requested spawns, which follow planning, so it is effectively unreachable. A clear 422 is the safest response."
+      }
+    ],
+    "metadata": {
+      "planningMode": "auto",
+      "sizeJustification": "Inseparable: one function signature change (writeAutoStartXBrief) must land atomically with its three callers (CLI start, dashboard spawn route, Deft switch) and the tests that pin the old location, or typecheck and tests go red; the remaining subsystems are the docs pages describing the same behavior. Only 10 files total.",
+      "canonicalFilename": "2026-11-15-PAN-5316-pan-start-plan-skip-from-the-primary-checkout-writes-the-issue-s-xbrief-into-the-primary-tree-not-the-workspace.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "workspace-writer",
+        "title": "Make writeAutoStartXBrief write into the issue workspace plan home and update its three callers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T04:50:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5316",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/xbrief/auto-synthesize.ts",
+            "src/cli/commands/start.ts",
+            "src/dashboard/server/routes/agents/spawn-issue.ts",
+            "src/lib/deft/switch.ts",
+            "src/lib/xbrief/__tests__/auto-synthesize.test.ts",
+            "src/lib/deft/__tests__/switch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/xbrief/__tests__/auto-synthesize.test.ts src/lib/deft/__tests__/switch.test.ts",
+            "npm run typecheck",
+            "grep -rn \"writeAutoStartXBrief(projectRoot\\|writeAutoStartXBrief(projectPath\" src"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "the grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 steps 1-6 exactly. (1) In auto-synthesize.ts, change AutoSynthesizeResult to { document, specPath, canonicalFilename }. Change the FsError import from `import type` to a value import, and import existsSync and realpathSync from node:fs, basename/join/resolve from node:path, and issueIdFromWorkspacePath from ./io.js. (2) Replace writeAutoStartXBrief with the two-argument (workspacePath, issue) version from the PRD. It fails with FsError({ path: workspacePath, operation: 'writeAutoStartXBrief', cause }) in three cases: issueIdFromWorkspacePath(workspacePath) !== issue.issueId.toUpperCase(); the workspace does not exist; or realpathSync(workspacePath) !== join(realpathSync(resolve(workspacePath,'..','..')), 'workspaces', basename(workspacePath)), which refuses a workspaces/feature-<id> symlink to the primary. Otherwise it calls writeSpecForIssue(workspacePath, <doc with plan.status 'proposed'>, 'proposed', canonicalFilename) and returns specPath = written.path. Rewrite its doc comment to say it writes into the workspace plan home, never the primary (PAN-5316). (3) In start.ts line 960, change only the call to writeAutoStartXBrief(workspace, issue); the line count must not grow. (4) In spawn-issue.ts, change the condition to `if (autoStart && !planPath && existsSync(workspacePath))` with a one-line PAN-5316 comment, and change the call to writeAutoStartXBrief(workspacePath, {...}). (5) In deft/switch.ts, change writePlaceholderPlan's deps type and defaultWritePlaceholderPlan to (workspace, issueId), use written.specPath, call d.writePlaceholderPlan(workspace, issue), and make refuseUnsupported return { workspace } only (it keeps its resolveProject/polyrepo/remote refusals). (6) Rewrite the two existing writeAutoStartXBrief tests in auto-synthesize.test.ts and the 'marks the stand-in plan it writes with deftPlaceholder' test in switch.test.ts. Each creates a real workspace dir, uses the new signature, asserts the spec is under <workspace>/.pan/specs, and asserts <projectRoot>/.pan/specs does not exist."
+        },
+        "items": [
+          {
+            "id": "workspace-writer.ac1",
+            "title": "Given a registered project and an existing workspaces/feature-pan-1072 dir, writeAutoStartXBrief(workspacePath, ...) returns specPath equal to <workspace>/.pan/specs/<canonicalFilename>, findPlanSync(workspacePath) returns that same path, and <projectRoot>/.pan/specs does not exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-writer.ac2",
+            "title": "npm run typecheck exits 0 with the two-argument signature at start.ts, spawn-issue.ts and deft/switch.ts, and `grep -rn \"writeAutoStartXBrief(projectRoot\\|writeAutoStartXBrief(projectPath\" src` returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-writer.ac3",
+            "title": "The Deft switch test 'marks the stand-in plan it writes' creates exactly one spec under <workspace>/.pan/specs/ with the Deft stand-in marker set to true in plan.metadata, and no <projectPath>/.pan/specs directory exists afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-writer.ac4",
+            "title": "When the local workspace directory is missing, the spawn-issue.ts auto-start branch skips synthesis (condition `autoStart && !planPath && existsSync(workspacePath)`) and the route returns its existing 422 'No workspace xBRIEF found' response",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "regression-tests",
+        "title": "Add real-git regression tests: skip-plan synthesis keeps the primary clean, and the guard rejects non-workspace targets",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T04:50:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5316",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/xbrief/__tests__/auto-synthesize.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/xbrief/__tests__/auto-synthesize.test.ts"
+          ],
+          "expected_outputs": [
+            "auto-synthesize.test.ts passes, including 'keeps the primary checkout clean and writes the spec into the issue worktree (PAN-5316)', 'refuses the primary root and writes nothing', 'refuses another issue's workspace', 'refuses a missing workspace without creating it', and 'refuses a workspace symlink that points at the primary checkout'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. Inside describe('writeAutoStartXBrief'), add five tests that reuse withTempDir, git and initializeGitRepo. (1) 'keeps the primary checkout clean and writes the spec into the issue worktree (PAN-5316)': set OVERDECK_HOME=root (restore in finally), initialize the primary on main, register it via projectRegistry.entries = [{ key: 'skip-plan-project', config: { name: 'Skip plan project', path: projectRoot } }] so resolvePlanHome takes the registered-project branch production uses, commit a .gitignore containing `workspaces/`, run `git worktree add --quiet -b feature/pan-5316 workspaces/feature-pan-5316`, and call writeAutoStartXBrief(workspacePath, { issueId: 'PAN-5316', ... }). Assert: the primary `git status --porcelain` is ''; <projectRoot>/.pan/specs does not exist; result.specPath === join(workspacePath,'.pan','specs',canonicalFilename); `git status --porcelain --untracked-files=all` in the workspace contains `.pan/specs/<canonicalFilename>`; findPlanSync(workspacePath) === result.specPath. (2) 'refuses the primary root and writes nothing': pass projectRoot. Expect an FsError with operation 'writeAutoStartXBrief' (use Effect.exit or Effect.flip), the primary status stays '', and no <projectRoot>/.pan. (3) 'refuses another issue's workspace': use workspaces/feature-pan-1074 with issueId PAN-9999. Expect the FsError and no .pan under that workspace. (4) 'refuses a missing workspace without creating it': use a never-created workspaces/feature-pan-1075 with issueId PAN-1075. Expect the FsError, and the workspace path still does not exist. (5) 'refuses a workspace symlink that points at the primary checkout': on the registered primary, mkdir workspaces/ and symlinkSync(projectRoot, workspaces/feature-pan-1076). Call with issueId PAN-1076. Expect the FsError and no <projectRoot>/.pan. Do not assert an empty primary porcelain here, because git lists the symlink itself as untracked. No fake timers are needed. Do not use skipIf/.only or source-grep assertions."
+        },
+        "items": [
+          {
+            "id": "regression-tests.ac1",
+            "title": "Given a registered real git primary with workspaces/ ignored and a real feature/pan-5316 worktree, when writeAutoStartXBrief(workspacePath, ...) runs, the primary `git status --porcelain` returns an empty string and the workspace status lists the new .pan/specs/<canonicalFilename> file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "regression-tests.ac2",
+            "title": "Given the primary root as the target, writeAutoStartXBrief rejects with FsError operation 'writeAutoStartXBrief' and creates no <projectRoot>/.pan directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "regression-tests.ac3",
+            "title": "Given another issue's workspace or a never-created workspace path, writeAutoStartXBrief rejects with FsError operation 'writeAutoStartXBrief' and creates neither the workspace directory nor a .pan directory inside it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "regression-tests.ac4",
+            "title": "Given workspaces/feature-pan-1076 is a symlink to the primary checkout, writeAutoStartXBrief rejects with FsError operation 'writeAutoStartXBrief' and creates no <projectRoot>/.pan directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document where the skip-plan synthesized spec is written",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T04:50:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5316",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/XBRIEF.md",
+            "sync-sources/skills/pan-start/SKILL.md",
+            "changelog.d/pan-5316.md",
+            ".overdeck/context/codebase/concerns.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n \"PAN-5316\" docs/XBRIEF.md",
+            "grep -n \"never into the primary checkout\" sync-sources/skills/pan-start/SKILL.md"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "docs/XBRIEF.md prints two PAN-5316 references (Work starts item and Concurrency Model row)",
+            "SKILL.md prints the new --plan skip sentence"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 exactly, with the exact wording given there. (1) docs/XBRIEF.md lifecycle item 4 'Work starts' (line 91): append the sentence that `pan start --plan skip` (and the dashboard auto-start spawn) synthesizes a minimal spec into <project>/workspaces/feature-<issue>/.pan/specs/, never the primary checkout, uncommitted until `pan done`, accepted by plan-integrity as `first-add` (PAN-5316). (2) docs/XBRIEF.md Concurrency Model row for `.pan/specs/<file>` (line 137): extend the Writer cell to name the per-issue writers (finalize promotion, skip-plan synthesis, start-time status flip) that write the base workspace copy, never the primary (PAN-4225, PAN-5316). (3) docs/XBRIEF.md Plan Resolution paragraph (line 423): replace the stale `findSpecByIssue(projectRoot, issueId)` description with the workspace-plan-home-first, then main-checkout, then workspace-draft order. (4) sync-sources/skills/pan-start/SKILL.md, after the paragraph ending 'for `--plan skip`.' (line 64): add '`--plan skip` writes the synthesized spec into the issue workspace's `.pan/specs/`, on the feature branch, never into the primary checkout.' (5) Create changelog.d/pan-5316.md with the PRD's '#### Fixed' entry. (6) .overdeck/context/codebase/concerns.md, the bullet 'Per-issue continue/spec writers target the issue's base workspace, never the primary checkout' (PAN-4225): add the skip-plan writeAutoStartXBrief synthesis to its writer list, and leave the last-verified line untouched."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/XBRIEF.md 'Work starts' item contains the rule that `pan start --plan skip` writes the synthesized spec into <project>/workspaces/feature-<issue>/.pan/specs/, never the primary checkout, and its Concurrency Model .pan/specs row contains skip-plan synthesis as a base-workspace writer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "docs/XBRIEF.md Plan Resolution paragraph no longer contains `findSpecByIssue(projectRoot, issueId)` and describes the workspace-first, then main-checkout, then workspace-draft lookup order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "changelog.d/pan-5316.md exists with a single '#### Fixed' section linking issue #5316, and `npm run lint:docs` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "sync-sources/skills/pan-start/SKILL.md contains the sentence that `--plan skip` writes the synthesized spec into the issue workspace's .pan/specs/, never into the primary checkout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "workspace-writer",
+        "to": "regression-tests",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
