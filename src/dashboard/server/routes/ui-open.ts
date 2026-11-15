@@ -49,15 +49,9 @@ function isPositiveInteger(value: unknown): value is number {
 /** Realpath every candidate; a candidate whose path does not resolve is skipped. */
 async function realCandidates<T extends { path: string }>(rows: readonly T[], real: UiOpenDeps['realpath']): Promise<T[]> {
   const resolved = await Promise.all(
-    rows.map(async (row): Promise<T | null> => {
-      try {
-        return { ...row, path: await real(row.path) };
-      } catch {
-        return null;
-      }
-    }),
+    rows.map((row) => real(row.path).then((path) => [{ ...row, path }], () => [])),
   );
-  return resolved.filter((row): row is T => row !== null);
+  return resolved.flat();
 }
 
 export async function handleUiOpen(
@@ -88,26 +82,36 @@ export async function handleUiOpen(
     deps.listProjects().then((rows) => realCandidates(rows, deps.realpath)),
     deps.listScratch().then((rows) => realCandidates(rows, deps.realpath)),
   ]);
-  const hit = resolvePathRoot(realPath, projects, scratch);
+  let hit = resolvePathRoot(realPath, projects, scratch);
+  // A scratch row may point at the primary checkout or outside the workspaces dir,
+  // and resolveExplorerRoot refuses those (D-A4). Such a row must not shadow the
+  // project, so a refused scratch root falls back to the project rules.
+  let root: { absPath: string; projectKey: string } | null = null;
+  if (hit.kind === 'root' && hit.rootId.startsWith('workspace:')) {
+    root = await deps.resolveRoot(hit.rootId).catch(() => null);
+    if (!root) hit = resolvePathRoot(realPath, projects, []);
+  }
   if (hit.kind === 'outside') {
     const dir = kind === 'dir' ? realPath : dirname(realPath);
     return jsonResponse({ error: 'outside-projects', path, kind, suggestion: `pan project add ${dir}` }, { status: 404 });
   }
-  const noRoot = () => jsonResponse({ error: 'no-root', path, projectKey: hit.projectKey }, { status: 404 });
-  if (hit.kind === 'no-root') return noRoot();
+  const target = hit;
+  const noRoot = () => jsonResponse({ error: 'no-root', path, projectKey: target.projectKey }, { status: 404 });
+  if (target.kind === 'no-root') return noRoot();
 
-  let root: { absPath: string; projectKey: string };
-  try {
-    root = await deps.resolveRoot(hit.rootId);
-  } catch {
-    return noRoot();
+  if (!root) {
+    try {
+      root = await deps.resolveRoot(target.rootId);
+    } catch {
+      return noRoot();
+    }
   }
   const rel = relative(root.absPath, realPath);
   if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return noRoot();
 
   const resolution: UiOpenResolution = {
     projectKey: root.projectKey,
-    rootId: hit.rootId,
+    rootId: target.rootId,
     relPath: rel.split(sep).join('/'),
     kind,
     ...(line !== undefined ? { line } : {}),

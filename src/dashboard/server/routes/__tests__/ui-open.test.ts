@@ -116,4 +116,19 @@ describe('POST /api/ui/open', () => {
     );
     expect(result.body).toMatchObject({ rootId: 'workspace:ws-a', relPath: '', projectKey: 'demo' });
   });
+
+  it('falls back to the project when a scratch row is refused as a root', async () => {
+    const result = await call(
+      { path: join(project, 'docs') },
+      {
+        listScratch: async () => [{ id: 'ws-primary', path: project }],
+        resolveRoot: async (rootId) => {
+          if (rootId.startsWith('workspace:')) throw new Error('ROOT_NOT_FOUND: workspace is the primary checkout');
+          return { absPath: project, projectKey: 'demo' };
+        },
+      },
+    );
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({ rootId: 'project:demo', relPath: 'docs' });
+  });
 });
