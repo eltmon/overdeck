@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5358",
   "created": "2026-11-15T16:13:08.101Z",
-  "updated": "2026-11-15T18:08:29.116Z",
+  "updated": "2026-11-15T18:19:42.240Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -184,9 +184,22 @@
       "doneAt": "2026-11-15T18:08:17.539Z"
     },
     "cli-reindex-sync": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5358",
-      "claimedAt": "2026-11-15T18:08:29.115Z"
+      "claimedAt": "2026-11-15T18:08:29.115Z",
+      "doneAt": "2026-11-15T18:19:42.240Z"
+    },
+    "cli-reindex-sync.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:19:42.240Z"
+    },
+    "cli-reindex-sync.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:19:42.240Z"
+    },
+    "cli-reindex-sync.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T18:19:42.240Z"
     }
   }
 }
