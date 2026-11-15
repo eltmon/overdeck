@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5294",
   "created": "2026-11-15T11:49:42.622Z",
-  "updated": "2026-11-15T13:41:48.849Z",
+  "updated": "2026-11-15T13:41:49.906Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -234,6 +234,11 @@
     "home-assembly.ac5": {
       "status": "completed",
       "doneAt": "2026-11-15T13:41:48.849Z"
+    },
+    "home-e2e": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5294",
+      "claimedAt": "2026-11-15T13:41:49.906Z"
     }
   },
   "agentModel": "claude-opus-5-5"
