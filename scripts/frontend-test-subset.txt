@@ -453,6 +453,7 @@ src/lib/__tests__/issueActions.parity.test.tsx
 src/lib/__tests__/issueActions.test.ts
 src/lib/__tests__/issueLinks.test.ts
 src/lib/__tests__/linkedConversation.test.ts
+src/lib/__tests__/markdownDocLinks.test.ts
 src/lib/__tests__/monaco-setup.test.ts
 src/lib/__tests__/nativeQuietReads.test.tsx
 src/lib/__tests__/panesStore.code.test.ts
