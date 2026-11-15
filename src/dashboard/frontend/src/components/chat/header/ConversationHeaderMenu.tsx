@@ -12,6 +12,7 @@ import { BookmarksMenuItem } from '../bookmarks/BookmarksDrawer';
 import { OpenFolderMenuItems } from './OpenFolderMenuItems';
 import { continueTargetOf, openContinueOnDevice } from '../continueOnDevice/continueOnDeviceStore';
 import { hasConversationChanges, openConversationDiffWindow } from '../diffWindow';
+import { useConversationChangesContext } from '../conversationChanges/ConversationChangesScope';
 import { fetchFullTranscript, type MessagesResponse } from '../messagesQuery';
 import type { ViewMode } from '../useNeedsTerminalAutoSwitch';
 import styles from '../../CommandDeck/styles/command-deck.module.css';
@@ -87,6 +88,8 @@ export function ConversationHeaderMenu({
   onRetitle,
 }: ConversationHeaderMenuProps) {
   const confirm = useConfirm();
+  // The diff window's Open file actions use the panel's explorer root (PAN-5295 WI-5).
+  const changesRootId = useConversationChangesContext()?.rootId ?? null;
   const [deliveryMethod, setDeliveryMethod] = useState(conversation.deliveryMethod ?? 'auto');
   const [deliveryMethodSaving, setDeliveryMethodSaving] = useState(false);
 
@@ -236,7 +239,7 @@ export function ConversationHeaderMenu({
           Open in new window
         </MenuItemButton>
         {hasConversationChanges(conversation) && (
-          <MenuItemButton onClick={() => { openConversationDiffWindow(conversation, { rootId: null }); onClose(); }}>
+          <MenuItemButton onClick={() => { openConversationDiffWindow(conversation, { rootId: changesRootId }); onClose(); }}>
             <FileDiff size={14} />
             Full diff in a new window
           </MenuItemButton>
