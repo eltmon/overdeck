@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5337",
   "created": "2026-11-15T11:36:29.093Z",
-  "updated": "2026-11-15T14:53:24.455Z",
+  "updated": "2026-11-15T14:53:32.984Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,6 +112,11 @@
     "chat-doc-location-mode.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T14:53:24.455Z"
+    },
+    "markdown-tab-location": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5337",
+      "claimedAt": "2026-11-15T14:53:32.984Z"
     }
   },
   "agentModel": "claude-sonnet-5"
