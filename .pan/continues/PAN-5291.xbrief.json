@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5291",
   "created": "2026-11-15T08:32:27.661Z",
-  "updated": "2026-11-15T09:16:59.585Z",
+  "updated": "2026-11-15T09:18:26.741Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -152,9 +152,18 @@
       "doneAt": "2026-11-15T09:16:49.204Z"
     },
     "dock-chip-resync": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5291",
-      "claimedAt": "2026-11-15T09:16:59.584Z"
+      "claimedAt": "2026-11-15T09:16:59.584Z",
+      "doneAt": "2026-11-15T09:18:26.741Z"
+    },
+    "dock-chip-resync.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T09:18:26.741Z"
+    },
+    "dock-chip-resync.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T09:18:26.741Z"
     }
   }
 }
