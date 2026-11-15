@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
@@ -35,6 +35,17 @@ import { Stage } from '../index'
 import { usePanesStore, selectPanesForWorkspace, selectActivePaneId } from '../../../lib/panesStore'
 import { useTerminalStateStore } from '../../terminal/terminalStateStore'
 import { collectLeafIds, type PaneLayout } from '../../../lib/paneLayout'
+import { installWorkDockFetchMock } from '../../../test-utils/strictFetchMock'
+
+// PAN-5289: the Stage mounts the work dock, which loads the project and workspace registries.
+let workDockFetch: ReturnType<typeof installWorkDockFetchMock>
+beforeEach(() => {
+  workDockFetch = installWorkDockFetchMock()
+})
+afterEach(async () => {
+  await workDockFetch.assertNoUnexpectedRequests()
+  vi.unstubAllGlobals()
+})
 
 const DECK = 'overdeck'
 

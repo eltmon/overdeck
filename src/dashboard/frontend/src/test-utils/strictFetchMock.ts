@@ -62,3 +62,16 @@ export function installEffortDefaultFetchMock() {
     return undefined;
   });
 }
+
+/**
+ * PAN-5289: every Stage mounts the work dock, whose root context asks
+ * `GET /api/registered-projects` and `GET /api/workspace-registry`. Answers only
+ * those two requests, with no projects and no workspaces.
+ */
+export function installWorkDockFetchMock() {
+  return installStrictFetchMock(({ method, url }) => {
+    if (method === 'GET' && url === '/api/registered-projects') return Response.json([]);
+    if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+    return undefined;
+  });
+}

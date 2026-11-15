@@ -48,6 +48,7 @@ import type { StageContext, PaneWrapperProps, StageApi } from './types'
 import { StageDeckProvider, type StageDeckContextValue, type OpenBesideInput, type OpenDockInput } from './StageDeckContext'
 import { openCodePane } from '../explorer/openCodePane'
 import { useWorkDockStore } from '../dock/workDockStore'
+import { WorkDock } from '../dock/WorkDock'
 import styles from './stage.module.css'
 
 export type { StageContext, PaneWrapperProps, StageApi } from './types'
@@ -552,7 +553,7 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
     },
     [deckKey, activeId, layout, panesById, setActivePane, setLayout],
   )
-  // Writes the dock store only until the dock UI lands (PAN-5287 S-D2).
+  // The mounted WorkDock reads the store (PAN-5289).
   const openDock = useCallback((input: OpenDockInput) => {
     useWorkDockStore.getState().openDock(deckKey, input)
   }, [deckKey])
@@ -688,36 +689,39 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
   return (
     <StageDeckProvider value={deckContextValue}>
       <div className={styles.stage}>
-        <PaneBar
-          panes={displayPanes}
-          activePaneId={activePane?.paneId ?? activePaneId}
-          onSelect={handleSelectPane}
-          onClose={handleClosePane}
-          onAdd={handleAddPane}
-          newActions={newActions}
-          onPaneContextMenu={handlePaneContextMenu}
-          onTabDragStart={setDraggingPaneId}
-          onTabDragEnd={() => setDraggingPaneId(null)}
-          onTabDetach={handleTabDetach}
-        />
-        <div className={styles.paneArea}>
-          {effectiveLayout && (
-            <PaneLayoutView
-              node={effectiveLayout}
-              path={[]}
-              panesById={panesById}
-              renderPaneContent={renderPaneContent}
-              focusedPaneId={focusedPaneId}
-              showHeaders={splitActive}
-              draggingPaneId={draggingPaneId}
-              onFocus={(id) => setActivePane(deckKey, id)}
-              onCloseLeaf={closeLeaf}
-              onRatioChange={onRatioChange}
-              onDropTab={onDropTab}
-            />
-          )}
+        <div className={styles.stageMain}>
+          <PaneBar
+            panes={displayPanes}
+            activePaneId={activePane?.paneId ?? activePaneId}
+            onSelect={handleSelectPane}
+            onClose={handleClosePane}
+            onAdd={handleAddPane}
+            newActions={newActions}
+            onPaneContextMenu={handlePaneContextMenu}
+            onTabDragStart={setDraggingPaneId}
+            onTabDragEnd={() => setDraggingPaneId(null)}
+            onTabDetach={handleTabDetach}
+          />
+          <div className={styles.paneArea}>
+            {effectiveLayout && (
+              <PaneLayoutView
+                node={effectiveLayout}
+                path={[]}
+                panesById={panesById}
+                renderPaneContent={renderPaneContent}
+                focusedPaneId={focusedPaneId}
+                showHeaders={splitActive}
+                draggingPaneId={draggingPaneId}
+                onFocus={(id) => setActivePane(deckKey, id)}
+                onCloseLeaf={closeLeaf}
+                onRatioChange={onRatioChange}
+                onDropTab={onDropTab}
+              />
+            )}
+          </div>
+          {terminalOpen && <TerminalDrawer threadId={deckKey} cwd={terminalCwd} />}
         </div>
-        {terminalOpen && <TerminalDrawer threadId={deckKey} cwd={terminalCwd} />}
+        <WorkDock deckKey={deckKey} activePane={activePane} layoutLeafIds={layoutLeafIds} panesById={panesById} conversations={conversations} />
 
         {tabMenu && tabMenuConv && (
           <ConversationActionMenu

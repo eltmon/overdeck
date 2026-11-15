@@ -1,7 +1,17 @@
 /* Stage — PaneBar + pane renderer styles (PAN-1549). Ported from the
    pan-1549 mockup, retargeted onto the app's global semantic tokens. */
 
+/* The Stage is a row: the main column, then the work dock (PAN-5289 B-D2). */
 .stage {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  min-width: 0;
+  height: 100%;
+}
+
+/* PaneBar, pane area and terminal drawer. */
+.stageMain {
   flex: 1;
   display: flex;
   flex-direction: column;
