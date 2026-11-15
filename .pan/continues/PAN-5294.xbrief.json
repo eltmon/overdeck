@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5294",
+  "created": "2026-11-15T11:49:42.622Z",
+  "updated": "2026-11-15T11:49:42.622Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "pipeline-lanes": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5294",
+      "claimedAt": "2026-11-15T11:49:42.622Z"
+    }
+  }
+}
