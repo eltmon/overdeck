@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5357",
   "created": "2026-11-15T15:33:34.867Z",
-  "updated": "2026-11-15T15:41:15.206Z",
+  "updated": "2026-11-15T15:41:37.775Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,6 +34,11 @@
     "seq-write-noop.ac5": {
       "status": "completed",
       "doneAt": "2026-11-15T15:41:15.205Z"
+    },
+    "cli-write-sequence-noop": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5357",
+      "claimedAt": "2026-11-15T15:41:37.775Z"
     }
   }
 }
