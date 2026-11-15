@@ -2453,7 +2453,9 @@ resubscribes never receives a command published before it subscribed.
 - **Stream:** `pan.subscribeUiCommands` (`WS_METHODS.subscribeUiCommands`,
   payload `{}`, success `UiCommand` from `packages/contracts/src/ui-commands.ts`),
   scope `read:events`. The only command type today is `open-path`, carrying a
-  `UiOpenResolution` (`projectKey`, `rootId`, `relPath`, `kind`, `line?`, `column?`).
+  `UiOpenResolution` (`projectKey`, `deckKey`, `rootId`, `relPath`, `kind`, `line?`, `column?`).
+  `projectKey` and `rootId` use the registered key; `deckKey` is the project's name, or its key
+  when it has none (`projectDeckKey`), because the dashboard keys decks by name (PAN-5398).
 - **Route:** `POST /api/ui/open { path, line?, column?, dryRun? }`
   (`src/dashboard/server/routes/ui-open.ts`, scope `operate`) realpaths and stats
   the absolute path, maps it to an explorer root with the shared
@@ -2469,10 +2471,11 @@ resubscribes never receives a command published before it subscribed.
   record); a follower waits 750 ms and acts only when visible and no tab posted
   `{ handled: id }` on `BroadcastChannel('overdeck.ui-commands')`. Acting runs
   `openPathInDeck`, focuses the window and calls the desktop bridge's
-  `raiseWindow`.
+  `raiseWindow`. The toast and the CLI success line after an open are both
+  `uiOpenSummary(resolution)` (PAN-5398).
 - **Link:** `/open?path=…` is handled by `OpenPathHost`, which resolves with
   `dryRun: true` so other tabs do not act too, then replaces the URL with
-  `/command-deck/<project>`. `pan open` opens this link when `delivered` is 0 or
+  `/command-deck/<deckKey>`. `pan open` opens this link when `delivered` is 0 or
   with `--new-tab`.
 
 ## File explorer server (PAN-5183)
