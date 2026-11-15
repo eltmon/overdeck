@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T15:55:01.403534Z · model: claude-opus-5-5 · open: 906_
+_Last sequenced: 2026-11-15T15:57:49.262682Z · model: claude-opus-5-5 · open: 906_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -225,6 +225,7 @@ _Last sequenced: 2026-11-15T15:55:01.403534Z · model: claude-opus-5-5 · open: 
 | 217 | PAN-3186 | XS | high | ok |  |  | One configured non-git member (auricle/infra) blanks pipeline membership for the whole project the resolver claims it can answer. |
 | 218 | PAN-5370 | S | medium | ok |  |  | Workflow-redesign live-check fixes: Issues header overlap, breadcrumb clips file name, Spend fact never times out, More wraps. |
 | 219 | PAN-3185 | XS | high | ok |  |  | Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail. |
+| 219 | PAN-5371 | S | medium | ok |  |  | Simple Home headline (18) and top bar Needs-you (8) count different things; pick one rule so both agree (epic D-8). |
 | 220 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time with no production-reach check, so members read shipped while prod serves the old build. |
 | 221 | PAN-5335 | M | high | ok |  |  | Workflow redesign F follow-up: collapse handoff groups, unclipped cost, footer label, one current nav item, keep project. |
 | 221 | PAN-3130 | S | high | ok |  |  | Identifier-joined write paths have no containment assertion, so a crafted issue or agent id could redirect a canonical write. |
@@ -910,7 +911,6 @@ _Last sequenced: 2026-11-15T15:55:01.403534Z · model: claude-opus-5-5 · open: 
 | 901 | PAN-5181 | XS | low | ok |  |  | Fix shipped in PR #5179 (merged 2026-11-13); the body says it closes on merge. Verify and close. |
 | 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
 | 903 | PAN-5235 | XS | low | ok |  |  | Fix already applied: terminal-dialog toast now navigates to the agent's terminal tab. Verify and close. |
-| 904 | PAN-5280 | XS | low | ok |  |  | Record of two UI fixes made inline on main (orbiting logo, unclipped Home project menu). Verify and close. |
 
 ## Rationale detail
 
@@ -1241,11 +1241,24 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T15:55:01.403534Z",
+  "generatedAt": "2026-11-15T15:57:49.262682Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 906,
   "nodes": [
+    {
+      "issue": "PAN-5013",
+      "rank": 3,
+      "size": "S",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned.",
+      "rationale": "Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.",
+      "gate": "auto",
+      "planning": "auto"
+    },
     {
       "issue": "PAN-5337",
       "rank": 4,
@@ -1256,6 +1269,19 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "dependsOn": [],
       "why": "In pipeline: every relative link in a Markdown preview opens a 404 /conv/<file> URL instead of the linked file.",
       "rationale": "New in-pipeline bug, pinned at a freed top slot. All 93 links in a measured docs index were dead; PAN-5340 builds on its fix.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5356",
+      "rank": 4,
+      "size": "M",
+      "importance": "critical",
+      "score": 91,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Merge train re-assembles on every bookkeeping-only main commit, so batches never live long enough for CI; skip .pan/** moves.",
+      "rationale": "New critical substrate bug: it is why the approved PAN-5290/5294/5348 batch cannot land today. Keeping a live generation when main moved only through CI-ignored bookkeeping paths unblocks the merge train; ranked just below the in-pipeline pins and PAN-5013.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1273,28 +1299,15 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "planning": "auto"
     },
     {
-      "issue": "PAN-5013",
-      "rank": 3,
+      "issue": "PAN-5363",
+      "rank": 7,
       "size": "S",
-      "importance": "critical",
-      "score": 86,
+      "importance": "high",
+      "score": 70,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned.",
-      "rationale": "Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5356",
-      "rank": 4,
-      "size": "M",
-      "importance": "critical",
-      "score": 91,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Merge train re-assembles on every bookkeeping-only main commit, so batches never live long enough for CI; skip .pan/** moves.",
-      "rationale": "New critical substrate bug: it is why the approved PAN-5290/5294/5348 batch cannot land today. Keeping a live generation when main moved only through CI-ignored bookkeeping paths unblocks the merge train; ranked just below the in-pipeline pins and PAN-5013.",
+      "why": "In pipeline: merge train board Train switch flips back on after off; board cache not dropped on write, optimistic value lost.",
+      "rationale": "Back in the manifest after dropping out of the last two passes; restored with its prior node. In-pipeline bug with a file:line root cause (switch falls back to a stale 5 s server board cache after the POST settles). Placed in a free top-tier slot near PAN-5364, which edits the same ProjectTrainCard.tsx; high rather than critical because the write itself succeeds.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1325,32 +1338,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "planning": "auto"
     },
     {
-      "issue": "PAN-5364",
-      "rank": 11,
-      "size": "M",
-      "importance": "high",
-      "score": 68,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: merge train board shows a voided rebuild on top, buries the merged batch, and voided batches never age out.",
-      "rationale": "New in-pipeline bug filed 2026-11-15, confirmed against the live board: after a promote there is no hero batch, so the voided sibling sits first and the merged batch is buried among aging voided rows. Pinned beside PAN-5363 because both edit ProjectTrainCard.tsx; the rebuild churn itself is PAN-5356, which this issue explicitly leaves out of scope.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5354",
-      "rank": 12,
-      "size": "M",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Host-crash-killed work agents stay dead: deacon-lite confirms death but nothing resumes; add paced resumeCrashedWorkAgents.",
-      "rationale": "New substrate bug from the 2026-11-15 host crash: five work agents sat dead 1-2h because no code path turns a confirmed death into a resume or Needs-you item since the PAN-3917 cut. It ranks just below the in-pipeline pins because unattended recovery is a pipeline prerequisite, and the body already carries file:line root cause, a reuse-the-crash-door design, 11 ACs and named tests, so it is ready to plan.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4636",
       "rank": 10,
       "size": "S",
@@ -1364,6 +1351,19 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "planning": "auto"
     },
     {
+      "issue": "PAN-5364",
+      "rank": 11,
+      "size": "M",
+      "importance": "high",
+      "score": 68,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: merge train board shows a voided rebuild on top, buries the merged batch, and voided batches never age out.",
+      "rationale": "New in-pipeline bug filed 2026-11-15, confirmed against the live board: after a promote there is no hero batch, so the voided sibling sits first and the merged batch is buried among aging voided rows. Pinned beside PAN-5363 because both edit ProjectTrainCard.tsx; the rebuild churn itself is PAN-5356, which this issue explicitly leaves out of scope.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-4553",
       "rank": 11,
       "size": "S",
@@ -1373,6 +1373,19 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "dependsOn": [],
       "why": "Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges.",
       "rationale": "Rank unchanged; its duplicate PAN-4929 entered the pipeline with an open PR, so this issue now waits on that PR instead of being picked up separately.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5354",
+      "rank": 12,
+      "size": "M",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Host-crash-killed work agents stay dead: deacon-lite confirms death but nothing resumes; add paced resumeCrashedWorkAgents.",
+      "rationale": "New substrate bug from the 2026-11-15 host crash: five work agents sat dead 1-2h because no code path turns a confirmed death into a resume or Needs-you item since the PAN-3917 cut. It ranks just below the in-pipeline pins because unattended recovery is a pipeline prerequisite, and the body already carries file:line root cause, a reuse-the-crash-door design, 11 ACs and named tests, so it is ready to plan.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1455,28 +1468,15 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "planning": "auto"
     },
     {
-      "issue": "PAN-5347",
-      "rank": 21,
-      "size": "S",
-      "importance": "medium",
-      "score": 64,
+      "issue": "PAN-5369",
+      "rank": 18,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
       "condition": "ok",
       "dependsOn": [],
-      "why": "In pipeline: composer / menu lists no skills; add them from /api/skills/overrides under a labeled Skills group",
-      "rationale": "New in-pipeline discoverability fix: skills never reach the composer slash menu, so operators cannot find skill-only workflows. Pinned in the free rank-21 slot beside the other in-pipeline work; it reuses the existing skills route and category grouping.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5339",
-      "rank": 22,
-      "size": "S",
-      "importance": "medium",
-      "score": 64,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: conversation names, conv N forms and /conv URLs in messages become clickable links.",
-      "rationale": "New in-pipeline enhancement, pinned at the freed rank-22 slot. It is self-contained in ChatMarkdown and the existing /conv route.",
+      "why": "Dashboard main thread pinned at 100%: orphan scan re-queries SQLite for 4000 transcripts per tick; cost/usage routes never answer.",
+      "rationale": "New issue with a profiled root cause: 42% of main-thread CPU goes to an unindexed per-transcript lookup on every conversation poll tick, which starves /api/costs/summary, /api/fleet/usage and /api/health. It degrades every dashboard surface and blocks PAN-5370 item 3 from being observable, so it ranks beside the other event-loop fix PAN-4544.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1494,6 +1494,19 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "planning": "auto"
     },
     {
+      "issue": "PAN-5347",
+      "rank": 21,
+      "size": "S",
+      "importance": "medium",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: composer / menu lists no skills; add them from /api/skills/overrides under a labeled Skills group",
+      "rationale": "New in-pipeline discoverability fix: skills never reach the composer slash menu, so operators cannot find skill-only workflows. Pinned in the free rank-21 slot beside the other in-pipeline work; it reuses the existing skills route and category grouping.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-4551",
       "rank": 21,
       "size": "L",
@@ -1503,6 +1516,19 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "dependsOn": [],
       "why": "Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised",
       "rationale": "Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. PAN-4527, PAN-4531 and PAN-4540 closed on 2026-10-24, so it now waits only on PAN-4534 (in pipeline); rank holds at 14.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5339",
+      "rank": 22,
+      "size": "S",
+      "importance": "medium",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: conversation names, conv N forms and /conv URLs in messages become clickable links.",
+      "rationale": "New in-pipeline enhancement, pinned at the freed rank-22 slot. It is self-contained in ChatMarkdown and the existing /conv route.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4017,15 +4043,15 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "planning": "auto"
     },
     {
-      "issue": "PAN-5335",
-      "rank": 221,
-      "size": "M",
-      "importance": "high",
-      "score": 70,
+      "issue": "PAN-5370",
+      "rank": 218,
+      "size": "S",
+      "importance": "medium",
+      "score": 60,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Workflow redesign F follow-up: collapse handoff groups, unclipped cost, footer label, one current nav item, keep project.",
-      "rationale": "New follow-up to the merged child F of PAN-5284, placed in a freed high-tier slot; it is a prerequisite for PAN-5343.",
+      "why": "Workflow-redesign live-check fixes: Issues header overlap, breadcrumb clips file name, Spend fact never times out, More wraps.",
+      "rationale": "New child of epic PAN-5284 with four concrete UI defects and testable acceptance; placed just ahead of the epic node with its sibling children.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4043,6 +4069,19 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "planning": "auto"
     },
     {
+      "issue": "PAN-5371",
+      "rank": 219,
+      "size": "S",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Simple Home headline (18) and top bar Needs-you (8) count different things; pick one rule so both agree (epic D-8).",
+      "rationale": "New child of epic PAN-5284 with a concrete count mismatch, two stated fixes to choose in planning, and a testable acceptance; placed beside sibling PAN-5370.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3179",
       "rank": 220,
       "size": "M",
@@ -4051,6 +4090,19 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "condition": "ok",
       "dependsOn": [],
       "why": "A UAT promote is complete at merge time with no production-reach check, so members read shipped while prod serves the old build.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5335",
+      "rank": 221,
+      "size": "M",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Workflow redesign F follow-up: collapse handoff groups, unclipped cost, footer label, one current nav item, keep project.",
+      "rationale": "New follow-up to the merged child F of PAN-5284, placed in a freed high-tier slot; it is a prerequisite for PAN-5343.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6171,19 +6223,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "planning": "skip"
     },
     {
-      "issue": "PAN-5353",
-      "rank": 395,
-      "size": "S",
-      "importance": "medium",
-      "score": 56,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Send now: flush a queued message into a running Claude Code turn via the Ctrl+X Ctrl+S chord. PRD written, chord live-probed.",
-      "rationale": "New issue since the prior run: a small, self-contained conversation-view feature with a PRD and a live-probed mechanism, placed in the free rank-395 slot among medium conversation UX work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3661",
       "rank": 393,
       "size": "XS",
@@ -6206,6 +6245,19 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "why": "Dev-checkout preflight: after a git pull that adds a dep, the CLI dies with ERR_MODULE_NOT_FOUND instead of saying 'run bun install'.",
       "gate": "auto",
       "planning": "skip"
+    },
+    {
+      "issue": "PAN-5353",
+      "rank": 395,
+      "size": "S",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Send now: flush a queued message into a running Claude Code turn via the Ctrl+X Ctrl+S chord. PRD written, chord live-probed.",
+      "rationale": "New issue since the prior run: a small, self-contained conversation-view feature with a PRD and a live-probed mechanism, placed in the free rank-395 slot among medium conversation UX work.",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-3164",
@@ -6244,32 +6296,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "planning": "auto"
     },
     {
-      "issue": "PAN-5358",
-      "rank": 401,
-      "size": "M",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Curated memory facts reach agents only via a budget-cut launch index (89 of 171 dropped in dfai); add facts to per-turn relevance injection.",
-      "rationale": "New memory feature with a concrete, measured gap; placed beside the other mid-tier context-delivery work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5359",
-      "rank": 402,
-      "size": "M",
-      "importance": "medium",
-      "score": 56,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Per-turn memory injection skips project-root conversations and every Codex conversation; install the hook there and add a Codex turn path.",
-      "rationale": "New harness-coverage gap for memory injection; companion to PAN-5358, ranked right after it.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-5366",
       "rank": 400,
       "size": "M",
@@ -6285,6 +6311,19 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "planning": "auto"
     },
     {
+      "issue": "PAN-5358",
+      "rank": 401,
+      "size": "M",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Curated memory facts reach agents only via a budget-cut launch index (89 of 171 dropped in dfai); add facts to per-turn relevance injection.",
+      "rationale": "New memory feature with a concrete, measured gap; placed beside the other mid-tier context-delivery work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3944",
       "rank": 401,
       "size": "S",
@@ -6294,6 +6333,19 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "dependsOn": [],
       "why": "Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard",
       "rationale": "The root-cause fix is on main with a regression test; what is left are two optional hardening follow-ups. Needs a re-scope to those.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5359",
+      "rank": 402,
+      "size": "M",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Per-turn memory injection skips project-root conversations and every Codex conversation; install the hook there and add a Codex turn path.",
+      "rationale": "New harness-coverage gap for memory injection; companion to PAN-5358, ranked right after it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6580,6 +6632,18 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "planning": "auto"
     },
     {
+      "issue": "PAN-1673",
+      "rank": 426,
+      "size": "S",
+      "importance": "medium",
+      "score": 55,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously)",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-5349",
       "rank": 427,
       "size": "L",
@@ -6589,18 +6653,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "dependsOn": [],
       "why": "pan open <path> opens files/folders in the dashboard; opt-in OS file-manager 'Open in Overdeck'. PRD in .pan/drafts/pan-5349.md",
       "rationale": "New feature with a PRD on main: needs a server-to-browser command channel plus per-OS file-manager integrations, so it is large but self-contained; ranked with other medium features of clear value.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1673",
-      "rank": 426,
-      "size": "S",
-      "importance": "medium",
-      "score": 55,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously)",
       "gate": "auto",
       "planning": "auto"
     },
@@ -10547,19 +10599,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "planning": "interactive"
     },
     {
-      "issue": "PAN-5360",
-      "rank": 750,
-      "size": "L",
-      "importance": "low",
-      "score": 44,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Memory facts lack source, created date and supersession; add frontmatter, --supersedes, and an advisory duplicate/contradiction lint.",
-      "rationale": "New memory-governance feature; speculative LLM lint portion keeps it low, placed next to the related PAN-943 review tooling.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-962",
       "rank": 749,
       "size": "M",
@@ -10569,6 +10608,19 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "dependsOn": [],
       "why": "Post-PAN-946: vBRIEF lifecycle follow-up plan",
       "rationale": "Triage: xBRIEF already ships file-based specs/continues under .pan/; verify remaining checklist items against the write-xbrief skill. Rank held.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5360",
+      "rank": 750,
+      "size": "L",
+      "importance": "low",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Memory facts lack source, created date and supersession; add frontmatter, --supersedes, and an advisory duplicate/contradiction lint.",
+      "rationale": "New memory-governance feature; speculative LLM lint portion keeps it low, placed next to the related PAN-943 review tooling.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12476,57 +12528,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "why": "Fix already applied: terminal-dialog toast now navigates to the agent's terminal tab. Verify and close.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-5280",
-      "rank": 904,
-      "size": "XS",
-      "importance": "low",
-      "score": 8,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Record of two UI fixes made inline on main (orbiting logo, unclipped Home project menu). Verify and close.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5363",
-      "rank": 7,
-      "size": "S",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: merge train board Train switch flips back on after off; board cache not dropped on write, optimistic value lost.",
-      "rationale": "Back in the manifest after dropping out of the last two passes; restored with its prior node. In-pipeline bug with a file:line root cause (switch falls back to a stale 5 s server board cache after the POST settles). Placed in a free top-tier slot near PAN-5364, which edits the same ProjectTrainCard.tsx; high rather than critical because the write itself succeeds.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5369",
-      "rank": 18,
-      "size": "M",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Dashboard main thread pinned at 100%: orphan scan re-queries SQLite for 4000 transcripts per tick; cost/usage routes never answer.",
-      "rationale": "New issue with a profiled root cause: 42% of main-thread CPU goes to an unindexed per-transcript lookup on every conversation poll tick, which starves /api/costs/summary, /api/fleet/usage and /api/health. It degrades every dashboard surface and blocks PAN-5370 item 3 from being observable, so it ranks beside the other event-loop fix PAN-4544.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5370",
-      "rank": 218,
-      "size": "S",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Workflow-redesign live-check fixes: Issues header overlap, breadcrumb clips file name, Spend fact never times out, More wraps.",
-      "rationale": "New child of epic PAN-5284 with four concrete UI defects and testable acceptance; placed just ahead of the epic node with its sibling children.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -13803,6 +13804,13 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-5284",
+      "to": "PAN-5371",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
