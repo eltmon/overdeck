@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5292",
   "created": "2026-11-15T01:03:44.357Z",
-  "updated": "2026-11-15T01:26:46.410Z",
+  "updated": "2026-11-15T01:26:52.984Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -194,6 +194,11 @@
     "home-page-counts.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T01:26:46.410Z"
+    },
+    "topbar-assemble": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5292",
+      "claimedAt": "2026-11-15T01:26:52.984Z"
     }
   }
 }
