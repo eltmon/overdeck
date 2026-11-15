@@ -7,7 +7,20 @@ import { closeMemoryFtsDatabases, withMemoryFtsDatabase } from '../../../src/lib
 import { ensureParentDir, resolveRagRunsFile, resolveStatusFile } from '../../../src/lib/memory/paths.js';
 import { handleMemoryInjectBody, handleMemorySessionStartBody } from '../../../src/dashboard/server/routes/hooks.js';
 import { COMPLIANCE_ADVISORY_WARNING } from '../../../src/lib/compliance/advisory-warning.js';
-import { injectPromptTimeMemory, PROMPT_TIME_MEMORY_BUDGETS, type PromptTimeRagDecisionLogEntry } from '../../../src/lib/memory/injection.js';
+import {
+  injectPromptTimeMemory,
+  PROMPT_TIME_MEMORY_BUDGETS,
+  type PromptTimeMemoryCandidate,
+  type PromptTimeRagDecisionLogEntry,
+} from '../../../src/lib/memory/injection.js';
+import { renderMemoryIndexSection } from '../../../src/lib/memory/facts/render.js';
+import {
+  machineMemoryDir,
+  projectMemoryDir,
+  readMemoryFactsSync,
+  userMemoryDir,
+  writeMemoryFact,
+} from '../../../src/lib/memory/facts/store.js';
 
 // Background AI is off-by-default since PAN-1589 (cheapMode). These tests drive
 // the prompt-time query-expansion path, which only runs when the feature gate
@@ -15,6 +28,20 @@ import { injectPromptTimeMemory, PROMPT_TIME_MEMORY_BUDGETS, type PromptTimeRagD
 vi.mock('../../../src/lib/background-ai/features.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/lib/background-ai/features.js')>();
   return { ...actual, isBackgroundFeatureEnabled: () => true };
+});
+
+// PAN-5358: the default fact loader resolves the project store through
+// getProjectByKey(identity.projectId)?.primaryPath. Every other injection
+// test relies on this returning null under the temp OVERDECK_HOME (no
+// project row exists), so fact tests opt in per test by setting this ref.
+const { factProjectPathRef } = vi.hoisted(() => ({ factProjectPathRef: { current: null as string | null } }));
+vi.mock('../../../src/lib/workspaces/resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/workspaces/resolver.js')>();
+  return {
+    ...actual,
+    getProjectByKey: (key: string) =>
+      factProjectPathRef.current ? { primaryPath: factProjectPathRef.current } : actual.getProjectByKey(key),
+  };
 });
 
 let tempDir: string | null = null;
@@ -53,6 +80,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   closeMemoryFtsDatabases();
+  factProjectPathRef.current = null;
   if (originalHome === undefined) delete process.env.OVERDECK_HOME;
   else process.env.OVERDECK_HOME = originalHome;
   if (tempDir) await rm(tempDir, { recursive: true, force: true });
@@ -794,6 +822,235 @@ describe('prompt-time memory injection', () => {
       id: 'truncated-1',
       outcome: 'budget-truncated',
       reason: 'memory-context-truncated-to-budget',
+    });
+  });
+
+  describe('fact injection (PAN-5358)', () => {
+    const extractionFailed = async () =>
+      ({ status: 'dropped' as const, reason: 'extraction-failed' as const, error: new Error('no provider in test') });
+
+    function fact(overrides: { id: string; description: string; body?: string; review?: string[]; always?: boolean }) {
+      return {
+        type: 'feedback' as const,
+        title: overrides.id,
+        description: overrides.description,
+        tags: [],
+        updated: null,
+        source: null,
+        review: overrides.review ?? [],
+        body: overrides.body ?? '',
+        ...(overrides.always !== undefined ? { always: overrides.always } : {}),
+        id: overrides.id,
+      };
+    }
+
+    it('injects an omitted fact whose topic the prompt names', async () => {
+      const projectDir = await mkdtemp(join(tmpdir(), 'pan-memory-fact-project-'));
+      factProjectPathRef.current = projectDir;
+      const dir = projectMemoryDir(projectDir);
+
+      for (let i = 0; i < 300; i += 1) {
+        await writeMemoryFact(dir, 'project', fact({
+          id: `filler-fact-${String(i).padStart(3, '0')}`,
+          description: `Routine filler guidance entry number ${i} about everyday workspace housekeeping.`,
+        }));
+      }
+      await writeMemoryFact(dir, 'project', {
+        ...fact({ id: 'topic-x-fact', description: 'Explains the zyphorquartz subsystem that the prompt will name directly.' }),
+        type: 'reference',
+      });
+
+      const { facts } = readMemoryFactsSync(dir, 'project');
+      const launchIndex = renderMemoryIndexSection({ scope: 'project', dir, facts, budget: 12_000 });
+      expect(launchIndex).not.toContain('topic-x-fact');
+
+      const { result, decision } = await injectWithLog({
+        prompt: 'please explain how zyphorquartz behaves under load',
+        identity,
+        now: new Date('2026-05-16T22:30:00.000Z'),
+        id: 'fact-omitted-from-launch',
+        expansion: extractionFailed,
+      });
+
+      expect(result.context).toContain('Explains the zyphorquartz subsystem');
+      expect(decision.sources).toContainEqual(
+        expect.objectContaining({ docType: 'fact', id: 'fact:project:topic-x-fact' }),
+      );
+    });
+
+    it('cuts fact candidates to the facts budget', async () => {
+      const bigText = 'x'.repeat(2000);
+      const candidates: PromptTimeMemoryCandidate[] = [1, 2, 3].map((n) => ({
+        key: 'facts',
+        title: `Memory fact (project): feedback/big-fact-${n}`,
+        text: bigText,
+        source: {
+          id: `fact:project:big-fact-${n}`,
+          docType: 'fact',
+          scope: 'project',
+          score: 1,
+          tokens: Math.ceil(bigText.length / 4),
+        },
+      }));
+
+      const { result, decision } = await injectWithLog({
+        prompt: 'anything at all',
+        identity,
+        now: new Date('2026-05-16T22:30:00.000Z'),
+        id: 'facts-budget-1',
+        budgets: { facts: 50 },
+        loadFacts: async () => candidates,
+        expansion: extractionFailed,
+      });
+
+      expect(decision.allocations.facts).toBeLessThanOrEqual(50);
+      expect(result.status).toBe('budget-truncated');
+    });
+
+    it('logs fact hit counts and allocations in rag-runs', async () => {
+      const projectDir = await mkdtemp(join(tmpdir(), 'pan-memory-fact-rag-'));
+      factProjectPathRef.current = projectDir;
+      const dir = projectMemoryDir(projectDir);
+      await writeMemoryFact(dir, 'project', fact({
+        id: 'rag-run-fact',
+        description: 'Describes the quetzalcoatl deployment checklist for this test.',
+      }));
+
+      const result = await injectPromptTimeMemory({
+        prompt: 'what is the quetzalcoatl deployment checklist',
+        identity,
+        now: new Date('2026-05-16T22:30:00.000Z'),
+        id: 'rag-run-1',
+        expansion: extractionFailed,
+      });
+
+      expect(result.status).toBe('injected');
+      const entries = await readRagEntries();
+      const decisionEntries = entries.filter((entry: { type: string }) => entry.type === 'rag-decision');
+      expect(decisionEntries).toHaveLength(1);
+      expect(decisionEntries[0].hitCounts.facts).toBeGreaterThanOrEqual(1);
+      expect(decisionEntries[0].budgets.facts).toBe(1500);
+      expect(decisionEntries[0].allocationBytes.facts).toBeGreaterThan(0);
+    });
+
+    it('injects no facts from an empty or missing fact store', async () => {
+      await writeStatus();
+      const promptArgs = {
+        prompt: 'prompt injection memory retrieval summary',
+        identity,
+        now: new Date('2026-05-16T22:30:00.000Z'),
+        expansion: extractionFailed,
+      };
+
+      const withDefaultLoader = await injectWithLog({ ...promptArgs, id: 'empty-store-default' });
+      const withExplicitEmptyLoader = await injectWithLog({
+        ...promptArgs,
+        id: 'empty-store-explicit',
+        loadFacts: async () => [],
+      });
+
+      expect(withDefaultLoader.decision.hitCounts.facts).toBe(0);
+      expect(withDefaultLoader.result.context).toBe(withExplicitEmptyLoader.result.context);
+    });
+
+    it('excludes always facts and review-marked facts', async () => {
+      const projectDir = await mkdtemp(join(tmpdir(), 'pan-memory-fact-exclude-'));
+      factProjectPathRef.current = projectDir;
+      const dir = projectMemoryDir(projectDir);
+
+      await writeMemoryFact(dir, 'project', fact({
+        id: 'active-fact',
+        description: 'Describes the brontowidget rollback procedure in detail.',
+      }));
+      await writeMemoryFact(dir, 'project', fact({
+        id: 'always-fact',
+        description: 'Also describes the brontowidget subsystem, but is an always fact.',
+        always: true,
+      }));
+      await writeMemoryFact(dir, 'project', fact({
+        id: 'review-fact',
+        description: 'Also describes the brontowidget subsystem, but is under review.',
+        review: ['unindexed'],
+      }));
+
+      const { result } = await injectWithLog({
+        prompt: 'explain the brontowidget rollback procedure',
+        identity,
+        now: new Date('2026-05-16T22:30:00.000Z'),
+        id: 'exclude-flags-1',
+        expansion: extractionFailed,
+      });
+
+      expect(result.context).toContain('rollback procedure in detail');
+      expect(result.context).not.toContain('always fact');
+      expect(result.context).not.toContain('under review');
+    });
+
+    it('reads the project, operator and machine stores', async () => {
+      const projectDir = await mkdtemp(join(tmpdir(), 'pan-memory-fact-stores-'));
+      factProjectPathRef.current = projectDir;
+
+      await writeMemoryFact(projectMemoryDir(projectDir), 'project', fact({
+        id: 'project-store-fact',
+        description: 'Names the kaurimoth project-store topic for this test.',
+      }));
+      await writeMemoryFact(userMemoryDir(), 'user', fact({
+        id: 'operator-store-fact',
+        description: 'Names the vulpineash operator-store topic for this test.',
+      }));
+      await writeMemoryFact(machineMemoryDir(), 'machine', fact({
+        id: 'machine-store-fact',
+        description: 'Names the glimmerdock machine-store topic for this test.',
+      }));
+
+      const { decision } = await injectWithLog({
+        prompt: 'explain the kaurimoth, vulpineash and glimmerdock topics',
+        identity,
+        now: new Date('2026-05-16T22:30:00.000Z'),
+        id: 'all-stores-1',
+        expansion: extractionFailed,
+      });
+
+      expect(decision.hitCounts.facts).toBe(3);
+      const scopes = decision.sources
+        .filter((source: { docType: string }) => source.docType === 'fact')
+        .map((source: { scope: string }) => source.scope);
+      expect(new Set(scopes)).toEqual(new Set(['project', 'user', 'machine']));
+    });
+
+    it('injects the topical fact for a spawn-shaped prompt', async () => {
+      const projectDir = await mkdtemp(join(tmpdir(), 'pan-memory-fact-spawn-'));
+      factProjectPathRef.current = projectDir;
+      const dir = projectMemoryDir(projectDir);
+
+      for (let i = 0; i < 8; i += 1) {
+        await writeMemoryFact(dir, 'project', fact({
+          id: `boiler-${i}`,
+          description: 'Generic workspace orchestration notes shared by every boilerplate fact.',
+        }));
+      }
+      await writeMemoryFact(dir, 'project', fact({
+        id: 'gauntlet-fact',
+        description: 'Investigates the qzyxspecialtopic regression reported during this test.',
+      }));
+
+      const boilerplate = Array.from({ length: 300 }, (_, i) => (i % 7 === 0 ? 'workspace' : `boilerword${i}`)).join(' ');
+      const prompt = `${boilerplate}\n\nIssue: investigate the qzyxspecialtopic regression reported by the operator.`;
+
+      const { decision } = await injectWithLog({
+        prompt,
+        identity,
+        surface: 'spawn',
+        now: new Date('2026-05-16T22:30:00.000Z'),
+        id: 'spawn-shaped-1',
+        expansion: extractionFailed,
+      });
+
+      const factSources = decision.sources.filter((source: { docType: string }) => source.docType === 'fact');
+      expect(factSources.map((source: { id: string }) => source.id)).toContain('fact:project:gauntlet-fact');
+      expect(factSources.map((source: { id: string }) => source.id)).not.toEqual(
+        expect.arrayContaining([expect.stringMatching(/^fact:project:boiler-/)]),
+      );
     });
   });
 });

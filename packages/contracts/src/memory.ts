@@ -102,7 +102,7 @@ export type ResetMarker = typeof ResetMarker.Type
 
 export const RagDecisionSource = Schema.Struct({
   id: Schema.String,
-  docType: Schema.Literals(["observation", "summary", "status", "sibling", "knowledge"]),
+  docType: Schema.Literals(["observation", "summary", "status", "sibling", "knowledge", "fact"]),
   scope: Schema.String,
   score: Schema.Number,
   tokens: Schema.Number,
@@ -130,6 +130,7 @@ export const RagDecision = Schema.Struct({
     summaries: Schema.Number,
     sibling: Schema.Number,
     knowledgeIndex: Schema.Number,
+    facts: Schema.optional(Schema.Number),
   }),
   sources: Schema.Array(RagDecisionSource),
   reason: Schema.NullOr(Schema.String),
