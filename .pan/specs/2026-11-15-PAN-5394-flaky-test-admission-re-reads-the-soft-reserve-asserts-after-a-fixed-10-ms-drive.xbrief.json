@@ -4,17 +4,17 @@
     "created": "2026-11-15T20:03:37Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5394: Flaky test: admission 're-reads the soft reserve' asserts after a fixed 10 ms drive",
-    "updated": "2026-11-15T20:08:24.276Z"
+    "updated": "2026-11-15T20:22:47.616Z"
   },
   "plan": {
     "id": "pan-5394",
     "title": "Flaky test: admission 're-reads the soft reserve' asserts after a fixed 10 ms drive",
-    "status": "proposed",
+    "status": "running",
     "uid": "2e8120a7-d254-443c-aea2-dd9e0c299646",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T20:03:37Z",
-    "updated": "2026-11-15T20:08:24.276Z",
+    "updated": "2026-11-15T20:22:47.616Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5394",
@@ -253,5 +253,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
