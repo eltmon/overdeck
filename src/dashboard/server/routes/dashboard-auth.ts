@@ -435,21 +435,57 @@ const runningInContainer = existsSync('/.dockerenv');
  * a bridge IP too, and the entry Traefik appends is the one a caller cannot spoof.
  */
 export function isLoopbackPeer(request: HttpServerRequest.HttpServerRequest): boolean {
+  return localPeerKind(request) !== null;
+}
+
+/**
+ * How a local peer reached the server, or `null` for a non-local peer:
+ * `loopback` (a literal 127.0.0.1/::1 socket), `bridge` (the host-local
+ * Traefik on a Docker bridge, whose forwarded client {@link forwardedClientIsLocal}
+ * verified), or `container` (a peer on this container's own networks).
+ */
+function localPeerKind(request: HttpServerRequest.HttpServerRequest): 'loopback' | 'bridge' | 'container' | null {
   const remoteAddress = (request as { remoteAddress?: unknown }).remoteAddress;
   const raw = remoteAddress && typeof remoteAddress === 'object' && '_tag' in remoteAddress
     ? Option.getOrElse(remoteAddress as Option.Option<string>, () => '')
     : typeof remoteAddress === 'string'
       ? remoteAddress
       : '';
-  if (!raw) return false;
+  if (!raw) return null;
   // Node reports dual-stack IPv4 peers as IPv4-mapped IPv6 (::ffff:a.b.c.d).
   const addr = raw.startsWith('::ffff:') ? raw.slice('::ffff:'.length) : raw;
-  if (addr === '127.0.0.1' || addr === '::1') return true;
+  if (addr === '127.0.0.1' || addr === '::1') return 'loopback';
   const interfaces = networkInterfaces();
   if (peerIsHostLocalDockerBridge(addr, interfaces)) {
-    return forwardedClientIsLocal(request.headers as HeaderMap, interfaces);
+    return forwardedClientIsLocal(request.headers as HeaderMap, interfaces) ? 'bridge' : null;
   }
-  return runningInContainer && peerIsLocalContainerNetwork(addr, interfaces);
+  return runningInContainer && peerIsLocalContainerNetwork(addr, interfaces) ? 'container' : null;
+}
+
+/**
+ * THE answer to "is this a browser or process on this machine?" — used by the
+ * session mint and the remote request gate, so they never disagree (PAN-5344).
+ *
+ * `dashboard.require_token_mint` (set by hand, or on by itself with remote
+ * access, D-4645-12) distrusts *forwarded* requests, never local ones: a
+ * host-local reverse proxy (Tailscale Serve and cloudflared target
+ * `http://127.0.0.1:<port>`) makes a remote visitor a loopback peer carrying
+ * `X-Forwarded-For`, so under the toggle that shape is refused. Everything
+ * else that is verifiably local stays trusted whatever the toggle says:
+ *   - a loopback peer with no forwarding header (a browser on localhost:3011);
+ *   - a Docker-bridge peer whose rightmost `X-Forwarded-For` is local (a
+ *     browser on overdeck.localhost via the managed Traefik, which strips
+ *     client-sent forwarding headers and appends the peer it accepted).
+ * A Tailscale Funnel request is a public visitor and is never local.
+ */
+export function isTrustedLocalCaller(request: HttpServerRequest.HttpServerRequest): boolean {
+  const headers = request.headers as HeaderMap;
+  if (isTailscaleFunnelRequest(headers)) return false;
+  const kind = localPeerKind(request);
+  if (kind === null) return false;
+  if (!hasProxyForwardingHeader(headers)) return true;
+  if (!readRemoteAccessConfig().requireTokenMint) return true;
+  return kind === 'bridge';
 }
 
 /**
@@ -477,12 +513,10 @@ export function rejectUnauthorizedDashboardSessionMintRequest(
   // PAN-4645 NFR-2: no root credential is minted or honoured over a machine
   // channel, whatever headers it carries (H3).
   if (channel !== null) return jsonResponse({ error: 'unauthorized' }, { status: 401 });
-  // With dashboard.require_token_mint, a loopback peer is not enough: a local
-  // reverse proxy makes every remote visitor look like one (PAN-3762 D-3762-9).
-  // A Tailscale Funnel request is a public visitor, never a trusted peer (PAN-4648).
-  const peerTrusted =
-    !readRemoteAccessConfig().requireTokenMint && isLoopbackPeer(request) && !isTailscaleFunnelRequest(request.headers as HeaderMap);
-  if (!hasDashboardInternalToken(request) && !peerTrusted) {
+  // A browser on this machine always mints. With dashboard.require_token_mint
+  // a forwarded loopback request is not local: a local reverse proxy makes a
+  // remote visitor look like one (PAN-3762 D-3762-9, PAN-5344).
+  if (!hasDashboardInternalToken(request) && !isTrustedLocalCaller(request)) {
     return jsonResponse({ error: 'unauthorized' }, { status: 401 });
   }
   return null;

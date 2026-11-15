@@ -342,14 +342,15 @@ dashboard:
 
 With it on:
 
-- A browser can only get a root session by presenting the internal token (for
-  example the one-time `#overdeck_token=<token>` URL fragment, where the token is
-  the contents of `~/.overdeck/internal-token`). Being local no longer counts.
-- A local request that carries a proxy header (`X-Forwarded-For`,
-  `X-Forwarded-Host` or `Forwarded`) counts as remote, so it needs a credential.
+- A request the proxy forwarded (one that reaches the dashboard from
+  `127.0.0.1` carrying `X-Forwarded-For`, `X-Forwarded-Host` or `Forwarded`)
+  counts as remote, so it needs a credential.
+- A browser on this machine still signs in by itself, on `localhost:3011` and on
+  `overdeck.localhost`. The setting never locks you out of your own dashboard.
 
 A browser that already holds a session keeps working. A new browser behind the
-proxy needs the `#overdeck_token=` fragment or pairing. You can also turn it on
+proxy needs pairing or the one-time `#overdeck_token=<token>` URL fragment, where
+the token is the contents of `~/.overdeck/internal-token`. You can also turn it on
 in **Settings → Access Tokens → Require a token to sign in**. A Settings change
 applies at once. A hand edit of `config.yaml` needs a dashboard restart. The key
 is read only from the global `~/.overdeck/config.yaml`, never from a project
