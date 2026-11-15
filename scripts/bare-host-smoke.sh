@@ -30,6 +30,7 @@
 #
 # Exit codes: 0 every check passed, 1 a check failed, 2 setup error, 64 bad usage.
 set -u
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 
 # PAN-5176 calibration 2026-11-13 (D14: budget = max(10, min(30, 3 x highest
 # sample)), never above 30), from green runs on PR #5179:
@@ -79,6 +80,13 @@ R_IDLE_NET=''
 R_ENOENT_PASS=false
 R_TRACE_FROM=''
 R_TRACE_TO=''
+# PAN-5361: the multi-window shim. Until WI-2 lands these mirror the single
+# R_IDLE_BASELINE/R_IDLE_NEW/R_TRACE_FROM/R_TRACE_TO windows above; R_IDLE_TREE
+# stays empty until WI-3 adds the /proc snapshot.
+R_BASELINE_WINDOWS=''
+R_IDLE_WINDOWS=''
+R_IDLE_TREE=''
+R_IDLE_SPAWNER_MS=''
 
 usage() {
   cat <<'EOF'
@@ -165,110 +173,12 @@ idle_window() {
 }
 
 write_result() {
-  export R_SETUP_ERROR R_PANUP_RC R_PANUP_HEALTHY R_PANUP_PASS R_IDLE_BOOTED R_IDLE_STAYED_UP R_IDLE_BASELINE \
-    R_IDLE_NEW R_IDLE_NET R_ENOENT_PASS R_TRACE_FROM R_TRACE_TO
+  export R_SETUP_ERROR R_PANUP_RC R_PANUP_HEALTHY R_PANUP_PASS R_IDLE_BOOTED R_IDLE_STAYED_UP \
+    R_BASELINE_WINDOWS R_IDLE_WINDOWS R_IDLE_FROM R_IDLE_TO R_IDLE_TREE R_IDLE_SPAWNER_MS R_ENOENT_PASS
   R_OS="$OS_NAME" R_SUBJECT="$SUBJECT" R_BUDGET="$BUDGET" R_WINDOW="$WINDOW_SECS" R_OUT="$OUT" \
     R_FORBIDDEN_FILE="$WORK_DIR/forbidden-lines.txt" R_ENOENT_FILE="$WORK_DIR/enoent-counts.txt" \
     R_TRACE_FILE="$WORK_DIR/spawn-trace.log" R_PATH_ENTRIES="$BARE_PATH_ENTRIES" \
-    node -e '
-const fs = require("fs");
-const e = process.env;
-const readLines = (file) => { try { return fs.readFileSync(file, "utf8").split("\n").filter(Boolean); } catch { return []; } };
-const num = (value) => (value === undefined || value === "" ? null : Number(value));
-const bool = (value) => value === "true";
-const setupError = e.R_SETUP_ERROR || null;
-const repeats = readLines(e.R_ENOENT_FILE)
-  .map((line) => { const m = /^\s*(\d+)\s+(.*)$/.exec(line); return m ? { key: m[2], count: Number(m[1]) } : null; })
-  .filter((entry) => entry && entry.count >= 2);
-const net = num(e.R_IDLE_NET);
-// Diagnostic: the child_process calls Overdeck made during the idle window.
-let spawns = null;
-if (e.R_TRACE_FROM && e.R_TRACE_TO) {
-  const from = Number(e.R_TRACE_FROM), to = Number(e.R_TRACE_TO);
-  // A call is a "spawn" or "error" record; an "exit" record marks a call
-  // that already counted as failed (its shell exited 127).
-  const groups = new Map();
-  let count = 0, failed = 0, spawnErrors = 0;
-  for (const line of readLines(e.R_TRACE_FILE)) {
-    let rec; try { rec = JSON.parse(line); } catch { continue; }
-    if (!(rec.t >= from && rec.t <= to)) continue;
-    const g = groups.get(rec.program) || { program: rec.program, count: 0, failed: 0, errors: [] };
-    if (rec.event !== "exit") { count += 1; g.count += 1; }
-    if (rec.event === "error" && rec.error !== "exit 127") spawnErrors += 1;
-    if (rec.error) {
-      failed += 1; g.failed += 1;
-      if (!g.errors.includes(rec.error)) g.errors.push(rec.error);
-    }
-    groups.set(rec.program, g);
-  }
-  const top = [...groups.values()].sort((x, y) => y.count - x.count).slice(0, 10);
-  // A call that fails to spawn costs one process per bare PATH entry on
-  // macOS, so it weighs PATH_ENTRIES; every other call weighs 1.
-  const cost = count + (Number(e.R_PATH_ENTRIES) - 1) * spawnErrors;
-  spawns = { count, failed, spawnErrors, cost, top };
-}
-const window = Number(e.R_WINDOW);
-// Which number decides the idle check: the traced spawn cost on macOS, the
-// PID net elsewhere.
-const rule = e.R_OS === "darwin" ? "traced-cost" : "pid-net";
-const value = rule === "traced-cost" ? (spawns ? spawns.cost : null) : net;
-const budget = num(e.R_BUDGET);
-const idlePass = bool(e.R_IDLE_BOOTED) && bool(e.R_IDLE_STAYED_UP) && value !== null && budget !== null && value <= budget;
-const result = {
-  version: "1",
-  os: e.R_OS || null,
-  subject: e.R_SUBJECT || null,
-  panUp: { rc: num(e.R_PANUP_RC), healthy: bool(e.R_PANUP_HEALTHY), forbiddenToolLines: readLines(e.R_FORBIDDEN_FILE), pass: bool(e.R_PANUP_PASS) },
-  idle: {
-    booted: bool(e.R_IDLE_BOOTED), stayedUp: bool(e.R_IDLE_STAYED_UP), baselineNew: num(e.R_IDLE_BASELINE), idleNew: num(e.R_IDLE_NEW), net,
-    netPerSec: net === null ? null : Math.round((net / window) * 100) / 100, budget, rule, value, pass: idlePass, spawns,
-  },
-  enoent: { repeats, pass: bool(e.R_ENOENT_PASS) },
-  pass: false,
-  setupError,
-};
-result.pass = !setupError && result.panUp.pass && result.idle.pass && result.enoent.pass;
-if (e.R_OUT) {
-  fs.mkdirSync(require("path").dirname(e.R_OUT), { recursive: true });
-  fs.writeFileSync(e.R_OUT, JSON.stringify(result, null, 2) + "\n");
-}
-const show = (value) => (value === null ? "n/a" : String(value));
-const verdict = (ok) => (ok ? "PASS" : "FAIL");
-const lines = [
-  "bare-host smoke: " + (setupError ? "SETUP ERROR" : verdict(result.pass)) + " (" + show(result.os) + ", " + show(result.subject) + ")",
-];
-if (setupError) lines.push("  setup error: " + setupError);
-lines.push("  pan up:  " + verdict(result.panUp.pass) + " rc=" + show(result.panUp.rc) + " healthy=" + result.panUp.healthy + " forbidden-tool lines=" + result.panUp.forbiddenToolLines.length);
-for (const line of result.panUp.forbiddenToolLines) lines.push("           " + line);
-lines.push("  idle:    " + verdict(result.idle.pass) + " booted=" + result.idle.booted + " stayedUp=" + result.idle.stayedUp + " rule=" + rule + " value=" + show(value) + " budget=" + show(budget));
-lines.push("           PIDs: baseline=" + show(result.idle.baselineNew) + " idle=" + show(result.idle.idleNew) + " net=" + show(result.idle.net) + " (" + show(result.idle.netPerSec) + "/s)" + (rule === "pid-net" ? "" : " (reported, not asserted)"));
-if (spawns) {
-  lines.push("           Overdeck child_process calls in the idle window: " + spawns.count + " (" + spawns.failed + " failed, " + spawns.spawnErrors + " failed to spawn), traced cost " + spawns.cost);
-  for (const g of spawns.top) lines.push("             " + g.count + "x " + g.program + (g.failed ? " (" + g.failed + " failed: " + g.errors.join(", ") + ")" : ""));
-}
-lines.push("  ENOENT:  " + verdict(result.enoent.pass) + " repeats=" + repeats.length);
-for (const r of repeats) lines.push("           " + r.count + "x " + r.key);
-lines.push("  result:  " + (e.R_OUT || "not written"));
-console.log(lines.join("\n"));
-if (e.GITHUB_STEP_SUMMARY) {
-  const md = [
-    "### Bare-host smoke (" + show(result.os) + "): " + (setupError ? "setup error" : verdict(result.pass)),
-    "",
-    "| Check | Result | Detail |",
-    "| --- | --- | --- |",
-    "| pan up | " + verdict(result.panUp.pass) + " | rc " + show(result.panUp.rc) + ", healthy " + result.panUp.healthy + ", " + result.panUp.forbiddenToolLines.length + " forbidden-tool lines |",
-    "| Idle (" + rule + ") | " + verdict(result.idle.pass) + " | " + show(value) + " per " + window + " s, budget " + show(budget) + " |",
-    "| Idle new PIDs | " + (rule === "pid-net" ? verdict(result.idle.pass) : "info") + " | net " + show(result.idle.net) + " per " + window + " s (" + show(result.idle.netPerSec) + "/s) |",
-    "| Overdeck spawns (idle window) | info | " + (spawns ? spawns.count + " calls, " + spawns.failed + " failed" + (spawns.top.length ? "; top: " + spawns.top.slice(0, 5).map((g) => g.count + "x " + g.program + (g.failed ? " (" + g.failed + " failed)" : "")).join(", ") : "") : "n/a") + " |",
-    "| ENOENT repeats | " + verdict(result.enoent.pass) + " | " + repeats.length + " repeated |",
-    "",
-    "Subject: `" + show(result.subject) + "`" + (setupError ? ". Setup error: " + setupError : ""),
-    "",
-  ];
-  fs.appendFileSync(e.GITHUB_STEP_SUMMARY, md.join("\n") + "\n");
-}
-process.exit(result.pass ? 0 : 1);
-'
+    node "$SCRIPT_DIR/bare-host-smoke/result.mjs"
 }
 
 die_setup() {
@@ -573,6 +483,7 @@ measure_idle() {
   sample_churn
   echo "== baseline window (${WINDOW_SECS} s, no Overdeck process)"
   R_IDLE_BASELINE=$(window_count)
+  R_BASELINE_WINDOWS="$R_IDLE_BASELINE"
   echo "baseline new PIDs: $R_IDLE_BASELINE"
 
   echo "== dashboard server idle window"
@@ -591,6 +502,9 @@ measure_idle() {
     sleep "$SETTLE_SECS"
     idle_window
     R_IDLE_NET=$((R_IDLE_NEW - R_IDLE_BASELINE))
+    R_IDLE_WINDOWS="$R_IDLE_NEW"
+    R_IDLE_FROM="$R_TRACE_FROM"
+    R_IDLE_TO="$R_TRACE_TO"
     echo "idle new PIDs: $R_IDLE_NEW, net $R_IDLE_NET (the verdict is in the summary below)"
     # A dashboard that died during the window spawns nothing, so an empty
     # trace would pass: it must still be running and healthy afterwards.
