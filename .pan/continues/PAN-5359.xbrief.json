@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5359",
   "created": "2026-11-15T15:42:47.790Z",
-  "updated": "2026-11-15T16:07:20.924Z",
+  "updated": "2026-11-15T16:07:34.834Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "conversation-identity.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T16:07:20.923Z"
+    },
+    "main-workspace-backfill": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5359",
+      "claimedAt": "2026-11-15T16:07:34.833Z"
     }
   }
 }
