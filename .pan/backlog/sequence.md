@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T14:18:29.960806Z · model: claude-opus-5-5 · open: 895_
+_Last sequenced: 2026-11-15T14:20:45.072976Z · model: claude-opus-5-5 · open: 896_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -401,6 +401,7 @@ _Last sequenced: 2026-11-15T14:18:29.960806Z · model: claude-opus-5-5 · open: 
 | 392 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
 | 393 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
 | 394 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
+| 395 | PAN-5353 | S | medium | ok |  |  | Send now: flush a queued message into a running Claude Code turn via the Ctrl+X Ctrl+S chord. PRD written, chord live-probed. |
 | 396 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
 | 397 | PAN-2069 | XS | medium | ok |  |  | caveman: follow-up gaps |
 | 398 | PAN-1918 | XS | medium | ok |  |  | full frontend vitest suite runs in no CI path |
@@ -1230,10 +1231,10 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T14:18:29.960806Z",
+  "generatedAt": "2026-11-15T14:20:45.072976Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 895,
+  "openCount": 896,
   "nodes": [
     {
       "issue": "PAN-5290",
@@ -12369,6 +12370,19 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
       "dependsOn": [],
       "why": "In pipeline: composer / menu lists no skills; add them from /api/skills/overrides under a labeled Skills group",
       "rationale": "New in-pipeline discoverability fix: skills never reach the composer slash menu, so operators cannot find skill-only workflows. Pinned in the free rank-21 slot beside the other in-pipeline work; it reuses the existing skills route and category grouping.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5353",
+      "rank": 395,
+      "size": "S",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Send now: flush a queued message into a running Claude Code turn via the Ctrl+X Ctrl+S chord. PRD written, chord live-probed.",
+      "rationale": "New issue since the prior run: a small, self-contained conversation-view feature with a PRD and a live-probed mechanism, placed in the free rank-395 slot among medium conversation UX work.",
       "gate": "auto",
       "planning": "auto"
     }
