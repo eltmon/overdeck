@@ -101,6 +101,7 @@ export function useSkillSlashCommands({ harness, context, active }: UseSkillSlas
   const enabled = key !== '' && getHarnessBehavior(harness).capabilities.skillSlashCommands;
   const [commands, setCommands] = useState<readonly SlashCommand[]>(EMPTY_SKILL_COMMANDS);
   const wasActiveRef = useRef(false);
+  const warnedRef = useRef(false);
 
   useEffect(() => {
     setCommands(EMPTY_SKILL_COMMANDS);
@@ -120,7 +121,9 @@ export function useSkillSlashCommands({ harness, context, active }: UseSkillSlas
       .then(setCommands)
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
-        console.warn('[skillSlashCommands] failed to fetch skill commands', error);
+        if (warnedRef.current) return;
+        warnedRef.current = true;
+        console.warn('[skillSlashCommands] skills unavailable:', error);
       });
     return () => controller.abort();
     // `context` is intentionally omitted: `key` already encodes its value.

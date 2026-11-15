@@ -114,6 +114,14 @@ describe('useSkillSlashCommands (PAN-5347)', () => {
     await act(async () => {});
 
     expect(result.current).toBe(EMPTY_SKILL_COMMANDS);
-    expect(warn).toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledTimes(1);
+
+    // A second failed fetch (menu closed and reopened) warns no further.
+    rerender({ active: false });
+    rerender({ active: true });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await act(async () => {});
+
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 });
