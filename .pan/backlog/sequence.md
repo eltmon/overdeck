@@ -1,14 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T21:03:35.057965Z · model: claude-opus-5-5 · open: 898_
+_Last sequenced: 2026-11-15T22:57:10.199155Z · model: claude-opus-5-5 · open: 896_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-5396 | S | critical | ok |  |  | In pipeline: post-merge pause/close skipped when verifying_on_main transition throws; merged issues keep live agents. |
-| 2 | PAN-5395 | S | critical | ok |  |  | In pipeline: single-repo workspaces read untracked Overdeck sync output as dirty, so work agents are refused and never start. |
+| 1 | PAN-5401 | S | critical | ok |  |  | In pipeline: close-out DoD row 1 reads only reviewDecision, rejecting comment verdicts the merge door accepts. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
-| 4 | PAN-5394 | XS | high | ok |  |  | Fixed by PR #5397 (merged 20:46Z) and closed out at 21:02Z; no work left, drops off on the next run. |
 | 5 | PAN-5398 | S | medium | ok |  |  | In pipeline: pan open uses the project key as deck key, opening a phantom deck where key differs from name. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
@@ -906,21 +904,13 @@ _Last sequenced: 2026-11-15T21:03:35.057965Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
-### PAN-5396 (rank 1)
+### PAN-5401 (rank 1)
 
-New in-pipeline substrate bug: a throw in the post-merge lifecycle leaves work agents alive after merge and blocks close-out; pinned into the rank freed by closed PAN-5392.
-
-### PAN-5395 (rank 2)
-
-New since the prior run and already in the pipeline, so it is pinned near the top; it blocks work-agent starts in every single-repo project that does not gitignore all sync paths, which makes it a critical substrate fix.
+New in-pipeline substrate bug: the merge door and close-out disagree on the same review, so comment-posted verdicts force a manual --accept-review override; pinned into the rank freed by closed PAN-5396.
 
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
-
-### PAN-5394 (rank 4)
-
-Its PR #5397 merged and the close-out ceremony closed the issue after the manifest snapshot, so it is no longer in the pipeline; rank kept so pinned neighbours do not shift.
 
 ### PAN-5398 (rank 5)
 
@@ -1226,6 +1216,14 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
 
 Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.
 
+### PAN-5330 (rank 83)
+
+New substrate bug placed in a freed high-tier slot. With several workspace stacks up, browser checks hit the wrong backend and flake, which corrupts verification.
+
+### PAN-3234 (rank 84)
+
+Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1233,34 +1231,21 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T21:03:35.057965Z",
+  "generatedAt": "2026-11-15T22:57:10.199155Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 898,
+  "openCount": 896,
   "nodes": [
     {
-      "issue": "PAN-5396",
+      "issue": "PAN-5401",
       "rank": 1,
       "size": "S",
       "importance": "critical",
-      "score": 88,
+      "score": 86,
       "condition": "ok",
       "dependsOn": [],
-      "why": "In pipeline: post-merge pause/close skipped when verifying_on_main transition throws; merged issues keep live agents.",
-      "rationale": "New in-pipeline substrate bug: a throw in the post-merge lifecycle leaves work agents alive after merge and blocks close-out; pinned into the rank freed by closed PAN-5392.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5395",
-      "rank": 2,
-      "size": "S",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: single-repo workspaces read untracked Overdeck sync output as dirty, so work agents are refused and never start.",
-      "rationale": "New since the prior run and already in the pipeline, so it is pinned near the top; it blocks work-agent starts in every single-repo project that does not gitignore all sync paths, which makes it a critical substrate fix.",
+      "why": "In pipeline: close-out DoD row 1 reads only reviewDecision, rejecting comment verdicts the merge door accepts.",
+      "rationale": "New in-pipeline substrate bug: the merge door and close-out disagree on the same review, so comment-posted verdicts force a manual --accept-review override; pinned into the rank freed by closed PAN-5396.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1274,19 +1259,6 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "dependsOn": [],
       "why": "Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned.",
       "rationale": "Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5394",
-      "rank": 4,
-      "size": "XS",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fixed by PR #5397 (merged 20:46Z) and closed out at 21:02Z; no work left, drops off on the next run.",
-      "rationale": "Its PR #5397 merged and the close-out ceremony closed the issue after the manifest snapshot, so it is no longer in the pipeline; rank kept so pinned neighbours do not shift.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13559,6 +13531,13 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-5401",
+      "to": "PAN-4547",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     },
     {
       "from": "PAN-750",
