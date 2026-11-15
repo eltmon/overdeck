@@ -104,26 +104,29 @@ describe('listOpenPullRequestsForProject — GitLab (PAN-4597)', () => {
   });
 
   it('reads the merge request listing instead of gh', async () => {
-    mocks.execFileAsync.mockImplementation((file: string) => {
+    // PAN-5320: the listing reads every open page, then the newest merged
+    // page; GitLab answers each by its `state` filter.
+    const openRows = [
+      {
+        iid: 20, web_url: 'https://gitlab.com/group/repo/-/merge_requests/20', state: 'opened',
+        source_branch: 'feature/pan-20', draft: false, detailed_merge_status: 'mergeable',
+        approved: true, sha: 'e'.repeat(40),
+      },
+      {
+        iid: 21, web_url: 'https://gitlab.com/group/repo/-/merge_requests/21', state: 'opened',
+        source_branch: 'feature/pan-21', draft: true, sha: 'f'.repeat(40),
+      },
+    ];
+    const mergedRows = [
+      {
+        iid: 22, web_url: 'https://gitlab.com/group/repo/-/merge_requests/22', state: 'merged',
+        source_branch: 'feature/pan-22', sha: 'g'.repeat(40),
+      },
+    ];
+    mocks.execFileAsync.mockImplementation((file: string, args: string[]) => {
       if (file === 'glab') {
-        return Promise.resolve({
-          stdout: JSON.stringify([
-            {
-              iid: 20, web_url: 'https://gitlab.com/group/repo/-/merge_requests/20', state: 'opened',
-              source_branch: 'feature/pan-20', draft: false, detailed_merge_status: 'mergeable',
-              approved: true, sha: 'e'.repeat(40),
-            },
-            {
-              iid: 21, web_url: 'https://gitlab.com/group/repo/-/merge_requests/21', state: 'opened',
-              source_branch: 'feature/pan-21', draft: true, sha: 'f'.repeat(40),
-            },
-            {
-              iid: 22, web_url: 'https://gitlab.com/group/repo/-/merge_requests/22', state: 'merged',
-              source_branch: 'feature/pan-22', sha: 'g'.repeat(40),
-            },
-          ]),
-          stderr: '',
-        });
+        const rows = args[1]?.includes('state=opened') ? openRows : args[1]?.includes('state=merged') ? mergedRows : [];
+        return Promise.resolve({ stdout: JSON.stringify(rows), stderr: '' });
       }
       throw new Error(`unexpected exec: ${file}`);
     });
@@ -135,5 +138,9 @@ describe('listOpenPullRequestsForProject — GitLab (PAN-4597)', () => {
     ]);
     // The gitlab path never touches gh — the merge request listing is read instead.
     expect(mocks.runGh).not.toHaveBeenCalled();
+    expect(mocks.execFileAsync.mock.calls.filter(([file]) => file === 'glab').map(([, args]) => (args as string[])[1])).toEqual([
+      'projects/:id/merge_requests?state=opened&per_page=100&page=1',
+      'projects/:id/merge_requests?state=merged&order_by=updated_at&per_page=100',
+    ]);
   });
 });
