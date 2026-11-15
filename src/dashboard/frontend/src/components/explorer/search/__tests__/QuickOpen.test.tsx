@@ -19,12 +19,17 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-function renderQuickOpen() {
+function renderQuickOpen(extra: { changedPaths?: ReadonlySet<string>; onReveal?: (path: string) => void } = {}) {
   const onPick = vi.fn()
   const onClose = vi.fn()
-  render(<QuickOpen rootId="issue:PAN-1" open onPick={onPick} onClose={onClose} />)
+  render(<QuickOpen rootId="issue:PAN-1" open onPick={onPick} onClose={onClose} {...extra} />)
   return { onPick, onClose, input: screen.getByRole('combobox') }
 }
+
+/** The option rows, by their full text. */
+const rowTexts = () => screen.getAllByRole('option').map((o) => o.textContent)
+/** An element whose own text content (marks included) is exactly `text`. */
+const byWholeText = (text: string) => screen.getByText((_, el) => el?.tagName === 'SPAN' && el.textContent === text)
 
 const type = (input: HTMLElement, value: string) => fireEvent.change(input, { target: { value } })
 
@@ -39,7 +44,7 @@ describe('QuickOpen', () => {
     expect(rpc.searchFiles).not.toHaveBeenCalled()
     await act(() => vi.advanceTimersByTimeAsync(1))
     expect(rpc.searchFiles).toHaveBeenCalledTimes(1)
-    expect(rpc.searchFiles).toHaveBeenCalledWith('issue:PAN-1', 'ws-rpc', 50)
+    expect(rpc.searchFiles).toHaveBeenCalledWith('issue:PAN-1', 'ws-rpc', 200)
   })
 
   it('sends nothing for an empty query', async () => {
@@ -55,8 +60,8 @@ describe('QuickOpen', () => {
     const { input, onPick, onClose } = renderQuickOpen()
     type(input, 'ws-rpc')
     await act(() => vi.advanceTimersByTimeAsync(120))
-    expect(screen.getByText('ws-rpc.ts')).toBeInTheDocument()
-    expect(screen.getByText('src/dashboard/server')).toBeInTheDocument()
+    expect(byWholeText('ws-rpc.ts')).toBeInTheDocument()
+    expect(byWholeText('src/dashboard/server')).toBeInTheDocument()
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(onPick).toHaveBeenCalledWith('src/dashboard/server/ws-rpc.ts')
     expect(onClose).toHaveBeenCalled()
@@ -75,8 +80,7 @@ describe('QuickOpen', () => {
       pending[1]({ paths: ['new.ts'] })
       pending[0]({ paths: ['old.ts'] })
     })
-    expect(screen.getByText('new.ts')).toBeInTheDocument()
-    expect(screen.queryByText('old.ts')).toBeNull()
+    expect(rowTexts()).toEqual(['new.ts'])
   })
 
   it('drops the old results as soon as the query changes', async () => {
@@ -85,9 +89,9 @@ describe('QuickOpen', () => {
     const { input, onPick } = renderQuickOpen()
     type(input, 'foo')
     await act(() => vi.advanceTimersByTimeAsync(120))
-    expect(screen.getByText('foo.ts')).toBeInTheDocument()
+    expect(rowTexts()).toEqual(['foo.tssrc'])
     type(input, 'bar')
-    expect(screen.queryByText('foo.ts')).toBeNull()
+    expect(screen.queryAllByRole('option')).toHaveLength(0)
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(onPick).not.toHaveBeenCalled()
   })
@@ -96,5 +100,42 @@ describe('QuickOpen', () => {
     const { input, onClose } = renderQuickOpen()
     fireEvent.keyDown(input, { key: 'Escape' })
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('asks for 200 paths and shows at most 50', async () => {
+    rpc.searchFiles.mockResolvedValue({ paths: Array.from({ length: 200 }, (_, i) => `src/foo${i}.ts`) })
+    const { input } = renderQuickOpen()
+    type(input, 'foo')
+    await act(() => vi.advanceTimersByTimeAsync(120))
+    expect(rpc.searchFiles).toHaveBeenCalledWith('issue:PAN-1', 'foo', 200)
+    expect(screen.getAllByRole('option')).toHaveLength(50)
+  })
+
+  it('marks the matched text and ranks a changed path first in its tier with a tag (PAN-5289)', async () => {
+    rpc.searchFiles.mockResolvedValue({ paths: ['a/foo.ts', 'b/foo.ts', 'c/myfoo.ts'] })
+    const { input } = renderQuickOpen({ changedPaths: new Set(['b/foo.ts', 'c/myfoo.ts']) })
+    type(input, 'foo')
+    await act(() => vi.advanceTimersByTimeAsync(120))
+    const options = screen.getAllByRole('option')
+    // Both foo.ts are tier 1 (b changed, so first); myfoo.ts is tier 2 even though changed.
+    expect(options.map((o) => o.getAttribute('data-value'))).toEqual(['b/foo.ts', 'a/foo.ts', 'c/myfoo.ts'])
+    expect(options[0].querySelector('mark')).toHaveTextContent('foo')
+    expect(options[0]).toHaveTextContent('changed here')
+    expect(options[1]).not.toHaveTextContent('changed here')
+    expect(screen.getByText(/Shift Enter reveal in files/)).toBeInTheDocument()
+  })
+
+  it('reveals on Shift+Enter and opens on Enter', async () => {
+    rpc.searchFiles.mockResolvedValue({ paths: ['src/foo.ts', 'lib/foo.ts'] })
+    const onReveal = vi.fn()
+    const { input, onPick, onClose } = renderQuickOpen({ onReveal })
+    type(input, 'foo')
+    await act(() => vi.advanceTimersByTimeAsync(120))
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: true })
+    expect(onReveal).toHaveBeenCalledWith('src/foo.ts')
+    expect(onPick).not.toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalled()
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onPick).toHaveBeenCalledWith('src/foo.ts')
   })
 })
