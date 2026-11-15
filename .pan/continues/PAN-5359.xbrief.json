@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5359",
   "created": "2026-11-15T15:42:47.790Z",
-  "updated": "2026-11-15T17:09:56.467Z",
+  "updated": "2026-11-15T17:11:54.648Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,9 +120,14 @@
       "doneAt": "2026-11-15T17:09:49.150Z"
     },
     "claude-registration-test": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5359",
-      "claimedAt": "2026-11-15T17:09:56.466Z"
+      "claimedAt": "2026-11-15T17:09:56.466Z",
+      "doneAt": "2026-11-15T17:11:54.648Z"
+    },
+    "claude-registration-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T17:11:54.648Z"
     }
   }
 }
