@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5347",
   "created": "2026-11-15T13:35:45.395Z",
-  "updated": "2026-11-15T14:39:16.079Z",
+  "updated": "2026-11-15T14:39:17.224Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -160,6 +160,9 @@
       "doneAt": "2026-11-15T14:23:00.630Z"
     },
     "frontend-footer-conversation-prop.ac3": {
+      "status": "cancelled"
+    },
+    "frontend-footer-conversation-prop.ac4": {
       "status": "cancelled"
     }
   }
