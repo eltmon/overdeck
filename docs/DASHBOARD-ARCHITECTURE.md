@@ -1801,10 +1801,15 @@ Nothing renders the dock until child B builds it.
 ### Dock store
 
 `components/dock/workDockStore.ts` holds per-deck dock state: `open`, `tab`
-(`files`, `changes` or `search`), `width`, and the transient `reveal`, `diff`,
-`changesScope` and `rootOverride`. Only `open`, `tab` and `width` persist, as
-JSON under `localStorage` key `overdeck.dock.<deckKey>`. Width is clamped to
-260–720 px (default 340). A corrupt stored field falls back to its default.
+(`files`, `changes`, `search` or `live`), `width`, and the transient `reveal`,
+`diff` (with `diffList`, the list it was opened from), `changesScope`,
+`searchPath` (Find in folder), `openSeq` (counts `openDock` calls, so the
+Search tab refocuses on a repeat open), `quickOpen` (Go to file, shared by the
+Stage + menu and the dock) and `rootOverride` with its `rootOverrideAnchor`
+pane. `toggleTab(deck, tab)` closes the dock when it is open on that tab and
+opens it there otherwise. Only `open`, `tab` and `width` persist, as JSON under
+`localStorage` key `overdeck.dock.<deckKey>`. Width is clamped to 260–720 px
+(default 340). A corrupt stored field falls back to its default.
 
 ### Explorer root of a conversation
 
@@ -2054,6 +2059,82 @@ body. The body scan exists because GitHub squash merges move each
 sub-commit's trailers into the body and leave only `Co-authored-by:` lines in
 the final paragraph. Without a match the commit is `unattributed`.
 
+## Work dock (PAN-5289)
+
+The work dock is the right column of the Stage: `.stage` is a row of
+`.stageMain` (PaneBar, pane area, terminal drawer) and `<WorkDock>`
+(`components/dock/WorkDock.tsx`), full Stage height. It has the tabs Files,
+Changes, Search and Live; Live renders only when it has items. Closed, it is a
+0-width element, so its shortcuts and Go to file still work. `dock/*` never
+imports `Stage/index.tsx`; it reaches the deck through `useStageDeck()`, and
+every file it opens goes through `openBeside`.
+
+### Dock scope
+
+`deriveDockScope` (`components/dock/dockScope.ts`, pure) maps the active pane
+to the dock root, the Changes source and the scope-line header. First match
+wins:
+
+1. A `rootOverride` whose `rootOverrideAnchor` is unset or is the active pane
+   id. The override belongs to the tab that was active when it was set; nothing
+   clears it on a tab change, and **Follow tab** clears it.
+2. An agent pane bound to a known conversation: `rootIdForConversation`; a
+   `null` root gives the reason `linked` or `outside`.
+3. A pipeline-session agent pane (`agentId` + `issueId`): `issue:<ID>`.
+4. An issue pane: `issue:<ID>`.
+5. A code pane: its root and file (`revealPath`); Changes follows the first
+   conversation leaf of the layout, else the root kind.
+6. Anything else: the deck's project root, found by key or name
+   (`findRegisteredProject`), or `no-project`.
+
+### Data sources
+
+Conversation paths are repo paths; `toRootPath` maps them to root paths before
+any explorer call, dot, filter or reveal.
+
+| Changes source | File list | Diff of a committed file | Diff of an uncommitted file |
+|---|---|---|---|
+| `conversation` (chips This conversation, Last turn, Not committed) | `GET /api/conversations/:name/changes?scope=conversation\|turn\|uncommitted` | `GET /api/diffs/compare?repo=<repoRoot>&base=<sha>^&head=<sha>&file=<repo path>` | explorer `readFile` of HEAD and the working copy, diffed with `parseDiffFromFile` |
+| `conversation` (chip All of main today) | `…/changes?scope=main` | same compare call | — |
+| `root` (issue or edit workspace) | explorer `gitStatus`: entries → "Not committed yet", committed → "Committed on <branch>" | issue root: `GET /api/agents/<agentId>/diffs/vs-main?file=` | `readFile` × 2 |
+| `project-main` | `GET /api/projects/:projectKey/changes?since=<local midnight>`; a commit's files from compare | compare with `&file=` | `readFile` × 2 |
+
+`useConversationChanges` polls every 5 s only while the conversation is
+working and refetches on explorer watch batches; it subscribes only while its
+query is enabled. `useScopeChangedPaths` turns the scope=conversation answer
+into the changed-here set (tree dots, the "Only what this conversation changed"
+filter, Search dots, Go to file ranking).
+
+### activeDock and shortcuts
+
+The mounted dock publishes `{ deckKey, activePaneId, rootId, changedPaths,
+openFile, revealFile }` in `components/dock/activeDock.ts` and clears it on
+unmount (only while it still holds its deck). The `Ctrl K` palette, mounted
+outside every Stage, reads it in `palette/fileProvider.ts` for its Files scope.
+The dock registers `dock.files` (⌘⇧E / Ctrl+Shift+E), `dock.changes`
+(⌘⇧G / Ctrl+Shift+G), `explorer.content-search` (⌘⇧F / Ctrl+Shift+F) and
+`explorer.quick-open` (⌘P / Ctrl+P) as `global` registry shortcuts, which win
+over Monaco; the diff view registers `dock.diff-next` (`J`) and
+`dock.diff-prev` (`K`) as `not-editing` shortcuts.
+
+### Go to file ranking
+
+`fileMatchTier` (server `services/explorer/search.ts`, client
+`explorer/search/fileMatch.ts`, one JSON case table for both) ranks a path
+for a query, first true wins, with `q` the trimmed lowercased query and `base`
+the text after the last `/`:
+
+| Tier | Condition |
+|---|---|
+| 0 | `q` has no `/` and `base === q` |
+| 1 | `q` has no `/` and `base` starts with `q` |
+| 2 | `q` has no `/` and `base` contains `q` |
+| 3 | the path contains `q` |
+| 4 | `fuzzyScore` matches |
+
+`searchFiles` sorts by tier, then path length (tiers 0–3) or fuzzy score
+(tier 4). The client stable-sorts by tier, then files changed here first.
+
 ## File explorer server (PAN-5183)
 
 The file explorer's server half lives in `src/dashboard/server/services/explorer/`
@@ -2211,13 +2292,14 @@ ported file since its port. The license texts are in `licenses/`, and
 
 ### Explorer pane, tree and search (PAN-5186)
 
-The Stage `'files'` pane is the explorer. It is keyed by `explorerRootId`, not
-by issue: the project home's **Files** button opens it on `project:<key>` (the
-project checkout), and an issue tab's **Files** button opens it on
-`issue:<ID>`. `addPane` keeps at most one explorer pane per `(deck, root)`.
-A legacy `files` pane persisted before this change migrates on deck load: one
-with an `issueId` gets `explorerRootId: issue:<ID>`, and one with neither field
-is closed. `FilesPane` is gone. Its job, the agent's changed files, is the
+The explorer is the work dock's Files tab (PAN-5289): `ExplorerFiles` in
+`explorer/ExplorerPane.tsx`, rendered by `dock/FilesTab.tsx` for the dock root.
+The project home's and the issue overview's **Files** buttons open the dock,
+which follows the active tab. A `files` pane persisted before PAN-5289 is closed
+on deck load; the last one with a root (`explorerRootId`, or `issue:<ID>` for a
+legacy pane) becomes the dock's `rootOverride`, anchored to the pane active
+after the closes, and the dock opens on Files. `PaneType` keeps `'files'` as
+migration input only. `FilesPane` is gone. Its job, the agent's changed files, is the
 explorer's **Changed** filter, which renders a tree synthesized from
 `explorerGitStatus` (working tree plus the branch's commits), so a deleted file
 still shows.
