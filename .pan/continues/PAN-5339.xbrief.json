@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5339",
   "created": "2026-11-15T11:44:33.269Z",
-  "updated": "2026-11-15T14:46:00.693Z",
+  "updated": "2026-11-15T14:46:09.713Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,6 +76,11 @@
     "resolution-hook.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T14:46:00.692Z"
+    },
+    "remark-plugin": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5339",
+      "claimedAt": "2026-11-15T14:46:09.713Z"
     }
   },
   "agentModel": "claude-sonnet-5"
