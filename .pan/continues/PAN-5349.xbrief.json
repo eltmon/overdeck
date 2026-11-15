@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-5349",
   "created": "2026-11-15T15:32:54.289Z",
-  "updated": "2026-11-15T17:39:59.979Z",
+  "updated": "2026-11-15T18:17:47.445Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-15T18:17Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-15T18:17:47.444Z"
+    }
+  ],
   "items": {
     "path-root": {
       "status": "completed",
@@ -387,5 +393,14 @@
       "status": "completed",
       "doneAt": "2026-11-15T17:39:59.978Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-15T18:17:47Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5349\n\nPull request: https://github.com/eltmon/overdeck/pull/5382 (head `7229f663`)\n\nSource: check_run:test-shard (2/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (2/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/132907499892/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/43745408791/job/132907499892  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/telemetry-docs.test.ts\u001b[2m > \u001b[22mtelemetry documentation\u001b[2m > \u001b[22mkeeps every event, property, and allowed value domain in exact contract sync\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/telemetry-docs.test.ts\u001b[2m > \u001b[22mtelemetry documentation\u001b[2m > \u001b[22mkeeps every event, property, and allowed value domain in exact contract sync\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected { events: { …(29) }, …(1) } to deeply equal { events: { …(29) }, …(1) }\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[33m@@ -235,11 +235,10 @@\u001b[39m\n\u001b[2m        \"/api/self/workers\",\u001b[22m\n\u001b[2m        \"/api/self/workers/:id\",\u001b[22m\n\u001b[2m        \"/api/self/workers/:id/wait\",\u001b[22m\n\u001b[2m        \"/api/settings/resolved\",\u001b[22m\n\u001b[2m        \"/api/telemetry/client-config\",\u001b[22m\n\u001b[32m-       \"/api/ui/open\",\u001b[39m\n\u001b[2m        \"/api/versions/self\",\u001b[22m\n\u001b[2m        \"/api/versions/self/update\",\u001b[22m\n\u001b[2m        \"/api/workers\",\u001b[22m\n\u001b[2m        \"/api/workers/:id/status\",\u001b[22m\n\u001b[2m        \"/api/workers/:id/stop\",\u001b[22m\n\u001b[33m@@ -353,11 +352,10 @@\u001b[39m\n\u001b[2m        \"tiered\",\u001b[22m\n\u001b[2m        \"tracker-status\",\u001b[22m\n\u001b[2m        \"trackers\",\u001b[22m\n\u001b[2m        \"triggers\",\u001b[22m\n\u001b[2m        \"tts\",\u001b[22m\n\u001b[32m-       \"ui\",\u001b[39m\n\u001b[2m        \"update\",\u001b[22m\n\u001b[2m        \"vault\",\u001b[22m\n\u001b[2m        \"velocity\",\u001b[22m\n\u001b[2m        \"version\",\u001b[22m\n\u001b[2m        \"versions\",\u001b[22m\n\n\u001b[36m \u001b[2m❯\u001b[22m tests/unit/telemetry-docs.test.ts:\u001b[2m74:36\u001b[22m\u001b[39m\n    \u001b[90m 72|\u001b[39m\n    \u001b[90m 73|\u001b[39m   it('keeps every event, property, and allowed value domain in exact c…\n    \u001b[90m 74|\u001b[39m     \u001b[34mexpect\u001b[39m(\u001b[34mcatalogDrift\u001b[39m(markdown))\u001b[33m.\u001b[39m\u001b[34mtoEqual\u001b[39m({\n    \u001b[90m   |\u001b[39m                                    \u001b[31m^\u001b[39m\n    \u001b[90m 75|\u001b[39m       events\u001b[33m:\u001b[39m \u001b[34mruntimeCatalog\u001b[39m()\u001b[33m,\u001b[39m\n    \u001b[90m 76|\u001b[3\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m678 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m1 skipped\u001b[39m\u001b[90m (680)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
 }
