@@ -19,6 +19,62 @@ export function topGitHubQuotaCallers(quota: GitHubQuotaSnapshot): GitHubQuotaCa
     .slice(0, TOP_CALLERS);
 }
 
+/** The top-callers list and the unattributed row, shared by the pill popover and the section. */
+function QuotaCallers({ quota }: { quota: GitHubQuotaSnapshot }) {
+  const callers = topGitHubQuotaCallers(quota);
+  return (
+    <>
+      {callers.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No metered GitHub calls this hour.</p>
+      ) : (
+        <ul className="space-y-1" data-testid="github-quota-callers">
+          {callers.map((usage) => (
+            <li key={usage.caller} className="flex items-center justify-between gap-3 text-xs">
+              <span className="font-mono text-foreground">{usage.caller}</span>
+              <span className="font-mono tabular-nums text-muted-foreground">
+                {totalPoints(usage)} pts{usage.estimated ? ' (est.)' : ''}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-2 flex items-center justify-between gap-3 border-t border-border pt-2 text-xs text-muted-foreground">
+        <span>Unattributed (other tools and installs)</span>
+        <span className="font-mono tabular-nums">{quota.unattributed} pts</span>
+      </div>
+    </>
+  );
+}
+
+/**
+ * GitHubQuotaSection (PAN-5292 WI-E4, E-D12) — the GitHub quota block inside
+ * the top bar's health-dot popover. It shows the user account's GraphQL budget
+ * from the latest `rateLimit` sample, then the five callers that spent the most
+ * points this hour and the points no metered caller claims. The label turns
+ * amber while GitHub calls are paused. Renders nothing until the server's
+ * publisher first reports, so the popover shows no empty heading.
+ */
+export function GitHubQuotaSection() {
+  const quota = useDashboardStore(selectGitHubQuota);
+  if (!quota) return null;
+
+  const sample = quota.samples.find((s) => s.pool === 'user' && s.bucket === 'graphql');
+  const paused = quota.pauses.length > 0;
+
+  return (
+    <section aria-label="GitHub quota" data-testid="github-quota-section" className="mt-3 border-t border-border pt-3">
+      <div className="eyebrow mb-2">GitHub quota</div>
+      <p
+        data-testid="github-quota-label"
+        className={`mb-2 text-xs tabular-nums ${paused ? 'text-warning-foreground' : 'text-foreground'}`}
+      >
+        {sample ? `${sample.remaining} of ${sample.limit} GraphQL points left this hour` : 'No sample yet'}
+      </p>
+      <QuotaCallers quota={quota} />
+    </section>
+  );
+}
+
 /**
  * GitHubQuotaPill (PAN-4264) — the user account's GitHub GraphQL budget
  * (`GH <remaining>/<limit>` from the latest GraphQL `rateLimit` sample, not
@@ -66,7 +122,6 @@ export function GitHubQuotaPill() {
   const tone = paused
     ? 'border-warning/40 bg-warning/10 text-warning-foreground'
     : 'border-border text-muted-foreground';
-  const callers = topGitHubQuotaCallers(quota);
   const description = sample
     ? `GitHub GraphQL quota${quota.login ? ` for ${quota.login}` : ''}: ${sample.remaining} of ${sample.limit} points left this hour`
     : 'GitHub GraphQL quota: no sample yet';
@@ -96,24 +151,7 @@ export function GitHubQuotaPill() {
           className="absolute right-0 top-full z-[200] mt-2 w-[min(20rem,calc(100vw-1rem))] rounded-xl border border-border bg-popover p-3 text-sm shadow-lg"
         >
           <p id={POPOVER_TITLE_ID} className="mb-2 font-medium text-foreground">GitHub calls, last hour</p>
-          {callers.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No metered GitHub calls this hour.</p>
-          ) : (
-            <ul className="space-y-1" data-testid="github-quota-callers">
-              {callers.map((usage) => (
-                <li key={usage.caller} className="flex items-center justify-between gap-3 text-xs">
-                  <span className="font-mono text-foreground">{usage.caller}</span>
-                  <span className="font-mono tabular-nums text-muted-foreground">
-                    {totalPoints(usage)} pts{usage.estimated ? ' (est.)' : ''}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="mt-2 flex items-center justify-between gap-3 border-t border-border pt-2 text-xs text-muted-foreground">
-            <span>Unattributed (other tools and installs)</span>
-            <span className="font-mono tabular-nums">{quota.unattributed} pts</span>
-          </div>
+          <QuotaCallers quota={quota} />
         </div>
       )}
     </div>
