@@ -2,9 +2,15 @@
   "version": "1",
   "issueId": "PAN-5402",
   "created": "2026-11-15T23:07:41.060Z",
-  "updated": "2026-11-15T23:24:50.312Z",
+  "updated": "2026-11-15T23:25:09.920Z",
   "gitState": {},
-  "decisions": [],
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Vendoring change verified by okf-vendor-pin CI check; no code logic changes requiring tests (b836519bd95)",
+      "recordedAt": "2026-11-15T23:25:09.919Z"
+    }
+  ],
   "hazards": [],
   "resumePoint": null,
   "sessionHistory": [],
