@@ -102,6 +102,20 @@ describe('ConversationRow model metadata', () => {
     expect(title).toContain('1.2k tokens');
     expect(screen.queryByTitle('Model: k3')).not.toBeInTheDocument();
   });
+
+  // PAN-5335 WI-2: the cost part never clips mid-number; other parts still ellipsize.
+  it('keeps the cost part unclipped while other meta parts can ellipsize', () => {
+    renderRow({ totalCost: 26.73 });
+
+    const costPart = screen.getByText('$26.73');
+    expect(costPart).toHaveAttribute('data-meta-part', 'cost');
+    expect(costPart).toHaveClass(styles.conversationMetaPart, styles.conversationMetaCost);
+
+    const statePart = screen.getByTestId('conversation-meta-line').querySelector('[data-meta-part="state"]');
+    expect(statePart).not.toBeNull();
+    expect(statePart).toHaveClass(styles.conversationMetaPart);
+    expect(statePart).not.toHaveClass(styles.conversationMetaCost);
+  });
 });
 
 describe('ConversationRow drag and Move (PAN-5293 F-D20)', () => {

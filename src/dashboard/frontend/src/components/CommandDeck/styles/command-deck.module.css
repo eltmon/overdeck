@@ -2418,6 +2418,16 @@
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
+.conversationMetaPart {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conversationMetaCost {
+  flex-shrink: 0;
+}
+
 .conversationMetaSep {
   opacity: 0.4;
   flex-shrink: 0;
