@@ -27,15 +27,25 @@ const DOCK_TABS: readonly DockTab[] = ['files', 'changes', 'search', 'live']
 
 /** A file the Changes tab shows a diff of: a root path, its commit, or a committed file of an issue root (vs main). */
 export interface DockDiffTarget {
+  /** Root path (a repo path when the file is outside the root). */
   path: string
   sha?: string
   committedVsMain?: boolean
+  /** Conversation commits: the repo the commit is in, and the file's path in it (for compare). */
+  repoRoot?: string
+  repoPath?: string
+  /** The commit is on the remote (shown in the diff header). */
+  pushed?: boolean
+  /** The file is outside the dock root: no open beside or reveal. */
+  outsideRoot?: boolean
 }
 
 export interface OpenDockInput {
   tab: DockTab
   reveal?: { rootId: string; path: string }
   diff?: DockDiffTarget
+  /** The Changes list in display order, for the diff view's i/N and previous/next. */
+  diffList?: readonly DockDiffTarget[]
   changesScope?: ChangeScope
   /** Search tab: limit content search to this root path (Find in folder). */
   searchPath?: string
@@ -50,6 +60,7 @@ export interface DockState {
   rootOverrideAnchor?: string
   changesScope?: ChangeScope
   diff?: DockDiffTarget
+  diffList?: readonly DockDiffTarget[]
   reveal?: { rootId: string; path: string }
   searchPath?: string
   /** Counts openDock calls; starts at 0 on hydrate, never persisted. */
@@ -137,10 +148,11 @@ export const useWorkDockStore = create<WorkDockStore>((set, get) => {
     },
 
     openDock: (deckKey, input) => {
-      const { reveal: _reveal, diff: _diff, changesScope: _scope, searchPath: _searchPath, ...rest } = current(deckKey)
+      const { reveal: _reveal, diff: _diff, diffList: _diffList, changesScope: _scope, searchPath: _searchPath, ...rest } = current(deckKey)
       const next: DockState = { ...rest, open: true, tab: input.tab, openSeq: rest.openSeq + 1 }
       if (input.reveal) next.reveal = input.reveal
       if (input.diff) next.diff = input.diff
+      if (input.diffList) next.diffList = input.diffList
       if (input.changesScope) next.changesScope = input.changesScope
       if (input.searchPath) next.searchPath = input.searchPath
       commit(deckKey, next)

@@ -15,7 +15,7 @@ import { useStageDeck } from '../../Stage/StageDeckContext'
 import { toRootPath } from '../changes-model'
 import type { DockScope } from '../dockScope'
 import { useConversationChanges } from '../useConversationChanges'
-import { useWorkDockStore } from '../workDockStore'
+import { useWorkDockStore, type DockDiffTarget } from '../workDockStore'
 import { ChangeFileRow } from './ChangeFileRow'
 import { ChangeGroup, ChangeTag, commitTime } from './ChangeGroup'
 
@@ -57,8 +57,25 @@ export function ConversationChangesList({ deckKey, scope, conversation }: Conver
   const data = query.data
   const rootPathOf = (repoPath: string): string | null => (data && rootId ? toRootPath(data.repoRoot, rootAbs, repoPath) : null)
 
-  const row = (file: ChangedFile, sha: string | undefined, note?: string | null) => {
+  const targetOf = (file: ChangedFile, commit?: ChangeCommit): DockDiffTarget => {
     const rootPath = rootPathOf(file.path)
+    const target: DockDiffTarget = { path: rootPath ?? file.path, repoPath: file.path }
+    if (data) target.repoRoot = data.repoRoot
+    if (commit) {
+      target.sha = commit.sha
+      target.pushed = commit.pushed
+    }
+    if (rootPath === null) target.outsideRoot = true
+    return target
+  }
+  // Every row in display order, for the diff view's i/N and previous/next.
+  const targets: DockDiffTarget[] = data
+    ? [...data.uncommitted.map((f) => targetOf(f)), ...data.commits.flatMap((c) => c.files.map((f) => targetOf(f, c)))]
+    : []
+
+  const row = (file: ChangedFile, commit: ChangeCommit | undefined, note?: string | null) => {
+    const rootPath = rootPathOf(file.path)
+    const sha = commit?.sha
     return (
       <ChangeFileRow
         key={`${sha ?? 'work'}:${file.path}`}
@@ -66,7 +83,7 @@ export function ConversationChangesList({ deckKey, scope, conversation }: Conver
         additions={file.additions}
         deletions={file.deletions}
         rootPath={rootPath}
-        onDiff={() => useWorkDockStore.getState().openDock(deckKey, { tab: 'changes', diff: { path: rootPath ?? file.path, ...(sha ? { sha } : {}) } })}
+        onDiff={() => useWorkDockStore.getState().openDock(deckKey, { tab: 'changes', diff: targetOf(file, commit), diffList: targets, changesScope: chip })}
         onOpenBeside={() => {
           if (rootId && rootPath) deck?.openBeside?.({ rootId, path: rootPath })
         }}
@@ -131,7 +148,7 @@ function ChangeGroups({
 }: {
   data: ConversationChanges
   chip: ChangeScope
-  row: (file: ChangedFile, sha: string | undefined, note?: string | null) => ReactElement
+  row: (file: ChangedFile, commit: ChangeCommit | undefined, note?: string | null) => ReactElement
 }) {
   if (data.uncommitted.length === 0 && data.commits.length === 0) {
     return <p className="px-3 py-3 text-xs text-muted-foreground">No changes in this scope.</p>
@@ -166,7 +183,7 @@ function ChangeGroups({
             </>
           }
         >
-          {commit.files.map((file) => row(file, commit.sha))}
+          {commit.files.map((file) => row(file, commit))}
         </ChangeGroup>
       ))}
     </div>

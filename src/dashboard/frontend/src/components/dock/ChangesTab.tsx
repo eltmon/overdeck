@@ -6,14 +6,18 @@
 // (ProjectMainChangesList). useChangesCount gives the tab label its count,
 // only while the dock is open (NFR-2).
 
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 
 import { useExplorerGitStatus } from '../explorer/git/useExplorerGitStatus'
 import { ConversationChangesList } from './changes/ConversationChangesList'
+import { DockDiffView } from './changes/DockDiffView'
 import { ProjectMainChangesList } from './changes/ProjectMainChangesList'
 import { RootChangesList } from './changes/RootChangesList'
 import type { DockScope } from './dockScope'
 import { useConversationChanges } from './useConversationChanges'
+import { useWorkDockStore, type DockDiffTarget } from './workDockStore'
+
+const sameTarget = (a: DockDiffTarget, b: DockDiffTarget) => a.path === b.path && a.sha === b.sha && !!a.committedVsMain === !!b.committedVsMain
 
 export interface ChangesTabProps {
   deckKey: string
@@ -21,6 +25,25 @@ export interface ChangesTabProps {
 }
 
 export function ChangesTab({ deckKey, scope }: ChangesTabProps) {
+  const diff = useWorkDockStore((s) => s.byDeck[deckKey]?.diff)
+  const diffList = useWorkDockStore((s) => s.byDeck[deckKey]?.diffList)
+  const changesScope = useWorkDockStore((s) => s.byDeck[deckKey]?.changesScope)
+  const list = useMemo(() => (diff ? (diffList?.some((t) => sameTarget(t, diff)) ? diffList : [diff]) : []), [diff, diffList])
+  const index = diff ? Math.max(0, list.findIndex((t) => sameTarget(t, diff))) : 0
+  const onIndex = useCallback(
+    (i: number) => {
+      const target = list[i]
+      if (target) useWorkDockStore.getState().openDock(deckKey, { tab: 'changes', diff: target, diffList: list, ...(changesScope ? { changesScope } : {}) })
+    },
+    [deckKey, list, changesScope],
+  )
+  // Back to the list keeps the chip the list was on.
+  const onBack = useCallback(
+    () => useWorkDockStore.getState().openDock(deckKey, { tab: 'changes', ...(changesScope ? { changesScope } : {}) }),
+    [deckKey, changesScope],
+  )
+  if (diff) return <DockDiffView deckKey={deckKey} scope={scope} list={list} index={index} onIndex={onIndex} onBack={onBack} />
+
   const { changes } = scope
   if (changes.kind === 'conversation') {
     return <ConversationChangesList key={changes.conversation.name} deckKey={deckKey} scope={scope} conversation={changes.conversation} />

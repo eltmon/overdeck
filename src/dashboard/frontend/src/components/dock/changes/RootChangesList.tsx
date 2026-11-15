@@ -29,12 +29,13 @@ export function RootChangesList({ deckKey, rootId }: RootChangesListProps) {
   const { entries, committed, branch } = git.result
   if (entries.length === 0 && committed.length === 0) return <p className="px-3 py-3 text-xs text-muted-foreground">No changes on this root.</p>
 
+  const targets: DockDiffTarget[] = [...entries.map((e) => ({ path: e.path })), ...committed.map((e) => ({ path: e.path, committedVsMain: true }))]
   const row = (path: string, diff: DockDiffTarget) => (
     <ChangeFileRow
       key={`${diff.committedVsMain ? 'committed' : 'work'}:${path}`}
       path={path}
       rootPath={path}
-      onDiff={() => useWorkDockStore.getState().openDock(deckKey, { tab: 'changes', diff })}
+      onDiff={() => useWorkDockStore.getState().openDock(deckKey, { tab: 'changes', diff, diffList: targets })}
       onOpenBeside={() => deck?.openBeside?.({ rootId, path })}
       onReveal={() => useWorkDockStore.getState().openDock(deckKey, { tab: 'files', reveal: { rootId, path } })}
     />

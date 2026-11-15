@@ -49,7 +49,7 @@ function CommitFiles({
 }: {
   repoPath: string
   commit: ProjectCommit
-  row: (path: string, diff: DockDiffTarget, additions?: number, deletions?: number) => ReactElement
+  row: (path: string, diff: DockDiffTarget, list: readonly DockDiffTarget[], additions?: number, deletions?: number) => ReactElement
 }) {
   const query = useQuery({
     queryKey: ['project-commit-files', repoPath, commit.sha],
@@ -61,7 +61,8 @@ function CommitFiles({
   })
   if (query.isPending) return <p className="py-1 pl-8 text-xs text-muted-foreground">Loading files…</p>
   if (query.isError) return <p className="py-1 pl-8 text-xs text-destructive">Couldn't load files: {query.error.message}</p>
-  return <>{query.data.files.map((f) => row(f.path, { path: f.path, sha: commit.sha }, f.additions, f.deletions))}</>
+  const list = query.data.files.map((f) => ({ path: f.path, sha: commit.sha }))
+  return <>{query.data.files.map((f, i) => row(f.path, list[i], list, f.additions, f.deletions))}</>
 }
 
 export function ProjectMainChangesList({ deckKey, projectKey }: ProjectMainChangesListProps) {
@@ -80,20 +81,21 @@ export function ProjectMainChangesList({ deckKey, projectKey }: ProjectMainChang
     staleTime: 4000,
   })
 
-  const row = (path: string, diff: DockDiffTarget, additions?: number, deletions?: number) => (
+  const row = (path: string, diff: DockDiffTarget, list: readonly DockDiffTarget[], additions?: number, deletions?: number) => (
     <ChangeFileRow
       key={`${diff.sha ?? 'work'}:${path}`}
       path={path}
       additions={additions}
       deletions={deletions}
       rootPath={path}
-      onDiff={() => useWorkDockStore.getState().openDock(deckKey, { tab: 'changes', diff })}
+      onDiff={() => useWorkDockStore.getState().openDock(deckKey, { tab: 'changes', diff, diffList: list })}
       onOpenBeside={() => deck?.openBeside?.({ rootId, path })}
       onReveal={() => useWorkDockStore.getState().openDock(deckKey, { tab: 'files', reveal: { rootId, path } })}
     />
   )
 
   const uncommitted = git.result?.entries ?? []
+  const uncommittedList = uncommitted.map((e) => ({ path: e.path }))
   return (
     <div>
       {uncommitted.length > 0 && (
@@ -106,7 +108,7 @@ export function ProjectMainChangesList({ deckKey, projectKey }: ProjectMainChang
             </>
           }
         >
-          {uncommitted.map((e) => row(e.path, { path: e.path }))}
+          {uncommitted.map((e, i) => row(e.path, uncommittedList[i], uncommittedList))}
         </ChangeGroup>
       )}
       {query.isPending && <p className="px-3 py-3 text-xs text-muted-foreground">Loading today's commits…</p>}
