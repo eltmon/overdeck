@@ -809,6 +809,35 @@ describe('ComposerFooter attachments', () => {
     );
   });
 
+  it('orders the toolbar attach, model, Thinking, Send, context, mic, send (PAN-5295)', () => {
+    const usage = { usedTokens: 12_500, maxTokens: 200_000, usedPercentage: 6.25, remainingTokens: 187_500, remainingPercentage: 93.75 };
+    const { container } = render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} contextWindowUsage={usage} />);
+
+    const ordered = [
+      screen.getByRole('button', { name: 'Attach files' }),
+      screen.getByTestId('model-picker'),
+      screen.getByTestId('effort-picker'),
+      screen.getByRole('button', { name: /^Send:/ }),
+      screen.getByTestId('context-window-meter'),
+      screen.getByTitle('Toggle voice input (Ctrl+Shift+M)'),
+      screen.getByTitle('Send message (Enter)'),
+    ];
+    for (let i = 1; i < ordered.length; i++) {
+      expect(ordered[i - 1].compareDocumentPosition(ordered[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    expect(container.querySelector('.composerToolbarDivider')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Attach files' })).toHaveAttribute('title', 'Attach files');
+    expect(screen.getByRole('button', { name: 'Attach files' }).querySelector('svg.lucide-plus')).not.toBeNull();
+  });
+
+  it('keeps the Pi Compact button after the Send button (PAN-5295)', () => {
+    render(<ComposerFooter conversation={{ ...conversation, harness: 'pi' as const }} />);
+
+    const send = screen.getByRole('button', { name: /^Send:/ });
+    const compact = screen.getByRole('button', { name: 'Compact context' });
+    expect(send.compareDocumentPosition(compact) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('offers Auto and Steer for a Claude Code conversation (PAN-4292)', () => {
     render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} />);
 

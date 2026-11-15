@@ -3,7 +3,7 @@
 // owns every value and handler; this component only lays the controls out.
 
 import type { Dispatch, SetStateAction } from 'react';
-import { AlertCircle, Loader2, Mic, MicOff, Paperclip, Scissors, SendHorizontal } from 'lucide-react';
+import { AlertCircle, Loader2, Mic, MicOff, Plus, Scissors, SendHorizontal } from 'lucide-react';
 import type { HarnessSteerKind } from '@overdeck/contracts';
 import { ModelPicker, MODEL_EFFORT_SUPPORT } from './ModelPicker';
 import { pickerEffortLevels, type Harness } from '../shared/ModelPicker';
@@ -78,6 +78,17 @@ export function ComposerToolbar({
 }: ComposerToolbarProps) {
   return (
     <div className={styles.composerToolbar}>
+      {/* PAN-5295 D2-14: attach, model, Thinking, Send, Compact on the left; context, mic, send on the right. */}
+      <button
+        className={styles.voiceToolbarButton}
+        onClick={onAttach}
+        disabled={isDisabled}
+        type="button"
+        title="Attach files"
+        aria-label="Attach files"
+      >
+        <Plus size={16} />
+      </button>
       {!native && (
         <ModelPicker
           value={model}
@@ -106,7 +117,6 @@ export function ComposerToolbar({
           running: {contextWindowUsage.lastModel}
         </span>
       )}
-      <div className={styles.composerToolbarDivider} />
       <EffortPicker chip={effort.chip} pending={effort.pending} title={effort.title} value={effort.effort} onChange={effort.onChange} disabled={effort.pending || !effort.liveChangeEnabled} availableLevels={pickerEffortLevels(model) ?? MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
 
       {showDeliverySelector && (
@@ -129,16 +139,7 @@ export function ComposerToolbar({
 
       <div className={styles.composerToolbarSpacer} />
 
-      <button
-        className={styles.voiceToolbarButton}
-        onClick={onAttach}
-        disabled={isDisabled}
-        type="button"
-        title="Attach files"
-        aria-label="Attach files"
-      >
-        <Paperclip size={16} />
-      </button>
+      <ContextWindowMeter usage={contextWindowUsage} />
 
       {!native && (
         <button
@@ -151,8 +152,6 @@ export function ComposerToolbar({
           {voiceState.error ? <AlertCircle size={16} /> : voiceState.isListening ? <MicOff size={16} /> : <Mic size={16} />}
         </button>
       )}
-
-      <ContextWindowMeter usage={contextWindowUsage} />
 
       <button
         className={styles.sendButton}
