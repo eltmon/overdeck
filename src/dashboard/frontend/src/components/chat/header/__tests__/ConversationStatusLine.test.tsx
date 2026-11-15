@@ -106,4 +106,11 @@ describe('ConversationStatusLine', () => {
     expect(branch).toHaveAttribute('title', 'Worktree · /home/eltmon/Projects/dfai');
     expect(screen.queryByText('Worktree')).toBeNull();
   });
+
+  it("renders a detached HEAD as 'detached' instead of the literal ref name", () => {
+    render(<ConversationStatusLine conversation={{ ...CONVERSATION, branch: 'HEAD' } as Conversation} status={STATUS} native={false} />);
+    const branch = screen.getByText('detached').parentElement!;
+    expect(branch).toHaveAttribute('title', 'Detached HEAD · /home/eltmon/Projects/dfai');
+    expect(screen.queryByText('HEAD')).toBeNull();
+  });
 });
