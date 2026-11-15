@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { CloisterStatusBar } from './CloisterStatusBar';
 import { DialogProvider } from './DialogProvider';
 import { SystemHealthPill } from './SystemHealthPill';
 
@@ -10,7 +11,7 @@ const { mockToastError, mockUseSystemHealth, hookState } = vi.hoisted(() => ({
   mockToastError: vi.fn(),
   mockUseSystemHealth: vi.fn(),
   hookState: {
-    current: undefined as { data: SystemHealthSnapshot; isLoading: boolean; error: null } | undefined,
+    current: undefined as { data: SystemHealthSnapshot | undefined; isLoading: boolean; error: Error | null } | undefined,
   },
 }));
 
@@ -41,6 +42,12 @@ vi.mock('../hooks/useKillAgent', () => ({
 
 vi.mock('../lib/refresh-dashboard-state', () => ({
   refreshDashboardState: mockRefreshDashboardState,
+}));
+
+// The popover hosts CloisterStatusBar as a section; mock it to a marker, as
+// SystemMenu.test.tsx did before SystemMenu was folded into the health dot.
+vi.mock('./CloisterStatusBar', () => ({
+  CloisterStatusBar: () => <div data-testid="cloister-controls" />,
 }));
 
 const GIB = 1024 ** 3;
@@ -192,17 +199,21 @@ function createSnapshot(state: HealthState): SystemHealthSnapshot {
 
 function renderPill(queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-})) {
+}), children?: React.ReactNode) {
   return {
     queryClient,
     ...render(
       <QueryClientProvider client={queryClient}>
         <DialogProvider>
-          <SystemHealthPill />
+          <SystemHealthPill>{children}</SystemHealthPill>
         </DialogProvider>
       </QueryClientProvider>,
     ),
   };
+}
+
+function newQueryClient() {
+  return new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
 }
 
 function setSnapshot(state: HealthState) {
@@ -216,22 +227,119 @@ describe('SystemHealthPill', () => {
   });
 
   it.each([
-    ['healthy', 'Healthy · 41 GB available', 'healthy'],
-    ['measuring', 'Measuring system health…', 'measuring'],
-    ['warning', 'Warning · spawn headroom tight', 'warning'],
-    ['critical', 'Critical · memory pressure detected', 'critical'],
-    ['unavailable', 'Health unavailable · Retry', 'unavailable'],
-  ] as const)('renders distinct %s copy and icon', (state, copy, icon) => {
+    ['healthy', 'Healthy · 41 GB available', 'bg-success'],
+    ['measuring', 'Measuring system health…', 'bg-info'],
+    ['warning', 'Warning · spawn headroom tight', 'bg-warning'],
+    ['critical', 'Critical · memory pressure detected', 'bg-destructive'],
+    ['unavailable', 'Health unavailable · Retry', 'bg-muted-foreground'],
+  ] as const)('renders distinct %s copy and dot color', (state, copy, dotClass) => {
     setSnapshot(state);
 
     renderPill();
 
     const pill = screen.getByTestId('system-health-pill');
     expect(pill).toHaveAccessibleName(copy);
-    expect(pill.querySelector(`[data-health-icon="${icon}"]`)).toBeInTheDocument();
-    if (state === 'healthy' || state === 'measuring') {
-      expect(pill.querySelector('[data-health-icon="warning"]')).not.toBeInTheDocument();
+    expect(pill).toHaveAttribute('title', copy);
+    const dot = screen.getByTestId('system-health-dot');
+    expect(dot).toHaveClass(dotClass);
+    for (const other of ['bg-success', 'bg-info', 'bg-warning', 'bg-destructive', 'bg-muted-foreground']) {
+      if (other !== dotClass) expect(dot).not.toHaveClass(other);
     }
+  });
+
+  it.each([
+    ['loading', { data: undefined, isLoading: true, error: null }, 'Measuring system health…'],
+    ['fetch error', { data: undefined, isLoading: false, error: new Error('boom') }, 'Health unavailable'],
+  ] as const)('renders a clickable gray dot while %s and opens the hosted sections', (_label, hook, copy) => {
+    hookState.current = { ...hook };
+    renderPill(newQueryClient(), <section aria-label="GitHub quota" data-testid="hosted-section" />);
+
+    const pill = screen.getByTestId('system-health-pill');
+    expect(pill.tagName).toBe('BUTTON');
+    expect(pill).toHaveAccessibleName(copy);
+    expect(screen.getByTestId('system-health-dot')).toHaveClass('bg-muted-foreground');
+
+    fireEvent.click(pill);
+    const dialog = screen.getByRole('dialog', { name: 'System health' });
+    expect(dialog).toHaveTextContent(copy);
+    expect(within(dialog).getByTestId('hosted-section')).toBeInTheDocument();
+  });
+
+  it('renders the passed sections after the System-health body', () => {
+    setSnapshot('healthy');
+    renderPill(newQueryClient(), <div data-testid="hosted-section">quota</div>);
+    fireEvent.click(screen.getByTestId('system-health-pill'));
+    const dialog = screen.getByRole('dialog', { name: 'System health' });
+    expect(within(dialog).getByText('Overcommit 33.3%')).toBeInTheDocument();
+    expect(within(dialog).getByTestId('hosted-section')).toBeInTheDocument();
+  });
+
+  it('stays open for a pointer-down inside a portaled dialog and closes for one on the page', () => {
+    setSnapshot('healthy');
+    render(<div role="dialog" aria-label="Restart sessions" data-testid="portaled-dialog"><button type="button">Restart</button></div>);
+    renderPill();
+
+    fireEvent.click(screen.getByTestId('system-health-pill'));
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Restart' }));
+    expect(screen.getByRole('dialog', { name: 'System health' })).toBeInTheDocument();
+
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole('dialog', { name: 'System health' })).not.toBeInTheDocument();
+  });
+
+  it('stays open for any pointer-down while an alertdialog is up', () => {
+    setSnapshot('healthy');
+    const { rerender } = render(<div />);
+    renderPill();
+
+    fireEvent.click(screen.getByTestId('system-health-pill'));
+    rerender(<div role="alertdialog" aria-label="Confirm" />);
+    fireEvent.pointerDown(document.body);
+    expect(screen.getByRole('dialog', { name: 'System health' })).toBeInTheDocument();
+  });
+
+  it('closes when a click inside it navigates, and stays open for one that does not', () => {
+    setSnapshot('healthy');
+    window.history.replaceState(null, '', '/');
+    renderPill(newQueryClient(), (
+      <>
+        <button type="button" onClick={() => window.history.pushState({}, '', '/settings')}>Open settings</button>
+        <button type="button">Stay here</button>
+      </>
+    ));
+
+    fireEvent.click(screen.getByTestId('system-health-pill'));
+    fireEvent.click(screen.getByRole('button', { name: 'Stay here' }));
+    expect(screen.getByRole('dialog', { name: 'System health' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open settings' }));
+    expect(window.location.pathname).toBe('/settings');
+    expect(screen.queryByRole('dialog', { name: 'System health' })).not.toBeInTheDocument();
+    window.history.replaceState(null, '', '/');
+  });
+
+  it('caps the popover height from its own top edge so the last section stays reachable', () => {
+    setSnapshot('healthy');
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      top: 90, bottom: 1100, left: 0, right: 0, width: 0, height: 1010, x: 0, y: 90, toJSON: () => ({}),
+    } as DOMRect);
+    window.innerHeight = 1000;
+    renderPill();
+    fireEvent.click(screen.getByTestId('system-health-pill'));
+    expect(screen.getByRole('dialog', { name: 'System health' }).style.maxHeight).toBe('902px');
+    rect.mockRestore();
+  });
+
+  it('reaches the Cloister system controls through the health dot', () => {
+    setSnapshot('healthy');
+    renderPill(newQueryClient(), <CloisterStatusBar />);
+
+    expect(screen.queryByTestId('cloister-controls')).toBeNull();
+    fireEvent.click(screen.getByTestId('system-health-pill'));
+    expect(screen.getByTestId('cloister-controls')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('system-health-pill'));
+    expect(screen.queryByTestId('cloister-controls')).toBeNull();
   });
 
   it('keeps virtual commitment visible as a historical diagnostic', () => {
@@ -330,7 +438,7 @@ describe('SystemHealthPill', () => {
 
     renderPill();
 
-    const classes = screen.getByTestId('system-health-pill').className.split(' ');
+    const classes = screen.getByTestId('system-health-dot').className.split(' ');
     expect(classes).toContain('motion-safe:animate-pulse');
     expect(classes).not.toContain('animate-pulse');
     expect(screen.getByTestId('system-health-pill')).toHaveAccessibleName(/Critical/);

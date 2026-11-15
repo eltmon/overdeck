@@ -827,7 +827,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
           {!collapsed && (
             <div className="px-3 py-2 space-y-1">
               <div className="flex items-center gap-2">
-                {/* Cloister system controls moved to the top app-bar SystemMenu (PAN-1605). */}
+                {/* Cloister system controls live in the top bar's health-dot popover (PAN-1605, PAN-5292). */}
                 <div className="ml-auto">
                   <FreshnessIndicator />
                 </div>

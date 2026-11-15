@@ -1,28 +1,28 @@
-import { AlertTriangle, History, Search, StopCircle } from 'lucide-react';
-import { DeaconPauseToggle } from '../components/DeaconPauseToggle';
+import { AlertTriangle, History, Moon, Search, Sun } from 'lucide-react';
+import { DeaconFrozenChip, DeaconPauseToggle } from '../components/DeaconPauseToggle';
 import { DegradedModeBanner } from '../components/DegradedModeBanner';
 import { NewBuildBanner } from '../components/NewBuildBanner';
 import { LowCostModePill } from '../components/LowCostModePill';
-import { DecisionsIndicator } from '../components/DecisionsIndicator';
 import { NeedsYouIndicator } from '../components/flywheel/NeedsYouIndicator';
-import { SystemMenu } from '../components/SystemMenu';
+import { CloisterStatusBar } from '../components/CloisterStatusBar';
 import { StoppedAgentsBanner } from '../components/StoppedAgentsBanner';
-import { RunningAgentsPill } from '../components/RunningAgentsPill';
 import { CodexAuthBanner } from '../components/CodexAuthBanner';
 import { ConversationSearchBanner } from '../components/ConversationSearchBanner';
 import { InotifyPressureBanner } from '../components/InotifyPressureBanner';
 import { LinearMcpAuthBanner } from '../components/LinearMcpAuthBanner';
 import { RestartApprovalBanner } from '../components/RestartApprovalBanner';
 import { GitHubRateLimitBanner } from '../components/GitHubRateLimitBanner';
-import { GitHubQuotaPill } from '../components/GitHubQuotaPill';
+import { GitHubQuotaSection } from '../components/GitHubQuotaPill';
 import { SetupChecklistBanner } from '../components/SetupChecklistBanner';
 import { ClaudeCodeUpgradeBanner } from '../components/ClaudeCodeUpgradeBanner';
 import { SyncRequiredBanner } from '../components/SyncRequiredBanner';
-import { SystemHealthPill } from '../components/SystemHealthPill';
+import { HealthSection, SystemHealthPill } from '../components/SystemHealthPill';
 import { StaleBuildChip } from '../components/StaleBuildChip';
-import { triggerEmergencyStop, EMERGENCY_STOP_HOTKEY_LABEL } from '../components/EmergencyStopOverlay';
 import type { Tab } from '../components/Header';
-import { projectCrumbLabel, searchButtonText } from './appChromeLabels';
+import { useTheme } from '../hooks/useTheme';
+import { PALETTE_SEARCH_PLACEHOLDER, paletteKeycap } from './appChromeLabels';
+import { AgentsMenu } from './topbar/AgentsMenu';
+import { Breadcrumb } from './topbar/Breadcrumb';
 import { AddProjectDialogHost } from '../components/project/new/AddProjectDialog';
 import type { CreatedProject } from '../components/project/new/projectCreateTypes';
 import type { TrackerStatusItem } from './api';
@@ -36,7 +36,6 @@ interface DashboardLifecycleView {
 interface AppChromeProps {
   activeTab: Tab;
   selectedProjectKey: string | null;
-  runningAgentCount: number;
   dashboardLifecycle: DashboardLifecycleView;
   missingKeyTrackers: TrackerStatusItem[];
   trackerBannerDismissed: boolean;
@@ -44,14 +43,13 @@ interface AppChromeProps {
   isRestartBackendPending: boolean;
   isRestartCliproxyPending: boolean;
   isSessionFeedSidebarOpen: boolean;
-  onSearchOpen: () => void;
+  /** Open the command palette (the top bar's search box, PAN-5292 E-D15). */
+  onPaletteOpen: () => void;
   onOpenSettings: () => void;
   onDismissTrackerBanner: () => void;
   onRestartBackend: () => void;
   onRestartCliproxy: () => void;
   onToggleSessionFeedSidebar: () => void;
-  /** Open the Flywheel page; the indicator has already asked it to reveal the block. */
-  onNavigateNeedsYou?: () => void;
   /** A project was added through the Add-project modal this chrome hosts. */
   onProjectCreated: (project: CreatedProject) => void;
 }
@@ -59,7 +57,6 @@ interface AppChromeProps {
 export function AppChrome({
   activeTab,
   selectedProjectKey,
-  runningAgentCount,
   dashboardLifecycle,
   missingKeyTrackers,
   trackerBannerDismissed,
@@ -67,13 +64,12 @@ export function AppChrome({
   isRestartBackendPending,
   isRestartCliproxyPending,
   isSessionFeedSidebarOpen,
-  onSearchOpen,
+  onPaletteOpen,
   onOpenSettings,
   onDismissTrackerBanner,
   onRestartBackend,
   onRestartCliproxy,
   onToggleSessionFeedSidebar,
-  onNavigateNeedsYou,
   onProjectCreated,
 }: AppChromeProps) {
   return (
@@ -171,56 +167,39 @@ export function AppChrome({
         </div>
       )}
 
-      {/* App bar (PAN-1591) — project crumb · centered search · status pills.
-          Replaces the persistent deacon/mem chrome with a compact strip. */}
+      {/* App bar (PAN-5292) — crumb · search box (opens the palette) · agents
+          menu, Needs you, exception chips, health dot, theme. AppChrome calls no
+          store selector: every count lives in its own leaf component (E-D1). */}
       <div className="relative flex h-12 shrink-0 items-center gap-3 border-b border-border bg-background px-3">
-        {/* left: active-project crumb */}
-        <div className="flex shrink-0 items-center gap-2 text-sm font-semibold text-foreground">
-          {selectedProjectKey ? (
-            <>
-              <span className="h-3.5 w-3.5 rounded-[4px] bg-primary/40" aria-hidden="true" />
-              {projectCrumbLabel(selectedProjectKey)}
-            </>
-          ) : (
-            <span className="text-muted-foreground">All projects</span>
-          )}
-        </div>
+        <Breadcrumb activeTab={activeTab} selectedProjectKey={selectedProjectKey} />
 
-        {/* center: search (project-scoped placeholder — wired to global search today) */}
         <button
           type="button"
-          onClick={onSearchOpen}
+          onClick={onPaletteOpen}
           className="mx-auto flex w-full min-w-0 max-w-md items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent"
           title="Search"
+          data-testid="topbar-search"
         >
           <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
-          <span className="truncate">{searchButtonText(selectedProjectKey)}</span>
-          <kbd className="ml-auto rounded border border-border px-1.5 text-[11px]">/</kbd>
+          <span className="truncate">{PALETTE_SEARCH_PLACEHOLDER}</span>
+          <kbd className="ml-auto shrink-0 rounded border border-border px-1.5 text-[11px]">{paletteKeycap()}</kbd>
         </button>
 
-        {/* right: status pills */}
-        <div className="flex shrink-0 items-center gap-2">
-          <DeaconPauseToggle compact />
-          <RunningAgentsPill />
-          {runningAgentCount > 0 && (
-            <button
-              type="button"
-              onClick={triggerEmergencyStop}
-              title={`Emergency stop — kill all agents and freeze auto-resume (${EMERGENCY_STOP_HOTKEY_LABEL})`}
-              aria-label="Emergency stop all agents"
-              className="inline-flex items-center gap-1.5 rounded-full border border-destructive/40 bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/20 transition-colors"
-            >
-              <StopCircle className="h-3.5 w-3.5" /> Stop all
-            </button>
-          )}
+        <div className="flex shrink-0 items-center gap-1.5">
+          <AgentsMenu />
+          <NeedsYouIndicator />
+          {/* Exception chips: each renders only while its condition is true (E-D9). */}
+          <DeaconFrozenChip />
           <StoppedAgentsBanner variant="pill" />
           <LowCostModePill onOpenSettings={onOpenSettings} />
           <StaleBuildChip />
-          <GitHubQuotaPill />
-          <SystemHealthPill />
-          <DecisionsIndicator />
-          <NeedsYouIndicator onActivate={onNavigateNeedsYou} />
-          <SystemMenu onOpenSettings={onOpenSettings} />
+          <SystemHealthPill>
+            <GitHubQuotaSection />
+            <HealthSection title="Auto-resume"><DeaconPauseToggle /></HealthSection>
+            <StoppedAgentsBanner variant="section" />
+            <HealthSection title="System controls"><CloisterStatusBar onOpenSettings={onOpenSettings} /></HealthSection>
+          </SystemHealthPill>
+          <ThemeToggleButton />
           {/* The Command Deck has the always-on Awareness rail, so the global
               feed toggle only appears on other pages (PAN-1591). */}
           {activeTab !== 'command-deck' && (
@@ -238,5 +217,22 @@ export function AppChrome({
         </div>
       </div>
     </>
+  );
+}
+
+function ThemeToggleButton() {
+  const { theme, toggleTheme } = useTheme();
+  const label = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  return (
+    <button
+      type="button"
+      onClick={toggleTheme}
+      aria-label={label}
+      title={label}
+      data-testid="topbar-theme"
+      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+    >
+      {theme === 'dark' ? <Sun className="h-4 w-4" aria-hidden="true" /> : <Moon className="h-4 w-4" aria-hidden="true" />}
+    </button>
   );
 }

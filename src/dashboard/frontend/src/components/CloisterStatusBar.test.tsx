@@ -130,6 +130,17 @@ describe('CloisterStatusBar TTS health badge', () => {
     expect(screen.queryByRole('dialog', { name: 'Restart sessions' })).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
   });
+
+  it('marks the restart-config modal as a dialog so the health popover stays open under it (PAN-5292 E-D6)', async () => {
+    mockFetch({ ttsEnabled: false });
+    renderStatusBar();
+
+    fireEvent.click(await screen.findByTitle('Restart agents with current config'));
+
+    const modal = screen.getByRole('dialog', { name: 'Restart agents with current config' });
+    expect(modal).toHaveAttribute('aria-modal', 'true');
+    expect(modal).toHaveClass('fixed', 'inset-0');
+  });
 });
 
 describe('CloisterStatusBar emergency stop', () => {

@@ -19,7 +19,11 @@ import { useDashboardStore } from '../lib/store';
 import { usePendingInputDialogs } from './hooks/usePendingInputDialogs';
 import { useDesktopActivityNotifications } from './hooks/useDesktopActivityNotifications';
 
-/** Live agent count for the app-bar status pill (PAN-1591). Returns a number, so `App` re-renders only when it changes. */
+/**
+ * How many store agents an update restart would interrupt, for UpdateDialog
+ * (PAN-5292 E-D2). The top bar's "N agents working" uses useAgentsWorking()
+ * instead. Returns a number, so `App` re-renders only when it changes.
+ */
 export function countRunningAgents(agentsById: Record<string, AgentSnapshot>): number {
   let count = 0;
   for (const agent of Object.values(agentsById)) {

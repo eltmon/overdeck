@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { projectCrumbLabel, searchButtonText } from './appChromeLabels';
+import { formatSpec } from '../lib/shortcuts/keys';
+import { TAB_PATHS } from './routes';
+import { PALETTE_SEARCH_PLACEHOLDER, paletteKeycap, projectCrumbLabel, TAB_TITLES } from './appChromeLabels';
 
 describe('projectCrumbLabel (PAN-5000)', () => {
   it('renders the No project deck as "No project"', () => {
@@ -12,16 +14,20 @@ describe('projectCrumbLabel (PAN-5000)', () => {
   });
 });
 
-describe('searchButtonText (PAN-5000)', () => {
-  it('shows the global placeholder for the No project deck', () => {
-    expect(searchButtonText('__no-project__')).toBe('Search issues, conversations, commands…');
+describe('top bar labels (PAN-5292)', () => {
+  it('names what the palette searches in the search box', () => {
+    expect(PALETTE_SEARCH_PLACEHOLDER).toBe('Search issues, conversations, commands…');
   });
 
-  it('shows the global placeholder when no deck is selected', () => {
-    expect(searchButtonText(null)).toBe('Search issues, conversations, commands…');
+  it('has a non-empty page title for every route', () => {
+    for (const tab of Object.keys(TAB_PATHS) as Array<keyof typeof TAB_PATHS>) {
+      expect(TAB_TITLES[tab]?.trim(), tab).toBeTruthy();
+    }
+    expect(Object.keys(TAB_TITLES).sort()).toEqual(Object.keys(TAB_PATHS).sort());
   });
 
-  it('shows a project-scoped placeholder for a registered project key', () => {
-    expect(searchButtonText('overdeck')).toBe('Search overdeck…');
+  it('prints the palette keycap for each platform', () => {
+    expect(paletteKeycap('other')).toBe(formatSpec('Ctrl+K', 'other'));
+    expect(paletteKeycap('mac')).toBe(formatSpec('Meta+K', 'mac'));
   });
 });

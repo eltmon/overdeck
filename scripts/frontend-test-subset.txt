@@ -4,15 +4,20 @@
 # .gitattributes marks this file merge=union, so concurrent additions merge cleanly.
 # A union merge can leave lines unsorted or duplicated; the runner dedupes.
 # Long-term fix: PAN-3532 runs the whole frontend suite.
+src/App/AppChrome.test.tsx
 src/App/AppLiveStoreHost.render-count.test.tsx
 src/App/BackendConnectionBoundary.test.tsx
+src/App/__tests__/countAgreement.test.tsx
 src/App/api.test.ts
 src/App/appChromeLabels.test.ts
 src/App/routes.linked.test.ts
+src/App/topbar/AgentsMenu.test.tsx
+src/App/topbar/Breadcrumb.test.tsx
 src/__tests__/fr7-conversation-pending-input.test.tsx
 src/__tests__/overlay-tokens.test.ts
 src/components/Agents/directory/directory-tree.test.ts
 src/components/Agents/live/live-model.test.ts
+src/components/CloisterStatusBar.test.tsx
 src/components/CommandDeck/CommandDeck.test.tsx
 src/components/CommandDeck/ProjectTree/FeatureItem.linkedConversation.test.tsx
 src/components/CommandDeck/ProjectTree/FeatureItem.pullRequest.test.tsx
@@ -39,6 +44,10 @@ src/components/CommandDeck/__tests__/useConversationMutations.stop.test.tsx
 src/components/CommandDeck/__tests__/useConversationMutations.triage.test.tsx
 src/components/CommandDeck/__tests__/useDefaultDeckSelection.test.ts
 src/components/CommandPalette.test.tsx
+src/components/DeaconPauseToggle.test.tsx
+src/components/StaleBuildChip.test.tsx
+src/components/SystemHealthPill.test.tsx
+src/components/__tests__/StoppedAgentsBanner.test.tsx
 src/components/dock/__tests__/workDockStore.test.ts
 src/components/EmergencyStopOverlay.test.tsx
 src/components/EventRouter.test.tsx
@@ -290,6 +299,7 @@ src/components/flywheel/__tests__/FlywheelLaneBoard.test.tsx
 src/components/flywheel/__tests__/FlywheelNeedsYouCards.test.tsx
 src/components/flywheel/__tests__/FlywheelShippedToday.test.tsx
 src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx
+src/components/flywheel/__tests__/NeedsYouIndicator.test.tsx
 src/components/home/__tests__/AnywhereSetUpRow.test.tsx
 src/components/home/__tests__/HomeComposer.test.tsx
 src/components/home/__tests__/HomeComposerProjectChip.test.tsx
@@ -365,6 +375,7 @@ src/components/sessionFeed/__tests__/gauntletRunEntries.test.ts
 src/components/sessionFeed/__tests__/useActivityEntryFeed.test.ts
 src/components/sessionFeed/__tests__/useConversationFeed.test.ts
 src/components/sessionFeed/__tests__/useMergedFeed.test.ts
+src/components/shared/ContextMenu.test.tsx
 src/components/shared/ModelPicker/ModelPicker.render.test.tsx
 src/components/shared/ModelPicker/__tests__/harnessRows.test.ts
 src/components/shared/__tests__/Modal.test.tsx
@@ -376,6 +387,7 @@ src/components/skills/useIssueSkillOverrideCount.test.tsx
 src/components/skills/SkillControls.test.tsx
 src/components/skills/SkillOverridesPanel.test.tsx
 src/components/skills/SkillPacksSection.test.tsx
+src/components/system-health-ui-no-loss.test.tsx
 src/components/terminal/TerminalDrawer.pending.test.tsx
 src/components/terminal/terminalControlFrames.test.ts
 src/components/workspace/new/__tests__/smartField.test.ts
@@ -433,6 +445,7 @@ src/lib/shortcuts/__tests__/registry.test.ts
 src/lib/shortcuts/__tests__/ShortcutsSheet.test.tsx
 src/lib/simple/uiMode.test.ts
 src/lib/simple/useSimpleActions.test.tsx
+src/pages/HomePage.test.tsx
 src/pages/__tests__/FlywheelPage.test.tsx
 src/pages/__tests__/NewProjectPage.no-loss.test.tsx
 src/pages/__tests__/NewWorkspacePage.test.tsx
