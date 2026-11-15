@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5295",
   "created": "2026-11-15T19:39:19.043Z",
-  "updated": "2026-11-15T19:43:38.865Z",
+  "updated": "2026-11-15T19:43:43.039Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,6 +64,11 @@
     "dock-files-filter.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T19:43:38.865Z"
+    },
+    "diff-window": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5295",
+      "claimedAt": "2026-11-15T19:43:43.039Z"
     }
   }
 }
