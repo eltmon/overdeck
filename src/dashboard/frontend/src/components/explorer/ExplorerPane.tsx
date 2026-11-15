@@ -8,10 +8,12 @@
 // the old changed-files list: it shows a tree synthesized from git status
 // (D-B8). Go to file and content search belong to the dock.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
-import { ChevronsDownUp, ChevronsUpDown, Eye, EyeOff, FilePlus, FolderPlus, RefreshCw } from 'lucide-react'
+import { forwardRef, useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
+import { Check, ChevronsDownUp, FilePlus, MoreHorizontal } from 'lucide-react'
+import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
 
+import { MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu'
 import { useStageDeck } from '../Stage/StageDeckContext'
 import { useDeleteFlow } from './actions/useDeleteFlow'
 import { useExplorerActions } from './actions/useExplorerActions'
@@ -57,19 +59,13 @@ function PaneMessage({ children }: { children: ReactNode }) {
   return <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground">{children}</div>
 }
 
-function HeaderButton({
-  label,
-  onClick,
-  disabled,
-  children,
-}: {
-  label: string
-  onClick(): void
-  disabled?: boolean
-  children: ReactNode
-}) {
+const HeaderButton = forwardRef<HTMLButtonElement, { label: string; onClick(): void; disabled?: boolean; children: ReactNode }>(function HeaderButton(
+  { label, onClick, disabled, children },
+  ref,
+) {
   return (
     <button
+      ref={ref}
       type="button"
       title={label}
       aria-label={label}
@@ -79,6 +75,112 @@ function HeaderButton({
     >
       {children}
     </button>
+  )
+})
+
+/** The tree filter (B-D12): every file, the git-status tree, or what the scoped conversation changed. */
+type FilesFilter = 'all' | 'changed' | 'mine'
+
+const FILTER_LINE: Record<Exclude<FilesFilter, 'all'>, string> = {
+  changed: 'Showing changed files',
+  mine: 'Showing files this conversation changed',
+}
+
+function CheckMark({ on }: { on: boolean }) {
+  return <Check className={`h-3.5 w-3.5 shrink-0 ${on ? '' : 'invisible'}`} aria-hidden />
+}
+
+interface ViewOptionsProps {
+  filter: FilesFilter
+  conversationScope: boolean
+  notGit: boolean
+  showIgnored: boolean
+  showDotfiles: boolean
+  writable: boolean
+  expanding: boolean
+  onFilter(filter: FilesFilter): void
+  onShowIgnored(show: boolean): void
+  onShowDotfiles(show: boolean): void
+  onNewFolder(): void
+  onExpandAll(): void
+  onRefresh(): void
+}
+
+/** The ⋯ View options menu of the Files header (B-D12, §6.9). */
+function ViewOptionsMenu(props: ViewOptionsProps) {
+  const { filter, conversationScope, notGit, showIgnored, showDotfiles, writable, expanding } = props
+  const buttonRef = useRef<HTMLButtonElement | null>(null)
+  const [position, setPosition] = useState<{ top: number; right: number } | null>(null)
+  const close = () => setPosition(null)
+  const run = (action: () => void) => () => {
+    close()
+    action()
+  }
+  const toggleOpen = () => {
+    if (position) return close()
+    const rect = buttonRef.current?.getBoundingClientRect()
+    setPosition({ top: (rect?.bottom ?? 0) + 4, right: Math.max(8, window.innerWidth - (rect?.right ?? 0)) })
+  }
+  const radio = (value: FilesFilter, label: string, disabledReason?: string) => (
+    <MenuItemButton
+      role="menuitemradio"
+      aria-checked={filter === value}
+      disabled={disabledReason !== undefined}
+      title={disabledReason}
+      onClick={run(() => props.onFilter(value))}
+    >
+      <CheckMark on={filter === value} />
+      {label}
+    </MenuItemButton>
+  )
+  return (
+    <>
+      <HeaderButton ref={buttonRef} label="View options" onClick={toggleOpen}>
+        <MoreHorizontal className="h-3.5 w-3.5" />
+      </HeaderButton>
+      {position &&
+        createPortal(
+          <>
+            <MenuOverlay onClick={close} />
+            <MenuSurface
+              aria-label="View options"
+              onClose={close}
+              returnFocusRef={buttonRef}
+              className="fixed z-[1000] min-w-[230px]"
+              style={{ position: 'fixed', top: position.top, right: position.right }}
+            >
+              {radio('all', 'Show all files')}
+              {radio('changed', 'Only changed files', notGit ? 'Not a git repository' : undefined)}
+              {conversationScope && radio('mine', 'Only what this conversation changed')}
+              <MenuSeparator />
+              <MenuItemButton role="menuitemcheckbox" aria-checked={showIgnored} onClick={run(() => props.onShowIgnored(!showIgnored))}>
+                <CheckMark on={showIgnored} />
+                Show git-ignored files
+              </MenuItemButton>
+              <MenuItemButton role="menuitemcheckbox" aria-checked={showDotfiles} onClick={run(() => props.onShowDotfiles(!showDotfiles))}>
+                <CheckMark on={showDotfiles} />
+                Show dotfiles
+              </MenuItemButton>
+              <MenuSeparator />
+              {writable && (
+                <MenuItemButton onClick={run(props.onNewFolder)}>
+                  <CheckMark on={false} />
+                  New folder
+                </MenuItemButton>
+              )}
+              <MenuItemButton disabled={expanding || filter !== 'all'} onClick={run(props.onExpandAll)}>
+                <CheckMark on={false} />
+                Expand all folders
+              </MenuItemButton>
+              <MenuItemButton onClick={run(props.onRefresh)}>
+                <CheckMark on={false} />
+                Refresh
+              </MenuItemButton>
+            </MenuSurface>
+          </>,
+          document.body,
+        )}
+    </>
   )
 }
 
@@ -94,7 +196,7 @@ export interface ExplorerFilesProps {
   onFindInFolder(dirPath: string): void
 }
 
-export function ExplorerFiles({ rootId, deckKey, revealPath, onFindInFolder }: ExplorerFilesProps) {
+export function ExplorerFiles({ rootId, deckKey, changedPaths: scopeChangedPaths, conversationScope, revealPath, onFindInFolder }: ExplorerFilesProps) {
   const parsed = parseRootId(rootId)
   const rootKind = parsed?.kind ?? 'workspace'
   const root: RootState | undefined = useExplorerStore((s) => s.roots[rootId])
@@ -190,17 +292,28 @@ export function ExplorerFiles({ rootId, deckKey, revealPath, onFindInFolder }: E
 
   const showDotfiles = root?.showDotfiles ?? true
   const showIgnored = root?.showIgnored ?? false
-  const changedOnly = root?.changedOnly ?? false
   const notGit = git.errorCode === 'NOT_A_GIT_REPO'
+  // 'changed' is the store's changedOnly; 'mine' needs a conversation scope.
+  const [filterChoice, setFilterChoice] = useState<FilesFilter>(() => (root?.changedOnly ? 'changed' : 'all'))
+  const filter: FilesFilter = filterChoice === 'mine' && !conversationScope ? 'all' : filterChoice
+  const changedOnly = filter !== 'all'
+  const setFilter = useCallback(
+    (next: FilesFilter) => {
+      setFilterChoice(next)
+      useExplorerStore.getState().setChangedOnly(rootId, next === 'changed')
+    },
+    [rootId],
+  )
 
   const rows: ExplorerTreeItem[] = useMemo(() => {
     if (!root) return []
-    if (changedOnly) {
+    if (filter === 'changed') {
       const changed = [...git.decorations.files].map(([path, d]) => ({ path, isDeleted: d.status === 'deleted' }))
       return projectChangedRows(changed, showDotfiles)
     }
+    if (filter === 'mine') return projectChangedRows([...scopeChangedPaths].map((path) => ({ path, isDeleted: false })), showDotfiles)
     return projectRows({ dirs: root.dirs, expanded: new Set(root.expanded), showDotfiles, showIgnored })
-  }, [root, changedOnly, git.decorations, showDotfiles, showIgnored])
+  }, [root, filter, git.decorations, scopeChangedPaths, showDotfiles, showIgnored])
 
   // The active code pane's file: open its folders and select it.
   useEffect(() => {
@@ -284,7 +397,7 @@ export function ExplorerFiles({ rootId, deckKey, revealPath, onFindInFolder }: E
     expand: (path) => useExplorerStore.getState().setExpanded(rootId, path, true),
     onMove: (paths, dir) => void actions.move(paths, dir),
     onFiles: (dt, dir) => {
-      if (changedOnly) toast.error('Turn off the Changed filter to add files.')
+      if (changedOnly) toast.error('Show all files to add files here.')
       else void uploadDroppedItems(snapshotDroppedItems(dt), dir, actions)
     },
   })
@@ -464,45 +577,39 @@ export function ExplorerFiles({ rootId, deckKey, revealPath, onFindInFolder }: E
         <span className="truncate font-mono text-foreground">{label}</span>
         {branch && <span className="min-w-0 truncate font-mono text-muted-foreground">{branch}</span>}
         <div className="ml-auto flex shrink-0 items-center gap-0.5">
-          <HeaderButton
-            label={showDotfiles ? 'Hide dotfiles' : 'Show dotfiles'}
-            onClick={() => useExplorerStore.getState().setShowDotfiles(rootId, !showDotfiles)}
-          >
-            {showDotfiles ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-          </HeaderButton>
-          <button
-            type="button"
-            aria-pressed={changedOnly}
-            disabled={notGit}
-            title={notGit ? 'Not a git repository' : 'Show only changed files'}
-            onClick={() => useExplorerStore.getState().setChangedOnly(rootId, !changedOnly)}
-            className={`h-6 rounded px-2 transition-colors disabled:pointer-events-none disabled:opacity-40 ${
-              changedOnly ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-            }`}
-          >
-            Changed
-          </button>
           {writable && (
-            <>
-              <HeaderButton label="New file" onClick={() => inline.startCreate('file')}>
-                <FilePlus className="h-3.5 w-3.5" />
-              </HeaderButton>
-              <HeaderButton label="New folder" onClick={() => inline.startCreate('dir')}>
-                <FolderPlus className="h-3.5 w-3.5" />
-              </HeaderButton>
-            </>
+            <HeaderButton label="New file" onClick={() => inline.startCreate('file')}>
+              <FilePlus className="h-3.5 w-3.5" />
+            </HeaderButton>
           )}
-          <HeaderButton label="Refresh" onClick={onRefresh}>
-            <RefreshCw className="h-3.5 w-3.5" />
-          </HeaderButton>
-          <HeaderButton label="Expand all" onClick={() => void onExpandAll()} disabled={expanding || changedOnly}>
-            <ChevronsUpDown className="h-3.5 w-3.5" />
-          </HeaderButton>
           <HeaderButton label="Collapse all" onClick={() => useExplorerStore.getState().collapseAll(rootId)} disabled={changedOnly}>
             <ChevronsDownUp className="h-3.5 w-3.5" />
           </HeaderButton>
+          <ViewOptionsMenu
+            filter={filter}
+            conversationScope={conversationScope}
+            notGit={notGit}
+            showIgnored={showIgnored}
+            showDotfiles={showDotfiles}
+            writable={writable}
+            expanding={expanding}
+            onFilter={setFilter}
+            onShowIgnored={(show) => useExplorerStore.getState().setShowIgnored(rootId, show)}
+            onShowDotfiles={(show) => useExplorerStore.getState().setShowDotfiles(rootId, show)}
+            onNewFolder={() => inline.startCreate('dir')}
+            onExpandAll={() => void onExpandAll()}
+            onRefresh={onRefresh}
+          />
         </div>
       </div>
+      {filter !== 'all' && (
+        <div className="flex items-center gap-2 border-b border-border px-3 py-1 text-[11px] text-muted-foreground" data-testid="explorer-filter-line">
+          <span>{FILTER_LINE[filter]}</span>
+          <button type="button" className="ml-auto rounded px-1.5 text-foreground hover:bg-accent" onClick={() => setFilter('all')}>
+            Show all
+          </button>
+        </div>
+      )}
       {notGit && <div className="border-b border-border px-3 py-1 text-[11px] text-muted-foreground">Not a git repository, so files show no git colors.</div>}
       {git.result?.truncated && (
         <div className="border-b border-border px-3 py-1 text-[11px] text-muted-foreground">Git status shows the first 20,000 changes.</div>

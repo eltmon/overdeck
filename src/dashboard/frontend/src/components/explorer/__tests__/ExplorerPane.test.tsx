@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach, onTestFinished } from 'vitest'
-import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { PanRpcError, type ExplorerEntry, type ExplorerListDirResult, type ExplorerWatchBatch } from '@overdeck/contracts'
 
@@ -74,6 +74,12 @@ function renderPane(props: Partial<ExplorerFilesProps> = {}, deck: StageDeckCont
     </DialogProvider>
   )
   return render(<QueryClientProvider client={qc}>{deck ? <StageDeckProvider value={deck}>{files}</StageDeckProvider> : files}</QueryClientProvider>)
+}
+
+/** Open the header's View options menu and return the item named `name`. */
+function viewOption(name: string): HTMLElement {
+  fireEvent.click(screen.getByRole('button', { name: 'View options' }))
+  return within(screen.getByRole('menu', { name: 'View options' })).getByText(name).closest('[role^="menuitem"]') as HTMLElement
 }
 
 function deckWith(over: Partial<StageDeckContextValue> = {}): StageDeckContextValue {
@@ -155,10 +161,15 @@ describe('ExplorerFiles', () => {
     renderPane()
     await screen.findByText('README.md')
     await waitFor(() => expect(rpc.gitStatus).toHaveBeenCalled())
-    fireEvent.click(screen.getByRole('button', { name: 'Changed' }))
+    fireEvent.click(viewOption('Only changed files'))
     expect(await screen.findByText('gone.ts')).toBeInTheDocument()
     expect(screen.queryByText('README.md')).toBeNull()
-    expect(screen.getByRole('button', { name: 'Changed' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('explorer-filter-line')).toHaveTextContent('Showing changed files')
+    // Show all restores the full tree.
+    fireEvent.click(screen.getByRole('button', { name: 'Show all' }))
+    expect(await screen.findByText('README.md')).toBeInTheDocument()
+    expect(screen.queryByTestId('explorer-filter-line')).toBeNull()
+    expect(viewOption('Show all files')).toHaveAttribute('aria-checked', 'true')
   })
 
   it('re-lists every loaded directory on a watch resync', async () => {
@@ -199,12 +210,14 @@ describe('ExplorerFiles', () => {
     expect(selectPanesForWorkspace(DECK)(usePanesStore.getState()).some((p) => p.paneType === 'code')).toBe(false)
   })
 
-  it('disables Changed on a non-git root', async () => {
+  it('disables Only changed files on a non-git root', async () => {
     rpc.gitStatus.mockRejectedValue(new PanRpcError({ message: 'no git', code: 'NOT_A_GIT_REPO' }))
     renderPane({ rootId: 'project:plain' })
     await screen.findByText('README.md')
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Changed' })).toBeDisabled())
-    expect(screen.getByRole('button', { name: 'Changed' })).toHaveAttribute('title', 'Not a git repository')
+    await screen.findByText('Not a git repository, so files show no git colors.')
+    const item = viewOption('Only changed files')
+    expect(item).toBeDisabled()
+    expect(item).toHaveAttribute('title', 'Not a git repository')
   })
 
   it('registers no explorer-scoped shortcuts', async () => {
@@ -216,6 +229,48 @@ describe('ExplorerFiles', () => {
     const ids = result.current.map((d) => d.id)
     expect(ids).not.toContain('explorer.quick-open')
     expect(ids).not.toContain('explorer.content-search')
+  })
+
+  it('lists the view items, with the conversation filter only for a conversation scope', async () => {
+    const { unmount } = renderPane({ conversationScope: true })
+    await screen.findByText('README.md')
+    fireEvent.click(screen.getByRole('button', { name: 'View options' }))
+    const menu = within(screen.getByRole('menu', { name: 'View options' }))
+    for (const name of ['Show all files', 'Only changed files', 'Only what this conversation changed', 'Show git-ignored files', 'Show dotfiles']) {
+      expect(menu.getByText(name)).toBeInTheDocument()
+    }
+    expect(menu.getByText('Show all files').closest('[role="menuitemradio"]')).toHaveAttribute('aria-checked', 'true')
+    unmount()
+    renderPane({ conversationScope: false })
+    await screen.findByText('README.md')
+    fireEvent.click(screen.getByRole('button', { name: 'View options' }))
+    expect(within(screen.getByRole('menu', { name: 'View options' })).queryByText('Only what this conversation changed')).toBeNull()
+  })
+
+  it('shows only the conversation changes with its filter line', async () => {
+    renderPane({ conversationScope: true, changedPaths: new Set(['src/a.ts']) })
+    await screen.findByText('README.md')
+    fireEvent.click(viewOption('Only what this conversation changed'))
+    expect(await screen.findByText('a.ts')).toBeInTheDocument()
+    expect(screen.queryByText('README.md')).toBeNull()
+    expect(screen.getByTestId('explorer-filter-line')).toHaveTextContent('Showing files this conversation changed')
+  })
+
+  it('toggles git-ignored files and dotfiles from View options, and runs its actions', async () => {
+    renderPane()
+    await screen.findByText('README.md')
+    fireEvent.click(viewOption('Show git-ignored files'))
+    expect(useExplorerStore.getState().roots['issue:PAN-1'].showIgnored).toBe(true)
+    expect(viewOption('Show git-ignored files')).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Show dotfiles' }))
+    expect(useExplorerStore.getState().roots['issue:PAN-1'].showDotfiles).toBe(false)
+    const calls = rpc.listDir.mock.calls.length
+    fireEvent.click(viewOption('Refresh'))
+    await waitFor(() => expect(rpc.listDir.mock.calls.length).toBeGreaterThan(calls))
+    fireEvent.click(viewOption('Expand all folders'))
+    await waitFor(() => expect(useExplorerStore.getState().roots['issue:PAN-1'].expanded).toContain('src'))
+    fireEvent.click(viewOption('New folder'))
+    expect(screen.getByRole('textbox', { name: 'New folder name' })).toBeInTheDocument()
   })
 
   it('reveals and selects the revealPath file (PAN-5289)', async () => {
@@ -318,7 +373,7 @@ describe('ExplorerFiles', () => {
       renderPane()
       await screen.findByText('README.md')
       act(() => useExplorerStore.getState().select('issue:PAN-1', 'src', 'replace', ['src']))
-      fireEvent.click(screen.getByRole('button', { name: 'New folder' }))
+      fireEvent.click(viewOption('New folder'))
       const input = screen.getByRole('textbox', { name: 'New folder name' })
       fireEvent.change(input, { target: { value: 'lib' } })
       fireEvent.keyDown(input, { key: 'Enter' })
@@ -341,7 +396,7 @@ describe('ExplorerFiles', () => {
       renderPane({ rootId: 'project:overdeck' })
       await screen.findByText('README.md')
       expect(screen.getByRole('button', { name: 'New file' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'New folder' })).toBeInTheDocument()
+      expect(viewOption('New folder')).toBeInTheDocument()
     })
 
     it('shows Rename and Delete but no Stage in a project-root context menu', async () => {
@@ -356,9 +411,10 @@ describe('ExplorerFiles', () => {
       renderPane()
       await screen.findByText('README.md')
       await waitFor(() => expect(rpc.gitStatus).toHaveBeenCalled())
-      fireEvent.click(screen.getByRole('button', { name: 'Changed' }))
+      fireEvent.click(viewOption('Only changed files'))
       await waitFor(() => expect(screen.queryByRole('button', { name: 'New file' })).toBeNull())
-      expect(screen.queryByRole('button', { name: 'New folder' })).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: 'View options' }))
+      expect(within(screen.getByRole('menu', { name: 'View options' })).queryByText('New folder')).toBeNull()
     })
 
     it('opens the menu with New file and New folder on an empty root', async () => {
