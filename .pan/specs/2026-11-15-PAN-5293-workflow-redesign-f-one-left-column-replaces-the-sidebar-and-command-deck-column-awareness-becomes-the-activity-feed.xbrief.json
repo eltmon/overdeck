@@ -4,17 +4,17 @@
     "created": "2026-11-15T06:56:07Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5293: Workflow redesign F: one left column replaces the sidebar and Command Deck column; Awareness becomes the Activity feed",
-    "updated": "2026-11-15T06:56:15.313Z"
+    "updated": "2026-11-15T06:57:27.104Z"
   },
   "plan": {
     "id": "pan-5293",
     "title": "Workflow redesign F: one left column replaces the sidebar and Command Deck column; Awareness becomes the Activity feed",
-    "status": "proposed",
+    "status": "running",
     "uid": "29ad49df-0199-459f-b620-d900ffa3f6a1",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T06:56:07Z",
-    "updated": "2026-11-15T06:56:15.313Z",
+    "updated": "2026-11-15T06:57:27.104Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5293",
@@ -2186,5 +2186,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
