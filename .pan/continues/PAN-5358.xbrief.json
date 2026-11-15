@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5358",
   "created": "2026-11-15T16:13:08.101Z",
-  "updated": "2026-11-15T18:19:42.240Z",
+  "updated": "2026-11-15T18:19:52.766Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -200,6 +200,11 @@
     "cli-reindex-sync.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T18:19:42.240Z"
+    },
+    "docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5358",
+      "claimedAt": "2026-11-15T18:19:52.765Z"
     }
   }
 }
