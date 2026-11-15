@@ -629,6 +629,46 @@ browser on the same machine, and finish the sign-in.
 ~/.overdeck/bin/cliproxy -config ~/.overdeck/cliproxy/config.yaml -claude-login -no-browser
 ```
 
+#### Account pool and reset-first routing
+
+A provider can have several accounts in CLIProxy's auth dir
+(`~/.overdeck/cliproxy/auth/`), for example two ChatGPT logins. CLIProxy picks
+from the highest-priority tier of a provider's accounts. When an account's
+weekly window resets, any quota it has not used is lost, so the host dashboard
+sets each account's `priority` so that **the account whose weekly quota resets
+soonest gets the highest priority**:
+
+- Ranking covers `codex` and `claude` accounts only, per provider, and runs
+  only when a provider has 2 or more eligible accounts (enabled, usage read
+  without error, weekly window known). With one account, nothing is written.
+- Eligible accounts that are not exhausted get priorities `n × 10` down to `10`
+  in order of the soonest weekly reset. Ties go to the lower weekly used
+  percent, then to the lower `auth_index`. Exhausted accounts get `0`, so
+  CLIProxy uses them only when nothing else is available.
+- Overdeck owns `priority` on eligible accounts and rewrites it every 5 minutes
+  (and 10 seconds after the dashboard starts). Accounts it cannot read, and
+  disabled accounts, keep whatever priority they have. There is no setting to
+  turn this off.
+- **To take an account out of rotation,** set `"disabled": true` in its auth
+  file. The Codex auth bridge keeps `disabled`, `priority` and `weight` when it
+  rewrites `codex-primary.json` from `~/.codex/auth.json`.
+- Session affinity (above) still holds: a running conversation stays on its
+  account even when priorities change. Priority decides only new sessions,
+  requests without a session, and failover.
+
+Overdeck reads usage through the localhost management API (the key in
+`management-key`), sending each provider's usage request with that account's
+own token. It never redeems reset credits. Settings → Providers → **CLIProxy
+accounts** shows each account's windows, reset times, rank and state;
+`GET /api/cliproxy/accounts` returns the same snapshot (`?refresh=1` forces a
+fresh read; otherwise it is at most 5 minutes old).
+
+Your `routing:` and `management:` values in `config.extra.yaml` are deep-merged
+over the generated ones, so they win on conflicts. If the panel says "CLIProxy
+management API is off" after a key change, delete both `management-key` and
+`config.yaml` in `~/.overdeck/cliproxy/`, then run `pan restart --cliproxy`;
+Overdeck generates a new key and config on start.
+
 ### Important Notes
 
 - This configures **Claude Code** (the CLI tool), not Overdeck's agent routing

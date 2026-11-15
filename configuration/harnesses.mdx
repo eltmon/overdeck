@@ -1234,6 +1234,12 @@ CLIProxy auto-installs its pinned release on Linux, macOS, and Windows for amd64
 arm64 systems. On Windows, the sidecar is installed as `~/.overdeck/bin/cliproxy.exe`
 using the OS-bundled `curl` and `tar` tools.
 
+When CLIProxy holds two or more logins for one provider (for example two ChatGPT
+accounts), the host dashboard routes new sessions to the account whose weekly
+quota resets soonest, so quota is not lost at the reset. Settings → Providers →
+**CLIProxy accounts** shows each account's usage windows, reset times and routing
+rank. See "Account pool and reset-first routing" in `docs/CONFIGURATION.md`.
+
 ### When to pick which
 
 - **Default to `claude-code`** for Anthropic-subscription users and for roles

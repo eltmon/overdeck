@@ -160,6 +160,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   // ── cliproxy.ts ───────────────────────────────────────────────────────────
   { surface: 'GET /api/cliproxy/status',                  kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'CLIProxy status probe; outside 8 remodel domains' },
   { surface: 'POST /api/cliproxy/restart',                kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'CLIProxy restart; outside 8 remodel domains' },
+  { surface: 'GET /api/cliproxy/accounts',               kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'CLIProxy pooled-account usage (PAN-5278); outside 8 remodel domains' },
 
   // ── cloister.ts ───────────────────────────────────────────────────────────
   { surface: 'GET /api/cloister/status',                  kind: 'http', disposition: 'AGGREGATE',   door: 'CloisterRuntime.getStatus recomposed' },
