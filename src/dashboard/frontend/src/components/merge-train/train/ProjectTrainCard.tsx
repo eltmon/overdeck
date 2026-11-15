@@ -18,7 +18,7 @@ import { useConfirm } from '../../DialogProvider';
 import { canRetryAssembly, retryAssemblyConfirmCopy } from '../mergeTrainCopy';
 import { ToggleSwitch } from '../../flywheel/primitives';
 import { postJson } from '../mergeTrainApi';
-import type { BoardProject, UatGenerationPayload } from './boardTypes';
+import type { BoardProject } from './boardTypes';
 import { BatchCard } from './BatchCard';
 import { Pill } from './CarStatusPill';
 import { OlderBatchRow } from './OlderBatchRow';
@@ -39,13 +39,9 @@ import {
   trainOffBanner,
 } from './trainCopy';
 import { inLiveHeroBatch, useInvalidateBoard, useNow, type LiveMergeRun } from './useMergeTrainBoard';
+import { pickHeroBatch } from './batchSections';
 
-/** The hero batch: newest assembling/ready, else newest superseded. Batches arrive newest first. */
-export function pickHeroBatch(batches: readonly UatGenerationPayload[]): UatGenerationPayload | null {
-  return batches.find((b) => b.status === 'assembling' || b.status === 'ready')
-    ?? batches.find((b) => b.status === 'superseded')
-    ?? null;
-}
+export { pickHeroBatch } from './batchSections';
 
 export interface ProjectTrainCardProps {
   project: BoardProject;
