@@ -853,7 +853,7 @@ describe('head-of-line fairness (PAN-5285)', () => {
     await driveUntil(() => onFirstWaiting.mock.calls.some(([reason]) => reason.kind === 'cpu'))
     const secondPromise = acquireQualityGateAdmission(small, fairDeps(rootDir, () => 2, () => 16 * GiB, { ...cpu, onWaiting }))
     const secondSettled = settledFlag(secondPromise)
-    await drive(10)
+    await drive(200, () => onWaiting.mock.calls.length > 0)
 
     // The first waiter fits memory and waits on CPU, so the second may not pass it.
     expect(secondSettled()).toBe(false)
@@ -878,7 +878,7 @@ describe('head-of-line fairness (PAN-5285)', () => {
     clock = 2_000
     const secondPromise = acquireQualityGateAdmission(small, fairDeps(rootDir, () => clock, () => 16 * GiB, { ...both, onWaiting: onSecondWaiting }))
     const secondSettled = settledFlag(secondPromise)
-    await drive(10)
+    await drive(200, () => onSecondWaiting.mock.calls.length > 0)
 
     // Past the bound, nobody passes the head while the held slot drains.
     expect(headSettled()).toBe(false)
