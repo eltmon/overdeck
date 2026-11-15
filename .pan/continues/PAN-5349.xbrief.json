@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5349",
   "created": "2026-11-15T15:32:54.289Z",
-  "updated": "2026-11-15T16:19:10.194Z",
+  "updated": "2026-11-15T16:19:18.870Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,11 @@
     "open-path-in-deck.ac5": {
       "status": "completed",
       "doneAt": "2026-11-15T16:19:10.193Z"
+    },
+    "ui-commands-host": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5349",
+      "claimedAt": "2026-11-15T16:19:18.869Z"
     }
   }
 }
