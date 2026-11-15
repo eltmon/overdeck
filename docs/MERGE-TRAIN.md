@@ -23,7 +23,8 @@ merge mechanics after a PR is chosen are in [MERGE-WORKFLOW.md](MERGE-WORKFLOW.m
 | **Car** | One issue on the train: an open PR a review approved, or an issue with a live auto-merge row or merge run. |
 | **Batch** (generation) | A `uat/<label>-<codename>-<MMDD>-<n>` branch merging several ready features for joint testing, stored in `uat_generations`. |
 | **Live batch** | A batch with status `assembling`, `ready` or `superseded`. |
-| **Superseded** | A batch a newer one replaced (its base moved or its input set changed). Still testable and promotable. |
+| **Superseded** | A batch a newer one replaced (main moved by a code commit, or its input set changed). Still testable and promotable. |
+| **Bookkeeping commit** | A commit that touches only `BOOKKEEPING_PATH_GLOBS` (`.pan/**`, `.overdeck/memory/**`; `src/lib/cloister/bookkeeping-paths.ts`). CI's `paths-ignore` is the same list, and a test fails if the two drift. |
 | **Invalidated** (voided) | A batch whose content can no longer be trusted. Cannot be promoted. |
 | **Status reason** | `uat_generations.status_reason`: one sentence saying why a batch became `superseded` or `invalidated`. |
 | **Cooldown** | `AUTO_MERGE_COOLDOWN_MS` (5 minutes) between scheduling an auto-merge and merging it. Cancel works during it. |
@@ -106,6 +107,32 @@ listings the ready set reads, from any member repo in a polyrepo project. It is
 read once per tick and only while a live batch exists. If that read fails, the
 less specific "no longer ready to merge" reason is used. The generations payload and the board carry `statusReason`, and the
 UI never hides a voided or superseded batch.
+
+### When a batch is rebuilt
+
+Each tick, the reconciler assembles a new batch only when no live batch
+answers the ready set. A live batch answers it when its members, held-out
+features and branch heads match the ready set, and its base is still main's
+head. Main moving past the base counts as no change (PAN-5356) when all
+three of these hold:
+
+- the base is an ancestor of main;
+- every commit between them is a bookkeeping commit, checked per commit with
+  renames split, so a code change and its revert still count;
+- none of those commits touches a file the batch changes.
+
+The third rule keeps a kept batch promotable: promote refuses as
+`stale-base` when main's new commits overlap the batch's files, and the
+reconciler would never rebuild a batch it kept. The check
+(`isBookkeepingOnlyBaseMove` in `uat-generation-deps.ts`) runs for monorepo
+projects only. A polyrepo batch, a failed check, or any other main move
+rebuilds the batch as before. Bookkeeping-only churn also leaves a recent
+failed assembly's 10-minute backoff in force. When the batch merges, the
+bookkeeping commits come in with it.
+
+Before this rule, a writer pushing bookkeeping commits every one to three
+minutes rebuilt the batch each time. No batch lived long enough for its
+roughly 25-minute combined CI to finish.
 
 ## Strikes
 

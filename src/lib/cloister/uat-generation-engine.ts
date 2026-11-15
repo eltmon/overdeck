@@ -16,6 +16,7 @@
  * uat-generation-deps.ts for the real wiring), so every path — happy,
  * conflict-resolved, held-out, failed — is unit-testable with fake deps.
  */
+import type { BaseMove } from './bookkeeping-paths.js';
 import { makeUniqueUatCandidateName } from './uat-candidate-name.js';
 import {
   applyUnionLintPlan,
@@ -83,6 +84,13 @@ export interface GenerationGitDeps {
   branchHeadSha(branch: string): Promise<string>;
   /** Whether a UAT branch tip is already contained in the target branch. */
   isBranchContainedInMain?(branch: string): Promise<boolean>;
+  /**
+   * PAN-5356: true when `fromSha` is an ancestor of `toSha` and every commit
+   * between them touches only bookkeeping paths (`BOOKKEEPING_PATH_GLOBS`),
+   * none of them a file `batchBranch` changes. Used by the reconciler, not
+   * the engine. Omitted, false or a rejection all mean "the base really moved".
+   */
+  isBookkeepingOnlyBaseMove?(move: BaseMove): Promise<boolean>;
   /**
    * Merge a feature branch into the generation worktree. On conflict the
    * worktree is left MID-CONFLICT (the hook needs that state); the engine
