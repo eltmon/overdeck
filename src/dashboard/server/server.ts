@@ -139,6 +139,7 @@ import { conversationAttachmentRoutes } from './routes/conversation-attachments.
 import { eventsRouteLayer } from './routes/events.js';
 import { projectsRouteLayer } from './routes/projects.js';
 import { projectsMergeTrainRouteLayer } from './routes/projects-merge-train.js';
+import { projectChangesRouteLayer } from './routes/project-changes.js';
 import { mergeTrainRouteLayer } from './routes/merge-train.js';
 import { mergeTrainLanesRouteLayer } from './routes/merge-train-lanes.js';
 import { flywheelRouteLayer } from './routes/flywheel.js';
@@ -443,6 +444,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   eventsRouteLayer,
   projectsRouteLayer,
   projectsMergeTrainRouteLayer,
+  projectChangesRouteLayer,
   mergeTrainRouteLayer,
   mergeTrainLanesRouteLayer,
   flywheelRouteLayer,
