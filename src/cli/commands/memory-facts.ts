@@ -2,7 +2,7 @@
 import { execFile } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { promisify } from 'node:util';
 import { Command } from 'commander';
 import chalk from 'chalk';
@@ -20,6 +20,7 @@ import {
   removeMemoryFact,
   userMemoryDir,
   writeMemoryFact,
+  writeSupersedingFact,
 } from '../../lib/memory/facts/store.js';
 import {
   isOperatorMemorySynced,
@@ -100,13 +101,21 @@ function printWriteResult(
   verb: 'Wrote' | 'Removed',
   json: boolean | undefined,
   sync: OperatorMemorySyncOutcome | undefined,
+  superseded?: readonly string[],
 ): void {
   if (json) {
-    console.log(JSON.stringify(sync ? { file, sync } : { file }, null, 2));
+    console.log(JSON.stringify({ file, ...(superseded ? { superseded } : {}), ...(sync ? { sync } : {}) }, null, 2));
     return;
   }
   console.log(chalk.green(`✓ ${verb} ${file}`));
+  for (const supersededFile of superseded ?? []) console.log(chalk.green(`✓ Marked superseded ${supersededFile}`));
   if (sync) for (const line of formatSyncOutcome(sync).lines) console.log(line);
+}
+
+/** `git add` hint for a project-store write: the fact plus every fact it marked superseded (PAN-5360). */
+function projectCommitHint(root: string | null, files: readonly string[]): string {
+  const paths = files.map((file) => `${PROJECT_MEMORY_RELATIVE}/${basename(file)}`).join(' ');
+  return `  Commit it: git -C ${root} add ${paths}`;
 }
 
 export interface MemoryFactShowOptions extends FactTargetFlags {}
@@ -171,6 +180,10 @@ export interface MemoryFactAddOptions extends FactTargetFlags {
   body?: string;
   bodyFile?: string;
   tags?: string;
+  /** PAN-5360: free-text attribution (who or what made the rule, and when). */
+  source?: string;
+  /** PAN-5360: comma-separated ids of facts this one replaces, in the same store. */
+  supersedes?: string;
   json?: boolean;
   /** Injectable for tests; defaults to the real `git check-ignore` call (D11). */
   checkIgnored?: (root: string, relativePath: string) => Promise<boolean>;
@@ -212,28 +225,37 @@ export async function memoryFactAddCommand(id: string, options: MemoryFactAddOpt
   }
 
   const body = options.body ?? (options.bodyFile ? await readFile(options.bodyFile, 'utf8') : '');
+  const today = new Date().toISOString().slice(0, 10);
+  const supersedes = parseTags(options.supersedes);
+  const fact = {
+    id,
+    type: options.type,
+    title: options.title ?? defaultFactTitle(id),
+    description: options.description,
+    tags: parseTags(options.tags),
+    created: today,
+    updated: today,
+    source: options.source ?? null,
+    review: [],
+    body,
+  };
   let file: string;
+  let supersededFiles: string[] = [];
   try {
-    file = await writeMemoryFact(target.dir, target.scope, {
-      id,
-      type: options.type,
-      title: options.title ?? defaultFactTitle(id),
-      description: options.description,
-      tags: parseTags(options.tags),
-      updated: new Date().toISOString().slice(0, 10),
-      source: null,
-      review: [],
-      body,
-    });
+    if (supersedes.length > 0) {
+      ({ file, supersededFiles } = await writeSupersedingFact(target.dir, target.scope, fact, supersedes, { overwrite: false, today }));
+    } else {
+      file = await writeMemoryFact(target.dir, target.scope, fact);
+    }
   } catch (err) {
     console.error(chalk.red(err instanceof Error ? err.message : String(err)));
     return exitCli(1);
   }
 
   const sync = await syncAfterUserWrite(target, options.syncOperator);
-  printWriteResult(file, 'Wrote', options.json, sync);
+  printWriteResult(file, 'Wrote', options.json, sync, supersedes.length > 0 ? supersededFiles : undefined);
   if (options.json) return;
-  if (target.scope === 'project') console.log(`  Commit it: git -C ${target.root} add ${PROJECT_MEMORY_RELATIVE}/${id}.md`);
+  if (target.scope === 'project') console.log(projectCommitHint(target.root, [file, ...supersededFiles]));
 }
 
 export interface MemoryFactEditOptions extends FactTargetFlags {
@@ -419,6 +441,8 @@ export function registerMemoryFactCommands(memory: Command): void {
     .option('--body <text>', 'Fact body')
     .option('--body-file <path>', 'Read the fact body from a file')
     .option('--tags <a,b>', 'Comma-separated tags')
+    .option('--source <text>', 'Who or what made this rule, and when (for example "twitch:alice 2026-11-10 14:20")')
+    .option('--supersedes <ids>', 'Comma-separated ids of facts this one replaces; marks them superseded (same store)')
     .option('--project <key>', 'Project key (defaults to the project owning the cwd)')
     .option('--user', 'Write to the operator store (travels with you; synced when set up)')
     .option('--machine', 'Write to the machine store (this machine only)')

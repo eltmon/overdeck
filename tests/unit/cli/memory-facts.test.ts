@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -20,6 +20,7 @@ vi.mock('../../../src/lib/memory/cli.js', async (importOriginal) => {
 });
 
 import { readMemoryFactsSync } from '../../../src/lib/memory/facts/store.js';
+import { renderManagedMemorySections } from '../../../src/lib/memory/facts/render.js';
 import {
   memoryFactAddCommand,
   memoryFactEditCommand,
@@ -252,6 +253,67 @@ describe('pan memory curated-fact commands (PAN-3957)', () => {
       expect(output).toContain('Commit it: git -C');
       const { facts } = readMemoryFactsSync(join(projectRoot, '.overdeck', 'memory'), 'project');
       expect(facts.map((f) => f.id)).toEqual(['new-fact']);
+    });
+
+    it('add x --source "twitch:alice" --supersedes y writes both links and drops y from the launch index', async () => {
+      const dir = join(projectRoot, '.overdeck', 'memory');
+      await memoryFactAddCommand('old-rule', baseAddOptions({ description: 'Old arrival rule.' }));
+      logSpy.mockClear();
+
+      await memoryFactAddCommand('new-rule', baseAddOptions({
+        description: 'New arrival rule.',
+        source: 'twitch:alice',
+        supersedes: 'old-rule',
+      }));
+
+      const today = new Date().toISOString().slice(0, 10);
+      const newText = readFileSync(join(dir, 'new-rule.md'), 'utf8');
+      expect(newText).toContain('source: twitch:alice');
+      expect(newText).toContain(`created: ${today}`);
+      expect(newText).toMatch(/supersedes:\n {2}- old-rule/);
+      const oldText = readFileSync(join(dir, 'old-rule.md'), 'utf8');
+      expect(oldText).toContain('status: superseded');
+      expect(oldText).toContain('superseded_by: new-rule');
+
+      const output = logSpy.mock.calls.flat().join('\n');
+      expect(output).toContain(`✓ Marked superseded ${join(dir, 'old-rule.md')}`);
+
+      const rendered = renderManagedMemorySections(projectRoot, {
+        userDir: join(tmpRoot, 'no-user'),
+        machineDir: join(tmpRoot, 'no-machine'),
+      });
+      expect(rendered).toContain('/new-rule:');
+      expect(rendered).not.toContain('/old-rule:');
+    });
+
+    it('add --supersedes missing exits 1 and writes no file', async () => {
+      const dir = join(projectRoot, '.overdeck', 'memory');
+      await expect(
+        memoryFactAddCommand('new-rule', baseAddOptions({ supersedes: 'missing' })),
+      ).rejects.toThrow();
+      expect(exitCodes).toEqual([1]);
+      expect(errorSpy.mock.calls.flat().join('\n')).toContain('no fact "missing"');
+      expect(existsSync(join(dir, 'new-rule.md'))).toBe(false);
+    });
+
+    it('add prints a git add hint naming both files', async () => {
+      await memoryFactAddCommand('old-rule', baseAddOptions());
+      logSpy.mockClear();
+      await memoryFactAddCommand('new-rule', baseAddOptions({ supersedes: 'old-rule' }));
+      expect(logSpy.mock.calls.flat().join('\n')).toContain(
+        `Commit it: git -C ${projectRoot} add .overdeck/memory/new-rule.md .overdeck/memory/old-rule.md`,
+      );
+    });
+
+    it('add --json with --supersedes reports the superseded files', async () => {
+      const dir = join(projectRoot, '.overdeck', 'memory');
+      await memoryFactAddCommand('old-rule', baseAddOptions());
+      logSpy.mockClear();
+      await memoryFactAddCommand('new-rule', baseAddOptions({ supersedes: 'old-rule', json: true }));
+      expect(JSON.parse(String(logSpy.mock.calls[0][0]))).toEqual({
+        file: join(dir, 'new-rule.md'),
+        superseded: [join(dir, 'old-rule.md')],
+      });
     });
 
     it('refuses outside a registered project', async () => {
