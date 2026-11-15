@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5293",
   "created": "2026-11-15T06:57:45.448Z",
-  "updated": "2026-11-15T08:27:25.144Z",
+  "updated": "2026-11-15T08:30:10.620Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -378,9 +378,10 @@
       "doneAt": "2026-11-15T08:27:25.143Z"
     },
     "awareness-removal": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5293",
-      "claimedAt": "2026-11-15T08:26:57.345Z"
+      "claimedAt": "2026-11-15T08:26:57.345Z",
+      "doneAt": "2026-11-15T08:30:10.620Z"
     },
     "activity-feed-tab.ac1": {
       "status": "completed",
@@ -393,6 +394,18 @@
     "activity-feed-tab.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T08:27:25.143Z"
+    },
+    "awareness-removal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-15T08:30:10.620Z"
+    },
+    "awareness-removal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T08:30:10.620Z"
+    },
+    "awareness-removal.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T08:30:10.620Z"
     }
   }
 }
