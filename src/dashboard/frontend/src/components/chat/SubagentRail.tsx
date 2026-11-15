@@ -6,6 +6,9 @@ import type { SubagentSummary } from './chat-types';
 /** Mirrors the Awareness rail's collapse persistence (PAN-1591 pattern). */
 const AGENTS_RAIL_COLLAPSED_KEY = 'overdeck.ui.agentsRailCollapsed';
 
+/** Below this host-pane width, the rail auto-collapses regardless of the stored preference (PAN-5329). */
+export const NARROW_PANE_PX = 760;
+
 interface SubagentRailProps {
   conversation: Conversation;
   subagents: SubagentSummary[];
@@ -52,20 +55,56 @@ export function useSubagentSelection(subagents: readonly SubagentSummary[]) {
 
 export function SubagentRail({ conversation, subagents, selectedAgentId, defaultCollapsed }: SubagentRailProps) {
   const select = useCallback((agentId: string | null) => updateSelectedSubagent(agentId), []);
-  const [collapsed, setCollapsed] = useState(
+  const [storedCollapsed, setStoredCollapsed] = useState(
     () => defaultCollapsed ?? (typeof window !== 'undefined' && localStorage.getItem(AGENTS_RAIL_COLLAPSED_KEY) === 'true'),
   );
+
+  // Measures the rail's host pane (its parent) rather than itself: the rail's own
+  // width is what we're deciding, so it can't be the measurement source.
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  const hostRef = useCallback((el: HTMLElement | null) => {
+    if (el) setHost(el.parentElement);
+  }, []);
+
+  const [narrow, setNarrow] = useState(false);
+  // Narrow-pane collapse override: null defers to storedCollapsed, otherwise wins
+  // over it while the pane stays narrow. Never persisted — it's a transient
+  // reaction to space, not a preference.
+  const [override, setOverride] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!host) return;
+    const observer = new ResizeObserver((entries) => {
+      const last = entries[entries.length - 1];
+      if (!last || last.contentRect.width <= 0) return;
+      setNarrow(last.contentRect.width < NARROW_PANE_PX);
+    });
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, [host]);
+
+  useEffect(() => {
+    if (!narrow) setOverride(null);
+  }, [narrow]);
+
+  const collapsed = narrow ? (override ?? true) : storedCollapsed;
+
   const toggleCollapsed = useCallback((next: boolean) => {
-    setCollapsed(next);
+    if (narrow) {
+      setOverride(next);
+      return;
+    }
+    setStoredCollapsed(next);
     if (defaultCollapsed !== undefined) return;
     try { localStorage.setItem(AGENTS_RAIL_COLLAPSED_KEY, String(next)); } catch { /* ignore */ }
-  }, [defaultCollapsed]);
+  }, [narrow, defaultCollapsed]);
 
   if (subagents.length === 0) return null;
 
   if (collapsed) {
     return (
       <button
+        ref={hostRef}
         type="button"
         className="flex w-[30px] min-w-[30px] shrink-0 cursor-pointer flex-col items-center gap-2.5 border-l border-border bg-card pt-2.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         onClick={() => toggleCollapsed(false)}
@@ -82,6 +121,7 @@ export function SubagentRail({ conversation, subagents, selectedAgentId, default
 
   return (
     <aside
+      ref={hostRef}
       aria-label="Conversation agents"
       className="flex min-h-0 w-64 min-w-0 shrink-0 flex-col border-l border-border bg-card"
     >
