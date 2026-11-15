@@ -8,7 +8,7 @@
  */
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { resolveBareNumericId } from '../../lib/issue-id.js';
+import { parseIssueId, resolveBareNumericId } from '../../lib/issue-id.js';
 
 export type OpenTarget =
   | { kind: 'path'; abs: string; line?: number; column?: number }
@@ -20,7 +20,17 @@ export interface OpenTargetDeps {
   resolveIssue: (raw: string) => string | null;
 }
 
-const defaultDeps: OpenTargetDeps = { exists: existsSync, resolveIssue: (raw) => resolveBareNumericId(raw) };
+/**
+ * `resolveBareNumericId` upper-cases any string, so only an id that parses as
+ * an issue id (`PAN-123`, `agent-pan-123`, a Rally id, or bare digits naming
+ * one agent) counts; anything else stays invalid.
+ */
+function resolveIssueTarget(raw: string): string | null {
+  const id = resolveBareNumericId(raw);
+  return id && parseIssueId(id) ? id : null;
+}
+
+const defaultDeps: OpenTargetDeps = { exists: existsSync, resolveIssue: resolveIssueTarget };
 
 // `:line:column` is tried before `:line`, so `f.ts:12:3` is not read as the file `f.ts:12`
 // (a greedy `^(.*):(\d+)(?::(\d+))?$` would capture `f.ts:12` as the path).

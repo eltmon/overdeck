@@ -41,6 +41,12 @@ describe('parseOpenTarget', () => {
     });
   });
 
+  it('with the default resolver, accepts an issue id and rejects other words', () => {
+    expect(parseOpenTarget('PAN-123', dir, home)).toEqual({ kind: 'issue', id: 'PAN-123' });
+    expect(parseOpenTarget('agent-pan-7', dir, home)).toEqual({ kind: 'issue', id: 'PAN-7' });
+    expect(parseOpenTarget('no-such-thing', dir, home)).toEqual({ kind: 'invalid' });
+  });
+
   it('expands ~ to home', () => {
     expect(parseOpenTarget('~/x', dir, home, noIssue)).toEqual({ kind: 'path', abs: join(home, 'x') });
     expect(parseOpenTarget('~', dir, home, noIssue)).toEqual({ kind: 'path', abs: home });
