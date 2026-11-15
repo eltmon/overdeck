@@ -9,6 +9,11 @@ import { getOverdeckDatabase } from './infra.js';
  * (most roots miss — agent/specialist/unregistered sessions have no
  * conversation row — and a miss scans every conversation row). This module
  * resolves every distinct root in one query instead.
+ *
+ * `listConversationLocators()` and `isConversationLocatorOwned()` (PAN-5369)
+ * give callers that check many transcripts per tick (the orphan scan, fork
+ * adoption) an index-backed ownership check instead of one full lookup per
+ * transcript.
  */
 
 const SQLITE_MAX_PARAMS = 500;
@@ -60,4 +65,30 @@ export function resolveConversationsByClaudeSessionIds(sessionIds: string[]): Ma
     }
   }
   return results;
+}
+
+/** Every locator owned by a conversation, across all harnesses. */
+export function listConversationLocators(): Set<string> {
+  const rows = getOverdeckDatabase()
+    .prepare(
+      `SELECT cf.locator AS locator
+       FROM conversation_files cf
+       JOIN conversations c ON c.id = cf.conversation_id`,
+    )
+    .all() as Array<{ locator: string }>;
+  return new Set(rows.map((row) => row.locator));
+}
+
+/** Whether any conversation currently owns `locator`. */
+export function isConversationLocatorOwned(locator: string): boolean {
+  const row = getOverdeckDatabase()
+    .prepare(
+      `SELECT 1
+       FROM conversation_files cf
+       JOIN conversations c ON c.id = cf.conversation_id
+       WHERE cf.locator = ?
+       LIMIT 1`,
+    )
+    .get(locator);
+  return row !== undefined;
 }
