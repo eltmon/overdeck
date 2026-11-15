@@ -2055,7 +2055,7 @@ renders only its content area, full width: it has no column of its own and no
 feed column.
 
 - **Width.** 264 px by default. Dragging the right edge resizes it between 240
-  and 400 px. The width persists in `localStorage` key
+  and 640 px. The width persists in `localStorage` key
   `overdeck.ui.leftColumnWidth`.
 - **Collapsed.** `[` (shortcut `frame.collapse`) toggles a 48 px strip: the
   project mark (opens the switcher menu), nav icons with titles, a `+` New

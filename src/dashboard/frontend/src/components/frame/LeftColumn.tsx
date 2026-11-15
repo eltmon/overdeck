@@ -5,7 +5,7 @@
  * and Workspaces sections, then the footer. It shows the selected project's
  * lists on every route.
  *
- * Width 264 px by default, drag-resizable 240–400 px on its right edge,
+ * Width 264 px by default, drag-resizable 240–640 px on its right edge,
  * collapsible to 48 px with `[`, all persisted per viewer. Below 900 px it is
  * a drawer: hidden until "Open navigation", closed by its overlay or by any
  * navigation. It also mounts DeckDataHost (the session-tree subscription)
@@ -31,7 +31,7 @@ export const LEFT_COLUMN_WIDTH_KEY = 'overdeck.ui.leftColumnWidth';
 export const LEFT_COLUMN_COLLAPSED_KEY = 'overdeck.ui.leftColumnCollapsed';
 export const LEFT_COLUMN_DEFAULT_WIDTH = 264;
 export const LEFT_COLUMN_MIN_WIDTH = 240;
-export const LEFT_COLUMN_MAX_WIDTH = 400;
+export const LEFT_COLUMN_MAX_WIDTH = 640;
 export const LEFT_COLUMN_COLLAPSED_WIDTH = 48;
 /** Below this window width the column is a drawer. */
 export const LEFT_COLUMN_DRAWER_QUERY = '(max-width: 899px)';
