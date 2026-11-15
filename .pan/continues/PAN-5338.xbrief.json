@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-5338",
   "created": "2026-11-15T11:36:37.856Z",
-  "updated": "2026-11-15T11:59:13.164Z",
+  "updated": "2026-11-15T14:26:33.128Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-11-15T14:25:14.976Z"
+    }
+  ],
   "items": {
     "preview-source-helpers": {
       "status": "completed",
@@ -40,6 +46,15 @@
     "relative-links-guard.ac1": {
       "status": "completed",
       "doneAt": "2026-11-15T11:59:13.164Z"
+    },
+    "relative-links-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:26:33.127Z"
+    },
+    "relative-links-guard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-15T14:26:33.127Z"
     }
-  }
+  },
+  "agentModel": "claude-sonnet-5"
 }
