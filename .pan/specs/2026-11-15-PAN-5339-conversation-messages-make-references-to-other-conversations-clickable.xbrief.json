@@ -1,0 +1,717 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T11:40:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5339: Conversation messages: make references to other conversations clickable",
+    "updated": "2026-11-15T11:42:39.223Z"
+  },
+  "plan": {
+    "id": "pan-5339",
+    "title": "Conversation messages: make references to other conversations clickable",
+    "status": "proposed",
+    "uid": "432504ed-c431-408b-9eeb-3de09a6845ee",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-15T11:40:00Z",
+    "updated": "2026-11-15T11:42:39.223Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5339",
+        "label": "PAN-5339",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5339.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "conversations",
+      "markdown"
+    ],
+    "narratives": {
+      "Problem": "A message that names another conversation (20261113-6031, conv-20261113-6031, conv 3904, /conv/3904) renders as plain text or inline code; the operator cannot click it to open that conversation.",
+      "Proposal": "Inside a conversation transcript, ChatMarkdown pre-scans the message for reference keys, resolves them against the ['conversations'] list and, for unlisted (archived) keys, GET /api/conversations/<key>. The resolved map feeds a new remark plugin (links resolved plain-text references and whole-value inline code) and the existing a component (generated and hand-written /conv/ links). A ConversationReferenceLink opens the conversation in the deck through useOpenConversation (extended to take a Conversation object) via a nullable opener context mounted in App; modified clicks and hosts without deck navigation open a new tab.",
+      "NonGoals": "- Linked conversation names (@<env>/<name>) and non-date names (conv-flywheel, 20260706-3577-post-clear-...) are not recognised\n- Host-less text such as overdeck.localhost/conv/3904 is not linked\n- Inline code holding a reference plus other text is not split\n- No new server route and no server change; usePriorityConversation is unchanged\n- Messages over 50,000 characters never link\n- ChatMarkdown outside a conversation transcript (PRD viewer, dialogs, activity feed) is unchanged\n- No hover prefetch and no title-less optimistic links\n- No second Markdown pipeline and no new code component\n- A linked conversation's own transcript links nothing (its ids belong to the owner machine)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Render a reference as text until it resolves; never as a title-less link",
+        "rationale": "Required behaviour item 3 and its test ('an unknown one renders text') outrank the checkpoint's optional title-less rendering."
+      },
+      {
+        "summary": "Name pattern accepts a 4-character lowercase hex suffix (\\d{8}-[0-9a-f]{4})",
+        "rationale": "Summary forks and vault continues name conversations YYYYMMDD-<randomUUID().slice(0,4)>; about 400 of 3905 local names carry a letter in that suffix, so a digits-only pattern misses real conversations."
+      },
+      {
+        "summary": "Resolve unlisted keys with the existing GET /api/conversations/:id under a separate query key",
+        "rationale": "The list excludes archived rows; the existing route resolves id or name, archived included, and 404s cheaply, so no new route (and no no-loss-matrix/route-scopes row) is needed."
+      },
+      {
+        "summary": "Inline code links only when its whole trimmed value is one reference",
+        "rationale": "Splitting a code span into code/link/code pieces changes its look; the observed case is whole-value code."
+      },
+      {
+        "summary": "The numbered form links the whole phrase 'conv 3904'",
+        "rationale": "The phrase is what the reader sees as the reference; linking only the digits is a smaller target."
+      },
+      {
+        "summary": "Dashboard host = same origin, or both URL and page on loopback hosts",
+        "rationale": "Numeric ids are machine-local; Copy link uses window.location.origin, and overdeck.localhost vs localhost:3011 are the same machine."
+      },
+      {
+        "summary": "Gate on the transcript context (ConversationPullRequestContext); tool rows inside a transcript also link, bounded to 20 lookups per message",
+        "rationale": "The context marks a conversation transcript and carries the viewed conversation's name for item 6; other ChatMarkdown hosts stay unchanged."
+      },
+      {
+        "summary": "Without deck navigation (pop-outs, /m, issue drawer) a resolved reference is a new-tab link",
+        "rationale": "Mirrors the documented issue-link behaviour; useDeckNavigation throws outside App's provider."
+      },
+      {
+        "summary": "A hand-written link to the viewed conversation stays an in-app link",
+        "rationale": "Item 6 targets generated references; a link the agent wrote on purpose is kept."
+      },
+      {
+        "summary": "A linked conversation's transcript links nothing",
+        "rationale": "Its text refers to the owner machine's ids and names; resolving them locally would open the wrong conversation."
+      }
+    ],
+    "items": [
+      {
+        "id": "ref-patterns",
+        "title": "Add the conversation reference patterns module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5339",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/conversationReferences.ts",
+            "src/dashboard/frontend/src/lib/__tests__/conversationReferences.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/conversationReferences.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversationReferences.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ],
+          "foundationFor": [
+            "resolution-hook",
+            "remark-plugin",
+            "reference-link",
+            "chatmarkdown-wiring"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 and decisions D7, D10, D11. Create src/dashboard/frontend/src/lib/conversationReferences.ts exporting splitConversationReferences, parseConversationReference, parseConversationHref, collectConversationReferenceKeys (default limit 20, fenced ``` and ~~~ blocks removed before scanning), mayContainConversationReference, and the shared ConversationRef / ConversationRefMap types plus EMPTY_CONVERSATION_REFS. Use exactly the three regexes of D11 (name /(?<![\\w/.-])(conv-)?(\\d{8}-[0-9a-f]{4})(?![\\w-]|[./]\\w)/g, numbered /\\b(?:conversation|conv)[ \\t]+#?(\\d{1,7})(?![\\w-])/gi, path /(?<![\\w.:/-])\\/conv\\/(\\d{1,9}|\\d{8}-[0-9a-f]{4})(?![\\w/-]|\\.\\w)/g); earliest match wins, no overlaps. Keys: decimal id string for numbered and numeric path forms; bare name (no conv- prefix) for name forms. parseConversationHref accepts /conv/<key> with optional ?query/#hash, and absolute http(s) URLs whose origin equals location.origin or whose hostname and location.hostname are both loopback (localhost, 127.0.0.1, ::1, *.localhost). Conversation is a type-only import from ../components/CommandDeck/ConversationList."
+        },
+        "items": [
+          {
+            "id": "ref-patterns.ac1",
+            "title": "Given the strings conv-20261113-6031, 20261113-6031, 20260824-343d, conv 3904, Conversation 3904, conv #3904, /conv/3904 and /conv/20261113-6031, splitConversationReferences returns one keyed segment each with keys 20261113-6031, 20261113-6031, 20260824-343d, 3904, 3904, 3904, 3904, 20261113-6031",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ref-patterns.ac2",
+            "title": "Given 2026-11-13, c9906c2370a, 555-123-4567, 12345678-1234-5678-9abc-def012345678, 20260706-3577-post-clear-78e2e542, abc-20261113-6031, conversations 12, conv-20261113-6031/state.json and 20261113-6031.md, splitConversationReferences returns no keyed segment; given 'See 20261113-6031.' it returns the key 20261113-6031",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ref-patterns.ac3",
+            "title": "parseConversationHref returns 3904 for /conv/3904 and for http://overdeck.localhost/conv/3904 when location.hostname is localhost, and returns null for https://example.com/conv/3904",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ref-patterns.ac4",
+            "title": "collectConversationReferenceKeys returns no key for a reference that appears only inside a fenced code block, and returns at most 20 keys for a text holding 25 distinct references",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "opener-door",
+        "title": "Let useOpenConversation open a Conversation object and expose it as a nullable link opener",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5339",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/frame/deck/useOpenConversation.ts",
+            "src/dashboard/frontend/src/components/chat/ConversationLinkOpener.tsx",
+            "src/dashboard/frontend/src/App.tsx",
+            "src/dashboard/frontend/src/components/frame/deck/__tests__/useOpenConversation.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/frame/deck/__tests__/useOpenConversation.test.tsx",
+            "cd src/dashboard/frontend && npx vitest run src/components/frame/__tests__/ConversationsSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useOpenConversation.test.tsx passes",
+            "ConversationsSection.test.tsx still passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 and decision D8. In useOpenConversation.ts change the returned callback to (target: string | Conversation | null) => void: name = string/null target as-is, else target.name; conv = list row with that name, else the object itself. Keep the rest of the body unchanged and update the header comment. Create components/chat/ConversationLinkOpener.tsx with ConversationLinkOpenerContext (createContext<ConversationLinkOpener | null>(null)), ConversationLinkOpenerProvider (calls useOpenConversation(null) once and provides it) and useConversationLinkOpener(). In App.tsx wrap <AppRoutes .../> inside <main> (under DeckNavigationProvider, App.tsx:792) with <ConversationLinkOpenerProvider>. New test file uses TestDeckNavigationProvider and vi.mock('../useProjectScope') returning an empty conversation list and a resolveConversationProjectName stub."
+        },
+        "items": [
+          {
+            "id": "opener-door.ac1",
+            "title": "Given an empty conversation list, when the callback is called with the object { id: 3904, name: '20261113-6031' }, then TestDeckNavigationProvider records openInDeck with conversationRouteKey '3904'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "opener-door.ac2",
+            "title": "Given a listed conversation name string, the callback still records openInDeck for it, and an unlisted name string still records selectProject, as before the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "opener-door.ac3",
+            "title": "App.tsx renders ConversationLinkOpenerProvider as a descendant of DeckNavigationProvider and an ancestor of AppRoutes (a reviewer grep of App.tsx; no test reads source, which lint:source-introspection rejects)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resolution-hook",
+        "title": "Add the useConversationReferences resolution hook",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5339",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/useConversationReferences.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/useConversationReferences.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/useConversationReferences.test.tsx",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "useConversationReferences.test.tsx passes",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-6",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 and decisions D1, D9, D12. useConversationReferences(text, currentConversationName) computes keys with collectConversationReferenceKeys; returns EMPTY_CONVERSATION_REFS and enables no query when parseLinkedConversationName(currentConversationName) from @overdeck/contracts is non-null (a linked transcript); reads the ['conversations'] query (queryFn fetchConversations from components/CommandDeck/ConversationList, enabled: keys.length > 0, staleTime 10000, refetchOnWindowFocus false, a select memoized on keys that keeps only rows with origin neither 'linked' nor 'vault' whose String(id) or name equals a key); for keys missing from the settled list runs useQueries with queryKey ['conversation-reference', key], staleTime 300000, refetchOnWindowFocus false, retry false, queryFn fetchWithTimeout('/api/conversations/' + encodeURIComponent(key)) returning null on 404 and throwing on other non-OK. Returns a ConversationRefMap (routeKey = String(id), title, isCurrent = name === currentConversationName, conversation = the row) whose identity changes only when its content changes; EMPTY_CONVERSATION_REFS when empty. Implementation checkpoint D12: if lint:circular reports a new cycle, use a local fetch('/api/conversations') query function instead and keep only the type import."
+        },
+        "items": [
+          {
+            "id": "resolution-hook.ac1",
+            "title": "Given text with no reference candidates, the hook returns EMPTY_CONVERSATION_REFS and the stubbed fetch is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolution-hook.ac2",
+            "title": "Given a key present in the /api/conversations response, the hook resolves it without requesting /api/conversations/<key>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolution-hook.ac3",
+            "title": "Given the unlisted key 20260824-343d, the hook requests /api/conversations/20260824-343d exactly once and returns an entry for it; given a key whose request returns 404, the map has no entry for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolution-hook.ac4",
+            "title": "Given currentConversationName equal to a resolved row's name, the hook returns that entry marked isCurrent true; given the linked name @env-1/20261113-6031, the hook returns EMPTY_CONVERSATION_REFS and the stubbed fetch is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remark-plugin",
+        "title": "Add the remarkConversationReferences plugin",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5339",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/remarkConversationReferences.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/remarkConversationReferences.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/remarkConversationReferences.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "remarkConversationReferences.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 and decision D5. remarkConversationReferences({ refs }) returns a transformer that walks the mdast like remarkBareFileTextLinks (ChatMarkdown.tsx:338): skips code, link, linkReference and definition nodes; splits text children with splitConversationReferences and turns segments whose key is in refs and not isCurrent into { type: 'link', url: '/conv/' + routeKey, title: null, children: [{ type: 'text', value }] }; replaces an inlineCode child whose parseConversationReference(value.trim()) resolves (not current) with { type: 'link', url, title: null, children: [theInlineCodeNode] }. Empty refs returns immediately. Tests build mdast trees by hand and call the transformer directly; do not import unified or remark-parse (not declared frontend dependencies)."
+        },
+        "items": [
+          {
+            "id": "remark-plugin.ac1",
+            "title": "Given a paragraph text node 'Tell 20261113-6031 now' and refs holding that key with routeKey 3904, the transformer produces text 'Tell ', a link node with url /conv/3904 and text child '20261113-6031', then text ' now'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remark-plugin.ac2",
+            "title": "Given an inlineCode node with value '20261113-6031', the transformer replaces it with a link node whose only child is the original inlineCode node",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remark-plugin.ac3",
+            "title": "Given a code (fenced) node, an inlineCode 'pan tell 20261113-6031', a text with an unknown key, or a text with an isCurrent key, the transformer preserves each node unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reference-link",
+        "title": "Add the ConversationReferenceLink component",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5339",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ConversationReferenceLink.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationReferenceLink.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ConversationReferenceLink.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConversationReferenceLink.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. ConversationReferenceLink({ conversationRef, className, children }) renders <a href=/conv/<routeKey> target=_blank rel='noopener noreferrer' title={title ?? name} data-conversation-id={routeKey}>. onClick: when useConversationLinkOpener() is non-null and the click is a plain left click (copy the guard at TranscriptIssueLink.tsx:50-51: defaultPrevented, button !== 0, meta/ctrl/shift/alt), preventDefault and call the opener with conversationRef.conversation; otherwise do nothing so the browser opens a new tab."
+        },
+        "items": [
+          {
+            "id": "reference-link.ac1",
+            "title": "Given an opener context, a plain click calls the opener once with the conversation row, fireEvent.click returns false, and window.open is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reference-link.ac2",
+            "title": "Given an opener context, Ctrl-click and Meta-click do not call the opener",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reference-link.ac3",
+            "title": "Given no opener context, a plain click calls nothing and the anchor keeps target=_blank and href /conv/<routeKey>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reference-link.ac4",
+            "title": "The anchor title is the conversation title, and is the conversation name when the title is null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "chatmarkdown-wiring",
+        "title": "Wire conversation references into ChatMarkdown",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5339",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ChatMarkdown.tsx",
+            "src/dashboard/frontend/src/components/chat/TranscriptPullRequestLink.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.conversation-links.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ChatMarkdown.conversation-links.test.tsx",
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ChatMarkdown.test.tsx",
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ChatMarkdown.issue-links.test.tsx",
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ChatMarkdown.pull-request-links.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "ChatMarkdown.conversation-links.test.tsx passes",
+            "existing ChatMarkdown test files pass",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 and decisions D3, D4. Export useTranscriptConversation() from TranscriptPullRequestLink.tsx (returns useContext(ConversationPullRequestContext)). In ChatMarkdown.tsx rename the body to ChatMarkdownBody (wrapped in memo) with a conversationRefs prop; the exported memo ChatMarkdown renders ChatMarkdownWithConversationRefs (calls useConversationReferences(text.length > LARGE_MESSAGE_CHARS ? '' : text, conversationName)) when the transcript context exists, else ChatMarkdownBody with EMPTY_CONVERSATION_REFS. remarkPlugins become [remarkGfm, [remarkConversationReferences, { refs }], [remarkBareFileTextLinks, { cwd }]] with deps [cwd, conversationRefs]. makeComponents gains conversationRefs; at the top of the a component, parseConversationHref(href) → refs.get(key) → render ConversationReferenceLink with className styles.mdLink. Keep ChatMarkdown.tsx under 600 lines. The test file runs every case under describe.each over useStreamdown false and true, wrapped in QueryClientProvider, ConversationPullRequestProvider (name 20261115-0001) and ConversationLinkOpenerContext.Provider."
+        },
+        "items": [
+          {
+            "id": "chatmarkdown-wiring.ac1",
+            "title": "Given /api/conversations lists { id: 3904, name: '20261113-6031', title: 'Refactor the deck' }, the text 'Tell 20261113-6031 now' and the text 'Tell `20261113-6031` now' each render a link with href /conv/3904 and title 'Refactor the deck', and the inline-code link contains a <code> element, under both renderers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chatmarkdown-wiring.ac2",
+            "title": "conv 3904, conversation 3904, conv #3904 and /conv/3904 each render a link to /conv/3904; the archived unlisted key 20260824-343d renders a link once its fetch resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chatmarkdown-wiring.ac3",
+            "title": "Given the 404 key 20990101-1234, a fenced block containing 20261113-6031, or the current conversation 20261115-0001, ChatMarkdown renders no link and the text stays visible",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chatmarkdown-wiring.ac4",
+            "title": "Given a hand-written [open it](/conv/3904) link, when it is plain-clicked, then the opener mock receives the row and window.open is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chatmarkdown-wiring.ac5",
+            "title": "Rendered without ConversationPullRequestProvider, 20261113-6031 renders no link and no /api/conversations request is sent; rendered in a linked transcript (provider name @env-1/20261115-0001), conv 3904 renders no link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document conversation links and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5339",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "changelog.d/pan-5339.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Add a '### Conversation links' section to features/conversations.mdx immediately after the '### Issue links' section (which ends with '...an issue link always opens the tracker in a new tab.'), stating every behaviour listed in WI-7 step 1. Create changelog.d/pan-5339.md with the exact '#### New' bullet given in WI-7 step 2."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "features/conversations.mdx contains a '### Conversation links' heading directly after the '### Issue links' section that names the forms 20261113-6031, conv-20261113-6031, conv 3904 and /conv/<id>, and states that fenced code never links and the viewed conversation is not linked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "The section states that a plain click opens the conversation in the dashboard, Ctrl/Cmd-click and middle-click open a new tab, and pop-outs, /m and the issue drawer open a new tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "changelog.d/pan-5339.md exists with a '#### New' heading and one bullet linking #5339, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-subset",
+        "title": "List the new frontend test files in the CI subset",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T11:40:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-5339",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'conversationReferences.test.ts\\|ConversationReferenceLink.test.tsx\\|remarkConversationReferences.test.ts\\|useConversationReferences.test.tsx\\|useOpenConversation.test.tsx\\|ChatMarkdown.conversation-links.test.tsx' scripts/frontend-test-subset.txt"
+          ],
+          "expected_outputs": [
+            "grep prints 6"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Add the six new test paths (relative to src/dashboard/frontend) to scripts/frontend-test-subset.txt in sorted position: src/components/chat/__tests__/ChatMarkdown.conversation-links.test.tsx, src/components/chat/__tests__/ConversationReferenceLink.test.tsx, src/components/chat/__tests__/remarkConversationReferences.test.ts, src/components/chat/__tests__/useConversationReferences.test.tsx, src/components/frame/deck/__tests__/useOpenConversation.test.tsx, src/lib/__tests__/conversationReferences.test.ts."
+        },
+        "items": [
+          {
+            "id": "ci-subset.ac1",
+            "title": "scripts/frontend-test-subset.txt contains each of the six new test paths exactly once, each placed in sorted order among its neighbours",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-subset.ac2",
+            "title": "Every one of the six listed paths exists on disk relative to src/dashboard/frontend (a shell loop over the six paths with test -f exits 0); the full subset is not run on the host, CI runs it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "ref-patterns",
+        "to": "resolution-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "ref-patterns",
+        "to": "remark-plugin",
+        "type": "blocks"
+      },
+      {
+        "from": "ref-patterns",
+        "to": "reference-link",
+        "type": "blocks"
+      },
+      {
+        "from": "ref-patterns",
+        "to": "chatmarkdown-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "opener-door",
+        "to": "reference-link",
+        "type": "blocks"
+      },
+      {
+        "from": "opener-door",
+        "to": "chatmarkdown-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "resolution-hook",
+        "to": "chatmarkdown-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "remark-plugin",
+        "to": "chatmarkdown-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "reference-link",
+        "to": "chatmarkdown-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "ref-patterns",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "opener-door",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "resolution-hook",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "remark-plugin",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "reference-link",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "chatmarkdown-wiring",
+        "to": "ci-subset",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-15-PAN-5339-conversation-messages-make-references-to-other-conversations-clickable.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
