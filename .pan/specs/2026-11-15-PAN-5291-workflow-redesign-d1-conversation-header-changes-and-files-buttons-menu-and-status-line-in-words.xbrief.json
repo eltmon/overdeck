@@ -1,0 +1,893 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T08:23:10Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5291: Workflow redesign D1: conversation header (Changes and Files buttons, ⋯ menu) and status line in words",
+    "updated": "2026-11-15T08:32:00.102Z"
+  },
+  "plan": {
+    "id": "pan-5291",
+    "title": "Workflow redesign D1: conversation header (Changes and Files buttons, ⋯ menu) and status line in words",
+    "status": "running",
+    "uid": "d7f5c1d7-5e18-497c-8ade-8d66325c8ed9",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-15T08:23:10Z",
+    "updated": "2026-11-15T08:32:00.102Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5291",
+        "label": "PAN-5291",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5291/.pan/drafts/pan-5291.md",
+        "label": "PRD draft (.pan/drafts/pan-5291.md)",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-5284.md",
+        "label": "Parent PRD PAN-5284 (child D1)",
+        "type": "prd"
+      },
+      {
+        "uri": "docs/design/workflow-redesign-mockup.html",
+        "label": "Approved mockup, screen 1",
+        "type": "design"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "conversation-header",
+      "workflow-redesign",
+      "work-dock"
+    ],
+    "metadata": {
+      "sizeJustification": "One header component and its status line, split into 11 small items that mostly share ConversationHeader.tsx/ConversationHeaderMenu.tsx; the file count is driven by one test file per new module, two existing Playwright specs that click the moved Tools button, two screenshots and three doc files. The parent PRD (PAN-5284 §9-§10) already fixes D1 as one child issue; splitting further would leave the dashboard with a half-moved header (parent D-13).",
+      "parentIssue": "PAN-5284",
+      "canonicalFilename": "2026-11-15-PAN-5291-workflow-redesign-d1-conversation-header-changes-and-files-buttons-menu-and-status-line-in-words.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "From a conversation tab there is no way to see what the agent changed or to browse its files, and the header is crowded with About, Tools, Bookmarks, Copy link and Detach buttons while the status line shows a raw session id and an editor chip. ConversationPanel.tsx is 1525 lines against a 1531 cap, so nothing can be added without extracting first.",
+      "Proposal": "Extract the header into components/chat/header/ (ConversationHeader, ConversationHeaderMenu, ConversationStatusLine) with no behavior change. Then add Changes (+/-) and Files buttons that open the work dock scoped to the conversation, fed by the dock's own useConversationChanges query (scope 'conversation') and mounted only inside a Stage. Move About, Bookmarks, Show tool calls, Copy link, Open in new window, Copy conversation id, Copy session id, Open folder in <Editor>, Subagents and an Advanced group (delivery transport) into the ⋯ menu in the mockup's order. Rewrite the status line in words: state · machine · ~/folder (opens Files) · branch (+PR badge) · N commits pushed / not pushed (open Changes) · N files not committed (opens Changes on Not committed, amber) · cost (cyan). Fix the dock Changes chip so a repeat openDock with a changesScope switches it. Update the two Playwright specs that clicked the Tools button, add a fixture-backed header spec with light/dark screenshots, and update features/conversations.mdx, docs/DASHBOARD-ARCHITECTURE.md and changelog.d/pan-5291.md.",
+      "NonGoals": "- No change to the per-turn Changed files card, ChangedFilesTree.tsx, the inline DiffPanel / ?diff=1 path or the 5 s /diffs poll (child D2).\n- No change to ComposerFooter.tsx, DeliveryModeSelect.tsx, EffortPicker.tsx, PaneBar.tsx or the Stage tab labels (child D2).\n- The subagents rail's default open/closed state does not change (child D2 WI-D6); only a toggle signal is added.\n- No server or API change; GET /api/conversations/:name/changes is used as child A shipped it.\n- No confirm dialog is added to Stop the agent.\n- No Changes/Files buttons and no commit/uncommitted status-line parts outside a Stage (popout, phone app, drawer, Flywheel pane, Agents directory).\n- No change to conversation list rows or their change totals (child F).\n- No new polling loop and no polling faster than 5 s.\n- No scripts/file-size-allowlist.txt edit; ConversationPanel.tsx never grows past 1525 lines.\n- The aria-label \"More conversation actions\" on the ⋯ trigger is not renamed.\n- PanOpenInPicker keeps its behavior for its other consumers (IssueOpenInDialog, IssueDetailSections)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "D1 ships the ⋯ → Subagents item through a new SubagentRail toggleSignal prop; D2 keeps owning the rail's default state.",
+        "rationale": "FR-1 (assigned to D1) lists Subagents in ⋯ while parent §7 gives the rail default to D2; a one-prop seam satisfies FR-1 without changing the default D2 owns."
+      },
+      {
+        "summary": "Copy conversation id copies conversation.name; a separate Copy session id item keeps the old status-line session-file id reachable when it differs.",
+        "rationale": "The mockup shows the name; parent §7 (no-loss) requires today's session id value to stay reachable."
+      },
+      {
+        "summary": "Changes/Files buttons and the commit/uncommitted status-line parts render only inside a Stage (useStageDeck().openDock exists); outside they are absent.",
+        "rationale": "There is no dock to open outside a Stage; parent FR-4 keeps today's behavior outside a Stage, and gating keeps /changes and the root-context queries out of 12 mount sites and their strict-fetch tests."
+      },
+      {
+        "summary": "The header's /changes query is enabled only for real rows (id >= 0) that are not linked or vault conversations, and reuses the dock's query key.",
+        "rationale": "Synthetic ids 404 (same guard as /diffs); linked and vault rows have no local root; sharing the key means one request for header, Files dots and Changes tab."
+      },
+      {
+        "summary": "Open folder in… is a flat list of editor menu items (preferred first; remote SSH list for linked conversations), and the header keeps calling useEditorOpenFavoriteShortcut.",
+        "rationale": "MenuSurface has no submenus; the ⌘⇧O shortcut was mounted by the status-line picker and would otherwise disappear."
+      },
+      {
+        "summary": "The folder text uses a textual home abbreviation (/home/<u>, /Users/<u>, /root → ~).",
+        "rationale": "The frontend has no home directory value for a conversation; the rule is deterministic and testable."
+      },
+      {
+        "summary": "Status-line colors follow the mockup: amber for 'N files not committed', cyan for cost, the existing state dot; everything else muted.",
+        "rationale": "Parent D-1 makes the mockup the visual spec; each color keeps its style-guide meaning, and the one-signal-per-row rule targets data-dense list rows, not this header line."
+      },
+      {
+        "summary": "Header Changes and Files buttons always open the dock (never toggle) and always pass changesScope.",
+        "rationale": "Predictable behavior from a labelled button; the shortcuts keep toggling; passing the scope lets the chip reset (D1-15)."
+      },
+      {
+        "summary": "'Stop agent' in the header menu is renamed 'Stop the agent' without adding the mockup's confirm ellipsis.",
+        "rationale": "FR-1 names it 'Stop the agent'; today's action has no dialog and adding one is out of scope."
+      },
+      {
+        "summary": "The changelog file is changelog.d/pan-5291.md, not the stub's 5291.md.",
+        "rationale": "changelog.d/README.md requires the lowercase issue id and every sibling child uses pan-<n>.md."
+      }
+    ],
+    "items": [
+      {
+        "id": "extract-header",
+        "title": "Extract the conversation header into chat/header/ with no behavior change (WI-1)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T08:23:10Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-5291",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "header-dock-buttons",
+            "menu-view-toggles",
+            "menu-copy-open",
+            "menu-open-folder",
+            "menu-subagents",
+            "status-line-words"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/header/ConversationHeader.tsx",
+            "src/dashboard/frontend/src/components/chat/header/ConversationHeaderMenu.tsx",
+            "src/dashboard/frontend/src/components/chat/header/ConversationStatusLine.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ConversationPanel.test.tsx src/components/chat/__tests__/ConversationPanel.native.test.tsx",
+            "npm run typecheck",
+            "wc -l src/dashboard/frontend/src/components/chat/ConversationPanel.tsx"
+          ],
+          "expected_outputs": [
+            "both ConversationPanel test files pass with no test file modified in the item commit",
+            "typecheck completes without errors",
+            "ConversationPanel.tsx line count is 1150 or less"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. Move ConversationPanel.tsx lines 689-1006 (search '{/* Header — hidden in embedded mode') into components/chat/header/ConversationHeader.tsx, the ⋯ MenuSurface body (lines 843-978) plus updateConversationDeliveryMethod, delivery-method state/effect/handler, handleExportTranscript, openHandoffDoc/openHandoffTarget and useConfirm into ConversationHeaderMenu.tsx, and status row 2 (lines 984-1004) into ConversationStatusLine.tsx. Header-only state (copied, menuOpen, menuTriggerRef, title editing state, renameMutation, retitleMutation, abortMutation, handleCopyLink, handleDetach, native) moves with it. The panel keeps convMutations, aboutOpen/aboutQuery/refreshAboutMutation, hideToolCalls, handleArchive, archivePending and the working/status/machine computations, and passes them via the ConversationHeaderProps interface pinned in PRD WI-1 step 4. Remove imports the panel no longer uses. Do not edit any test file in this commit."
+        },
+        "items": [
+          {
+            "id": "extract-header.ac1",
+            "title": "Given the extraction commit, when ConversationPanel.test.tsx and ConversationPanel.native.test.tsx run unmodified, then every test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-header.ac2",
+            "title": "ConversationPanel.tsx contains 1150 lines or fewer and renders the header through <ConversationHeader> when not embedded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-header.ac3",
+            "title": "Given the extraction, the repo contains components/chat/header/ConversationHeader.tsx, ConversationHeaderMenu.tsx and ConversationStatusLine.tsx, each exporting a component with the prop names pinned in PRD WI-1 step 4",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "header-dock-buttons",
+        "title": "Changes (+/−) and Files header buttons that open the dock, mounted only inside a Stage (WI-2)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T08:23:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/header/headerChanges.tsx",
+            "src/dashboard/frontend/src/components/chat/header/__tests__/headerChanges.test.tsx",
+            "src/dashboard/frontend/src/components/chat/header/ConversationHeader.tsx",
+            "src/dashboard/frontend/src/components/chat/header/ConversationStatusLine.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/header/__tests__/headerChanges.test.tsx src/components/chat/__tests__/ConversationPanel.test.tsx src/components/chat/__tests__/ConversationPanel.native.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "headerChanges.test.tsx and both ConversationPanel test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-9",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 and decisions D1-7, D1-8, D1-9, D1-13, D1-14. Create headerChanges.tsx with useHeaderChanges (useRootContext + rootIdForConversation + useConversationChanges(conversation, 'conversation', { rootId, enabled }) where enabled = id >= 0 && origin is neither 'linked' nor 'vault'), StageHeaderChanges (render-prop gate) and HeaderDockButtons. ConversationHeader reads useStageDeck(); only when openDock exists does it mount StageHeaderChanges and render the buttons immediately before the ⋯ trigger; otherwise changes = null. Changes calls openDock({ tab: 'changes', changesScope: 'conversation' }); Files calls openDock({ tab: 'files' }). Pass changes to ConversationStatusLine as a new prop (unused until status-line-words). Add the new test file to scripts/frontend-test-subset.txt in sorted order. Test harness: extend renderPanel in ConversationPanel.test.tsx (line 198) with an optional deck?: StageDeckContextValue argument that wraps the panel in <StageDeckProvider value={deck}>; in the in-Stage test return [] from /api/registered-projects and /api/workspace-registry so rootIdForConversation is null and no explorer watch opens."
+        },
+        "items": [
+          {
+            "id": "header-dock-buttons.ac1",
+            "title": "Given totals with additions 86 and deletions 1 inside a StageDeckProvider, the header renders a Changes button containing '+86' and '−1' with aria-label 'Changes, 86 lines added, 1 removed', and a Files button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "header-dock-buttons.ac2",
+            "title": "When Changes is clicked, openDock receives { tab: 'changes', changesScope: 'conversation' }; when Files is clicked, openDock receives { tab: 'files' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "header-dock-buttons.ac3",
+            "title": "Given the panel rendered without a StageDeckProvider, no Files button renders and the strict fetch mock records no /changes, /api/registered-projects or /api/workspace-registry request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "header-dock-buttons.ac4",
+            "title": "A conversation with id -1, or with origin 'linked', sends no /changes request; with totals null or zero lines the Changes button reads 'Changes' with no numbers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "menu-view-toggles",
+        "title": "Move About, Bookmarks and Show tool calls into the ⋯ menu and order its groups (WI-4)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T08:23:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/header/ConversationHeader.tsx",
+            "src/dashboard/frontend/src/components/chat/header/ConversationHeaderMenu.tsx",
+            "src/dashboard/frontend/src/components/chat/bookmarks/BookmarksDrawer.tsx",
+            "src/dashboard/frontend/src/components/chat/bookmarks/__tests__/BookmarksDrawer.test.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.native.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/bookmarks/__tests__/BookmarksDrawer.test.tsx src/components/chat/__tests__/ConversationPanel.test.tsx src/components/chat/__tests__/ConversationPanel.native.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "BookmarksDrawer.test.tsx and both ConversationPanel test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4 and D1-2, D1-3. Remove the About toggle, Tools toggle and BookmarksToggle from row 1; switch the ⋯ trigger icon to MoreHorizontal keeping aria-label 'More conversation actions' and the right-click handler. Add menu group 1: 'About this conversation' and 'Show tool calls' as role=menuitemcheckbox items (aria-checked={aboutOpen} / {!hideToolCalls}, right text on/off for tool calls), and replace BookmarksToggle in BookmarksDrawer.tsx with BookmarksMenuItem({ onDone }). Order the existing items into D1-3 groups 3, 4 and 6, wrap the delivery row in an 'Advanced' eyebrow group (rendered only when the row renders), and rename 'Stop agent' to 'Stop the agent'. Update (never delete) the pinned tests listed in PRD WI-4 and add BookmarksDrawer.test.tsx to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "menu-view-toggles.ac1",
+            "title": "Row 1 renders no button named 'Show about this conversation', 'Hide tool calls' or 'Show bookmarks', and the ⋯ trigger keeps aria-label 'More conversation actions'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-view-toggles.ac2",
+            "title": "Given ⋯ open, clicking the menuitemcheckbox 'About this conversation' shows the summary drawer and reopening ⋯ shows aria-checked='true'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-view-toggles.ac3",
+            "title": "Given ⋯ open, 'Show tool calls' starts aria-checked='true' and after one click reopening ⋯ shows aria-checked='false' and the transcript hides tool calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-view-toggles.ac4",
+            "title": "BookmarksMenuItem renders the bookmark count, opens the bookmarks drawer and calls onDone when clicked; the header menu says 'Stop the agent' and native tests assert that label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "menu-copy-open",
+        "title": "Move Copy link and Detach into ⋯ and add Copy conversation id / Copy session id (WI-5)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T08:23:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/header/ConversationHeader.tsx",
+            "src/dashboard/frontend/src/components/chat/header/ConversationHeaderMenu.tsx",
+            "src/dashboard/frontend/src/components/chat/header/ConversationStatusLine.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ConversationPanel.test.tsx src/components/chat/__tests__/ConversationPanel.native.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both ConversationPanel test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5 and D1-3 group 2, D1-4. Remove the Copy link and Detach icon buttons from row 1; move handleCopyLink and handleDetach into ConversationHeaderMenu.tsx. Add in group 2: 'Copy conversation id' (copies conversation.name, name shown right in mono), 'Copy session id' (only when the sessionFile basename without .jsonl exists and differs from the name; shows its first 8 characters), 'Copy link' (same URL as today) and 'Open in new window' (same window.open arguments as today's Detach). Each closes the menu and toasts 'Copied conversation id' / 'Copied session id' / 'Copied link'. Remove the session id span from ConversationStatusLine. Rewrite the three Detach tests to use ⋯ → Open in new window (same assertions) and add the copy-id tests from PRD WI-5. Test harness: navigator.clipboard is not stubbed in ConversationPanel.test.tsx; stub it per test with Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn().mockResolvedValue(undefined) }, configurable: true })."
+        },
+        "items": [
+          {
+            "id": "menu-copy-open.ac1",
+            "title": "Row 1 renders no 'Copy link to conversation' or 'Detach conversation' button; ⋯ → 'Open in new window' calls window.open('/popout/conversation/1', '_blank', a string containing 'popup=yes'), with '?view=terminal' in terminal mode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-copy-open.ac2",
+            "title": "When ⋯ → 'Copy conversation id' is clicked, navigator.clipboard receives 'test-conv'; given sessionFile '/x/abc12345-0000.jsonl', 'Copy session id' sends 'abc12345-0000', and without sessionFile the item is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-copy-open.ac3",
+            "title": "The status line no longer renders the session id text, and an embedded panel renders no ⋯ trigger",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "menu-open-folder",
+        "title": "Open folder in <Editor> items in ⋯; the editor picker leaves the status line; ⌘⇧O kept (WI-6)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T08:23:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/PanOpenInPicker.tsx",
+            "src/dashboard/frontend/src/components/chat/header/OpenFolderMenuItems.tsx",
+            "src/dashboard/frontend/src/components/chat/header/__tests__/OpenFolderMenuItems.test.tsx",
+            "src/dashboard/frontend/src/components/chat/header/ConversationHeaderMenu.tsx",
+            "src/dashboard/frontend/src/components/chat/header/ConversationStatusLine.tsx",
+            "src/dashboard/frontend/src/components/chat/header/ConversationHeader.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.native.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/header/__tests__/OpenFolderMenuItems.test.tsx src/components/PanOpenInPicker.test.tsx src/components/__tests__/PanOpenInPicker.remote.test.tsx src/components/chat/__tests__/ConversationPanel.test.tsx src/components/chat/__tests__/ConversationPanel.native.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "OpenFolderMenuItems.test.tsx, both PanOpenInPicker test files and both ConversationPanel test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6 and D1-5. In PanOpenInPicker.tsx export useAvailableEditors, openFolderInEditor, openLinkedFolderInEditor and EDITOR_LABELS, and make LocalOpenInPicker and RemoteOpenInPicker call them so their behavior is unchanged. Create OpenFolderMenuItems.tsx: local conversations get one 'Open folder in <Editor>' item per available editor, preferred first with the formatSpec shortcut text; linked conversations get the REMOTE_EDITORS items then REMOTE_UNVERIFIED items disabled with REMOTE_EDITOR_UNSUPPORTED_HINT; no editors render nothing. Render it first in menu group 2 only when not native. Remove PanOpenInPicker and its separator from the status line. In ConversationHeader call useEditorOpenFavoriteShortcut(native || origin === 'linked' ? null : (conversation.cwd ?? null)). Replace the native test's open-in-picker mock assertions as PRD WI-6 states, add the shortcut-hook assertion to ConversationPanel.test.tsx, and add the new test file to the subset. Test harness: ConversationPanel.native.test.tsx line 35 mocks '../../PanOpenInPicker' wholesale, which would leave the new named exports undefined; replace that mock with vi.mock('../header/OpenFolderMenuItems', () => ({ OpenFolderMenuItems: () => <div data-testid=\"open-folder-items\" /> })) and assert the testid is absent in the phone app and present outside it. ConversationPanel.test.tsx's wsTransport mock returns a never-resolving request, so useAvailableEditors yields no editors there and no extra mock is needed."
+        },
+        "items": [
+          {
+            "id": "menu-open-folder.ac1",
+            "title": "Given editors ['cursor','vscode'] with preferred 'vscode', OpenFolderMenuItems renders 'Open folder in VS Code' before 'Open folder in Cursor', and clicking Cursor calls shellOpenInEditor with { cwd, editor: 'cursor' } and onDone",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-open-folder.ac2",
+            "title": "Given a linked conversation, the items list the remote editors with Cursor and Windsurf disabled, and clicking VS Code sends a POST to /api/linked-conversations/open-in-editor with { conversation, editor: 'vscode' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-open-folder.ac3",
+            "title": "Given the phone app, the open ⋯ menu renders no OpenFolderMenuItems (testid open-folder-items); outside the phone app it renders them; the status line renders no editor picker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-open-folder.ac4",
+            "title": "When the ⋯ menu is closed, the header still calls useEditorOpenFavoriteShortcut with the conversation's cwd, and PanOpenInPicker.test.tsx and PanOpenInPicker.remote.test.tsx run green with no edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "menu-subagents",
+        "title": "⋯ → Subagents toggles the subagents rail through a toggleSignal prop (WI-7)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T08:23:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/SubagentRail.tsx",
+            "src/dashboard/frontend/src/components/chat/SubagentRail.test.tsx",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/header/ConversationHeader.tsx",
+            "src/dashboard/frontend/src/components/chat/header/ConversationHeaderMenu.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/SubagentRail.test.tsx src/components/chat/__tests__/ConversationPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SubagentRail.test.tsx (the 10 existing tests plus the new ones) and ConversationPanel.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7 and D1-6. Add toggleSignal?: number to SubagentRailProps; record the first value in a ref and, on each later change, call toggleCollapsed(!collapsed) (narrow pane flips the override, wide pane flips the stored state and writes localStorage unless defaultCollapsed is set). In ConversationPanel add a railToggle counter, pass toggleSignal to SubagentRail and subagentCount + onToggleSubagents to ConversationHeader → ConversationHeaderMenu. The menu item 'Subagents' (count on the right) is the last item of group 1 and is hidden when subagentCount is 0. The default open/closed state of the rail does not change."
+        },
+        "items": [
+          {
+            "id": "menu-subagents.ac1",
+            "title": "Rerendering SubagentRail with toggleSignal 0 then 1 collapses an open rail and writes overdeck.ui.agentsRailCollapsed='true'; 1 then 2 opens it again; the initial value never toggles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-subagents.ac2",
+            "title": "Given defaultCollapsed set, a toggleSignal increment collapses or opens the rail and stores nothing in localStorage, and the 10 existing SubagentRail tests run green with no edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-subagents.ac3",
+            "title": "⋯ renders no 'Subagents' item when the messages response has no subagents and renders 'Subagents' with count 2 when two subagents are present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "status-line-words",
+        "title": "Status line in words: folder, branch, commits pushed/not pushed, files not committed, each part opening the dock (WI-8)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T08:23:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/header/ConversationStatusLine.tsx",
+            "src/dashboard/frontend/src/components/chat/header/__tests__/ConversationStatusLine.test.tsx",
+            "src/dashboard/frontend/src/components/chat/ConversationBranchMeta.tsx",
+            "src/dashboard/frontend/src/components/chat/header/ConversationHeader.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/header/__tests__/ConversationStatusLine.test.tsx src/components/chat/__tests__/ConversationPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConversationStatusLine.test.tsx and ConversationPanel.test.tsx (including the PAN-3822 PR badge test, unchanged) pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-8 and D1-9, D1-10, D1-11, D1-12. ConversationStatusLine takes { conversation, status, native, changes } and renders, separated by styles.conversationMetaSep: state dot + label, ConversationMachineChip, folder (abbreviateHome(cwd) mono, title=cwd; a button calling openDock({ tab: 'files' }) when changes is non-null, else a plain span), branch via ConversationBranchMeta (mono branch, GitFork icon only for worktrees, 'Worktree/Local · cwd' tooltip, PR badge unchanged), then when totals are loaded and the count > 0: 'N commits pushed' and 'N commits not pushed' (openDock({ tab: 'changes', changesScope: 'conversation' })), 'N files not committed' in text-state-needs-you (openDock({ tab: 'changes', changesScope: 'uncommitted' })), then cost in text-signal-cost-foreground. Keep styles.conversationMetaRow on the container. Export abbreviateHome, commitsPushedLabel, commitsNotPushedLabel, filesNotCommittedLabel. Action parts are <button type='button'> with 'underline decoration-dotted underline-offset-2 hover:text-foreground'. Write ConversationStatusLine.test.tsx per PRD WI-8 and add it to the subset."
+        },
+        "items": [
+          {
+            "id": "status-line-words.ac1",
+            "title": "abbreviateHome returns '~/Projects/dfai' for '/home/eltmon/Projects/dfai', '~' for '/Users/a', '~/x' for '/root/x', and returns '/srv/app' and '/homes/x' unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-line-words.ac2",
+            "title": "Given totals commitsPushed 2, commitsLocal 1, uncommittedFiles 1, the status line renders in DOM order the state label, the ~ folder, the branch, '2 commits pushed', '1 commit not pushed', '1 file not committed' (class text-state-needs-you) and the cost, and no session id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-line-words.ac3",
+            "title": "When the folder is clicked, openDock receives { tab: 'files' }; when either commit part is clicked, it receives { tab: 'changes', changesScope: 'conversation' }; when '1 file not committed' is clicked, it receives { tab: 'changes', changesScope: 'uncommitted' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-line-words.ac4",
+            "title": "With changes null the folder renders as a plain span with no button and no commit or uncommitted part renders; a zero count renders no part; the PAN-3822 PR badge test passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dock-chip-resync",
+        "title": "The dock's conversation Changes chip follows a repeat openDock with a changesScope (WI-9)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T08:23:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/dock/changes/ConversationChangesList.tsx",
+            "src/dashboard/frontend/src/components/dock/__tests__/ConversationChangesList.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/dock/__tests__/ConversationChangesList.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConversationChangesList.test.tsx passes including the new repeat-open case and the existing 'opens on the store changesScope chip' case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-9 and D1-15. In ConversationChangesList.tsx, after the useState chip line, subscribe to useWorkDockStore(s => s.byDeck[deckKey]?.openSeq) and in a useEffect on [deckKey, openSeq] set the chip to the store's changesScope when it is set. Add useEffect to the React import. Change nothing else in the file (child C may have it open). Add one test: mounted on 'conversation', then act(() => useWorkDockStore.getState().openDock(deck, { tab: 'changes', changesScope: 'uncommitted' })), the Not committed chip becomes selected and the next request uses scope=uncommitted."
+        },
+        "items": [
+          {
+            "id": "dock-chip-resync.ac1",
+            "title": "Given the list mounted on the This conversation chip, when openDock is called with changesScope 'uncommitted', then the Not committed chip renders as selected and the next /changes request carries scope=uncommitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-chip-resync.ac2",
+            "title": "The existing ConversationChangesList tests pass unchanged and the diff to ConversationChangesList.tsx adds only the openSeq subscription, the effect and the import",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "playwright-tools-specs",
+        "title": "Update the two Playwright specs that clicked the header Tools button to use ⋯ → Show tool calls (WI-10)",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-15T08:23:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/hide-tool-calls.spec.ts",
+            "src/dashboard/frontend/tests/pan-4497-timeline-overlap.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'title=\"Hide tool calls\"\\|title=\"Show tool calls\"' src/dashboard/frontend/tests/hide-tool-calls.spec.ts src/dashboard/frontend/tests/pan-4497-timeline-overlap.spec.ts || echo none",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the grep prints 'none'",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-10. In tests/hide-tool-calls.spec.ts (lines 120, 139) and tests/pan-4497-timeline-overlap.spec.ts (lines 381, 386) replace each click on button[title=\"Hide tool calls\"] / button[title=\"Show tool calls\"] with: await page.getByLabel('More conversation actions').click(); await page.getByRole('menuitemcheckbox', { name: /Show tool calls/ }).click(). Keep every transcript assertion; update comments that say wrench toggle / header button to say the ⋯ menu. These specs are not in CI's test:playwright list; run them if an isolated dashboard is available, otherwise say in the PR that they were updated but not run."
+        },
+        "items": [
+          {
+            "id": "playwright-tools-specs.ac1",
+            "title": "Neither spec file contains title=\"Hide tool calls\" or title=\"Show tool calls\" locators",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-tools-specs.ac2",
+            "title": "Each former toggle click opens the 'More conversation actions' menu and clicks the menuitemcheckbox named 'Show tool calls', and every transcript assertion is preserved unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "header-uat-spec",
+        "title": "Fixture-backed Playwright spec for the header plus light/dark NFR-6 screenshots (WI-11)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-15T08:23:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-5291-conversation-header.spec.ts",
+            "docs/screenshots/pan-5291/conversation-header-dark.png",
+            "docs/screenshots/pan-5291/conversation-header-light.png"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-5291-conversation-header.spec.ts",
+            "ls docs/screenshots/pan-5291/conversation-header-dark.png docs/screenshots/pan-5291/conversation-header-light.png"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "pan-5291-conversation-header.spec.ts passes against an isolated fixture dashboard",
+            "both screenshot files exist"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-7",
+            "FR-8",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-11. Create tests/pan-5291-conversation-header.spec.ts modeled on tests/pan-5289-work-dock.spec.ts (startIsolatedDashboard, seed-workflow-fixture, DECK 'workflow-fixture', 1920x1000, serial, pageerror guard, header comment saying it is not in CI's list because it seeds git repositories). Read the fixture's /api/conversations/fixture-1/changes?scope=conversation with page.request and assert the header and status line from that response (never hardcoded numbers). Assert Changes/Files/folder/'N files not committed' open the dock on the right tab and chip, assert the ⋯ items of PRD WI-11 step 3, and save dark and light screenshots of the conversation pane to docs/screenshots/pan-5291/. Open both PNGs yourself, compare with mockup screen 1's header (.ch), fix gaps, and attach both to the PR description."
+        },
+        "items": [
+          {
+            "id": "header-uat-spec.ac1",
+            "title": "Given the seeded fixture conversation, the header Changes button shows '+' and '−' numbers equal to the fixture's /changes totals and the status line shows the D1-10 words for its commitsPushed, commitsLocal and uncommittedFiles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "header-uat-spec.ac2",
+            "title": "Clicking Changes opens the work dock on Changes with the This conversation chip, Files and the folder open it on Files, and 'N files not committed' with the list on screen selects the Not committed chip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "header-uat-spec.ac3",
+            "title": "⋯ lists About this conversation, Bookmarks, Show tool calls, Copy conversation id, Copy link, Open in new window, Favorite, Regenerate title, Export transcript and Archive conversation, and row 1 renders no Copy link or Detach icon",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "header-uat-spec.ac4",
+            "title": "When the spec runs at 1920x1000, it saves docs/screenshots/pan-5291/conversation-header-dark.png and conversation-header-light.png, and both are attached to the PR description",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-changelog",
+        "title": "Document the header, ⋯ menu and status line; add changelog.d/pan-5291.md (WI-12)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T08:23:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "changelog.d/pan-5291.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'Copy session id' features/conversations.mdx",
+            "grep -n 'Conversation header (PAN-5291)' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "the grep prints a line from features/conversations.mdx",
+            "the grep prints the section heading line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-12 with the exact text it gives. features/conversations.mdx: update the Copy link and Bookmarks rows of the control table, add the '### The header and status line' section (row-1 buttons, what Changes/Files open and their shortcuts, that they appear only in a Command Deck tab, the status-line parts and wording, the full ⋯ list including Copy conversation id vs Copy session id and Advanced → Delivery method, ⌘⇧O), change the Bookmarks paragraph to '⋯ → Bookmarks', change 'header `⋮`' to 'header `⋯`' in the pull-request section, and name 'Stop the agent' for the header menu in the stopping section. docs/DASHBOARD-ARCHITECTURE.md: add '## Conversation header (PAN-5291)' after '### Workflow fixture' with the chat/header file table, the Stage gate, the shared conversation-changes query key and the chip resync on openSeq. Create changelog.d/pan-5291.md with the two Improved bullets from the PRD."
+        },
+        "items": [
+          {
+            "id": "docs-changelog.ac1",
+            "title": "features/conversations.mdx contains a '### The header and status line' section that names Changes, Files, the status-line words ('commits pushed', 'not pushed', 'files not committed') and the ⋯ items including 'Copy session id' and 'Advanced'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac2",
+            "title": "features/conversations.mdx no longer contains the string 'header `⋮`' and its Bookmarks paragraph reads '⋯ → **Bookmarks** opens a list'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac3",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains the heading 'Conversation header (PAN-5291)' with the chat/header file table, and changelog.d/pan-5291.md exists with an '#### Improved' heading so that npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "extract-header",
+        "to": "header-dock-buttons",
+        "type": "blocks"
+      },
+      {
+        "from": "header-dock-buttons",
+        "to": "menu-view-toggles",
+        "type": "blocks"
+      },
+      {
+        "from": "menu-view-toggles",
+        "to": "menu-copy-open",
+        "type": "blocks"
+      },
+      {
+        "from": "menu-copy-open",
+        "to": "menu-open-folder",
+        "type": "blocks"
+      },
+      {
+        "from": "menu-open-folder",
+        "to": "menu-subagents",
+        "type": "blocks"
+      },
+      {
+        "from": "menu-subagents",
+        "to": "status-line-words",
+        "type": "blocks"
+      },
+      {
+        "from": "menu-view-toggles",
+        "to": "playwright-tools-specs",
+        "type": "blocks"
+      },
+      {
+        "from": "status-line-words",
+        "to": "header-uat-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "dock-chip-resync",
+        "to": "header-uat-spec",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

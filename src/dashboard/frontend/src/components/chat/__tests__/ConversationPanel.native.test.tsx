@@ -1,10 +1,10 @@
 /**
  * PAN-4837 WI-17a: in the phone app the conversation header and ⋮ menu hide
- * every control whose route the phone token cannot call; "Stop agent" stays.
+ * every control whose route the phone token cannot call; "Stop the agent" stays.
  * Outside the app every control renders as before.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
 import { ConversationPanel } from '../ConversationPanel';
@@ -32,7 +32,7 @@ vi.mock('../../DiffWorkerPoolProvider', () => ({
 }));
 vi.mock('../../DiffPanel', () => ({ DiffPanel: () => <div data-testid="diff-panel" /> }));
 vi.mock('../ComposerFooter', () => ({ ComposerFooter: () => <div data-testid="composer-footer" /> }));
-vi.mock('../../PanOpenInPicker', () => ({ PanOpenInPicker: () => <div data-testid="open-in-picker" /> }));
+vi.mock('../header/OpenFolderMenuItems', () => ({ OpenFolderMenuItems: () => <div data-testid="open-folder-items" /> }));
 
 const native = globalThis as { __OVERDECK_NATIVE__?: boolean };
 
@@ -96,25 +96,25 @@ describe('ConversationPanel in the phone app (PAN-4837)', () => {
     localStorage.clear();
   });
 
-  it('keeps Stop agent and hides every admin action, the rename pencil and the open-in picker', () => {
+  it('keeps Stop the agent and hides every admin action, the rename pencil and the open-folder items', () => {
     native.__OVERDECK_NATIVE__ = true;
     renderPanel();
     const menu = openMenu();
-    expect(menu.textContent).toContain('Stop agent');
+    expect(menu.textContent).toContain('Stop the agent');
     for (const label of ['Favorite', 'Regenerate title', 'Share', 'Archive conversation', 'Export transcript']) {
       expect(menu.textContent).not.toContain(label);
     }
     expect(screen.queryByRole('button', { name: 'Rename test-conv' })).not.toBeInTheDocument();
-    expect(screen.queryByTestId('open-in-picker')).not.toBeInTheDocument();
+    expect(within(menu).queryByTestId('open-folder-items')).not.toBeInTheDocument();
   });
 
   it('shows every action outside the phone app', () => {
     renderPanel();
     const menu = openMenu();
-    for (const label of ['Stop agent', 'Favorite', 'Regenerate title', 'Archive conversation', 'Export transcript']) {
+    for (const label of ['Stop the agent', 'Favorite', 'Regenerate title', 'Archive conversation', 'Export transcript']) {
       expect(menu.textContent).toContain(label);
     }
     expect(screen.getByRole('button', { name: 'Rename test-conv' })).toBeInTheDocument();
-    expect(screen.getByTestId('open-in-picker')).toBeInTheDocument();
+    expect(within(menu).getByTestId('open-folder-items')).toBeInTheDocument();
   });
 });

@@ -1,30 +1,29 @@
 /**
- * PAN-4498 WI-6: the Bookmarks header toggle and the bookmarks drawer list.
- * Both render nothing outside a ConversationBookmarksProvider.
+ * PAN-4498 WI-6: the bookmarks drawer list, opened from the header ⋯ menu's
+ * Bookmarks item (PAN-5291). Both render nothing outside a ConversationBookmarksProvider.
  */
 import { useState } from 'react';
 import { Bookmark, Pencil, X } from 'lucide-react';
-import styles from '../../CommandDeck/styles/command-deck.module.css';
 import { formatTimestamp } from '../messagesTimeline/helpers';
 import { useConversationBookmarks } from './ConversationBookmarks';
 import { isNativeShell } from '../../../lib/nativeShell';
+import { MenuItemButton } from '../../shared/ContextMenu';
 
-export function BookmarksToggle() {
+/** The ⋯ menu's Bookmarks item: toggles the bookmarks drawer, then closes the menu. */
+export function BookmarksMenuItem({ onDone }: { onDone: () => void }) {
   const ctx = useConversationBookmarks();
   if (!ctx) return null;
   const { listOpen, setListOpen, bookmarks } = ctx;
   return (
-    <button
-      type="button"
-      className={`${styles.conversationAboutToggle} ${listOpen ? styles.conversationAboutToggleActive : ''}`}
-      onClick={() => setListOpen(!listOpen)}
-      title={listOpen ? 'Hide bookmarks' : 'Show bookmarks'}
-      aria-label={listOpen ? 'Hide bookmarks' : 'Show bookmarks'}
-      aria-pressed={listOpen}
+    <MenuItemButton
+      role="menuitemcheckbox"
+      aria-checked={listOpen}
+      onClick={() => { setListOpen(!listOpen); onDone(); }}
     >
       <Bookmark size={14} />
-      <span>{`Bookmarks${bookmarks.length > 0 ? ` ${bookmarks.length}` : ''}`}</span>
-    </button>
+      <span>Bookmarks</span>
+      {bookmarks.length > 0 && <span className="ml-auto tabular-nums text-muted-foreground">{bookmarks.length}</span>}
+    </MenuItemButton>
   );
 }
 

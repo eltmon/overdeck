@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, X } from 'lucide-react';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import type { SubagentSummary } from './chat-types';
@@ -21,6 +21,12 @@ interface SubagentRailProps {
    * user's own conversation-page rail preference.
    */
   defaultCollapsed?: boolean;
+  /**
+   * Each change after mount flips the rail, exactly as its own buttons do
+   * (pane-local on a narrow pane, stored otherwise). The header's ⋯ →
+   * Subagents item bumps it (PAN-5291 D1-6); the mount value never toggles.
+   */
+  toggleSignal?: number;
 }
 
 function readSelectedSubagent(): string | null {
@@ -53,7 +59,7 @@ export function useSubagentSelection(subagents: readonly SubagentSummary[]) {
   return { selectedAgentId, selectedSubagent, clearSelection };
 }
 
-export function SubagentRail({ conversation, subagents, selectedAgentId, defaultCollapsed }: SubagentRailProps) {
+export function SubagentRail({ conversation, subagents, selectedAgentId, defaultCollapsed, toggleSignal }: SubagentRailProps) {
   const select = useCallback((agentId: string | null) => updateSelectedSubagent(agentId), []);
   const [storedCollapsed, setStoredCollapsed] = useState(
     () => defaultCollapsed ?? (typeof window !== 'undefined' && localStorage.getItem(AGENTS_RAIL_COLLAPSED_KEY) === 'true'),
@@ -98,6 +104,13 @@ export function SubagentRail({ conversation, subagents, selectedAgentId, default
     if (defaultCollapsed !== undefined) return;
     try { localStorage.setItem(AGENTS_RAIL_COLLAPSED_KEY, String(next)); } catch { /* ignore */ }
   }, [narrow, defaultCollapsed]);
+
+  const lastToggleSignal = useRef(toggleSignal);
+  useEffect(() => {
+    if (toggleSignal === undefined || toggleSignal === lastToggleSignal.current) return;
+    lastToggleSignal.current = toggleSignal;
+    toggleCollapsed(!collapsed);
+  }, [toggleSignal, collapsed, toggleCollapsed]);
 
   if (subagents.length === 0) return null;
 
