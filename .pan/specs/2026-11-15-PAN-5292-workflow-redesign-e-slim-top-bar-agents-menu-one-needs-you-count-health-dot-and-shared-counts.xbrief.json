@@ -1,0 +1,1089 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T00:54:26Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5292: Workflow redesign E: slim top bar (agents menu, one Needs-you count, health dot) and shared counts",
+    "updated": "2026-11-15T01:03:21.127Z"
+  },
+  "plan": {
+    "id": "pan-5292",
+    "title": "Workflow redesign E: slim top bar (agents menu, one Needs-you count, health dot) and shared counts",
+    "status": "running",
+    "uid": "9cf99efd-46e2-4c73-ab6a-50b09dbc66cd",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-15T00:54:26Z",
+    "updated": "2026-11-15T01:03:21.127Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5292",
+        "label": "PAN-5292",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5292/.pan/drafts/pan-5292.md",
+        "label": "PRD draft (.pan/drafts/pan-5292.md)",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-5284.md",
+        "label": "Parent PRD (PAN-5284, child E)",
+        "type": "prd"
+      },
+      {
+        "uri": "docs/design/workflow-redesign-mockup.html",
+        "label": "Approved mockup",
+        "type": "design"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "top-bar",
+      "needs-you",
+      "workflow-redesign"
+    ],
+    "narratives": {
+      "Problem": "The app bar is eleven unrelated pills, and three surfaces count 'needs you' with three different rules (Decisions badge, Flywheel badge, Home card) while the agents pill and the Home page count running agents differently, so the numbers disagree.",
+      "Proposal": "Replace the bar's right side with the mockup's agents menu, Needs-you button, health dot (whose popover hosts System health, GitHub quota, auto-resume, stopped agents and Cloister controls as inline sections) and theme toggle, plus four exception chips that render only while abnormal; make the search box open the palette and the crumb read project / active tab; switch the top bar and the Home page to child S's useNeedsYouItems and useAgentsWorking selectors, and prove agreement with one test.",
+      "NonGoals": "- Do not change the left column, Sidebar.tsx, the brand placement or the window-spanning layout (child F).\n- Do not remove the Activity-feed (History) toggle or the Awareness column (child F).\n- Do not edit CommandPalette.tsx or add files to the palette (child B).\n- Do not change project Home, CommandDeck/ProjectOverview.tsx or Stage files (child G / B).\n- Do not change the system-notices row or any banner above the bar.\n- Do not change useAgentsWorking, useNeedsYouItems, projectOf or WorkingRow.\n- Do not change other count surfaces: MobileNeedsYou, God View, pipeline-helpers, DecisionsPanel, pipeline-state.\n- Do not change UpdateDialog's running-agent count.\n- Do not add polling intervals or new server routes.\n- Do not raise or add any scripts/file-size-allowlist.txt row.\n- No mobile/narrow layout work beyond not overflowing at 1280 px."
+    },
+    "metadata": {
+      "canonicalFilename": "2026-11-15-PAN-5292-workflow-redesign-e-slim-top-bar-agents-menu-one-needs-you-count-health-dot-and-shared-counts.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keep the Activity-feed (History) toggle in the top bar in this child (E-D3).",
+        "rationale": "Parent §7 gives its replacement (/activity Feed tab) to child F; removing it here would leave the off-deck feed unreachable until F merges, violating parent D-13/D-14."
+      },
+      {
+        "summary": "No brand/logo in the top bar in this child (E-D4).",
+        "rationale": "The window-spanning top bar is child F's App.tsx layout change; Sidebar.tsx still shows the logo until F."
+      },
+      {
+        "summary": "Add 'Auto-resume frozen' and 'N stopped' exception chips beyond §6.7's two (E-D9).",
+        "rationale": "DeaconPauseBanner is mounted nowhere, so the bar's compact toggle is the only frozen signal, and Stop all freezes Deacon; the stopped pill is the only stopped-agents signal. §6.7's own rule is 'exceptions surface'."
+      },
+      {
+        "summary": "Stale-build chip reads 'Build behind main' with a 'Run pan reload' title instead of 'Reload to update' (E-D10).",
+        "rationale": "The chip reports the server build lagging origin/main; a browser reload does not fix it and NewBuildBanner owns the browser-reload case."
+      },
+      {
+        "summary": "Low-cost mode and stale build are chips only, not popover sections.",
+        "rationale": "Parent §7 row for the top bar assigns them to 'exception chips (low-cost, stale)' and the popover to freeze, restart, quota, health and system menu."
+      },
+      {
+        "summary": "Keep SystemHealthPill's file, name and test id; it renders the dot and takes children sections (E-D14).",
+        "rationale": "16 pinned tests query data-testid system-health-pill and its dialog; a rename adds churn without behavior."
+      },
+      {
+        "summary": "Health popover hosts inline sections; outside clicks inside any role=dialog/alertdialog are ignored; Cloister's restart-config modal gains role=dialog (E-D5, E-D6).",
+        "rationale": "Nested absolute popovers clip inside a scrolling popover, and CloisterStatusBar portals sub-dialogs to body which would otherwise close the popover."
+      },
+      {
+        "summary": "Delete RunningAgentsPill(+test), DecisionsIndicator and SystemMenu(+test); remove GitHubQuotaPill component (E-D12, E-D13, E-D13a).",
+        "rationale": "Their only consumer is AppChrome; the test-skip gate's deleted-subject exemption covers tests deleted with their subjects, and their behaviors are re-tested in the new components."
+      },
+      {
+        "summary": "countRunningAgents stays in App.tsx for UpdateDialog only (E-D2).",
+        "rationale": "UpdateDialog counts agents an update restart would interrupt, a different question from agents working; App must not subscribe to slices (PAN-4560)."
+      },
+      {
+        "summary": "Search box opens the palette with a global placeholder; child B changes PALETTE_SEARCH_PLACEHOLDER when files land (E-D15).",
+        "rationale": "CommandPalette.tsx is child B's file and B lands after E; the palette is global so the placeholder no longer names the project."
+      },
+      {
+        "summary": "Agents menu joins store agents and the conversations query for model and age; WorkingRow is unchanged (E-D17).",
+        "rationale": "Child S's WorkingRow has no model or time; extending the shared selector is outside this child's scope."
+      },
+      {
+        "summary": "Needs you and agents controls are always visible; neutral at zero (E-D18).",
+        "rationale": "Parent §6.7: amber only when N > 0; the mockup shows both controls permanently; the agents menu is also the way to the Agents page."
+      },
+      {
+        "summary": "All CI-subset additions happen in one ci-subset item.",
+        "rationale": "Keeps the parallel component items file-disjoint so subagents never edit the same file."
+      }
+    ],
+    "items": [
+      {
+        "id": "agents-menu",
+        "title": "Agents menu component (N agents working ▾, rows, Stop all)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T00:54:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5292",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/topbar/AgentsMenu*"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/App/topbar/AgentsMenu.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in AgentsMenu.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E2",
+            "NFR-E2",
+            "NFR-E4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-E1. Create App/topbar/AgentsMenu.tsx (no props) calling useAgentsWorking(), joining agentsById and the shared ['conversations'] query for model and age (E-D17), project names from ['registered-projects']; PopoverSurface dropdown with 'Working now' rows, 'Open the Agents page' and 'Stop all agents…' (triggerEmergencyStop). Write App/topbar/AgentsMenu.test.tsx with cases (a)-(e) from the PRD. Do not edit AppChrome.tsx (WI-E10 wires it)."
+        },
+        "items": [
+          {
+            "id": "agents-menu.ac1",
+            "title": "Given useAgentsWorking returns 0, 1 and 3 rows, when AgentsMenu renders, then the trigger reads 'No agents working', '1 agent working' and '3 agents working', and the open menu renders exactly that many rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-menu.ac2",
+            "title": "Given a conversation row and an issue agent row, when each is clicked, then the URL becomes /conv/<name> and /issues/<ID> respectively and the menu closes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-menu.ac3",
+            "title": "Given count > 0, when 'Stop all agents…' is clicked, then triggerEmergencyStop is called once; given count 0, the item renders disabled with title 'No agents are working'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-menu.ac4",
+            "title": "When count > 0 the trigger dot has class bg-state-live and no class containing 'emerald'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "needs-you-menu",
+        "title": "Needs-you button and menu on useNeedsYouItems",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T00:54:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5292",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/{,__tests__/}NeedsYouIndicator*.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/flywheel/__tests__/NeedsYouIndicator.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in NeedsYouIndicator.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E3",
+            "FR-E9",
+            "NFR-E4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-E2. Rewrite components/flywheel/NeedsYouIndicator.tsx on useNeedsYouItems() with the grouped PopoverSurface menu and 'Open Activity' footer; keep onActivate in the props type as an ignored @deprecated prop so AppChrome compiles until WI-E10. Rewrite its test file (cases a-e)."
+        },
+        "items": [
+          {
+            "id": "needs-you-menu.ac1",
+            "title": "Given useNeedsYouItems returns N items (including N = 0), when NeedsYouIndicator renders, then the trigger with data-testid flywheel-needs-you-indicator reads 'Needs you · N' and is never hidden",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-menu.ac2",
+            "title": "The trigger carries the amber badge-border-state-needs-you / badge-bg-state-needs-you classes only when N > 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-menu.ac3",
+            "title": "Given items in two projects and one without projectKey, when the menu opens, then rows render under each project's display name and the project-less row under 'Other'; clicking a row calls that item's open() once and closes the menu",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-menu.ac4",
+            "title": "Given the real selector and GET /api/flywheel/status returning 200 {}, the button renders 'Needs you · 0' and nothing throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "health-dot",
+        "title": "SystemHealthPill renders as the health dot hosting child sections",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T00:54:26Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5292",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/SystemHealthPill*.tsx",
+            "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx",
+            "src/dashboard/frontend/src/components/CloisterStatusBar.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/SystemHealthPill.test.tsx src/components/system-health-ui-no-loss.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in SystemHealthPill.test.tsx and system-health-ui-no-loss.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E4",
+            "NFR-E4",
+            "NFR-E5"
+          ],
+          "foundationFor": [
+            "topbar-assemble"
+          ],
+          "parallelSafeReason": "Touches only SystemHealthPill.tsx, its two test files and one attribute in CloisterStatusBar.tsx; no other item edits those files."
+        },
+        "narrative": {
+          "Action": "PRD WI-E3. Change SystemHealthPill's trigger to the dot (E-D7, E-D8), add children sections slot and exported HealthSection wrapper, keep the alertdialog early-return and add the target-based close rule (E-D6), add role=dialog aria-modal to CloisterStatusBar's restart-config modal outer container. Keep file name, export name and data-testid (E-D14). Move trigger-text assertions to aria-label/title; add the new cases."
+        },
+        "items": [
+          {
+            "id": "health-dot.ac1",
+            "title": "Given each HealthState (healthy, warning, critical, measuring, unavailable), the button data-testid system-health-pill renders a dot with bg-success, bg-warning, bg-destructive (plus motion-safe:animate-pulse), bg-info and bg-muted-foreground respectively, and its aria-label equals the health copy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "health-dot.ac2",
+            "title": "Given useSystemHealth is loading or errored, the dot is still a button and clicking it opens role=dialog containing the passed children",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "health-dot.ac3",
+            "title": "Given the popover is open, a pointer-down inside a separate element with role=dialog outside the wrapper keeps it open, a pointer-down anywhere while a role=alertdialog exists keeps it open, and a pointer-down on document.body with neither closes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "health-dot.ac4",
+            "title": "Given <SystemHealthPill><CloisterStatusBar/></SystemHealthPill>, opening the dot renders data-testid cloister-controls; every pre-existing case in both test files still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "health-dot.ac5",
+            "title": "Given the Cloister restart-config modal opens, then its outer fixed inset-0 container renders with role=dialog and aria-modal=true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "quota-section",
+        "title": "GitHubQuotaSection for the health popover",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T00:54:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5292",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/{,__tests__/}GitHubQuotaPill*.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/__tests__/GitHubQuotaPill.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in GitHubQuotaPill.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-E4. Add exported GitHubQuotaSection (inline, no popover) beside the existing GitHubQuotaPill; retarget the four existing test cases to the section. WI-E10 deletes the pill component."
+        },
+        "items": [
+          {
+            "id": "quota-section.ac1",
+            "title": "Given selectGitHubQuota returns null, GitHubQuotaSection renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quota-section.ac2",
+            "title": "Given a user graphql sample of 4956/5000, the element data-testid github-quota-label reads '4956 of 5000 GraphQL points left this hour'; without a sample it reads 'No sample yet'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quota-section.ac3",
+            "title": "Given six metered callers, GitHubQuotaSection renders data-testid github-quota-callers with the top 5 by points descending, followed by the unattributed row, without any click",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quota-section.ac4",
+            "title": "Given quota.pauses is non-empty, the label line has class text-warning-foreground",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stopped-section",
+        "title": "StoppedAgentsBanner section variant for the health popover",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T00:54:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5292",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/{,__tests__/}StoppedAgentsBanner*.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/__tests__/StoppedAgentsBanner.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in StoppedAgentsBanner.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-E5. Widen variant to 'banner'|'pill'|'section'; guard the api-error toast effect body with variant==='section' early return; extract a local StoppedAgentsList shared by the pill popover and the section. Add tests (a)-(c)."
+        },
+        "items": [
+          {
+            "id": "stopped-section.ac1",
+            "title": "Given stopped agents exist, variant='section' renders data-testid stopped-agents-section with one row per stopped issue and 'Restart all' (data-testid section-restart-all) restarts each once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stopped-section.ac2",
+            "title": "Given no stopped agents, variant='section' renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stopped-section.ac3",
+            "title": "Given a pill and a section mounted together, when an agent's resolution changes to api_error, then toast.warning fires exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stopped-section.ac4",
+            "title": "Every pre-existing pill and banner case still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stale-build-chip",
+        "title": "StaleBuildChip reads 'Build behind main' with the pan reload remedy",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T00:54:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5292",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/StaleBuildChip*.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/StaleBuildChip.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in StaleBuildChip.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-E6 / E-D10. Change the chip text and title; update the existing label test."
+        },
+        "items": [
+          {
+            "id": "stale-build-chip.ac1",
+            "title": "Given staleness status 'stale' with behindBuildInputs 2, the chip renders the text 'Build behind main' and its title contains '2 build-input commit(s) behind' and 'pan reload'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-build-chip.ac2",
+            "title": "Given staleness not stale or unavailable, the chip renders nothing (both existing null cases pass)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deacon-frozen-chip",
+        "title": "DeaconFrozenChip exception chip",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T00:54:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5292",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/DeaconPauseToggle*.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/DeaconPauseToggle.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in DeaconPauseToggle.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-E7. Export DeaconFrozenChip (compact toggle only while paused); rename the compact paused label to 'Auto-resume frozen' and its title; full variant unchanged. Update the compact assertion and add cases."
+        },
+        "items": [
+          {
+            "id": "deacon-frozen-chip.ac1",
+            "title": "Given GET /api/deacon/pause returns {paused:false}, DeaconFrozenChip renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-frozen-chip.ac2",
+            "title": "Given {paused:true}, DeaconFrozenChip renders a button named /Auto-resume frozen/ with classes border-warning/32 bg-warning/8 text-warning-foreground",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-frozen-chip.ac3",
+            "title": "When that button is clicked, then fetch receives POST /api/deacon/pause with body {\"paused\":false}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "crumb-and-labels",
+        "title": "Breadcrumb, TAB_TITLES and palette placeholder labels",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T00:54:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5292",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/appChromeLabels*.ts",
+            "src/dashboard/frontend/src/App/topbar/Breadcrumb*"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/App/appChromeLabels.test.ts src/App/topbar/Breadcrumb.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in appChromeLabels.test.ts and Breadcrumb.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E6",
+            "FR-E7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-E8 / E-D15 / E-D16. Add PALETTE_SEARCH_PLACEHOLDER, TAB_TITLES, paletteKeycap to App/appChromeLabels.ts (searchButtonText stays until WI-E10); create App/topbar/Breadcrumb.tsx and its test."
+        },
+        "items": [
+          {
+            "id": "crumb-and-labels.ac1",
+            "title": "Given App/appChromeLabels.ts, then the exported search-box label constant returns 'Search issues, conversations, commands…' and TAB_TITLES contains a non-empty title for every key of TAB_PATHS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crumb-and-labels.ac2",
+            "title": "Given platform 'other' and 'mac', then paletteKeycap returns the formatSpec output for 'Ctrl+K' and 'Meta+K' respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crumb-and-labels.ac3",
+            "title": "Given the Command Deck route, a registered project {key:'panopticon-cli', name:'overdeck'} and an active pane labelled 'Fort 3D', Breadcrumb renders 'overdeck' and 'Fort 3D' and never 'panopticon-cli'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crumb-and-labels.ac4",
+            "title": "Given the Command Deck with no project, Breadcrumb renders 'All projects'; given activeTab 'flywheel', it renders 'Flywheel' only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "home-page-counts",
+        "title": "Home page counts from useNeedsYouItems and useAgentsWorking",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T00:54:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5292",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/pages/HomePage*.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/pages/HomePage.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in HomePage.test.tsx passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E8",
+            "FR-E9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-E9. Call both selectors in HomePage, pass their values into buildHomeSummaryCards, rename the card to 'Agents working' with the role breakdown, delete isRunningAgent; update HomePage.test.tsx with selector mocks."
+        },
+        "items": [
+          {
+            "id": "home-page-counts.ac1",
+            "title": "Given useAgentsWorking returns count 3 with byRole planning 1, building 2, the Home summary card labelled 'Agents working' shows 3 with detail '1 planning · 2 building'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-page-counts.ac2",
+            "title": "Given useNeedsYouItems returns 2 items, the 'Needs you' card shows 2 regardless of derivedIssueStateByIssueId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-page-counts.ac3",
+            "title": "Given the existing Paused, Ready to merge and Cost today fixtures, then those cards show their existing values, and pages/HomePage.tsx contains no isRunningAgent function",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "topbar-assemble",
+        "title": "Wire the slim top bar into AppChrome and App",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T00:54:26Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5292",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/AppChrome*.tsx",
+            "src/dashboard/frontend/src/App*.tsx",
+            "src/dashboard/frontend/src/App/AppLiveStoreHost.tsx",
+            "src/dashboard/frontend/src/components/RunningAgentsPill*.tsx",
+            "src/dashboard/frontend/src/components/DecisionsIndicator.tsx",
+            "src/dashboard/frontend/src/components/SystemMenu*.tsx",
+            "src/dashboard/frontend/src/components/{,__tests__/}GitHubQuotaPill*.tsx",
+            "src/dashboard/frontend/src/App/appChromeLabels*.ts",
+            "src/dashboard/frontend/src/components/flywheel/{,__tests__/}NeedsYouIndicator*.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/App/AppChrome.test.tsx src/App.test.tsx src/App/appChromeLabels.test.ts src/App/AppLiveStoreHost.render-count.test.tsx",
+            "npm run typecheck",
+            "npm run lint",
+            "wc -l src/dashboard/frontend/src/App.tsx"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in AppChrome.test.tsx, App.test.tsx, appChromeLabels.test.ts and AppLiveStoreHost.render-count.test.tsx passed",
+            "typecheck completes without errors",
+            "lint exits 0",
+            "App.tsx line count is at most 1019"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E1",
+            "FR-E5",
+            "FR-E6",
+            "NFR-E1",
+            "NFR-E2",
+            "NFR-E3",
+            "NFR-E5",
+            "NFR-E6"
+          ],
+          "foundationFor": [
+            "docs",
+            "ci-subset"
+          ],
+          "parallelSafeReason": "Runs only after all eight component items it consumes; the only files it shares with them are the removal lines named in its Action, which those items finish first."
+        },
+        "narrative": {
+          "Action": "PRD WI-E10. Rewrite the app-bar block of AppChrome.tsx per PRD §7 (notices row untouched); add ThemeToggleButton; App.tsx passes onPaletteOpen and drops runningAgentCount/onNavigateNeedsYou props (countRunningAgents stays for UpdateDialog, E-D2); rewrite countRunningAgents' doc comment; delete RunningAgentsPill(+test), DecisionsIndicator, SystemMenu(+test); remove GitHubQuotaPill component, searchButtonText (+3 tests) and NeedsYouIndicator's deprecated onActivate; mock the new leaves in App.test.tsx; write App/AppChrome.test.tsx; take NFR-6 screenshots."
+        },
+        "items": [
+          {
+            "id": "topbar-assemble.ac1",
+            "title": "AppChrome.test.tsx passes: the bar contains, in DOM order, the agents menu, Needs-you button, health dot and theme toggle, and contains no 'Stop all' button, no decisions-indicator, no github-quota-pill, no running-agents-pill and no 'System controls' button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "topbar-assemble.ac2",
+            "title": "Given activeTab 'home' the Activity-feed toggle renders and given 'command-deck' it does not; when the search button is clicked, then onPaletteOpen is called once, and the button shows the search-box label constant with the Ctrl K / ⌘K keycap",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "topbar-assemble.ac3",
+            "title": "The health dot receives the quota, auto-resume, stopped-agents and system-controls sections as children, and the four exception chips render left of it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "topbar-assemble.ac4",
+            "title": "Given the finished diff, then components/RunningAgentsPill.tsx, components/DecisionsIndicator.tsx and components/SystemMenu.tsx are absent, App.test.tsx and AppLiveStoreHost.render-count.test.tsx pass, npm run typecheck and npm run lint each exit with code 0, and App.tsx contains at most 1019 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "topbar-assemble.ac5",
+            "title": "Given the NFR-E6 run on this branch's build with the seeded workflow fixture in an isolated Playwright profile completes, when the agent opens the six PNGs in .tmp/pan-5292-screens/ (conversation and project Home in light and dark, health popover open, agents menu open), then each file exists at 1920x1000 and shows only the PRD §7 top-bar elements",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "count-agreement-test",
+        "title": "One test proves top bar and Home counts agree",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T00:54:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5292",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/__tests__/countAgreement.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/App/__tests__/countAgreement.test.tsx"
+          ],
+          "expected_outputs": [
+            "vitest reports every test in countAgreement.test.tsx passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-E11. Render NeedsYouIndicator, AgentsMenu and HomePage over one seeded store (seedDashboardStore) and stubbed fetch without mocking the selectors; compute expected totals with buildNeedsYouItems/buildAgentsWorking over the same fixture (no hard-coded totals) and assert both surfaces equal them. Read lib/selectors/needsYou.ts, components/flywheel/needsYouRows.ts, lib/useDecisions.ts and lib/flywheelApi.ts first; never loosen the equality."
+        },
+        "items": [
+          {
+            "id": "count-agreement-test.ac1",
+            "title": "Given a seeded store and stubbed fetch producing at least one pending-input, one issue-attention and one Flywheel needs-you item, when NeedsYouIndicator and HomePage render with the real selectors, then both show the same Needs-you count, equal to buildNeedsYouItems over that fixture and at least 3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "count-agreement-test.ac2",
+            "title": "Given running agents plus a conv-<name> agent matching a working conversation, when AgentsMenu and HomePage render, then the agents trigger and Home's 'Agents working' card show the same count, equal to buildAgentsWorking over that fixture and at least 2, with the conv- session counted once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-subset",
+        "title": "Register every new and touched frontend test in the CI subset",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T00:54:26Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-5292",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/App/AppChrome.test.tsx src/App/__tests__/countAgreement.test.tsx src/App/topbar/AgentsMenu.test.tsx src/App/topbar/Breadcrumb.test.tsx src/components/DeaconPauseToggle.test.tsx src/components/StaleBuildChip.test.tsx src/components/SystemHealthPill.test.tsx src/components/__tests__/StoppedAgentsBanner.test.tsx src/components/flywheel/__tests__/NeedsYouIndicator.test.tsx src/components/system-health-ui-no-loss.test.tsx src/pages/HomePage.test.tsx src/App/appChromeLabels.test.ts src/components/__tests__/GitHubQuotaPill.test.tsx"
+          ],
+          "expected_outputs": [
+            "vitest reports all 13 files passed",
+            "grep finds each of the 11 paths once in scripts/frontend-test-subset.txt"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-E1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-E12. Add the 11 test paths to scripts/frontend-test-subset.txt in sorted position (do not add App.test.tsx), then run them all."
+        },
+        "items": [
+          {
+            "id": "ci-subset.ac1",
+            "title": "scripts/frontend-test-subset.txt contains, in sorted position, the 11 paths listed in PRD WI-E12 (AppChrome, countAgreement, AgentsMenu, Breadcrumb, DeaconPauseToggle, StaleBuildChip, SystemHealthPill, StoppedAgentsBanner, NeedsYouIndicator, system-health-ui-no-loss, HomePage tests) and no duplicate of them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-subset.ac2",
+            "title": "Running npx vitest run on exactly those 11 files plus appChromeLabels.test.ts and GitHubQuotaPill.test.tsx from src/dashboard/frontend exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the top bar, Needs-you count and changelog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T00:54:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5292",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "features/mission-control.mdx",
+            "changelog.d/pan-5292.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n '## Top bar (PAN-5292)' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep prints the section heading"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-E1",
+            "FR-E3",
+            "FR-E4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-E13. Write the docs section, update the render-discipline bullet, add the mission-control paragraph and the changelog entry."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a '## Top bar (PAN-5292)' section placed before '## File explorer server (PAN-5183)' that names useNeedsYouItems, useAgentsWorking, the four exception chips, the health-dot close rule and the search-box label hand-off to child B",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, then its 'Aggregate chrome is the exception' bullet contains AgentsMenu and contains neither RunningAgentsPill nor DecisionsIndicator",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given features/mission-control.mdx, then its Decisions section contains a paragraph saying the top bar's 'Needs you · N' count equals the Home page's Needs-you number, and changelog.d/pan-5292.md contains one '#### Improved' bullet linking #5292",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "agents-menu",
+        "to": "topbar-assemble",
+        "type": "blocks"
+      },
+      {
+        "from": "needs-you-menu",
+        "to": "topbar-assemble",
+        "type": "blocks"
+      },
+      {
+        "from": "health-dot",
+        "to": "topbar-assemble",
+        "type": "blocks"
+      },
+      {
+        "from": "quota-section",
+        "to": "topbar-assemble",
+        "type": "blocks"
+      },
+      {
+        "from": "stopped-section",
+        "to": "topbar-assemble",
+        "type": "blocks"
+      },
+      {
+        "from": "stale-build-chip",
+        "to": "topbar-assemble",
+        "type": "blocks"
+      },
+      {
+        "from": "deacon-frozen-chip",
+        "to": "topbar-assemble",
+        "type": "blocks"
+      },
+      {
+        "from": "crumb-and-labels",
+        "to": "topbar-assemble",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-menu",
+        "to": "count-agreement-test",
+        "type": "blocks"
+      },
+      {
+        "from": "needs-you-menu",
+        "to": "count-agreement-test",
+        "type": "blocks"
+      },
+      {
+        "from": "home-page-counts",
+        "to": "count-agreement-test",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-menu",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "needs-you-menu",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "health-dot",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "stopped-section",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "stale-build-chip",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "deacon-frozen-chip",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "crumb-and-labels",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "home-page-counts",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "topbar-assemble",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "count-agreement-test",
+        "to": "ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "topbar-assemble",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

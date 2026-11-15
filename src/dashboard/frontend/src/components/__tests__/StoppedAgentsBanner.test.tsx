@@ -1,6 +1,8 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { toast } from 'sonner';
+
 import { useDashboardStore } from '../../lib/store';
 import type { Agent, BackendPane } from '../../types';
 import { StoppedAgentsBanner } from '../StoppedAgentsBanner';
@@ -174,5 +176,62 @@ describe('StoppedAgentsBanner', () => {
     }));
     expect(within(popover).getByText('✓ 2 restarted')).toBeInTheDocument();
     expect(within(popover).getByTestId('pill-restart-all')).toHaveTextContent('Restart all');
+  });
+
+  it('renders the section variant inline and restarts each stopped agent once (PAN-5292 E-D11)', async () => {
+    const fetchMock = vi.mocked(fetch);
+    seedStore(stoppedAgents(), [
+      { identifier: 'PAN-1420', title: 'Known stopped issue', canonicalStatus: 'in_progress' },
+    ]);
+
+    render(<StoppedAgentsBanner variant="section" />);
+    const section = screen.getByTestId('stopped-agents-section');
+    expect(section).toHaveAccessibleName('Stopped agents');
+    expect(section).toHaveTextContent('2 stopped · panes the backend reports exited');
+    expect(within(section).getByText('Known stopped issue')).toBeInTheDocument();
+    expect(section).toHaveTextContent('PAN-1422');
+    expect(screen.queryByTestId('stopped-agents-pill')).toBeNull();
+
+    await act(async () => {
+      fireEvent.click(within(section).getByTestId('section-restart-all'));
+      await vi.runAllTimersAsync();
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/agents', expect.objectContaining({
+      body: JSON.stringify({ issueId: 'PAN-1420' }),
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/agents', expect.objectContaining({
+      body: JSON.stringify({ issueId: 'PAN-1422' }),
+    }));
+    expect(within(section).getByText('✓ 2 restarted')).toBeInTheDocument();
+  });
+
+  it('renders nothing in the section variant when no agent is stopped', () => {
+    seedStore([
+      { ...agent({ id: 'agent-pan-1419-running', issueId: 'PAN-1419', status: 'running' }), paneState: 'working' as const },
+    ]);
+    const { container } = render(<StoppedAgentsBanner variant="section" />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('fires the api-error toast once when a pill and a section are mounted together', () => {
+    vi.mocked(toast.warning).mockClear();
+    const stopped = stoppedAgents();
+    seedStore(stopped);
+    render(
+      <>
+        <StoppedAgentsBanner variant="pill" />
+        <StoppedAgentsBanner variant="section" />
+      </>,
+    );
+    expect(toast.warning).not.toHaveBeenCalled();
+
+    act(() => {
+      seedStore([{ ...stopped[0]!, resolution: 'api_error' }, stopped[1]!]);
+    });
+
+    expect(toast.warning).toHaveBeenCalledTimes(1);
+    expect(toast.warning).toHaveBeenCalledWith('PAN-1420: API error — auto-retry nudge sent', { duration: 8000 });
   });
 });

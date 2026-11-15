@@ -230,7 +230,7 @@ describe('system health UI no-loss audit', () => {
 
     const stateBadge = within(dialog).getByRole('status', { name: 'healthy system health' });
     expect(stateBadge).toHaveTextContent('healthy');
-    expect(dialog).toHaveClass('w-[min(22rem,calc(100vw-1rem))]');
+    expect(dialog).toHaveClass('w-[min(24rem,calc(100vw-1rem))]');
 
     // Chip row (new top status row, replaces old 8-tile status grid)
     expect(within(dialog).getByRole('group', { name: 'Admitted work agents: 2' })).toBeInTheDocument();

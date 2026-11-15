@@ -18,7 +18,7 @@ afterEach(() => {
 });
 
 describe('StaleBuildChip', () => {
-  it('renders the number of missed build-input commits in the warning tone', () => {
+  it('reads "Build behind main" in the warning tone and names the missed commits and the remedy', () => {
     hookState.data = {
       status: 'stale',
       buildCommit: '1234567890abcdef',
@@ -30,13 +30,15 @@ describe('StaleBuildChip', () => {
       computedAt: 1_752_580_800_000,
     };
 
-    const chip = render(<StaleBuildChip />).getByText('build stale ×2');
+    const chip = render(<StaleBuildChip />).getByText('Build behind main');
 
     expect(chip).toHaveClass('text-warning-foreground');
     expect(chip).toHaveAttribute(
       'title',
-      'Running build 12345678 · origin/main fedcba09 · 5 total commit(s) behind',
+      'Running build 12345678 · origin/main fedcba09 · 2 build-input commit(s) behind · 5 total commit(s) behind · Run pan reload to build and restart the dashboard.',
     );
+    expect(chip.getAttribute('title')).toContain('2 build-input commit(s) behind');
+    expect(chip.getAttribute('title')).toContain('pan reload');
   });
 
   it.each(['fresh', 'unknown'] as const)('renders nothing for %s builds', (status) => {
@@ -59,6 +61,6 @@ describe('StaleBuildChip', () => {
     hookState.data = null;
 
     render(<StaleBuildChip />);
-    expect(screen.queryByText(/build stale/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Build behind main')).not.toBeInTheDocument();
   });
 });

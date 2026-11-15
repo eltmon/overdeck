@@ -63,6 +63,7 @@ export function DeaconPauseToggle({ compact = false }: { compact?: boolean }) {
     : 'Freeze Deacon — stop all patrol cycles globally';
 
   if (compact) {
+    const compactTitle = paused ? 'Auto-resume (Deacon) is frozen — click to resume patrol' : title;
     // Paused is an attention condition (all automatic patrol/recovery is off),
     // so it reads as a warning pill with a pulsing "!" badge — not the calm
     // informational style. Running is a subtle icon button (PAN-1591).
@@ -75,10 +76,10 @@ export function DeaconPauseToggle({ compact = false }: { compact?: boolean }) {
             ? 'rounded-md border border-warning/32 bg-warning/8 px-2.5 py-1 text-xs font-medium text-warning-foreground hover:bg-warning/16'
             : 'rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground'
         }`}
-        title={title}
+        title={compactTitle}
       >
         <Snowflake className="h-3.5 w-3.5" />
-        {paused && <span>Deacon frozen</span>}
+        {paused && <span>Auto-resume frozen</span>}
         {paused && (
           <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 animate-pulse items-center justify-center rounded-full bg-warning text-[9px] font-medium leading-none text-warning-foreground ring-2 ring-background">!</span>
         )}
@@ -110,6 +111,17 @@ export function DeaconPauseToggle({ compact = false }: { compact?: boolean }) {
       )}
     </button>
   );
+}
+
+/**
+ * The top bar's "Auto-resume frozen" exception chip (PAN-5292 WI-E7, E-D9):
+ * the compact toggle, rendered only while Deacon is paused. Clicking it
+ * resumes patrol. Normal state shows nothing.
+ */
+export function DeaconFrozenChip() {
+  const { data } = useDeaconPause();
+  if (data?.paused !== true) return null;
+  return <DeaconPauseToggle compact />;
 }
 
 /**

@@ -1,3 +1,16 @@
+/**
+ * The top bar's health dot (PAN-5292 WI-E3, FR-E4, E-D5…E-D8, E-D14).
+ *
+ * The trigger is a 9 px dot whose color follows useSystemHealth() alone; its
+ * `title` and `aria-label` carry the health copy ("Healthy · 23 GB available").
+ * It is a button in every state, loading and fetch error included, because its
+ * popover also hosts the system widgets that used to be their own pills
+ * (GitHub quota, auto-resume, stopped agents, Cloister controls), passed in as
+ * `children` and rendered inline after the System-health section.
+ *
+ * The file keeps its old name, export and `data-testid="system-health-pill"` so
+ * the pinned tests that query them keep working.
+ */
 import type {
   HealthReason,
   HealthState,
@@ -5,16 +18,8 @@ import type {
   SystemHealthSnapshot,
 } from '@overdeck/contracts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  AlertTriangle,
-  ChevronDown,
-  CircleCheck,
-  CircleHelp,
-  Loader2,
-  Skull,
-  X,
-} from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { X } from 'lucide-react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 import { useSystemHealth } from '../hooks/useSystemHealth';
@@ -120,21 +125,6 @@ function healthCopy(data: SystemHealthSnapshot, reasons: readonly HealthReason[]
       return `Critical · ${firstReasonLabel(data, reasons) ?? 'action required'}`;
     case 'unavailable':
       return 'Health unavailable · Retry';
-  }
-}
-
-function StateIcon({ state }: { state: HealthState }) {
-  switch (state) {
-    case 'measuring':
-      return <Loader2 data-health-icon="measuring" aria-hidden="true" className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />;
-    case 'healthy':
-      return <CircleCheck data-health-icon="healthy" aria-hidden="true" className="h-3.5 w-3.5" />;
-    case 'warning':
-      return <AlertTriangle data-health-icon="warning" aria-hidden="true" className="h-3.5 w-3.5" />;
-    case 'critical':
-      return <Skull data-health-icon="critical" aria-hidden="true" className="h-3.5 w-3.5" />;
-    case 'unavailable':
-      return <CircleHelp data-health-icon="unavailable" aria-hidden="true" className="h-3.5 w-3.5" />;
   }
 }
 
@@ -246,13 +236,41 @@ function AttentionTargetActions({
   );
 }
 
-export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
+/** One labelled block inside the health-dot popover, after the System-health section. */
+export function HealthSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section aria-label={title} className="mt-3 border-t border-border pt-3">
+      <div className="eyebrow mb-2">{title}</div>
+      {children}
+    </section>
+  );
+}
+
+export function SystemHealthPill({ compact = false, children }: { compact?: boolean; children?: ReactNode }) {
   const { data, isLoading, error } = useSystemHealth();
   const [open, setOpen] = useState(false);
   const [highlightLeakedOnly, setHighlightLeakedOnly] = useState(false);
   const previousState = useRef<HealthState | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const urlBeforeClickRef = useRef<string | null>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // The popover starts below the top bar, so a fixed 100vh cap would push its
+  // last sections (System controls) past the bottom of the window. Cap it from
+  // its own top edge instead, and scroll inside it.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const fit = () => {
+      const el = popoverRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top;
+      el.style.maxHeight = `${Math.max(200, window.innerHeight - top - 8)}px`;
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, [open]);
 
   const closePopover = useCallback((restoreFocus = true) => {
     setHighlightLeakedOnly(false);
@@ -269,6 +287,10 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
     if (!open) return;
     const onPointerDown = (event: PointerEvent) => {
       if (document.querySelector('[role="alertdialog"]')) return;
+      // A portaled dialog (the Cloister restart popover and config modal) lives
+      // outside the wrapper; a click inside it must not close the popover (E-D6).
+      const target = event.target as Element | null;
+      if (target?.closest?.('[role="dialog"], [role="alertdialog"]') && !wrapperRef.current?.contains(target)) return;
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
         closePopover();
       }
@@ -285,7 +307,11 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
   }, [closePopover, open]);
 
   const reasons = useMemo(() => data ? healthReasons(data) : [], [data]);
-  const copy = data ? healthCopy(data, reasons) : 'Health unavailable · Retry';
+  const copy = data
+    ? healthCopy(data, reasons)
+    : isLoading ? 'Measuring system health…' : 'Health unavailable';
+  const dotClass = data ? stateDotClass(data.state) : 'bg-muted-foreground';
+  const errorMessage = !data && !isLoading ? (error as Error | undefined)?.message : undefined;
   const attentionItems = useMemo(() => data ? buildAttentionItems(data) : [], [data]);
   const summary = useMemo(() => data ? summaryLine(data, attentionItems) : '', [data, attentionItems]);
   const notes = useMemo(() => data ? contextNotes(data) : [], [data]);
@@ -321,29 +347,113 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
     [leakedFirstConsumers],
   );
 
-  if (isLoading) {
-    return (
-      <div role="status" className={`flex items-center gap-2 rounded-md border border-border px-2 py-1.5 text-xs text-muted-foreground ${compact ? 'justify-center px-1.5' : ''}`} aria-label="Loading system health">
-        <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
-        {!compact && <span>Health</span>}
-      </div>
-    );
-  }
+  const relayPresentation = data ? webhookRelayPresentation(data) : null;
 
-  if (error || !data) {
-    return (
-      <div role="alert" className={`flex items-center gap-2 rounded-md border border-border bg-muted px-2 py-1.5 text-xs text-muted-foreground ${compact ? 'justify-center px-1.5' : ''}`} title={(error as Error | undefined)?.message ?? 'Failed to load system health'} aria-label="Health unavailable">
-        <CircleHelp aria-hidden="true" className="h-3.5 w-3.5" />
-        {!compact && <span>Health unavailable · Retry</span>}
-      </div>
-    );
-  }
+  return (
+    <div ref={wrapperRef} className="relative">
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => {
+          setHighlightLeakedOnly(false);
+          setOpen((value) => !value);
+        }}
+        className="inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-accent"
+        data-testid="system-health-pill"
+        aria-label={copy}
+        title={errorMessage ? `${copy} · ${errorMessage}` : copy}
+        aria-expanded={open}
+        aria-controls={POPOVER_ID}
+        aria-haspopup="dialog"
+      >
+        <span
+          data-testid="system-health-dot"
+          aria-hidden="true"
+          className={`h-[9px] w-[9px] rounded-full ${dotClass}${data?.state === 'critical' ? ' motion-safe:animate-pulse' : ''}`}
+        />
+        <span className="sr-only">{copy}</span>
+      </button>
 
+      {open && !compact && (
+        <div
+          ref={popoverRef}
+          id={POPOVER_ID}
+          role="dialog"
+          aria-labelledby={POPOVER_TITLE_ID}
+          // E-D6: a click that navigates (a stopped-agent row, Cloister's
+          // Settings) closes the popover. Child handlers run before this
+          // bubble-phase handler, so a URL change here means they navigated,
+          // whether through pushState alone or pushState plus popstate.
+          onClickCapture={() => { urlBeforeClickRef.current = window.location.pathname + window.location.search; }}
+          onClick={() => {
+            const before = urlBeforeClickRef.current;
+            urlBeforeClickRef.current = null;
+            if (before !== null && before !== window.location.pathname + window.location.search) closePopover(false);
+          }}
+          className="absolute right-0 top-full z-[200] mt-2 w-[min(24rem,calc(100vw-1rem))] max-h-[calc(100vh-1rem)] overflow-auto rounded-xl border border-border bg-popover p-3 text-sm shadow-lg"
+        >
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <div className="mb-2 flex items-center gap-2">
+                <span id={POPOVER_TITLE_ID} className="font-semibold text-foreground">System health</span>
+                {data && (
+                  <span
+                    role="status"
+                    aria-label={`${data.state} system health`}
+                    className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize ${stateClasses(data.state)}`}
+                  >
+                    <span aria-hidden="true" className={`inline-flex h-2 w-2 rounded-full ${stateDotClass(data.state)}`} />
+                    {data.state}
+                  </span>
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {data ? `Updated ${Math.round((Date.now() - Date.parse(data.updatedAt)) / 1000)}s ago` : copy}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => closePopover()}
+              className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+              aria-label="Close system health"
+            >
+              <X aria-hidden="true" className="h-4 w-4" />
+            </button>
+          </div>
+
+          {data && relayPresentation && (
+            <HealthDetails
+              data={data}
+              summary={summary}
+              relayPresentation={relayPresentation}
+              attentionItems={attentionItems}
+              notes={notes}
+              highlightLeakedOnly={highlightLeakedOnly}
+              setHighlightLeakedOnly={setHighlightLeakedOnly}
+              leakedFirstConsumers={leakedFirstConsumers}
+              maxConsumerMemory={maxConsumerMemory}
+              openAttentionIssue={openAttentionIssue}
+            />
+          )}
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface RelayPresentation {
+  label: string;
+  classes: string;
+  dotClass: string;
+}
+
+function webhookRelayPresentation(data: SystemHealthSnapshot): RelayPresentation {
   const relay = data.services.find((service) => service.id === 'smee-relay' || service.id === 'webhook-relay');
   const relayStatus = relay?.status ?? data.summary.smeeRelay.status;
   const relayConfigured = relayStatus !== 'not_configured'
     && (data.summary.smeeRelay.configured || relay !== undefined);
-  const relayPresentation = !relayConfigured
+  return !relayConfigured
     ? {
         label: 'Not configured',
         classes: 'border-border bg-muted/40',
@@ -360,62 +470,34 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
           classes: 'border-destructive/50 bg-destructive/10',
           dotClass: 'bg-destructive',
         };
+}
 
+/** The System-health section's body: summary, vitals, chips, attention items and top consumers. */
+function HealthDetails({
+  data,
+  summary,
+  relayPresentation,
+  attentionItems,
+  notes,
+  highlightLeakedOnly,
+  setHighlightLeakedOnly,
+  leakedFirstConsumers,
+  maxConsumerMemory,
+  openAttentionIssue,
+}: {
+  data: SystemHealthSnapshot;
+  summary: string;
+  relayPresentation: RelayPresentation;
+  attentionItems: ReturnType<typeof buildAttentionItems>;
+  notes: ReturnType<typeof contextNotes>;
+  highlightLeakedOnly: boolean;
+  setHighlightLeakedOnly: (value: boolean) => void;
+  leakedFirstConsumers: SystemHealthConsumer[];
+  maxConsumerMemory: number;
+  openAttentionIssue: (issueId: string) => void;
+}) {
   return (
-    <div ref={wrapperRef} className="relative">
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => {
-          setHighlightLeakedOnly(false);
-          setOpen((value) => !value);
-        }}
-        className={`flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-xs transition-colors hover:bg-accent ${stateClasses(data.state)} ${compact ? 'justify-center px-1.5' : 'justify-between'}`}
-        data-testid="system-health-pill"
-        aria-label={copy}
-        aria-expanded={open}
-        aria-controls={POPOVER_ID}
-        aria-haspopup="dialog"
-      >
-        <span className="flex min-w-0 items-center gap-2">
-          <StateIcon state={data.state} />
-          {!compact && <span>{copy}</span>}
-        </span>
-        {!compact && <ChevronDown aria-hidden="true" className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />}
-      </button>
-
-      {open && !compact && (
-        <div
-          id={POPOVER_ID}
-          role="dialog"
-          aria-labelledby={POPOVER_TITLE_ID}
-          className="absolute right-0 top-full z-[200] mt-2 w-[min(22rem,calc(100vw-1rem))] max-h-[calc(100vh-1rem)] overflow-auto rounded-xl border border-border bg-popover p-3 text-sm shadow-lg"
-        >
-          <div className="mb-3 flex items-start justify-between gap-3">
-            <div>
-              <div className="mb-2 flex items-center gap-2">
-                <span id={POPOVER_TITLE_ID} className="font-semibold text-foreground">System health</span>
-                <span
-                  role="status"
-                  aria-label={`${data.state} system health`}
-                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize ${stateClasses(data.state)}`}
-                >
-                  <span aria-hidden="true" className={`inline-flex h-2 w-2 rounded-full ${stateDotClass(data.state)}`} />
-                  {data.state}
-                </span>
-              </div>
-              <div className="text-xs text-muted-foreground">Updated {Math.round((Date.now() - Date.parse(data.updatedAt)) / 1000)}s ago</div>
-            </div>
-            <button
-              type="button"
-              onClick={() => closePopover()}
-              className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-              aria-label="Close system health"
-            >
-              <X aria-hidden="true" className="h-4 w-4" />
-            </button>
-          </div>
-
+    <>
           <div className="mb-3 rounded-lg border border-border bg-muted/30 p-2 text-sm">
             <div className="text-foreground">{summary}</div>
           </div>
@@ -615,8 +697,6 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
               );
             })}
           </div>
-        </div>
-      )}
-    </div>
+    </>
   );
 }

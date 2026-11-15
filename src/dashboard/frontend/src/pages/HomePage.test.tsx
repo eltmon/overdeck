@@ -8,6 +8,23 @@ import { HomePage } from './HomePage';
 import { usePlannedBacklogVisibility } from '../hooks/usePlannedBacklogVisibility';
 import { useDashboardStore } from '../lib/store';
 
+const selectorMocks = vi.hoisted(() => ({
+  needsYou: [] as Array<{ key: string }>,
+  working: {
+    count: 0,
+    byRole: { planning: 0, building: 0, review: 0, test: 0, conversation: 0, other: 0 },
+    rows: [] as unknown[],
+  },
+}));
+
+// The Home cards read the same selectors as the top bar (PAN-5292 FR-E8).
+vi.mock('../lib/selectors/needsYou', () => ({
+  useNeedsYouItems: () => selectorMocks.needsYou,
+}));
+vi.mock('../lib/selectors/agentsWorking', () => ({
+  useAgentsWorking: () => selectorMocks.working,
+}));
+
 vi.mock('../components/home/HomeComposer', () => ({
   HomeComposer: ({ mode }: { mode: string }) => <div data-testid="home-composer" data-mode={mode} />,
 }));
@@ -122,6 +139,12 @@ function renderHomePage(props: Parameters<typeof HomePage>[0] = {}) {
 }
 
 beforeEach(() => {
+  selectorMocks.needsYou = [];
+  selectorMocks.working = {
+    count: 0,
+    byRole: { planning: 0, building: 0, review: 0, test: 0, conversation: 0, other: 0 },
+    rows: [],
+  };
   resetDashboardStore();
   usePlannedBacklogVisibility.setState({ showPlannedBacklog: true });
   localStorage.clear();
@@ -161,13 +184,31 @@ describe('HomePage', () => {
       },
     });
 
+    selectorMocks.working = {
+      count: 3,
+      byRole: { planning: 1, building: 2, review: 0, test: 0, conversation: 0, other: 0 },
+      rows: [],
+    };
+    // Two items from the shared selector, though the store marks only PAN-3 needs-you.
+    selectorMocks.needsYou = [{ key: 'issue:PAN-3' }, { key: 'flywheel:abc' }];
+
     renderHomePage({ now: new Date('2026-05-25T12:00:00.000Z') });
 
-    expect(summaryCard('Running agents')).toHaveTextContent('2');
+    expect(summaryCard('Agents working')).toHaveTextContent('3');
+    expect(summaryCard('Agents working')).toHaveTextContent('1 planning · 2 building');
+    expect(screen.queryByText('Running agents')).toBeNull();
     expect(summaryCard('Paused')).toHaveTextContent('1');
     expect(summaryCard('Ready to merge')).toHaveTextContent('1');
-    expect(summaryCard('Needs you')).toHaveTextContent('1');
+    expect(summaryCard('Needs you')).toHaveTextContent('2');
     expect(await screen.findByText('$12.35')).toBeInTheDocument();
+  });
+
+  it('reads "Live sessions" under Agents working when nothing is working', () => {
+    vi.stubGlobal('fetch', homeFetchStub({}));
+    renderHomePage();
+    expect(summaryCard('Agents working')).toHaveTextContent('0');
+    expect(summaryCard('Agents working')).toHaveTextContent('Live sessions');
+    expect(summaryCard('Needs you')).toHaveTextContent('0');
   });
 
   it('renders cost as unavailable when metrics summary is absent', async () => {

@@ -906,7 +906,7 @@ The dashboard store is a Zustand 4 store, so a `useDashboardStore(selector)` cal
 - **Click handlers read the store at call time.** A component that needs a slice only to look something up when the operator clicks reads `useDashboardStore.getState()` inside the handler instead of subscribing.
 - **Streamed deltas reach only the open conversation.** A delta is a `setQueryData` on `['conversation-messages', name]`; it re-renders `ConversationPanel` and its timeline. `ComposerFooter` and `ConversationListItem` are memoized, so their props must stay identity-stable: `useStableComposerProps` gives the composer a send callback that reads the latest messages from a ref, and `useConversationMutations` returns one memoized object built from the mutations' stable `.mutate` functions. Archive- and stop-pending state are not per instance: the archive and stop mutations carry `mutationKey: ['conversation-archive']` and `mutationKey: ['conversation-stop']`, every hook instance reads the pending names from the MutationCache with `useMutationState`, and the returned object changes identity only when one of those lists changes (PAN-4584). Both mutations' `onSuccess` await the `['conversations']` invalidate promise before their side effects, so pending lasts until the refetch lands, not just until the POST resolves (PAN-4626).
 - **Live-store consumers of the shell live in `AppLiveStoreHost`.** The pending-input dialogs, desktop activity notifications and the "Rebuild stack for" workspace invalidation follow agent, issue and activity changes. They render in `App/AppLiveStoreHost.tsx`, a sibling of the routed tree, so those changes do not re-render `App` and everything below it.
-- **Aggregate chrome is the exception.** `RunningAgentsPill`, `StoppedAgentsBanner`, `SystemHealthPill`, `DecisionsIndicator`, `NeedsYouIndicator`, the nav `Sidebar` and `ConversationDock` show cross-issue totals, so they may re-render when any agent or issue entry changes.
+- **Aggregate chrome is the exception.** `AgentsMenu`, `StoppedAgentsBanner`, `SystemHealthPill`, `NeedsYouIndicator`, the nav `Sidebar` and `ConversationDock` show cross-issue totals, so they may re-render when any agent or issue entry changes.
 - **The 5 s health poll still re-renders `App`.** `App` reads `dataUpdatedAt` from the `backend-health` query, and several relative-time labels advance only because of that re-render. It stays until those labels move onto a shared clock (the PAN-4560 follow-up issue).
 
 **Render-count tests.** `src/dashboard/frontend/src/test-utils/renderCounter.tsx` provides `createRenderCounter()` (a `Probe` that counts React `Profiler` commits of a subtree, mounts excluded), `applyStoreEvents(events)` (applies domain events inside `act`), `resetDashboardStore()` and `seedDashboardStore(partial)`. The tests assert render counts, never that a `memo` exists, so they stay valid when the React Compiler ([PAN-4561](https://github.com/eltmon/overdeck/issues/4561)) replaces hand-written memoization. Each fixed path has one, and all run in CI through `npm run test:frontend-subset`,
@@ -1290,8 +1290,8 @@ and the standalone conversation pop-out (`StandaloneRoutes.tsx`). The native
 phone app (`apps/mobile`) never shows it — its bundle cannot be reloaded to
 update, so there is nothing a reload would fix.
 
-This is a different problem from `StaleBuildChip` ("build stale ×N" in the
-command deck), which compares the *server's* build with `origin/main` to flag
+This is a different problem from `StaleBuildChip` ("Build behind main" in the
+top bar), which compares the *server's* build with `origin/main` to flag
 that the running server itself is behind — not whether a given tab's own
 bundle matches that server. A tab can show the new-build banner while the
 server is perfectly up to date with `origin/main`, and vice versa. Browser
@@ -1909,6 +1909,65 @@ records conversations `fixture-1` and `fixture-2`, and writes their Claude Code
 transcripts under `<home>/.claude/projects/`. It refuses to run when
 `OVERDECK_HOME` is unset or is the operator's `~/.overdeck`, so point it at an
 isolated test home.
+
+## Top bar (PAN-5292)
+
+The top bar is the 48 px row that `App/AppChrome.tsx` renders above the routed
+page, right of the sidebar. The system-notices row and the banners above it are
+separate and unchanged. Left to right, the bar holds:
+
+1. **Crumb** (`App/topbar/Breadcrumb.tsx`). On the Command Deck it reads
+   `<project name> / <active Stage pane label>`. The name is the registered
+   project's `name` from `useRootLabel('project:<key>')`, never the key, and the
+   pane label is `selectActivePane(key)?.label ?? 'Home'`. With no project it
+   reads "All projects"; on the No-project deck it reads "No project / <pane>".
+   Every other route shows `TAB_TITLES[activeTab]` alone.
+2. **Search box.** It opens the command palette (scope `all`), the same as
+   `Ctrl K` / `⌘K`; `/` still opens the search modal. Its text is
+   `PALETTE_SEARCH_PLACEHOLDER` and its keycap is `paletteKeycap()`, both in
+   `App/appChromeLabels.ts`. When the palette gains a Files scope (child B of
+   the workflow redesign, which owns `CommandPalette.tsx`), that change also
+   sets `PALETTE_SEARCH_PLACEHOLDER` to "Go to file, conversation, issue or
+   command".
+3. **Agents menu** (`App/topbar/AgentsMenu.tsx`): "N agents working ▾", counted
+   by `useAgentsWorking()` (`lib/selectors/agentsWorking.ts`). The dot is
+   `bg-state-live` (blue) when N > 0. The menu lists every working session
+   (title, project · role · model, age), then **Open the Agents page** and
+   **Stop all agents…**, which opens the emergency-stop confirm
+   (`triggerEmergencyStop`) and is disabled at 0.
+4. **Needs you · N** (`components/flywheel/NeedsYouIndicator.tsx`), counted by
+   `useNeedsYouItems()` (`lib/selectors/needsYou.ts`). It is always visible and
+   amber only when N > 0. The menu groups items by project (items without one
+   under "Other"); a row calls its item's `open()`, and **Open Activity** goes
+   to `/activity`.
+5. **Exception chips**, each rendered only while its condition is true:
+   **Auto-resume frozen** (`DeaconFrozenChip`, while Deacon is paused; click to
+   resume), **N stopped** (`StoppedAgentsBanner variant="pill"`), **Low-cost
+   mode** (`LowCostModePill`, while cheap mode is on) and **Build behind main**
+   (`StaleBuildChip`, while the server build misses build-input commits on
+   origin/main; its title names `pan reload`).
+6. **Health dot** (`components/SystemHealthPill.tsx`): a 9 px dot whose color
+   follows `useSystemHealth()` only (success, warning, destructive with a
+   motion-safe pulse, info while measuring, muted when unavailable). It is a
+   button in every state, loading and fetch errors included. Its popover holds
+   the System-health section, then the sections AppChrome passes as children:
+   GitHub quota (`GitHubQuotaSection`), Auto-resume (`DeaconPauseToggle`),
+   Stopped agents (`StoppedAgentsBanner variant="section"`, only when some
+   exist) and System controls (`CloisterStatusBar`).
+7. **Theme toggle**, then the Activity-feed toggle on every route except the
+   Command Deck.
+
+The Home page's "Needs you" and "Agents working" cards read the same two
+selectors, so the top bar and Home always show the same numbers
+(`App/__tests__/countAgreement.test.tsx` pins it). `AppChrome` itself calls no
+store selector: each count lives in its own leaf component.
+
+**Health-dot close rule.** The popover closes on Escape, a second click on the
+dot, a click inside it that changes the URL (a stopped-agent row, Cloister's
+Settings), and a pointer-down outside the dot's wrapper. A pointer-down is
+ignored while any `[role="alertdialog"]` is mounted, and when its target is
+inside a `[role="dialog"]` or `[role="alertdialog"]` outside the wrapper, which
+covers Cloister's portaled restart popover and its restart-config modal.
 
 ## Conversation changes (PAN-5288)
 
