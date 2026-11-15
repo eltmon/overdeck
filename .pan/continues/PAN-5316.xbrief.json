@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5316",
   "created": "2026-11-15T05:00:24.282Z",
-  "updated": "2026-11-15T05:11:37.244Z",
+  "updated": "2026-11-15T05:11:43.367Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,11 @@
     "regression-tests.ac4": {
       "status": "completed",
       "doneAt": "2026-11-15T05:11:37.244Z"
+    },
+    "docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5316",
+      "claimedAt": "2026-11-15T05:11:43.367Z"
     }
   }
 }
