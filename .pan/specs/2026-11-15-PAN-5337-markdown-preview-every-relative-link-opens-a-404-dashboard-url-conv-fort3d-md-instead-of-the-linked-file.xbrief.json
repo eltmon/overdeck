@@ -4,17 +4,17 @@
     "created": "2026-11-15T11:26:35Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5337: Markdown preview: every relative link opens a 404 dashboard URL (/conv/fort3d.md) instead of the linked file",
-    "updated": "2026-11-15T11:34:58.345Z"
+    "updated": "2026-11-15T11:36:13.735Z"
   },
   "plan": {
     "id": "pan-5337",
     "title": "Markdown preview: every relative link opens a 404 dashboard URL (/conv/fort3d.md) instead of the linked file",
-    "status": "proposed",
+    "status": "running",
     "uid": "19019077-d684-4aed-8b10-6c34bc290b6a",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T11:26:35Z",
-    "updated": "2026-11-15T11:34:58.345Z",
+    "updated": "2026-11-15T11:36:13.735Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5337",
@@ -759,5 +759,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
