@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5334",
   "created": "2026-11-15T10:33:35.496Z",
-  "updated": "2026-11-15T10:52:39.215Z",
+  "updated": "2026-11-15T10:52:42.905Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,11 @@
     "session-id-source.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T10:52:39.215Z"
+    },
+    "docs-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5334",
+      "claimedAt": "2026-11-15T10:52:42.905Z"
     }
   }
 }
