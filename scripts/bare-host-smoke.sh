@@ -45,6 +45,10 @@ WINDOW_SECS=30
 SETTLE_SECS=20
 HEALTH_TIMEOUT_SECS=120
 CHURN_SECS=20
+# PAN-5361: Linux takes 3 windows per side (min-of-N absorbs one runner PID
+# burst); macOS keeps the single window its traced-cost rule has always used.
+WINDOWS_PER_SIDE_LINUX=3
+WINDOWS_PER_SIDE_MACOS=1
 
 DENIED_TOOLS="docker tmux systemctl journalctl brew"
 GUARDED_PORTS="3010 3011 3012 8317"
@@ -62,6 +66,7 @@ OUT=''
 BUDGET=''
 SUBJECT=''
 OS_NAME=''
+WINDOWS_PER_SIDE=''
 BARE_PATH=''
 RUN_USER=''
 CORE=''
@@ -74,17 +79,14 @@ R_PANUP_HEALTHY=false
 R_PANUP_PASS=false
 R_IDLE_BOOTED=false
 R_IDLE_STAYED_UP=false
-R_IDLE_BASELINE=''
-R_IDLE_NEW=''
-R_IDLE_NET=''
 R_ENOENT_PASS=false
-R_TRACE_FROM=''
-R_TRACE_TO=''
-# PAN-5361: the multi-window shim. Until WI-2 lands these mirror the single
-# R_IDLE_BASELINE/R_IDLE_NEW/R_TRACE_FROM/R_TRACE_TO windows above; R_IDLE_TREE
-# stays empty until WI-3 adds the /proc snapshot.
+# PAN-5361: one entry per window, space separated, appended by take_windows().
+# R_IDLE_FROM/R_IDLE_TO are stamped for the idle side only. R_IDLE_TREE stays
+# empty until WI-3 adds the /proc snapshot.
 R_BASELINE_WINDOWS=''
 R_IDLE_WINDOWS=''
+R_IDLE_FROM=''
+R_IDLE_TO=''
 R_IDLE_TREE=''
 R_IDLE_SPAWNER_MS=''
 
@@ -150,26 +152,33 @@ new_pids() {
   echo $((b - a))
 }
 
-# Window count, retaken once when the PID counter wrapped (negative count).
-window_count() {
-  local n
-  n=$(new_pids "$WINDOW_SECS")
-  if [ "$n" -lt 0 ]; then n=$(new_pids "$WINDOW_SECS"); fi
-  echo "$n"
-}
-
-# The idle window into R_IDLE_NEW, with the spawn-trace bounds stamped
-# around exactly the window that is kept: a retake after a PID-counter wrap
-# restamps R_TRACE_FROM, so the traced cost never covers two windows. Call
-# it directly, never in $(...), so its assignments reach the caller.
-idle_window() {
-  R_TRACE_FROM="$(date +%s)000"
-  R_IDLE_NEW=$(new_pids "$WINDOW_SECS")
-  if [ "$R_IDLE_NEW" -lt 0 ]; then
-    R_TRACE_FROM="$(date +%s)000"
-    R_IDLE_NEW=$(new_pids "$WINDOW_SECS")
-  fi
-  R_TRACE_TO="$(date +%s)999"
+# take_windows <side>: side is "baseline" or "idle". Takes WINDOWS_PER_SIDE
+# back-to-back WINDOW_SECS windows, appending each window's new-PID count to
+# R_BASELINE_WINDOWS or R_IDLE_WINDOWS (space separated, one entry per
+# window). For the idle side it also stamps each window's spawn-trace bounds
+# into R_IDLE_FROM/R_IDLE_TO, so the traced cost never covers two windows: a
+# retake after a PID-counter wrap restamps "from" before the retake, and the
+# kept attempt's bounds are the ones appended. Call it directly, never in
+# $(...), so its assignments reach the caller.
+take_windows() {
+  local side="$1" count=0 from to n
+  while [ "$count" -lt "$WINDOWS_PER_SIDE" ]; do
+    if [ "$OS_NAME" = darwin ]; then from="$(date +%s)000"; else from="$(date +%s%3N)"; fi
+    n=$(new_pids "$WINDOW_SECS")
+    if [ "$n" -lt 0 ]; then
+      if [ "$OS_NAME" = darwin ]; then from="$(date +%s)000"; else from="$(date +%s%3N)"; fi
+      n=$(new_pids "$WINDOW_SECS")
+    fi
+    if [ "$OS_NAME" = darwin ]; then to="$(date +%s)999"; else to="$(date +%s%3N)"; fi
+    if [ "$side" = baseline ]; then
+      R_BASELINE_WINDOWS="${R_BASELINE_WINDOWS:+$R_BASELINE_WINDOWS }$n"
+    else
+      R_IDLE_WINDOWS="${R_IDLE_WINDOWS:+$R_IDLE_WINDOWS }$n"
+      R_IDLE_FROM="${R_IDLE_FROM:+$R_IDLE_FROM }$from"
+      R_IDLE_TO="${R_IDLE_TO:+$R_IDLE_TO }$to"
+    fi
+    count=$((count + 1))
+  done
 }
 
 write_result() {
@@ -223,8 +232,8 @@ parse_args() {
   check_work_dir_fresh
 
   case "$(uname -s)" in
-    Darwin) OS_NAME=darwin; [ -n "$BUDGET" ] || BUDGET="$IDLE_BUDGET_MACOS" ;;
-    Linux) OS_NAME=linux; [ -n "$BUDGET" ] || BUDGET="$IDLE_BUDGET_LINUX" ;;
+    Darwin) OS_NAME=darwin; [ -n "$BUDGET" ] || BUDGET="$IDLE_BUDGET_MACOS"; WINDOWS_PER_SIDE="$WINDOWS_PER_SIDE_MACOS" ;;
+    Linux) OS_NAME=linux; [ -n "$BUDGET" ] || BUDGET="$IDLE_BUDGET_LINUX"; WINDOWS_PER_SIDE="$WINDOWS_PER_SIDE_LINUX" ;;
     *) OS_NAME="$(uname -s)"; die_setup "unsupported OS $(uname -s); this smoke runs on macOS and Linux" ;;
   esac
 
@@ -406,9 +415,9 @@ if (file && !cp.__overdeckSpawnTrace) {
   Object.defineProperty(cp, '__overdeckSpawnTrace', { value: true });
   let depth = 0;
   const optionsOf = (a) => a.slice(1, 3).find((x) => x && typeof x === 'object' && !Array.isArray(x));
-  const programOf = (api, a) => {
+  const shellOf = (api, a) => api === 'exec' || api === 'execSync' || Boolean(optionsOf(a)?.shell);
+  const programOf = (api, a, shell) => {
     const target = String(a[0] ?? '');
-    const shell = api === 'exec' || api === 'execSync' || Boolean(optionsOf(a)?.shell);
     return path.basename(shell ? (target.trim().split(/\s+/)[0] || '') : target);
   };
   const log = (rec) => { try { fs.appendFileSync(file, JSON.stringify(rec) + '\n'); } catch {} };
@@ -417,7 +426,8 @@ if (file && !cp.__overdeckSpawnTrace) {
     if (typeof orig !== 'function') continue;
     const wrapped = function (...a) {
       if (depth > 0) return orig.apply(this, a);
-      const rec = { t: Date.now(), pid: process.pid, api, program: api === 'fork' ? 'node' : programOf(api, a) };
+      const shell = shellOf(api, a);
+      const rec = { t: Date.now(), pid: process.pid, api, program: api === 'fork' ? 'node' : programOf(api, a, shell), shell };
       depth += 1;
       try {
         const r = orig.apply(this, a);
@@ -481,10 +491,9 @@ sample_churn() {
 measure_idle() {
   local server waited=0
   sample_churn
-  echo "== baseline window (${WINDOW_SECS} s, no Overdeck process)"
-  R_IDLE_BASELINE=$(window_count)
-  R_BASELINE_WINDOWS="$R_IDLE_BASELINE"
-  echo "baseline new PIDs: $R_IDLE_BASELINE"
+  echo "== baseline window(s) (${WINDOWS_PER_SIDE} x ${WINDOW_SECS} s, no Overdeck process)"
+  take_windows baseline
+  echo "baseline new PIDs per window: $R_BASELINE_WINDOWS"
 
   echo "== dashboard server idle window"
   write_spawn_tracer
@@ -500,12 +509,8 @@ measure_idle() {
 
   if [ "$R_IDLE_BOOTED" = true ]; then
     sleep "$SETTLE_SECS"
-    idle_window
-    R_IDLE_NET=$((R_IDLE_NEW - R_IDLE_BASELINE))
-    R_IDLE_WINDOWS="$R_IDLE_NEW"
-    R_IDLE_FROM="$R_TRACE_FROM"
-    R_IDLE_TO="$R_TRACE_TO"
-    echo "idle new PIDs: $R_IDLE_NEW, net $R_IDLE_NET (the verdict is in the summary below)"
+    take_windows idle
+    echo "idle new PIDs per window: $R_IDLE_WINDOWS (the verdict is in the summary below)"
     # A dashboard that died during the window spawns nothing, so an empty
     # trace would pass: it must still be running and healthy afterwards.
     if kill -0 "$server" 2>/dev/null && curl -sf --max-time 5 -o /dev/null http://127.0.0.1:3011/api/health; then
