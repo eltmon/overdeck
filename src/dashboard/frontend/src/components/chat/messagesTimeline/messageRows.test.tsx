@@ -17,6 +17,9 @@ vi.mock('../ChatMarkdown', () => ({
   ChatMarkdown: ({ text }: { text: string }) => <div data-testid="md">{text}</div>,
 }));
 
+const sendNowQueued = vi.hoisted(() => vi.fn(async (_name: string, _agentId?: string) => {}));
+vi.mock('../../../lib/composerSendNow', () => ({ sendNowQueued }));
+
 function paragraphs(n: number, prefix = 'Paragraph'): string {
   return Array.from({ length: n }, (_, i) => `${prefix} ${i + 1} — the agent explains at length.`).join('\n\n');
 }
@@ -304,5 +307,66 @@ describe('Sending… bubble Cancel (PAN-5237)', () => {
     expect(screen.getByText(/Waiting: the agent needs a permission answer first/)).toBeInTheDocument();
     expect(cancelButton()).not.toBeNull();
     expect(screen.queryByRole('button', { name: 'Discard' })).toBeNull();
+  });
+});
+
+describe('Send now link on the queued bubble (PAN-5353)', () => {
+  function acknowledged(overrides: Partial<ChatMessage> = {}): ChatMessage {
+    return {
+      id: 'optimistic-c1', role: 'user', text: 'hello', createdAt: '2026-11-13T12:00:00.000Z',
+      acknowledged: true, ...overrides,
+    };
+  }
+  const sendNowButton = () => screen.queryByRole('button', { name: 'Send queued messages now' });
+
+  beforeEach(() => {
+    sendNowQueued.mockClear();
+  });
+
+  it('renders Send now on an acknowledged optimistic bubble with sendNowConversationName set', () => {
+    render(<UserMessageRow message={acknowledged()} sendNowConversationName="c1" />);
+    const button = sendNowButton();
+    expect(button).not.toBeNull();
+    expect(button).toHaveTextContent('Send now');
+  });
+
+  it('renders no Send now button without sendNowConversationName', () => {
+    render(<UserMessageRow message={acknowledged()} />);
+    expect(sendNowButton()).toBeNull();
+  });
+
+  it('renders no Send now button on an unacknowledged (Sending…) bubble', () => {
+    render(<UserMessageRow message={acknowledged({ acknowledged: false, clientMessageId: 'c1', sendPhase: 'queued' })} sendNowConversationName="c1" />);
+    expect(sendNowButton()).toBeNull();
+  });
+
+  it('renders no Send now button on a held bubble', () => {
+    render(<UserMessageRow message={acknowledged({ deliveryState: 'held', heldAt: 1 })} sendNowConversationName="c1" />);
+    expect(sendNowButton()).toBeNull();
+  });
+
+  it('renders no Send now button when deliveryState is unknown', () => {
+    render(<UserMessageRow message={acknowledged({ deliveryState: 'unknown' })} sendNowConversationName="c1" />);
+    expect(sendNowButton()).toBeNull();
+  });
+
+  it('renders no Send now button on a settled transcript bubble (no optimistic- prefix)', () => {
+    render(<UserMessageRow message={acknowledged({ id: 'msg-1' })} sendNowConversationName="c1" />);
+    expect(sendNowButton()).toBeNull();
+  });
+
+  it('clicking Send now calls sendNowQueued and shows Sending now… disabled until it resolves', async () => {
+    let resolveSend!: () => void;
+    sendNowQueued.mockImplementation(() => new Promise((resolve) => { resolveSend = () => resolve(undefined); }));
+    render(<UserMessageRow message={acknowledged()} sendNowConversationName="c1" sendNowAgentId="agent-pan-1" />);
+
+    fireEvent.click(sendNowButton()!);
+    expect(sendNowQueued).toHaveBeenCalledWith('c1', 'agent-pan-1');
+    const running = screen.getByRole('button', { name: 'Send queued messages now' });
+    expect(running).toHaveTextContent('Sending now…');
+    expect(running).toBeDisabled();
+
+    await act(async () => { resolveSend(); await Promise.resolve(); });
+    expect(screen.getByRole('button', { name: 'Send queued messages now' })).toHaveTextContent('Send now');
   });
 });
