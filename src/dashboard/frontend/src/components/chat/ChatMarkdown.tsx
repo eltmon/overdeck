@@ -31,7 +31,10 @@ import remarkGfm from 'remark-gfm';
 import { CheckIcon, CopyIcon } from 'lucide-react';
 import type { Components, ExtraProps } from 'react-markdown';
 import { resolveMarkdownFileLinkMeta, shouldPreserveMarkdownFileLinkHref, splitMarkdownTextFileLinks, type MarkdownFileLinkMeta } from '../../markdown-links';
+import { classifyDocHref, docDirOf } from '../../lib/markdownDocLinks';
+import { headingSlug, remarkHeadingSlugs } from '../../lib/remarkHeadingSlugs';
 import { MarkdownFileLink } from './MarkdownFileLink';
+import { MarkdownDocLink } from './MarkdownDocLink';
 import { useFilePathExists } from '../../hooks/useFilePathExists';
 import { useTheme } from '../../hooks/useTheme';
 import { useColorTheme } from '../../hooks/useColorTheme';
@@ -365,19 +368,31 @@ function remarkBareFileTextLinks(options: { cwd?: string } = {}) {
   };
 }
 
-/** An href the browser would resolve against the dashboard page (PAN-5338 D-11). */
-export function isRelativeMarkdownHref(href: string | undefined): boolean {
-  if (typeof href !== 'string') return false;
-  const h = href.trim();
-  if (h.length === 0 || h.startsWith('#') || h.startsWith('/')) return false;
-  return !/^(https?|mailto):/i.test(h);
+/** The file this markdown is, when known: document-relative links resolve against it (PAN-5337). */
+export interface ChatMarkdownDocLocation {
+  rootId: string;
+  path: string;
+}
+
+// PAN-5337: scrolls a `#slug` fragment link to its heading inside the
+// nearest preview, instead of letting the browser navigate and rewrite
+// location.hash (D7). A fragment with no matching heading does nothing.
+function scrollToHeading(slug: string) {
+  return (event: React.MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    const container = event.currentTarget.closest('[data-testid="markdown-tab"]');
+    if (!container) return;
+    const bySlug = container.querySelector(`[data-heading-slug="${CSS.escape(slug)}"]`);
+    const target = bySlug ?? container.querySelector(`[data-heading-slug="${CSS.escape(headingSlug(slug))}"]`);
+    target?.scrollIntoView({ block: 'start' });
+  };
 }
 
 function makeComponents(
   isStreaming: boolean,
   cwd: string | undefined,
   issueId: string | null | undefined,
-  plainRelativeLinks: boolean,
+  docLocation: ChatMarkdownDocLocation | undefined,
 ): Components & StreamdownComponents {
   return {
     pre({ children }: React.JSX.IntrinsicElements['pre'] & ExtraProps) {
@@ -407,6 +422,25 @@ function makeComponents(
       );
     },
     a({ href, children }: React.JSX.IntrinsicElements['a'] & ExtraProps) {
+      const classified = classifyDocHref(href);
+
+      if (docLocation) {
+        if (classified.kind === 'relative') {
+          return (
+            <MarkdownDocLink rootId={docLocation.rootId} fromDir={docDirOf(docLocation.path)} target={classified}>
+              {children}
+            </MarkdownDocLink>
+          );
+        }
+        if (classified.kind === 'fragment') {
+          return (
+            <a href={`#${classified.slug}`} className={styles.mdLink} onClick={scrollToHeading(classified.slug)}>
+              {children}
+            </a>
+          );
+        }
+      }
+
       const fileLinkMeta = resolveMarkdownFileLinkMeta(href, cwd);
       if (fileLinkMeta) {
         return (
@@ -419,8 +453,10 @@ function makeComponents(
         );
       }
 
-      if (plainRelativeLinks && isRelativeMarkdownHref(href)) {
-        return <span className={styles.mdLink} data-relative-link="">{children}</span>;
+      // PAN-5337: a relative href nothing above resolved must never reach the
+      // browser — it would resolve against the current /conv/<id> URL and 404.
+      if (classified.kind === 'relative') {
+        return <span data-testid="markdown-inert-link">{children}</span>;
       }
 
       // Block javascript: and data: URIs to prevent XSS from assistant markdown
@@ -444,8 +480,8 @@ interface ChatMarkdownProps {
   cwd?: string;
   issueId?: string | null;
   useStreamdown?: boolean;
-  /** Render a relative-href anchor as plain text (PAN-5338 D-11); default false. */
-  plainRelativeLinks?: boolean;
+  /** The file this markdown is (PAN-5337): document-relative links resolve against it. */
+  docLocation?: ChatMarkdownDocLocation;
 }
 
 // Messages above this size are rendered as plain text behind a collapse instead
@@ -488,15 +524,15 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   cwd,
   issueId,
   useStreamdown,
-  plainRelativeLinks = false,
+  docLocation,
 }: ChatMarkdownProps) {
   const components = useMemo(
-    () => makeComponents(isStreaming, cwd, issueId, plainRelativeLinks),
-    [isStreaming, cwd, issueId, plainRelativeLinks],
+    () => makeComponents(isStreaming, cwd, issueId, docLocation),
+    [isStreaming, cwd, issueId, docLocation?.rootId, docLocation?.path],
   );
   const remarkPlugins = useMemo(
-    () => [remarkGfm, [remarkBareFileTextLinks, { cwd }]] as ReactMarkdownRemarkPlugins,
-    [cwd],
+    () => [remarkGfm, [remarkBareFileTextLinks, { cwd }], ...(docLocation ? [remarkHeadingSlugs] : [])] as ReactMarkdownRemarkPlugins,
+    [cwd, docLocation],
   );
   const contextUseStreamdown = useContext(StreamdownRendererContext);
   const renderWithStreamdown = useStreamdown ?? contextUseStreamdown;
