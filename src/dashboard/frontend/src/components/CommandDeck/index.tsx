@@ -1,54 +1,32 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { useShortcut, type ShortcutDef } from '../../lib/shortcuts/registry';
 import { useShallow } from 'zustand/react/shallow';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
-import { ProjectNode } from './ProjectTree/ProjectNode';
-import { type TreeSessionFilter } from './ProjectTree/FeatureItem';
+import { ChevronLeft } from 'lucide-react';
 import { Stage } from '../Stage';
 import { ProjectHome } from '../Stage/ProjectHome';
 import { IssueOverview } from '../Stage/IssueOverview';
 import { SessionFeedSidebar } from '../sessionFeed/SessionFeedSidebar';
 import { NO_PROJECT_KEY, NO_PROJECT_LABEL } from './projectsData';
-import { ProjectMembershipBoundary } from './ProjectMembershipBoundary';
-import { TasksDialog } from '../TasksDialog';
-import { PlanDialog } from '../PlanDialog';
-import { ConversationList, type Conversation } from './ConversationList';
-import { useConversationMutations } from './useConversationMutations';
-import { ForkModal } from './ForkModal';
-import { NewConversationPickers } from './NewConversationPickers';
+import { type Conversation } from './ConversationList';
 import { openConversationTab } from './openConversationTab';
 import { type ViewMode } from '../chat/ConversationPanel';
-import { NewConversationSplitButton } from '../newConversation/NewConversationSplitButton';
 import type { Issue } from '../../types';
 import { useDashboardStore } from '../../lib/store';
 import { useAgentSetInvalidation } from '../../lib/useAgentSetInvalidation';
 import { agentIdsByIssueKey, issueCreatedAtById, issueTitlesByKey } from './agentIdsByIssueKey';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
-import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import styles from './styles/command-deck.module.css';
 import { fetchRegisteredProjects, ProjectRegistryErrorState, UnknownProjectState } from './UnknownProjectState';
 import { DeckEmptyState } from './DeckEmptyState';
 import { useDefaultDeckSelection } from './useDefaultDeckSelection';
-import { IssuesPaneFilterRow } from './IssuesPaneFilterRow';
 import { usePriorityConversation } from './usePriorityConversation';
 import { LoadingBoundary } from '../primitives/LoadingBoundary';
 import { useDeckProjects } from '../frame/deck/useDeckProjects';
-import { useSessionTreeSubscription } from '../frame/deck/useSessionTreeSubscription';
-import { useContainerStats } from '../frame/deck/useContainerStats';
 import { useIssueCosts } from '../frame/deck/useIssueCosts';
 import { fetchConversations, useProjectScope } from '../frame/deck/useProjectScope';
-import { openIssueTabIn, useDeckDialogs, useIssueSessionActions } from '../frame/deck/useIssueSessionActions';
-import { useNewConversationDefaults } from '../frame/deck/newConversationDefaults';
+import { openIssueTabIn, useIssueSessionActions } from '../frame/deck/useIssueSessionActions';
 import { useCreateConversation } from '../frame/deck/useCreateConversation';
-import { useOpenConversation } from '../frame/deck/useOpenConversation';
 import { conversationRouteKey } from '../../lib/linkedConversation';
-
-async function fetchVersion(): Promise<{ version: string }> {
-  const res = await fetch('/api/version');
-  if (!res.ok) throw new Error('Failed to fetch version');
-  return res.json();
-}
 
 interface CommandDeckProps {
   /** Deep-link conversation ID — selects this conversation on mount */
@@ -80,10 +58,6 @@ interface CommandDeckProps {
    * to /command-deck/<project>/<issue>. */
   onCockpitChange?: (projectKey: string | null, issueId: string | null) => void;
 }
-
-const CONVS_COLLAPSED_KEY = 'mc-convs-collapsed';
-const PROJECTS_COLLAPSED_KEY = 'mc-projects-collapsed';
-const SECTION_SPLIT_KEY = 'mc-section-split';
 
 function ProjectPendingState({ onRetry }: { onRetry: () => void }) {
   return (
@@ -119,65 +93,12 @@ export function CommandDeck({
     setAwarenessCollapsed(collapsed);
     try { localStorage.setItem('overdeck.ui.awarenessCollapsed', String(collapsed)); } catch { /* ignore */ }
   }, []);
-  const [showTasks, setShowTasks] = useState(false);
-  const planDialogIssue = useDeckDialogs((s) => s.planDialogIssue);
-  const setPlanDialogIssue = useDeckDialogs.getState().setPlanDialogIssue;
-  const [convsCollapsed, setConvsCollapsed] = useState(() => {
-    try { return localStorage.getItem(CONVS_COLLAPSED_KEY) === 'true'; } catch { return false; }
-  });
-  const [projectsCollapsed, setProjectsCollapsed] = useState(() => {
-    try { return localStorage.getItem(PROJECTS_COLLAPSED_KEY) === 'true'; } catch { return false; }
-  });
-  const toggleConvsCollapsed = useCallback(() => {
-    setConvsCollapsed(prev => {
-      const next = !prev;
-      try { localStorage.setItem(CONVS_COLLAPSED_KEY, String(next)); } catch { /* ignore */ }
-      return next;
-    });
-  }, []);
-  const toggleProjectsCollapsed = useCallback(() => {
-    setProjectsCollapsed(prev => {
-      const next = !prev;
-      try { localStorage.setItem(PROJECTS_COLLAPSED_KEY, String(next)); } catch { /* ignore */ }
-      return next;
-    });
-  }, []);
-  const [sectionSplit, setSectionSplit] = useState(() => {
-    try {
-      const saved = localStorage.getItem(SECTION_SPLIT_KEY);
-      return saved ? Math.max(20, Math.min(80, Number(saved))) : 50;
-    } catch { return 50; }
-  });
-  const isSectionDragging = useRef(false);
-  const sectionDragStartY = useRef(0);
-  const sectionDragStartSplit = useRef(50);
-  const sectionContainerRef = useRef<HTMLDivElement>(null);
-  const [treeFilter, setTreeFilter] = useState<TreeSessionFilter>('all');
-  const { model: sidebarModel, harness: sidebarHarness, effort: sidebarEffort, setModel: setSidebarModel, setHarness: setSidebarHarness, setEffort: setSidebarEffort } =
-    useNewConversationDefaults(useShallow((d) => ({ model: d.model, harness: d.harness, effort: d.effort, setModel: d.setModel, setHarness: d.setHarness, setEffort: d.setEffort })));
-
-  // Per-issue session selection (PAN-830 pan-11sr) — slice keyed by issueId.
-  // The tree highlight uses the value for whichever feature is currently active.
-  const selectedSessionByIssue = useCommandDeckSelection((s) => s.selectedSessionByIssue);
-  const selectedSessionId = selectedFeature
-    ? selectedSessionByIssue[selectedFeature] ?? null
-    : null;
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
-    const saved = localStorage.getItem('mc-sidebar-width');
-    return saved ? Math.max(280, Number(saved)) : 320;
-  });
-  const isDragging = useRef(false);
-  const startX = useRef(0);
-  const startWidth = useRef(0);
-  const currentWidth = useRef(sidebarWidth);
   const queryClient = useQueryClient();
   // PAN-2893: agent spawn/stop events refetch the projects pane immediately.
   useAgentSetInvalidation(queryClient);
 
-  const { projects, projectsWithSessions, isLoading } = useDeckProjects();
-  // Until the frame swap (PAN-5293 WI-17) the deck still mounts the live
-  // session-tree subscription itself.
-  useSessionTreeSubscription(projects);
+  // PAN-5293 F-D4: the left column's DeckDataHost owns the session-tree subscription.
+  const { projectsWithSessions } = useDeckProjects();
   const { issueCosts, issueCostDetails } = useIssueCosts();
 
   const { data: registeredProjects = [], isFetched: registeredProjectsFetched, isError: registeredProjectsError, refetch: refetchRegisteredProjects } = useQuery({
@@ -186,12 +107,6 @@ export function CommandDeck({
     staleTime: 60000,
   });
   useDefaultDeckSelection({ selectedProject, registeredProjects, onSelectProject, convId, loaded: registeredProjectsFetched && !registeredProjectsError });
-
-  const { data: versionData } = useQuery({
-    queryKey: ['version'],
-    queryFn: fetchVersion,
-    staleTime: Infinity,
-  });
 
   useEffect(() => {
     // A pending conversation deep-link (convId) must win over auto-select:
@@ -203,8 +118,6 @@ export function CommandDeck({
       onSelectProject(projectsWithFeatures[0]!.name);
     }
   }, [convId, onSelectProject, projectsWithSessions, selectedProject]);
-
-  const containerStats = useContainerStats(projectsWithSessions);
 
   // PAN-4560: flat lookup maps instead of the whole agent and issue slices, so
   // the deck re-renders only when an entry it reads changes. Handlers read the
@@ -222,11 +135,7 @@ export function CommandDeck({
 
   const { conversations, error: conversationRouteError } = usePriorityConversation(convId, conversationList);
 
-  const {
-    handleSelectFeature, handleSelectSession, handleStopSession, handleCleanupOrphanedResources, handleViewTerminal,
-    handlePauseSession, handleResumeSession, handleUnpauseSession, handleRestartSession, handleDeepWipe,
-    handleOpenStateDir, handleOpenPlanDialog, handleViewJsonl,
-  } = useIssueSessionActions(selectedProject);
+  const { handleSelectFeature } = useIssueSessionActions(selectedProject);
   const {
     projectConvs, projectConvIdSet, projectIssueIds, selectedProjectData, visibleFeatures,
     selectedRegisteredProject, resolveConversationProjectName, membership,
@@ -381,141 +290,14 @@ export function CommandDeck({
   [projectsWithSessions]);
 
 
-  // The project header in column 2 is a single (selected) project; clicking it
-  // focuses the deck's HOME tab via the App sidebar's selection callback.
-  const handleSelectProject = useCallback((projectName: string) => {
-    onSelectProject?.(projectName);
-    setSelectedFeature(null);
-    setSelectedConversation(null);
-  }, [onSelectProject]);
-
-  // PAN-1561: selecting a conversation opens it as an agent tab in its project's
-  // deck (switching project if it belongs to a different one than is shown).
-  const keepUrlSyncInStep = useCallback((name: string) => { prevSelectedRef.current = name; }, []);
-  const handleSelectConversation = useOpenConversation(selectedProject, { conversations, onOpened: keepUrlSyncInStep });
-
-  const projectConvMutations = useConversationMutations(selectedConversation, handleSelectConversation);
-
-  // Listen for `/handoff …` submitted in the chat composer — opens the fork
-  // modal pre-set to handoff mode for the conversation that emitted the
-  // event. Trailing text after the verb becomes the focus and pre-fills the
-  // dialog's Focus textarea.
-  useEffect(() => {
-    const handler = (event: Event) => {
-      const detail = (event as CustomEvent<{
-        conversation: Conversation;
-        mode?: 'summary' | 'fast-summary' | 'plain' | 'handoff';
-        focus?: string;
-      }>).detail;
-      if (!detail?.conversation) return;
-      projectConvMutations.openForkModal(detail.conversation, { mode: detail.mode, focus: detail.focus });
-    };
-    window.addEventListener('overdeck:open-fork-modal', handler);
-    return () => window.removeEventListener('overdeck:open-fork-modal', handler);
-  }, [projectConvMutations]);
-
   // Create a conversation (optionally scoped to a project) and open it as an
   // agent tab in the deck. The deck's own refs follow the new conversation so
   // its deep-link and URL-sync effects do not re-apply it.
   const onConversationCreated = useCallback((conv: Conversation) => {
-    if (convsCollapsed) setConvsCollapsed(false);
     appliedConvId.current = `${String(conv.id)}::${conversationViewMode ?? 'conversation'}`;
     prevSelectedRef.current = conv.name;
-  }, [convsCollapsed, conversationViewMode]);
-  const { create: createConversationForProject, createForAgent: createDeckConversation } =
-    useCreateConversation(selectedProject, onConversationCreated);
-
-  const handleNewConversation = useCallback(() => {
-    const projectKey = selectedProject && selectedProject !== NO_PROJECT_KEY ? selectedProject : undefined;
-    void createConversationForProject(projectKey);
-  }, [createConversationForProject, selectedProject]);
-  // PAN-5287 S-D7: N starts a conversation here; moves to the left column in child F.
-  useShortcut(useMemo((): ShortcutDef => ({
-    id: 'deck.new-conversation', keys: { mac: 'N', other: 'N' }, scope: 'not-editing',
-    label: 'New conversation', group: 'General', run: () => handleNewConversation(),
-    when: () => !document.querySelector('[aria-modal="true"]'),
-  }), [handleNewConversation]));
-
-  const handleNewProjectConversation = useCallback((projectKey: string) => {
-    void createConversationForProject(projectKey);
-  }, [createConversationForProject]);
-
-  // Section divider drag handlers
-  const handleSectionDragStart = useCallback((e: React.MouseEvent) => {
-    isSectionDragging.current = true;
-    sectionDragStartY.current = e.clientY;
-    sectionDragStartSplit.current = sectionSplit;
-    document.body.style.cursor = 'row-resize';
-    document.body.style.userSelect = 'none';
-    e.preventDefault();
-  }, [sectionSplit]);
-
-  useEffect(() => {
-    const handleSectionDragMove = (e: MouseEvent) => {
-      if (!isSectionDragging.current || !sectionContainerRef.current) return;
-      const containerHeight = sectionContainerRef.current.getBoundingClientRect().height;
-      if (containerHeight <= 0) return;
-      const deltaY = e.clientY - sectionDragStartY.current;
-      const deltaPct = (deltaY / containerHeight) * 100;
-      const newSplit = Math.max(15, Math.min(85, sectionDragStartSplit.current + deltaPct));
-      setSectionSplit(newSplit);
-    };
-
-    const handleSectionDragEnd = () => {
-      if (isSectionDragging.current) {
-        isSectionDragging.current = false;
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-        setSectionSplit(prev => {
-          try { localStorage.setItem(SECTION_SPLIT_KEY, String(Math.round(prev))); } catch { /* ignore */ }
-          return prev;
-        });
-      }
-    };
-
-    document.addEventListener('mousemove', handleSectionDragMove);
-    document.addEventListener('mouseup', handleSectionDragEnd);
-    return () => {
-      document.removeEventListener('mousemove', handleSectionDragMove);
-      document.removeEventListener('mouseup', handleSectionDragEnd);
-    };
-  }, []);
-
-  // Resizable sidebar drag handlers
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    isDragging.current = true;
-    startX.current = e.clientX;
-    startWidth.current = sidebarWidth;
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    e.preventDefault();
-  }, [sidebarWidth]);
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging.current) return;
-      const delta = e.clientX - startX.current;
-      const newWidth = Math.max(280, Math.min(500, startWidth.current + delta));
-      setSidebarWidth(newWidth);
-      currentWidth.current = newWidth;
-    };
-
-    const handleMouseUp = () => {
-      if (isDragging.current) {
-        localStorage.setItem('mc-sidebar-width', String(currentWidth.current));
-      }
-      isDragging.current = false;
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, []);
+  }, [conversationViewMode]);
+  const { createForAgent: createDeckConversation } = useCreateConversation(selectedProject, onConversationCreated);
 
   // Re-fetch all query caches when the WebSocket transport reconnects after
   // a dashboard restart. Without this, the Command Deck operates on stale
@@ -561,147 +343,6 @@ export function CommandDeck({
   return (
     <div className={styles.commandDeck}>
       <div className={styles.layout}>
-        {/* Sidebar: Project Tree */}
-        <div className={styles.sidebar} style={{ width: sidebarWidth, minWidth: sidebarWidth }}>
-          <div className={styles.sidebarHeader}>
-            <div className={styles.sidebarHeaderRow}>
-              <h2 className={styles.sidebarTitle}>Command Deck</h2>
-              <div className={styles.sidebarHeaderGroup}>
-                <NewConversationPickers
-                  model={sidebarModel}
-                  onModelChange={setSidebarModel}
-                  harness={sidebarHarness}
-                  onHarnessChange={setSidebarHarness}
-                  effort={sidebarEffort}
-                  onEffortChange={setSidebarEffort}
-                />
-                <NewConversationSplitButton
-                  onQuickCreate={handleNewConversation}
-                  projectKey={selectedProject && selectedProject !== NO_PROJECT_KEY ? selectedProject : undefined}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div ref={sectionContainerRef} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-          {/* ── Conversations section ─────────────────────────────── */}
-          <div
-            className={`${styles.sidebarSection} ${convsCollapsed ? styles.sidebarSectionCollapsed : ''}`}
-            style={!convsCollapsed && !projectsCollapsed ? { flex: `0 0 ${sectionSplit}%` } : undefined}
-          >
-            <div className={styles.sectionHeader} onClick={toggleConvsCollapsed}>
-              {convsCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-              <span className={styles.sectionTitle}>Conversations</span>
-              <span className={styles.segmentCount}>{projectConvs.length}</span>
-            </div>
-            {!convsCollapsed && (
-              <div className={styles.sectionBody}>
-                {selectedProject ? (
-                  <ConversationList
-                    selectedConversation={selectedConversation}
-                    onSelectConversation={handleSelectConversation}
-                    includeIds={projectConvIdSet}
-                  />
-                ) : (
-                  <div className={styles.emptyProject}>Select a project to see its conversations</div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* ── Draggable divider ─────────────────────────────────── */}
-          {!convsCollapsed && !projectsCollapsed && (
-            <div
-              className={styles.sectionDivider}
-              onMouseDown={handleSectionDragStart}
-            />
-          )}
-
-          {/* ── Issues section (selected project's tree, PAN-1561) ───── */}
-          <div
-            className={`${styles.sidebarSection} ${projectsCollapsed ? styles.sidebarSectionCollapsed : ''}`}
-            style={!convsCollapsed && !projectsCollapsed ? { flex: `0 0 ${100 - sectionSplit}%` } : undefined}
-          >
-            <div className={styles.sectionHeader} onClick={toggleProjectsCollapsed}>
-              {projectsCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-              <span className={styles.sectionTitle}>Issues</span>
-              <span className={styles.segmentCount}>{visibleFeatures.length}</span>
-            </div>
-            {!projectsCollapsed && (
-              <div className={styles.sectionBody}>
-                <IssuesPaneFilterRow
-                  filter={treeFilter}
-                  onFilterChange={setTreeFilter}
-                />
-                <ProjectMembershipBoundary
-                  selectedProject={selectedProject} projectKey={selectedRegisteredProject?.key ?? selectedProjectData?.key}
-                  projectName={selectedProjectData?.name}
-                  loading={isLoading && !selectedProjectData}
-                  disabled={isProjectValidationPending || Boolean(registeredProjectsError) || showUnknownProject}
-                >
-                  {selectedProjectData ? (
-                    <ProjectNode
-                      key={selectedProjectData.path} projectKey={selectedProjectData.key}
-                    name={selectedProjectData.name}
-                    features={visibleFeatures}
-                    selectedFeature={selectedFeature}
-                    onSelectFeature={handleSelectFeature}
-                    onSelectProject={handleSelectProject}
-                    selectedProject={selectedProject}
-                    selectedSessionId={selectedSessionId}
-                    onSelectSession={handleSelectSession}
-                    issueTitles={issueTitles}
-                    issueCosts={issueCosts}
-                    filter={treeFilter}
-                    onStopSession={handleStopSession}
-                    onViewTerminal={handleViewTerminal}
-                    onPauseSession={handlePauseSession}
-                    onResumeSession={handleResumeSession}
-                    onUnpauseSession={handleUnpauseSession}
-                    onRestartSession={handleRestartSession}
-                    onDeepWipe={handleDeepWipe}
-                    onOpenStateDir={handleOpenStateDir}
-                    onViewJsonl={handleViewJsonl}
-                    onCleanupOrphanedResources={handleCleanupOrphanedResources}
-                    onOpenPlanDialog={handleOpenPlanDialog}
-                    onNewConversation={handleNewProjectConversation}
-                    containerStats={containerStats}
-                  />
-                  ) : (
-                    <div className={styles.emptyProject}>No issues for this project</div>
-                  )}
-                </ProjectMembershipBoundary>
-              </div>
-            )}
-          </div>
-          </div>
-
-          {projectConvMutations.forkTarget && (
-            <ForkModal
-              conversation={projectConvMutations.forkTarget}
-              initialMode={projectConvMutations.forkTargetMode}
-              initialFocus={projectConvMutations.forkTargetFocus}
-              isPending={projectConvMutations.isForkPending}
-              onClose={projectConvMutations.closeForkModal}
-              onConfirm={(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness, projectKey, handoffExtras) => {
-                projectConvMutations.submitFork(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness, projectKey, handoffExtras);
-              }}
-            />
-          )}
-
-          {versionData && (
-            <div className={styles.sidebarFooter}>
-              <span className={styles.versionLabel}>v{versionData.version}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Resize Handle */}
-        <div
-          className={styles.resizeHandle}
-          onMouseDown={handleMouseDown}
-        />
-
         {/* Content Area — the project-scoped deck (PAN-1561) */}
         <div className={styles.content}>
           {conversationRouteError && <p role="alert">{conversationRouteError.message}</p>}
@@ -784,26 +425,6 @@ export function CommandDeck({
         )}
       </div>
 
-      {/* Tasks Dialog */}
-      {showTasks && selectedFeature && (
-        <TasksDialog
-          issueId={selectedFeature}
-          isOpen={showTasks}
-          onClose={() => setShowTasks(false)}
-        />
-      )}
-
-      {planDialogIssue && (
-        <PlanDialog
-          issue={planDialogIssue}
-          isOpen={true}
-          onClose={() => setPlanDialogIssue(null)}
-          onComplete={async () => {
-            setPlanDialogIssue(null);
-            await refreshDashboardState(queryClient);
-          }}
-        />
-      )}
     </div>
   );
 }

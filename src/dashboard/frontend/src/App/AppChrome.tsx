@@ -20,6 +20,8 @@ import { HealthSection, SystemHealthPill } from '../components/SystemHealthPill'
 import { StaleBuildChip } from '../components/StaleBuildChip';
 import type { Tab } from '../components/Header';
 import { useTheme } from '../hooks/useTheme';
+import { useOverdeckBusy } from '../hooks/useOverdeckBusy';
+import { OverdeckMark } from '../components/OverdeckMark';
 import { PALETTE_SEARCH_PLACEHOLDER, paletteKeycap } from './appChromeLabels';
 import { AgentsMenu } from './topbar/AgentsMenu';
 import { Breadcrumb } from './topbar/Breadcrumb';
@@ -52,6 +54,8 @@ interface AppChromeProps {
   onToggleSessionFeedSidebar: () => void;
   /** A project was added through the Add-project modal this chrome hosts. */
   onProjectCreated: (project: CreatedProject) => void;
+  /** The brand cell opens Home (PAN-5293 F-D14). */
+  onGoHome: () => void;
 }
 
 export function AppChrome({
@@ -71,6 +75,7 @@ export function AppChrome({
   onRestartCliproxy,
   onToggleSessionFeedSidebar,
   onProjectCreated,
+  onGoHome,
 }: AppChromeProps) {
   return (
     <>
@@ -171,6 +176,7 @@ export function AppChrome({
           menu, Needs you, exception chips, health dot, theme. AppChrome calls no
           store selector: every count lives in its own leaf component (E-D1). */}
       <div className="relative flex h-12 shrink-0 items-center gap-3 border-b border-border bg-background px-3">
+        <BrandHome onGoHome={onGoHome} />
         <Breadcrumb activeTab={activeTab} selectedProjectKey={selectedProjectKey} />
 
         <button
@@ -217,6 +223,23 @@ export function AppChrome({
         </div>
       </div>
     </>
+  );
+}
+
+/** PAN-5293 F-D14: the brand at the left of the app bar; the mark orbits while Overdeck is busy. */
+function BrandHome({ onGoHome }: { onGoHome: () => void }) {
+  const busy = useOverdeckBusy();
+  return (
+    <button
+      type="button"
+      onClick={onGoHome}
+      title="Go to Home"
+      data-testid="topbar-brand"
+      className="flex shrink-0 items-center gap-2 rounded-md px-1 py-1 transition-opacity hover:opacity-80"
+    >
+      <OverdeckMark className="h-5 w-5 shrink-0 text-primary" orbiting={busy} />
+      <span className="font-display text-base font-semibold text-foreground">Overdeck</span>
+    </button>
   );
 }
 

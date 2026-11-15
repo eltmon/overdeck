@@ -105,7 +105,20 @@ vi.mock('./components/CommandPalette', () => ({
 vi.mock('./components/ResourcesPanel', () => ({ ResourcesPanel: () => null }));
 vi.mock('./components/GodView', () => ({ GodViewPage: () => null }));
 vi.mock('./components/context/ContextPage', () => ({ ContextPage: () => <div data-testid="context-page" /> }));
-vi.mock('./components/Sidebar', () => ({ Sidebar: () => null }));
+// PAN-5293: the left column opens things through the deck navigation door.
+vi.mock('./components/frame/LeftColumn', async () => {
+  const { useDeckNavigation } = await vi.importActual<typeof import('./components/frame/deck/deckNavigation')>('./components/frame/deck/deckNavigation');
+  return {
+    LeftColumn: () => {
+      const navigation = useDeckNavigation();
+      return (
+        <button onClick={() => navigation.openInDeck({ projectKey: 'panopticon-cli', conversationRouteKey: '42' })}>
+          Left column conversation
+        </button>
+      );
+    },
+  };
+});
 vi.mock('./components/BootstrapGate', () => ({ BootstrapGate: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 vi.mock('./components/skeletons/KanbanSkeleton', () => ({ KanbanSkeleton: () => null }));
 vi.mock('./components/skeletons/AgentsSkeleton', () => ({ AgentsSkeleton: () => null }));
@@ -449,6 +462,26 @@ describe('App primary routing', () => {
     fireEvent.click(screen.getByText('Select panopticon'));
 
     expect(window.location.pathname).toBe('/command-deck/panopticon-cli');
+    expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli');
+  });
+
+  it('the top-bar brand navigates Home (PAN-5293 F-D14)', () => {
+    window.history.replaceState(null, '', '/pipeline');
+    renderApp();
+    fireEvent.click(screen.getByTestId('topbar-brand'));
+    expect(window.location.pathname).toBe('/');
+    expect(screen.getByTestId('home-page')).toBeInTheDocument();
+  });
+
+  it('opens a left-column conversation in the deck from another route (PAN-5293 FR-3)', () => {
+    window.history.replaceState(null, '', '/flywheel');
+    renderApp();
+    expect(screen.queryByTestId('conv-id')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Left column conversation'));
+
+    expect(window.location.pathname).toBe('/conv/42');
+    expect(screen.getByTestId('conv-id').textContent).toBe('42');
     expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli');
   });
 

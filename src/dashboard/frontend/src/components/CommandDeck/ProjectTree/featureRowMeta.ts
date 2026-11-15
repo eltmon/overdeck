@@ -5,7 +5,7 @@
 
 import type { SessionNode } from '@overdeck/contracts';
 import type { PipelineIssuePhase } from '../../../lib/pipeline-state';
-import { shortModel } from '../conversationMeta';
+import { shortModel } from '../modelLabels';
 
 export const STAGE_WORDS: Record<PipelineIssuePhase, string> = {
   todo: 'Not started',

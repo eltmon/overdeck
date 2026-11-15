@@ -4,9 +4,9 @@
  * Branch, model, tokens and harness go into the line's tooltip.
  */
 
-import { getRuntimeBehavior, normalizeHarnessName } from '@overdeck/contracts';
+import { getRuntimeBehavior, normalizeHarnessName, type ConversationChangeTotals } from '@overdeck/contracts';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
-import type { Conversation } from './ConversationList';
+import { shortModel } from './modelLabels';
 
 /** Compact token count, e.g. 1234 → "1.2k", 2_500_000 → "2.5M". */
 export function formatTokens(tokens: number): string {
@@ -15,16 +15,8 @@ export function formatTokens(tokens: number): string {
   return `${tokens}`;
 }
 
-/** Trim model IDs to a readable label, e.g. "claude-opus-4-8" → "opus-4-8". */
-export function shortModel(model: string): string {
-  return model
-    .replace(/^claude-/, '')
-    .replace(/-\d{8}$/, '')
-    .replace(/-latest$/, '');
-}
-
 /** A harness id's declared display name; an unknown future id stays raw. */
-export function shortHarness(harness: NonNullable<Conversation['harness']>): string {
+export function shortHarness(harness: string): string {
   const runtime = normalizeHarnessName(harness);
   return runtime ? getRuntimeBehavior(runtime).displayName : harness;
 }
@@ -45,9 +37,24 @@ export interface ConversationMeta {
   title: string;
 }
 
-type MetaConversation = Pick<Conversation,
-  'pendingInputCount' | 'isWorking' | 'sessionAlive' | 'lastActivityAt' | 'lastAttachedAt' | 'createdAt'
-  | 'changeTotals' | 'harness' | 'totalCost' | 'totalTokens' | 'model' | 'branch'>;
+/**
+ * The conversation fields the meta line reads. Structural, so this module
+ * does not import ConversationList (ConversationRow imports this module).
+ */
+export interface MetaConversation {
+  pendingInputCount?: number;
+  isWorking?: boolean;
+  sessionAlive: boolean;
+  lastActivityAt?: string | null;
+  lastAttachedAt: string | null;
+  createdAt: string;
+  changeTotals?: ConversationChangeTotals;
+  harness?: string | null;
+  totalCost?: number;
+  totalTokens?: number;
+  model?: string | null;
+  branch?: string | null;
+}
 
 function stateWord(conv: MetaConversation, now: Date): string {
   if ((conv.pendingInputCount ?? 0) > 0) return 'Needs you';

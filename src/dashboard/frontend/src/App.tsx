@@ -19,7 +19,7 @@ import type { CreatedProject } from './components/project/new/useProjectCreateIn
 import { takeAddProjectReturnTo, useAddProjectDialog } from './components/project/new/addProjectDialogStore';
 import { requestLauncherFocusAfterCreate } from './components/Stage/launcherFocusStore';
 import { Tab } from './components/Header';
-import { Sidebar } from './components/Sidebar';
+import { LeftColumn } from './components/frame/LeftColumn';
 import { UpdateDialog } from './components/UpdateDialog';
 import { TasksDialog } from './components/TasksDialog';
 import { PrdViewer } from './components/PrdViewer';
@@ -776,49 +776,47 @@ export default function App() {
 
   return (
     <IssueDrawerAvailableContext.Provider value>
-    <div className="h-screen flex flex-row overflow-hidden bg-background">
+    <div className="h-screen flex flex-col overflow-hidden bg-background">
       {/* Event-sourced state: connects WsTransport → DashboardStore (PAN-428 B4) */}
       <EventRouter />
 
       {/* Mounts @keyframes for the pulsing extreme-tier cost warning badge */}
       <CostWarningStyles />
 
-      {/* Collapsible sidebar navigation */}
-      <Sidebar
+      {/* PAN-5293 §6.3: the top bar spans the full width; below it, the left
+          column then the routed page. */}
+      <AppChrome
         activeTab={activeTab}
-        onTabChange={setActiveTab}
-        onSearchOpen={() => setIsSearchOpen(true)}
-        selectedProject={selectedProjectKey}
-        onSelectProject={handleSelectProject}
-        onNewProject={handleNewProject}
-        onNewWorkspace={() => onNewWorkspace(selectedProjectKey ?? undefined)}
-        onOpenUpdater={() => setIsUpdateDialogOpen(true)}
-        onSelectWorkspace={onSelectWorkspace}
+        selectedProjectKey={selectedProjectKey}
+        dashboardLifecycle={dashboardLifecycle}
+        missingKeyTrackers={missingKeyTrackers}
+        trackerBannerDismissed={trackerBannerDismissed}
+        showCliproxyBanner={showCliproxyBanner}
+        isRestartBackendPending={restartBackendMutation.isPending}
+        isRestartCliproxyPending={restartCliproxyMutation.isPending}
+        isSessionFeedSidebarOpen={isSessionFeedSidebarOpen}
+        onPaletteOpen={() => { setPaletteInitialScope('all'); setIsPaletteOpen(true); }}
+        onOpenSettings={() => setActiveTab('settings')}
+        onDismissTrackerBanner={() => setTrackerBannerDismissed(true)}
+        onRestartBackend={() => restartBackendMutation.mutate()}
+        onRestartCliproxy={() => restartCliproxyMutation.mutate()}
+        onToggleSessionFeedSidebar={() => setSessionFeedSidebarOpen(!isSessionFeedSidebarOpen)}
+        onProjectCreated={handleProjectCreated}
+        onGoHome={() => setActiveTab('home')}
       />
 
-      {/* Main content area */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <AppChrome
-          activeTab={activeTab}
-          selectedProjectKey={selectedProjectKey}
-          dashboardLifecycle={dashboardLifecycle}
-          missingKeyTrackers={missingKeyTrackers}
-          trackerBannerDismissed={trackerBannerDismissed}
-          showCliproxyBanner={showCliproxyBanner}
-          isRestartBackendPending={restartBackendMutation.isPending}
-          isRestartCliproxyPending={restartCliproxyMutation.isPending}
-          isSessionFeedSidebarOpen={isSessionFeedSidebarOpen}
-          onPaletteOpen={() => { setPaletteInitialScope('all'); setIsPaletteOpen(true); }}
-          onOpenSettings={() => setActiveTab('settings')}
-          onDismissTrackerBanner={() => setTrackerBannerDismissed(true)}
-          onRestartBackend={() => restartBackendMutation.mutate()}
-          onRestartCliproxy={() => restartCliproxyMutation.mutate()}
-          onToggleSessionFeedSidebar={() => setSessionFeedSidebarOpen(!isSessionFeedSidebarOpen)}
-          onProjectCreated={handleProjectCreated}
-        />
-
-        <div className="min-h-0 flex flex-1 overflow-hidden">
+      <div className="min-h-0 flex flex-1 overflow-hidden">
         <DeckNavigationProvider value={deckNavigation}>
+        <LeftColumn
+          activeTab={activeTab}
+          selectedProject={selectedProjectKey}
+          onTabChange={setActiveTab}
+          onNewProject={handleNewProject}
+          onNewWorkspace={onNewWorkspace}
+          onOpenUpdater={() => setIsUpdateDialogOpen(true)}
+          onSelectWorkspace={onSelectWorkspace}
+          onOpenShortcuts={openShortcutsSheet}
+        />
         <main
           data-drawer-open={drawerOpen ? 'true' : undefined}
           className="relative flex-1 flex overflow-hidden data-[drawer-open=true]:before:pointer-events-none data-[drawer-open=true]:before:absolute data-[drawer-open=true]:before:inset-0 data-[drawer-open=true]:before:z-[80] data-[drawer-open=true]:before:bg-primary/[0.04] data-[drawer-open=true]:before:backdrop-blur-[2px]"
@@ -859,7 +857,6 @@ export default function App() {
         {isSessionFeedSidebarOpen && !['command-deck', 'backlog', 'god-view'].includes(activeTab) && (
           <SessionFeedSidebar onClose={() => setSessionFeedSidebarOpen(false)} />
         )}
-        </div>
       </div>
 
       <IssueDrawer />

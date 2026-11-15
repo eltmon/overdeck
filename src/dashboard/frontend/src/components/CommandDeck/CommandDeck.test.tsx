@@ -6,6 +6,8 @@ import { toast } from 'sonner';
 import { CommandDeck } from './index';
 import { TestDeckNavigationProvider, type DeckTarget } from '../frame/deck/deckNavigation';
 import { useNewConversationDefaults } from '../frame/deck/newConversationDefaults';
+import { ConversationsSection } from '../frame/ConversationsSection';
+import { IssuesSection } from '../frame/IssuesSection';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { usePanesStore } from '../../lib/panesStore';
 import { usePlannedBacklogVisibility } from '../../hooks/usePlannedBacklogVisibility';
@@ -447,7 +449,17 @@ function renderCommandDeck(
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <TestDeckNavigationProvider navigation={deckNavigationLike(props)}><CommandDeck {...props} /></TestDeckNavigationProvider>
+      <TestDeckNavigationProvider navigation={deckNavigationLike(props)}>
+        {/* PAN-5293: the deck's lists live in the left column now; render its
+            sections beside the deck so row clicks still reach the deck. */}
+        {props?.selectedProject && (
+          <>
+            <ConversationsSection selectedProject={props.selectedProject} />
+            <IssuesSection selectedProject={props.selectedProject} />
+          </>
+        )}
+        <CommandDeck {...props} />
+      </TestDeckNavigationProvider>
     </QueryClientProvider>,
   );
 }
@@ -556,29 +568,26 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     expect(await screen.findByTestId('feature-PAN-821')).toBeInTheDocument();
     expect(screen.getByTestId('feature-PAN-2822')).toBeInTheDocument();
 
-    const toggle = screen.getByTestId('planned-backlog-toggle');
-    const issuesHeader = screen.getByText('Issues').parentElement!;
-    expect(toggle).toHaveClass('treeFilterButtonActive');
-    expect(within(issuesHeader).getByText('2')).toBeInTheDocument();
+    // PAN-5293: the Planned toggle and the count live in the left column's
+    // Issues header (IssuesSection.test); here the shared store drives both
+    // the tree and the project home.
+    const toggle = () => act(() => usePlannedBacklogVisibility.getState().toggleShowPlannedBacklog());
     const initialHomeFeatures = latestStageProps.renderHome({}).props.features.map((feature: any) => feature.issueId);
     expect(initialHomeFeatures).toHaveLength(2);
     expect(initialHomeFeatures).toEqual(expect.arrayContaining(['PAN-821', 'PAN-2822']));
 
-    fireEvent.click(toggle);
+    toggle();
 
     await waitFor(() => expect(screen.queryByTestId('feature-PAN-2822')).not.toBeInTheDocument());
     expect(screen.getByTestId('feature-PAN-821')).toBeInTheDocument();
-    expect(toggle).not.toHaveClass('treeFilterButtonActive');
-    expect(within(issuesHeader).getByText('1')).toBeInTheDocument();
     expect(latestStageProps.renderHome({}).props.features.map((feature: any) => feature.issueId)).toEqual([
       'PAN-821',
     ]);
 
-    fireEvent.click(toggle);
+    toggle();
 
     expect(await screen.findByTestId('feature-PAN-2822')).toBeInTheDocument();
-    expect(toggle).toHaveClass('treeFilterButtonActive');
-    expect(within(issuesHeader).getByText('2')).toBeInTheDocument();
+    expect(latestStageProps.renderHome({}).props.features).toHaveLength(2);
   });
 
   it('passes the immutable registration key to the project tree node', async () => {
@@ -753,12 +762,16 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     expect(JSON.parse(String(post?.[1]?.body))).toMatchObject({ model: 'm2', harness: 'claude-code', projectKey: 'test-project' });
   });
 
-  it('no longer renders the sticky context checkboxes in the sidebar (PAN-4486)', async () => {
+  it('renders no sticky context checkboxes and no column of its own (PAN-4486, PAN-5293)', async () => {
     renderCommandDeck({ selectedProject: 'test-project' });
     await screen.findByTestId('stage');
     expect(screen.queryByRole('checkbox', { name: 'No context' })).toBeNull();
     expect(screen.queryByRole('checkbox', { name: 'Skip CLAUDE.md' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'New conversation options' })).toBeTruthy();
+    // The New conversation split button, its pickers and the heading moved to the left column.
+    expect(screen.queryByRole('button', { name: 'New conversation options' })).toBeNull();
+    expect(screen.queryByText('Command Deck')).toBeNull();
+    expect(document.querySelector('.resizeHandle')).toBeNull();
+    expect(screen.getByTestId('stage').closest('.content')).not.toBeNull();
   });
 
   it('returns the server error while preserving the existing error signals', async () => {
@@ -861,7 +874,7 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
         </QueryClientProvider>
       </StrictMode>,
     );
-    await screen.findAllByTestId('project-node');
+    await screen.findByTestId('stage');
     await waitFor(() => expect(useCommandDeckSelection.getState().selectedConversation).toBe('test-conv'));
     expect(panes('test-project').filter((p) => p.paneType === 'agent' && p.conversationId === 'test-conv')).toHaveLength(1);
   });
@@ -880,7 +893,7 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
         </QueryClientProvider>
       </StrictMode>,
     );
-    await screen.findAllByTestId('project-node');
+    await screen.findByTestId('stage');
     await waitFor(() => expect(useCommandDeckSelection.getState().selectedFeature).toBe('PAN-821'));
     expect(panes('test-project').filter((p) => p.paneType === 'issue' && p.issueId === 'PAN-821')).toHaveLength(1);
   });
