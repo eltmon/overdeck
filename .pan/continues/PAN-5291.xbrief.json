@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5291",
   "created": "2026-11-15T08:32:27.661Z",
-  "updated": "2026-11-15T08:40:16.066Z",
+  "updated": "2026-11-15T08:40:22.141Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
     "extract-header.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T08:40:16.066Z"
+    },
+    "header-dock-buttons": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5291",
+      "claimedAt": "2026-11-15T08:40:22.141Z"
     }
   }
 }
