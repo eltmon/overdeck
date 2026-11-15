@@ -64,6 +64,7 @@ VERSION=''
 WORK_DIR=''
 OUT=''
 BUDGET=''
+IDLE_SPAWNER_MS=''
 SUBJECT=''
 OS_NAME=''
 WINDOWS_PER_SIDE=''
@@ -102,6 +103,10 @@ Usage: bare-host-smoke.sh (--tarball <path> | --version <npm version>) --work-di
   --out <file>         Where to write the JSON result (default <work-dir>/result.json).
   --budget <n>         Idle budget: new PIDs per 30 s window, net of baseline
                        (default 30 on macOS and on Linux).
+  --idle-spawner-ms <n> Load a preload into the idle dashboard server only
+                       that spawns `true` every <n> ms (whole number >= 50).
+                       The positive control for the Linux idle measure: it
+                       must fail pid-net and blame the dashboard tree.
   --help               Print this help.
 
 Exit codes: 0 pass, 1 a check failed, 2 setup error, 64 bad usage.
@@ -292,6 +297,7 @@ parse_args() {
       --work-dir) [ $# -ge 2 ] || bad_usage "--work-dir needs a directory"; WORK_DIR="$2"; shift 2 ;;
       --out) [ $# -ge 2 ] || bad_usage "--out needs a file"; OUT="$2"; shift 2 ;;
       --budget) [ $# -ge 2 ] || bad_usage "--budget needs a number"; BUDGET="$2"; shift 2 ;;
+      --idle-spawner-ms) [ $# -ge 2 ] || bad_usage "--idle-spawner-ms needs a number"; IDLE_SPAWNER_MS="$2"; shift 2 ;;
       *) bad_usage "unknown argument: $1" ;;
     esac
   done
@@ -302,6 +308,12 @@ parse_args() {
     '') ;;
     *[!0-9]*) bad_usage "--budget must be a whole number" ;;
   esac
+  case "$IDLE_SPAWNER_MS" in
+    '') ;;
+    *[!0-9]*) bad_usage "--idle-spawner-ms must be a whole number" ;;
+    *) [ "$IDLE_SPAWNER_MS" -ge 50 ] || bad_usage "--idle-spawner-ms must be >= 50" ;;
+  esac
+  R_IDLE_SPAWNER_MS="$IDLE_SPAWNER_MS"
   case "$WORK_DIR" in
     /*) ;;
     *) WORK_DIR="$PWD/$WORK_DIR" ;;
@@ -554,6 +566,22 @@ if (file && !cp.__overdeckSpawnTrace) {
 TRACER
 }
 
+# PAN-5361: the positive control for the Linux idle measure (--idle-spawner-ms).
+# A Node preload that spawns `true` every <n> ms, loaded into the idle
+# dashboard server only via NODE_OPTIONS: the argv[1] guard keeps it out of
+# every other Node process the dashboard starts (child CLI invocations,
+# etc.), since NODE_OPTIONS rides into all of them.
+write_idle_spawner() {
+  cat >"$WORK_DIR/tools/idle-spawner.cjs" <<'SPAWNER'
+'use strict';
+const ms = Number(process.env.OVERDECK_SMOKE_SPAWNER_MS);
+if (ms > 0 && /[\\/]dist[\\/]dashboard[\\/]server\.js$/.test(process.argv[1] || '')) {
+  const { spawn } = require('child_process');
+  setInterval(() => { try { spawn('true', [], { stdio: 'ignore' }).on('error', () => {}); } catch {} }, ms).unref();
+}
+SPAWNER
+}
+
 # Diagnostic only, never an assertion, and outside both measured windows:
 # with no Overdeck process alive, sample `ps` every 0.2 s for CHURN_SECS and
 # count new processes by command, so a noisy baseline names its source.
@@ -575,7 +603,7 @@ sample_churn() {
 }
 
 measure_idle() {
-  local server waited=0
+  local server waited=0 node_options
   sample_churn
   echo "== baseline window(s) (${WINDOWS_PER_SIDE} x ${WINDOW_SECS} s, no Overdeck process)"
   take_windows baseline
@@ -583,8 +611,13 @@ measure_idle() {
 
   echo "== dashboard server idle window"
   write_spawn_tracer
+  node_options="--require \"$WORK_DIR/tools/spawn-trace.cjs\""
+  if [ -n "$IDLE_SPAWNER_MS" ]; then
+    write_idle_spawner
+    node_options="$node_options --require \"$WORK_DIR/tools/idle-spawner.cjs\""
+  fi
   bare OVERDECK_NO_RESUME=1 DASHBOARD_PORT=3010 API_PORT=3011 PORT=3011 OVERDECK_MODE=production \
-    NODE_OPTIONS="--require \"$WORK_DIR/tools/spawn-trace.cjs\"" OVERDECK_SPAWN_TRACE="$WORK_DIR/spawn-trace.log" \
+    NODE_OPTIONS="$node_options" OVERDECK_SPAWN_TRACE="$WORK_DIR/spawn-trace.log" OVERDECK_SMOKE_SPAWNER_MS="$IDLE_SPAWNER_MS" \
     "$NODE_BIN" "$CORE/dist/dashboard/server.js" >"$WORK_DIR/server.log" 2>&1 &
   server=$!
   while [ "$waited" -lt "$HEALTH_TIMEOUT_SECS" ]; do
