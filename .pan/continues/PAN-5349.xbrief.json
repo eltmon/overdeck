@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5349",
   "created": "2026-11-15T15:32:54.289Z",
-  "updated": "2026-11-15T16:26:09.269Z",
+  "updated": "2026-11-15T16:26:18.362Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -162,6 +162,11 @@
     "add-project-prefill.ac3": {
       "status": "completed",
       "doneAt": "2026-11-15T16:26:09.269Z"
+    },
+    "open-path-link": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5349",
+      "claimedAt": "2026-11-15T16:26:18.362Z"
     }
   }
 }
