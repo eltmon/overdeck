@@ -155,6 +155,8 @@ export function WorkDock({ deckKey, activePane, layoutLeafIds, panesById, conver
   // ─── activeDock registration (B-D5) ───────────────────────────────────────
   const fileRootRef = useRef<string | null>(null)
   fileRootRef.current = scope.rootId ?? scope.deckRootId
+  const scopeRootRef = useRef<string | null>(null)
+  scopeRootRef.current = scope.rootId
   const openBesideRef = useRef(deck?.openBeside)
   openBesideRef.current = deck?.openBeside
   const activePaneId = activePane?.paneId ?? null
@@ -170,7 +172,10 @@ export function WorkDock({ deckKey, activePane, layoutLeafIds, panesById, conver
       },
       revealFile: (path) => {
         const rootId = fileRootRef.current
-        if (rootId) useWorkDockStore.getState().openDock(deckKey, { tab: 'files', reveal: { rootId, path } })
+        if (!rootId) return
+        // The dock has no root and Go to file used the deck root: point the dock there first.
+        if (rootId !== scopeRootRef.current) useWorkDockStore.getState().setRootOverride(deckKey, rootId, activePaneId ?? undefined)
+        useWorkDockStore.getState().openDock(deckKey, { tab: 'files', reveal: { rootId, path } })
       },
     })
   }, [deckKey, activePaneId, scope.rootId, changedPaths])

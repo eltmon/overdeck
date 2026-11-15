@@ -503,13 +503,18 @@ describe('FilesTab Reveal in files (PAN-5289 review)', () => {
     await waitFor(() => expect(treeRow('src/a.ts')).toHaveAttribute('aria-selected', 'true'))
   })
 
-  it('points the dock at the reveal root when it is another root, anchored to the active tab', async () => {
-    useActiveDock.setState({
-      current: { deckKey: DECK, activePaneId: 'chat-1', rootId: 'issue:PAN-1', changedPaths: new Set(), openFile: vi.fn(), revealFile: vi.fn() },
-    })
+  it('ignores a reveal for another root and writes no root override (B-D17)', async () => {
     renderTab()
     await screen.findByText('README.md')
     act(() => useWorkDockStore.getState().openDock(DECK, { tab: 'files', reveal: { rootId: 'project:overdeck', path: 'README.md' } }))
-    await waitFor(() => expect(useWorkDockStore.getState().byDeck[DECK]).toMatchObject({ rootOverride: 'project:overdeck', rootOverrideAnchor: 'chat-1' }))
+    expect(useWorkDockStore.getState().byDeck[DECK].rootOverride).toBeUndefined()
+    expect(useExplorerStore.getState().roots['issue:PAN-1'].selection).toEqual([])
+  })
+
+  it('clears the reveal request once it is handled', async () => {
+    renderTab()
+    await screen.findByText('README.md')
+    act(() => useWorkDockStore.getState().openDock(DECK, { tab: 'files', reveal: { rootId: 'issue:PAN-1', path: 'src/a.ts' } }))
+    await waitFor(() => expect(useWorkDockStore.getState().byDeck[DECK].reveal).toBeUndefined())
   })
 })

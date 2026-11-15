@@ -1808,9 +1808,13 @@ Search tab refocuses on a repeat open), `quickOpen` (Go to file, shared by the
 Stage + menu and the dock) and `rootOverride` with its `rootOverrideAnchor`
 pane. `toggleTab(deck, tab)` closes the dock when it is open on that tab and
 opens it there otherwise. The Files tab reveals both the active code pane's
-file (`scope.revealPath`) and the store's `reveal` (Reveal in files, keyed on
-`openSeq`; a reveal on another root first sets the root override). The dock
-drops `diff`, `diffList` and `searchPath` when its scope changes
+file (`scope.revealPath`) and the store's `reveal` (Reveal in files). A reveal
+is a one-shot request: it applies only when its root is the Files tab's root,
+then `clearReveal` drops it, so it never writes a root override or re-applies
+after a tab change (B-D17). A caller revealing on another root (Go to file or
+`activeDock.revealFile` on the deck root) sets the override itself, anchored to
+the active pane, before `openDock`. The dock drops `diff`, `diffList`,
+`searchPath` and an unhandled `reveal` when its scope changes
 (`clearScopedState`). Only `open`, `tab` and `width` persist, as JSON under
 `localStorage` key `overdeck.dock.<deckKey>`. Width is clamped to 260–720 px
 (default 340). A corrupt stored field falls back to its default.

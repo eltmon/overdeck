@@ -8,6 +8,10 @@ vi.mock('sonner', () => ({ toast }))
 vi.mock('../../Stage/panes/AgentPane', () => ({ AgentPane: () => <div data-testid="agent-pane" /> }))
 vi.mock('../../terminal/TerminalDrawer', () => ({ TerminalDrawer: () => <div data-testid="terminal-drawer" /> }))
 // The explorer body is covered by ExplorerPane.test.tsx; here it only shows which root it got.
+// The Changes lists read git status over the explorer RPC, which these tests do not run.
+vi.mock('../../explorer/git/useExplorerGitStatus', () => ({
+  useExplorerGitStatus: () => ({ result: null, decorations: { files: new Map(), folders: new Map() }, errorCode: undefined, errorMessage: undefined, refresh: () => {} }),
+}))
 vi.mock('../../explorer/ExplorerPane', () => ({
   ExplorerFiles: ({ rootId, changedPaths }: { rootId: string; changedPaths: ReadonlySet<string> }) => (
     <div data-testid="explorer-files" data-changed={[...changedPaths].join(',')}>
@@ -19,6 +23,7 @@ vi.mock('../../explorer/ExplorerPane', () => ({
 import { WorkDock, type WorkDockProps } from '../WorkDock'
 import { useWorkDockStore, dockStorageKey } from '../workDockStore'
 import { useActiveDock } from '../activeDock'
+import { useExplorerStore } from '../../explorer/explorerStore'
 import { StageDeckProvider, type StageDeckContextValue } from '../../Stage/StageDeckContext'
 import { Stage } from '../../Stage'
 import { installShortcutListener, resetShortcutsForTests } from '../../../lib/shortcuts/registry'
@@ -90,6 +95,7 @@ beforeEach(() => {
       if (url === '/api/registered-projects') return Response.json(PROJECTS)
       if (url === '/api/workspace-registry') return Response.json({ workspaces: [] })
       if (url.startsWith('/api/conversations/') && url.includes('/changes?')) return Response.json(NO_CHANGES)
+      if (url.startsWith('/api/projects/') && url.includes('/changes?')) return Response.json({ projectKey: 'p', branch: 'main', commits: [] })
       return Response.json([])
     }),
   )
@@ -226,7 +232,10 @@ describe('WorkDock', () => {
     current?.openFile('src/a.ts')
     expect(deck.openBeside).toHaveBeenCalledWith({ rootId: 'project:p', path: 'src/a.ts' })
     act(() => current?.revealFile('src/b.ts'))
-    expect(useWorkDockStore.getState().byDeck[DECK]).toMatchObject({ open: true, tab: 'files', reveal: { rootId: 'project:p', path: 'src/b.ts' } })
+    expect(useWorkDockStore.getState().byDeck[DECK]).toMatchObject({ open: true, tab: 'files' })
+    // The Files tab handled the one-shot request: the file is selected and the request is gone.
+    await waitFor(() => expect(useExplorerStore.getState().roots['project:p']?.selection).toEqual(['src/b.ts']))
+    expect(useWorkDockStore.getState().byDeck[DECK].reveal).toBeUndefined()
     unmount()
     expect(useActiveDock.getState().current).toBeNull()
   })
@@ -250,6 +259,68 @@ describe('WorkDock scope changes (PAN-5289 review)', () => {
     act(() => useWorkDockStore.getState().openDock(DECK, { tab: 'search', searchPath: 'src' }))
     rerender(wrap(<WorkDock {...props({ activePane: homePane, conversations })} />))
     await waitFor(() => expect(useWorkDockStore.getState().byDeck[DECK].searchPath).toBeUndefined())
+  })
+})
+
+describe('WorkDock after a Reveal (PAN-5289 review cycle 2)', () => {
+  const conversations = () => [conv({ name: 'c1' })]
+
+  it('keeps following the active tab: no override after revealing on an issue tab and switching to Home', async () => {
+    const { rerender } = render(wrap(<WorkDock {...props({ activePane: issuePane, conversations: conversations() })} />))
+    openDock()
+    await waitFor(() => expect(scopeText()).toBe('Issue PAN-9 · Fix the gate'))
+    act(() => useWorkDockStore.getState().openDock(DECK, { tab: 'files', reveal: { rootId: 'issue:PAN-9', path: 'src/a.ts' } }))
+    await waitFor(() => expect(useWorkDockStore.getState().byDeck[DECK].reveal).toBeUndefined())
+
+    rerender(wrap(<WorkDock {...props({ activePane: homePane, conversations: conversations() })} />))
+    await waitFor(() => expect(scopeText()).toBe('Project Project P · main checkout'))
+    expect(screen.getByTestId('explorer-files')).toHaveTextContent('project:p')
+    expect(useWorkDockStore.getState().byDeck[DECK].rootOverride).toBeUndefined()
+
+    rerender(wrap(<WorkDock {...props({ activePane: issuePane, conversations: conversations() })} />))
+    await waitFor(() => expect(scopeText()).toBe('Issue PAN-9 · Fix the gate'))
+    expect(screen.queryByRole('button', { name: 'Follow the active tab' })).toBeNull()
+  })
+
+  it('keeps a conversation scope after revealing from it, visiting an issue tab and coming back', async () => {
+    const { rerender } = render(wrap(<WorkDock {...props({ activePane: chatPane, conversations: conversations() })} />))
+    openDock()
+    await waitFor(() => expect(scopeText()).toBe('For Fix the bug · Project P · main'))
+    act(() => useWorkDockStore.getState().openDock(DECK, { tab: 'files', reveal: { rootId: 'project:p', path: 'src/a.ts' } }))
+    await waitFor(() => expect(useWorkDockStore.getState().byDeck[DECK].reveal).toBeUndefined())
+
+    rerender(wrap(<WorkDock {...props({ activePane: issuePane, conversations: conversations() })} />))
+    await waitFor(() => expect(scopeText()).toBe('Issue PAN-9 · Fix the gate'))
+    rerender(wrap(<WorkDock {...props({ activePane: chatPane, conversations: conversations() })} />))
+    await waitFor(() => expect(scopeText()).toBe('For Fix the bug · Project P · main'))
+    expect(useWorkDockStore.getState().byDeck[DECK].rootOverride).toBeUndefined()
+    expect(screen.queryByRole('button', { name: 'Follow the active tab' })).toBeNull()
+  })
+
+  it('drops an unhandled reveal when the scope changes before the Files tab shows', async () => {
+    const { rerender } = render(wrap(<WorkDock {...props({ activePane: issuePane, conversations: conversations() })} />))
+    act(() => useWorkDockStore.getState().openDock(DECK, { tab: 'changes' }))
+    await waitFor(() => expect(scopeText()).toBe('Issue PAN-9 · Fix the gate'))
+    // A reveal request that the Files tab never handled (the dock is on Changes).
+    act(() => useWorkDockStore.setState((s) => ({ byDeck: { ...s.byDeck, [DECK]: { ...s.byDeck[DECK], reveal: { rootId: 'issue:PAN-9', path: 'x.ts' } } } })))
+    rerender(wrap(<WorkDock {...props({ activePane: homePane, conversations: conversations() })} />))
+    await waitFor(() => expect(useWorkDockStore.getState().byDeck[DECK].reveal).toBeUndefined())
+    act(() => useWorkDockStore.getState().setTab(DECK, 'files'))
+    expect(screen.getByTestId('explorer-files')).toHaveTextContent('project:p')
+    expect(useWorkDockStore.getState().byDeck[DECK].rootOverride).toBeUndefined()
+  })
+
+  it('revealFile on the deck root, when the dock has no root, points the dock there anchored to the active pane', async () => {
+    const outside = [conv({ name: 'c1', cwd: '/srv/elsewhere' })]
+    render(wrap(<WorkDock {...props({ activePane: chatPane, conversations: outside })} />))
+    openDock('changes')
+    act(() => useWorkDockStore.getState().setTab(DECK, 'files'))
+    // The deck root is known once Open project files is offered.
+    await screen.findByRole('button', { name: 'Open project files' })
+    act(() => useActiveDock.getState().current?.revealFile('README.md'))
+    expect(useWorkDockStore.getState().byDeck[DECK]).toMatchObject({ rootOverride: 'project:p', rootOverrideAnchor: 'a1', tab: 'files' })
+    await waitFor(() => expect(screen.getByTestId('explorer-files')).toHaveTextContent('project:p'))
+    await waitFor(() => expect(useWorkDockStore.getState().byDeck[DECK].reveal).toBeUndefined())
   })
 })
 
