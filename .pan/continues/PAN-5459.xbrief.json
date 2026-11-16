@@ -1,0 +1,170 @@
+{
+  "version": "1",
+  "issueId": "PAN-5459",
+  "created": "2026-11-16T23:02:28.883Z",
+  "updated": "2026-11-16T23:25:16.901Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-16T23:25Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-16T23:25:16.901Z"
+    }
+  ],
+  "items": {
+    "wall-clock-budget": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5459",
+      "claimedAt": "2026-11-16T23:02:28.883Z",
+      "doneAt": "2026-11-16T23:06:20.097Z"
+    },
+    "wall-clock-budget.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:06:20.097Z"
+    },
+    "wall-clock-budget.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:06:20.097Z"
+    },
+    "wall-clock-budget.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:06:20.097Z"
+    },
+    "wall-clock-budget.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:06:20.097Z"
+    },
+    "nslots-pressure-waits": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5459",
+      "claimedAt": "2026-11-16T23:06:44.559Z",
+      "doneAt": "2026-11-16T23:09:03.741Z"
+    },
+    "nslots-pressure-waits.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:09:03.741Z"
+    },
+    "nslots-pressure-waits.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:09:03.741Z"
+    },
+    "nslots-pressure-waits.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:09:03.741Z"
+    },
+    "slot-report-waits": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5459",
+      "claimedAt": "2026-11-16T23:09:11.453Z",
+      "doneAt": "2026-11-16T23:10:22.818Z"
+    },
+    "slot-report-waits.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:10:22.818Z"
+    },
+    "slot-report-waits.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:10:22.818Z"
+    },
+    "slot-report-waits.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:10:22.818Z"
+    },
+    "head-ordering-waits": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5459",
+      "claimedAt": "2026-11-16T23:10:31.230Z",
+      "doneAt": "2026-11-16T23:11:42.565Z"
+    },
+    "head-ordering-waits.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:11:42.565Z"
+    },
+    "head-ordering-waits.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:11:42.565Z"
+    },
+    "head-ordering-waits.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:11:42.565Z"
+    },
+    "head-ordering-waits.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:11:42.565Z"
+    },
+    "legacy-grace-wait": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5459",
+      "claimedAt": "2026-11-16T23:11:52.363Z",
+      "doneAt": "2026-11-16T23:12:42.528Z"
+    },
+    "legacy-grace-wait.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:12:42.528Z"
+    },
+    "legacy-grace-wait.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:12:42.528Z"
+    },
+    "legacy-grace-wait.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:12:42.528Z"
+    },
+    "memory-progress-waits": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5459",
+      "claimedAt": "2026-11-16T23:12:52.661Z",
+      "doneAt": "2026-11-16T23:14:04.200Z"
+    },
+    "memory-progress-waits.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:14:04.200Z"
+    },
+    "memory-progress-waits.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:14:04.200Z"
+    },
+    "memory-progress-waits.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:14:04.200Z"
+    },
+    "memory-progress-waits.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:14:04.200Z"
+    },
+    "final-load-verify": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5459",
+      "claimedAt": "2026-11-16T23:14:13.536Z",
+      "doneAt": "2026-11-16T23:16:36.351Z"
+    },
+    "final-load-verify.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:16:36.351Z"
+    },
+    "final-load-verify.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:16:36.351Z"
+    },
+    "final-load-verify.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:16:36.351Z"
+    },
+    "final-load-verify.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:16:36.351Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-16T23:25:16Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5459 (PR #5460)\n\nCodeRabbit posted 1 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4593095657 · .pan/drafts/PAN-5459.md:444 [Minor]: Check each load-worker PID separately.\n  https://github.com/eltmon/overdeck/pull/5460#discussion_r4593095657\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5460/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5459 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5460 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    }
+  ]
+}

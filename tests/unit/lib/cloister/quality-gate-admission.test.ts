@@ -62,24 +62,40 @@ function deps(rootDir: string, samples: QualityGatePressureSample[] = [low]): Qu
   }
 }
 
-// Captured before vi.useFakeTimers() so it always schedules real wall-clock time.
+// Captured before vi.useFakeTimers() so they always schedule and read real wall-clock time.
 const nativeSetTimeout = globalThis.setTimeout
+const nativeNow = Date.now
 
-async function drive(attempts: number, done: () => boolean = () => false): Promise<void> {
-  for (let attempt = 0; attempt < attempts && !done(); attempt++) {
-    // The admission loop awaits real fs promises that resolve on the libuv
-    // threadpool; on a loaded host a bare setImmediate spin exhausts every
-    // attempt before a single fs op completes. A 1ms real yield per attempt
-    // gives the threadpool wall-clock time without unfaking tested delays.
-    await new Promise((resolve) => nativeSetTimeout(resolve, 1))
-    await realSetImmediate()
-    await vi.runOnlyPendingTimersAsync()
-  }
+/**
+ * PAN-5459: real time one condition wait may take. A turn count is not safe: on a
+ * loaded runner each fs op in the admission loop eats more turns. Fake time does
+ * not count against it, and a wait that passes returns on its first true turn.
+ */
+const DRIVE_BUDGET_MS = 4_000
+
+// Several condition waits per test can each use most of DRIVE_BUDGET_MS on a loaded runner.
+vi.setConfig({ testTimeout: 30_000 })
+
+/** One turn of the admission loop. */
+async function turn(): Promise<void> {
+  // The admission loop awaits real fs promises that resolve on the libuv
+  // threadpool; on a loaded host a bare setImmediate spin exhausts every
+  // attempt before a single fs op completes. A 1ms real yield per turn
+  // gives the threadpool wall-clock time without unfaking tested delays.
+  await new Promise((resolve) => nativeSetTimeout(resolve, 1))
+  await realSetImmediate()
+  await vi.runOnlyPendingTimersAsync()
+}
+
+/** Drive the admission loop until done() holds or DRIVE_BUDGET_MS of real time passes. Never asserts. */
+async function drive(done: () => boolean): Promise<void> {
+  const deadline = nativeNow() + DRIVE_BUDGET_MS
+  while (!done() && nativeNow() < deadline) await turn()
 }
 
 async function driveUntil(done: () => boolean): Promise<void> {
-  await drive(100, done)
-  expect(done()).toBe(true)
+  await drive(done)
+  expect(done(), `condition not met within ${DRIVE_BUDGET_MS} ms of real time`).toBe(true)
 }
 
 /** A slot owner file body for `pid`, acquired at `acquiredAt`. */
@@ -243,13 +259,16 @@ describe('quality gate admission', () => {
       let secondResolved = false
       void secondPromise.then(() => { secondResolved = true })
 
-      await drive(20)
+      // B has reached the CPU check and seen high pressure.
+      await driveUntil(() => samplePressure.mock.calls.length > 0)
       expect(secondResolved).toBe(false)
       expect(existsSync(join(rootDir, 'slot-1.json'))).toBe(false)
 
       await first.release()
-      // Let B finish any pass that listed slot 0 as held before it sees low pressure.
-      await drive(5)
+      // A pass that listed slot 0 as held may still be in flight. Two more samples mean
+      // the later pass started after the release, so B sees slot 0 free once pressure clears.
+      const samplesAtRelease = samplePressure.mock.calls.length
+      await driveUntil(() => samplePressure.mock.calls.length >= samplesAtRelease + 2)
       samplePressure.mockResolvedValue(low)
       const second = await driveUntilResolved(secondPromise)
       expect(second.slot).toBe(0)
@@ -301,11 +320,12 @@ describe('quality gate admission', () => {
     it('counts a held slot above a lowered slot count against capacity', async () => {
       const rootDir = home()
       writeFileSync(join(rootDir, 'slot-1.json'), ownerJson(process.pid, 10_000))
-      const admission = acquireQualityGateAdmission(request, { ...deps(rootDir), now: () => 10_000 })
+      const onWaiting = vi.fn()
+      const admission = acquireQualityGateAdmission(request, { ...deps(rootDir), now: () => 10_000, onWaiting })
       let resolved = false
       void admission.then(() => { resolved = true })
 
-      await drive(20)
+      await driveUntil(() => onWaiting.mock.calls.some(([reason]) => reason.kind === 'slots'))
       expect(resolved).toBe(false)
 
       unlinkSync(join(rootDir, 'slot-1.json'))
@@ -386,11 +406,12 @@ describe('quality gate admission', () => {
       configMocks.loadGlobalConfigNoMigration.mockRejectedValue(new Error('broken config.yaml'))
       const first = await driveUntilResolved(acquireQualityGateAdmission(request, configDeps(rootDir, 1)))
       const second = await driveUntilResolved(acquireQualityGateAdmission(request, configDeps(rootDir, 2)))
-      const thirdPromise = acquireQualityGateAdmission(request, configDeps(rootDir, 3))
+      const onThirdWaiting = vi.fn()
+      const thirdPromise = acquireQualityGateAdmission(request, { ...configDeps(rootDir, 3), onWaiting: onThirdWaiting })
       let thirdSettled = false
       thirdPromise.finally(() => { thirdSettled = true }).catch(() => undefined)
 
-      await drive(20)
+      await driveUntil(() => onThirdWaiting.mock.calls.some(([reason]) => reason.kind === 'slots'))
       expect([first.slots, second.slots]).toEqual([2, 2])
       expect(thirdSettled).toBe(false)
 
@@ -405,11 +426,12 @@ describe('quality gate admission', () => {
       const rootDir = home()
       configuredSlots(3)
       const first = await driveUntilResolved(acquireQualityGateAdmission(request, { ...deps(rootDir), now: () => 1 }))
-      const secondPromise = acquireQualityGateAdmission(request, { ...deps(rootDir), now: () => 2 })
+      const onWaiting = vi.fn()
+      const secondPromise = acquireQualityGateAdmission(request, { ...deps(rootDir), now: () => 2, onWaiting })
       let secondResolved = false
       void secondPromise.then(() => { secondResolved = true })
 
-      await drive(20)
+      await driveUntil(() => onWaiting.mock.calls.some(([reason]) => reason.kind === 'slots'))
       expect(secondResolved).toBe(false)
       expect(configMocks.loadGlobalConfigNoMigration).not.toHaveBeenCalled()
 
@@ -554,10 +576,10 @@ describe('memory admission (PAN-5248)', () => {
     }, { onWaiting }))
     const settled = settledFlag(promise)
 
-    await drive(200, () => onWaiting.mock.calls.length > 0)
+    await drive(() => onWaiting.mock.calls.length > 0)
     // Two more polls read memory after the first report, so toHaveBeenCalledTimes(1) proves no repeat report.
     const readsAtReport = reads
-    await drive(200, () => reads >= readsAtReport + 2)
+    await drive(() => reads >= readsAtReport + 2)
     expect(reads).toBeGreaterThanOrEqual(readsAtReport + 2)
     expect(settled()).toBe(false)
     expect(onWaiting).toHaveBeenCalledTimes(1)
@@ -587,7 +609,7 @@ describe('memory admission (PAN-5248)', () => {
     const secondSettled = settledFlag(secondPromise)
     const thirdSettled = settledFlag(thirdPromise)
 
-    await drive(200, () => onWaiting.mock.calls.length > 0
+    await drive(() => onWaiting.mock.calls.length > 0
       && readdirSync(rootDir).filter((entry) => entry.startsWith('waiter-')).length === 2)
     expect(secondSettled()).toBe(false)
     expect(thirdSettled()).toBe(false)
@@ -615,7 +637,7 @@ describe('memory admission (PAN-5248)', () => {
     const onWaiting = vi.fn()
     const promise = acquireQualityGateAdmission(keyed, memDeps(emptyRoot, 1, () => available, { onWaiting }))
     const settled = settledFlag(promise)
-    await drive(200, () => onWaiting.mock.calls.length > 0)
+    await drive(() => onWaiting.mock.calls.length > 0)
     expect(settled()).toBe(false)
     expect(onWaiting).toHaveBeenCalledWith(expect.objectContaining({ kind: 'memory', footprintBytes: 2.5 * GiB }))
     available = 20 * GiB
@@ -659,7 +681,7 @@ describe('memory admission (PAN-5248)', () => {
         onWaiting,
       }))
       const settled = settledFlag(promise)
-      await drive(200, () => onWaiting.mock.calls.length > 0)
+      await drive(() => onWaiting.mock.calls.length > 0)
       expect(settled()).toBe(false)
       const reason = onWaiting.mock.calls[0]![0]
       expect(reason.kind).toBe('memory')
@@ -689,7 +711,7 @@ describe('memory admission (PAN-5248)', () => {
     }, { onWaiting }))
     const settled = settledFlag(promise)
 
-    await drive(40, () => reads > 2)
+    await drive(() => reads > 2)
     expect(reads).toBeGreaterThan(2)
     expect(settled()).toBe(false)
     expect(ownerFiles(rootDir)).toEqual([])
@@ -813,6 +835,12 @@ describe('head-of-line fairness (PAN-5285)', () => {
     return typeof since === 'number' ? since : undefined
   }
 
+  /** The wait-reason kind a waiter ticket for `gateName` recorded, or undefined. */
+  function waitKind(rootDir: string, gateName: string): string | undefined {
+    const wait = waiterTicket(rootDir, gateName)?.wait as { reason?: { kind?: unknown } } | undefined
+    return typeof wait?.reason?.kind === 'string' ? wait.reason.kind : undefined
+  }
+
   /**
    * Attach a rejection handler now. CI retries a failed test once, and a failed
    * attempt that never reached its own handler would leave this acquire polling a
@@ -862,7 +890,7 @@ describe('head-of-line fairness (PAN-5285)', () => {
     await driveUntil(() => onFirstWaiting.mock.calls.some(([reason]) => reason.kind === 'cpu'))
     const secondPromise = acquireQualityGateAdmission(small, fairDeps(rootDir, () => 2, () => 16 * GiB, { ...cpu, onWaiting }))
     const secondSettled = settledFlag(secondPromise)
-    await drive(200, () => onWaiting.mock.calls.length > 0)
+    await drive(() => onWaiting.mock.calls.length > 0)
 
     // The first waiter fits memory and waits on CPU, so the second may not pass it.
     expect(secondSettled()).toBe(false)
@@ -887,7 +915,7 @@ describe('head-of-line fairness (PAN-5285)', () => {
     clock = 2_000
     const secondPromise = acquireQualityGateAdmission(small, fairDeps(rootDir, () => clock, () => 16 * GiB, { ...both, onWaiting: onSecondWaiting }))
     const secondSettled = settledFlag(secondPromise)
-    await drive(200, () => onSecondWaiting.mock.calls.length > 0)
+    await drive(() => onSecondWaiting.mock.calls.length > 0)
 
     // Past the bound, nobody passes the head while the held slot drains.
     expect(headSettled()).toBe(false)
@@ -913,8 +941,9 @@ describe('head-of-line fairness (PAN-5285)', () => {
     const available = () => 12.5 * GiB
     // Two slots, so the head only ever waits on memory, never on the slot the second gate holds.
     const headPromise = pending(acquireQualityGateAdmission(big, fairDeps(rootDir, () => clock, available, { maxWaitMs: 10_000, slots: 2 })))
+    // The head records its memory block at t=1, so at t=5000 it is past the 1 s bound.
+    await driveUntil(() => blockedSince(rootDir, 'vitest') === 1)
     clock = 5_000
-    await drive(10)
 
     const second = await driveUntilResolved(acquireQualityGateAdmission(small, fairDeps(rootDir, () => clock, available, { slots: 2 })))
     expect(second.admittedAlone).toBe(false)
@@ -932,7 +961,8 @@ describe('head-of-line fairness (PAN-5285)', () => {
     const held = { isProcessAlive: otherAlive, staleMs: 600_000 }
     const headPromise = acquireQualityGateAdmission(big, fairDeps(rootDir, () => clock, () => 16 * GiB, held))
     const headSettled = settledFlag(headPromise)
-    await drive(5)
+    // Queued at t=1 and waiting on the held slot, not on memory.
+    await driveUntil(() => waitKind(rootDir, 'vitest') === 'slots')
     // Long past the bound in queue age, but it has waited on the slot, not on memory.
     clock = 10_000
     unlinkSync(join(rootDir, 'owner.json'))
@@ -958,9 +988,11 @@ describe('head-of-line fairness (PAN-5285)', () => {
       ...big, ticketId: '0000000000000000-0000525285-000000', pid: OTHER_PID, createdAt: 0, footprintBytes: 3 * GiB,
     }))
     let clock = 1
-    const promise = acquireQualityGateAdmission(small, fairDeps(rootDir, () => clock, () => 16 * GiB, { isProcessAlive: otherAlive }))
+    const onWaiting = vi.fn()
+    const promise = acquireQualityGateAdmission(small, fairDeps(rootDir, () => clock, () => 16 * GiB, { isProcessAlive: otherAlive, onWaiting }))
     const settled = settledFlag(promise)
-    await drive(10)
+    // The grace starts at t=1, at the first queue check, which reports `queue`.
+    await driveUntil(() => onWaiting.mock.calls.some(([reason]) => reason.kind === 'queue'))
     expect(settled()).toBe(false)
 
     clock = 40_000
@@ -972,13 +1004,19 @@ describe('head-of-line fairness (PAN-5285)', () => {
     await seedPeaks(rootDir)
     let clock = 1
     // 16 GiB host: a soft-reserve clamp would cut the 9 GiB estimate to 4 GiB and pass 10 - 4 >= 4.
+    let reads = 0
     const promise = pending(acquireQualityGateAdmission(big, fairDeps(rootDir, () => clock, () => 10 * GiB, {
       maxWaitMs: 10_000,
-      sampleMemory: async () => ({ memAvailableBytes: 10 * GiB, memTotalBytes: 16 * GiB }),
+      sampleMemory: async () => {
+        reads++
+        return { memAvailableBytes: 10 * GiB, memTotalBytes: 16 * GiB }
+      },
     })))
     await driveUntil(() => blockedSince(rootDir, 'vitest') === 1)
     clock = 5_000
-    await drive(10)
+    // Two more reads: a whole poll pass ran past the bound and still did not start alone.
+    const readsAtBound = reads
+    await driveUntil(() => reads >= readsAtBound + 2)
     expect(readdirSync(rootDir).filter((entry) => entry === 'owner.json')).toEqual([])
 
     clock = 20_000
@@ -1001,8 +1039,8 @@ describe('head-of-line fairness (PAN-5285)', () => {
     const settled = settledFlag(promise)
     await driveUntil(() => blockedSince(rootDir, 'vitest') === 1)
     clock = 5_000
-    await driveUntil(() => droppedOnce)
-    await drive(5)
+    // The settle re-check saw the drop and gave the slot back.
+    await driveUntil(() => droppedOnce && !existsSync(join(rootDir, 'owner.json')))
     expect(settled()).toBe(false)
 
     dropWhileHeld = false
@@ -1027,11 +1065,14 @@ describe('head-of-line fairness (PAN-5285)', () => {
   it('re-reads the estimate every poll, so a corrected footprint unblocks a queued waiter', async () => {
     const rootDir = home()
     let estimate = 9 * GiB
+    const onWaiting = vi.fn()
     const promise = acquireQualityGateAdmission(big, fairDeps(rootDir, () => 1, () => 16 * GiB, {
       readFootprintEstimate: async () => estimate,
+      onWaiting,
     }))
     const settled = settledFlag(promise)
-    await drive(10)
+    // The 9 GiB estimate blocked it on memory.
+    await driveUntil(() => onWaiting.mock.calls.some(([reason]) => reason.kind === 'memory'))
     expect(settled()).toBe(false)
 
     estimate = 1 * GiB
@@ -1056,7 +1097,7 @@ describe('head-of-line fairness (PAN-5285)', () => {
       const onWaiting = vi.fn()
       const promise = acquireQualityGateAdmission(mid, { ...configured, onWaiting })
       const settled = settledFlag(promise)
-      await drive(200, () => onWaiting.mock.calls.length > 0)
+      await drive(() => onWaiting.mock.calls.length > 0)
       // 16 - 5 = 11 GiB is under the 12 GiB reserve.
       expect(settled()).toBe(false)
       expect(onWaiting).toHaveBeenCalledWith(expect.objectContaining({ kind: 'memory', softReserveBytes: 12 * GiB }))
