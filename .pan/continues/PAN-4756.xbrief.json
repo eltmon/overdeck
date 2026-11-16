@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:45:45.288Z",
+  "updated": "2026-11-16T11:46:08.393Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -390,9 +390,22 @@
       "doneAt": "2026-11-16T11:45:44.014Z"
     },
     "migrate-teardown-modal": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4756",
-      "claimedAt": "2026-11-16T11:45:45.288Z"
+      "claimedAt": "2026-11-16T11:45:45.288Z",
+      "doneAt": "2026-11-16T11:46:08.393Z"
+    },
+    "migrate-teardown-modal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:46:08.393Z"
+    },
+    "migrate-teardown-modal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:46:08.393Z"
+    },
+    "migrate-teardown-modal.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:46:08.393Z"
     }
   }
 }
