@@ -237,6 +237,11 @@ describe('suppression detection (FR-10)', () => {
     ]);
   });
 
+  it('ignores nosemgrep in prose files Semgrep never scans', () => {
+    const diff = 'diff --git a/docs/x.md b/docs/x.md\n--- a/docs/x.md\n+++ b/docs/x.md\n@@ -1 +1 @@\n-a\n+Use `# nosemgrep: rule` with a reason.\n';
+    expect(detectSuppressionChanges(parseUnifiedDiff(diff), ['p/default'])).toEqual([]);
+  });
+
   it('reports nothing for a diff without suppressions', () => {
     expect(detectSuppressionChanges(parseUnifiedDiff('diff --git a/a.ts b/a.ts\n--- a/a.ts\n+++ b/a.ts\n@@ -1 +1 @@\n-x\n+y\n'), ['p/default'])).toEqual([]);
   });
@@ -266,10 +271,42 @@ describe('decideSastGate: advisory unless blocking', () => {
         repos: [{ repoKey: 'repo', head: 'abc', status: 'error', note: 'Semgrep exited 2 (scanner error or registry unreachable)' }],
       }));
       expect(result).toMatchObject({ passed: true, required: false, skipped: true });
-      expect(result.error).toContain('Semgrep did not run: Semgrep exited 2');
+      expect(result.error).toContain('Semgrep did not complete: Semgrep exited 2');
       expect(result.output).toContain('SKIPPED');
       expect(result.output).not.toContain('No findings');
     }
+  });
+
+  it('a partly scanned workspace with no findings is skipped and names the unscanned repo', () => {
+    const result = decideSastGate(input({
+      mode: 'blocking',
+      repos: [
+        { repoKey: 'fe', head: 'a', status: 'scanned' },
+        { repoKey: 'api', head: 'b', status: 'error', note: 'Semgrep timed out after 300s and was killed' },
+      ],
+    }));
+    expect(result).toMatchObject({ passed: true, required: false, skipped: true });
+    expect(result.output).toContain('did not complete a scan of api');
+  });
+
+  it('a finding from a scanned repo still blocks when another repo could not be scanned', () => {
+    const result = decideSastGate(input({
+      mode: 'blocking',
+      findings: [finding({ path: 'fe/src/app.py' })],
+      repos: [
+        { repoKey: 'fe', head: 'a', status: 'scanned' },
+        { repoKey: 'api', head: 'b', status: 'error', note: 'Semgrep exited 2' },
+      ],
+    }));
+    expect(result).toMatchObject({ passed: false, required: true });
+    expect(result.skipped).toBeUndefined();
+    expect(result.output).toContain('api: Semgrep exited 2');
+  });
+
+  it('asks the artifact to keep the output of a passing row only when it lists suppressions or notes', () => {
+    expect(decideSastGate(input()).keepOutput).toBeUndefined();
+    expect(decideSastGate(input({ suppressions: [{ kind: 'semgrepignore', path: '.semgrepignore', detail: '.semgrepignore added' }] })).keepOutput).toBe(true);
+    expect(decideSastGate(input({ findings: [finding()] })).keepOutput).toBeUndefined();
   });
 
   it('no changed files is a pass, not a skip', () => {
@@ -307,6 +344,11 @@ describe('sastFindingsForReview', () => {
       mode: 'advisory',
       findings: [{ path: 'fe/src/app.py' }],
     });
+  });
+
+  it('names the repos the gate could not scan', () => {
+    const partial = { ...record, repos: [...record.repos.slice(0, 1), { repoKey: 'api', head: 'bbb', status: 'error' as const, note: 'exit 2' }] };
+    expect(sastFindingsForReview(partial, new Map([['fe', 'aaa'], ['api', 'bbb']]))).toMatchObject({ status: 'fresh', unscanned: ['api'] });
   });
 
   it('is stale when any head moved, and lists nothing', () => {

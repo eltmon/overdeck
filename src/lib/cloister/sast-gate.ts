@@ -276,6 +276,9 @@ export function localRulePaths(configs: readonly string[]): string[] {
     .filter((config, index, all) => config !== '' && config !== '.' && !config.startsWith('/') && all.indexOf(config) === index);
 }
 
+/** Files Semgrep does not scan, where `nosemgrep` is prose rather than a suppression. */
+const PROSE_FILE = /\.(?:md|mdx|markdown|rst|txt|adoc)$/i;
+
 /** FR-10: suppressions and rule changes the diff introduces. */
 export function detectSuppressionChanges(files: readonly DiffFileChange[], configs: readonly string[]): SastSuppression[] {
   const rulePaths = localRulePaths(configs);
@@ -291,7 +294,7 @@ export function detectSuppressionChanges(files: readonly DiffFileChange[], confi
     if (touched.some((p) => rulePaths.some((rule) => p === rule || p.startsWith(`${rule}/`)))) {
       out.push({ kind: 'rule-config', path, detail: `rule file ${change}` });
     }
-    if (!file.newPath) continue;
+    if (!file.newPath || PROSE_FILE.test(file.newPath)) continue;
     for (const entry of file.added) {
       if (/nosemgrep/i.test(entry.text)) {
         out.push({ kind: 'nosemgrep', path, line: entry.line, detail: entry.text.trim().slice(0, 200) });
@@ -314,17 +317,25 @@ export interface SastGateInput {
   durationMs: number;
 }
 
-/** True when no repo completed a scan and at least one hit a scanner problem. */
-export function sastScanSkipped(repos: readonly SastRepoRecord[]): boolean {
-  return repos.some((repo) => repo.status === 'error') && !repos.some((repo) => repo.status === 'scanned');
+/** Repos the gate meant to scan but could not (scanner missing or failing, git error). */
+export function unscannedRepos(repos: readonly SastRepoRecord[]): string[] {
+  return repos.filter((repo) => repo.status === 'error').map((repo) => repo.repoKey);
+}
+
+/**
+ * True when the result is not a full scan and found nothing: at least one repo
+ * could not be scanned. A finding from a repo that was scanned still counts.
+ */
+export function sastScanSkipped(input: Pick<SastGateInput, 'repos' | 'findings'>): boolean {
+  return input.findings.length === 0 && unscannedRepos(input.repos).length > 0;
 }
 
 export function formatSastOutput(input: SastGateInput): string {
   const lines: string[] = [
     `Semgrep sast gate: mode ${input.mode}, severity >= ${input.severity}, configs ${input.configs.join(', ')}`,
   ];
-  if (sastScanSkipped(input.repos)) {
-    lines.push('SKIPPED: Semgrep did not complete a scan, so this gate checked nothing.');
+  if (sastScanSkipped(input)) {
+    lines.push(`SKIPPED: Semgrep did not complete a scan of ${unscannedRepos(input.repos).join(', ')}, so this is not a clean result.`);
   } else if (input.findings.length === 0) {
     lines.push('No findings on lines this branch added.');
   } else {
@@ -359,7 +370,7 @@ export function formatSastOutput(input: SastGateInput): string {
  */
 export function decideSastGate(input: SastGateInput): QualityGateResult {
   const output = formatSastOutput(input);
-  if (sastScanSkipped(input.repos)) {
+  if (sastScanSkipped(input)) {
     const reasons = input.repos.filter((repo) => repo.status === 'error' && repo.note).map((repo) => repo.note);
     return {
       name: SAST_GATE_NAME,
@@ -368,16 +379,18 @@ export function decideSastGate(input: SastGateInput): QualityGateResult {
       skipped: true,
       output,
       durationMs: input.durationMs,
-      error: `Semgrep did not run: ${reasons.join('; ') || 'scanner error'}`,
+      error: `Semgrep did not complete: ${reasons.join('; ') || 'scanner error'}`,
     };
   }
   const passed = input.findings.length === 0;
+  const keepOutput = passed && (input.suppressions.length > 0 || input.repos.some((repo) => repo.note));
   return {
     name: SAST_GATE_NAME,
     passed,
     required: input.mode === 'blocking',
     output,
     durationMs: input.durationMs,
+    ...(keepOutput ? { keepOutput: true } : {}),
     ...(passed ? {} : { error: `${input.findings.length} Semgrep finding(s) at or above ${input.severity} on changed lines` }),
   };
 }
@@ -390,6 +403,8 @@ export interface ReviewSemgrepFindings {
   status: 'fresh' | 'stale' | 'absent';
   mode?: 'advisory' | 'blocking';
   skipped?: boolean;
+  /** Repos the gate could not scan; their changes carry no Semgrep evidence. */
+  unscanned?: string[];
   findings: SastFinding[];
   suppressions: SastSuppression[];
 }
@@ -406,10 +421,12 @@ export function sastFindingsForReview(
     && record.repos.length === heads.size
     && record.repos.every((repo) => heads.get(repo.repoKey) === repo.head);
   if (!matches) return { status: 'stale', mode: record.mode, findings: [], suppressions: [] };
+  const unscanned = unscannedRepos(record.repos);
   return {
     status: 'fresh',
     mode: record.mode,
     ...(record.skipped ? { skipped: true } : {}),
+    ...(unscanned.length > 0 ? { unscanned } : {}),
     findings: record.findings,
     suppressions: record.suppressions,
   };

@@ -112,7 +112,9 @@ at or above `severity`. It never uses Semgrep's `--baseline-commit` mode.
 
 A missing binary, a scanner error (an unreachable registry exits `2`), a timeout after
 `timeout_seconds`, or unreadable output never blocks a merge, in any mode. The skip is visible
-in the verification artifact and the Test/Lint transcript.
+in the verification artifact and the Test/Lint transcript. In a polyrepo workspace each repo is
+scanned on its own: a finding in a repo that was scanned still counts, and a repo that could not
+be scanned is named in the result and in the review context.
 
 To set the mode for one project, add `verification.sast` to that project in
 `~/.overdeck/projects.yaml`:
@@ -133,7 +135,8 @@ or `.semgrep/`). Suppressions never fail the gate. The security review lane rece
 findings and the suppressions, and confirms or dismisses each one.
 
 If you would rather run your own Semgrep command, a plain quality gate in `projects.yaml` also
-works, for example `quality_gates.sast: { command: "semgrep scan --config p/default --error .", required: true }`.
+works, for example `quality_gates.semgrep: { command: "semgrep scan --config p/default --error .", required: true }`.
+Do not name it `sast`, which is the built-in check's name.
 That gate blocks on any finding in the whole tree, and it is not diff-scoped.
 
 ## Harness support

@@ -118,10 +118,11 @@ export function writeVerificationArtifact(
       passed: r.passed,
       required: r.required !== false,
       durationMs: r.durationMs,
-      // Keep full output only where it matters: failures, and skipped gates
-      // (PAN-4590), whose skip must stay visible. Passing gates get a clean
-      // record without megabytes of build noise.
-      ...(r.passed && !r.skipped ? {} : { output: r.output }),
+      // Keep full output only where it matters: failures, skipped gates and
+      // passing gates that ask for it (PAN-4590), so a skip or a listed
+      // suppression stays visible. Other passing gates get a clean record
+      // without megabytes of build noise.
+      ...(r.passed && !r.skipped && !r.keepOutput ? {} : { output: r.output }),
       ...(r.error ? { error: r.error } : {}),
       ...(r.skipped ? { skipped: true } : {}),
     })),

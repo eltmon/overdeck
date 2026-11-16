@@ -85,6 +85,13 @@ describe('verification artifact', () => {
     });
   });
 
+  it('keeps the output of a passing gate that asks for it (PAN-4590)', () => {
+    writeVerificationArtifact(workspace, 'PAN-4590', [
+      gate({ name: 'sast', passed: true, required: false, keepOutput: true, output: 'nosemgrep src/app.py:7' }),
+    ]);
+    expect(readVerificationArtifact(workspace)?.gates[0]).toMatchObject({ passed: true, output: 'nosemgrep src/app.py:7' });
+  });
+
   it('an advisory sast failure keeps its findings but does not fail the run (PAN-4590)', () => {
     writeVerificationArtifact(workspace, 'PAN-4590', [
       gate({ name: 'lint' }),

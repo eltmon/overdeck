@@ -266,6 +266,7 @@ projects:
 | `workspace.env.load` | No | When `true`, loads the rendered `<workspace>/.env` into agent launcher shells and host quality gates. Default `false`. See [dbt and data projects](#dbt-and-data-projects). |
 | `release` | No | Coordinated post-merge release configuration |
 | `verification.tests` | No | `ci` or `local`: where the verification gate's `test` gate runs. `ci` skips the local `quality_gates.test` run and treats the CI test job on the PR head as the test gate; `local` runs it on the host. Default: `ci` when the project has `github_repo` and a GitHub Actions workflow that runs a job named `test`/`tests`/`test-*`/`test (…)` on pull requests, else `local`. |
+| `verification.sast` | No | `off`, `advisory` or `blocking`: the mode of the built-in Semgrep `sast` gate for this project only, overriding `security.semgrep.gate` in `~/.overdeck/config.yaml`. It cannot turn Semgrep on; with `security.semgrep.enabled: false` no scan runs. Unset uses the global mode (default `advisory`). See [Semgrep](/configuration/semgrep#verification-gate). |
 | `quality_gates` | No | Map of verification gates; see [Quality gates](#quality-gates). |
 | `mcp_servers` | No | MCP servers for this project's agents, in the role `mcpServers:` shape (a list of single-key maps); see [Project MCP servers](/configuration/mcp#project-mcp-servers). |
 | `mcp_strict` | No | `true` adds `--strict-mcp-config` to the project's Claude Code launches, so only Overdeck's, the project's and the role's MCP servers load. Default: `false`. |

@@ -880,11 +880,14 @@ invalid value is ignored with a warning, never read as `blocking`. A repo's
 | Advisory, findings | `passed: false, required: false`, findings in `output` | passes |
 | Blocking, no findings | `passed: true, required: true` | passes |
 | Blocking, findings | `passed: false, required: true` | `failedCheck: sast` |
-| Scan did not complete (binary missing, scanner error, registry unreachable, timeout, unreadable output) | `passed: true, required: false, skipped: true`, reason in `error` | passes |
+| No findings, and a repo could not be scanned (binary missing, scanner error, registry unreachable, timeout, unreadable output, git error) | `passed: true, required: false, skipped: true`, reason in `error` | passes |
 
-A skipped gate is never a silent pass. The artifact keeps its `output`,
-`error` and `skipped: true`, the Command Deck Test/Lint transcript prints
-`SKIPPED: <reason>`, and the review context says no scan is available.
+A finding from a repo that was scanned counts even when another repo could not
+be scanned. A skipped gate is never a silent pass. The artifact keeps its
+`output`, `error` and `skipped: true`, the Command Deck Test/Lint transcript
+prints `SKIPPED: <reason>`, and the review context names the unscanned repos.
+A passing row that lists suppressions or notes sets `keepOutput`, so the
+artifact keeps that output too.
 
 **Scope.** For each repo root: `base = git merge-base origin/<target> HEAD`.
 The targets are `git diff --name-only --diff-filter=AMR <base>` (working tree,
@@ -906,7 +909,9 @@ clean and `1` with findings. Any other code (an offline registry fetch gives
 `2`) skips the gate with the stderr tail as the reason.
 
 **Process.** Each scan takes a slot in the quality-gate admission queue
-(`gateName: sast`) and releases it in `finally`. It runs in its own process
+(`gateName: sast`, no memory footprint key) and releases it in `finally`. The
+worker's admission phase moves to queued and back to running around it, so the
+verification worker's run deadline is not spent waiting in the queue. It runs in its own process
 group and the whole group is killed at `security.semgrep.timeout_seconds`
 (default 300). The child env sets `SEMGREP_ENABLE_VERSION_CHECK=0`,
 `SEMGREP_SEND_METRICS=off` and `OVERDECK_GATE_ADMITTED=1`, keeps Semgrep state
@@ -915,7 +920,8 @@ in `~/.overdeck/tools/semgrep/`, and removes `SEMGREP_APP_TOKEN` and
 skipped result.
 
 **Suppression surfacing (FR-10).** The gate reads the same `-U0` diff for added
-`nosemgrep` comments, edits to any `.semgrepignore`, and changes under a
+`nosemgrep` comments (except in prose files such as `.md`, `.mdx` and `.txt`,
+which Semgrep never scans), edits to any `.semgrepignore`, and changes under a
 repo-local rule path (a `configs` entry that is not a registry id, plus
 `.semgrep.yml`, `.semgrep.yaml` and `.semgrep/`). It lists them in the gate
 output even when the scan is skipped. They never fail the gate; the security

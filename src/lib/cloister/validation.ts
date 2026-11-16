@@ -188,6 +188,9 @@ export interface QualityGateResult {
   /** PAN-4590: the gate checked nothing (e.g. Semgrep missing or failed). Always
    *  paired with `passed: true, required: false`; `error` carries the reason. */
   skipped?: boolean;
+  /** PAN-4590: keep `output` in the artifact even though the gate passed
+   *  (a sast row that lists new suppressions or repos it could not scan). */
+  keepOutput?: boolean;
 }
 
 /**

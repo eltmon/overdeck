@@ -497,14 +497,16 @@ function formatSemgrepSection(semgrep: ReviewSemgrepFindings | undefined): strin
   const lines: string[] = [''];
   const findings = Array.isArray(semgrep.findings) ? semgrep.findings : [];
   const suppressions = Array.isArray(semgrep.suppressions) ? semgrep.suppressions : [];
+  const unscanned = Array.isArray(semgrep.unscanned) ? semgrep.unscanned : [];
   if (semgrep.skipped) {
-    lines.push('Semgrep: the sast gate scan did not run (scanner missing or failed); no findings are available.');
+    lines.push(`Semgrep: the sast gate could not scan ${unscanned.join(', ') || 'the workspace'} (scanner missing or failed); treat it as unscanned.`);
   } else {
     lines.push(`Semgrep findings on changed lines (${semgrep.mode ?? 'advisory'} gate; scanner evidence, confirm or dismiss each): ${findings.length}`);
     for (const f of findings.slice(0, 10)) {
       lines.push(`  - ${f.path}:${f.startLine} [${f.severity}] ${f.ruleId} ${truncateWellFormed(f.message ?? '', 160)}`);
     }
     if (findings.length > 10) lines.push(`  ... and ${findings.length - 10} more (see manifest)`);
+    if (unscanned.length > 0) lines.push(`  Not scanned (scanner missing or failed): ${unscanned.join(', ')}`);
   }
   if (suppressions.length > 0) {
     lines.push('New Semgrep suppressions or rule changes (justify or flag each):');

@@ -589,7 +589,9 @@ describe('Semgrep sast findings in the review context (PAN-4590)', () => {
 
   it('says when the scan was skipped or stale', () => {
     expect(formatTier1Summary({ ...baseManifest, semgrepFindings: { status: 'fresh', skipped: true, findings: [], suppressions: [] } }))
-      .toContain('the sast gate scan did not run');
+      .toContain('the sast gate could not scan the workspace');
+    expect(formatTier1Summary({ ...baseManifest, semgrepFindings: { status: 'fresh', findings: [finding], suppressions: [], unscanned: ['api'] } }))
+      .toContain('Not scanned (scanner missing or failed): api');
     expect(formatTier1Summary({ ...baseManifest, semgrepFindings: { status: 'stale', findings: [], suppressions: [] } }))
       .toContain('the last sast gate scan was for other commits');
   });

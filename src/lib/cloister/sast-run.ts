@@ -253,7 +253,6 @@ export async function runSastGate(opts: SastRunOptions, deps: SastRunDeps = {}):
           workspacePath: root.dir,
           gateName: SAST_GATE_NAME,
           attempt: 1,
-          footprintKey: `gate:${SAST_GATE_NAME}:semgrep`,
         });
         let outcome: ScannerOutcome;
         try {
@@ -312,7 +311,7 @@ export async function runSastGate(opts: SastRunOptions, deps: SastRunDeps = {}):
     });
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
-    return { name: SAST_GATE_NAME, passed: true, required: false, skipped: true, output: reason, durationMs: 0, error: `Semgrep did not run: ${reason}` };
+    return { name: SAST_GATE_NAME, passed: true, required: false, skipped: true, output: reason, durationMs: 0, error: `Semgrep did not complete: ${reason}` };
   }
   const record: SastLatestRecord = {
     version: 1,
