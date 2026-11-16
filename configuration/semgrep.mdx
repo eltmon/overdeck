@@ -10,12 +10,12 @@ analysis (SAST) scanner. It is **off by default**.
 
 ## What it is
 
-Phase 1 covers config, the managed install, and `pan doctor` rows: turning the feature on makes
-Overdeck install a pinned Semgrep binary and report its health. In-session tools (#4591) are now
-available too — a `semgrep` MCP server, a post-edit scan hook, and a `semgrep` skill. Later
-phases — a verification-gate scan with review-lane findings (#4590), a Codex edit hook (#5434),
-CI (#4592), a Platform/Guardian tier (#4593), and dashboard controls (#4594) — are planned but
-not part of this release.
+Turning the feature on makes Overdeck install a pinned Semgrep binary and report its health in
+`pan doctor`. It also adds in-session tools (#4591): a `semgrep` MCP server, a post-edit scan
+hook, and a `semgrep` skill. The verification gate runs a `sast` scan of each branch, and its
+findings go to the security review lane (#4590). A Codex edit hook (#5434), CI (#4592), a
+Platform/Guardian tier (#4593), and dashboard controls (#4594) are planned but not part of this
+release.
 
 ## Turn it on
 
@@ -27,9 +27,14 @@ security:
     enabled: true
     mcp: true
     edit_hook: true
+    gate: advisory          # off | advisory | blocking
+    severity: ERROR         # INFO | WARNING | ERROR
+    configs: [p/default]    # registry ids or repo-relative rule paths
+    timeout_seconds: 300
 ```
 
 `mcp` and `edit_hook` each default to `false` and do nothing unless `enabled` is also `true`.
+The four gate keys show their defaults; see [Verification gate](#verification-gate).
 Then run `pan sync` (or `pan install`) to trigger the managed install. A config change reaches
 new agent sessions only — it does not affect an agent already running.
 
@@ -93,6 +98,44 @@ blocks the edit — and a finding arrives as context for the agent to triage, no
 The `semgrep` skill covers triage, a justified `nosemgrep`, and custom rules. It is hidden at
 launch while Semgrep is off (`security.semgrep.enabled: false`).
 
+## Verification gate
+
+With `enabled: true`, every verification run ends with a built-in `sast` check. It scans the
+files the branch added, modified or renamed, and counts only findings on lines the branch added
+at or above `severity`. It never uses Semgrep's `--baseline-commit` mode.
+
+| `gate` | A counted finding | Semgrep missing or failing |
+| --- | --- | --- |
+| `off` | No scan runs | No scan runs |
+| `advisory` (default) | Recorded in the verification artifact and the review context; the run still passes | The check is marked skipped with the reason; the run still passes |
+| `blocking` | Verification fails with `failedCheck: sast`, and the work agent gets the file, line, rule id, message and fix hint | The check is marked skipped with the reason; the run still passes |
+
+A missing binary, a scanner error (an unreachable registry exits `2`), a timeout after
+`timeout_seconds`, or unreadable output never blocks a merge, in any mode. The skip is visible
+in the verification artifact and the Test/Lint transcript.
+
+To set the mode for one project, add `verification.sast` to that project in
+`~/.overdeck/projects.yaml`:
+
+```yaml
+projects:
+  myapp:
+    verification:
+      sast: blocking        # off | advisory | blocking
+```
+
+It overrides `security.semgrep.gate` for that project only. It cannot turn Semgrep on: with
+`enabled: false` no scan runs. A repo's own `.pan.yaml` cannot set it.
+
+The gate also lists every new suppression in the diff: an added `nosemgrep` comment, an edit
+to a `.semgrepignore`, and a change to a repo-local rule file (a `configs` path, `.semgrep.yml`,
+or `.semgrep/`). Suppressions never fail the gate. The security review lane receives the
+findings and the suppressions, and confirms or dismisses each one.
+
+If you would rather run your own Semgrep command, a plain quality gate in `projects.yaml` also
+works, for example `quality_gates.sast: { command: "semgrep scan --config p/default --error .", required: true }`.
+That gate blocks on any finding in the whole tree, and it is not diff-scoped.
+
 ## Harness support
 
 | Harness | MCP server | Edit hook |
@@ -110,18 +153,21 @@ launch while Semgrep is off (`security.semgrep.enabled: false`).
 | `pan doctor` registry check | `semgrep.dev` (bare `HEAD` request) | No |
 | MCP `semgrep_rule_schema` | `semgrep.dev` | No |
 | Post-edit scan | `semgrep.dev` (registry download of `p/default`) | No |
+| Verification `sast` scan | `semgrep.dev` (registry download of each registry id in `configs`) | No |
 | Version check / metrics | Disabled (`SEMGREP_ENABLE_VERSION_CHECK=0`, `SEMGREP_SEND_METRICS=off`) | n/a |
 | Semgrep Platform / Guardian | Not available in this release | — |
 
-MCP tracing is disabled (`SEMGREP_MCP_DISABLE_TRACING=true`), and every in-session Semgrep
-process writes its state to `~/.overdeck/tools/semgrep/` instead of the default `~/.semgrep/`.
+MCP tracing is disabled (`SEMGREP_MCP_DISABLE_TRACING=true`), and every in-session and gate
+Semgrep process writes its state to `~/.overdeck/tools/semgrep/` instead of the default
+`~/.semgrep/`. The gate also removes `SEMGREP_APP_TOKEN` and `SEMGREP_RULES` from the scan's
+environment.
 
 ## Licensing
 
 The Semgrep engine is licensed under LGPL-2.1. Registry rule packs (such as `p/default`) are
 licensed under the [Semgrep Rules License v1.0](https://semgrep.dev/legal/rules-license/) and
-are downloaded only by your own CLI, on your own machine, when a future scan runs — Overdeck
-never bundles or serves rule packs itself.
+are downloaded only by your own CLI, on your own machine, when a scan runs — Overdeck never
+bundles or serves rule packs itself.
 
 ## Platforms
 

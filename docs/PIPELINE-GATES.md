@@ -54,7 +54,9 @@ runs these steps in order. Each step that fails returns early with the named
    [Plan-integrity gate](#plan-integrity-gate-pan-1728).
 7. Run each declared `pre_push` gate in declaration order (`runQualityGates`);
    the first failing *required* gate stops the loop and its name becomes the
-   `failedCheck`.
+   `failedCheck`. When every gate so far passed and Semgrep is on, the built-in
+   `sast` gate runs last — `failedCheck: sast` only in `blocking` mode. See
+   [Semgrep sast gate](#semgrep-sast-gate-pan-4590).
 8. In `ci` tests mode, if the CI test job already failed on this head, record
    a failed `test` result — `failedCheck: test`.
 9. A gate that could not run at all (a missing container, Docker down) defers
@@ -856,6 +858,76 @@ git restore --source=<reference sha> --staged --worktree -- <spec path(s)>
 Then commit, and record completion with `pan task done`. The same command also
 removes an added spec file. If the plan itself is wrong, stop and ask for
 re-planning (`pan plan <ISSUE>`). Never use `git checkout` in a workspace.
+
+## Semgrep sast gate (PAN-4590)
+
+The built-in `sast` gate scans the lines a branch adds with the managed Semgrep
+CLI (`~/.overdeck/bin/semgrep`). It runs only when `security.semgrep.enabled`
+is `true` in `~/.overdeck/config.yaml`; with Semgrep off it runs no process and
+adds no row to the artifact. The pure logic is `src/lib/cloister/sast-gate.ts`;
+the process side is `src/lib/cloister/sast-run.ts`.
+
+**Mode.** `security.semgrep.gate` sets it for every project: `off`, `advisory`
+(the default) or `blocking`. The operator-owned `verification.sast` key in
+`projects.yaml` overrides it for one project. It cannot turn Semgrep on, and an
+invalid value is ignored with a warning, never read as `blocking`. A repo's
+`.pan.yaml` cannot set either key.
+
+| Situation | Gate row | Run outcome |
+| --- | --- | --- |
+| Off, or Semgrep disabled | none | unchanged |
+| Advisory, no findings | `passed: true, required: false` | passes |
+| Advisory, findings | `passed: false, required: false`, findings in `output` | passes |
+| Blocking, no findings | `passed: true, required: true` | passes |
+| Blocking, findings | `passed: false, required: true` | `failedCheck: sast` |
+| Scan did not complete (binary missing, scanner error, registry unreachable, timeout, unreadable output) | `passed: true, required: false, skipped: true`, reason in `error` | passes |
+
+A skipped gate is never a silent pass. The artifact keeps its `output`,
+`error` and `skipped: true`, the Command Deck Test/Lint transcript prints
+`SKIPPED: <reason>`, and the review context says no scan is available.
+
+**Scope.** For each repo root: `base = git merge-base origin/<target> HEAD`.
+The targets are `git diff --name-only --diff-filter=AMR <base>` (working tree,
+existing files only), passed explicitly after `--`. A finding counts only when
+its line range overlaps a line added in `git diff -U0 <base>` and its severity
+is at or above `security.semgrep.severity` (default `ERROR`). Semgrep severities
+map as `CRITICAL`/`HIGH`/`ERROR` → `ERROR`, `MEDIUM`/`WARNING` → `WARNING`,
+`LOW`/`INFO` → `INFO`, anything else → `WARNING`. A finding on unchanged lines
+that the change caused (a deleted sanitizer) is missed; the security review
+lane covers that. Untracked files are not scanned. A root with no changed files
+runs no scan.
+
+**Never baseline mode.** `semgrep --baseline-commit` runs `git worktree add` in
+the shared `.git`, and a killed scan leaves that worktree registered. Explicit
+targets touch no git state.
+
+**Exit codes.** `semgrep scan --json --metrics off --error` exits `0` when
+clean and `1` with findings. Any other code (an offline registry fetch gives
+`2`) skips the gate with the stderr tail as the reason.
+
+**Process.** Each scan takes a slot in the quality-gate admission queue
+(`gateName: sast`) and releases it in `finally`. It runs in its own process
+group and the whole group is killed at `security.semgrep.timeout_seconds`
+(default 300). The child env sets `SEMGREP_ENABLE_VERSION_CHECK=0`,
+`SEMGREP_SEND_METRICS=off` and `OVERDECK_GATE_ADMITTED=1`, keeps Semgrep state
+in `~/.overdeck/tools/semgrep/`, and removes `SEMGREP_APP_TOKEN` and
+`SEMGREP_RULES`. Nothing in the gate throws into the runner: any failure is a
+skipped result.
+
+**Suppression surfacing (FR-10).** The gate reads the same `-U0` diff for added
+`nosemgrep` comments, edits to any `.semgrepignore`, and changes under a
+repo-local rule path (a `configs` entry that is not a registry id, plus
+`.semgrep.yml`, `.semgrep.yaml` and `.semgrep/`). It lists them in the gate
+output even when the scan is skipped. They never fail the gate; the security
+review lane judges each one.
+
+**Review context (FR-4).** The run writes `<workspace>/.overdeck/sast-latest.json`
+with each repo's head. `buildReviewContext` adds `semgrepFindings` to the
+manifest: `fresh` with the findings and suppressions when every reviewed head
+matches, `stale` when any head moved, `absent` when there is no record. Review
+never runs Semgrep itself. `formatTier1Summary` lists up to 10 findings and 10
+suppressions, and `roles/review-security.md` tells the security lane to confirm
+or dismiss each finding and to check each suppression.
 
 ## Verdict feedback routing
 
