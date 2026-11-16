@@ -7,6 +7,33 @@ try {
   // The allowlist is generated in A1 WI-3; keep bootstrap lint config loadable.
 }
 
+let compilerAllowlist = [];
+try {
+  compilerAllowlist = require('./eslint-react-compiler-allowlist.json');
+} catch {
+  // PAN-4561: files that broke a compiler rule when the rules were turned on.
+}
+
+// PAN-4561: React Compiler rules (eslint-plugin-react-hooks 7) for dashboard
+// frontend source. docs/DASHBOARD-ARCHITECTURE.md, React Compiler.
+const REACT_COMPILER_RULES = {
+  'react-hooks/rules-of-hooks': 'error',
+  'react-hooks/static-components': 'error',
+  'react-hooks/use-memo': 'error',
+  'react-hooks/preserve-manual-memoization': 'error',
+  'react-hooks/incompatible-library': 'error',
+  'react-hooks/immutability': 'error',
+  'react-hooks/globals': 'error',
+  'react-hooks/refs': 'error',
+  'react-hooks/set-state-in-effect': 'error',
+  'react-hooks/error-boundaries': 'error',
+  'react-hooks/purity': 'error',
+  'react-hooks/set-state-in-render': 'error',
+  'react-hooks/unsupported-syntax': 'error',
+  'react-hooks/config': 'error',
+  'react-hooks/gating': 'error',
+};
+
 module.exports = {
   root: true,
   env: {
@@ -64,6 +91,24 @@ module.exports = {
         ],
       },
     },
+    {
+      files: ['src/dashboard/frontend/src/**/*.ts', 'src/dashboard/frontend/src/**/*.tsx'],
+      excludedFiles: [
+        'src/dashboard/frontend/src/**/*.test.ts',
+        'src/dashboard/frontend/src/**/*.test.tsx',
+        'src/dashboard/frontend/src/**/__tests__/**',
+        'src/dashboard/frontend/src/test-utils/**',
+      ],
+      plugins: ['react-hooks'],
+      rules: {
+        ...REACT_COMPILER_RULES,
+        // The compiler validates memo dependencies itself; PAN-4561 Decision 6 keeps this off.
+        'react-hooks/exhaustive-deps': 'off',
+      },
+    },
+    ...(compilerAllowlist.length
+      ? [{ files: compilerAllowlist, rules: Object.fromEntries(Object.keys(REACT_COMPILER_RULES).map((r) => [r, 'off'])) }]
+      : []),
     {
       files: ['**/*.test.ts', '**/*.test.tsx', '**/__tests__/**'],
       rules: {
