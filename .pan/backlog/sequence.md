@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T18:30:34.320516Z · model: claude-opus-5-5 · open: 894_
+_Last sequenced: 2026-11-16T19:39:52.439344Z · model: claude-opus-5-5 · open: 893_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -886,7 +886,6 @@ _Last sequenced: 2026-11-16T18:30:34.320516Z · model: claude-opus-5-5 · open: 
 | 887 | PAN-4555 | XS | low | ok |  |  | Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then. |
 | 888 | PAN-5449 | M | low | ok |  |  | Unblocked: PAN-4590 sast gate merged. A skipped sast scan renders as a green pass; add skipped state + findings list. |
 | 889 | PAN-5434 | M | low | ok |  |  | Codex apply_patch post-edit Semgrep scan; needs a hooks.json composer shared with SageOx. PAN-4591 merged; live Codex probe first. |
-| 891 | PAN-4594 | M | low | ok |  |  | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
 | 892 | PAN-4593 | L | low | needs-refinement |  |  | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
 | 893 | PAN-5022 | L | medium | ok |  |  | Phone app: relay notification preferences to offline machines via the directory, and drop muted pushes on the phone. |
 | 894 | PAN-5021 | M | low | needs-refinement |  |  | PAN-5100 landed phone telemetry with conflicting decisions; re-scope to any remaining gap or close as superseded. |
@@ -1229,10 +1228,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T18:30:34.320516Z",
+  "generatedAt": "2026-11-16T19:39:52.439344Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 894,
+  "openCount": 893,
   "nodes": [
     {
       "issue": "PAN-5452",
@@ -12181,19 +12180,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "planning": "auto"
     },
     {
-      "issue": "PAN-4594",
-      "rank": 891,
-      "size": "M",
-      "importance": "low",
-      "score": 36,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590.",
-      "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4593",
       "rank": 892,
       "size": "L",
@@ -13467,13 +13453,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-5449",
-      "to": "PAN-4594",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
     },
     {
       "from": "PAN-750",
