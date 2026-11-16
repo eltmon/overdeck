@@ -421,6 +421,8 @@ describe('shouldPollPr (PAN-5290 C-D6)', () => {
     expect(shouldPollPr(pr())).toBe(false)
     expect(shouldPollPr(pr({ ...blocked, state: 'MERGED' }))).toBe(false)
     expect(shouldPollPr(null)).toBe(false)
+    expect(shouldPollPr(pr({ mergeStateStatus: 'UNSTABLE', checksPassing: false }))).toBe(true)
+    expect(shouldPollPr(pr({ mergeStateStatus: 'UNSTABLE', checksPassing: false, isDraft: true }))).toBe(false)
   })
 
   it('refetches the status after 15 000 ms for a BLOCKED PR', async () => {
@@ -443,5 +445,20 @@ describe('shouldPollPr (PAN-5290 C-D6)', () => {
     expect(statusCalls()).toBe(1)
     await act(() => vi.advanceTimersByTimeAsync(PR_STATUS_REFETCH_MS * 3))
     expect(statusCalls()).toBe(1)
+  })
+
+  it('refetches every 15 000 ms while an UNSTABLE PR\'s checks run and stops once GitHub reports CLEAN', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: false })
+    stubServer({ body: status(pr({ mergeStateStatus: 'UNSTABLE', checksPassing: false })) })
+    renderWorkspaceBar()
+    await act(() => vi.advanceTimersByTimeAsync(10))
+    expect(statusCalls()).toBe(1)
+    statusAnswer = { body: status(pr()) }
+    await act(() => vi.advanceTimersByTimeAsync(PR_STATUS_REFETCH_MS + 100))
+    expect(statusCalls()).toBe(2)
+    expect(sentence()).toBe('PR #7 · no conflicts. Merging squashes it into main.')
+    expect(screen.getByRole('button', { name: 'Merge' }).className).toContain('bg-primary')
+    await act(() => vi.advanceTimersByTimeAsync(PR_STATUS_REFETCH_MS * 3))
+    expect(statusCalls()).toBe(2)
   })
 })
