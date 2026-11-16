@@ -54,7 +54,7 @@ import * as OS from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { scanImportClosure } from "./import-closure.mjs";
-import { SERVER_SKIP_PACKAGES } from "./package-policy.mjs";
+import { findForbiddenPackages, SERVER_SKIP_PACKAGES } from "./package-policy.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const desktopDir = join(__dirname, "..");
@@ -330,6 +330,15 @@ writeFileSync(
 
 console.log("[prepare-server] Installing externalized deps...");
 installDependencies(serverDir);
+
+const forbiddenServerPackages = findForbiddenPackages(join(serverDir, "node_modules"));
+if (forbiddenServerPackages.length > 0) {
+  console.error(`[prepare-server] server/node_modules contains packages the desktop server must not ship: ${forbiddenServerPackages.join(", ")}`);
+  console.error("  These drag ~720 MB of onnxruntime into the npm tarball and the installers (PAN-5424).");
+  console.error("  Find the chunk that names them (scanImportClosure output) and add the package to SERVER_SKIP_PACKAGES in scripts/package-policy.mjs, or make it unreachable.");
+  process.exit(1);
+}
+console.log("[prepare-server] Verified: server/node_modules has no onnxruntime / @huggingface/transformers");
 
 const desktopRequire = Module.createRequire(join(desktopDir, "package.json"));
 

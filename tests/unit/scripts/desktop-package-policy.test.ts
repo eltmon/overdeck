@@ -1,10 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { scanImportClosure } from '../../../apps/desktop/scripts/import-closure.mjs';
-import { SERVER_SKIP_PACKAGES } from '../../../apps/desktop/scripts/package-policy.mjs';
+import { findForbiddenPackages, SERVER_SKIP_PACKAGES } from '../../../apps/desktop/scripts/package-policy.mjs';
 
 /**
  * PAN-5424: PAN-5358's namespace dynamic import of index-builder left a JSDoc
@@ -41,5 +41,49 @@ describe('desktop package policy', () => {
     expect(SERVER_SKIP_PACKAGES.has('@effect/platform-bun')).toBe(true);
     expect(SERVER_SKIP_PACKAGES.has('playwright')).toBe(true);
     expect(SERVER_SKIP_PACKAGES.has('playwright-core')).toBe(true);
+  });
+});
+
+const writePackageDir = (dir: string, relPath: string) => {
+  const pkgDir = join(dir, ...relPath.split('/'));
+  mkdirSync(pkgDir, { recursive: true });
+  writeFileSync(join(pkgDir, 'package.json'), '{}\n');
+};
+
+describe('findForbiddenPackages', () => {
+  const makeRoot = () => {
+    const dir = mkdtempSync(join(tmpdir(), 'desktop-forbidden-packages-'));
+    roots.push(dir);
+    return dir;
+  };
+
+  it('finds a top-level hit', () => {
+    const dir = makeRoot();
+    writePackageDir(dir, 'onnxruntime-node');
+    expect(findForbiddenPackages(dir)).toEqual(['onnxruntime-node']);
+  });
+
+  it('finds a nested hit', () => {
+    const dir = makeRoot();
+    writePackageDir(dir, 'foo/node_modules/onnxruntime-web');
+    expect(findForbiddenPackages(dir)).toEqual([join('foo', 'node_modules', 'onnxruntime-web')]);
+  });
+
+  it('finds a scoped hit', () => {
+    const dir = makeRoot();
+    writePackageDir(dir, '@huggingface/transformers');
+    expect(findForbiddenPackages(dir)).toEqual(['@huggingface/transformers']);
+  });
+
+  it('returns empty for a clean tree', () => {
+    const dir = makeRoot();
+    writePackageDir(dir, 'yaml');
+    writePackageDir(dir, '@scope/pkg');
+    expect(findForbiddenPackages(dir)).toEqual([]);
+  });
+
+  it('returns empty for a missing directory', () => {
+    const dir = makeRoot();
+    expect(findForbiddenPackages(join(dir, 'does-not-exist'))).toEqual([]);
   });
 });

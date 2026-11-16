@@ -4,6 +4,9 @@
  * tests/unit/scripts/desktop-package-policy.test.ts.
  */
 
+import { existsSync, readdirSync } from "node:fs";
+import { join, relative } from "node:path";
+
 /** Bare specifiers scanImportClosure must not treat as server externals. */
 export const SERVER_SKIP_PACKAGES = new Set([
   "@effect/platform-bun", // bun-only dynamic import, never reached under Node
@@ -15,3 +18,42 @@ export const SERVER_SKIP_PACKAGES = new Set([
   // embedding runs from the CLI runtime, which keeps transformers (PAN-5358).
   "@huggingface/transformers",
 ]);
+
+/** Packages that must never appear in server/node_modules (PAN-5424). */
+export const FORBIDDEN_SERVER_PACKAGES = [
+  "@huggingface/transformers",
+  "onnxruntime-node",
+  "onnxruntime-web",
+  "onnxruntime-common",
+];
+
+const walkForbidden = (nodeModulesDir, baseDir, forbidden, hits) => {
+  if (!existsSync(nodeModulesDir)) return;
+  for (const name of forbidden) {
+    const candidate = join(nodeModulesDir, name);
+    if (existsSync(candidate)) hits.push(relative(baseDir, candidate));
+  }
+  for (const entry of readdirSync(nodeModulesDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    if (entry.name.startsWith("@")) {
+      const scopeDir = join(nodeModulesDir, entry.name);
+      for (const scoped of readdirSync(scopeDir, { withFileTypes: true })) {
+        if (!scoped.isDirectory()) continue;
+        walkForbidden(join(scopeDir, scoped.name, "node_modules"), baseDir, forbidden, hits);
+      }
+      continue;
+    }
+    walkForbidden(join(nodeModulesDir, entry.name, "node_modules"), baseDir, forbidden, hits);
+  }
+};
+
+/**
+ * Returns every `<…>/node_modules/<forbidden>` directory under nodeModulesDir,
+ * including nested node_modules, as paths relative to nodeModulesDir. Empty
+ * when nodeModulesDir does not exist.
+ */
+export const findForbiddenPackages = (nodeModulesDir, forbidden = FORBIDDEN_SERVER_PACKAGES) => {
+  const hits = [];
+  walkForbidden(nodeModulesDir, nodeModulesDir, forbidden, hits);
+  return hits.sort();
+};
