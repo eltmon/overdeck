@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5343",
   "created": "2026-11-16T00:09:01.559Z",
-  "updated": "2026-11-16T01:07:34.683Z",
+  "updated": "2026-11-16T01:07:42.274Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -384,6 +384,11 @@
     "row-drag.ac4": {
       "status": "completed",
       "doneAt": "2026-11-16T01:07:34.683Z"
+    },
+    "pane-marks": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T01:07:42.274Z"
     }
   }
 }
