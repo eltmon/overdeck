@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4561",
   "created": "2026-11-16T11:22:23.903Z",
-  "updated": "2026-11-16T11:25:19.348Z",
+  "updated": "2026-11-16T11:25:27.768Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,6 +22,11 @@
     "timings-before.ac2": {
       "status": "completed",
       "doneAt": "2026-11-16T11:25:19.348Z"
+    },
+    "react19-deps": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4561",
+      "claimedAt": "2026-11-16T11:25:27.768Z"
     }
   }
 }
