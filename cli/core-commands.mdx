@@ -101,6 +101,25 @@ pan doctor --json
 The exit code matches text mode: `1` when any check is `error`, or when any
 check is `warn` and `--strict` was passed; otherwise `0`.
 
+## pan semgrep ci-setup
+
+Open a pull request that adds a Semgrep GitHub Actions workflow to a project.
+
+```bash
+pan semgrep ci-setup myapp --dry-run
+pan semgrep ci-setup myapp
+```
+
+Options:
+- `--dry-run` — print the target repository, base branch, gate mode and the
+  workflow, and change nothing
+- `--sarif-upload` — also scan base-branch pushes and upload the results to
+  GitHub code scanning
+
+It needs `security.semgrep.enabled: true` and a single-repo GitHub project. The
+generated commit skips repository hooks. See
+[Semgrep CI workflow](/configuration/semgrep#ci-workflow).
+
 ## pan diagnose
 
 Collect a redacted diagnostic bundle and, with your consent, start Claude

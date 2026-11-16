@@ -286,6 +286,15 @@ the **CI test job on the PR head is the test gate**:
   cancels the previous commit's in-progress jobs, and GitHub reports them with
   the PR's new head) is not reported, so no feedback is written. A failing
   job whose check also fails on main is marked inherited from main.
+- **Semgrep checks (PAN-4592).** A failing check whose name
+  `isSemgrepCheckName` accepts (`semgrep`, `Semgrep OSS`, `semgrep / scan`;
+  not `semgrepx` or `run-semgrep`) gets the Semgrep findings excerpt instead
+  (`extractSemgrepFindingsExcerpt`: from the `N Code Finding(s)` line through
+  the `Ran N rules on M files` line, about 2000 characters), followed by
+  instructions to fix each finding, rescan with the managed Semgrep CLI, and
+  suppress only a confirmed false positive with
+  `nosemgrep: <rule-id> -- <reason>`. A Semgrep check is never the CI test
+  gate.
 - **A later failure on the same head (PAN-4625).** The relay records, per
   issue, the head it last delivered feedback for and the failed check names
   that feedback named. A later relay for the same head (a `test-shard (4/4)`
@@ -934,6 +943,18 @@ matches, `stale` when any head moved, `absent` when there is no record. Review
 never runs Semgrep itself. `formatTier1Summary` lists up to 10 findings and 10
 suppressions, and `roles/review-security.md` tells the security lane to confirm
 or dismiss each finding and to check each suppression.
+
+**CI check (PAN-4592).** `pan semgrep ci-setup` adds a GitHub Actions workflow
+whose `semgrep` job carries the gate mode in its `OVERDECK_SEMGREP_GATE` env
+line, written once from this gate's mode (`off` is written as `advisory`). In
+`blocking` mode a pull request that adds a finding fails the `semgrep` check,
+which the CI failure relay delivers like any other red check. In `advisory`
+mode the job always concludes green and only prints a warning, so no
+merge-verdict reader needs an advisory rule for it: `ADVISORY_CHECK_NAMES`
+(`src/lib/advisory-checks.ts`) is unchanged, and a green advisory run is never
+relayed. The workflow does not follow later changes to `security.semgrep.gate`
+or `verification.sast`; the operator edits the env line. See
+`configuration/semgrep.mdx`, "CI workflow".
 
 ## Verdict feedback routing
 
