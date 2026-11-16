@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5343",
   "created": "2026-11-16T00:09:01.559Z",
-  "updated": "2026-11-16T00:25:54.285Z",
+  "updated": "2026-11-16T00:25:55.874Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,11 @@
     "switcher-door.ac4": {
       "status": "completed",
       "doneAt": "2026-11-16T00:25:54.284Z"
+    },
+    "scope-switch": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:25:55.873Z"
     }
   }
 }
