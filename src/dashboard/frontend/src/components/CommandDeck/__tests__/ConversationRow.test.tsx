@@ -714,6 +714,39 @@ describe('ConversationRow open-beside controls (PAN-5343 H-D5)', () => {
   });
 });
 
+describe('ConversationRow hover action group (PAN-5414)', () => {
+  it('groups the Beside and kebab buttons under one conversationActions parent', () => {
+    renderRow({}, { onOpenBeside: vi.fn() });
+    const group = screen.getByTestId('conversation-actions');
+    expect(group).toHaveClass(styles.conversationActions);
+    expect(within(group).getByRole('button', { name: 'Open beside' })).toBeInTheDocument();
+    expect(within(group).getByLabelText('More actions for Test conversation')).toBeInTheDocument();
+  });
+
+  it('groups only the kebab under conversationActions when there is no Beside opener', () => {
+    renderRow({});
+    const group = screen.getByTestId('conversation-actions');
+    expect(group).toHaveClass(styles.conversationActions);
+    expect(within(group).queryByRole('button', { name: 'Open beside' })).not.toBeInTheDocument();
+    expect(within(group).getByLabelText('More actions for Test conversation')).toBeInTheDocument();
+  });
+
+  it('groups the kebab under conversationActions on a nested row too', () => {
+    renderRow({}, { variant: 'nested' });
+    const group = screen.getByTestId('conversation-actions');
+    expect(group).toHaveClass(styles.conversationActions);
+    expect(within(group).getByLabelText('More actions for Test conversation')).toBeInTheDocument();
+  });
+
+  it('holds the group open with conversationActionsOpen while the menu is open', () => {
+    renderRow({});
+    const group = screen.getByTestId('conversation-actions');
+    expect(group).not.toHaveClass(styles.conversationActionsOpen);
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    expect(group).toHaveClass(styles.conversationActionsOpen);
+  });
+});
+
 describe('ConversationRow drag onto a pane (PAN-5343 H-D8)', () => {
   it('is draggable with a deck key and records the drag', async () => {
     const { useConversationDragStore, CONVERSATION_DRAG_TYPE } = await import('../../Stage/conversationDragStore');

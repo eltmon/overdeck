@@ -2403,6 +2403,19 @@
   margin-left: 0;
 }
 
+/* PAN-5414: held open while the overflow menu is open. The portaled menu's
+   overlay captures row hover/focus, so the group's own opacity must be
+   lifted independently of :hover/:focus-within. */
+.conversationActionsOpen {
+  max-width: 120px;
+  opacity: 1;
+  margin-left: 0;
+}
+
+.conversationActionsOpen .conversationKebabBtn {
+  opacity: 1;
+}
+
 .conversationItemSelected {
   background: color-mix(in srgb, var(--primary) 14%, transparent);
 }
@@ -2483,6 +2496,12 @@
 .conversationKebabBtn:hover {
   background: var(--accent);
   color: var(--foreground);
+}
+
+/* PAN-5414: conversationActions clips overflow, which would otherwise crop
+   the default outside focus ring. */
+.conversationActions .conversationKebabBtn:focus-visible {
+  outline-offset: -2px;
 }
 
 .projectConvItem .conversationKebabBtn {

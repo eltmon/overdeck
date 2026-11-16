@@ -696,38 +696,46 @@ export function ConversationRow({
         </span>
       )}
 
-      {/* PAN-5343 H-D5: open beside the panes on screen. */}
-      {onOpenBeside && !editingName && (
-        <span
-          role="button"
-          tabIndex={0}
-          className={styles.conversationKebabBtn}
-          onClick={(e) => { e.stopPropagation(); onOpenBeside(conv.name); }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onOpenBeside(conv.name); }
-          }}
-          title={`Open beside (${currentPlatform() === 'mac' ? '⌘' : 'Ctrl'}+Click)`}
-          aria-label="Open beside"
-        >
-          <Columns2 size={iconSize} />
-        </span>
-      )}
-
-      {/* Overflow actions (⋮) — replaces the inline icon swarm */}
+      {/* PAN-5414: Beside and kebab share one collapsing group, held open
+          while the overflow menu is open so the portaled menu's row-hover
+          overlay doesn't drop the trigger's own opacity back to 0. */}
       {!editingName && (
         <span
-          ref={menuBtnRef}
-          role="button"
-          tabIndex={0}
-          className={styles.conversationKebabBtn}
-          onClick={openMenu}
-          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') openMenu(e); }}
-          title="More actions"
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
-          aria-label={`More actions for ${conv.title ?? conv.name}`}
+          className={`${styles.conversationActions} ${menuOpen ? styles.conversationActionsOpen : ''}`}
+          data-testid="conversation-actions"
         >
-          <MoreVertical size={iconSize} />
+          {/* PAN-5343 H-D5: open beside the panes on screen. */}
+          {onOpenBeside && (
+            <span
+              role="button"
+              tabIndex={0}
+              className={styles.conversationKebabBtn}
+              onClick={(e) => { e.stopPropagation(); onOpenBeside(conv.name); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onOpenBeside(conv.name); }
+              }}
+              title={`Open beside (${currentPlatform() === 'mac' ? '⌘' : 'Ctrl'}+Click)`}
+              aria-label="Open beside"
+            >
+              <Columns2 size={iconSize} />
+            </span>
+          )}
+
+          {/* Overflow actions (⋮) — replaces the inline icon swarm */}
+          <span
+            ref={menuBtnRef}
+            role="button"
+            tabIndex={0}
+            className={styles.conversationKebabBtn}
+            onClick={openMenu}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') openMenu(e); }}
+            title="More actions"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-label={`More actions for ${conv.title ?? conv.name}`}
+          >
+            <MoreVertical size={iconSize} />
+          </span>
         </span>
       )}
 
