@@ -146,14 +146,15 @@ export async function buildOwnPatches(
   const sections: string[] = [];
   if (paths.length === 0) return { plain, sections };
 
-  const ordered = chronological(changes?.commits ?? []);
-  const resolves = await Promise.all(
-    ordered.map((commit) => gitSucceeds(repoRoot, ['cat-file', '-e', `${commit.sha}^{commit}`])),
-  );
-  const chrono = ordered.filter((_, index) => resolves[index]);
+  // Sequential on purpose: a conversation can attribute hundreds of files, and this
+  // runs in the dashboard server, so git processes run one at a time.
+  const chrono: ChangeCommit[] = [];
+  for (const commit of chronological(changes?.commits ?? [])) {
+    if (await gitSucceeds(repoRoot, ['cat-file', '-e', `${commit.sha}^{commit}`])) chrono.push(commit);
+  }
   const uncommittedByPath = new Map((changes?.uncommitted ?? []).map((file) => [file.path, file]));
 
-  const plans = await Promise.all(paths.map(async (path): Promise<PathPlan> => {
+  const planPath = async (path: string): Promise<PathPlan> => {
     const own = chrono.filter((commit) => commit.files.some((file) => file.path === path));
     const unc = uncommittedByPath.get(path);
     const untracked = unc?.status === 'A'
@@ -171,7 +172,9 @@ export async function buildOwnPatches(
       return { kind: 'plain', patch };
     }
     return { kind: 'sections', own, uncommitted: unc ? (untracked ? 'untracked' : 'tracked') : 'none' };
-  }));
+  };
+  const plans: PathPlan[] = [];
+  for (const path of paths) plans.push(await planPath(path));
 
   const uncommittedOnly: string[] = [];
   const sectionPaths = new Map<string, Set<string>>();
