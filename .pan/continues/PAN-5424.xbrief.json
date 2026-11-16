@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5424",
   "created": "2026-11-16T06:26:53.865Z",
-  "updated": "2026-11-16T07:06:28.335Z",
+  "updated": "2026-11-16T07:06:37.112Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
     "forbidden-packages-guard.ac3": {
       "status": "completed",
       "doneAt": "2026-11-16T07:06:28.334Z"
+    },
+    "pack-size-guard": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5424",
+      "claimedAt": "2026-11-16T07:06:37.112Z"
     }
   }
 }
