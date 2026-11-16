@@ -11,9 +11,10 @@ import type { AnywhereStatus } from '../../Settings/anywhere/anywhereApi';
 import { handOffConversation, openSessionVaultSettings, type HandOffBody } from './continueOnDeviceApi';
 import { HANDOFF_HARNESSES, useContinueOnDeviceStore, type ContinueTarget } from './continueOnDeviceStore';
 import { useHandoffNoticeStore } from './handoffNoticeStore';
+import formStyles from '../../shared/ModalForm.module.css';
 
 const SESSION_VAULT_DOCS = 'https://overdeck.ai/configuration/session-vault';
-const BUTTON = 'rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50';
+const BUTTON = formStyles.button;
 const CODE = 'block rounded-md bg-muted px-2 py-1 font-mono text-xs text-foreground break-all';
 
 type Outcome = { status: number; body: HandOffBody | { error?: string } | null };
@@ -142,7 +143,7 @@ export function HandOffTab({ target, status }: { target: ContinueTarget; status:
         type="button"
         onClick={() => void handleHandOff()}
         disabled={pending}
-        className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+        className={formStyles.primaryButton}
       >
         {pending ? 'Handing off…' : 'Hand off now'}
       </button>
