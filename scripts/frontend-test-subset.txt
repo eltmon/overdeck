@@ -162,6 +162,7 @@ src/components/Settings/sections/__tests__/TelemetrySection.test.tsx
 src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx
 src/components/Settings/sections/__tests__/tiered-crews.test.ts
 src/components/Stage/__tests__/openBeside.test.tsx
+src/components/Stage/__tests__/openConversationInDeck.test.ts
 src/components/Stage/HomePane/HomeActions.test.tsx
 src/components/Stage/HomePane/HomeFacts.test.tsx
 src/components/Stage/HomePane/HomeHeader.rename.test.tsx
