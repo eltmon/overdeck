@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5343",
   "created": "2026-11-16T00:09:01.559Z",
-  "updated": "2026-11-16T00:40:45.278Z",
+  "updated": "2026-11-16T00:40:50.590Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -242,6 +242,11 @@
     "row-open-controls.ac4": {
       "status": "completed",
       "doneAt": "2026-11-16T00:40:45.278Z"
+    },
+    "open-routing": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:40:50.590Z"
     }
   }
 }
