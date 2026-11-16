@@ -2358,7 +2358,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 30px 4px 24px;
+  padding: 4px 8px 4px 24px;
   position: relative;
   cursor: pointer;
   transition: background 0.1s;
@@ -2372,6 +2372,16 @@
 
 .conversationItem:hover {
   background: var(--accent);
+}
+
+/* PAN-5414: reserve the star's 30px slot only while it can show (hover,
+   focus, favorited, or the overflow menu open) so the row's own padding
+   doesn't permanently truncate the title/meta at rest. */
+.conversationItem:hover,
+.conversationItem:focus-within,
+.conversationItemFavorited,
+.conversationItemMenuOpen {
+  padding-right: 30px;
 }
 
 /* Hover-only action group — collapses to 0 width when row is not hovered,

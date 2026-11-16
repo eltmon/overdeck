@@ -342,7 +342,7 @@ export function ConversationRow({
   const offlineLinked = isOfflineLinked(conv); // PAN-4650: muted title, hollow dot, offline metadata
   const itemClass = (offlineLinked ? `${styles.linkedRowOffline} ` : '') + (isNested
     ? `${styles.projectConvItem} ${isSelected ? styles.projectConvItemSelected : ''} ${leavingKind ? styles.conversationRowLeaving : ''}`
-    : `${styles.conversationItem} ${isSelected || isMultiSelected ? styles.conversationItemSelected : ''} ${leavingKind ? styles.conversationRowLeaving : ''}`);
+    : `${styles.conversationItem} ${isSelected || isMultiSelected ? styles.conversationItemSelected : ''} ${leavingKind ? styles.conversationRowLeaving : ''} ${conv.isFavorited ? styles.conversationItemFavorited : ''} ${menuOpen ? styles.conversationItemMenuOpen : ''}`);
 
   // Fork / spawn status badges — shared by both row variants.
   const ownerLabel = conv.vaultOwnerLabel ?? 'another machine';

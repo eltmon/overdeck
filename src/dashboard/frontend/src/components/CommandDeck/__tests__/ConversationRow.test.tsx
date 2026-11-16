@@ -747,6 +747,31 @@ describe('ConversationRow hover action group (PAN-5414)', () => {
   });
 });
 
+describe('ConversationRow right-padding reservation (PAN-5414)', () => {
+  it('adds conversationItemFavorited on a flat favorited row, not on an unfavorited one', () => {
+    renderRow({ isFavorited: true });
+    expect(screen.getByTitle(conversation.name)).toHaveClass(styles.conversationItemFavorited);
+  });
+
+  it('omits conversationItemFavorited on a flat unfavorited row', () => {
+    renderRow({ isFavorited: false });
+    expect(screen.getByTitle(conversation.name)).not.toHaveClass(styles.conversationItemFavorited);
+  });
+
+  it('never adds conversationItemFavorited on a nested favorited row', () => {
+    renderRow({ isFavorited: true }, { variant: 'nested' });
+    expect(screen.getByTitle(conversation.name)).not.toHaveClass(styles.conversationItemFavorited);
+  });
+
+  it('adds conversationItemMenuOpen to a flat row once its kebab menu is opened', () => {
+    renderRow({});
+    const row = screen.getByTitle(conversation.name);
+    expect(row).not.toHaveClass(styles.conversationItemMenuOpen);
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    expect(row).toHaveClass(styles.conversationItemMenuOpen);
+  });
+});
+
 describe('ConversationRow drag onto a pane (PAN-5343 H-D8)', () => {
   it('is draggable with a deck key and records the drag', async () => {
     const { useConversationDragStore, CONVERSATION_DRAG_TYPE } = await import('../../Stage/conversationDragStore');
