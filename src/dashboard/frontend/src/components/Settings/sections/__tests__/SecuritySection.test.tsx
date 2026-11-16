@@ -130,24 +130,25 @@ describe('SecuritySection (PAN-4594)', () => {
     await waitFor(() => expect(installStatusCalls).toBe(2));
   });
 
-  it('keeps polling the install status until it reports installed, then stops', async () => {
+  it('re-reads the install status once after an install request and never polls (NFR-2)', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     let installStatusCalls = 0;
-    let toolInstalled = false;
     installStrictFetchMock(({ method, url, init }) => {
       if (method === 'GET' && url === '/api/semgrep/settings') return Response.json(BASE_VIEW);
       if (method === 'GET' && url === '/api/prereqs/useSemgrep') {
         installStatusCalls += 1;
         return Response.json({
           feature: 'useSemgrep',
-          tools: [{ tool: 'semgrep', installed: toolInstalled, installable: true }],
-          ready: toolInstalled,
-          missing: toolInstalled ? [] : ['semgrep'],
+          // The install fails and the tool stays uninstalled: no later event ever
+          // reports installed === true, so a poll gated on that would never stop.
+          tools: [{ tool: 'semgrep', installed: false, installable: true }],
+          ready: false,
+          missing: ['semgrep'],
         });
       }
       if (method === 'POST' && url === '/api/prereqs/install') {
         expect(JSON.parse(String(init?.body))).toEqual({ tool: 'semgrep' });
-        return Response.json({ success: true, message: 'installing…' });
+        return Response.json({ success: false, message: 'install failed' });
       }
       return undefined;
     });
@@ -156,18 +157,14 @@ describe('SecuritySection (PAN-4594)', () => {
       renderSection();
       const button = await screen.findByTestId('semgrep-install-button');
       await waitFor(() => expect(button).toBeEnabled());
+      const callsBeforeInstall = installStatusCalls;
       fireEvent.click(button);
-      await waitFor(() => expect(screen.getByTestId('semgrep-install-message')).toHaveTextContent('installing…'));
+      await waitFor(() => expect(screen.getByTestId('semgrep-install-message')).toHaveTextContent('install failed'));
 
-      const callsAfterRequest = installStatusCalls;
-      toolInstalled = true;
-      await vi.advanceTimersByTimeAsync(3_000);
-      await waitFor(() => expect(installStatusCalls).toBeGreaterThan(callsAfterRequest));
-      await waitFor(() => expect(screen.getByTestId('semgrep-install-status')).toHaveTextContent('1.180.0 installed'));
-
-      const callsOnceInstalled = installStatusCalls;
-      await vi.advanceTimersByTimeAsync(10_000);
-      expect(installStatusCalls).toBe(callsOnceInstalled);
+      // Exactly one re-read follows the install request (D12), never a repeating poll.
+      await waitFor(() => expect(installStatusCalls).toBe(callsBeforeInstall + 1));
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(installStatusCalls).toBe(callsBeforeInstall + 1);
     } finally {
       vi.useRealTimers();
     }

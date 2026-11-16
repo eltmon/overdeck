@@ -52,7 +52,6 @@ export function useSemgrepSettings() {
     queryKey: ['semgrep-settings'],
     queryFn: fetchSemgrepSettings,
   });
-  const [pollingInstall, setPollingInstall] = useState(false);
   const {
     data: installStatus,
     error: installStatusErrorObj,
@@ -63,14 +62,8 @@ export function useSemgrepSettings() {
     queryFn: fetchSemgrepInstallStatus,
     enabled: settings?.enabled === true,
     refetchOnWindowFocus: false,
-    // Keeps checking while an install is in flight or just ended without a response
-    // (D12): the installer can still be running past that point. Stops once the
-    // status confirms the tool installed.
-    refetchInterval: (query) => {
-      if (!pollingInstall) return false;
-      const data = query.state.data as PrereqFeatureStatus | undefined;
-      return data?.tools.find((t) => t.tool === 'semgrep')?.installed === true ? false : 3_000;
-    },
+    // NFR-2: no refetchInterval. Reads happen on mount, after an `enabled` change, and
+    // once after an install request (including a dropped one, D12) — never on a timer.
   });
   const installed = settings?.enabled ? installStatus?.tools.find((t) => t.tool === 'semgrep')?.installed : undefined;
   const installStatusError = settings?.enabled && installStatusErrorObj
@@ -129,7 +122,6 @@ export function useSemgrepSettings() {
 
   const install = () => {
     setInstalling(true);
-    setPollingInstall(true);
     void (async () => {
       try {
         await ensureDashboardSession();
