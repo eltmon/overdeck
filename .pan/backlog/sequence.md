@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T03:20:03.040633Z · model: claude-opus-5-5 · open: 891_
+_Last sequenced: 2026-11-16T03:48:20.005000Z · model: claude-opus-5-5 · open: 889_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -15,7 +15,6 @@ _Last sequenced: 2026-11-16T03:20:03.040633Z · model: claude-opus-5-5 · open: 
 | 15 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
 | 16 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 17 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
-| 18 | PAN-5391 | S | high | ok |  |  | Editor bar treats UNSTABLE as clean: primary Merge squash-merges a PR into main while checks still run; add amber state + confirm. |
 | 19 | PAN-5381 | S | high | ok |  |  | Dashboard main thread: findProjectByPath runs realpathSync on every project root per call (10.8% of profile); cache roots once. |
 | 20 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 21 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
@@ -422,7 +421,6 @@ _Last sequenced: 2026-11-16T03:20:03.040633Z · model: claude-opus-5-5 · open: 
 | 425 | PAN-5386 | XS | medium | ok |  |  | CodeRabbit follow-up for PAN-5361 (PR #5373): 1 Major finding, baseline burst can hide an idle regression in bare-host smoke |
 | 426 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
 | 427 | PAN-5227 | S | medium | ok |  |  | Closed-issue reaper re-checks every issue's state every 60 s, spending ~25% of the GitHub App REST bucket while idle. |
-| 428 | PAN-5342 | L | medium | ok |  |  | Safe shutdown: drain agents at a tool boundary before reboot; PRD landed; item 16 of workflow-redesign order book. |
 | 429 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
 | 430 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
 | 431 | PAN-1627 | M | medium | ok |  |  | Substrate: Claude Code's native .claude/** settings-edit protection wedges in-scope work agents (un-overridable by PreToolUse auto-appr… |
@@ -895,7 +893,7 @@ _Last sequenced: 2026-11-16T03:20:03.040633Z · model: claude-opus-5-5 · open: 
 | 899 | PAN-5207 | L | low | needs-refinement |  | PAN-5202 | Parked by the operator: Flux meeting bots for Zoom, Teams, Meet, Slack as a paid integration. Do not start. |
 | 901 | PAN-5181 | XS | low | ok |  |  | Fix shipped in PR #5179 (merged 2026-11-13); the body says it closes on merge. Verify and close. |
 | 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
-| 904 | PAN-5405 | S | medium | ok |  | PAN-5295 | CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus. |
+| 904 | PAN-5405 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus. |
 
 ## Rationale detail
 
@@ -938,10 +936,6 @@ Operator decision 2026-10-04 after the Flywheel closed 19 deployed issues by han
 ### PAN-4511 (rank 17)
 
 pan spawn is the foreman's pane-only item worker, so parallel waves cannot run any item through it on either backend. The test suite never asserts argv, so it stayed green. Small fix with a clear expected behavior.
-
-### PAN-5391 (rank 18)
-
-New bug found while testing workflow redesign child C: the file-explorer editor bar offers a one-click primary Merge while CI is pending because mergeVerdict counts UNSTABLE as CLEAN, so untested code can land on main. The fix is small and fully specified (checksPassing field, amber secondary Merge with confirmation, keep polling), so it takes the rank-18 slot freed by the closure of PAN-5369.
 
 ### PAN-5381 (rank 19)
 
@@ -1219,6 +1213,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 
 New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
 
+### PAN-4213 (rank 89)
+
+Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1226,10 +1224,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T03:20:03.040633Z",
+  "generatedAt": "2026-11-16T03:48:20.005000Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 891,
+  "openCount": 889,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -1358,19 +1356,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch",
       "rationale": "pan spawn is the foreman's pane-only item worker, so parallel waves cannot run any item through it on either backend. The test suite never asserts argv, so it stayed green. Small fix with a clear expected behavior.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5391",
-      "rank": 18,
-      "size": "S",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Editor bar treats UNSTABLE as clean: primary Merge squash-merges a PR into main while checks still run; add amber state + confirm.",
-      "rationale": "New bug found while testing workflow redesign child C: the file-explorer editor bar offers a one-click primary Merge while CI is pending because mergeVerdict counts UNSTABLE as CLEAN, so untested code can land on main. The fix is small and fully specified (checksPassing field, amber secondary Merge with confirmation, keep polling), so it takes the rank-18 slot freed by the closure of PAN-5369.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6478,19 +6463,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "condition": "ok",
       "dependsOn": [],
       "why": "Closed-issue reaper re-checks every issue's state every 60 s, spending ~25% of the GitHub App REST bucket while idle.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5342",
-      "rank": 428,
-      "size": "L",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Safe shutdown: drain agents at a tool boundary before reboot; PRD landed; item 16 of workflow-redesign order book.",
-      "rationale": "PRD landed and the issue joined the workflow-redesign order book as its last item, so score rises slightly; rank holds beside its order-book neighbours.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12305,9 +12277,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "importance": "medium",
       "score": 46,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5295"
-      ],
+      "dependsOn": [],
       "why": "CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus.",
       "rationale": "New CodeRabbit follow-up from the merged PAN-5295 PR; one Major and four Minor frontend findings, ranked with comparable follow-ups.",
       "gate": "auto",
