@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5341",
   "created": "2026-11-16T05:09:54.013Z",
-  "updated": "2026-11-16T05:20:16.475Z",
+  "updated": "2026-11-16T05:20:25.369Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,11 @@
     "diff-view-switch.ac2": {
       "status": "completed",
       "doneAt": "2026-11-16T05:20:16.475Z"
+    },
+    "dock-diff-wiring": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5341",
+      "claimedAt": "2026-11-16T05:20:25.369Z"
     }
   }
 }
