@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4592",
   "created": "2026-11-16T16:14:58.639Z",
-  "updated": "2026-11-16T16:19:31.035Z",
+  "updated": "2026-11-16T16:19:38.512Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,11 @@
     "ci-workflow-render.ac6": {
       "status": "completed",
       "doneAt": "2026-11-16T16:19:31.034Z"
+    },
+    "ci-setup-core": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4592",
+      "claimedAt": "2026-11-16T16:19:38.512Z"
     }
   }
 }
