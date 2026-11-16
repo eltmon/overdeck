@@ -282,8 +282,17 @@
       "reVerify": false,
       "addedAt": "2026-11-16T08:29:19.891Z",
       "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5448",
+      "lane": "A",
+      "order": 28,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-16T15:44:57.640Z",
+      "addedBy": "conv-20261113-6031"
     }
   ],
   "createdAt": "2026-11-14T19:17:57.102Z",
-  "updatedAt": "2026-11-16T08:29:19.891Z"
+  "updatedAt": "2026-11-16T15:44:57.641Z"
 }
