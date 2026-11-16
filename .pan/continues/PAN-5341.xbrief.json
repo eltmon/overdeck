@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5341",
   "created": "2026-11-16T05:09:54.013Z",
-  "updated": "2026-11-16T05:15:43.494Z",
+  "updated": "2026-11-16T05:15:51.711Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,6 +34,11 @@
     "dock-preview-source.ac5": {
       "status": "completed",
       "doneAt": "2026-11-16T05:15:43.493Z"
+    },
+    "diff-view-switch": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5341",
+      "claimedAt": "2026-11-16T05:15:51.711Z"
     }
   }
 }
