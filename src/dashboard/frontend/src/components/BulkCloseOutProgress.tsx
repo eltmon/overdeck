@@ -1,4 +1,6 @@
 import { Loader2, CheckCircle, XCircle, SkipForward, X } from 'lucide-react';
+import { Modal } from './shared/Modal';
+import formStyles from './shared/ModalForm.module.css';
 
 export type BulkCloseStatus = 'pending' | 'running' | 'done' | 'failed' | 'skipped';
 
@@ -48,14 +50,24 @@ export function BulkCloseOutProgress({ isOpen, results, onClose }: BulkCloseOutP
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={isComplete ? onClose : undefined} />
-      <div className="relative bg-card rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6">
-        <h3 className="text-lg font-semibold text-foreground mb-4">
-          {isComplete ? 'Bulk Close Out Complete' : 'Closing Out Issues...'}
-        </h3>
-
-        <div className="space-y-2 max-h-80 overflow-y-auto mb-4">
+    <Modal
+      title={isComplete ? 'Bulk Close Out Complete' : 'Closing Out Issues...'}
+      onClose={onClose}
+      dismissible={isComplete}
+      footer={isComplete ? (
+        <button type="button" onClick={onClose} className={formStyles.primaryButton}>
+          <X className="w-4 h-4" />
+          Close
+        </button>
+      ) : (
+        <p className={formStyles.status}>
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Processing...
+        </p>
+      )}
+    >
+      <div className={`${formStyles.content} space-y-4`}>
+        <div className="space-y-2 max-h-80 overflow-y-auto">
           {results.map((result) => (
             <div
               key={result.issueId}
@@ -74,30 +86,13 @@ export function BulkCloseOutProgress({ isOpen, results, onClose }: BulkCloseOutP
         </div>
 
         {isComplete && (
-          <div className="mb-4 text-sm text-foreground">
+          <div className="text-sm text-foreground">
             <span className="font-medium text-success">{succeeded} succeeded</span>
             {failed > 0 && <span className="font-medium text-destructive ml-3">{failed} failed</span>}
             {skipped > 0 && <span className="font-medium text-muted-foreground ml-3">{skipped} skipped</span>}
           </div>
         )}
-
-        <div className="flex justify-end">
-          {isComplete ? (
-            <button
-              onClick={onClose}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg transition-colors text-sm"
-            >
-              <X className="w-4 h-4" />
-              Close
-            </button>
-          ) : (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Processing...
-            </div>
-          )}
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }
