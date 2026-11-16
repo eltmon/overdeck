@@ -1,10 +1,12 @@
-import { NO_PROJECT_KEY, NO_PROJECT_LABEL } from '../components/CommandDeck/projectsData';
+import { ALL_PROJECTS_KEY, ALL_PROJECTS_LABEL, NO_PROJECT_KEY, NO_PROJECT_LABEL } from '../components/CommandDeck/projectsData';
 import type { Tab } from '../components/Header';
 import { currentPlatform, formatSpec, type Platform } from '../lib/shortcuts/keys';
 
 /** The app-bar crumb label for a selected deck key (PAN-5000). */
 export function projectCrumbLabel(key: string): string {
-  return key === NO_PROJECT_KEY ? NO_PROJECT_LABEL : key;
+  if (key === NO_PROJECT_KEY) return NO_PROJECT_LABEL;
+  if (key === ALL_PROJECTS_KEY) return ALL_PROJECTS_LABEL;
+  return key;
 }
 
 /** The top bar's search-box text; the box opens the command palette (PAN-5292 E-D15). Child B changes it when the palette gains files. */
