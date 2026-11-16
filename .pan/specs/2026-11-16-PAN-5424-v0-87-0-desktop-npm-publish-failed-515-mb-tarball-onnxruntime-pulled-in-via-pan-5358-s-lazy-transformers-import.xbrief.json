@@ -4,17 +4,17 @@
     "created": "2026-11-16T06:12:55Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5424: v0.87.0 desktop npm publish failed: 515 MB tarball (onnxruntime pulled in via PAN-5358's lazy transformers import)",
-    "updated": "2026-11-16T06:24:09.886Z"
+    "updated": "2026-11-16T06:25:11.645Z"
   },
   "plan": {
     "id": "pan-5424",
     "title": "v0.87.0 desktop npm publish failed: 515 MB tarball (onnxruntime pulled in via PAN-5358's lazy transformers import)",
-    "status": "proposed",
+    "status": "running",
     "uid": "ecc82bbd-418c-4068-a6ae-269ab4caf07a",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-16T06:12:55Z",
-    "updated": "2026-11-16T06:24:09.886Z",
+    "updated": "2026-11-16T06:25:11.645Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5424",
@@ -397,5 +397,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
