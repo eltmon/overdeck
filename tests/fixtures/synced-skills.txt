@@ -77,6 +77,7 @@ pan-resources
 pan-restart
 pan-review
 pan-rollout
+pan-semgrep
 pan-share
 pan-show
 pan-skill-creator
