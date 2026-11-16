@@ -5,7 +5,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { DollarSign, AlertTriangle, TrendingUp, Zap, X, BarChart3, FlaskConical, Server } from 'lucide-react';
+import { DollarSign, AlertTriangle, TrendingUp, Zap, BarChart3, FlaskConical, Server } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import {
   Chart as ChartJS,
@@ -21,6 +21,8 @@ import {
 } from 'chart.js';
 import { costBucketLabel } from '../lib/cost-bucket-labels';
 import { FleetUsagePanel } from './costs/FleetUsagePanel';
+import { Modal } from './shared/Modal';
+import formStyles from './shared/ModalForm.module.css';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, Filler, Tooltip);
 
@@ -213,116 +215,101 @@ function IssueDetailModal({ issueId, onClose }: { issueId: string; onClose: () =
   });
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div
-        className="bg-card border border-border rounded-xl w-full max-w-2xl max-h-[85vh] overflow-auto"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-6 border-b border-border">
-          <div className="flex items-center gap-3">
-            <BarChart3 className="w-5 h-5 text-primary" />
-            <h2 className="text-xl font-bold text-foreground font-mono">{displayIssueId}</h2>
-          </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-6">
-          {isLoading ? (
-            <div className="text-muted-foreground text-center py-8">Loading...</div>
-          ) : detail ? (
-            <>
-              {/* Summary */}
-              <div>
-                <div className="text-3xl font-bold text-success mb-1">${detail.totalCost.toFixed(4)}</div>
-                <div className="text-sm text-muted-foreground">
-                  {(detail.inputTokens + detail.outputTokens + detail.cacheReadTokens + detail.cacheWriteTokens).toLocaleString()} total tokens
-                </div>
-              </div>
-
-              {/* Token Breakdown */}
-              <div>
-                <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Token Usage</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { label: 'Input', value: detail.inputTokens },
-                    { label: 'Output', value: detail.outputTokens },
-                    { label: 'Cache Read', value: detail.cacheReadTokens },
-                    { label: 'Cache Write', value: detail.cacheWriteTokens },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="bg-card/50 rounded-lg p-3">
-                      <div className="text-xs text-muted-foreground">{label}</div>
-                      <div className="text-lg font-semibold text-foreground">{value.toLocaleString()}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* By Model */}
-              {Object.keys(detail.models).length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">By Model</h3>
-                  <div className="space-y-2">
-                    {Object.entries(detail.models)
-                      .sort(([, a], [, b]) => b.cost - a.cost)
-                      .map(([model, stats]) => (
-                        <div key={model} className="bg-card/50 rounded-lg p-3">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm text-foreground font-mono truncate mr-2">{model}</span>
-                            <span className="text-sm text-success font-semibold shrink-0">${stats.cost.toFixed(4)}</span>
-                          </div>
-                          <div className="flex gap-4 text-xs text-muted-foreground">
-                            <span>{stats.calls} calls</span>
-                            <span>{stats.tokens.toLocaleString()} tokens</span>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-
-              {/* By Stage */}
-              {Object.keys(detail.stages).length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">By Stage</h3>
-                  <div className="space-y-2">
-                    {Object.entries(detail.stages)
-                      .sort(([, a], [, b]) => b.cost - a.cost)
-                      .map(([stage, stats]) => (
-                        <div key={stage} className="bg-card/50 rounded-lg p-3">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm text-foreground capitalize">{stage}</span>
-                            <span className="text-sm text-success font-semibold">${stats.cost.toFixed(4)}</span>
-                          </div>
-                          <div className="flex gap-4 text-xs text-muted-foreground">
-                            <span>{stats.calls} calls</span>
-                            <span>{stats.tokens.toLocaleString()} tokens</span>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="text-muted-foreground text-center py-8">No data available</div>
-          )}
-
-          {/* Trend Chart */}
-          {trends && trends.trends.length > 0 && (
+    <Modal title={displayIssueId} onClose={onClose}>
+      <div className={`${formStyles.content} space-y-6`}>
+        {isLoading ? (
+          <div className="text-muted-foreground text-center py-8">Loading...</div>
+        ) : detail ? (
+          <>
+            {/* Summary */}
             <div>
-              <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
-                30-Day Trend
-              </h3>
-              <div className="h-36 bg-card/30 rounded-lg p-2">
-                <TrendChart trends={trends.trends} />
+              <div className="text-3xl font-bold text-success mb-1">${detail.totalCost.toFixed(4)}</div>
+              <div className="text-sm text-muted-foreground">
+                {(detail.inputTokens + detail.outputTokens + detail.cacheReadTokens + detail.cacheWriteTokens).toLocaleString()} total tokens
               </div>
             </div>
-          )}
-        </div>
+
+            {/* Token Breakdown */}
+            <div>
+              <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Token Usage</h3>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Input', value: detail.inputTokens },
+                  { label: 'Output', value: detail.outputTokens },
+                  { label: 'Cache Read', value: detail.cacheReadTokens },
+                  { label: 'Cache Write', value: detail.cacheWriteTokens },
+                ].map(({ label, value }) => (
+                  <div key={label} className="bg-card/50 rounded-lg p-3">
+                    <div className="text-xs text-muted-foreground">{label}</div>
+                    <div className="text-lg font-semibold text-foreground">{value.toLocaleString()}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* By Model */}
+            {Object.keys(detail.models).length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">By Model</h3>
+                <div className="space-y-2">
+                  {Object.entries(detail.models)
+                    .sort(([, a], [, b]) => b.cost - a.cost)
+                    .map(([model, stats]) => (
+                      <div key={model} className="bg-card/50 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm text-foreground font-mono truncate mr-2">{model}</span>
+                          <span className="text-sm text-success font-semibold shrink-0">${stats.cost.toFixed(4)}</span>
+                        </div>
+                        <div className="flex gap-4 text-xs text-muted-foreground">
+                          <span>{stats.calls} calls</span>
+                          <span>{stats.tokens.toLocaleString()} tokens</span>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* By Stage */}
+            {Object.keys(detail.stages).length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">By Stage</h3>
+                <div className="space-y-2">
+                  {Object.entries(detail.stages)
+                    .sort(([, a], [, b]) => b.cost - a.cost)
+                    .map(([stage, stats]) => (
+                      <div key={stage} className="bg-card/50 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm text-foreground capitalize">{stage}</span>
+                          <span className="text-sm text-success font-semibold">${stats.cost.toFixed(4)}</span>
+                        </div>
+                        <div className="flex gap-4 text-xs text-muted-foreground">
+                          <span>{stats.calls} calls</span>
+                          <span>{stats.tokens.toLocaleString()} tokens</span>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-muted-foreground text-center py-8">No data available</div>
+        )}
+
+        {/* Trend Chart */}
+        {trends && trends.trends.length > 0 && (
+          <div>
+            <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
+              30-Day Trend
+            </h3>
+            <div className="h-36 bg-card/30 rounded-lg p-2">
+              <TrendChart trends={trends.trends} />
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }
 
