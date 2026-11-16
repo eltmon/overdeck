@@ -18,6 +18,14 @@ describe('projectMarkColor (PAN-5335 WI-9/D-8)', () => {
 });
 
 describe('ProjectMark (PAN-5335 WI-9/D-8)', () => {
+  it('renders a glyph on the muted background instead of initials (PAN-5343 H-D2)', () => {
+    render(<ProjectMark name="All projects" muted glyph="✱" />);
+    const mark = screen.getByText('✱');
+    expect(mark).toHaveAttribute('aria-hidden', 'true');
+    expect(mark).toHaveClass('bg-muted');
+    expect(screen.queryByText('AP')).not.toBeInTheDocument();
+  });
+
   it('shows the colored initials with an inline background', () => {
     render(<ProjectMark name="mind-your-now" projectKey="mind-your-now" />);
     const mark = screen.getByText('MY');

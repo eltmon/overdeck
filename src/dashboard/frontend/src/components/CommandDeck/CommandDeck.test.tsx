@@ -927,3 +927,51 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     expect(onConvIdChange).not.toHaveBeenCalled();
   });
 });
+
+describe('CommandDeck — /conv deep links in the All projects deck (PAN-5343 H-D12)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    latestStageProps = undefined;
+    conversationListOverride = undefined;
+    priorityConversation = undefined;
+    resourceProjectsResponse = undefined;
+    registeredProjectsResponse = defaultRegisteredProjects;
+    registeredProjectsRequestError = null;
+    pipelineMembershipResponse = { ok: true, body: [] };
+    useCommandDeckSelection.getState().clearAll();
+    useCommandDeckSelection.setState({ selectedConversation: null, selectedFeature: null });
+    usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} });
+    localStorage.clear();
+  });
+
+  const panes = (deck: string) => usePanesStore.getState().panesByWorkspace[deck] ?? [];
+
+  it('opens the conversation in the All deck without switching projects', async () => {
+    const onSelectProject = vi.fn();
+    renderCommandDeck({ selectedProject: '__all-projects__', convId: '1', onSelectProject });
+
+    await waitFor(() => expect(panes('__all-projects__')).toEqual([
+      expect.objectContaining({ paneType: 'agent', conversationId: 'test-conv' }),
+    ]));
+    const pane = panes('__all-projects__')[0]!;
+    expect(usePanesStore.getState().activePaneByWorkspace['__all-projects__']).toBe(pane.paneId);
+    expect(onSelectProject).not.toHaveBeenCalled();
+    expect(panes('test-project')).toEqual([]);
+    expect(latestStageProps?.deckKey).toBe('__all-projects__');
+    expect(latestStageProps?.terminalCwd).toBeUndefined();
+  });
+
+  it('applies ?view=terminal to the shown pane', async () => {
+    renderCommandDeck({ selectedProject: '__all-projects__', convId: '1', conversationViewMode: 'terminal' });
+    await waitFor(() => expect(panes('__all-projects__')).toEqual([
+      expect.objectContaining({ conversationId: 'test-conv', viewMode: 'terminal' }),
+    ]));
+  });
+
+  it('still switches to the conversation\'s project from a project deck', async () => {
+    const onSelectProject = vi.fn();
+    renderCommandDeck({ selectedProject: 'Other Project', convId: '1', onSelectProject });
+    await waitFor(() => expect(onSelectProject).toHaveBeenCalledWith('test-project', { updateUrl: false }));
+    expect(panes('__all-projects__')).toEqual([]);
+  });
+});

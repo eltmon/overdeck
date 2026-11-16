@@ -6,6 +6,7 @@
  * and path. Its menu lists every registered project in owner groups (as the
  * Sidebar did), each with its machine count and a status word, then
  * No project, projects on other machines, Add a project and New workspace.
+ * PAN-5343 H-D2: the first menu item selects the All projects deck.
  * A filter input appears when there are more than 8 projects.
  */
 
@@ -17,7 +18,8 @@ import { useDashboardStore } from '../../lib/store';
 import { getPipelineIssuePhase } from '../../lib/pipeline-state';
 import { useAgentsWorking } from '../../lib/selectors/agentsWorking';
 import { issueByIdentifier } from '../../lib/selectors/issueIndex';
-import { fetchProjects, NO_PROJECT_KEY, NO_PROJECT_LABEL, type ProjectData } from '../CommandDeck/projectsData';
+import { ALL_PROJECTS_KEY, ALL_PROJECTS_LABEL, fetchProjects, NO_PROJECT_KEY, NO_PROJECT_LABEL, type ProjectData } from '../CommandDeck/projectsData';
+import { fetchConversations, type Conversation } from '../CommandDeck/ConversationList';
 import { MenuOverlay, MenuSeparator, PopoverSurface } from '../shared/ContextMenu';
 import { OwnerGroupHeader } from '../sidebar/OwnerGroupHeader';
 import { OtherMachineProjects, ProjectMachineCount } from '../sidebar/OtherMachineProjects';
@@ -54,6 +56,17 @@ export function countInReview(state: Pick<DashboardState, 'issuesRaw' | 'derived
   return count;
 }
 
+/** PAN-5343 H-D2: the All projects subtitle, "<N> projects · <M> active". */
+export function allProjectsSubtitle(projectCount: number, activeCount: number): string {
+  return `${projectCount} ${projectCount === 1 ? 'project' : 'projects'} · ${activeCount} active`;
+}
+
+/** Conversations with a live session, read from the shared ['conversations'] cache (no polling of its own). */
+function useActiveConversationCount(): number {
+  const { data } = useQuery({ queryKey: ['conversations'], queryFn: fetchConversations, staleTime: Infinity });
+  return useMemo(() => (data ?? []).filter((c: Conversation) => c.sessionAlive === true).length, [data]);
+}
+
 /** F-D8: "<n> working", else "<n> in review", else "idle". Its own component so only this row re-renders. */
 function ProjectStatusWord({ project }: { project: ProjectData }) {
   const working = useAgentsWorking({ projectKey: project.key }).count;
@@ -78,9 +91,13 @@ export function ProjectSwitcher({ selectedProject, onSelectProject, onNewProject
   const ownerGroups = useMemo(() => groupProjectsByOwner(projects), [projects]);
   const [collapsedOwners, toggleOwner] = useCollapsedOwners();
 
+  const activeCount = useActiveConversationCount();
+  const allSubtitle = allProjectsSubtitle(projects.length, activeCount);
+
   const isNoProject = selectedProject === NO_PROJECT_KEY;
-  const selected = selectedProject && !isNoProject ? projects.find((p) => p.name === selectedProject) : undefined;
-  const label = isNoProject ? NO_PROJECT_LABEL : selected?.name ?? selectedProject ?? 'Choose a project';
+  const isAllProjects = selectedProject === ALL_PROJECTS_KEY;
+  const selected = selectedProject && !isNoProject && !isAllProjects ? projects.find((p) => p.name === selectedProject) : undefined;
+  const label = isNoProject ? NO_PROJECT_LABEL : isAllProjects ? ALL_PROJECTS_LABEL : selected?.name ?? selectedProject ?? 'Choose a project';
   const showFilter = projects.length > PROJECT_FILTER_THRESHOLD;
   const needle = filter.trim().toLowerCase();
 
@@ -140,13 +157,18 @@ export function ProjectSwitcher({ selectedProject, onSelectProject, onNewProject
         onClick={() => (open ? close() : setOpen(true))}
         className={`list-row flex w-full items-center gap-2 rounded-md text-left ${collapsed ? 'justify-center p-1' : 'px-2 py-1.5'}`}
       >
-        {selected ? <ProjectMark name={selected.name} projectKey={selected.key} /> : <ProjectMark name={label} muted />}
+        {selected
+          ? <ProjectMark name={selected.name} projectKey={selected.key} />
+          : <ProjectMark name={label} muted glyph={isAllProjects ? '✱' : undefined} />}
         {!collapsed && (
           <>
             <span className="min-w-0 flex-1">
               <span data-testid="project-switcher-name" className="block truncate font-display text-sm font-medium text-foreground">{label}</span>
               {selected && (
                 <span className="block truncate font-mono text-[11px] text-muted-foreground">{tildeHomePath(selected.path)}</span>
+              )}
+              {isAllProjects && (
+                <span data-testid="project-switcher-subtitle" className="block truncate text-[11px] text-muted-foreground">{allSubtitle}</span>
               )}
             </span>
             <ChevronsUpDown aria-hidden className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -174,6 +196,19 @@ export function ProjectSwitcher({ selectedProject, onSelectProject, onNewProject
                 className="mb-1 w-full rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
               />
             )}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => pick(ALL_PROJECTS_KEY)}
+              data-testid="project-switcher-row-all-projects"
+              aria-current={isAllProjects ? 'true' : undefined}
+              className={`list-row flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-medium ${isAllProjects ? 'text-foreground' : 'text-body-foreground'}`}
+            >
+              <ProjectMark size="sm" name={ALL_PROJECTS_LABEL} muted glyph="✱" />
+              <span className="truncate">{ALL_PROJECTS_LABEL}</span>
+              <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">{allSubtitle}</span>
+            </button>
+            <MenuSeparator />
             {projects.length === 0 ? (
               <p className="px-2 py-1.5 text-xs text-muted-foreground">No projects</p>
             ) : projectRows}

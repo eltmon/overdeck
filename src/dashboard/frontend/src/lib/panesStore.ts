@@ -5,6 +5,9 @@
  * Each workspace opens on a permanent, unclosable HOME pane; the user opens
  * additional panes that persist independently per workspace.
  *
+ * PAN-5343 H-D15: the All projects deck is Home-less. It hydrates without a
+ * HOME pane, may close its last pane, and then has no active pane.
+ *
  * Like `lib/commandDeckSelection.ts`, this is a sibling Zustand store kept out
  * of the event-sourced `lib/store.ts` so local UI pane state never entangles
  * with the contracts-shared event reducers. State persists to localStorage
@@ -12,6 +15,7 @@
  */
 
 import { create } from 'zustand'
+import { ALL_PROJECTS_KEY } from './deckKeys'
 
 export type WorkspaceId = string
 export type PaneId = string
@@ -80,7 +84,7 @@ export interface WorkspacePane {
 export type PaneSpec = Omit<WorkspacePane, 'paneId' | 'createdAt'>
 
 export interface PanesState {
-  /** Map of workspaceId → ordered panes (HOME always first). */
+  /** Map of workspaceId → ordered panes (HOME always first, except in a Home-less deck). */
   panesByWorkspace: Record<WorkspaceId, WorkspacePane[]>
   /** Map of workspaceId → active pane id. */
   activePaneByWorkspace: Record<WorkspaceId, PaneId>
@@ -137,12 +141,29 @@ function isValidPane(value: unknown): value is WorkspacePane {
   )
 }
 
+/** PAN-5343 H-D15: a deck with no HOME pane (the All projects deck). */
+const isHomeless = (workspaceId: WorkspaceId): boolean => workspaceId === ALL_PROJECTS_KEY
+
 /**
  * Read panes for a workspace from localStorage. Returns null when storage is
  * absent or corrupt so the caller can degrade to a synthesized HOME pane.
  * Guarantees exactly one HOME pane at the front when it returns an array.
+ * A Home-less deck drops any HOME pane and returns the rest, `[]` when
+ * storage is absent or corrupt (never null).
  */
 function readPanes(workspaceId: WorkspaceId): WorkspacePane[] | null {
+  if (isHomeless(workspaceId)) return readStoredPanes(workspaceId)?.filter((p) => p.paneType !== 'home') ?? []
+  const panes = readStoredPanes(workspaceId)
+  if (!panes || panes.length === 0) return null
+  // Normalize to exactly one HOME pane at the front.
+  const homes = panes.filter((p) => p.paneType === 'home')
+  const rest = panes.filter((p) => p.paneType !== 'home')
+  const home = homes[0] ?? makeHomePane()
+  home.isPermanent = true
+  return [home, ...rest]
+}
+
+function readStoredPanes(workspaceId: WorkspaceId): WorkspacePane[] | null {
   let parsed: unknown
   try {
     const raw = localStorage.getItem(panesKey(workspaceId))
@@ -152,14 +173,7 @@ function readPanes(workspaceId: WorkspaceId): WorkspacePane[] | null {
     return null
   }
   if (!Array.isArray(parsed)) return null
-  const panes = parsed.filter(isValidPane)
-  if (panes.length === 0) return null
-  // Normalize to exactly one HOME pane at the front.
-  const homes = panes.filter((p) => p.paneType === 'home')
-  const rest = panes.filter((p) => p.paneType !== 'home')
-  const home = homes[0] ?? makeHomePane()
-  home.isPermanent = true
-  return [home, ...rest]
+  return parsed.filter(isValidPane)
 }
 
 function readActive(workspaceId: WorkspaceId): PaneId | null {
@@ -170,12 +184,14 @@ function readActive(workspaceId: WorkspaceId): PaneId | null {
   }
 }
 
-function persist(workspaceId: WorkspaceId, panes: WorkspacePane[], activeId: PaneId | undefined): void {
+function persist(workspaceId: WorkspaceId, panes: WorkspacePane[], activeId: PaneId | null): void {
   try {
     localStorage.setItem(panesKey(workspaceId), JSON.stringify(panes))
     // Guard against writing the literal string "undefined", which would hydrate
     // as a truthy-but-invalid active id and force an unexpected HOME fallback.
+    // A Home-less deck with no panes has no active id: remove the stored one.
     if (activeId) localStorage.setItem(activeKey(workspaceId), activeId)
+    else localStorage.removeItem(activeKey(workspaceId))
   } catch {
     /* ignore — persistence is best-effort */
   }
@@ -186,7 +202,7 @@ function persist(workspaceId: WorkspaceId, panes: WorkspacePane[], activeId: Pan
 // fires on every tab click / ⌘1–9, so we coalesce writes into a single async
 // flush instead of serializing + writing on every pane mutation.
 
-const persistPending = new Map<WorkspaceId, { panes: WorkspacePane[]; activeId: PaneId | undefined }>()
+const persistPending = new Map<WorkspaceId, { panes: WorkspacePane[]; activeId: PaneId | null }>()
 let persistTimer: ReturnType<typeof setTimeout> | null = null
 
 function flushPending(): void {
@@ -197,7 +213,7 @@ function flushPending(): void {
   persistPending.clear()
 }
 
-function schedulePersist(workspaceId: WorkspaceId, panes: WorkspacePane[], activeId: PaneId | undefined): void {
+function schedulePersist(workspaceId: WorkspaceId, panes: WorkspacePane[], activeId: PaneId | null): void {
   persistPending.set(workspaceId, { panes, activeId })
   if (persistTimer == null) persistTimer = setTimeout(flushPending, 0)
 }
@@ -273,11 +289,26 @@ function touchWorkspace(workspaceId: WorkspaceId): void {
   accessOrder.unshift(workspaceId)
 }
 
-/** Pick a valid active id: keep `preferred` if it exists, else fall back to HOME. */
-function resolveActiveId(panes: WorkspacePane[], preferred: PaneId | null): PaneId {
+/**
+ * Pick a valid active id: keep `preferred` if it exists, else fall back to
+ * HOME (or the first pane). Null only when there are no panes, which happens
+ * only in a Home-less deck.
+ */
+function resolveActiveId(panes: WorkspacePane[], preferred: PaneId | null): PaneId | null {
   if (preferred && panes.some((p) => p.paneId === preferred)) return preferred
   const home = panes.find((p) => p.paneType === 'home') ?? panes[0]
-  return home.paneId
+  return home?.paneId ?? null
+}
+
+/** Set a workspace's active id, deleting the entry when there is none. */
+function withActive(
+  map: Record<WorkspaceId, PaneId>,
+  workspaceId: WorkspaceId,
+  activeId: PaneId | null,
+): Record<WorkspaceId, PaneId> {
+  if (activeId) return { ...map, [workspaceId]: activeId }
+  const { [workspaceId]: _dropped, ...rest } = map
+  return rest
 }
 
 // ─── Store ─────────────────────────────────────────────────────────────────────
@@ -297,21 +328,22 @@ export const usePanesStore = create<PanesStore>((set, get) => ({
     if (workspaceId in state.panesByWorkspace) {
       const panes = state.panesByWorkspace[workspaceId]
       const activeId = resolveActiveId(panes, state.activePaneByWorkspace[workspaceId] ?? null)
-      if (activeId !== state.activePaneByWorkspace[workspaceId]) {
+      if (activeId !== (state.activePaneByWorkspace[workspaceId] ?? null)) {
         set((s) => ({
-          activePaneByWorkspace: { ...s.activePaneByWorkspace, [workspaceId]: activeId },
+          activePaneByWorkspace: withActive(s.activePaneByWorkspace, workspaceId, activeId),
         }))
         schedulePersist(workspaceId, panes, activeId)
       }
       return
     }
-    // First access — hydrate from storage, else synthesize HOME-only.
+    // First access — hydrate from storage, else synthesize HOME-only (a
+    // Home-less deck hydrates to its stored panes, possibly none).
     const hydrated = readPanes(workspaceId)
     const panes = hydrated ?? [makeHomePane()]
     const activeId = resolveActiveId(panes, readActive(workspaceId))
     set((s) => {
       const panesByWorkspace = { ...s.panesByWorkspace, [workspaceId]: panes }
-      const activePaneByWorkspace = { ...s.activePaneByWorkspace, [workspaceId]: activeId }
+      const activePaneByWorkspace = withActive(s.activePaneByWorkspace, workspaceId, activeId)
       // Evict least-recently-used workspaces beyond the cap (memory only;
       // localStorage is retained so they rehydrate on next access).
       while (accessOrder.length > MAX_WORKSPACES) {
@@ -327,6 +359,9 @@ export const usePanesStore = create<PanesStore>((set, get) => ({
   },
 
   addPane: (workspaceId, spec) => {
+    // A Home-less deck not yet in memory hydrates from storage first, so its
+    // stored panes are kept (and de-duplicated against) instead of replaced.
+    if (isHomeless(workspaceId) && !(workspaceId in get().panesByWorkspace)) get().ensureHome(workspaceId)
     touchWorkspace(workspaceId)
     // Opening a pane that already exists must focus it, never add a duplicate
     // (PAN-1561). Agent panes key on the conversation; issue tabs on the issue;
@@ -371,14 +406,15 @@ export const usePanesStore = create<PanesStore>((set, get) => ({
       const existing = s.panesByWorkspace[workspaceId]
       if (!existing) return s
       const target = existing.find((p) => p.paneId === paneId)
-      // Refuse to close HOME / permanent panes.
+      // Refuse to close HOME / permanent panes. A Home-less deck may close its
+      // last pane; it then has no active pane.
       if (!target || target.isPermanent || target.paneType === 'home') return s
       const panes = existing.filter((p) => p.paneId !== paneId)
       const activeId = resolveActiveId(panes, s.activePaneByWorkspace[workspaceId] ?? null)
       schedulePersist(workspaceId, panes, activeId)
       return {
         panesByWorkspace: { ...s.panesByWorkspace, [workspaceId]: panes },
-        activePaneByWorkspace: { ...s.activePaneByWorkspace, [workspaceId]: activeId },
+        activePaneByWorkspace: withActive(s.activePaneByWorkspace, workspaceId, activeId),
       }
     })
   },

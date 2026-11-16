@@ -7,6 +7,10 @@
  * (`projectKey`, else `deckKey`, else the No-project bucket), calls
  * `openInDeck` with its id and refreshes the conversation list. It resolves
  * to the new name, or to the error after toasting it.
+ *
+ * PAN-5343 H-D13: in the All projects deck the conversation is created in the
+ * last real project (unscoped when there is none) and opens beside the
+ * focused pane of the All deck.
  */
 
 import { useCallback, useMemo } from 'react';
@@ -17,7 +21,10 @@ import { pickerEffortLevels, type Harness } from '../../shared/ModelPicker';
 import type { ViewMode } from '../../chat/ConversationPanel';
 import type { Conversation } from '../../CommandDeck/ConversationList';
 import { openConversationTab } from '../../CommandDeck/openConversationTab';
-import { NO_PROJECT_KEY } from '../../CommandDeck/projectsData';
+import { ALL_PROJECTS_KEY, NO_PROJECT_KEY } from '../../CommandDeck/projectsData';
+import { openConversationBeside } from '../../Stage/openConversationInDeck';
+import { newConversationProjectKey } from '../../../lib/lastProject';
+import { usePanesStore } from '../../../lib/panesStore';
 import { useCommandDeckSelection } from '../../../lib/commandDeckSelection';
 import { useDeckNavigation } from './deckNavigation';
 import { useNewConversationDefaults } from './newConversationDefaults';
@@ -55,9 +62,15 @@ export function useCreateConversation(deckKey: string | null, onCreated?: (conv:
         }
         const conv = await res.json() as Conversation;
         useCommandDeckSelection.getState().setSelectedConversation(conv.name);
-        const targetDeck = projectKey ?? deckKey ?? NO_PROJECT_KEY;
-        openConversationTab(targetDeck, conv.name, conv.title ?? 'Agent', undefined, viewMode);
-        openInDeck({ projectKey: targetDeck, conversationRouteKey: String(conv.id) });
+        if (deckKey === ALL_PROJECTS_KEY) {
+          const paneId = openConversationBeside(ALL_PROJECTS_KEY, conv.name, conv.title ?? 'Agent');
+          if (viewMode) usePanesStore.getState().updatePane(ALL_PROJECTS_KEY, paneId, { viewMode });
+          openInDeck({ projectKey: ALL_PROJECTS_KEY, conversationRouteKey: String(conv.id) });
+        } else {
+          const targetDeck = projectKey ?? deckKey ?? NO_PROJECT_KEY;
+          openConversationTab(targetDeck, conv.name, conv.title ?? 'Agent', undefined, viewMode);
+          openInDeck({ projectKey: targetDeck, conversationRouteKey: String(conv.id) });
+        }
         onCreated?.(conv);
         queryClient.invalidateQueries({ queryKey: ['conversations'] });
         return { name: conv.name };
@@ -75,8 +88,7 @@ export function useCreateConversation(deckKey: string | null, onCreated?: (conv:
   // unscoped conversations (no projectKey).
   const createForAgent = useCallback(
     (agentId: string, message?: string, viewMode?: ViewMode): Promise<CreateConversationResult> => {
-      const projectKey = deckKey && deckKey !== NO_PROJECT_KEY ? deckKey : undefined;
-      return create(projectKey, harnessForAgent(agentId), message, viewMode);
+      return create(newConversationProjectKey(deckKey), harnessForAgent(agentId), message, viewMode);
     },
     [create, deckKey],
   );

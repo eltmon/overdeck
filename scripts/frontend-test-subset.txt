@@ -33,6 +33,7 @@ src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx
 src/components/CommandDeck/__tests__/ConversationList.render-count.test.tsx
 src/components/CommandDeck/__tests__/ConversationList.sort.test.ts
 src/components/CommandDeck/__tests__/ConversationList.test.tsx
+src/components/CommandDeck/__tests__/conversationProjectGroups.test.ts
 src/components/CommandDeck/__tests__/ConversationRow.linked.test.tsx
 src/components/CommandDeck/__tests__/ConversationRow.test.tsx
 src/components/CommandDeck/__tests__/DeckEmptyState.test.tsx
@@ -44,6 +45,7 @@ src/components/CommandDeck/__tests__/conversation-triage.test.ts
 src/components/CommandDeck/__tests__/conversationMeta.test.ts
 src/components/CommandDeck/__tests__/handoffComposerArgs.test.ts
 src/components/CommandDeck/__tests__/pipeline-helpers.test.ts
+src/components/CommandDeck/__tests__/projectsData.isRealProjectKey.test.ts
 src/components/CommandDeck/__tests__/projectsData.origin.test.ts
 src/components/CommandDeck/__tests__/useConversationMutations.archive.test.tsx
 src/components/CommandDeck/__tests__/useConversationMutations.stop.test.tsx
@@ -163,6 +165,7 @@ src/components/Settings/sections/__tests__/tiered-crews.test.ts
 src/components/ShutdownBanner.test.tsx
 src/components/ShutdownDialog.test.tsx
 src/components/Stage/__tests__/openBeside.test.tsx
+src/components/Stage/__tests__/openConversationInDeck.test.ts
 src/components/Stage/HomePane/HomeActions.test.tsx
 src/components/Stage/HomePane/HomeFacts.test.tsx
 src/components/Stage/HomePane/HomeHeader.rename.test.tsx
@@ -176,9 +179,12 @@ src/components/Stage/HomePane/Launcher.test.tsx
 src/components/Stage/IssueOverview.test.tsx
 src/components/Stage/PaneBar.test.tsx
 src/components/Stage/ProjectHome.test.tsx
+src/components/Stage/__tests__/PaneLayoutView.drop.test.tsx
 src/components/Stage/__tests__/PaneLayoutView.focus.test.tsx
 src/components/Stage/__tests__/explorer-migration.test.tsx
+src/components/Stage/__tests__/PaneLayoutView.only.test.tsx
 src/components/Stage/__tests__/revealPane.test.tsx
+src/components/Stage/__tests__/Stage.allProjects.test.tsx
 src/components/Stage/__tests__/stageDockMenu.test.tsx
 src/components/Stage/__tests__/PaneTabMenu.scroll.test.tsx
 src/components/Stage/cockpit/IssueMissionControl.header-title.test.tsx
@@ -492,6 +498,7 @@ src/lib/__tests__/composerSendQueue.test.ts
 src/lib/__tests__/composerSendNow.test.ts
 src/lib/__tests__/connectionState.test.ts
 src/lib/__tests__/conversationReferences.test.ts
+src/lib/__tests__/deckLayoutStore.test.ts
 src/lib/__tests__/explorer-drag-paths.test.ts
 src/lib/__tests__/flywheelNeedsYou.test.ts
 src/lib/__tests__/flywheelNeedsYouLinks.test.ts
@@ -506,8 +513,10 @@ src/lib/__tests__/linkedConversation.test.ts
 src/lib/__tests__/markdownDocLinks.test.ts
 src/lib/__tests__/monaco-setup.test.ts
 src/lib/__tests__/nativeQuietReads.test.tsx
+src/lib/__tests__/paneLayout.preset.test.ts
 src/lib/__tests__/panesStore.code.test.ts
 src/lib/__tests__/panesStore.explorer.test.ts
+src/lib/__tests__/panesStore.homeless.test.ts
 src/lib/__tests__/pendingInput.test.ts
 src/lib/__tests__/pendingInputAnswer.test.ts
 src/lib/__tests__/remarkHeadingSlugs.test.ts
@@ -534,6 +543,7 @@ src/lib/sessionOutcome.test.ts
 src/lib/shortcuts/__tests__/keys.test.ts
 src/lib/shortcuts/__tests__/registry.test.ts
 src/lib/shortcuts/__tests__/ShortcutsSheet.test.tsx
+src/lib/simple/needsYouCards.test.ts
 src/lib/simple/uiMode.test.ts
 src/lib/simple/useSimpleActions.test.tsx
 src/lib/uiCommands/leaderTab.test.ts

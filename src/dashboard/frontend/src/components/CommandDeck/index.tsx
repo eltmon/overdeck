@@ -4,7 +4,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stage } from '../Stage';
 import { ProjectHome } from '../Stage/ProjectHome';
 import { IssueOverview } from '../Stage/IssueOverview';
-import { NO_PROJECT_KEY, NO_PROJECT_LABEL } from './projectsData';
+import { ALL_PROJECTS_KEY, NO_PROJECT_KEY, NO_PROJECT_LABEL } from './projectsData';
+import { showConversationInAllDeck } from '../Stage/openConversationInDeck';
 import { type Conversation } from './ConversationList';
 import { openConversationTab } from './openConversationTab';
 import { type ViewMode } from '../chat/ConversationPanel';
@@ -167,19 +168,21 @@ export function CommandDeck({
           subagentId: pendingConversationTarget.subagentId,
         }
       : undefined;
-    // Opening a conversation: the /conv/<id> route owns the URL, so switch the
-    // deck's project without writing /command-deck/<project> over it.
-    onSelectProject?.(projectName, { updateUrl: false });
-    openConversationTabIn(
-      projectName,
-      conv.name,
-      pendingConversationTarget?.label ?? conv.title ?? 'Agent',
-      target,
-      conversationViewMode === 'terminal' ? 'terminal' : undefined,
-    );
+    const label = pendingConversationTarget?.label ?? conv.title ?? 'Agent';
+    const viewMode = conversationViewMode === 'terminal' ? 'terminal' : undefined;
+    if (selectedProject === ALL_PROJECTS_KEY) {
+      // PAN-5343 H-D12: the All projects deck keeps the conversation in its own
+      // deck instead of switching to the conversation's project.
+      showConversationInAllDeck(conv.name, label, target, viewMode);
+    } else {
+      // Opening a conversation: the /conv/<id> route owns the URL, so switch the
+      // deck's project without writing /command-deck/<project> over it.
+      onSelectProject?.(projectName, { updateUrl: false });
+      openConversationTabIn(projectName, conv.name, label, target, viewMode);
+    }
     if (target) onPendingConversationTargetConsumed?.();
     appliedConvId.current = deepLinkKey;
-  }, [convId, conversations, registeredProjectsFetched, registeredProjectsError, resolveConversationProjectName, onSelectProject, openConversationTabIn, pendingConversationTarget, onPendingConversationTargetConsumed, conversationViewMode]);
+  }, [convId, conversations, registeredProjectsFetched, registeredProjectsError, resolveConversationProjectName, onSelectProject, openConversationTabIn, pendingConversationTarget, onPendingConversationTargetConsumed, conversationViewMode, selectedProject]);
 
   // Auto-select first conversation on initial load if no deep-link and no feature selected.
   // An `?issue=` deep-link (issue cockpit/drawer, e.g. ?issue=PAN-1908&tab=conversation)

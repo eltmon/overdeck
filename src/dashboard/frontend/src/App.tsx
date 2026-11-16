@@ -12,7 +12,7 @@ import { SharedConversationRoute } from './components/chat/sharing/SharedConvers
 import { SearchModal } from './components/search/SearchModal';
 import { CommandPalette, type ConversationPaletteOpenRequest } from './components/CommandPalette';
 import { NO_PROJECT_KEY } from './components/CommandDeck/projectsData';
-import { clearLastProjectKey, initialProjectKey, isKnownProjectKey, readLastProjectKey, writeLastProjectKey } from './lib/lastProject';
+import { clearLastProjectKey, initialProjectKey, isKnownProjectKey, readAllProjectsDeck, readLastProjectKey, rememberDeckSelection } from './lib/lastProject';
 import { IssueDrawer } from './components/drawer/IssueDrawer';
 import { IssueDrawerAvailableContext } from './components/drawer/issueDrawerAvailableContext';
 import { ResumableSessionDialog } from './components/ResumableSessionDialog';
@@ -190,6 +190,7 @@ export default function App() {
     routeProject: initialCockpitRoute?.project ?? initialProjectRoute,
     pathname: window.location.pathname,
     stored: readLastProjectKey(),
+    allProjectsDeck: readAllProjectsDeck(),
   }));
   const [selectedProjectKey, setSelectedProjectKey] = useState<string | null>(
     () => initialProjectSelection.key,
@@ -201,7 +202,7 @@ export default function App() {
     initialProjectSelection.fromStorage ? initialProjectSelection.key : null,
   );
   useEffect(() => {
-    if (selectedProjectKey !== null) writeLastProjectKey(selectedProjectKey);
+    if (selectedProjectKey !== null) rememberDeckSelection(selectedProjectKey);
   }, [selectedProjectKey]);
   const [conversationViewMode, setConversationViewModeState] = useState<ConversationViewMode>(
     () => initialConversationRoute.viewMode,

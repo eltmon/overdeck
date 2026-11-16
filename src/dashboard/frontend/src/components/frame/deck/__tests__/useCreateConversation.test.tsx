@@ -6,7 +6,9 @@ import { toast } from 'sonner';
 import { useCreateConversation } from '../useCreateConversation';
 import { useNewConversationDefaults } from '../newConversationDefaults';
 import { TestDeckNavigationProvider, type DeckNavigationCall } from '../deckNavigation';
-import { usePanesStore } from '../../../../lib/panesStore';
+import { flushPanesPersistence, usePanesStore } from '../../../../lib/panesStore';
+import { resetDeckLayoutStore, selectDeckLayout, useDeckLayoutStore } from '../../../../lib/deckLayoutStore';
+import { collectLeafIds } from '../../../../lib/paneLayout';
 import { useCommandDeckSelection } from '../../../../lib/commandDeckSelection';
 import { NO_PROJECT_KEY } from '../../../CommandDeck/projectsData';
 
@@ -97,5 +99,43 @@ describe('useCreateConversation (PAN-5293 WI-5)', () => {
     expect(body).not.toHaveProperty('projectKey');
     expect(body.harness).toBe('codex');
     expect(calls).toEqual([{ method: 'openInDeck', target: { projectKey: NO_PROJECT_KEY, conversationRouteKey: '42' } }]);
+  });
+});
+
+describe('useCreateConversation in the All projects deck (PAN-5343 H-D13)', () => {
+  const ALL = '__all-projects__';
+
+  beforeEach(() => {
+    flushPanesPersistence();
+    localStorage.clear();
+    usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} });
+    resetDeckLayoutStore();
+  });
+
+  it('creates in the last real project and opens beside the focused pane in the All deck', async () => {
+    localStorage.setItem('overdeck.ui.lastProjectKey', 'overdeck');
+    const existing = usePanesStore.getState().addPane(ALL, { paneType: 'agent', label: 'Old', conversationId: 'old-conv' });
+    const { result } = renderHook(() => useCreateConversation(ALL), { wrapper });
+    await act(async () => {
+      await result.current.createForAgent('claude-code');
+    });
+
+    expect(postBody().projectKey).toBe('overdeck');
+    expect(JSON.stringify(postBody())).not.toContain('__all-projects__');
+    expect(calls).toEqual([{ method: 'openInDeck', target: { projectKey: ALL, conversationRouteKey: '42' } }]);
+    const panes = usePanesStore.getState().panesByWorkspace[ALL] ?? [];
+    const created = panes.find((p) => p.conversationId === 'new-conv');
+    expect(collectLeafIds(selectDeckLayout(ALL)(useDeckLayoutStore.getState())!)).toEqual([existing, created!.paneId]);
+    expect(usePanesStore.getState().panesByWorkspace.overdeck).toBeUndefined();
+  });
+
+  it('creates unscoped when there is no last real project', async () => {
+    localStorage.setItem('overdeck.ui.lastProjectKey', '__no-project__');
+    const { result } = renderHook(() => useCreateConversation(ALL), { wrapper });
+    await act(async () => {
+      await result.current.create(undefined);
+    });
+    expect(postBody()).not.toHaveProperty('projectKey');
+    expect(calls).toEqual([{ method: 'openInDeck', target: { projectKey: ALL, conversationRouteKey: '42' } }]);
   });
 });

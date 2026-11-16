@@ -122,6 +122,13 @@ describe('LeftColumn (PAN-5293 F-D18)', () => {
     expect(screen.queryByTestId('stub-workspaces')).not.toBeInTheDocument();
   });
 
+  it('in the All projects deck shows Conversations but no Issues or Workspaces (PAN-5343 H-D4)', () => {
+    renderShell('__all-projects__');
+    expect(screen.getByTestId('stub-conversations')).toBeInTheDocument();
+    expect(screen.queryByTestId('stub-issues')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('stub-workspaces')).not.toBeInTheDocument();
+  });
+
   it('below 900 px is a drawer hidden until the open-navigation event, closed by its overlay', () => {
     narrow = true;
     stubMatchMedia();

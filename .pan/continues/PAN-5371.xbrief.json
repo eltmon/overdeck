@@ -1,0 +1,105 @@
+{
+  "version": "1",
+  "issueId": "PAN-5371",
+  "created": "2026-11-16T01:41:59.414Z",
+  "updated": "2026-11-16T02:05:37.475Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "simple-needs-you-split": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5371",
+      "claimedAt": "2026-11-16T01:41:59.414Z",
+      "doneAt": "2026-11-16T01:48:10.155Z"
+    },
+    "simple-needs-you-split.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:48:10.155Z"
+    },
+    "simple-needs-you-split.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:48:10.155Z"
+    },
+    "simple-needs-you-split.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:48:10.155Z"
+    },
+    "simple-needs-you-split.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:48:10.155Z"
+    },
+    "simple-needs-you-split.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:48:10.155Z"
+    },
+    "simple-home-shared-count": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5371",
+      "claimedAt": "2026-11-16T01:48:36.995Z",
+      "doneAt": "2026-11-16T01:57:29.986Z"
+    },
+    "simple-home-shared-count.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:57:29.986Z"
+    },
+    "simple-home-shared-count.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:57:29.986Z"
+    },
+    "simple-home-shared-count.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:57:29.986Z"
+    },
+    "simple-home-shared-count.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:57:29.986Z"
+    },
+    "simple-home-shared-count.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:57:29.986Z"
+    },
+    "simple-home-count-agreement-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5371",
+      "claimedAt": "2026-11-16T01:57:37.077Z",
+      "doneAt": "2026-11-16T02:04:06.862Z"
+    },
+    "simple-home-count-agreement-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:04:06.862Z"
+    },
+    "simple-home-count-agreement-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:04:06.862Z"
+    },
+    "simple-home-count-agreement-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:04:06.862Z"
+    },
+    "simple-home-count-agreement-test.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:04:06.862Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5371",
+      "claimedAt": "2026-11-16T02:04:11.746Z",
+      "doneAt": "2026-11-16T02:05:37.475Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:05:37.475Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:05:37.475Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:05:37.475Z"
+    }
+  }
+}

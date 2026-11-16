@@ -1,17 +1,21 @@
 /**
  * PAN-2908 · C-SIMPLE — "My work" home (simple mode default).
  *
- * Sections in fixed order: Needs you → Working now → Ready to merge →
- * Finished, plus the Home composer (PAN-4280). One primary action per
- * card; destructive actions do not exist here (Advanced only).
- * Data: dashboard store (issues, agents, review status, pending input).
+ * Sections in fixed order: Needs you → Ready to start → Having trouble →
+ * Just filed → Working now → Ready to merge → Finished, plus the Home
+ * composer (PAN-4280). One primary action per card; destructive actions do
+ * not exist here (Advanced only).
+ * Data: dashboard store (issues, agents, review status, pending input) plus
+ * the shared Needs-you selector (PAN-5371), so the headline count and card
+ * list agree with the top bar.
  */
 import { useMemo, useState } from 'react';
 import { useDashboardStore, type PendingInputSubject } from '../../lib/store';
-import { usePendingInputSubjects } from '../../lib/useDecisions';
 import type { Issue } from '../../types';
 import type { AgentSnapshot } from '@overdeck/contracts';
 import { bucketSimpleHome, deriveSimpleIssue, type SimpleIssueDerivation, type NeedsYouKind } from '../../lib/simple/derive';
+import { useNeedsYouItems } from '../../lib/selectors/needsYou';
+import { coveredIssueIds, simpleNeedsYouCards, simpleSecondarySections, type SimpleNeedsYouCard } from '../../lib/simple/needsYouCards';
 import { SIMPLE_STRINGS } from '../../lib/simple/strings';
 import { useSimpleActions } from '../../lib/simple/useSimpleActions';
 import { useUiMode, syncSimpleIssueUrl } from '../../lib/simple/uiMode';
@@ -142,6 +146,35 @@ function ProblemsCard({ item, kind, onOpen }: { item: SimpleIssueDerivation; kin
   );
 }
 
+/** A card with no Simple derivation: a Flywheel row, a system decision, or
+ * conversation/agent pending input with no issue (N-D5). */
+function NeedsYouItemCard({ card, onOpen }: { card: SimpleNeedsYouCard; onOpen: () => void }) {
+  return (
+    <div className="mt-3 rounded-2xl border border-warning/40 bg-card p-4 shadow-sm">
+      <div className="text-[15px] font-medium">{card.title}</div>
+      <p className="mt-2 text-[13.5px] leading-relaxed">{card.item.ask}</p>
+      <div className="mt-3">
+        <QuietButton onClick={onOpen}>Open</QuietButton>
+      </div>
+    </div>
+  );
+}
+
+/** One Needs-you card per shared selector item (N-D3, N-D4). */
+function NeedsYouCardView({ card, openSimpleIssue }: { card: SimpleNeedsYouCard; openSimpleIssue: (id: string) => void }) {
+  const onOpen = () => {
+    if (card.derivation) openIssue(card.derivation, openSimpleIssue);
+    else card.item.open();
+  };
+  if (card.card === 'question' && card.derivation) {
+    return <QuestionCard item={card.derivation} subject={card.item.subject} onOpen={onOpen} />;
+  }
+  if (card.derivation && (card.card === 'start-work' || card.card === 'stuck' || card.card === 'problems')) {
+    return <ProblemsCard item={card.derivation} kind={card.card} onOpen={onOpen} />;
+  }
+  return <NeedsYouItemCard card={card} onOpen={onOpen} />;
+}
+
 /* ── Working / Ready / Finished rows ─────────────────────────────────── */
 function WorkingRow({ item, onOpen }: { item: SimpleIssueDerivation; onOpen: () => void }) {
   return (
@@ -187,7 +220,6 @@ export function SimpleHomePage() {
   const agentsById = useDashboardStore((s) => s.agentsById);
   const derivedByIssueId = useDashboardStore((s) => s.derivedIssueStateByIssueId);
   const panesById = useDashboardStore((s) => s.backendPanesById);
-  const pendingSubjects = usePendingInputSubjects();
   const openSimpleIssue = useUiMode((s) => s.openSimpleIssue);
 
   const { derivations, buckets, byIdentifier } = useMemo(() => {
@@ -216,27 +248,16 @@ export function SimpleHomePage() {
     };
   }, [issuesRaw, agentsById, derivedByIssueId, panesById]);
 
-  const subjectByIssue = useMemo(() => {
-    const map = new Map<string, PendingInputSubject>();
-    for (const s of pendingSubjects ?? []) {
-      if (s.issueId) map.set(s.issueId.toLowerCase(), s);
-    }
-    return map;
-  }, [pendingSubjects]);
-
-  // Pending-input subjects whose issue didn't bucket as needs-you still show as questions.
-  const extraQuestions = useMemo(() => {
-    const covered = new Set(buckets.needsYou.map((n) => n.derivation.issue.identifier.toLowerCase()));
-    const out: { derivation: SimpleIssueDerivation; subject: PendingInputSubject }[] = [];
-    for (const [key, subject] of subjectByIssue) {
-      if (covered.has(key)) continue;
-      const d = byIdentifier.get(key);
-      if (d) out.push({ derivation: d, subject });
-    }
-    return out;
-  }, [buckets.needsYou, subjectByIssue, byIdentifier]);
-
-  const needsCount = buckets.needsYou.length + extraQuestions.length;
+  const needsItems = useNeedsYouItems();
+  const cards = useMemo(() => simpleNeedsYouCards(needsItems, byIdentifier), [needsItems, byIdentifier]);
+  const secondary = useMemo(() => simpleSecondarySections(buckets.needsYou, needsItems), [buckets.needsYou, needsItems]);
+  const needsCount = needsItems.length;
+  const othersWaiting = secondary.readyToStart.length + secondary.trouble.length > 0;
+  const covered = useMemo(() => coveredIssueIds(needsItems), [needsItems]);
+  const working = useMemo(
+    () => buckets.working.filter((d) => !covered.has(d.issue.identifier.toUpperCase())),
+    [buckets.working, covered],
+  );
   const filed = useMemo(() => justFiled(derivations), [derivations]);
 
   return (
@@ -246,10 +267,10 @@ export function SimpleHomePage() {
           <div>
             <h1 className="text-2xl font-medium">{needsCount > 0 ? `${needsCount} thing${needsCount === 1 ? '' : 's'} need${needsCount === 1 ? 's' : ''} you.` : S.greetingFallback}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {needsCount > 0 ? 'Everything else is moving on its own.' : S.nothingNeedsYou}
+              {othersWaiting ? S.othersWaitingSub : needsCount > 0 ? S.everythingElseMoving : S.nothingNeedsYou}
             </p>
             <div className="mt-3 flex gap-4 text-[13px] text-muted-foreground">
-              <span><b className="font-medium text-foreground">{buckets.working.length}</b> being worked on</span>
+              <span><b className="font-medium text-foreground">{working.length}</b> being worked on</span>
               <span><b className="font-medium text-foreground">{buckets.ready.length}</b> ready to merge</span>
               <span><b className="font-medium text-foreground">{buckets.finished.length}</b> finished this week</span>
             </div>
@@ -265,17 +286,32 @@ export function SimpleHomePage() {
           <h2 className="text-[15px] font-medium">{S.needsYouTitle} <span className="text-xs text-muted-foreground">{needsCount}</span></h2>
           <div className="mt-0.5 text-xs text-muted-foreground">{S.needsYouSub}</div>
           {needsCount === 0 && <div className="mt-3 rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">{S.nothingNeedsYou}</div>}
-          {buckets.needsYou.map(({ derivation, kind }) =>
-            kind === 'question' ? (
-              <QuestionCard key={derivation.issue.identifier} item={derivation} subject={subjectByIssue.get(derivation.issue.identifier.toLowerCase())} onOpen={() => openIssue(derivation, openSimpleIssue)} />
-            ) : (
-              <ProblemsCard key={derivation.issue.identifier} item={derivation} kind={kind} onOpen={() => openIssue(derivation, openSimpleIssue)} />
-            ),
-          )}
-          {extraQuestions.map(({ derivation, subject }) => (
-            <QuestionCard key={`q-${derivation.issue.identifier}`} item={derivation} subject={subject} onOpen={() => openIssue(derivation, openSimpleIssue)} />
+          {cards.map((c) => (
+            <div key={c.item.key} data-testid="simple-needs-you-card" data-needs-you-key={c.item.key}>
+              <NeedsYouCardView card={c} openSimpleIssue={openSimpleIssue} />
+            </div>
           ))}
         </section>
+
+        {secondary.readyToStart.length > 0 && (
+          <section className="mt-8" data-testid="simple-ready-to-start">
+            <h2 className="text-[15px] font-medium">{S.readyToStartTitle} <span className="text-xs text-muted-foreground">{secondary.readyToStart.length}</span></h2>
+            <div className="mt-0.5 text-xs text-muted-foreground">{S.readyToStartSub}</div>
+            {secondary.readyToStart.map((d) => (
+              <ProblemsCard key={d.issue.identifier} item={d} kind="start-work" onOpen={() => openIssue(d, openSimpleIssue)} />
+            ))}
+          </section>
+        )}
+
+        {secondary.trouble.length > 0 && (
+          <section className="mt-8" data-testid="simple-having-trouble">
+            <h2 className="text-[15px] font-medium">{S.troubleTitle} <span className="text-xs text-muted-foreground">{secondary.trouble.length}</span></h2>
+            <div className="mt-0.5 text-xs text-muted-foreground">{S.troubleSub}</div>
+            {secondary.trouble.map((t) => (
+              <ProblemsCard key={t.derivation.issue.identifier} item={t.derivation} kind={t.kind} onOpen={() => openIssue(t.derivation, openSimpleIssue)} />
+            ))}
+          </section>
+        )}
 
         {filed.length > 0 && (
           <section className="mt-8">
@@ -288,9 +324,9 @@ export function SimpleHomePage() {
         )}
 
         <section className="mt-8">
-          <h2 className="text-[15px] font-medium">{S.workingTitle} <span className="text-xs text-muted-foreground">{buckets.working.length}</span></h2>
+          <h2 className="text-[15px] font-medium">{S.workingTitle} <span className="text-xs text-muted-foreground">{working.length}</span></h2>
           <div className="mt-0.5 text-xs text-muted-foreground">{S.workingSub}</div>
-          {buckets.working.map((d) => (
+          {working.map((d) => (
             <WorkingRow key={d.issue.identifier} item={d} onOpen={() => openIssue(d, openSimpleIssue)} />
           ))}
         </section>

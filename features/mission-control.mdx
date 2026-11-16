@@ -20,7 +20,7 @@ The top bar spans the full window width. It starts with the Overdeck brand, whic
 
 The left column is the same on every page. On the Flywheel page, in Settings or anywhere else, it still lists the selected project's conversations, issues and workspaces. Clicking a row opens it in the Command Deck. From top to bottom:
 
-- **Project switcher.** It shows a colored initials mark, the project's name and its path (such as `~/Projects/overdeck`); every project row in the menu carries its own colored mark too. Its menu lists every project, grouped by owner, each with a status word: "2 working", "1 in review" or "idle". Below the projects are **No project**, projects on your other machines, **Add a project**, and **New workspace in** the selected project. With more than 8 projects, a filter box appears at the top of the menu. The dashboard remembers the last project you picked and restores it on a fresh load of a page that isn't already project-scoped (e.g. Activity).
+- **Project switcher.** It shows a colored initials mark, the project's name and its path (such as `~/Projects/overdeck`); every project row in the menu carries its own colored mark too. Its menu starts with **All projects** (a ✱ mark and "N projects · M active"), which opens the All projects deck described below. It then lists every project, grouped by owner, each with a status word: "2 working", "1 in review" or "idle". Below the projects are **No project**, projects on your other machines, **Add a project**, and **New workspace in** the selected project. With more than 8 projects, a filter box appears at the top of the menu. The dashboard remembers the last project you picked and restores it on a fresh load of a page that isn't already project-scoped (e.g. Activity).
 - **Navigation.** **Project home** (shown only when a project is selected; it is the only one of the two current on a Command Deck tab, and only while the Home pane is active) and **Flywheel** (reads "running" during a run), **Order books**, and **More**. **More** holds every other view, grouped as Operations, Infrastructure, Observability and System — it no longer lists Command Deck, since Project home already opens the deck. Experimental views appear there only when experimental features are on.
 - **New conversation.** The main part of the button starts a conversation in the selected project (key `N`). A second line under it names the default model, the harness when it is not Claude Code, and the effort it will spawn with. The caret opens a menu with the model and harness picker, the effort picker, the Retrospective button and **New conversation with options…**. See [Conversations](/features/conversations#new-conversation-with-options).
 - **Conversations.** **Active** shows Needs you and Inbox. **All N** adds Snoozed and Settled. Each row has a meta line in words: its state, its changes (`+12 −3`, then "2 not committed"), the harness when it is not Claude Code, and its cost (never clipped mid-number). A conversation's successors and lanes are grouped under a toggle that starts collapsed unless one of them needs you; a collapsed group still shows the selected conversation's row.
@@ -31,6 +31,35 @@ The left column is the same on every page. On the Flywheel page, in Settings or 
 With no project selected, the switcher reads "Choose a project" and the column shows "Pick a project to see its conversations and issues" instead of the lists. New conversation then starts a conversation outside any project.
 
 The column is 264 px wide. Drag its right edge to resize it between 240 and 640 px. Press `[` to collapse it to 48 px, where it shows only icons. In a window narrower than 900 px, the column is a drawer: open it with **Open navigation** at the left of the top bar.
+
+### All projects and side-by-side conversations
+
+The **All projects** deck lists the conversations of every project in one place and shows up to four of them side by side, each with its own composer. It does not switch you away when you open a conversation from another project.
+
+**Opening it.** There are two doors, and both open the same deck:
+
+- **All projects** at the top of the project switcher's menu. With the deck open, the switcher reads "All projects" with a ✱ mark and "N projects · M active".
+- The **This project / All projects** switch under the Conversations header. **This project** returns to the last project you had open.
+
+**The list.** **Needs you** comes first, as always. The Inbox then shows one group per project, sorted by name, with **No project** last; each group header shows the project's mark and "N working" or "idle". Rows in Needs you, Snoozed and Settled carry their project's mark. While two or more conversations are on screen, a row shows a small number for the pane it is in. Project home, Issues and Workspaces are hidden in this deck, and the top bar reads "All projects / " and the focused conversation's title, or "All projects / N conversations side by side".
+
+**Opening conversations.**
+
+| Action | What happens |
+| --- | --- |
+| Click a row | Shows the conversation in the focused pane. The conversation it replaces stays open as a tab. |
+| `Ctrl`+Click (`Cmd`+Click on macOS), the row's **Beside** button, or **Open beside** in the row menu | Opens the conversation beside the panes already on screen: two side by side, then three columns, then a grid of four. With four on screen, it replaces the one you looked at least recently. |
+| **Open in its project** in the row menu | Switches to the conversation's own project deck. |
+| Shift+Click | Selects rows for the bulk Settle, Unsettle and Snooze bar. |
+| Drag a row onto a pane | Dropping in the middle of the pane shows the conversation there; dropping near an edge opens it beside. |
+
+`Ctrl`/`Cmd`+Click and the **Beside** button also work in a project deck, where they open the conversation beside the panes of that project.
+
+**Layout presets.** At the right end of the tab strip, **Layout** has four buttons: **One**, **Two side by side**, **Three columns** and **Grid of four**. They arrange the open conversations into equal panes, starting with the ones on screen. Each split pane's header has a ⤢ button, **Make this the only pane**, which shows just that conversation and keeps the others as tabs (this button is in every deck).
+
+**New conversation** in this deck starts the conversation in the last project you had open and opens it beside the focused pane; the button's second line names that project first. With nothing open, the deck reads "Pick conversations on the left. Ctrl+Click opens one beside another."
+
+The deck, its open conversations and its layout survive a reload, including a reload on a conversation's own `/conv/<id>` address.
 
 ## Project Tree
 
@@ -130,6 +159,12 @@ question, plan, permission request, issue that needs you, Flywheel request and
 system decision. The Home page's "Needs you" card shows the same number. Open
 the button to see the items grouped by project, and use **Open Activity** for
 system events. Each row in the menu shows how long the item has waited.
+
+In Simple mode, Home's headline ("3 things need you.") uses the same count, and
+its **Needs you** list shows the same items, including Flywheel requests and
+system decisions. Plans that wait for **Start work** appear under
+**Ready to start**, and stuck work or work whose check found problems appears
+under **Having trouble**. Those two sections are not part of the count.
 
 ## Activity feed
 

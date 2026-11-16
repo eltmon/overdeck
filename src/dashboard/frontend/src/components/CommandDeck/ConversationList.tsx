@@ -14,6 +14,7 @@ import styles from './styles/command-deck.module.css';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 import { fetchRegisteredProjects } from './UnknownProjectState';
 import { MenuItemButton, MenuOverlay, MenuSurface } from '../shared/ContextMenu';
+import { groupNodesByProject, ProjectGroupHeader, type ConversationProjectRef } from './conversationProjectGroups';
 import type { ConversationChangeTotals, LinkedConversationFields, PullRequestLink } from '@overdeck/contracts';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -253,6 +254,19 @@ interface ConversationListProps {
   includeIds?: Set<number>;
   /** PAN-5293 F-D13: 'active' shows only Needs you and Inbox; default 'all' shows all four sections. */
   scope?: 'active' | 'all';
+  /**
+   * PAN-5343 H-D3: the All projects list. Inbox rows render under one header
+   * per project; rows in the other sections carry their project's mark.
+   */
+  groupByProject?: (conv: Conversation) => ConversationProjectRef;
+  /** PAN-5343 H-D18: conversation name → 1-based split leaf, while the deck is split. */
+  paneSlots?: ReadonlyMap<string, number>;
+  /** PAN-5343 H-D5: Ctrl/Cmd+Click, the Beside control and the Open beside menu item. When absent, Ctrl/Cmd+Click toggles the multi-selection. */
+  onOpenBeside?: (name: string) => void;
+  /** PAN-5343 H-D5: the Open in its project menu item. */
+  onOpenInProject?: (name: string) => void;
+  /** PAN-5343 H-D8: a conversation's own project deck; when given, rows drag onto Stage panes. */
+  deckKeyOf?: (conv: Conversation) => string;
 }
 
 /** The sections the 'active' scope shows. */
@@ -346,6 +360,14 @@ interface ConversationListItemProps {
   onToggleGroup: (node: ConversationTreeNode<Conversation>) => void;
   mutations: ConversationMutations;
   registeredProjects: RegisteredProject;
+  /** PAN-5343 H-D3: the project mark shown before the title, outside the grouped Inbox. */
+  markProjectKey?: string;
+  markName?: string;
+  /** PAN-5343 H-D18: the split leaf showing this row's conversation. */
+  paneSlot?: number;
+  onOpenBeside?: (name: string) => void;
+  onOpenInProject?: (name: string) => void;
+  dragDeckKey?: string;
 }
 
 /** The non-zero group counts, in the order the PRD fixes (WI-10 step 3). */
@@ -371,6 +393,12 @@ function ConversationListItemImpl({
   onToggleGroup,
   mutations,
   registeredProjects,
+  markProjectKey,
+  markName,
+  paneSlot,
+  onOpenBeside,
+  onOpenInProject,
+  dragDeckKey,
 }: ConversationListItemProps) {
   return (
     <motion.div
@@ -390,6 +418,12 @@ function ConversationListItemImpl({
         mutations={mutations}
         registeredProjects={registeredProjects}
         orphanOf={node.orphanOf}
+        markProjectKey={markProjectKey}
+        markName={markName}
+        paneSlot={paneSlot}
+        onOpenBeside={onOpenBeside}
+        onOpenInProject={onOpenInProject}
+        dragDeckKey={dragDeckKey}
       />
       {node.descendants.length > 0 && (
         <button
@@ -430,6 +464,9 @@ function itemPropsEqual(a: ConversationListItemProps, b: ConversationListItemPro
   if (a.section !== b.section) return false;
   if (a.collapsed !== b.collapsed) return false;
   if (a.isMultiSelected !== b.isMultiSelected) return false;
+  if (a.markProjectKey !== b.markProjectKey || a.markName !== b.markName) return false;
+  if (a.paneSlot !== b.paneSlot) return false;
+  if (a.dragDeckKey !== b.dragDeckKey) return false;
   if ((a.selectedConversation === a.node.conv.name) !== (b.selectedConversation === b.node.conv.name)) return false;
   if (a.node.descendants.length !== b.node.descendants.length) return false;
   for (let i = 0; i < a.node.descendants.length; i += 1) {
@@ -445,12 +482,14 @@ function itemPropsEqual(a: ConversationListItemProps, b: ConversationListItemPro
     && Object.is(a.onToggleGroup, b.onToggleGroup)
     && Object.is(a.mutations, b.mutations)
     && Object.is(a.registeredProjects, b.registeredProjects)
+    && Object.is(a.onOpenBeside, b.onOpenBeside)
+    && Object.is(a.onOpenInProject, b.onOpenInProject)
   );
 }
 
 const ConversationListItem = memo(ConversationListItemImpl, itemPropsEqual);
 
-export function ConversationList({ selectedConversation, onSelectConversation, excludeIds, includeIds, scope = 'all' }: ConversationListProps) {
+export function ConversationList({ selectedConversation, onSelectConversation, excludeIds, includeIds, scope = 'all', groupByProject, paneSlots, onOpenBeside, onOpenInProject, deckKeyOf }: ConversationListProps) {
   const shownSections = scope === 'active' ? ACTIVE_SECTION_ORDER : SECTION_ORDER;
   const [sort, setSort] = useState<SortOption>(loadSort);
   const [tab, setTab] = useState<ListTab>(loadTab);
@@ -610,6 +649,11 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
         return;
       }
     }
+    // PAN-5343 H-D5: with an opener, Ctrl/Cmd+Click opens beside and selects nothing.
+    if (onOpenBeside && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+      onOpenBeside(name);
+      return;
+    }
     if (e.metaKey || e.ctrlKey || e.shiftKey) {
       setSelected((previous) => {
         const next = new Set(previous);
@@ -623,7 +667,7 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
     setSelected(new Set());
     anchorRef.current = null;
     onSelectConversation(name);
-  }, [onSelectConversation]);
+  }, [onSelectConversation, onOpenBeside]);
 
   const clearSelection = useCallback(() => {
     setSelected(new Set());
@@ -675,12 +719,44 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
   // of the generic "No conversations yet" message, which would be misleading.
   const showInboxClear = needsYouCount === 0 && inboxCount === 0 && (snoozedCount > 0 || settledCount > 0);
 
+  // PAN-5343 H-D3: in the All projects list the Inbox renders grouped by project.
+  const inboxGroups = groupByProject
+    ? groupNodesByProject(sectionsById.get('inbox')?.nodes ?? [], groupByProject)
+    : null;
+  const sectionNodes = (id: ConversationSectionId) =>
+    id === 'inbox' && inboxGroups ? inboxGroups.flatMap((group) => group.nodes) : sectionsById.get(id)?.nodes ?? [];
+
   // D14: the visible top-level rows in render order, collapsed sections
   // excluded — Shift-click ranges over exactly this list.
   visibleTopLevelNamesRef.current = shownSections.flatMap((id) => {
     if (COLLAPSIBLE_SECTIONS.has(id) && !expandedSections.has(id)) return [];
-    return (sectionsById.get(id)?.nodes ?? []).map((node) => node.conv.name);
+    return sectionNodes(id).map((node) => node.conv.name);
   });
+
+  const renderItem = (node: ConversationTreeNode<Conversation>, id: ConversationSectionId, withMark: boolean) => {
+    const mark = withMark && groupByProject ? groupByProject(node.conv) : undefined;
+    return (
+      <ConversationListItem
+        key={node.conv.id}
+        node={node}
+        section={id}
+        collapsed={node.descendants.length > 0 && isGroupCollapsed(node)}
+        selectedConversation={selectedConversation}
+        onSelectConversation={onSelectConversation}
+        onRowClick={handleRowClick}
+        isMultiSelected={selected.has(node.conv.name)}
+        onToggleGroup={toggleGroup}
+        mutations={mutations}
+        registeredProjects={registeredProjects}
+        markProjectKey={mark?.key}
+        markName={mark?.label}
+        paneSlot={paneSlots?.get(node.conv.name)}
+        onOpenBeside={onOpenBeside}
+        onOpenInProject={onOpenInProject}
+        dragDeckKey={deckKeyOf?.(node.conv)}
+      />
+    );
+  };
 
   return (
     <div className={styles.conversationListWrapper} onKeyDown={handleKeyDown}>
@@ -805,23 +881,17 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
                 if (!expanded) return rendered;
               }
 
-              for (const node of nodes) {
-                rendered.push(
-                  <ConversationListItem
-                    key={node.conv.id}
-                    node={node}
-                    section={id}
-                    collapsed={node.descendants.length > 0 && isGroupCollapsed(node)}
-                    selectedConversation={selectedConversation}
-                    onSelectConversation={onSelectConversation}
-                    onRowClick={handleRowClick}
-                    isMultiSelected={selected.has(node.conv.name)}
-                    onToggleGroup={toggleGroup}
-                    mutations={mutations}
-                    registeredProjects={registeredProjects}
-                  />,
-                );
+              if (id === 'inbox' && inboxGroups) {
+                for (const group of inboxGroups) {
+                  rendered.push(
+                    <ProjectGroupHeader key={`project-group-${group.key}`} projectKey={group.key} label={group.label} working={group.working} />,
+                  );
+                  for (const node of group.nodes) rendered.push(renderItem(node, id, false));
+                }
+                return rendered;
               }
+
+              for (const node of nodes) rendered.push(renderItem(node, id, true));
               return rendered;
             })}
           </AnimatePresence>

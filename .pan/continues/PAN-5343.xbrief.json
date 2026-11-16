@@ -1,0 +1,447 @@
+{
+  "version": "1",
+  "issueId": "PAN-5343",
+  "created": "2026-11-16T00:09:01.559Z",
+  "updated": "2026-11-16T01:14:22.892Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "deck-key": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:09:01.559Z",
+      "doneAt": "2026-11-16T00:11:20.381Z"
+    },
+    "deck-key.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:11:20.381Z"
+    },
+    "deck-key.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:11:20.381Z"
+    },
+    "deck-key.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:11:20.381Z"
+    },
+    "deck-key.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:11:20.381Z"
+    },
+    "homeless-panes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:11:26.878Z",
+      "doneAt": "2026-11-16T00:14:00.296Z"
+    },
+    "preset-layout": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:13:35.998Z",
+      "doneAt": "2026-11-16T00:15:36.142Z"
+    },
+    "homeless-panes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:14:00.296Z"
+    },
+    "homeless-panes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:14:00.296Z"
+    },
+    "homeless-panes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:14:00.296Z"
+    },
+    "homeless-panes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:14:00.296Z"
+    },
+    "preset-layout.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:15:36.142Z"
+    },
+    "preset-layout.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:15:36.142Z"
+    },
+    "preset-layout.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:15:36.142Z"
+    },
+    "deck-layout-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:15:37.524Z",
+      "doneAt": "2026-11-16T00:17:59.246Z"
+    },
+    "deck-layout-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:17:59.246Z"
+    },
+    "deck-layout-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:17:59.246Z"
+    },
+    "deck-layout-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:17:59.246Z"
+    },
+    "deck-layout-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:17:59.246Z"
+    },
+    "deck-openers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:18:05.065Z",
+      "doneAt": "2026-11-16T00:23:26.042Z"
+    },
+    "deck-openers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:23:26.042Z"
+    },
+    "deck-openers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:23:26.042Z"
+    },
+    "deck-openers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:23:26.042Z"
+    },
+    "deck-openers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:23:26.042Z"
+    },
+    "deck-openers.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:23:26.042Z"
+    },
+    "switcher-door": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:23:31.438Z",
+      "doneAt": "2026-11-16T00:25:54.284Z"
+    },
+    "switcher-door.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:25:54.284Z"
+    },
+    "switcher-door.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:25:54.284Z"
+    },
+    "switcher-door.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:25:54.284Z"
+    },
+    "switcher-door.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:25:54.284Z"
+    },
+    "scope-switch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:25:55.873Z",
+      "doneAt": "2026-11-16T00:28:34.869Z"
+    },
+    "scope-switch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:28:34.869Z"
+    },
+    "scope-switch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:28:34.869Z"
+    },
+    "scope-switch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:28:34.869Z"
+    },
+    "hide-project-items": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:28:36.286Z",
+      "doneAt": "2026-11-16T00:30:17.516Z"
+    },
+    "hide-project-items.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:30:17.516Z"
+    },
+    "hide-project-items.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:30:17.516Z"
+    },
+    "hide-project-items.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:30:17.516Z"
+    },
+    "grouped-list": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:30:22.949Z",
+      "doneAt": "2026-11-16T00:33:55.703Z"
+    },
+    "grouped-list.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:33:55.703Z"
+    },
+    "grouped-list.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:33:55.703Z"
+    },
+    "grouped-list.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:33:55.703Z"
+    },
+    "grouped-list.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:33:55.703Z"
+    },
+    "pane-badges": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:34:03.129Z",
+      "doneAt": "2026-11-16T00:38:24.733Z"
+    },
+    "pane-badges.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:38:24.733Z"
+    },
+    "pane-badges.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:38:24.733Z"
+    },
+    "pane-badges.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:38:24.733Z"
+    },
+    "pane-badges.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:38:24.733Z"
+    },
+    "row-open-controls": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:38:35.220Z",
+      "doneAt": "2026-11-16T00:40:45.278Z"
+    },
+    "row-open-controls.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:40:45.278Z"
+    },
+    "row-open-controls.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:40:45.278Z"
+    },
+    "row-open-controls.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:40:45.278Z"
+    },
+    "row-open-controls.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:40:45.278Z"
+    },
+    "open-routing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:40:50.590Z",
+      "doneAt": "2026-11-16T00:43:34.409Z"
+    },
+    "open-routing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:43:34.409Z"
+    },
+    "open-routing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:43:34.409Z"
+    },
+    "open-routing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:43:34.409Z"
+    },
+    "conv-deeplink": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:43:35.810Z",
+      "doneAt": "2026-11-16T01:00:25.230Z"
+    },
+    "conv-deeplink.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:46:00.170Z"
+    },
+    "conv-deeplink.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:46:00.170Z"
+    },
+    "conv-deeplink.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:46:00.170Z"
+    },
+    "preset-bar": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:46:06.456Z",
+      "doneAt": "2026-11-16T00:59:54.407Z"
+    },
+    "preset-bar.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:48:56.345Z"
+    },
+    "preset-bar.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:48:56.345Z"
+    },
+    "preset-bar.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:48:56.345Z"
+    },
+    "preset-bar.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:48:56.345Z"
+    },
+    "crumb": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:49:05.112Z",
+      "doneAt": "2026-11-16T00:52:04.377Z"
+    },
+    "crumb.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:52:04.377Z"
+    },
+    "crumb.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:52:04.377Z"
+    },
+    "crumb.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:52:04.377Z"
+    },
+    "new-conversation": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:52:05.853Z",
+      "doneAt": "2026-11-16T00:54:44.120Z"
+    },
+    "new-conversation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:54:44.120Z"
+    },
+    "new-conversation.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:54:44.120Z"
+    },
+    "new-conversation.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:54:44.120Z"
+    },
+    "preset-bar.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:59:54.407Z"
+    },
+    "conv-deeplink.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:00:25.230Z"
+    },
+    "only-pane": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T01:00:30.624Z",
+      "doneAt": "2026-11-16T01:02:46.630Z"
+    },
+    "only-pane.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:02:46.630Z"
+    },
+    "only-pane.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:02:46.630Z"
+    },
+    "only-pane.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:02:46.630Z"
+    },
+    "row-drag": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T01:02:52.702Z",
+      "doneAt": "2026-11-16T01:07:34.683Z"
+    },
+    "row-drag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:07:34.683Z"
+    },
+    "row-drag.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:07:34.683Z"
+    },
+    "row-drag.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:07:34.683Z"
+    },
+    "row-drag.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:07:34.683Z"
+    },
+    "pane-marks": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T01:07:42.274Z",
+      "doneAt": "2026-11-16T01:11:12.691Z"
+    },
+    "pane-marks.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:11:12.691Z"
+    },
+    "pane-marks.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:11:12.691Z"
+    },
+    "pane-marks.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:11:12.691Z"
+    },
+    "empty-all-deck": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T01:11:17.863Z",
+      "doneAt": "2026-11-16T01:13:08.176Z"
+    },
+    "empty-all-deck.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:13:08.176Z"
+    },
+    "empty-all-deck.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:13:08.176Z"
+    },
+    "empty-all-deck.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:13:08.176Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T01:13:14.162Z",
+      "doneAt": "2026-11-16T01:14:22.892Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:14:22.892Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:14:22.892Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:14:22.892Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:14:22.892Z"
+    }
+  }
+}

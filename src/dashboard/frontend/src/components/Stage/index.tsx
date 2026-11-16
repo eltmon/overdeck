@@ -12,7 +12,7 @@ import type { SessionNode as SessionNodeType } from '@overdeck/contracts'
 import { useConversationMutations } from '../CommandDeck/useConversationMutations'
 import { ConversationActionMenu } from '../CommandDeck/ConversationActionMenu'
 import { PaneTabMenu } from './PaneTabMenu'
-import { PaneLayoutView } from './PaneLayoutView'
+import { PaneLayoutView, type DropZone } from './PaneLayoutView'
 import {
   leaf,
   isSplit,
@@ -24,10 +24,14 @@ import {
   pruneToValid,
   replaceLeaf,
   updateRatio,
-  isValidLayout,
   type PaneLayout,
   type SplitPath,
 } from '../../lib/paneLayout'
+import { selectDeckLayout, useDeckLayoutStore } from '../../lib/deckLayoutStore'
+import { ALL_PROJECTS_KEY } from '../../lib/deckKeys'
+import { LayoutPresetBar } from './LayoutPresetBar'
+import { useConversationDragStore } from './conversationDragStore'
+import { openConversationBeside, showConversation } from './openConversationInDeck'
 import { ForkModal } from '../CommandDeck/ForkModal'
 import { Bot, Terminal as TerminalIcon, Globe, FolderTree, GitCompare, Search } from 'lucide-react'
 import { PaneBar, type NewPaneAction } from './PaneBar'
@@ -50,6 +54,9 @@ import { useWorkDockStore } from '../dock/workDockStore'
 import { WorkDock } from '../dock/WorkDock'
 import { useRootContext } from '../explorer/rootForConversation'
 import { findRegisteredProject } from '../CommandDeck/UnknownProjectState'
+import { NO_PROJECT_LABEL, resolveEffectiveProjectKey } from '../CommandDeck/projectsData'
+import { ProjectMark } from '../frame/ProjectMark'
+import { currentPlatform } from '../../lib/shortcuts/keys'
 import styles from './stage.module.css'
 
 export type { StageContext, PaneWrapperProps, StageApi } from './types'
@@ -348,31 +355,25 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
 
   // Pane layout (PAN-1591): a binary split tree arranging the deck's visible
   // panes into arbitrary grids. A null / single-leaf layout means "no split" —
-  // the deck renders just the active pane. Persisted per project across reloads.
-  const layoutKey = `pan-layout:${deckKey}`
-  const [layout, setLayoutState] = useState<PaneLayout | null>(null)
+  // the deck renders just the active pane. Persisted per deck across reloads.
+  // PAN-5343 H-D14: the layout lives in deckLayoutStore so the list, the crumb
+  // and the deck openers can read and change it from outside the Stage. The
+  // Stage reads null until its mount effect re-reads storage, exactly as it
+  // did when the layout was local state.
+  const [hydratedDeck, setHydratedDeck] = useState<string | null>(null)
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(`pan-layout:${deckKey}`)
-      const parsed = raw ? (JSON.parse(raw) as unknown) : null
-      setLayoutState(isValidLayout(parsed) && leafCount(parsed) > 1 ? parsed : null)
-    } catch {
-      setLayoutState(null)
-    }
+    useDeckLayoutStore.getState().hydrateLayout(deckKey)
+    setHydratedDeck(deckKey)
   }, [deckKey])
+  const storeLayout = useDeckLayoutStore(selectDeckLayout(deckKey))
+  const layout = hydratedDeck === deckKey ? storeLayout : null
   const setLayout = useCallback(
-    (next: PaneLayout | null) => {
-      const effective = next && leafCount(next) > 1 ? next : null
-      setLayoutState(effective)
-      try {
-        if (effective) localStorage.setItem(layoutKey, JSON.stringify(effective))
-        else localStorage.removeItem(layoutKey)
-      } catch {
-        /* ignore */
-      }
-    },
-    [layoutKey],
+    (next: PaneLayout | null) => useDeckLayoutStore.getState().setLayout(deckKey, next),
+    [deckKey],
   )
+  useEffect(() => {
+    if (activeId) useDeckLayoutStore.getState().noteFocus(deckKey, activeId)
+  }, [deckKey, activeId])
 
   // Selecting a tab focuses its pane. While split: if the pane is already a
   // visible region, focus it; otherwise load it into the focused region (the
@@ -453,7 +454,23 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
   // than guessing. Fallback (⌘T / no menu) toggles the terminal drawer.
   const handleAddPane = useCallback(() => toggleTerminal(), [toggleTerminal])
   // B-D11: the deck's project, found by key or name.
-  const deckProject = findRegisteredProject(useRootContext().projects, deckKey)
+  const registeredProjects = useRootContext().projects
+  const deckProject = findRegisteredProject(registeredProjects, deckKey)
+  // PAN-5343 H-D9: in the All deck, agent tabs and split headers carry their
+  // conversation's project mark (muted for No project).
+  const renderPaneMark = useMemo(() => {
+    if (deckKey !== ALL_PROJECTS_KEY) return undefined
+    return (pane: WorkspacePane): ReactNode => {
+      if (pane.paneType !== 'agent' || !pane.conversationId) return null
+      const conv = conversations.find((c) => c.name === pane.conversationId)
+      if (!conv) return null
+      const key = resolveEffectiveProjectKey(conv, registeredProjects)
+      const project = key ? registeredProjects.find((p) => p.key === key) : undefined
+      return project
+        ? <ProjectMark size="sm" name={project.name ?? project.key} projectKey={project.key} />
+        : <ProjectMark size="sm" name={NO_PROJECT_LABEL} muted />
+    }
+  }, [deckKey, conversations, registeredProjects])
   // PAN-5295 D2-17: create actions first, then a separator, then the drawers;
   // each shows its registered shortcut's keycap for this platform.
   const newActions = useMemo<NewPaneAction[]>(() => {
@@ -659,6 +676,31 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
     [layout, activeId, deckKey, setActivePane, setLayout],
   )
 
+  // PAN-5343 H-D8: a conversation row dragged onto a pane. The All deck takes
+  // any conversation; a project deck takes only its own. The centre replaces
+  // the target leaf; an edge opens the conversation beside it.
+  const conversationDrag = useConversationDragStore((s) => s.dragging)
+  const draggingConversation = conversationDrag !== null && (deckKey === ALL_PROJECTS_KEY || conversationDrag.deckKey === deckKey)
+  const onDropConversation = useCallback(
+    (targetPaneId: string, name: string, zone: DropZone) => {
+      useConversationDragStore.getState().end()
+      setActivePane(deckKey, targetPaneId)
+      const label = conversations.find((c) => c.name === name)?.title ?? 'Agent'
+      if (zone === 'center') showConversation(deckKey, name, label)
+      else openConversationBeside(deckKey, name, label)
+    },
+    [deckKey, conversations, setActivePane],
+  )
+
+  // PAN-5343 H-D19: the split header's ⤢ — show only this pane; the others stay as tabs.
+  const makeOnlyPane = useCallback(
+    (paneId: string) => {
+      setLayout(null)
+      setActivePane(deckKey, paneId)
+    },
+    [deckKey, setActivePane, setLayout],
+  )
+
   const onRatioChange = useCallback(
     (path: SplitPath, ratio: number) => {
       setLayout(layout ? updateRatio(layout, path, ratio) : null)
@@ -696,6 +738,14 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
     [layout, activePane, deckKey, setActivePane, setLayout],
   )
   const effectiveLayout = layout ?? (activePane ? leaf(activePane.paneId) : null)
+  // PAN-5343 H-D7: the Layout presets, in the All projects deck only. Memoized so the memo'd PaneBar keeps equal props.
+  const activePaneIdForBar = activePane?.paneId ?? null
+  const layoutPresetBar = useMemo(
+    () => (deckKey === ALL_PROJECTS_KEY
+      ? <LayoutPresetBar deckKey={deckKey} panes={displayPanes} layout={layout} activePaneId={activePaneIdForBar} />
+      : undefined),
+    [deckKey, displayPanes, layout, activePaneIdForBar],
+  )
 
   // Close every closable tab (HOME/permanent panes stay). Also clears any split.
   const closeAllPanes = useCallback(() => {
@@ -742,8 +792,16 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
             onTabDragStart={setDraggingPaneId}
             onTabDragEnd={() => setDraggingPaneId(null)}
             onTabDetach={handleTabDetach}
+            trailing={layoutPresetBar}
+            renderTabPrefix={renderPaneMark}
           />
           <div className={styles.paneArea}>
+            {/* PAN-5343 H-D10: the Home-less All deck with nothing open. */}
+            {deckKey === ALL_PROJECTS_KEY && displayPanes.length === 0 && (
+              <div data-testid="all-projects-empty" className="flex flex-1 items-center justify-center p-8 text-center text-sm text-muted-foreground">
+                {`Pick conversations on the left. ${currentPlatform() === 'mac' ? 'Cmd' : 'Ctrl'}+Click opens one beside another.`}
+              </div>
+            )}
             {effectiveLayout && (
               <PaneLayoutView
                 node={effectiveLayout}
@@ -757,6 +815,10 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
                 onCloseLeaf={closeLeaf}
                 onRatioChange={onRatioChange}
                 onDropTab={onDropTab}
+                onMakeOnly={makeOnlyPane}
+                renderHeaderPrefix={renderPaneMark}
+                draggingConversation={draggingConversation}
+                onDropConversation={onDropConversation}
               />
             )}
           </div>

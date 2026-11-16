@@ -4,7 +4,7 @@
  * pending input surfaces as an answerable question, simple issue page shows
  * the status card + conversation composer.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest';
 import type { AgentSnapshot } from '@overdeck/contracts';
@@ -92,6 +92,8 @@ describe('SimpleHomePage (C-SIMPLE)', () => {
       if (url === '/api/issues/resource-allocated') return Response.json([]);
       if (url === '/api/registered-projects') return Response.json([{ key: 'panopticon-cli', name: 'panopticon-cli', path: '/tmp' }]);
       if (url === '/api/prerequisites') return Response.json({ platform: 'linux', allRequiredFound: true, checks: [] });
+      if (url === '/api/conversations/pending-input') return Response.json([]);
+      if (url === '/api/conversations') return Response.json([]);
       return Response.json({});
     }));
   });
@@ -151,6 +153,43 @@ describe('SimpleHomePage (C-SIMPLE)', () => {
     seed({ issues: [makeIssue({ state: 'backlog', title: 'Far-future idea' })] });
     renderWithProviders(<SimpleHomePage />);
     expect(screen.queryByText('Far-future idea')).not.toBeInTheDocument();
+  });
+
+  // PAN-5371: the shared selector does not count a plan-ready issue, so it
+  // renders under Ready to start and must not also be a Needs-you card.
+  it('a planned issue shows under Ready to start and is not a Needs-you card', () => {
+    seed({
+      issues: [makeIssue({ state: 'planned' })],
+      derivedState: derived('planned'),
+    });
+    renderWithProviders(<SimpleHomePage />);
+    const readyToStart = screen.getByTestId('simple-ready-to-start');
+    expect(within(readyToStart).getByText('Set up PostHog product analytics')).toBeInTheDocument();
+    expect(within(readyToStart).getByRole('button', { name: 'Start work' })).toBeInTheDocument();
+    // The default fetch stub's /api/disk-alert response can add a stray "Disk low"
+    // card, so assert on keys rather than on the absence of any needs-you card.
+    const keys = screen.queryAllByTestId('simple-needs-you-card').map((el) => el.getAttribute('data-needs-you-key'));
+    expect(keys).not.toContain('issue:PAN-1');
+  });
+
+  it('a pending question is one Needs-you card', () => {
+    seed({
+      issues: [makeIssue()],
+      agents: {
+        'agent-pan-1': makeAgent({
+          pendingInputCount: 1,
+          pendingInputKinds: ['askUserQuestion'],
+          pendingAskUserQuestion: {
+            toolUseId: 'tu-1',
+            askedAt: new Date().toISOString(),
+            questions: [{ question: 'Which PostHog project should events go to?', options: [] }],
+          },
+        }),
+      },
+    });
+    renderWithProviders(<SimpleHomePage />);
+    const cards = screen.queryAllByTestId('simple-needs-you-card').filter((el) => el.getAttribute('data-needs-you-key') === 'issue:PAN-1');
+    expect(cards).toHaveLength(1);
   });
 });
 

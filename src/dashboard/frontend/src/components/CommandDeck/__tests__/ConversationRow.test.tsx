@@ -666,3 +666,71 @@ describe('ConversationRow schedule menu item (PAN-4657 menu-wiring)', () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe('ConversationRow pane badge (PAN-5343 H-D18)', () => {
+  it('shows the split leaf number with its title', () => {
+    renderRow({}, { paneSlot: 2 });
+    const badge = screen.getByTestId('conversation-pane-slot');
+    expect(badge).toHaveTextContent('2');
+    expect(badge).toHaveAttribute('title', 'Shown in pane 2');
+  });
+
+  it('shows no badge without a pane slot', () => {
+    renderRow({});
+    expect(screen.queryByTestId('conversation-pane-slot')).not.toBeInTheDocument();
+  });
+});
+
+describe('ConversationRow open-beside controls (PAN-5343 H-D5)', () => {
+  it('the Beside control calls onOpenBeside and not onSelect', () => {
+    const onOpenBeside = vi.fn();
+    const onSelect = vi.fn();
+    renderRow({}, { onOpenBeside, onSelect });
+    fireEvent.click(screen.getByRole('button', { name: 'Open beside' }));
+    expect(onOpenBeside).toHaveBeenCalledWith(conversation.name);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('has no Beside control or menu items without the openers', () => {
+    renderRow({});
+    expect(screen.queryByRole('button', { name: 'Open beside' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    expect(screen.queryByText('Open beside')).not.toBeInTheDocument();
+    expect(screen.queryByText('Open in its project')).not.toBeInTheDocument();
+  });
+
+  it('the row menu shows Open beside and Open in its project', () => {
+    const onOpenBeside = vi.fn();
+    const onOpenInProject = vi.fn();
+    renderRow({}, { onOpenBeside, onOpenInProject });
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    const menu = screen.getByRole('menu', { name: 'Actions for Test conversation' });
+    fireEvent.click(within(menu).getByText('Open in its project'));
+    expect(onOpenInProject).toHaveBeenCalledWith(conversation.name);
+
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    fireEvent.click(within(screen.getByRole('menu', { name: 'Actions for Test conversation' })).getByText('Open beside'));
+    expect(onOpenBeside).toHaveBeenCalledWith(conversation.name);
+  });
+});
+
+describe('ConversationRow drag onto a pane (PAN-5343 H-D8)', () => {
+  it('is draggable with a deck key and records the drag', async () => {
+    const { useConversationDragStore, CONVERSATION_DRAG_TYPE } = await import('../../Stage/conversationDragStore');
+    renderRow({}, { dragDeckKey: 'dfai' });
+    const row = screen.getByTitle(conversation.name);
+    expect(row).toHaveAttribute('draggable', 'true');
+    const setData = vi.fn();
+    fireEvent.dragStart(row, { dataTransfer: { setData, effectAllowed: '' } });
+    expect(setData).toHaveBeenCalledWith(CONVERSATION_DRAG_TYPE, conversation.name);
+    expect(useConversationDragStore.getState().dragging).toEqual({ name: conversation.name, deckKey: 'dfai' });
+    fireEvent.dragEnd(row);
+    expect(useConversationDragStore.getState().dragging).toBeNull();
+  });
+
+  it('is not draggable without a deck key', () => {
+    renderRow({});
+    expect(screen.getByTitle(conversation.name)).not.toHaveAttribute('draggable');
+  });
+});
+

@@ -7,12 +7,22 @@
 import { compareIssueIds, projectDeckKey } from '@overdeck/contracts';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { fetchWithTimeout } from '../../lib/apiFetch';
+import { ALL_PROJECTS_KEY } from '../../lib/deckKeys';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
 
 /** Sentinel deck key for the "No project" bucket — conversations/terminals not
  * under any registered project (PAN-1561). */
 export const NO_PROJECT_KEY = '__no-project__';
 export const NO_PROJECT_LABEL = 'No project';
+export { ALL_PROJECTS_KEY, ALL_PROJECTS_LABEL } from '../../lib/deckKeys';
+
+/**
+ * PAN-5343 H-D17: true only for a deck key that names a registered project —
+ * not null or empty, not the No project bucket, not the All projects deck.
+ */
+export function isRealProjectKey(key: string | null | undefined): key is string {
+  return !!key && key !== NO_PROJECT_KEY && key !== ALL_PROJECTS_KEY;
+}
 
 export interface RegisteredProjectLite {
   key: string;

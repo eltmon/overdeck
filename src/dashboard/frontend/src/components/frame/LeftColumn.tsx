@@ -26,6 +26,7 @@ import { LeftColumnFooter } from './LeftColumnFooter';
 import { useDeckNavigation } from './deck/deckNavigation';
 import { DeckDataHost } from './deck/DeckDataHost';
 import { DeckDialogsHost } from './deck/DeckDialogsHost';
+import { ALL_PROJECTS_KEY } from '../../lib/deckKeys';
 
 export const LEFT_COLUMN_WIDTH_KEY = 'overdeck.ui.leftColumnWidth';
 export const LEFT_COLUMN_COLLAPSED_KEY = 'overdeck.ui.leftColumnCollapsed';
@@ -178,8 +179,13 @@ export function LeftColumn({
             ) : (
               <>
                 <ConversationsSection selectedProject={selectedProject} />
-                <IssuesSection selectedProject={selectedProject} />
-                <WorkspacesSection selectedProject={selectedProject} onSelectWorkspace={onSelectWorkspace} onNewWorkspace={onNewWorkspace} />
+                {/* PAN-5343 H-D4: issues and workspaces belong to one project, so the All projects deck hides them. */}
+                {selectedProject !== ALL_PROJECTS_KEY && (
+                  <>
+                    <IssuesSection selectedProject={selectedProject} />
+                    <WorkspacesSection selectedProject={selectedProject} onSelectWorkspace={onSelectWorkspace} onNewWorkspace={onNewWorkspace} />
+                  </>
+                )}
               </>
             )}
           </div>

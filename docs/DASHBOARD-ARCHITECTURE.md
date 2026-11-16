@@ -2080,7 +2080,11 @@ opens Home (`/`). After the brand, left to right, the bar holds:
    `useNeedsYouItems()` (`lib/selectors/needsYou.ts`). It is always visible and
    amber only when N > 0. The menu groups items by project (items without one
    under "Other"); a row calls its item's `open()`, and **Open Activity** goes
-   to `/activity`.
+   to `/activity`. Simple Home (`components/simple/SimpleHomePage.tsx`) uses the
+   same selector for its headline and its Needs-you cards (`lib/simple/needsYouCards.ts`
+   picks each card); the Simple reasons the selector does not count (`start-work`,
+   `stuck`, `problems`) render in its **Ready to start** and **Having trouble**
+   sections, outside the count (PAN-5371).
 5. **Exception chips**, each rendered only while its condition is true:
    **Auto-resume frozen** (`DeaconFrozenChip`, while Deacon is paused; click to
    resume), **N stopped** (`StoppedAgentsBanner variant="pill"`), **Low-cost
@@ -2327,6 +2331,109 @@ none of them.
 
 `LeftColumn` also mounts `DeckDialogsHost` once, so the fork modal and the Plan
 dialog open from any route.
+
+## All projects deck (PAN-5343)
+
+The All projects deck lists every project's conversations and shows one to
+four of them side by side. It is an ordinary deck with its own key; the
+Stage, the panes store and the URL code treat it like any other deck, with
+the differences below.
+
+### Deck key and the real-project rule
+
+- `lib/deckKeys.ts` is a leaf module (no imports) holding
+  `ALL_PROJECTS_KEY = '__all-projects__'` and `ALL_PROJECTS_LABEL`.
+  `projectsData.ts` re-exports both. `panesStore.ts` imports the leaf, not
+  `projectsData.ts`, so no import cycle forms.
+- The URL is `/command-deck/__all-projects__`, built by the existing route code.
+  `isKnownProject` and `isKnownProjectKey` accept the key, so it never renders
+  `UnknownProjectState`.
+- `isRealProjectKey(key)` (in `projectsData.ts`) is true only for a non-empty
+  key that is neither `NO_PROJECT_KEY` nor `ALL_PROJECTS_KEY`. Every "is this a
+  project?" check uses it (`ActivityFeedTab`, `newConversationProjectKey`), so
+  no request ever carries `projectKey: '__all-projects__'`.
+- The doors are the project switcher's first item and the Conversations
+  section's This project / All projects switch. Both call `selectProject`.
+
+### Home-less decks in `panesStore`
+
+`isHomeless(id)` is true for `ALL_PROJECTS_KEY`. For that deck `readPanes`
+drops any `home` pane and returns `[]` when storage is empty; `ensureHome`
+hydrates without synthesizing Home; `addPane` on a deck not yet in memory
+hydrates first instead of seeding Home; `resolveActiveId` may return `null`,
+which deletes the deck's active entry and removes `pan-active-pane:<key>`; and
+`closePane` may close the last pane. Project decks behave as before.
+
+### `deckLayoutStore`
+
+The split layout moved from Stage component state into `lib/deckLayoutStore.ts`
+(zustand), so the list, the crumb and the openers can read and change it.
+
+- `layoutByDeck` holds each deck's layout. `hydrateLayout(deck)` always re-reads
+  `pan-layout:<deck>`; `getLayout(deck)` hydrates only when the deck is not in
+  memory; `setLayout(deck, next)` stores a layout with ≤ 1 leaf as `null` and
+  removes the key, else writes it through. The storage key and that rule are
+  unchanged.
+- `focusHistoryByDeck` is session-only: pane ids, most recent first, no
+  duplicates, at most 32. The Stage calls `noteFocus` whenever the active pane
+  changes.
+- The Stage reads `null` until its mount effect has re-read storage, as it did
+  with local state, so a stale in-memory layout never heals against a new
+  pane set.
+
+### Presets
+
+`paneLayout.ts` adds `presetLayout(ids, n)` and `presetOf(layout)`. The presets
+are 1 → one leaf; 2 → a 50/50 row split; 3 → three equal columns (row split
+with ratio ⅓ whose second child is a 50/50 row split); 4 → a 2×2 grid (a 50/50
+column split of two 50/50 row splits). `presetOf` matches by nesting and
+ignores ratios. `Stage/LayoutPresetBar.tsx` renders the four buttons as the
+`PaneBar`'s `trailing` slot in the All deck only. Its candidates are agent
+panes: the visible agent leaves, then the focus history, then tab order.
+
+### The openers and the click rules
+
+`Stage/openConversationInDeck.ts` works on the stores through `getState()`, so
+the left column can call it from any route.
+
+- `showConversation(deck, name, label)` focuses a visible conversation;
+  otherwise it finds or adds the agent pane and, in a split, replaces the
+  focused leaf (the replaced pane stays a tab).
+- `openConversationBeside(deck, name, label)` adds the conversation to the
+  visible panes as an equal 2/3/4 preset; with four visible it replaces the
+  least recently focused non-active leaf, keeping the 2×2 shape.
+- `showConversationInAllDeck` is `showConversation` plus the message target
+  and `?view=terminal`, for `/conv/<id>` deep links while the All deck is
+  selected (`CommandDeck`'s deep-link effect skips `onSelectProject` then).
+
+| Input in the list | All projects deck | Project deck |
+| --- | --- | --- |
+| Click | `showConversation` in the All deck (`useOpenConversation`) | `openConversationTab` in the conversation's project (unchanged) |
+| Ctrl/Cmd+Click, Beside, Open beside | `openConversationBeside` in the All deck (`useOpenConversationBeside`) | `openConversationBeside` in the conversation's project |
+| Open in its project | `useOpenConversation(null)`: switch to the conversation's project | same |
+| Shift+Click | range/toggle multi-select | same |
+
+`ConversationList` takes `onOpenBeside`; without it, Ctrl/Cmd+Click keeps the
+old multi-select toggle. New per-row props (`markProjectKey`, `markName`,
+`paneSlot`, `onOpenBeside`, `onOpenInProject`, `dragDeckKey`) are primitives
+or stable callbacks compared in `itemPropsEqual`.
+
+### Drag a row onto a pane
+
+`Stage/conversationDragStore.ts` holds `{ name, deckKey }` while a row drags
+(`application/x-conversation-name`); `deckKey` is the conversation's own
+project deck. A Stage shows the drop overlay when the All deck is selected or
+the drag's `deckKey` is its own. A centre drop calls `showConversation`; an
+edge drop calls `openConversationBeside`.
+
+### Reload
+
+`lib/lastProject.ts` keeps `overdeck.ui.allProjectsDeck` beside
+`overdeck.ui.lastProjectKey`. `rememberDeckSelection` sets the flag for the
+All key and never writes that key as the last project; any other deck clears
+the flag. `initialProjectKey` returns the All key for a `/conv/` path or a
+storage fallback while the flag is set; a route project still wins and a bare
+`/command-deck` still returns no project.
 
 ## Conversation changes (PAN-5288)
 
