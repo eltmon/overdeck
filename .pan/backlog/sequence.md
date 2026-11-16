@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T02:34:19.198393Z · model: claude-opus-5-5 · open: 892_
+_Last sequenced: 2026-11-16T03:20:03.040633Z · model: claude-opus-5-5 · open: 891_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -215,7 +215,7 @@ _Last sequenced: 2026-11-16T02:34:19.198393Z · model: claude-opus-5-5 · open: 
 | 216 | PAN-3196 | S | high | ok |  |  | Root-owned container residue makes close-out die on EACCES after passing every DoD row; same family as PAN-3570. |
 | 217 | PAN-3186 | XS | high | ok |  |  | One configured non-git member (auricle/infra) blanks pipeline membership for the whole project the resolver claims it can answer. |
 | 218 | PAN-3185 | XS | high | ok |  |  | Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail. |
-| 219 | PAN-5371 | S | medium | ok |  |  | Simple Home headline (18) and top bar Needs-you (8) count different things; pick one rule so both agree (epic D-8). |
+| 219 | PAN-5413 | S | medium | ok |  |  | Kanban Needs-you strip counts with the old Simple Home rule; switch it to the shared top-bar selector (epic D-8). |
 | 220 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time with no production-reach check, so members read shipped while prod serves the old build. |
 | 221 | PAN-3130 | S | high | ok |  |  | Identifier-joined write paths have no containment assertion, so a crafted issue or agent id could redirect a canonical write. |
 | 222 | PAN-3047 | XS | high | ok |  |  | Strike-branch teardown uses --is-ancestor, which cannot see a squash merge, so all 96 strike/* branches survive as residue. |
@@ -394,7 +394,6 @@ _Last sequenced: 2026-11-16T02:34:19.198393Z · model: claude-opus-5-5 · open: 
 | 395 | PAN-3164 | XS | medium | ok |  |  | probeUatStack reports readiness from container count, so the UI offers 'Open UAT frontend' while the API is still resolving Maven deps. |
 | 396 | PAN-3121 | S | medium | ok |  |  | The failed-send outbox never reconciles against the transcript, so a delivered message keeps a Retry twin that would double-send. |
 | 397 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
-| 398 | PAN-5413 | S | medium | ok |  | PAN-5371 | Kanban Needs-you strip counts with the old Simple Home rule; switch it to the shared top-bar selector (epic D-8). |
 | 400 | PAN-5366 | M | medium | ok |  |  | Conversation page cannot show whether per-turn memory injection reaches it; add a state route and a status-line part. |
 | 401 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
 | 402 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
@@ -1227,10 +1226,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T02:34:19.198393Z",
+  "generatedAt": "2026-11-16T03:20:03.040633Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 892,
+  "openCount": 891,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -3925,15 +3924,15 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-5371",
+      "issue": "PAN-5413",
       "rank": 219,
       "size": "S",
       "importance": "medium",
       "score": 58,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Simple Home headline (18) and top bar Needs-you (8) count different things; pick one rule so both agree (epic D-8).",
-      "rationale": "New child of epic PAN-5284 with a concrete count mismatch, two stated fixes to choose in planning, and a testable acceptance; placed beside sibling PAN-5370.",
+      "why": "Kanban Needs-you strip counts with the old Simple Home rule; switch it to the shared top-bar selector (epic D-8).",
+      "rationale": "Its prerequisite PAN-5371 merged (#5415), so the shared needs-you selector exists and this fix is unblocked; it takes the rank-219 slot PAN-5371 vacated.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6135,21 +6134,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "condition": "ok",
       "dependsOn": [],
       "why": "Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5413",
-      "rank": 398,
-      "size": "S",
-      "importance": "medium",
-      "score": 56,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-5371"
-      ],
-      "why": "Kanban Needs-you strip counts with the old Simple Home rule; switch it to the shared top-bar selector (epic D-8).",
-      "rationale": "New child of epic PAN-5284 split out of PAN-5371 to keep that fix small; it reuses the needs-you split PAN-5371 lands, so it follows that work in the free rank-398 slot.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13439,13 +13423,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
     },
     {
       "from": "PAN-5284",
-      "to": "PAN-5371",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5284",
       "to": "PAN-5408",
       "type": "contains",
       "source": "github-ref",
@@ -13464,13 +13441,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-5371",
-      "to": "PAN-5413",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.7
     },
     {
       "from": "PAN-750",
