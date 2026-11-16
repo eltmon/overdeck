@@ -5,6 +5,7 @@
  * tables at wake-up. directory.ts runs every write; the Live Activity writes (PAN-4839) go through
  * `writeActivityEffect` here.
  */
+import { isConnectPlan } from '../../../packages/contracts/src/connect.ts';
 import type { ConnectPlan, DirectoryEndpoint } from '../../../packages/contracts/src/connect.ts';
 import type { ActivityRegistration, ActivityReport } from './activity-state.ts';
 import type { ApprovalRow, ClientRow, DirectoryEffect, DirectoryState, MachineRow } from './directory-state.ts';
@@ -235,7 +236,7 @@ export function loadDirectory(sql: SqlStorage): DirectoryState {
       lastSeenAt: r.last_seen_at,
     }));
   const planRow = sql.exec<{ value: string }>(`SELECT value FROM meta WHERE key = 'plan'`).toArray()[0];
-  const plan = planRow?.value === 'free' || planRow?.value === 'tester' ? (planRow.value as ConnectPlan) : null;
+  const plan: ConnectPlan | null = isConnectPlan(planRow?.value) ? planRow.value : null;
   const approvals = sql
     .exec<ApprovalSqlRow>('SELECT * FROM approvals ORDER BY created_at, request_id')
     .toArray()

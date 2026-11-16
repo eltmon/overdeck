@@ -10,7 +10,7 @@
  * trusted here; the public `Authorization` header is never read.
  * This module uses Web APIs only; src/index.ts owns the `cloudflare:workers` import.
  */
-import { CONNECT_CLOSE_CODES } from '../../../packages/contracts/src/connect.ts';
+import { CONNECT_CLOSE_CODES, isConnectPlan } from '../../../packages/contracts/src/connect.ts';
 import type { DirectoryToClientFrame, DirectoryToMachineFrame } from '../../../packages/contracts/src/connect.ts';
 import { ACCOUNT_PATHS, ACCOUNT_TABLES, accountView } from './account-view.ts';
 import { reduceClient } from './client-state.ts';
@@ -81,7 +81,7 @@ function parseIdentity(raw: string | null): ConnectIdentity | null {
   const { userId, githubId, deviceId, plan, maxDevices } = value as Record<string, unknown>;
   if (typeof userId !== 'string' || typeof deviceId !== 'string') return null;
   if (typeof githubId !== 'number' || !Number.isSafeInteger(githubId)) return null;
-  if (plan !== 'free' && plan !== 'tester') return null;
+  if (!isConnectPlan(plan)) return null;
   if (maxDevices !== null && (typeof maxDevices !== 'number' || !Number.isSafeInteger(maxDevices) || maxDevices < 0)) return null;
   return { userId, githubId, deviceId, plan, maxDevices };
 }

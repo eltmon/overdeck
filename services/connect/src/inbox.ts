@@ -9,7 +9,7 @@
  * time a re-send is due after a nack, or NULL while a delivery waits for its answer. A machine that
  * reconnects gets every pending event on its welcome.
  */
-import { INBOX_HOLD_MS } from '../../../packages/contracts/src/connect.ts';
+import { INBOX_HOLD_MS, planAllowsInbox } from '../../../packages/contracts/src/connect.ts';
 import type { ConnectPlan } from '../../../packages/contracts/src/connect.ts';
 import { bytesToHex, hexToBytes } from './fingerprint.ts';
 import { sealTo } from './seal.ts';
@@ -166,7 +166,7 @@ export class InboxStore {
   }): IntakeResult {
     const inbox = this.inboxFor(input.secretHash);
     if (!inbox) return { status: 404, body: NOT_FOUND };
-    if (input.plan !== 'tester') return { status: 403, body: { error: 'the inbox needs the Anywhere plan' } };
+    if (!planAllowsInbox(input.plan)) return { status: 403, body: { error: 'the inbox needs the Anywhere plan' } };
     const publicKeyHex = input.publicKeyHexOf(inbox.environmentId);
     if (!publicKeyHex) return { status: 404, body: NOT_FOUND };
 

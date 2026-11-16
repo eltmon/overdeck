@@ -72,8 +72,28 @@ export const CONNECT_CLOSE_CODES = {
 } as const
 export type ConnectCloseCode = (typeof CONNECT_CLOSE_CODES)[keyof typeof CONNECT_CLOSE_CODES]
 
-/** Account plan as the directory sees it (`Entitlement.plan` of the account service). */
-export type ConnectPlan = "free" | "tester"
+/** Account plan as the directory sees it: `Entitlement.plan`, with `anywhere` split by the relay add-on (PAN-4294). */
+export type ConnectPlan = "free" | "tester" | "anywhere" | "anywhere_relay"
+export const CONNECT_PLANS: readonly ConnectPlan[] = ["free", "tester", "anywhere", "anywhere_relay"]
+export function isConnectPlan(value: unknown): value is ConnectPlan {
+  return typeof value === "string" && (CONNECT_PLANS as readonly string[]).includes(value)
+}
+export function planAllowsRelay(plan: ConnectPlan | null): boolean {
+  return plan === "tester" || plan === "anywhere_relay"
+}
+export function planAllowsInbox(plan: ConnectPlan | null): boolean {
+  return plan !== null && plan !== "free"
+}
+
+/**
+ * The plan sent to machines and phones in `welcome` / `welcome-client` (PAN-4294 D-13). Released dashboards gate the
+ * inbox and relay lines on `plan === "tester"`, so every paid plan is sent as `tester`; the exact plan travels in
+ * `tier`. Relay use follows `relayAllowed`, so a wire `tester` never grants the relay by itself.
+ */
+export type ConnectWirePlan = "free" | "tester"
+export function wirePlanOf(plan: ConnectPlan): ConnectWirePlan {
+  return plan === "free" ? "free" : "tester"
+}
 
 export type ConnectErrorCode =
   | "unauthorized" | "unsupported" | "machine_limit" | "peer_offline"
@@ -193,7 +213,9 @@ export type DirectoryToMachineFrame =
   | {
     readonly type: "welcome"
     readonly protocol: ConnectProtocolVersion
-    readonly plan: ConnectPlan
+    readonly plan: ConnectWirePlan
+    /** The exact plan (PAN-4294); absent from directories older than it. */
+    readonly tier?: ConnectPlan
     readonly maxMachines: number | null
     readonly relayAllowed: boolean
     readonly inboxAllowed: boolean
@@ -289,7 +311,9 @@ export type DirectoryToClientFrame =
   | {
     readonly type: "welcome-client"
     readonly protocol: ConnectProtocolVersion
-    readonly plan: ConnectPlan
+    readonly plan: ConnectWirePlan
+    /** The exact plan (PAN-4294); absent from directories older than it. */
+    readonly tier?: ConnectPlan
     readonly relayAllowed: boolean
     readonly machines: readonly DirectoryMachine[]
   }

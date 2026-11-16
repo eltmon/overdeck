@@ -477,3 +477,12 @@ describe('client reducer: push registration (PAN-4830 WI-8)', () => {
     expect(JSON.stringify(logs(all))).not.toContain(PUSH_TOKEN);
   });
 });
+
+describe('client reducer: the paid plans (PAN-4294 connect-paid-plans)', () => {
+  it('welcome-client sends anywhere as wire tester with its tier and no relay; anywhere_relay gets the relay', () => {
+    const plain = sends(helloClient(EMPTY_DIRECTORY, 1, { deviceId: 'd-1', plan: 'anywhere', maxDevices: null }).effects)[0];
+    expect(plain).toMatchObject({ frame: { type: 'welcome-client', plan: 'tester', tier: 'anywhere', relayAllowed: false } });
+    const relay = sends(helloClient(EMPTY_DIRECTORY, 1, { deviceId: 'd-1', plan: 'anywhere_relay', maxDevices: null }).effects)[0];
+    expect(relay).toMatchObject({ frame: { type: 'welcome-client', plan: 'tester', tier: 'anywhere_relay', relayAllowed: true } });
+  });
+});

@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
-import { INBOX_BODY_MAX_BYTES, INBOX_HOLD_MS } from '../../../../packages/contracts/src/connect.ts';
+import { INBOX_BODY_MAX_BYTES, INBOX_HOLD_MS, type ConnectPlan } from '../../../../packages/contracts/src/connect.ts';
 import type { AccountBinding } from '../../../../services/connect/src/account.ts';
 import type { Deps, Env } from '../../../../services/connect/src/env.ts';
 import { HDR_INBOX_HEADERS, HDR_INBOX_SECRET_HASH } from '../../../../services/connect/src/env.ts';
@@ -62,7 +62,7 @@ function setup() {
       now += ms;
     },
     now: () => now,
-    intake: (secretHash: string, body = 'hello', plan: 'tester' | 'free' = 'tester') =>
+    intake: (secretHash: string, body = 'hello', plan: ConnectPlan = 'tester') =>
       store.intake({
         secretHash,
         headers: { 'content-type': 'application/json', 'x-github-event': 'push' },
@@ -130,6 +130,14 @@ describe('inbox store (PAN-2356 WI-8)', () => {
     expect(t.intake(hash, 'x', 'free')).toEqual({ status: 403, body: { error: 'the inbox needs the Anywhere plan' } });
     for (let i = 0; i < MAX_PENDING_PER_INBOX; i++) expect(t.intake(hash).status).toBe(202);
     expect(t.intake(hash)).toEqual({ status: 429, body: { error: 'inbox full' }, retryAfter: 3600 });
+  });
+
+  it('accepts intake for both paid plans (PAN-4294)', async () => {
+    const t = setup();
+    const { secret } = await t.store.create(ENV_A);
+    const hash = await sha256Hex(secret);
+    expect(t.intake(hash, 'x', 'anywhere').status).toBe(202);
+    expect(t.intake(hash, 'x', 'anywhere_relay').status).toBe(202);
   });
 
   it('answers a wrong secret with 404', async () => {
