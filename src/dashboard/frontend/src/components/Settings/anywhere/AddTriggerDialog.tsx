@@ -11,7 +11,7 @@
  * hold events in a directory inbox while this machine is offline; the result then shows the inbox
  * URL, once, instead of the Funnel URL.
  */
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -107,13 +107,6 @@ function AddTriggerDialogBody({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [created, setCreated] = useState<CreatedTriggerBody | null>(null);
-  const resultRef = useRef<HTMLDivElement>(null);
-
-  // The result view replaces the form (and its focused submit button); keep
-  // focus inside the dialog so Escape and the Tab trap still work (D6).
-  useEffect(() => {
-    if (created) resultRef.current?.closest<HTMLElement>('[data-component="modal"]')?.focus();
-  }, [created]);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -156,7 +149,7 @@ function AddTriggerDialogBody({ onClose }: { onClose: () => void }) {
           </button>
         }
       >
-        <div ref={resultRef} className={`${formStyles.content} space-y-4`}>
+        <div className={`${formStyles.content} space-y-4`}>
           {created.inboxUrl ? (
             <>
               <CopyField label="Inbox URL" value={created.inboxUrl} testId="trigger-created-inbox-url" />

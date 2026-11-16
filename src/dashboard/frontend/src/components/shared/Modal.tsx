@@ -89,6 +89,7 @@ export function Modal({
   const Panel = onSubmit ? 'form' : ('div' as unknown as 'form');
   const panelRef = useRef<HTMLFormElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
+  const scrimRef = useRef<HTMLDivElement | null>(null);
   const scrimPressedRef = useRef(false);
   // Captured at first render, before a child's autoFocus or this component's
   // effect moves focus into the panel (PAN-4756 FR-1).
@@ -105,6 +106,21 @@ export function Modal({
     target?.focus();
     return restore;
   }, [opener]);
+
+  // A dialog that swaps its body (a form replaced by its result) removes the
+  // focused control, and focus falls to <body>, outside the panel: Escape and
+  // the Tab trap then stop working. Pull focus back to the panel. Observe the
+  // scrim, not the panel: dropping onSubmit turns the panel from a form into a
+  // div, which React mounts as a new element.
+  useEffect(() => {
+    const scrim = scrimRef.current;
+    if (!scrim) return;
+    const observer = new MutationObserver(() => {
+      if (document.activeElement === null || document.activeElement === document.body) panelRef.current?.focus();
+    });
+    observer.observe(scrim, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     // React bubbles a nested portal's key events through the React tree; only
@@ -155,7 +171,7 @@ export function Modal({
   const bodyClassName = headless ? `${styles.body} ${styles.headlessBody}` : styles.body;
 
   return createPortal(
-    <div className={styles.scrim} data-component="modal-scrim" onMouseDown={onScrimMouseDown} onClick={onScrimClick}>
+    <div ref={scrimRef} className={styles.scrim} data-component="modal-scrim" onMouseDown={onScrimMouseDown} onClick={onScrimClick}>
       <Panel
         ref={panelRef}
         role={alert ? 'alertdialog' : 'dialog'}

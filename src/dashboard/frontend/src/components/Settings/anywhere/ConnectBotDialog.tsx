@@ -3,7 +3,7 @@
  * client (Hermes, OpenClaw, Grok Build, Grok Bot, the xAI API) scoped, revocable access to
  * this machine. Every reach is wired here: connector, tailscale, this-computer and public.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Modal } from '../../shared/Modal';
 import formStyles from '../../shared/ModalForm.module.css';
@@ -77,13 +77,6 @@ function ConnectBotDialogBody({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [output, setOutput] = useState<ConnectBotResult | null>(null);
-  const outputRef = useRef<HTMLDivElement>(null);
-
-  // The output replaces the form (and its focused button); keep focus inside
-  // the dialog so Escape and the Tab trap still work (D6).
-  useEffect(() => {
-    if (output) outputRef.current?.closest<HTMLElement>('[data-component="modal"]')?.focus();
-  }, [output]);
 
   // PAN-4947: the same key and loader as the Public MCP panel. A failed load (an older server
   // answers 404) leaves `publicMcp` undefined, which reads as off (D-6).
@@ -180,7 +173,7 @@ function ConnectBotDialogBody({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="Connect a bot" onClose={onClose}>
       {output ? (
-        <div ref={outputRef} className={`${formStyles.content} text-sm`} data-component="connect-bot-dialog">
+        <div className={`${formStyles.content} text-sm`} data-component="connect-bot-dialog">
           <ConnectBotOutput platform={platform} result={output} onDone={onClose} />
         </div>
       ) : (

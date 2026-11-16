@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { Modal } from '../Modal';
 import styles from '../Modal.module.css';
@@ -261,5 +261,42 @@ describe('Modal', () => {
     expect(screen.getByLabelText('auto')).toHaveFocus();
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(trigger).toHaveFocus();
+  });
+  it('refocuses the panel when a body swap removes the focused control', async () => {
+    function Swapper() {
+      const [done, setDone] = useState(false);
+      return (
+        <Modal title="T" onClose={() => {}}>
+          {done ? <p>Result</p> : <button onClick={() => setDone(true)}>Create</button>}
+        </Modal>
+      );
+    }
+    render(<Swapper />);
+    const create = screen.getByRole('button', { name: 'Create' });
+    create.focus();
+    fireEvent.click(create);
+    await screen.findByText('Result');
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'T' })).toHaveFocus());
+  });
+  it('refocuses the panel when dropping onSubmit remounts the panel', async () => {
+    function FormThenResult() {
+      const [done, setDone] = useState(false);
+      return (
+        <Modal
+          title="T"
+          onClose={() => {}}
+          onSubmit={done ? undefined : (event) => { event.preventDefault(); setDone(true); }}
+          footer={done ? undefined : <button type="submit">Create</button>}
+        >
+          {done ? <p>Result</p> : <input aria-label="name" />}
+        </Modal>
+      );
+    }
+    render(<FormThenResult />);
+    const create = screen.getByRole('button', { name: 'Create' });
+    create.focus();
+    fireEvent.click(create);
+    await screen.findByText('Result');
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'T' })).toHaveFocus());
   });
 });

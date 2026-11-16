@@ -7,7 +7,7 @@
  * (D-4649-3). Only a browser on this machine can mint tokens, so a 403
  * renders an explanation (D-4649-10).
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -108,13 +108,6 @@ function McpUrlDialogBody({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [minted, setMinted] = useState<MintedMcp | null>(null);
-  const mintedRef = useRef<HTMLDivElement>(null);
-
-  // The result replaces the form (and its focused button); keep focus inside
-  // the dialog so Escape and the Tab trap still work (D6).
-  useEffect(() => {
-    if (minted) mintedRef.current?.closest<HTMLElement>('[data-component="modal"]')?.focus();
-  }, [minted]);
 
   const address = choice ?? preferred;
 
@@ -147,7 +140,7 @@ function McpUrlDialogBody({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="Copy MCP URL" onClose={onClose}>
       {minted ? (
-        <div ref={mintedRef} className={`${formStyles.content} space-y-3`} data-component="mcp-url-dialog">
+        <div className={`${formStyles.content} space-y-3`} data-component="mcp-url-dialog">
           <p className={formStyles.hint}>This token is shown once.</p>
           <CopyField label="URL" value={minted.url} />
           <CopyField label="Header" value={`Authorization: Bearer ${minted.token}`} />
