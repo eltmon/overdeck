@@ -491,6 +491,7 @@ src/lib/__tests__/composerSendQueue.test.ts
 src/lib/__tests__/composerSendNow.test.ts
 src/lib/__tests__/connectionState.test.ts
 src/lib/__tests__/conversationReferences.test.ts
+src/lib/__tests__/deckLayoutStore.test.ts
 src/lib/__tests__/explorer-drag-paths.test.ts
 src/lib/__tests__/flywheelNeedsYou.test.ts
 src/lib/__tests__/flywheelNeedsYouLinks.test.ts

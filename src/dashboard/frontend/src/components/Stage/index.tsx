@@ -24,10 +24,10 @@ import {
   pruneToValid,
   replaceLeaf,
   updateRatio,
-  isValidLayout,
   type PaneLayout,
   type SplitPath,
 } from '../../lib/paneLayout'
+import { selectDeckLayout, useDeckLayoutStore } from '../../lib/deckLayoutStore'
 import { ForkModal } from '../CommandDeck/ForkModal'
 import { Bot, Terminal as TerminalIcon, Globe, FolderTree, GitCompare, Search } from 'lucide-react'
 import { PaneBar, type NewPaneAction } from './PaneBar'
@@ -348,31 +348,25 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
 
   // Pane layout (PAN-1591): a binary split tree arranging the deck's visible
   // panes into arbitrary grids. A null / single-leaf layout means "no split" —
-  // the deck renders just the active pane. Persisted per project across reloads.
-  const layoutKey = `pan-layout:${deckKey}`
-  const [layout, setLayoutState] = useState<PaneLayout | null>(null)
+  // the deck renders just the active pane. Persisted per deck across reloads.
+  // PAN-5343 H-D14: the layout lives in deckLayoutStore so the list, the crumb
+  // and the deck openers can read and change it from outside the Stage. The
+  // Stage reads null until its mount effect re-reads storage, exactly as it
+  // did when the layout was local state.
+  const [hydratedDeck, setHydratedDeck] = useState<string | null>(null)
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(`pan-layout:${deckKey}`)
-      const parsed = raw ? (JSON.parse(raw) as unknown) : null
-      setLayoutState(isValidLayout(parsed) && leafCount(parsed) > 1 ? parsed : null)
-    } catch {
-      setLayoutState(null)
-    }
+    useDeckLayoutStore.getState().hydrateLayout(deckKey)
+    setHydratedDeck(deckKey)
   }, [deckKey])
+  const storeLayout = useDeckLayoutStore(selectDeckLayout(deckKey))
+  const layout = hydratedDeck === deckKey ? storeLayout : null
   const setLayout = useCallback(
-    (next: PaneLayout | null) => {
-      const effective = next && leafCount(next) > 1 ? next : null
-      setLayoutState(effective)
-      try {
-        if (effective) localStorage.setItem(layoutKey, JSON.stringify(effective))
-        else localStorage.removeItem(layoutKey)
-      } catch {
-        /* ignore */
-      }
-    },
-    [layoutKey],
+    (next: PaneLayout | null) => useDeckLayoutStore.getState().setLayout(deckKey, next),
+    [deckKey],
   )
+  useEffect(() => {
+    if (activeId) useDeckLayoutStore.getState().noteFocus(deckKey, activeId)
+  }, [deckKey, activeId])
 
   // Selecting a tab focuses its pane. While split: if the pane is already a
   // visible region, focus it; otherwise load it into the focused region (the
