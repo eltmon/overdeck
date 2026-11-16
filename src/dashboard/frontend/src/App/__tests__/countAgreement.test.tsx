@@ -21,6 +21,7 @@ import type { Decision } from '../../lib/useDecisions';
 import { needsYouRows } from '../../components/flywheel/needsYouRows';
 import { flywheelStatus } from '../../components/flywheel/__tests__/fixtures';
 import { NeedsYouIndicator } from '../../components/flywheel/NeedsYouIndicator';
+import { NeedsYouStrip } from '../../components/KanbanBoard/NeedsYouStrip';
 import { HomePage } from '../../pages/HomePage';
 import { AgentsMenu } from '../topbar/AgentsMenu';
 import { SimpleHomePage } from '../../components/simple/SimpleHomePage';
@@ -357,5 +358,109 @@ describe('top bar and Simple Home counts agree (PAN-5371)', () => {
 
     const simpleHomeRoot = container.querySelector('[data-component="simple-home-page"]') as HTMLElement;
     expect(within(simpleHomeRoot).queryByText(/flywheel/i)).toBeNull();
+  });
+});
+
+// PAN-5413 — the Kanban board's Needs-you strip must agree with the top bar,
+// using the same shared selector. Reuses the PAN-5371 fixture, which already
+// holds every counted source and every displaced Simple reason.
+function computeExpectedNeedsYou5413() {
+  const state = useDashboardStore.getState();
+  const subjects = [
+    ...selectPendingInputSubjects(state),
+    {
+      agentId: 'helper',
+      source: 'conversation' as const,
+      issueId: undefined,
+      kinds: ['askUserQuestion'],
+      pendingAskUserQuestion: HELPER_CONVERSATION_PENDING_INPUT.pendingAskUserQuestion,
+      permissionRequestIds: [],
+      conversationTitle: HELPER_CONVERSATION_PENDING_INPUT.title,
+      since: HELPER_CONVERSATION_PENDING_INPUT.pendingAskUserQuestion.askedAt,
+    },
+  ];
+  const decisions = subjects.map((s) => ({ id: s.agentId, source: s.source, label: s.agentId, kinds: s.kinds })) as unknown as Decision[];
+  return buildNeedsYouItems({
+    subjects,
+    resolution: {
+      answeredToolUseIds: new Set(),
+      dismissedSubjectIds: new Set(),
+      resolvedPlanToolUseIds: new Set(),
+      dismissedPlanSubjectIds: new Set(),
+    },
+    derived: state.derivedIssueStateByIssueId,
+    flywheelRows: needsYouRows(LAST_TICK_5371),
+    decisions,
+    issueTitles: new Map(),
+    projectOf: buildProjectResolver([], []),
+  });
+}
+
+describe('top bar and Kanban Needs-you strip counts agree (PAN-5413)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(NOW));
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      return url in ROUTES_5371 ? Response.json(ROUTES_5371[url]) : new Response('not found', { status: 404 });
+    }));
+    seedDashboardStore({
+      ...INITIAL_READ_MODEL_STATE,
+      issuesRaw: ISSUES_5371,
+      agentsById: AGENTS_5371,
+      derivedIssueStateByIssueId: DERIVED_5371,
+    } as Parameters<typeof seedDashboardStore>[0]);
+  });
+
+  afterEach(() => {
+    useDashboardStore.setState({ ...INITIAL_READ_MODEL_STATE });
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it('shows the same Needs-you count and rows on the Kanban strip as the top bar', async () => {
+    const expectedNeedsYou = computeExpectedNeedsYou5413();
+    const expectedKeys = new Set(expectedNeedsYou.map((item) => item.key));
+    expect(expectedKeys).toContain('issue:PAN-11');
+    expect(expectedKeys).toContain('issue:PAN-12');
+    expect(expectedKeys).toContain('conversation:helper');
+    expect([...expectedKeys].some((k) => k.startsWith('flywheel:'))).toBe(true);
+    expect(expectedKeys.has('issue:PAN-13')).toBe(false);
+    expect(expectedKeys.has('issue:PAN-14')).toBe(false);
+    expect(expectedKeys.has('issue:PAN-15')).toBe(false);
+
+    const N = expectedNeedsYou.length;
+    expect(N).toBeLessThanOrEqual(6);
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <DialogProvider>
+          <NeedsYouIndicator />
+          <NeedsYouStrip onOpenIssue={vi.fn()} />
+        </DialogProvider>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('flywheel-needs-you-indicator')).toHaveTextContent(`Needs you · ${N}`));
+    await waitFor(() => expect(screen.getByTestId('needs-you-strip-count')).toHaveTextContent(`${N}`));
+
+    const rows = screen.getAllByTestId('needs-you-strip-row');
+    expect(rows).toHaveLength(Math.min(N, 6));
+    expect(new Set(rows.map((r) => r.getAttribute('data-needs-you-key')))).toEqual(expectedKeys);
+
+    const readyToStart = screen.getByTestId('needs-you-strip-ready-to-start');
+    expect(within(readyToStart).getByText(/Write onboarding docs/)).toBeInTheDocument();
+    expect(within(readyToStart).getByRole('button', { name: 'Start work' })).toBeInTheDocument();
+
+    const havingTrouble = screen.getByTestId('needs-you-strip-having-trouble');
+    expect(within(havingTrouble).getByText(/Flaky E2E test investigation/)).toBeInTheDocument();
+    expect(within(havingTrouble).getByText(/Review findings on the ingest job/)).toBeInTheDocument();
+
+    for (const row of rows) {
+      expect(within(row).queryByText(/Write onboarding docs/)).toBeNull();
+      expect(within(row).queryByText(/Flaky E2E test investigation/)).toBeNull();
+      expect(within(row).queryByText(/Review findings on the ingest job/)).toBeNull();
+    }
   });
 });
