@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5371",
   "created": "2026-11-16T01:41:59.414Z",
-  "updated": "2026-11-16T01:48:10.155Z",
+  "updated": "2026-11-16T01:48:36.995Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,6 +34,11 @@
     "simple-needs-you-split.ac5": {
       "status": "completed",
       "doneAt": "2026-11-16T01:48:10.155Z"
+    },
+    "simple-home-shared-count": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5371",
+      "claimedAt": "2026-11-16T01:48:36.995Z"
     }
   }
 }
