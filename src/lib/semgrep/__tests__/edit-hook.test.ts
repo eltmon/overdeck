@@ -1,7 +1,8 @@
 import { spawn } from 'node:child_process';
-import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -242,6 +243,8 @@ describe('runSemgrepEditHook (PAN-4591 WI-4 ac1/ac2/ac3/ac6/ac7)', () => {
   });
 });
 
+const REAL_SHIM = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', 'sync-sources', 'hooks', 'semgrep-edit-hook');
+
 describe('semgrep-edit-hook shell entry point (PAN-4591 WI-4 ac7)', () => {
   let dir: string;
 
@@ -255,10 +258,7 @@ describe('semgrep-edit-hook shell entry point (PAN-4591 WI-4 ac7)', () => {
 
   it('exits 0 with empty stdout when the bundle is missing', async () => {
     const shimPath = join(dir, 'semgrep-edit-hook');
-    await writeFile(
-      shimPath,
-      '#!/usr/bin/env bash\nSCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)" || exit 0\n[ -f "$SCRIPT_DIR/semgrep-edit-hook.js" ] || exit 0\nnode "$SCRIPT_DIR/semgrep-edit-hook.js" 2>/dev/null || true\nexit 0\n',
-    );
+    await copyFile(REAL_SHIM, shimPath);
     await chmod(shimPath, 0o755);
     const { stdout, code } = await runShim(shimPath, writePayload('Write', '/repo/src/a.ts'));
     expect(code).toBe(0);
@@ -267,10 +267,7 @@ describe('semgrep-edit-hook shell entry point (PAN-4591 WI-4 ac7)', () => {
 
   it('exits 0 with empty stdout when the bundle exits 3', async () => {
     const shimPath = join(dir, 'semgrep-edit-hook');
-    await writeFile(
-      shimPath,
-      '#!/usr/bin/env bash\nSCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)" || exit 0\n[ -f "$SCRIPT_DIR/semgrep-edit-hook.js" ] || exit 0\nnode "$SCRIPT_DIR/semgrep-edit-hook.js" 2>/dev/null || true\nexit 0\n',
-    );
+    await copyFile(REAL_SHIM, shimPath);
     await chmod(shimPath, 0o755);
     await writeFile(join(dir, 'semgrep-edit-hook.js'), '#!/usr/bin/env node\nprocess.exit(3);\n');
     const { stdout, code } = await runShim(shimPath, writePayload('Write', '/repo/src/a.ts'));

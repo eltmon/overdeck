@@ -82,6 +82,12 @@ describe('pan skills launch-settings — semgrep edit hook (PAN-4591 WI-5 ac1)',
     const printed = stdout.join('');
     expect(printed).toBe('');
   });
+
+  it('passes --conversation through to the resolver, which then adds no hook', async () => {
+    await run('launch-settings', '--harness', 'claude-code', '--cwd', '/w', '--conversation', 'conv-x');
+    const printed = stdout.join('');
+    expect(printed).toBe('');
+  });
 });
 
 describe('pan skills launch-settings — semgrep + SageOx hook merge (PAN-4591 WI-5 ac2)', () => {

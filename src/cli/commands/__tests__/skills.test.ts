@@ -90,9 +90,9 @@ vi.mock('../../../lib/sageox/config.js', () => ({
 
 vi.mock('../../../lib/sageox/binding.js', () => ({ readSageoxLinkState: mocks.readSageoxLinkState }));
 
-vi.mock('../../../lib/semgrep/in-session.js', () => ({
+vi.mock('../../../lib/semgrep/in-session.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../lib/semgrep/in-session.js')>()),
   resolveSemgrepLaunchSettings: mocks.resolveSemgrepLaunchSettings,
-  mergeClaudeHookMaps: (a: unknown, b: unknown) => (b ? { ...(a as object), ...(b as object) } : a),
 }));
 
 vi.mock('../../../lib/skill-packs/sources.js', () => ({

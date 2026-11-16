@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { getOverdeckHome } from '../paths.js';
 import { loadConfigNoMigration } from '../config-yaml.js';
 import { shellQuote } from '../shell-quote.js';
+import { getHarnessBehavior } from '../runtimes/behavior.js';
 import {
   SEMGREP_QUIET_ENV,
   inspectSemgrepLauncher,
@@ -114,7 +115,7 @@ export async function resolveSemgrepLaunchSettings(
     const hideSkill = cfg?.enabled !== true;
 
     const platform = deps.platform ?? process.platform;
-    const eligible = input.harness === 'claude-code'
+    const eligible = getHarnessBehavior(input.harness).launchCommandKind === 'claude-code'
       && cfg?.enabled === true
       && cfg?.edit_hook === true
       && !input.conversation
