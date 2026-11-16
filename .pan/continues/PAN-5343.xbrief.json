@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5343",
   "created": "2026-11-16T00:09:01.559Z",
-  "updated": "2026-11-16T00:18:05.065Z",
+  "updated": "2026-11-16T00:23:26.042Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,9 +94,30 @@
       "doneAt": "2026-11-16T00:17:59.246Z"
     },
     "deck-openers": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5343",
-      "claimedAt": "2026-11-16T00:18:05.065Z"
+      "claimedAt": "2026-11-16T00:18:05.065Z",
+      "doneAt": "2026-11-16T00:23:26.042Z"
+    },
+    "deck-openers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:23:26.042Z"
+    },
+    "deck-openers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:23:26.042Z"
+    },
+    "deck-openers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:23:26.042Z"
+    },
+    "deck-openers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:23:26.042Z"
+    },
+    "deck-openers.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:23:26.042Z"
     }
   }
 }
