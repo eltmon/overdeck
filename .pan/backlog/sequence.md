@@ -1,11 +1,10 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T09:49:59.987564Z · model: claude-opus-5-5 · open: 887_
+_Last sequenced: 2026-11-16T10:35:39.905521Z · model: claude-opus-5-5 · open: 887_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-5432 | XS | critical | ok |  |  | In pipeline: flaky injection test read fire-and-forget rag-runs log too early; failed v0.87.1 pack job, so nothing published |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
@@ -892,12 +891,9 @@ _Last sequenced: 2026-11-16T09:49:59.987564Z · model: claude-opus-5-5 · open: 
 | 901 | PAN-5181 | XS | low | ok |  |  | Fix shipped in PR #5179 (merged 2026-11-13); the body says it closes on merge. Verify and close. |
 | 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
 | 904 | PAN-5405 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus. |
+| 905 | PAN-5432 | XS | low | ok |  |  | Fixed by PR #5433 (merged) and issue closed; still in manifest as open. Nothing left to pick up. |
 
 ## Rationale detail
-
-### PAN-5432 (rank 1)
-
-New since the prior run and already in the pipeline, so it is pinned at rank 1. The flaky test failed the v0.87.1 release pack job and blocked publishing; the fix is test-only (vi.waitFor) and the issue carries substrate-improvement, so it rates critical.
 
 ### PAN-5013 (rank 3)
 
@@ -1215,6 +1211,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 
 New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
 
+### PAN-3100 (rank 88)
+
+New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1222,24 +1222,11 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T09:49:59.987564Z",
+  "generatedAt": "2026-11-16T10:35:39.905521Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 887,
   "nodes": [
-    {
-      "issue": "PAN-5432",
-      "rank": 1,
-      "size": "XS",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: flaky injection test read fire-and-forget rag-runs log too early; failed v0.87.1 pack job, so nothing published",
-      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 1. The flaky test failed the v0.87.1 release pack job and blocked publishing; the fix is test-only (vi.waitFor) and the issue carries substrate-improvement, so it rates critical.",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-5013",
       "rank": 3,
@@ -12251,6 +12238,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "dependsOn": [],
       "why": "CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus.",
       "rationale": "New CodeRabbit follow-up from the merged PAN-5295 PR; one Major and four Minor frontend findings, ranked with comparable follow-ups.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5432",
+      "rank": 905,
+      "size": "XS",
+      "importance": "low",
+      "score": 5,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Fixed by PR #5433 (merged) and issue closed; still in manifest as open. Nothing left to pick up.",
+      "rationale": "Demoted from the in-pipeline pin at rank 1 to the bottom because PR #5433 merged and the issue is now closed and closed-out, so no work remains.",
       "gate": "auto",
       "planning": "auto"
     }
