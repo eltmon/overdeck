@@ -2076,7 +2076,11 @@ opens Home (`/`). After the brand, left to right, the bar holds:
    `useNeedsYouItems()` (`lib/selectors/needsYou.ts`). It is always visible and
    amber only when N > 0. The menu groups items by project (items without one
    under "Other"); a row calls its item's `open()`, and **Open Activity** goes
-   to `/activity`.
+   to `/activity`. Simple Home (`components/simple/SimpleHomePage.tsx`) uses the
+   same selector for its headline and its Needs-you cards (`lib/simple/needsYouCards.ts`
+   picks each card); the Simple reasons the selector does not count (`start-work`,
+   `stuck`, `problems`) render in its **Ready to start** and **Having trouble**
+   sections, outside the count (PAN-5371).
 5. **Exception chips**, each rendered only while its condition is true:
    **Auto-resume frozen** (`DeaconFrozenChip`, while Deacon is paused; click to
    resume), **N stopped** (`StoppedAgentsBanner variant="pill"`), **Low-cost
