@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:38:53.725Z",
+  "updated": "2026-11-16T11:38:55.593Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -136,6 +136,11 @@
     "migrate-tasks-viewer-dialog.ac2": {
       "status": "completed",
       "doneAt": "2026-11-16T11:38:53.725Z"
+    },
+    "migrate-prd-viewer": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:38:55.593Z"
     }
   }
 }
