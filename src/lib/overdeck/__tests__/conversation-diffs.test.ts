@@ -18,6 +18,8 @@ vi.mock('../../checkpoint/checkpoint-manager.js', () => ({
 }));
 
 vi.mock('../../checkpoint/vs-default-branch.js', () => ({ diffVsDefaultBranch: vi.fn() }));
+// PAN-5418: getConversationDiffFull's own-patch module; mocked like the other sibling modules.
+vi.mock('../conversation-diff-own.js', () => ({ buildOwnPatches: vi.fn(), ownFileChanges: vi.fn() }));
 
 const conversationMocks = vi.hoisted(() => ({
   getConversationByName: vi.fn(),
