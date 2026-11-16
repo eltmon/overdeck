@@ -58,6 +58,15 @@ describe('renderResultText (PAN-5452)', () => {
   });
 });
 
+describe('renderResultText note placement (PAN-5452, PRD 3e)', () => {
+  it('renders the subtree note as the true last line, after Focused and Screenshot', () => {
+    const text = renderResultText({ snapshot: SNAPSHOT, screenshot: null, note: 'Indexes above are for this subtree only; any action returns the whole window again.' });
+    const lines = text.split('\n');
+    expect(lines.at(-1)).toBe('Indexes above are for this subtree only; any action returns the whole window again.');
+    expect(lines.at(-2)).toMatch(/^Screenshot:/);
+  });
+});
+
 describe('renderResultJson (PAN-5452)', () => {
   it('includes screenshot.path and never screenshotPngBase64 (ac3)', () => {
     const json = renderResultJson({ snapshot: SNAPSHOT, screenshot: { path: '/x/shot.png', width: 400, height: 600, scale: 1 } });

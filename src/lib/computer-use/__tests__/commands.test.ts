@@ -176,12 +176,12 @@ describe('get-app-state (PAN-5452 ac5)', () => {
     expect(filtered).toEqual(['0 window app', '\t1 button seven']);
   });
 
-  it('appends the subtree note after a cached subtree read', async () => {
+  it('carries the subtree note as its own field, not folded into treeLines, for a cached subtree read', async () => {
     const { runComputerOperation } = captureRunComputerOperation({ ok: true, snapshot: { treeLines: ['0 x'] } });
     const elementRecord = vi.fn().mockResolvedValue({ index: 2 });
     const result = await getAppState({ app: 'calc', elementIndex: 2 }, { runComputerOperation, elementRecord });
-    const filtered = (result.response as { snapshot: { treeLines: string[] } }).snapshot.treeLines;
-    expect(filtered.at(-1)).toBe(SUBTREE_NOTE);
+    expect((result.response as { note?: string }).note).toBe(SUBTREE_NOTE);
+    expect((result.response as { snapshot: { treeLines: string[] } }).snapshot.treeLines).toEqual(['0 x']);
   });
 });
 

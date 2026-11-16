@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -83,6 +83,24 @@ describe('claimLease / releaseLease (PAN-5452 ac1-3)', () => {
   });
 
   it('releasing with no lease file is a no-op', async () => {
+    await expect(releaseLease({ holder: 'a', ...deps() })).resolves.toBeUndefined();
+  });
+
+  it('treats a corrupt (empty) lease.json as no valid lease, so claimLease still succeeds', async () => {
+    await writeFile(path, '');
+    await expect(claimLease(Date.now(), { holder: 'a', ...deps() })).resolves.toBeUndefined();
+    const written = JSON.parse(await readFile(path, 'utf-8'));
+    expect(written.holder).toBe('a');
+  });
+
+  it('release --force removes a corrupt lease.json without reading it first', async () => {
+    await writeFile(path, '{not json');
+    await expect(releaseLease({ holder: 'a', force: true, ...deps() })).resolves.toBeUndefined();
+    await expect(readFile(path, 'utf-8')).rejects.toThrow();
+  });
+
+  it('a non-forced release against a corrupt lease.json is a no-op, not a throw', async () => {
+    await writeFile(path, '{not json');
     await expect(releaseLease({ holder: 'a', ...deps() })).resolves.toBeUndefined();
   });
 });

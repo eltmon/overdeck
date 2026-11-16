@@ -99,17 +99,26 @@ export interface GetAppStateOptions extends BaseAppOptions {
   maxElements?: number;
 }
 
-/** Filters treeLines for --query/--max-elements and notes a subtree read (PRD 3e). */
+/**
+ * Filters treeLines for --query/--max-elements and, for a cached subtree read,
+ * carries the PRD 3e note as its own field rather than folding it into
+ * treeLines — format.ts renders it as the command output's true last line,
+ * after Focused/Screenshot, as the PRD specifies.
+ */
 function applyTreeFilter(result: RunComputerOperationResult, options: GetAppStateOptions): RunComputerOperationResult {
   const snapshot = (result.response as { snapshot?: { treeLines: string[] } }).snapshot;
   if (!snapshot) return result;
 
-  let treeLines = snapshot.treeLines;
-  if (options.query !== undefined) treeLines = filterTree(treeLines, options.query, options.maxElements);
-  if (options.elementIndex !== undefined) treeLines = [...treeLines, SUBTREE_NOTE];
-  if (treeLines === snapshot.treeLines) return result;
+  const treeLines = options.query !== undefined ? filterTree(snapshot.treeLines, options.query, options.maxElements) : snapshot.treeLines;
+  const isSubtreeRead = options.elementIndex !== undefined;
+  if (treeLines === snapshot.treeLines && !isSubtreeRead) return result;
 
-  return { ...result, response: { ...result.response, snapshot: { ...snapshot, treeLines } } };
+  const response: Record<string, unknown> = {
+    ...result.response,
+    snapshot: treeLines === snapshot.treeLines ? snapshot : { ...snapshot, treeLines },
+  };
+  if (isSubtreeRead) response.note = SUBTREE_NOTE;
+  return { ...result, response };
 }
 
 export async function getAppState(options: GetAppStateOptions, deps: CommandDeps = {}): Promise<RunComputerOperationResult> {

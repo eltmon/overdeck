@@ -13,6 +13,18 @@ describe('resolveDesktopEnv (PAN-5452)', () => {
     if (result.ok) expect(result.env.DISPLAY).toBe(':0');
   });
 
+  it('does not pair session-scoped keys from a different session than the shell DISPLAY', async () => {
+    const execFile = vi.fn().mockResolvedValue({ stdout: SYSTEMCTL_OUTPUT });
+    const result = await resolveDesktopEnv({ env: { DISPLAY: ':0' }, execFile, existsSync: () => false });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.env.DISPLAY).toBe(':0');
+      expect(result.env.XAUTHORITY).toBeUndefined();
+      expect(result.env.XDG_SESSION_TYPE).toBeUndefined();
+    }
+  });
+
   it('fills gaps from systemctl when process env is empty (ac2)', async () => {
     const execFile = vi.fn().mockResolvedValue({ stdout: SYSTEMCTL_OUTPUT });
     const result = await resolveDesktopEnv({ env: {}, execFile, existsSync: () => false });

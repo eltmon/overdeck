@@ -19,6 +19,8 @@ const DESKTOP_ENV_KEYS = [
   'DBUS_SESSION_BUS_ADDRESS',
 ] as const;
 
+const DISPLAY_KEYS = ['DISPLAY', 'WAYLAND_DISPLAY'] as const;
+
 const SYSTEMCTL_TIMEOUT_MS = 5_000;
 
 const NO_DESKTOP_SESSION_MESSAGE =
@@ -65,7 +67,15 @@ export async function resolveDesktopEnv(deps: ResolveDesktopEnvDeps = {}): Promi
   const missingKeys = DESKTOP_ENV_KEYS.filter((key) => !env[key]);
   if (missingKeys.length > 0) {
     const fromSystemctl = await readSystemctlEnvironment(exec);
+    // Only pair XAUTHORITY/session/runtime/bus with systemctl's session when the
+    // display agrees (or neither side names one) — otherwise they can belong to a
+    // different login session than the DISPLAY/WAYLAND_DISPLAY already resolved.
+    const sameSession = DISPLAY_KEYS.every(
+      (key) => !env[key] || !fromSystemctl[key] || env[key] === fromSystemctl[key],
+    );
     for (const key of missingKeys) {
+      const isDisplayKey = (DISPLAY_KEYS as readonly string[]).includes(key);
+      if (!isDisplayKey && !sameSession) continue;
       if (fromSystemctl[key]) env[key] = fromSystemctl[key];
     }
   }

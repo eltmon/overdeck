@@ -57,12 +57,23 @@ function desktopBusyMessage(record: LeaseRecord, now: number): string {
   return `The desktop is in use by ${record.holder} until ${record.expiresAt} (${seconds}s). Retry after that, or ask the operator to run pan computer release --force.`;
 }
 
+/**
+ * A missing lease file and an unparseable one (a crash mid-write can leave it
+ * empty or truncated) both mean "no valid lease" — an operator must still be
+ * able to clear a stuck lease without hand-deleting a corrupt file first.
+ */
 async function readLease(path: string, readFileFn: typeof readFile): Promise<LeaseRecord | null> {
+  let raw: string;
   try {
-    return JSON.parse(await readFileFn(path, 'utf-8')) as LeaseRecord;
+    raw = await readFileFn(path, 'utf-8');
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw error;
+  }
+  try {
+    return JSON.parse(raw) as LeaseRecord;
+  } catch {
+    return null;
   }
 }
 
@@ -96,13 +107,18 @@ export async function claimLease(now: number, deps: LeaseFsDeps = {}): Promise<v
 /** Deletes the lease file if the caller holds it, or always when `force` is set. */
 export async function releaseLease(options: { force?: boolean } & LeaseFsDeps = {}): Promise<void> {
   const path = (options.leasePath ?? leasePath)();
-  const readFileFn = options.readFile ?? readFile;
   const rmFn = options.rm ?? rm;
-  const holder = options.holder ?? holderId();
 
+  if (options.force) {
+    await rmFn(path, { force: true });
+    return;
+  }
+
+  const readFileFn = options.readFile ?? readFile;
+  const holder = options.holder ?? holderId();
   const existing = await readLease(path, readFileFn);
   if (!existing) return;
-  if (!options.force && existing.holder !== holder) {
+  if (existing.holder !== holder) {
     throw new ComputerUseError('desktop_busy', desktopBusyMessage(existing, Date.now()));
   }
   await rmFn(path, { force: true });

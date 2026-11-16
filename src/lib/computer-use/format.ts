@@ -55,6 +55,8 @@ export interface RenderInput {
   windows?: readonly { index: number; title: string | null; isMinimized?: boolean }[];
   capabilities?: unknown;
   matches?: readonly string[];
+  /** PRD 3e: the subtree-read caveat. Always the true last line of text output. */
+  note?: string;
 }
 
 function screenshotLine(snapshot: RawSnapshot, screenshot: SavedScreenshot | null | undefined): string {
@@ -95,6 +97,7 @@ export function renderResultText(input: RenderInput): string {
   if (input.windows) lines.push(...renderWindowsLines(input.windows));
   if (input.capabilities) lines.push(JSON.stringify(input.capabilities));
   if (input.matches) lines.push(...input.matches);
+  if (input.note !== undefined) lines.push(input.note);
   return lines.join('\n');
 }
 
@@ -122,6 +125,7 @@ export function renderResultJson(input: RenderInput): Record<string, unknown> {
   if (input.windows !== undefined) result.windows = input.windows;
   if (input.capabilities !== undefined) result.capabilities = input.capabilities;
   if (input.matches !== undefined) result.matches = input.matches;
+  if (input.note !== undefined) result.note = input.note;
   return result;
 }
 

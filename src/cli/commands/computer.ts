@@ -17,10 +17,11 @@ function intOption(flagName: string) {
   };
 }
 
-interface ActionFlags {
+/** Commander's raw parse of the shared action flags: a negated `--no-screenshot` lands as `screenshot: false`, never `noScreenshot`. */
+interface ParsedActionFlags {
   windowIndex?: number;
   restoreWindow?: boolean;
-  noScreenshot?: boolean;
+  screenshot?: boolean;
   json?: boolean;
 }
 
@@ -29,6 +30,12 @@ function addActionOptions(cmd: Command): Command {
     .option('--window-index <n>', 'Window index (default: the first window)', intOption('--window-index'))
     .option('--restore-window', 'Bring the window forward first')
     .option('--no-screenshot', 'Skip taking a screenshot');
+}
+
+/** Translates Commander's negated `screenshot: false` into the library's `noScreenshot: true`. */
+function resolveActionFlags<T extends ParsedActionFlags>(options: T): Omit<T, 'screenshot'> & { noScreenshot: boolean } {
+  const { screenshot, ...rest } = options;
+  return { ...rest, noScreenshot: screenshot === false };
 }
 
 function addJsonOption(cmd: Command): Command {
@@ -45,6 +52,7 @@ async function printResult(result: RunComputerOperationResult, json?: boolean): 
       : {}),
     apps: response.apps as Parameters<typeof renderResultJson>[0]['apps'],
     windows: response.windows as Parameters<typeof renderResultJson>[0]['windows'],
+    note: response.note as string | undefined,
   };
   console.log(json ? JSON.stringify(renderResultJson(input)) : renderResultText(input));
 }
@@ -119,12 +127,12 @@ export function registerComputerCommands(program: Command): void {
       maxElements?: number;
       windowIndex?: number;
       restoreWindow?: boolean;
-      noScreenshot?: boolean;
+      screenshot?: boolean;
       json?: boolean;
     }) => {
       await run(options.json, async () => {
         const { getAppState } = await import('../../lib/computer-use/commands.js');
-        return getAppState(options);
+        return getAppState(resolveActionFlags(options));
       });
     },
   );
@@ -181,12 +189,12 @@ export function registerComputerCommands(program: Command): void {
       modifiers?: string;
       windowIndex?: number;
       restoreWindow?: boolean;
-      noScreenshot?: boolean;
+      screenshot?: boolean;
       json?: boolean;
     }) => {
       await run(options.json, async () => {
         const { click } = await import('../../lib/computer-use/commands.js');
-        return click(options);
+        return click(resolveActionFlags(options));
       });
     },
   );
@@ -207,12 +215,12 @@ export function registerComputerCommands(program: Command): void {
       action: string;
       windowIndex?: number;
       restoreWindow?: boolean;
-      noScreenshot?: boolean;
+      screenshot?: boolean;
       json?: boolean;
     }) => {
       await run(options.json, async () => {
         const { performSecondaryAction } = await import('../../lib/computer-use/commands.js');
-        return performSecondaryAction(options);
+        return performSecondaryAction(resolveActionFlags(options));
       });
     },
   );
@@ -235,12 +243,12 @@ export function registerComputerCommands(program: Command): void {
       valueStdin?: boolean;
       windowIndex?: number;
       restoreWindow?: boolean;
-      noScreenshot?: boolean;
+      screenshot?: boolean;
       json?: boolean;
     }) => {
       await run(options.json, async () => {
         const { setValue } = await import('../../lib/computer-use/commands.js');
-        return setValue(options);
+        return setValue(resolveActionFlags(options));
       });
     },
   );
@@ -263,12 +271,12 @@ export function registerComputerCommands(program: Command): void {
       textStdin?: boolean;
       windowIndex?: number;
       restoreWindow?: boolean;
-      noScreenshot?: boolean;
+      screenshot?: boolean;
       json?: boolean;
     }) => {
       await run(options.json, async () => {
         const { typeText } = await import('../../lib/computer-use/commands.js');
-        return typeText(options);
+        return typeText(resolveActionFlags(options));
       });
     },
   );
@@ -289,12 +297,12 @@ export function registerComputerCommands(program: Command): void {
       allowSystemShortcut?: boolean;
       windowIndex?: number;
       restoreWindow?: boolean;
-      noScreenshot?: boolean;
+      screenshot?: boolean;
       json?: boolean;
     }) => {
       await run(options.json, async () => {
         const { pressKey } = await import('../../lib/computer-use/commands.js');
-        return pressKey(options);
+        return pressKey(resolveActionFlags(options));
       });
     },
   );
@@ -315,12 +323,12 @@ export function registerComputerCommands(program: Command): void {
       allowSystemShortcut?: boolean;
       windowIndex?: number;
       restoreWindow?: boolean;
-      noScreenshot?: boolean;
+      screenshot?: boolean;
       json?: boolean;
     }) => {
       await run(options.json, async () => {
         const { hotkey } = await import('../../lib/computer-use/commands.js');
-        return hotkey(options);
+        return hotkey(resolveActionFlags(options));
       });
     },
   );
@@ -341,12 +349,12 @@ export function registerComputerCommands(program: Command): void {
       textStdin?: boolean;
       windowIndex?: number;
       restoreWindow?: boolean;
-      noScreenshot?: boolean;
+      screenshot?: boolean;
       json?: boolean;
     }) => {
       await run(options.json, async () => {
         const { pasteText } = await import('../../lib/computer-use/commands.js');
-        return pasteText(options);
+        return pasteText(resolveActionFlags(options));
       });
     },
   );
@@ -373,12 +381,12 @@ export function registerComputerCommands(program: Command): void {
       pages?: number;
       windowIndex?: number;
       restoreWindow?: boolean;
-      noScreenshot?: boolean;
+      screenshot?: boolean;
       json?: boolean;
     }) => {
       await run(options.json, async () => {
         const { scroll } = await import('../../lib/computer-use/commands.js');
-        return scroll(options);
+        return scroll(resolveActionFlags(options));
       });
     },
   );
@@ -407,12 +415,12 @@ export function registerComputerCommands(program: Command): void {
       toY?: number;
       windowIndex?: number;
       restoreWindow?: boolean;
-      noScreenshot?: boolean;
+      screenshot?: boolean;
       json?: boolean;
     }) => {
       await run(options.json, async () => {
         const { drag } = await import('../../lib/computer-use/commands.js');
-        return drag(options);
+        return drag(resolveActionFlags(options));
       });
     },
   );

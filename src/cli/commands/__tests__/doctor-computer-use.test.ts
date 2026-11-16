@@ -109,12 +109,13 @@ describe('checkComputerUse (PAN-5452)', () => {
     expect(checks).toContainEqual(expect.objectContaining({ status: 'warn', message: 'screenshots unavailable on Wayland' }));
   });
 
-  it('omits the ok row when the handshake fails', async () => {
+  it('reports an error row carrying the handshake failure instead of going silent', async () => {
     const checks = await checkComputerUse({
       config: enabledConfig(),
       platform: 'linux',
       deps: baseDeps({ runHelper: async () => { throw new Error('boom'); } }),
     });
     expect(checks.some((c) => c.status === 'ok')).toBe(false);
+    expect(checks).toContainEqual(expect.objectContaining({ status: 'error', message: expect.stringContaining('boom') }));
   });
 });

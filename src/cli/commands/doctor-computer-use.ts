@@ -125,10 +125,16 @@ export async function checkComputerUse(options: CheckComputerUseOptions): Promis
     }
   }
 
-  const handshakeOk = await runHelper({ tool: 'handshake' }, envResult.env).then(() => true, () => false);
-  if (handshakeOk) {
+  try {
+    await runHelper({ tool: 'handshake' }, envResult.env);
     const display = envResult.env.DISPLAY ?? envResult.env.WAYLAND_DISPLAY ?? '';
     checks.push({ name: NAME, status: 'ok', message: `Ready (${sessionType}, display ${display})` });
+  } catch (error) {
+    checks.push({
+      name: NAME,
+      status: 'error',
+      message: `Helper handshake failed: ${error instanceof Error ? error.message : String(error)}`,
+    });
   }
 
   return checks;

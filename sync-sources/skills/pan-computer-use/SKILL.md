@@ -44,7 +44,7 @@ Use the fresh state returned by each action for the next element index. Element 
 
 ## Reading State Cheaply
 
-In a large window, look for one control with `get-app-state --query <text>`: it prints only elements whose line contains the text (case-insensitive), with their ancestors. `--max-elements <n>` caps how many elements are printed.
+In a large window, look for one control with `get-app-state --query <text>`: it prints only elements whose line contains the text (case-insensitive), with their ancestors. `--max-elements <n>` caps how many matching lines print, but only together with `--query`; passed alone it has no effect.
 
 ```text
 pan computer get-app-state --app gnome-text-editor --query Downloads --json
@@ -131,6 +131,8 @@ Clicks, scrolling, drags and keyboard input bring the target window forward. Do 
 ## Screenshots
 
 `get-app-state` and actions request screenshots by default unless `--no-screenshot` is passed. A successful `--json` capture is saved as a PNG file; read it at `result.screenshot.path` with your file-reading or image tool. Coordinates passed to `click`, `scroll` and `drag` are window-local action coordinates, which may differ from screenshot pixels when `screenshot.scale` is not 1.
+
+On some multi-monitor setups, AT-SPI reports a window's bounds as `(0,0)` instead of its real screen position. When that happens, the screenshot can show an unrelated part of the desktop, and `screenshot.scale` does not correct it. Treat a screenshot that doesn't match the window you expect as a sign of this: prefer `--element-index` actions over `--x`/`--y` coordinates on that window, and confirm any coordinate action with a fresh `get-app-state` rather than trusting the screenshot.
 
 ## App Notes
 

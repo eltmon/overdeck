@@ -101,6 +101,12 @@ Everything lives under `~/.overdeck/computer-use/`:
 - Linux only. macOS (a signed Swift helper) and Windows (`runtime.ps1`) are follow-ups.
 - Wayland can't do hotkeys (`xdotool` needs X11); screenshots there need `grim`.
 - No remote hosts — a linked machine with no logged-in desktop session always refuses.
+- On some multi-monitor setups, AT-SPI can report a window's bounds at `(0,0)` instead of its
+  real screen position. When that happens, its screenshot can show the wrong area of the
+  desktop, and `click`/`scroll`/`drag` coordinates computed from that screenshot can miss the
+  window entirely. Prefer `--element-index` actions over `--x`/`--y` coordinates when a window's
+  reported bounds look suspicious, and verify a coordinate action's effect against a fresh
+  `get-app-state` rather than trusting the screenshot alone.
 - The helper is a verbatim vendored port of Orca's Linux computer-use bridge; see
   [`native/computer-use-linux/README.md`](https://github.com/eltmon/overdeck/blob/main/native/computer-use-linux/README.md)
   for how it's re-vendored.

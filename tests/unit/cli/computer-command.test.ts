@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const click = vi.fn();
 const listApps = vi.fn();
+const getAppState = vi.fn();
 const exitCli = vi.fn(async (_code: number) => undefined);
 
 vi.mock('../../../src/lib/computer-use/commands.js', () => ({
   click: (...args: unknown[]) => click(...args),
   listApps: (...args: unknown[]) => listApps(...args),
+  getAppState: (...args: unknown[]) => getAppState(...args),
 }));
 vi.mock('../../../src/cli/exit.js', () => ({ exitCli: (code: number) => exitCli(code) }));
 
@@ -57,6 +59,28 @@ describe('pan computer (PAN-5452)', () => {
     await pan('computer', 'click', '--app', 'calc', '--element-index', '3', '--click-count', '2');
 
     expect(click).toHaveBeenCalledWith(expect.objectContaining({ app: 'calc', elementIndex: 3, clickCount: 2 }));
+    expect(click.mock.calls[0][0]).not.toHaveProperty('screenshot');
+    log.mockRestore();
+  });
+
+  it('maps --no-screenshot (Commander\'s screenshot: false) to noScreenshot: true', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    getAppState.mockResolvedValue({ response: { ok: true, snapshot: { treeLines: [] } }, screenshot: null });
+
+    await pan('computer', 'get-app-state', '--app', 'calc', '--no-screenshot');
+
+    expect(getAppState).toHaveBeenCalledWith(expect.objectContaining({ app: 'calc', noScreenshot: true }));
+    expect(getAppState.mock.calls[0][0]).not.toHaveProperty('screenshot');
+    log.mockRestore();
+  });
+
+  it('maps the absence of --no-screenshot to noScreenshot: false', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    getAppState.mockResolvedValue({ response: { ok: true, snapshot: { treeLines: [] } }, screenshot: null });
+
+    await pan('computer', 'get-app-state', '--app', 'calc');
+
+    expect(getAppState).toHaveBeenCalledWith(expect.objectContaining({ app: 'calc', noScreenshot: false }));
     log.mockRestore();
   });
 

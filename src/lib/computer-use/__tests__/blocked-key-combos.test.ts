@@ -30,6 +30,15 @@ describe('assertKeyComboAllowed (PAN-5452)', () => {
     expect(thrown('alt+F4', true)).toBeNull();
   });
 
+  it.each(['Alt_L+F4', 'Control_L+q', 'Super_L+l', 'Alt_R+F4'])(
+    'blocks X11 side-suffixed modifier names like %s',
+    (key) => {
+      const error = thrown(key, false);
+      expect(isComputerUseError(error)).toBe(true);
+      expect((error as { code: string }).code).toBe('system_shortcut_blocked');
+    },
+  );
+
   it('names the effect and the bypass flag in the error message', () => {
     const error = thrown('alt+F4', false) as Error;
     expect(error.message).toBe(

@@ -89,7 +89,9 @@ function findBlockedKeyCombo(key: string): BlockedKeyCombo | null {
   let keyName = '';
   for (const part of parts) {
     const normalized = part.trim().toLowerCase();
-    const modifier = LINUX_RULES.modifierAliases[normalized.replace(/[\s_-]/g, '')];
+    // X11 keysym names such as Alt_L/Control_R carry a side suffix the alias table doesn't have.
+    const modifierName = normalized.replace(/_[lr]$/, '').replace(/[\s_-]/g, '');
+    const modifier = LINUX_RULES.modifierAliases[modifierName];
     if (modifier) {
       modifiers.add(modifier);
     } else {
