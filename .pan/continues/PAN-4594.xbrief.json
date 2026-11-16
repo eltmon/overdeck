@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4594",
   "created": "2026-11-16T16:04:35.511Z",
-  "updated": "2026-11-16T16:48:01.001Z",
+  "updated": "2026-11-16T16:48:08.053Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,11 @@
       "claimedBy": "agent-pan-4594",
       "claimedAt": "2026-11-16T16:43:12.937Z",
       "doneAt": "2026-11-16T16:48:01.001Z"
+    },
+    "prereqs-install-guard": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4594",
+      "claimedAt": "2026-11-16T16:48:08.053Z"
     }
   }
 }
