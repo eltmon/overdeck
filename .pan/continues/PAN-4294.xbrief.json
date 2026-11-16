@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4294",
   "created": "2026-11-16T20:10:42.311Z",
-  "updated": "2026-11-16T20:36:35.031Z",
+  "updated": "2026-11-16T20:36:36.156Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -136,6 +136,11 @@
     "account-page-billing.ac3": {
       "status": "completed",
       "doneAt": "2026-11-16T20:36:35.031Z"
+    },
+    "cancel-on-delete-revoke": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4294",
+      "claimedAt": "2026-11-16T20:36:36.156Z"
     }
   }
 }
