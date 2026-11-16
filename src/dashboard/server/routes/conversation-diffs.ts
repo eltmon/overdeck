@@ -1,7 +1,7 @@
 /**
  * Conversation diff routes (PAN-4501: moved out of routes/conversations.ts).
  * GET /api/conversations/:name/diffs          — per-turn summaries
- * GET /api/conversations/:name/diffs/full     — whole conversation
+ * GET /api/conversations/:name/diffs/full     — the conversation's attributed files (PAN-5408)
  * GET /api/conversations/:name/diffs/vs-main  — conversation repo vs the project's default branch
  * GET /api/conversations/:name/diffs/:turnId  — one turn
  * GET /api/conversations/:name/changes        — commits and uncommitted edits (PAN-5288)
@@ -9,12 +9,12 @@
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import { getConversationDiffs, getConversationDiffFull, getConversationDiffTurn, getConversationDiffVsMain } from '../../../lib/overdeck/conversation-diffs.js';
+import { getConversationDiffs, getConversationDiffFull, getConversationDiffTurn, getConversationDiffVsMain, type ConversationDiffFullDependencies } from '../../../lib/overdeck/conversation-diffs.js';
 import { getCachedMessages, peekCachedMessages, resolveSessionFile } from '../../../lib/overdeck/conversation-reads.js';
 import { getConversationChanges, type ConversationChangesDependencies } from '../../../lib/overdeck/conversation-changes.js';
 import { getConversationChangedLines } from '../../../lib/overdeck/conversation-change-lines.js';
 import { listConversations } from '../../../lib/overdeck/conversations.js';
-import type { ChangeScope } from '@overdeck/contracts';
+import type { ChangeScope, ConversationChanges } from '@overdeck/contracts';
 import { diffOptionsFromSearchParams } from '../../../lib/diffs/diff-output.js';
 import { jsonResponse } from '../http-helpers.js';
 import { validateOrigin } from './origin-validation.js';
@@ -22,6 +22,22 @@ import { validateOrigin } from './origin-validation.js';
 const conversationDiffDependencies = {
   resolveSessionFile,
   getCachedMessages,
+};
+
+const conversationChangesDependencies: ConversationChangesDependencies = {
+  resolveSessionFile,
+  getCachedMessages,
+  peekCachedMessages,
+  listConversations: () => listConversations(),
+  now: Date.now,
+};
+
+const conversationDiffFullDependencies: ConversationDiffFullDependencies = {
+  ...conversationDiffDependencies,
+  conversationChanges: async (name) => {
+    const response = await getConversationChanges(name, { scope: 'conversation' }, conversationChangesDependencies);
+    return response.status === 200 ? (response.body as ConversationChanges) : null;
+  },
 };
 
 const getConversationDiffsRoute = HttpRouter.add(
@@ -57,7 +73,7 @@ const getConversationDiffFullRoute = HttpRouter.add(
     const fileFilter = reqUrl.searchParams.get('file') ?? undefined;
     const diffOptions = diffOptionsFromSearchParams(reqUrl.searchParams);
     return yield* Effect.promise(async () => {
-      const response = await getConversationDiffFull(name, fileFilter, conversationDiffDependencies, diffOptions);
+      const response = await getConversationDiffFull(name, fileFilter, conversationDiffFullDependencies, diffOptions);
       return jsonResponse(response.body, response.status === undefined ? undefined : { status: response.status });
     });
   }),
@@ -105,14 +121,6 @@ const getConversationDiffTurnRoute = HttpRouter.add(
     });
   }),
 );
-
-const conversationChangesDependencies: ConversationChangesDependencies = {
-  resolveSessionFile,
-  getCachedMessages,
-  peekCachedMessages,
-  listConversations: () => listConversations(),
-  now: Date.now,
-};
 
 const getConversationChangesRoute = HttpRouter.add(
   'GET',

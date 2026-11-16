@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import type { ConversationChanges } from '@overdeck/contracts';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -53,6 +54,39 @@ function createRepo(name: string, relativePath: string, content: string): string
   return repo;
 }
 
+/** PAN-5408: a minimal ConversationChanges fixture for getConversationDiffFull's conversationChanges dep. */
+function changesFor(repoRoot: string, uncommittedPaths: string[], committedPaths: string[] = []): ConversationChanges {
+  const commits = committedPaths.length > 0
+    ? [{
+        sha: 'f'.repeat(40),
+        shortSha: 'fffffff',
+        subject: 's',
+        authoredAt: new Date().toISOString(),
+        pushed: false,
+        attribution: 'trailer' as const,
+        files: committedPaths.map((p) => ({ path: p, status: 'A' as const, additions: 1, deletions: 0 })),
+      }]
+    : [];
+  const uncommitted = uncommittedPaths.map((path) => ({
+    path,
+    status: 'M' as const,
+    additions: 1,
+    deletions: 0,
+    attribution: 'file' as const,
+    turnIds: [],
+  }));
+  return {
+    conversation: 'test',
+    repoRoot,
+    rootId: null,
+    branch: null,
+    scope: 'conversation',
+    uncommitted,
+    commits,
+    totals: { files: 0, additions: 0, deletions: 0, commitsPushed: 0, commitsLocal: 0, uncommittedFiles: 0 },
+  };
+}
+
 beforeEach(() => {
   testRoot = mkdtempSync(join(tmpdir(), 'pan-2844-conversation-diffs-'));
   testHome = join(testRoot, 'home');
@@ -67,6 +101,8 @@ afterEach(async () => {
   delete process.env.OVERDECK_HOME;
   rmSync(testRoot, { recursive: true, force: true });
 });
+
+const FUTURE_DATE = new Date(Date.now() + 86_400_000).toISOString();
 
 describe('getConversationDiffTurn', () => {
   it('returns the patch for a tracked edit in a different repository than the conversation cwd', async () => {
@@ -117,7 +153,10 @@ describe('getConversationDiffTurn', () => {
     expect(combinedDiff).toContain('diff --git a/README.md b/README.md');
     expect(combinedDiff).toContain('diff --git a/drafts/pan-2842.md b/drafts/pan-2842.md');
 
-    const fullResult = await getConversationDiffFull('cross-repo', undefined, deps);
+    const fullResult = await getConversationDiffFull('cross-repo', undefined, {
+      ...deps,
+      conversationChanges: async () => changesFor(cwdRepo, ['README.md']),
+    });
     const fullDiff = (fullResult.body as { diff: string }).diff;
     expect(fullDiff).toContain('diff --git a/README.md b/README.md');
     expect(fullDiff).toContain('diff --git a/drafts/pan-2842.md b/drafts/pan-2842.md');
@@ -232,10 +271,8 @@ describe('getConversationDiffVsMain', () => {
   });
 });
 
-describe('getConversationDiffFull (PAN-4501: zero-turn files)', () => {
-  const FUTURE_DATE = new Date(Date.now() + 86_400_000).toISOString();
-
-  it('returns the uncommitted and post-start committed files with a non-empty diff when there are no edit turns', async () => {
+describe('getConversationDiffFull (PAN-5408: attributed files only)', () => {
+  it('lists only attributed files: an unattributed uncommitted edit is left out', async () => {
     const repo = createRepo('full-files-repo', 'a.txt', 'a\n');
     const sessionFile = join(testRoot, 'session-full.jsonl');
     writeFileSync(sessionFile, '');
@@ -252,14 +289,16 @@ describe('getConversationDiffFull (PAN-4501: zero-turn files)', () => {
     const deps = {
       resolveSessionFile: async () => sessionFile,
       getCachedMessages: async () => ({ messages: [], fileEditsByAssistantId: new Map() }),
+      conversationChanges: async () => changesFor(repo, [], ['c.txt']),
     };
 
     const resultFull = await getConversationDiffFull('full-files', undefined, deps);
 
     const files = (resultFull.body as { files: Array<{ path: string }> }).files;
-    expect(files.map((f) => f.path)).toEqual(['a.txt', 'c.txt']);
+    expect(files.map((f) => f.path)).toEqual(['c.txt']);
     const diff = (resultFull.body as { diff: string }).diff;
-    expect(diff.length).toBeGreaterThan(0);
+    expect(diff).toContain('c.txt');
+    expect(diff).not.toContain('a.txt');
   });
 
   it('scopes the diff to fileFilter while files still lists every changed path', async () => {
@@ -279,6 +318,7 @@ describe('getConversationDiffFull (PAN-4501: zero-turn files)', () => {
     const deps = {
       resolveSessionFile: async () => sessionFile,
       getCachedMessages: async () => ({ messages: [], fileEditsByAssistantId: new Map() }),
+      conversationChanges: async () => changesFor(repo, ['a.txt'], ['c.txt']),
     };
 
     const resultFiltered = await getConversationDiffFull('full-files-filter', 'a.txt', deps);
@@ -288,16 +328,20 @@ describe('getConversationDiffFull (PAN-4501: zero-turn files)', () => {
     expect(diff).not.toContain('c.txt');
     const files = (resultFiltered.body as { files: Array<{ path: string }> }).files;
     expect(files.map((f) => f.path)).toEqual(['a.txt', 'c.txt']);
+
+    const emptyFilterResult = await getConversationDiffFull('full-files-filter', 'zzz.txt', deps);
+    expect((emptyFilterResult.body as { diff: string }).diff).toBe('');
   });
 });
 
 describe('ignoreWhitespace in the conversation diff views (PAN-4503)', () => {
-  const emptyDeps = (sessionFile: string) => ({
+  const emptyDeps = (sessionFile: string, repo: string) => ({
     resolveSessionFile: async () => sessionFile,
     getCachedMessages: async () => ({ messages: [] }),
+    conversationChanges: async () => changesFor(repo, ['a.js', 'b.txt']),
   });
 
-  async function createReindentConversation(name: string): Promise<string> {
+  async function createReindentConversation(name: string): Promise<{ sessionFile: string; repo: string }> {
     const repo = createRepo(`${name}-repo`, 'a.js', 'if (x) {\nfoo()\n}\n');
     writeFileSync(join(repo, 'b.txt'), 'hi\n');
     git(repo, ['add', 'b.txt']);
@@ -309,15 +353,15 @@ describe('ignoreWhitespace in the conversation diff views (PAN-4503)', () => {
     createConversation({ name, tmuxSession: `conv-${name}`, cwd: repo });
     writeFileSync(join(repo, 'a.js'), 'if (x) {\n    foo()\n}\n');
     writeFileSync(join(repo, 'b.txt'), 'hi\nthere\n');
-    return sessionFile;
+    return { sessionFile, repo };
   }
 
   it('drops the re-indent-only file from the all-turns and vs-main patches', async () => {
-    const sessionFile = await createReindentConversation('ws-fns');
+    const { sessionFile, repo } = await createReindentConversation('ws-fns');
     const { getConversationDiffFull, getConversationDiffTurn } = await import(
       '../../../../src/lib/overdeck/conversation-diffs.js'
     );
-    const deps = emptyDeps(sessionFile);
+    const deps = emptyDeps(sessionFile, repo);
 
     const ignored = (await getConversationDiffFull('ws-fns', undefined, deps, { ignoreWhitespace: true })).body as { diff: string };
     expect(ignored.diff).toContain('b.txt');
@@ -334,7 +378,8 @@ describe('ignoreWhitespace in the conversation diff views (PAN-4503)', () => {
   });
 
   it('serves /diffs/full?ignoreWhitespace=1 without the re-indent-only file', async () => {
-    await createReindentConversation('ws-route');
+    const { repo } = await createReindentConversation('ws-route');
+    gitAt(repo, ['commit', '--quiet', '-am', 'reindent', '-m', 'Overdeck-Conversation: conv-ws-route'], FUTURE_DATE);
     const { conversationDiffRoutes } = await import(
       '../../../../src/dashboard/server/routes/conversation-diffs.js'
     );
