@@ -234,6 +234,31 @@ renders the **not-found state**: a `<span data-doc-link-state="missing"|
 "outside">` with muted, dashed-underline text, `aria-disabled="true"` and a
 title naming the unresolved path — no `href`, no click handler.
 
+## Front matter in the Preview (PAN-5427)
+
+Before handing the body to `ChatMarkdown`, `MarkdownTab` splits off a leading
+YAML front matter block with `splitFrontMatter`
+(`src/dashboard/frontend/src/lib/frontMatter.ts`), a pure, import-free
+function, and renders it as a `<dl data-testid="markdown-front-matter">`
+above the content: keys in muted mono, values as plain text, `title` and
+`description` first, then every other key in source order.
+
+A body is only split when line 0 is a `---` fence, a later line is a closing
+`---` fence, and at least one top-level key line (`key: value`) appears
+between them. A fenced block with no key line — including an empty block or
+`---\nSome prose\n---` — renders unchanged: no list, and `ChatMarkdown`
+receives the original body, so a `---` anywhere outside this exact shape
+still renders as an `<hr>`.
+
+Values are returned as plain text, not full YAML: quoted scalars are
+unquoted, `|`/`>` block scalars and list/map continuation lines become
+dedented text, and column-0 `#` comment lines are dropped. MDX `import`/
+`export` lines and JSX components are untouched.
+
+Every `MarkdownTab` caller inherits this with no change of its own: the code
+pane Preview, the diff window and dock Changes Preview, the editor pane
+Preview, the Docs pane and the cockpit dig tabs.
+
 ## The open-target preference and the fallback matrix
 
 `src/dashboard/frontend/src/editorPreferences.ts` adds:
