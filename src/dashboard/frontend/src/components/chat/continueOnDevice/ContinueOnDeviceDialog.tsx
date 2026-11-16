@@ -5,8 +5,9 @@
  */
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { X } from 'lucide-react';
 
+import { Modal } from '../../shared/Modal';
+import formStyles from '../../shared/ModalForm.module.css';
 import { ANYWHERE_STATUS_QUERY_KEY, loadAnywhereStatus, type AnywhereStatus } from '../../Settings/anywhere/anywhereApi';
 import { HANDOFF_HARNESSES, useContinueOnDeviceStore, type ContinueTarget } from './continueOnDeviceStore';
 import { HandOffTab } from './HandOffTab';
@@ -41,63 +42,36 @@ export function ContinueOnDeviceDialog({ target, onClose }: { target: ContinueTa
     if (status && tab === null) setTab(defaultContinueTab(status, target));
   }, [status, tab, target]);
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
-
   const active = tab ?? (status ? defaultContinueTab(status, target) : 'screen');
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
-      <div
-        className="bg-card border border-border rounded-lg shadow-2xl w-full max-w-md mx-4"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="continue-on-device-title"
-        data-component="continue-on-device-dialog"
-      >
-        <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-border">
-          <div className="min-w-0">
-            <h3 id="continue-on-device-title" className="text-base font-medium text-foreground">Continue on another device</h3>
-            <p className="text-xs text-muted-foreground truncate">{target.title}</p>
-          </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="text-muted-foreground hover:text-foreground transition-colors">
-            <X className="w-5 h-5" />
-          </button>
+    <Modal title="Continue on another device" description={target.title} size="narrow" onClose={onClose}>
+      <div className={`${formStyles.content} space-y-4`} data-component="continue-on-device-dialog">
+        <div role="tablist" className="flex gap-1 border-b border-border">
+          {(['screen', 'handoff'] as const).map((key) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={active === key}
+              onClick={() => setTab(key)}
+              className={`px-2.5 py-1.5 text-xs transition-colors -mb-px border-b-2 ${
+                active === key ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {TAB_LABELS[key]}
+            </button>
+          ))}
         </div>
 
-        <div className="p-4 space-y-4">
-          <div role="tablist" className="flex gap-1 border-b border-border">
-            {(['screen', 'handoff'] as const).map((key) => (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                aria-selected={active === key}
-                onClick={() => setTab(key)}
-                className={`px-2.5 py-1.5 text-xs transition-colors -mb-px border-b-2 ${
-                  active === key ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {TAB_LABELS[key]}
-              </button>
-            ))}
-          </div>
-
-          {isLoading ? (
-            <p className="text-xs text-muted-foreground">Loading…</p>
-          ) : error ? (
-            <p className="text-xs text-destructive">{(error as Error).message}</p>
-          ) : status ? (
-            active === 'screen' ? <OpenOnScreenTab target={target} status={status} /> : <HandOffTab target={target} status={status} />
-          ) : null}
-        </div>
+        {isLoading ? (
+          <p className={formStyles.status}>Loading…</p>
+        ) : error ? (
+          <p className={formStyles.error}>{(error as Error).message}</p>
+        ) : status ? (
+          active === 'screen' ? <OpenOnScreenTab target={target} status={status} /> : <HandOffTab target={target} status={status} />
+        ) : null}
       </div>
-    </div>
+    </Modal>
   );
 }

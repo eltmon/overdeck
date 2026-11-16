@@ -418,14 +418,16 @@ describe('IssueActionMenu', () => {
     fireEvent.click(screen.getByTestId('issue-action-open'));
     expect(await screen.findByRole('dialog', { name: 'Open workspace' })).toBeInTheDocument();
 
-    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.keyDown(screen.getByRole('dialog', { name: 'Open workspace' }), { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Open workspace' })).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
     fireEvent.click(screen.getByTestId('issue-action-open'));
-    const dialog = await screen.findByRole('dialog', { name: 'Open workspace' });
+    await screen.findByRole('dialog', { name: 'Open workspace' });
 
-    fireEvent.click(dialog.parentElement!);
+    const scrim = document.querySelector('[data-component="modal-scrim"]')!;
+    fireEvent.mouseDown(scrim);
+    fireEvent.click(scrim);
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Open workspace' })).not.toBeInTheDocument());
   });
 

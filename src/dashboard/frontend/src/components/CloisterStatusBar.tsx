@@ -12,6 +12,8 @@ import { useDashboardStore, selectAgents } from '../lib/store';
 import { EMERGENCY_STOP_HOTKEY_LABEL, runEmergencyStop } from './EmergencyStopOverlay';
 import { fetchWithTimeout } from '../lib/apiFetch';
 import { PopoverSurface } from './shared/ContextMenu';
+import { Modal } from './shared/Modal';
+import formStyles from './shared/ModalForm.module.css';
 
 interface CloisterStatus {
   running: boolean;
@@ -443,88 +445,71 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
         )}
 
         {/* Restart with Current Config Modal */}
-        {showRestartConfigModal && createPortal(
-          <div role="dialog" aria-modal="true" aria-label="Restart agents with current config" className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-            <div className="bg-card border border-border rounded-lg shadow-lg max-w-2xl max-h-96 overflow-auto w-96">
-              <div className="px-4 py-3 border-b border-border flex justify-between items-center">
-                <h3 className="text-sm font-semibold text-foreground">
-                  Restart Agents with Current Config
-                </h3>
-                <button
-                  onClick={() => setShowRestartConfigModal(false)}
-                  className="text-muted-foreground hover:text-foreground text-lg leading-none"
-                >
-                  ×
-                </button>
-              </div>
-              <div className="p-4 space-y-3 max-h-64 overflow-y-auto">
-                {restartConfigData?.items.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No eligible agents to restart.</p>
-                ) : (
-                  restartConfigData?.items.map(item => (
-                    <label
-                      key={item.agentId}
-                      className="flex items-start gap-2 p-2 rounded text-xs text-foreground hover:bg-muted cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedForRestart.has(item.agentId)}
-                        onChange={e => {
-                          const newSelected = new Set(selectedForRestart);
-                          if (e.target.checked) {
-                            newSelected.add(item.agentId);
-                          } else {
-                            newSelected.delete(item.agentId);
-                          }
-                          setSelectedForRestart(newSelected);
-                        }}
-                        disabled={item.paused}
-                        className="accent-primary mt-0.5"
-                      />
-                      <div className="flex-1">
-                        <div className="font-medium text-foreground">
-                          {item.issueId}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground space-y-0.5">
-                          <div>Current: {item.currentModel} / {item.currentHarness}</div>
-                          {item.changed && (
-                            <div className="text-warning">→ New: {item.newModel} / {item.newHarness}</div>
-                          )}
-                          {!item.changed && (
-                            <div className="text-muted-foreground">No change needed</div>
-                          )}
-                          {item.paused && (
-                            <div className="text-destructive">Paused — cannot restart</div>
-                          )}
-                        </div>
-                      </div>
-                    </label>
-                  ))
-                )}
-              </div>
-              <div className="flex justify-end gap-1.5 px-4 py-3 border-t border-border">
-                <button
-                  onClick={() => setShowRestartConfigModal(false)}
-                  className="px-2 py-1 rounded text-xs text-foreground bg-muted hover:bg-accent"
-                >
+        {showRestartConfigModal && (
+          <Modal
+            title="Restart Agents with Current Config"
+            ariaLabel="Restart agents with current config"
+            size="narrow"
+            onClose={() => setShowRestartConfigModal(false)}
+            pinned={restartWithConfigMutation.isError ? (
+              <p className={formStyles.error}>{(restartWithConfigMutation.error as Error).message}</p>
+            ) : undefined}
+            footer={
+              <>
+                <button type="button" onClick={() => setShowRestartConfigModal(false)} className={formStyles.button}>
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={() => restartWithConfigMutation.mutate(Array.from(selectedForRestart))}
                   disabled={restartWithConfigMutation.isPending || selectedForRestart.size === 0}
-                  className="px-2 py-1 rounded text-xs text-primary-foreground bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={formStyles.primaryButton}
                 >
                   {restartWithConfigMutation.isPending ? 'Restarting...' : `Restart (${selectedForRestart.size})`}
                 </button>
-              </div>
-              {restartWithConfigMutation.isError && (
-                <div className="px-4 py-2 text-xs text-destructive border-t border-border">
-                  {(restartWithConfigMutation.error as Error).message}
-                </div>
+              </>
+            }
+          >
+            <div className={formStyles.form}>
+              {restartConfigData?.items.length === 0 ? (
+                <p className={formStyles.hint}>No eligible agents to restart.</p>
+              ) : (
+                restartConfigData?.items.map(item => (
+                  <label key={item.agentId} className={formStyles.choice}>
+                    <input
+                      type="checkbox"
+                      checked={selectedForRestart.has(item.agentId)}
+                      onChange={e => {
+                        const newSelected = new Set(selectedForRestart);
+                        if (e.target.checked) {
+                          newSelected.add(item.agentId);
+                        } else {
+                          newSelected.delete(item.agentId);
+                        }
+                        setSelectedForRestart(newSelected);
+                      }}
+                      disabled={item.paused}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className={formStyles.choiceTitle}>{item.issueId}</span>
+                      <span className={formStyles.choiceHint}>
+                        <span className="block">Current: {item.currentModel} / {item.currentHarness}</span>
+                        {item.changed && (
+                          <span className="block text-warning">→ New: {item.newModel} / {item.newHarness}</span>
+                        )}
+                        {!item.changed && (
+                          <span className="block">No change needed</span>
+                        )}
+                        {item.paused && (
+                          <span className="block text-destructive">Paused — cannot restart</span>
+                        )}
+                      </span>
+                    </span>
+                  </label>
+                ))
               )}
             </div>
-          </div>,
-          document.body,
+          </Modal>
         )}
 
         {/* Emergency Stop */}

@@ -92,7 +92,7 @@ describe('ResumableSessionDialog', () => {
   it('Resume session posts to the resume endpoint and closes', async () => {
     useResumeRecovery.getState().openRecovery({ kind: 'resumable', agentId: 'agent-pan-2876', issueId: 'PAN-2876' });
     renderDialog();
-    expect(screen.getByText('agent-pan-2876')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'agent-pan-2876 has a saved session' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('recovery-primary'));
 

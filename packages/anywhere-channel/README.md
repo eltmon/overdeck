@@ -157,8 +157,8 @@ grep -n -E "<img|<video|<audio|src=|href=" components/chat/**/*.tsx components/m
   (`lib/useChannelMediaSrc.ts`). In the native shell (`isNativeShell()`, `lib/nativeShell.ts`)
   it fetches the `/api/…` image into an object URL; elsewhere it returns the URL unchanged.
 - **Desktop-only, not supported in the app:** GodView's files link
-  (`components/GodView/ActionBar.tsx`) and the streaming readers in `DeepWipeDialog.tsx`,
-  `PlanDialog.tsx` and `hooks/useResetIssue.ts`. No phone screen mounts them.
+  (`components/GodView/ActionBar.tsx`) and the streaming readers in `PlanDialog.tsx` and
+  `hooks/useResetIssue.ts`. No phone screen mounts them.
 - **Not machine URLs:** composer previews (object URLs), the QR image, sharing avatars, external
   links, tracker URLs and the pairing camera.
 - There is no `EventSource`, `sendBeacon` or CSS `url(/api…)` in the frontend.

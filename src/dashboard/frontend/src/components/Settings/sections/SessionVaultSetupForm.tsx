@@ -9,6 +9,8 @@
  * form. The dialog closes only after the operator checks "I wrote it down".
  */
 import { useState } from 'react';
+import { Modal } from '../../shared/Modal';
+import formStyles from '../../shared/ModalForm.module.css';
 import { BUTTON_CLASS, INPUT_CLASS, postVault, vaultErrorMessage } from './sessionVaultShared';
 
 type PassphraseChoice = 'generate' | 'custom' | 'none';
@@ -38,71 +40,55 @@ export interface ShownOnce {
 
 export function RecoveryDialog({ secrets, onDone }: { secrets: ShownOnce; onDone: () => void }) {
   const [acknowledged, setAcknowledged] = useState(false);
-  const closeIfAcknowledged = () => {
-    if (acknowledged) onDone();
-  };
   return (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-      onClick={closeIfAcknowledged}
-      onKeyDown={(e) => { if (e.key === 'Escape') closeIfAcknowledged(); }}
+    <Modal
+      title="Write down your recovery phrase"
+      size="narrow"
+      onClose={onDone}
+      dismissible={acknowledged}
+      footer={
+        <button type="button" disabled={!acknowledged} onClick={onDone} className={formStyles.primaryButton}>
+          Done
+        </button>
+      }
     >
-      <div
-        className="bg-card border border-border rounded-lg shadow-2xl w-full max-w-md mx-4"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="vault-recovery-title"
-      >
-        <div className="px-4 py-3 border-b border-border">
-          <h3 id="vault-recovery-title" className="text-base font-semibold text-foreground">Write down your recovery phrase</h3>
-        </div>
-        <div className="p-4 space-y-3 text-sm">
-          <p className="text-foreground">It is shown only now. A new machine can join with it, or with the passphrase.</p>
+      <div className={formStyles.form}>
+        <div className={formStyles.field}>
+          <p className={formStyles.text}>It is shown only now. A new machine can join with it, or with the passphrase.</p>
           <textarea
             readOnly
             rows={4}
             data-testid="vault-recovery-phrase"
             value={secrets.recoveryPhrase}
-            className="w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground font-mono"
+            className={`${formStyles.textarea} ${formStyles.mono}`}
             onFocus={(e) => e.target.select()}
           />
-          {secrets.generated && (
-            <label className="block">
-              <span className="text-xs text-muted-foreground">Vault passphrase (shown only now)</span>
-              <input
-                type="text"
-                readOnly
-                data-testid="vault-generated-passphrase"
-                value={secrets.generated}
-                className="mt-1 w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground font-mono"
-                onFocus={(e) => e.target.select()}
-              />
-            </label>
-          )}
-          {secrets.passphraseError && (
-            <p className="text-xs text-destructive">
-              Could not store the passphrase: {secrets.passphraseError}. Join with the recovery phrase, or run: pan vault passphrase set
-            </p>
-          )}
-          <p className="text-xs text-muted-foreground">{VAULT_SECRET_WARNING}</p>
-          <label className="flex items-center gap-2 text-xs text-foreground">
-            <input type="checkbox" checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} />
-            I wrote it down
+        </div>
+        {secrets.generated && (
+          <label className={formStyles.field}>
+            <span className={formStyles.label}>Vault passphrase (shown only now)</span>
+            <input
+              type="text"
+              readOnly
+              data-testid="vault-generated-passphrase"
+              value={secrets.generated}
+              className={`${formStyles.input} ${formStyles.mono}`}
+              onFocus={(e) => e.target.select()}
+            />
           </label>
-        </div>
-        <div className="flex items-center justify-end px-4 py-3 border-t border-border">
-          <button
-            type="button"
-            disabled={!acknowledged}
-            onClick={onDone}
-            className="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
-          >
-            Done
-          </button>
-        </div>
+        )}
+        {secrets.passphraseError && (
+          <p className={formStyles.error}>
+            Could not store the passphrase: {secrets.passphraseError}. Join with the recovery phrase, or run: pan vault passphrase set
+          </p>
+        )}
+        <p className={formStyles.hint}>{VAULT_SECRET_WARNING}</p>
+        <label className={formStyles.choice}>
+          <input type="checkbox" checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} />
+          <span className={formStyles.choiceTitle}>I wrote it down</span>
+        </label>
       </div>
-    </div>
+    </Modal>
   );
 }
 

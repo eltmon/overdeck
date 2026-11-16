@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -109,12 +109,38 @@ describe('AddTriggerDialog (PAN-4648)', () => {
     const posted = JSON.parse(String((callsWith('POST')[0]?.[1] as RequestInit).body)) as Record<string, unknown>;
     expect(posted).toMatchObject({ name: 'ci-failures', target: { kind: 'conversation', conversation: '20261101-0001' }, verify: 'github' });
 
-    await user.click(screen.getByTestId('trigger-dialog-backdrop'));
-    expect(screen.getByTestId('trigger-created-url')).toBeInTheDocument();
-
     await user.click(screen.getByRole('button', { name: 'Done' }));
     expect(screen.queryByTestId('trigger-created-url')).toBeNull();
     expect(document.body.textContent).not.toContain(URL_SECRET);
+  });
+
+  it('a scrim click closes the one-time URL view and removes the URL from the DOM (PAN-4756 D5)', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<OpenDialog />);
+
+    await user.type(screen.getByLabelText('Name'), 'ci-failures');
+    await user.type(screen.getByLabelText('Conversation (name or id)'), '20261101-0001');
+    await user.click(screen.getByRole('button', { name: 'Create trigger' }));
+    expect(await screen.findByTestId('trigger-created-url')).toBeInTheDocument();
+
+    const scrim = document.querySelector('[data-component="modal-scrim"]')!;
+    fireEvent.mouseDown(scrim);
+    fireEvent.click(scrim);
+    expect(screen.queryByTestId('trigger-created-url')).toBeNull();
+    expect(document.body.textContent).not.toContain(URL_SECRET);
+  });
+
+  it('Escape closes the one-time URL view after the result replaces the form (PAN-4756)', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<OpenDialog />);
+
+    await user.type(screen.getByLabelText('Name'), 'ci-failures');
+    await user.type(screen.getByLabelText('Conversation (name or id)'), '20261101-0001');
+    await user.click(screen.getByRole('button', { name: 'Create trigger' }));
+    expect(await screen.findByTestId('trigger-created-url')).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+    expect(screen.queryByTestId('trigger-created-url')).toBeNull();
   });
 
   it('offers the overdeck.ai inbox on the Anywhere plan and shows the inbox URL instead of the Funnel URL (PAN-2356)', async () => {

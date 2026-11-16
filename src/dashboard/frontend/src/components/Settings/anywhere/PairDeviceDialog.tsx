@@ -7,7 +7,6 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -21,6 +20,8 @@ import {
   loadDevices,
 } from './anywhereApi';
 import { QrImage } from './QrImage';
+import { Modal } from '../../shared/Modal';
+import formStyles from '../../shared/ModalForm.module.css';
 
 const OTHER = '__other__';
 const LOCAL = '__local__';
@@ -181,141 +182,127 @@ function PairDeviceDialogBody({ onClose }: { onClose: () => void }) {
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
-      <div
-        className="bg-card border border-border rounded-lg shadow-2xl w-full max-w-md mx-4"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="pair-device-title"
-        data-component="pair-device-dialog"
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <h3 id="pair-device-title" className="text-base font-medium text-foreground">Pair a device</h3>
-          <button type="button" onClick={onClose} aria-label="Close" className="text-muted-foreground hover:text-foreground transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Modal title="Pair a device" size="narrow" onClose={onClose}>
+      <div className={formStyles.form} data-component="pair-device-dialog">
+        <div className={formStyles.field}>
+          <label htmlFor="pair-device-address" className={formStyles.label}>Address the other device opens</label>
+          <select
+            id="pair-device-address"
+            value={selected}
+            onChange={(e) => {
+              setChoice(e.target.value);
+              setAddError(null);
+              setPairing(null);
+              setForbidden(false);
+            }}
+            className={formStyles.select}
+          >
+            {selectOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
 
-        <div className="p-4 space-y-4 text-sm">
-          <div className="space-y-2">
-            <label htmlFor="pair-device-address" className="text-xs text-muted-foreground">Address the other device opens</label>
-            <select
-              id="pair-device-address"
-              value={selected}
-              onChange={(e) => {
-                setChoice(e.target.value);
-                setAddError(null);
-                setPairing(null);
-                setForbidden(false);
-              }}
-              className="w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-            >
-              {selectOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-
-            {selected === OTHER && (
-              <div className="space-y-2">
-                <input
-                  type="url"
-                  aria-label="Address"
-                  placeholder="https://desk.tailnet.ts.net"
-                  value={typed}
-                  onChange={(e) => {
-                    setTyped(e.target.value);
-                    setAddError(null);
-                  }}
-                  className="w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground font-mono focus:ring-1 focus:ring-primary"
-                />
-                {typed.trim() === '' && reachable.length === 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Other devices need an address they can reach, such as https://desk.tailnet.ts.net (Tailscale).
-                  </p>
-                )}
-                {typed.trim() !== '' && !typedOrigin && (
-                  <p className="text-xs text-muted-foreground">Enter an http:// or https:// address.</p>
-                )}
-                {typedOrigin && !typedAddress && (
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs text-muted-foreground">Not trusted yet</span>
-                    <button
-                      type="button"
-                      onClick={() => void handleAdd()}
-                      disabled={adding}
-                      className="rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
-                    >
-                      Add to trusted addresses
-                    </button>
-                  </div>
-                )}
-                {typedAddress?.loopback && (
-                  <p className="text-xs text-muted-foreground">
-                    This address works only on this machine. Choose “Use this machine only” instead.
-                  </p>
-                )}
-                {addError && <p className="text-xs text-destructive">{addError}</p>}
-              </div>
-            )}
-          </div>
-
-          {forbidden ? (
-            <p className="text-xs text-muted-foreground">
-              Pairing links can be created only from a browser on this machine. Open the dashboard on the machine itself.
-            </p>
-          ) : pairing ? (
-            <div className="space-y-3">
-              {pairing.local && <p className="text-xs text-muted-foreground">Works only on this machine</p>}
-              <div className="flex gap-2">
-                <input
-                  readOnly
-                  aria-label="Pairing link"
-                  value={pairing.link}
-                  onFocus={(e) => e.target.select()}
-                  className="flex-1 min-w-0 bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground font-mono"
-                />
-                <button
-                  type="button"
-                  onClick={() => void handleCopy()}
-                  className="shrink-0 rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/50 transition-colors"
-                >
-                  Copy
-                </button>
-              </div>
-              {expired ? (
+          {selected === OTHER && (
+            <div className="space-y-2">
+              <input
+                type="url"
+                aria-label="Address"
+                placeholder="https://desk.tailnet.ts.net"
+                value={typed}
+                onChange={(e) => {
+                  setTyped(e.target.value);
+                  setAddError(null);
+                }}
+                className={`${formStyles.input} ${formStyles.mono}`}
+              />
+              {typed.trim() === '' && reachable.length === 0 && (
+                <p className={formStyles.hint}>
+                  Other devices need an address they can reach, such as https://desk.tailnet.ts.net (Tailscale).
+                </p>
+              )}
+              {typed.trim() !== '' && !typedOrigin && (
+                <p className={formStyles.hint}>Enter an http:// or https:// address.</p>
+              )}
+              {typedOrigin && !typedAddress && (
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs text-muted-foreground">This link expired</span>
+                  <span className={formStyles.hint}>Not trusted yet</span>
                   <button
                     type="button"
-                    onClick={() => void handleCreate()}
-                    disabled={creating}
-                    className="rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
+                    onClick={() => void handleAdd()}
+                    disabled={adding}
+                    className={formStyles.button}
                   >
-                    New link
+                    Add to trusted addresses
                   </button>
                 </div>
-              ) : (
-                <>
-                  <QrImage link={pairing.link} alt="Pairing QR code" />
-                  <p className="text-xs text-muted-foreground">{expiresInText(pairing.expiresAt)}</p>
-                </>
               )}
+              {typedAddress?.loopback && (
+                <p className={formStyles.hint}>
+                  This address works only on this machine. Choose “Use this machine only” instead.
+                </p>
+              )}
+              {addError && <p className={formStyles.error}>{addError}</p>}
             </div>
-          ) : (
+          )}
+        </div>
+
+        {forbidden ? (
+          <p className={formStyles.hint}>
+            Pairing links can be created only from a browser on this machine. Open the dashboard on the machine itself.
+          </p>
+        ) : pairing ? (
+          <div className="space-y-3">
+            {pairing.local && <p className={formStyles.hint}>Works only on this machine</p>}
+            <div className="flex gap-2">
+              <input
+                readOnly
+                aria-label="Pairing link"
+                value={pairing.link}
+                onFocus={(e) => e.target.select()}
+                className={`${formStyles.input} ${formStyles.mono} flex-1`}
+              />
+              <button
+                type="button"
+                onClick={() => void handleCopy()}
+                className={`${formStyles.button} shrink-0`}
+              >
+                Copy
+              </button>
+            </div>
+            {expired ? (
+              <div className="flex items-center justify-between gap-3">
+                <span className={formStyles.hint}>This link expired</span>
+                <button
+                  type="button"
+                  onClick={() => void handleCreate()}
+                  disabled={creating}
+                  className={formStyles.button}
+                >
+                  New link
+                </button>
+              </div>
+            ) : (
+              <>
+                <QrImage link={pairing.link} alt="Pairing QR code" />
+                <p className={formStyles.hint}>{expiresInText(pairing.expiresAt)}</p>
+              </>
+            )}
+          </div>
+        ) : (
+          <div>
             <button
               type="button"
               onClick={() => void handleCreate()}
               disabled={!linkOrigin || creating}
-              className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+              className={formStyles.primaryButton}
             >
               Create pairing link
             </button>
-          )}
-          {linkError && <p className="text-xs text-destructive">{linkError}</p>}
-          {newest && <p className="text-xs text-foreground">Paired: {newest.name}</p>}
-        </div>
+          </div>
+        )}
+        {linkError && <p className={formStyles.error}>{linkError}</p>}
+        {newest && <p className={formStyles.text}>Paired: {newest.name}</p>}
       </div>
-    </div>
+    </Modal>
   );
 }

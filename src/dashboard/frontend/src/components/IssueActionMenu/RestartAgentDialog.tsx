@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { hasLiveAgent, type IssueActionEntry } from '../../lib/issueActions';
 import { ActionDialogFrame } from './ActionDialogFrame';
+import formStyles from '../shared/ModalForm.module.css';
 import type { UseIssueActionsResult } from './useIssueActions';
 
 /**
@@ -50,8 +51,8 @@ export function RestartAgentDialog({
 
   return (
     <ActionDialogFrame label={action.label} onClose={onClose}>
-      <div className="space-y-3">
-        <fieldset className="space-y-2">
+      <div className={formStyles.form}>
+        <fieldset className={formStyles.fieldset}>
           <legend className="sr-only">How to restart the agent</legend>
           <Option
             checked={choice === 'keep'}
@@ -71,7 +72,7 @@ export function RestartAgentDialog({
         <div className="flex justify-end gap-2">
           <button
             type="button"
-            className="rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent"
+            className={formStyles.button}
             onClick={onClose}
           >
             Cancel
@@ -80,7 +81,7 @@ export function RestartAgentDialog({
             type="button"
             data-testid="restart-agent-confirm"
             disabled={pending}
-            className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+            className={formStyles.primaryButton}
             onClick={submit}
           >
             {pending ? 'Restarting…' : 'Restart'}
@@ -103,17 +104,16 @@ function Option({
   detail: string;
 }) {
   return (
-    <label className="flex cursor-pointer gap-2 rounded-md border border-border px-3 py-2 hover:bg-accent">
+    <label className={formStyles.choice}>
       <input
         type="radio"
         name="restart-agent-choice"
-        className="mt-0.5"
         checked={checked}
         onChange={onSelect}
       />
       <span className="min-w-0">
-        <span className="block text-xs text-foreground">{title}</span>
-        <span className="mt-0.5 block text-[11px] leading-4 text-muted-foreground">{detail}</span>
+        <span className={formStyles.choiceTitle}>{title}</span>
+        <span className={formStyles.choiceHint}>{detail}</span>
       </span>
     </label>
   );

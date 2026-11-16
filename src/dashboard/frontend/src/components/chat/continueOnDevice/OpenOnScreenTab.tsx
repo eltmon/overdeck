@@ -20,6 +20,7 @@ import {
   type AnywhereStatus,
 } from '../../Settings/anywhere/anywhereApi';
 import type { ContinueTarget } from './continueOnDeviceStore';
+import formStyles from '../../shared/ModalForm.module.css';
 
 interface MintedLink {
   link: string;
@@ -51,7 +52,7 @@ function QrImage({ link }: { link: string }) {
   return <img alt="Conversation QR code" src={src} className="rounded-md bg-white p-1 w-48 h-48" />;
 }
 
-const BUTTON = 'rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50';
+const BUTTON = formStyles.button;
 
 export function OpenOnScreenTab({ target, status }: { target: ContinueTarget; status: AnywhereStatus }) {
   const queryClient = useQueryClient();
@@ -158,12 +159,12 @@ export function OpenOnScreenTab({ target, status }: { target: ContinueTarget; st
                 setTyped(e.target.value);
                 setAddError(null);
               }}
-              className="w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground font-mono focus:ring-1 focus:ring-primary"
+              className={`${formStyles.input} ${formStyles.mono}`}
             />
             <button type="button" onClick={() => void handleAdd()} disabled={adding || typed.trim() === ''} className={BUTTON}>
               Add an address
             </button>
-            {addError && <p className="text-xs text-destructive">{addError}</p>}
+            {addError && <p className={formStyles.error}>{addError}</p>}
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">Add an address from a browser on this machine (Settings → Anywhere).</p>
@@ -174,8 +175,8 @@ export function OpenOnScreenTab({ target, status }: { target: ContinueTarget; st
 
   return (
     <div className="space-y-3 text-sm">
-      <div className="space-y-1">
-        <label htmlFor="continue-address" className="text-xs text-muted-foreground">Address the other device opens</label>
+      <div className={formStyles.field}>
+        <label htmlFor="continue-address" className={formStyles.label}>Address the other device opens</label>
         <select
           id="continue-address"
           aria-label="Address the other device opens"
@@ -185,7 +186,7 @@ export function OpenOnScreenTab({ target, status }: { target: ContinueTarget; st
             setMinted(null);
             setLinkError(null);
           }}
-          className="w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+          className={formStyles.select}
         >
           {options.map((origin) => (
             <option key={origin} value={origin}>{origin}</option>
@@ -194,7 +195,7 @@ export function OpenOnScreenTab({ target, status }: { target: ContinueTarget; st
       </div>
 
       {canPair && (
-        <label className="flex items-center gap-2 text-xs text-foreground">
+        <label className={`${formStyles.choice} items-center text-sm`}>
           <input
             type="checkbox"
             checked={pair}
@@ -215,7 +216,7 @@ export function OpenOnScreenTab({ target, status }: { target: ContinueTarget; st
           data-testid="continue-link"
           value={shown ?? ''}
           onFocus={(e) => e.target.select()}
-          className="flex-1 min-w-0 bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground font-mono"
+          className={`${formStyles.input} ${formStyles.mono} flex-1`}
         />
         <button type="button" onClick={() => void handleCopy()} className={`shrink-0 ${BUTTON}`}>
           Copy
@@ -240,13 +241,13 @@ export function OpenOnScreenTab({ target, status }: { target: ContinueTarget; st
             type="button"
             onClick={() => void handleCreate()}
             disabled={creating}
-            className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+            className={formStyles.primaryButton}
           >
             Create pairing link
           </button>
         )
       )}
-      {linkError && <p className="text-xs text-destructive">{linkError}</p>}
+      {linkError && <p className={formStyles.error}>{linkError}</p>}
     </div>
   );
 }

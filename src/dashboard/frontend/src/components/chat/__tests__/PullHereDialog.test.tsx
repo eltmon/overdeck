@@ -85,7 +85,7 @@ describe('PullHereDialog (PAN-4650 WI-14)', () => {
     const onClose = vi.fn();
     render(<PullHereDialog target={TARGET} onClose={onClose} />);
     await act(async () => { fireEvent.click(screen.getByText('Pull here')); });
-    expect(screen.queryByLabelText('Close')).toBeNull();
+    expect(screen.getByLabelText('Close')).toBeDisabled();
     await act(async () => { await vi.advanceTimersByTimeAsync(PULL_POLL_MS); });
     expect(screen.getByRole('alert').textContent).toBe('Lost track of the pull: HTTP 404. It may still finish; the conversation list shows where it runs.');
     fireEvent.click(screen.getByLabelText('Close'));

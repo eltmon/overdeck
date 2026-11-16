@@ -5,6 +5,7 @@ import {
   AskUserQuestionDialog,
   type AskUserQuestionSubject,
 } from '../AskUserQuestionDialog';
+import modalStyles from '../shared/Modal.module.css';
 
 const pendingAskUserQuestion = {
   toolUseId: 'toolu_1',
@@ -472,7 +473,7 @@ describe('AskUserQuestionDialog needs-you tone and footer', () => {
   it('uses the needs-you warning tone on the panel', () => {
     const { container } = renderTone();
 
-    expect(screen.getByRole('dialog')).toHaveClass('border-warning/40');
+    expect(screen.getByRole('dialog')).toHaveClass(modalStyles.warning);
     expect(container.ownerDocument.querySelector('.border-primary\\/30')).toBeNull();
   });
 

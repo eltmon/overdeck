@@ -21,6 +21,7 @@ import {
   type BotPlatform,
 } from './botSnippets';
 import { CopyField } from './McpUrlDialog';
+import formStyles from '../../shared/ModalForm.module.css';
 
 export type ConnectBotResult =
   | { kind: 'connector'; pairingString: string; expiresAt: string; message: string; copied: boolean }
@@ -130,7 +131,7 @@ export function ConnectBotOutput({ platform, result, onDone }: ConnectBotOutputP
       <button
         type="button"
         onClick={onDone}
-        className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 transition-colors"
+        className={formStyles.primaryButton}
       >
         Done
       </button>

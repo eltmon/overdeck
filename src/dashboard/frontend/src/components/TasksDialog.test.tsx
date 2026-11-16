@@ -165,10 +165,12 @@ describe('TasksDialog', () => {
   it('closes from the close button and scrim', () => {
     installFetch();
     const onClose = vi.fn();
-    const { container } = render(<TasksDialog issueId="PAN-3231" isOpen onClose={onClose} />, { wrapper });
+    render(<TasksDialog issueId="PAN-3231" isOpen onClose={onClose} />, { wrapper });
 
     fireEvent.click(screen.getByRole('button', { name: 'Close tasks viewer' }));
-    fireEvent.click(container.querySelector('.absolute.inset-0')!);
+    const scrim = document.querySelector('[data-component="modal-scrim"]')!;
+    fireEvent.mouseDown(scrim);
+    fireEvent.click(scrim);
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 });

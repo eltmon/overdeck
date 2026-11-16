@@ -21,6 +21,8 @@ import { formatIssueRef } from '../lib/issueLabel'
 import { formatRelativeTime } from '../lib/formatRelativeTime'
 import { ChatMarkdown } from './chat/ChatMarkdown'
 import { bucketCount, capture } from '../lib/telemetry'
+import { Modal } from './shared/Modal'
+import formStyles from './shared/ModalForm.module.css'
 
 /**
  * PAN-1520 — minimal shape the dialog consumes. Works for either an
@@ -50,9 +52,6 @@ export interface AskUserQuestionSubject {
     }>
   } | null
 }
-
-/** Elements the Tab trap cycles through inside the dialog panel. */
-const FOCUSABLE_SELECTOR = 'button:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
 
 /** Visible keyboard focus ring shared by every control in the dialog (FR-10). */
 const FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
@@ -95,7 +94,7 @@ export function AskUserQuestionDialog({
     setNoteText('')
   }
 
-  const panelRef = useRef<HTMLDivElement>(null)
+  const questionsRef = useRef<HTMLDivElement>(null)
   const noteId = useId()
   const titleId = useId()
   // Each question's text gets `${questionIdBase}-<index>`; the first one also
@@ -104,18 +103,15 @@ export function AskUserQuestionDialog({
   const isVisible = isOpen && !!agent && !!pending && questions.length > 0
 
   // PAN-4754 FR-8 — move focus into the dialog on open (the selected option,
-  // else the first option) and hand it back to the opener on close. Keyed on
-  // the question too, so a new question arriving while open refocuses.
+  // else the first option). Keyed on the question too, so a new question
+  // arriving while open refocuses. Runs after Modal's own focus effect (D6);
+  // Modal hands focus back to the opener on close.
   useEffect(() => {
     if (!isVisible) return
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    const panel = panelRef.current
-    const initial = panel?.querySelector<HTMLElement>('[data-dialog-option][data-selected="true"]')
-      ?? panel?.querySelector<HTMLElement>('[data-dialog-option]')
+    const region = questionsRef.current
+    const initial = region?.querySelector<HTMLElement>('[data-dialog-option][data-selected="true"]')
+      ?? region?.querySelector<HTMLElement>('[data-dialog-option]')
     initial?.focus()
-    return () => {
-      if (opener?.isConnected) opener.focus()
-    }
   }, [isVisible, questionKey])
 
   // The header's "asked <age>" re-renders once a minute while open.
@@ -170,16 +166,12 @@ export function AskUserQuestionDialog({
     onSubmit(answers)
   }
 
-  // PAN-4754 FR-9 — Esc minimizes, Cmd/Ctrl+Enter sends, 1–4 pick an option
-  // of a single question (unless typing in the note). No key pressed inside
-  // the dialog reaches the dashboard's document-level shortcuts.
-  const handlePanelKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
+  // PAN-4754 FR-9 — Cmd/Ctrl+Enter sends, 1–4 pick an option of a single
+  // question (unless typing in the note). No key pressed inside the dialog
+  // reaches the dashboard's document-level shortcuts. Modal owns Esc
+  // (minimize) and the Tab trap.
+  const handlePanelKeyDown = (e: KeyboardEvent<HTMLElement>): void => {
     e.stopPropagation()
-    if (e.key === 'Escape') {
-      e.preventDefault()
-      if (!isSubmitting) onDismiss()
-      return
-    }
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault()
       if (canSubmit && !isSubmitting) handleSubmit()
@@ -198,151 +190,23 @@ export function AskUserQuestionDialog({
         e.preventDefault()
         chooseOption(0, option.label)
       }
-      return
-    }
-    if (e.key === 'Tab') trapTab(e)
-  }
-
-  // Tab and Shift+Tab wrap at the panel's last and first focusable elements.
-  const trapTab = (e: KeyboardEvent<HTMLDivElement>): void => {
-    if (!panelRef.current) return
-    const focusables = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
-    if (focusables.length === 0) return
-    const first = focusables[0]
-    const last = focusables[focusables.length - 1]
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault()
-      last.focus()
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault()
-      first.focus()
     }
   }
 
   return (
-    // Clicking the backdrop minimizes (not answers) — the question stays
+    // Esc and a scrim click minimize (not answer) — the question stays
     // recoverable via the "Needs you" list so navigation is never trapped.
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-      onClick={(e) => { if (e.target === e.currentTarget && !isSubmitting) onDismiss() }}
-    >
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={`${questionIdBase}-0`}
-        onKeyDown={handlePanelKeyDown}
-        className="w-full max-w-2xl overflow-hidden rounded-xl border border-warning/40 bg-card shadow-2xl"
-      >
-        <div className="flex items-center gap-3 border-b border-border px-5 py-4">
-          <div className="rounded-full bg-warning/15 p-2">
-            <MessageCircleQuestion className="h-5 w-5 text-warning" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="truncate text-lg font-semibold text-foreground">{displayName}</h2>
-            <p className="truncate text-sm text-muted-foreground">
-              <span className="font-mono">{agent.id}</span> · asked {formatRelativeTime(pending.askedAt, now)}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onDismiss}
-            disabled={isSubmitting}
-            title="Minimize — keeps the question in the activity feed's “Needs you” list"
-            aria-label="Minimize"
-            className={`shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS_RING}`}
-          >
-            <Minus className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="space-y-4 px-5 py-4 max-h-[60vh] overflow-y-auto">
-          {questions.map((q, qIdx) => {
-            // FR-12 — a `- **<label>:** <text>` context line shows under its
-            // option, for options that carry no description of their own.
-            const { consequences, remainingContext } = liftOptionConsequences(
-              q.context,
-              q.options.filter((o) => !o.description).map((o) => o.label),
-            )
-            return (
-              <div key={`q-${qIdx}`} className="space-y-2">
-                {q.header ? (
-                  <p className="eyebrow">{q.header}</p>
-                ) : null}
-                <div
-                  id={`${questionIdBase}-${qIdx}`}
-                  className="text-sm text-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
-                >
-                  <ChatMarkdown text={q.question} cwd={undefined} />
-                </div>
-                <div
-                  role={q.multiSelect ? 'group' : 'radiogroup'}
-                  aria-labelledby={`${questionIdBase}-${qIdx}`}
-                  className="space-y-1"
-                >
-                  {q.options.map((opt, oIdx) => {
-                    const isSelected = selections[qIdx]?.includes(opt.label) ?? false
-                    return (
-                      <button
-                        key={`q-${qIdx}-opt-${oIdx}`}
-                        type="button"
-                        role={q.multiSelect ? 'checkbox' : 'radio'}
-                        aria-checked={isSelected}
-                        data-dialog-option=""
-                        data-selected={isSelected ? 'true' : undefined}
-                        onClick={() => chooseOption(qIdx, opt.label)}
-                        disabled={isSubmitting}
-                        className={`flex w-full items-start gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS_RING} ${
-                          isSelected
-                            ? 'border-primary bg-primary/10 text-foreground'
-                            : 'border-border bg-background/40 text-foreground hover:bg-background/80'
-                        }`}
-                      >
-                        <span className="min-w-0 flex-1">
-                          <span className="block font-medium line-clamp-2" title={opt.label}>{opt.label}</span>
-                          {opt.description || consequences[opt.label] ? (
-                            <span className="mt-0.5 block text-xs text-muted-foreground">
-                              {opt.description || consequences[opt.label]}
-                            </span>
-                          ) : null}
-                        </span>
-                        {isSelected ? <Check aria-hidden="true" data-testid="option-check" className="mt-0.5 h-4 w-4 shrink-0 text-primary" /> : null}
-                      </button>
-                    )
-                  })}
-                </div>
-                {remainingContext ? (
-                  <div className="space-y-1">
-                    <p className="eyebrow">{"Agent's notes"}</p>
-                    <div className="border-l-2 border-border pl-3 text-sm text-muted-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                      <ChatMarkdown text={remainingContext} cwd={undefined} />
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            )
-          })}
-
-          {!isCodexApproval && (
-            <div className="space-y-1">
-              <label htmlFor={noteId} className="eyebrow block">
-                Add a note (optional)
-              </label>
-              <textarea
-                id={noteId}
-                value={noteText}
-                onChange={(e) => setNoteText(e.target.value)}
-                disabled={isSubmitting}
-                rows={2}
-                placeholder="Anything the agent should know with your answer."
-                className={`w-full rounded-md border border-border bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground ${FOCUS_RING} disabled:cursor-not-allowed disabled:opacity-60`}
-              />
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center gap-3 border-t border-border bg-card/40 px-5 py-4">
+    <Modal
+      title={displayName}
+      headless
+      labelledBy={titleId}
+      describedBy={`${questionIdBase}-0`}
+      tone="warning"
+      onClose={onDismiss}
+      dismissible={!isSubmitting}
+      onKeyDown={handlePanelKeyDown}
+      footer={
+        <>
           <p data-testid="send-helper" className="min-w-0 flex-1 text-xs text-muted-foreground">
             {canSubmit
               ? 'Send delivers your answer to the agent, which then continues.'
@@ -352,13 +216,120 @@ export function AskUserQuestionDialog({
             type="button"
             onClick={handleSubmit}
             disabled={isSubmitting || !canSubmit}
-            className={`inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS_RING}`}
+            className={formStyles.primaryButton}
           >
             {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
             Send Answer
           </button>
+        </>
+      }
+    >
+      <div className="flex shrink-0 items-center gap-3 border-b border-[color:var(--border-overlay,var(--border))] px-5 pb-[14px] pt-[18px]">
+        <div className="rounded-full bg-warning/15 p-2">
+          <MessageCircleQuestion className="h-5 w-5 text-warning" />
         </div>
+        <div className="min-w-0 flex-1">
+          <h2 id={titleId} className="truncate text-lg font-semibold text-foreground">{displayName}</h2>
+          <p className="truncate text-sm text-muted-foreground">
+            <span className="font-mono">{agent.id}</span> · asked {formatRelativeTime(pending.askedAt, now)}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onDismiss}
+          disabled={isSubmitting}
+          title="Minimize — keeps the question in the activity feed's “Needs you” list"
+          aria-label="Minimize"
+          className={`shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS_RING}`}
+        >
+          <Minus className="h-4 w-4" />
+        </button>
       </div>
-    </div>
+
+      <div ref={questionsRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+        {questions.map((q, qIdx) => {
+          // FR-12 — a `- **<label>:** <text>` context line shows under its
+          // option, for options that carry no description of their own.
+          const { consequences, remainingContext } = liftOptionConsequences(
+            q.context,
+            q.options.filter((o) => !o.description).map((o) => o.label),
+          )
+          return (
+            <div key={`q-${qIdx}`} className="space-y-2">
+              {q.header ? (
+                <p className="eyebrow">{q.header}</p>
+              ) : null}
+              <div
+                id={`${questionIdBase}-${qIdx}`}
+                className="text-sm text-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+              >
+                <ChatMarkdown text={q.question} cwd={undefined} />
+              </div>
+              <div
+                role={q.multiSelect ? 'group' : 'radiogroup'}
+                aria-labelledby={`${questionIdBase}-${qIdx}`}
+                className="space-y-1"
+              >
+                {q.options.map((opt, oIdx) => {
+                  const isSelected = selections[qIdx]?.includes(opt.label) ?? false
+                  return (
+                    <button
+                      key={`q-${qIdx}-opt-${oIdx}`}
+                      type="button"
+                      role={q.multiSelect ? 'checkbox' : 'radio'}
+                      aria-checked={isSelected}
+                      data-dialog-option=""
+                      data-selected={isSelected ? 'true' : undefined}
+                      onClick={() => chooseOption(qIdx, opt.label)}
+                      disabled={isSubmitting}
+                      className={`flex w-full items-start gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS_RING} ${
+                        isSelected
+                          ? 'border-primary bg-primary/10 text-foreground'
+                          : 'border-border bg-background/40 text-foreground hover:bg-background/80'
+                      }`}
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-medium line-clamp-2" title={opt.label}>{opt.label}</span>
+                        {opt.description || consequences[opt.label] ? (
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            {opt.description || consequences[opt.label]}
+                          </span>
+                        ) : null}
+                      </span>
+                      {isSelected ? <Check aria-hidden="true" data-testid="option-check" className="mt-0.5 h-4 w-4 shrink-0 text-primary" /> : null}
+                    </button>
+                  )
+                })}
+              </div>
+              {remainingContext ? (
+                <div className="space-y-1">
+                  <p className="eyebrow">{"Agent's notes"}</p>
+                  <div className="border-l-2 border-border pl-3 text-sm text-muted-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                    <ChatMarkdown text={remainingContext} cwd={undefined} />
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          )
+        })}
+
+        {!isCodexApproval && (
+          <div className={formStyles.field}>
+            <label htmlFor={noteId} className={formStyles.label}>
+              Add a note (optional)
+            </label>
+            <textarea
+              id={noteId}
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              disabled={isSubmitting}
+              rows={2}
+              placeholder="Anything the agent should know with your answer."
+              className={formStyles.textarea}
+            />
+          </div>
+        )}
+      </div>
+    </Modal>
   )
 }

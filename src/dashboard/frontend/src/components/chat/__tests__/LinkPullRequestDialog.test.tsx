@@ -110,8 +110,8 @@ describe('LinkPullRequestDialog (PAN-3822)', () => {
   it('closes on Escape', async () => {
     act(() => openPullRequestsDialog('conv-a'));
     renderHost();
-    await screen.findByRole('dialog', { name: 'Pull requests' });
-    fireEvent.keyDown(window, { key: 'Escape' });
+    const dialog = await screen.findByRole('dialog', { name: 'Pull requests' });
+    fireEvent.keyDown(dialog, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Pull requests' })).not.toBeInTheDocument());
   });
 });

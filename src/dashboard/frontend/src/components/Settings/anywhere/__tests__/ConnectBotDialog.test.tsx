@@ -125,6 +125,16 @@ describe('ConnectBotDialog (PAN-4951 WI-3, WI-4)', () => {
     expect(body.platform).toBe('hermes');
   });
 
+  it('keeps focus inside the dialog once the output replaces the form (PAN-4756)', async () => {
+    mockServer();
+    const { user } = await renderDialog();
+
+    await user.click(screen.getByRole('button', { name: 'Copy for Hermes' }));
+    await screen.findByLabelText('Message');
+
+    expect(document.querySelector('[data-component="modal"]')!.contains(document.activeElement)).toBe(true);
+  });
+
   it('adds approve to the body once it is ticked', async () => {
     mockServer();
     const { user } = await renderDialog();

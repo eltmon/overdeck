@@ -57,11 +57,13 @@ describe('PrdViewer', () => {
   it('closes on Escape, the close button, and the scrim', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 404 })));
     const onClose = vi.fn();
-    const { container } = render(<PrdViewer issueId="PAN-3231" onClose={onClose} />, { wrapper });
+    render(<PrdViewer issueId="PAN-3231" onClose={onClose} />, { wrapper });
 
-    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
     fireEvent.click(screen.getByRole('button', { name: 'Close PRD viewer' }));
-    fireEvent.click(container.querySelector('.absolute.inset-0')!);
+    const scrim = document.querySelector('[data-component="modal-scrim"]')!;
+    fireEvent.mouseDown(scrim);
+    fireEvent.click(scrim);
 
     expect(onClose).toHaveBeenCalledTimes(3);
   });

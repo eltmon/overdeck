@@ -8,13 +8,14 @@ import {
   Key,
   Loader2,
   Trash2,
-  X,
   Zap,
 } from 'lucide-react';
 import type { CodexAuthStatus } from '../../../hooks/useCodexAuthStatus';
 import { setReauthSession } from '../../../lib/pending-codex-spawn';
 import { popoutTerminal } from '../../TerminalPanel';
 import { HarnessLogo, ProviderLogo } from '../../shared/branding';
+import { Modal } from '../../shared/Modal';
+import formStyles from '../../shared/ModalForm.module.css';
 import { SensitiveText } from '../../SensitiveText';
 import { CliproxyAccountsPanel } from './CliproxyAccountsPanel';
 import { OpenRouterPage } from '../OpenRouterPage';
@@ -636,139 +637,120 @@ export function ProviderManagementSection({
       </section>
 
       {modelsModalProvider && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b border-border">
-              <div className="flex items-center gap-3">
-                <ProviderLogo
-                  provider={modelsModalProvider}
-                  label={PROVIDERS.find(p => p.id === modelsModalProvider)?.name}
-                  className="w-5 h-5 shrink-0"
-                />
-                <h3 className="text-foreground text-lg font-bold">
-                  {PROVIDERS.find(p => p.id === modelsModalProvider)?.name} Models
-                </h3>
-              </div>
-              <button
-                onClick={() => setModelsModalProvider(null)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+        <Modal
+          title={`${PROVIDERS.find(p => p.id === modelsModalProvider)?.name ?? ''} Models`}
+          onClose={() => setModelsModalProvider(null)}
+          footer={
+            <p className={`${formStyles.hint} flex-1 text-center`}>
+              Test verifies API key and model availability by asking "What is 2+3?"
+            </p>
+          }
+        >
+          <div className={formStyles.content}>
+            {(() => {
+              const providerApiKey = formData.api_keys[modelsModalProvider as keyof typeof formData.api_keys] || '';
+              const isEnvVarRef = providerApiKey.startsWith('$');
 
-            <div className="p-4 overflow-y-auto max-h-[60vh]">
-              {(() => {
-                const providerApiKey = formData.api_keys[modelsModalProvider as keyof typeof formData.api_keys] || '';
-                const isEnvVarRef = providerApiKey.startsWith('$');
-
-                if (!providerApiKey) {
-                  return (
-                    <div className="text-center py-8">
-                      <Key className="w-10 h-10 text-muted-foreground mb-2 mx-auto" />
-                      <p className="text-muted-foreground">Enter an API key to test models</p>
-                    </div>
-                  );
-                }
-
-                if (isEnvVarRef) {
-                  return (
-                    <div className="text-center py-8">
-                      <AlertTriangle className="w-10 h-10 text-warning mb-2 mx-auto" />
-                      <p className="text-warning">API key configured via environment variable</p>
-                      <p className="text-muted-foreground text-sm mt-1">
-                        <code className="font-mono bg-popover px-1 rounded">{providerApiKey}</code> is not set
-                      </p>
-                      <p className="text-muted-foreground text-xs mt-2">Set the environment variable or enter the key directly in Settings</p>
-                    </div>
-                  );
-                }
-
+              if (!providerApiKey) {
                 return (
-                  <div className="space-y-3">
-                    {(MODELS_BY_PROVIDER[modelsModalProvider]?.models || []).map((model) => {
-                      const testKey = `${modelsModalProvider}:${model.id}`;
-                      const testResult = modelTestResults[testKey];
-                      const isTesting = testingModel === testKey;
-
-                      return (
-                        <div
-                          key={model.id}
-                          className="bg-card border border-border rounded-lg p-4 hover:border-border transition-colors"
-                        >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <div className="w-4 h-4 flex items-center justify-center text-muted-foreground text-[10px]">
-                                  {typeof model.icon === 'string' ? model.icon[0] : '◆'}
-                                </div>
-                                <h4 className="text-foreground font-semibold">{model.name}</h4>
-                                {model.tier && (
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                                    model.tier === 'premium' ? 'badge-bg-signal-review text-signal-review-foreground' :
-                                    model.tier === 'balanced' ? 'badge-bg-primary text-primary' :
-                                    'badge-bg-success text-success-foreground'
-                                  }`}>
-                                    {model.tier}
-                                  </span>
-                                )}
-                              </div>
-                              {model.description && (
-                                <p className="text-xs text-muted-foreground mb-2">{model.description}</p>
-                              )}
-                              <div className="flex flex-wrap gap-1">
-                                {model.capabilities.map((cap) => (
-                                  <span
-                                    key={cap}
-                                    className="text-[9px] px-1.5 py-0.5 bg-card text-muted-foreground rounded border border-border"
-                                  >
-                                    {cap}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                            <div className="flex flex-col items-end gap-2">
-                              <button
-                                onClick={() => handleTestModel(modelsModalProvider, model.id)}
-                                disabled={isTesting}
-                                className="flex items-center gap-1.5 px-3 py-1.5 badge-bg-success hover:bg-success/20 border badge-border-success rounded-lg text-xs text-success-foreground transition-colors disabled:opacity-50 whitespace-nowrap"
-                              >
-                                {isTesting ? (
-                                  <Loader2 className="w-3 h-3 animate-spin" />
-                                ) : (
-                                  <Zap className="w-3.5 h-3.5" />
-                                )}
-                                Test 2+3
-                              </button>
-                              {testResult && (
-                                <div className={`flex items-center gap-1 text-xs ${testResult.success ? 'text-success' : 'text-destructive'}`}>
-                                  {testResult.success ? (
-                                    <CheckCircle className="w-3.5 h-3.5" />
-                                  ) : (
-                                    <AlertTriangle className="w-3.5 h-3.5" />
-                                  )}
-                                  {testResult.success
-                                    ? `${testResult.latencyMs}ms`
-                                    : (testResult.error?.slice(0, 30) || 'Failed')}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className="text-center py-8">
+                    <Key className="w-10 h-10 text-muted-foreground mb-2 mx-auto" />
+                    <p className="text-muted-foreground">Enter an API key to test models</p>
                   </div>
                 );
-              })()}
-            </div>
+              }
 
-            <div className="p-4 border-t border-border bg-card">
-              <p className="text-xs text-muted-foreground text-center">
-                Test verifies API key and model availability by asking "What is 2+3?"
-              </p>
-            </div>
+              if (isEnvVarRef) {
+                return (
+                  <div className="text-center py-8">
+                    <AlertTriangle className="w-10 h-10 text-warning mb-2 mx-auto" />
+                    <p className="text-warning">API key configured via environment variable</p>
+                    <p className="text-muted-foreground text-sm mt-1">
+                      <code className="font-mono bg-popover px-1 rounded">{providerApiKey}</code> is not set
+                    </p>
+                    <p className="text-muted-foreground text-xs mt-2">Set the environment variable or enter the key directly in Settings</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-3">
+                  {(MODELS_BY_PROVIDER[modelsModalProvider]?.models || []).map((model) => {
+                    const testKey = `${modelsModalProvider}:${model.id}`;
+                    const testResult = modelTestResults[testKey];
+                    const isTesting = testingModel === testKey;
+
+                    return (
+                      <div
+                        key={model.id}
+                        className="bg-card border border-border rounded-lg p-4 hover:border-border transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className="w-4 h-4 flex items-center justify-center text-muted-foreground text-[10px]">
+                                {typeof model.icon === 'string' ? model.icon[0] : '◆'}
+                              </div>
+                              <h4 className="text-foreground font-semibold">{model.name}</h4>
+                              {model.tier && (
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                                  model.tier === 'premium' ? 'badge-bg-signal-review text-signal-review-foreground' :
+                                  model.tier === 'balanced' ? 'badge-bg-primary text-primary' :
+                                  'badge-bg-success text-success-foreground'
+                                }`}>
+                                  {model.tier}
+                                </span>
+                              )}
+                            </div>
+                            {model.description && (
+                              <p className="text-xs text-muted-foreground mb-2">{model.description}</p>
+                            )}
+                            <div className="flex flex-wrap gap-1">
+                              {model.capabilities.map((cap) => (
+                                <span
+                                  key={cap}
+                                  className="text-[9px] px-1.5 py-0.5 bg-card text-muted-foreground rounded border border-border"
+                                >
+                                  {cap}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-2">
+                            <button
+                              onClick={() => handleTestModel(modelsModalProvider, model.id)}
+                              disabled={isTesting}
+                              className="flex items-center gap-1.5 px-3 py-1.5 badge-bg-success hover:bg-success/20 border badge-border-success rounded-lg text-xs text-success-foreground transition-colors disabled:opacity-50 whitespace-nowrap"
+                            >
+                              {isTesting ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Zap className="w-3.5 h-3.5" />
+                              )}
+                              Test 2+3
+                            </button>
+                            {testResult && (
+                              <div className={`flex items-center gap-1 text-xs ${testResult.success ? 'text-success' : 'text-destructive'}`}>
+                                {testResult.success ? (
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                ) : (
+                                  <AlertTriangle className="w-3.5 h-3.5" />
+                                )}
+                                {testResult.success
+                                  ? `${testResult.latencyMs}ms`
+                                  : (testResult.error?.slice(0, 30) || 'Failed')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
-        </div>
+        </Modal>
       )}
     </>
   );
