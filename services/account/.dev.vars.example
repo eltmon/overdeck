@@ -5,3 +5,9 @@ GITHUB_CLIENT_SECRET=your-github-oauth-app-client-secret
 OWNER_GITHUB_ID=123456
 # The local share Worker, whose /auth/callback is accepted as a PKCE redirect (PAN-4481).
 SHARE_BASE_URL=http://localhost:8787
+# Billing (PAN-4294): leave unset to keep billing off. Creem test mode for local work.
+CREEM_API_KEY=creem_test_your-api-key
+CREEM_WEBHOOK_SECRET=your-creem-webhook-secret
+CREEM_API_BASE=https://test-api.creem.io
+CREEM_PRODUCTS={"anywhere_monthly":"prod_1","anywhere_monthly_relay":"prod_2","anywhere_annual":"prod_3","anywhere_annual_relay":"prod_4","founding_annual":"prod_5","founding_annual_relay":"prod_6"}
+FOUNDING_ENDS_AT=2027-06-30T00:00:00Z
