@@ -993,9 +993,11 @@ describe('head-of-line fairness (PAN-5285)', () => {
       ...big, ticketId: '0000000000000000-0000525285-000000', pid: OTHER_PID, createdAt: 0, footprintBytes: 3 * GiB,
     }))
     let clock = 1
-    const promise = acquireQualityGateAdmission(small, fairDeps(rootDir, () => clock, () => 16 * GiB, { isProcessAlive: otherAlive }))
+    const onWaiting = vi.fn()
+    const promise = acquireQualityGateAdmission(small, fairDeps(rootDir, () => clock, () => 16 * GiB, { isProcessAlive: otherAlive, onWaiting }))
     const settled = settledFlag(promise)
-    await driveTurns(10)
+    // The grace starts at t=1, at the first queue check, which reports `queue`.
+    await driveUntil(() => onWaiting.mock.calls.some(([reason]) => reason.kind === 'queue'))
     expect(settled()).toBe(false)
 
     clock = 40_000
