@@ -52,6 +52,13 @@ export const SIMPLE_STRINGS = {
     chipAddProject: 'Add a project…',
     nothingNeedsYou: 'Nothing needs you right now. Nice.',
     quietEmpty: 'Nothing here yet.',
+    everythingElseMoving: 'Everything else is moving on its own.',
+    othersWaitingSub: 'Some work below is waiting to start or has hit a problem.',
+    readyToStartTitle: 'Ready to start',
+    readyToStartSub: 'The plan is written. Nothing starts until you press Start work.',
+    troubleTitle: 'Having trouble',
+    troubleSub: 'These hit a problem. You can nudge them from here; none is waiting on an answer.',
+    waitingDecisionTitle: 'A decision is waiting',
   },
   issue: {
     backToMyWork: '← My work',

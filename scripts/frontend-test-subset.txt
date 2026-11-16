@@ -541,6 +541,7 @@ src/lib/sessionOutcome.test.ts
 src/lib/shortcuts/__tests__/keys.test.ts
 src/lib/shortcuts/__tests__/registry.test.ts
 src/lib/shortcuts/__tests__/ShortcutsSheet.test.tsx
+src/lib/simple/needsYouCards.test.ts
 src/lib/simple/uiMode.test.ts
 src/lib/simple/useSimpleActions.test.tsx
 src/lib/uiCommands/leaderTab.test.ts
