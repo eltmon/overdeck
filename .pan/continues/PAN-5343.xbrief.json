@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5343",
   "created": "2026-11-16T00:09:01.559Z",
-  "updated": "2026-11-16T00:28:34.870Z",
+  "updated": "2026-11-16T00:28:36.286Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,11 @@
     "scope-switch.ac3": {
       "status": "completed",
       "doneAt": "2026-11-16T00:28:34.869Z"
+    },
+    "hide-project-items": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:28:36.286Z"
     }
   }
 }
