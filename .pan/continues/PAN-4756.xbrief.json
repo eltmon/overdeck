@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:46:33.083Z",
+  "updated": "2026-11-16T11:46:54.892Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -426,9 +426,22 @@
       "doneAt": "2026-11-16T11:46:31.760Z"
     },
     "migrate-set-up-phone-dialog": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4756",
-      "claimedAt": "2026-11-16T11:46:33.083Z"
+      "claimedAt": "2026-11-16T11:46:33.083Z",
+      "doneAt": "2026-11-16T11:46:54.891Z"
+    },
+    "migrate-set-up-phone-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:46:54.891Z"
+    },
+    "migrate-set-up-phone-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:46:54.891Z"
+    },
+    "migrate-set-up-phone-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:46:54.891Z"
     }
   }
 }
