@@ -9,6 +9,7 @@ import { create } from 'zustand';
 import { loadStoredHarness, loadStoredModel, onKnownModelsSync } from '../../chat/ModelPicker';
 import { loadStoredEffort, type EffortLevel } from '../../chat/EffortPicker';
 import type { Harness } from '../../shared/ModelPicker';
+import { ensureDefaultConversationModel } from '../../chat/defaultConversationModel';
 
 export interface NewConversationDefaults {
   model: string;
@@ -37,6 +38,19 @@ export const useNewConversationDefaults = create<NewConversationDefaults>((set) 
 onKnownModelsSync(() => {
   const restored = loadStoredModel();
   if (restored !== useNewConversationDefaults.getState().model) {
+    useNewConversationDefaults.setState({ model: restored });
+  }
+});
+
+// PAN-5370: off the deck (e.g. /activity) no model picker or Home composer
+// mounts, so nothing ever asked for the settings' default model and the
+// store stayed at '' ("model pending", quick create posting model: '').
+// Ask once at load; same re-derive rule as above, so a stored manual pick
+// still wins. An empty result (settings unreachable, nothing stored) changes
+// nothing.
+void ensureDefaultConversationModel().then(() => {
+  const restored = loadStoredModel();
+  if (restored && restored !== useNewConversationDefaults.getState().model) {
     useNewConversationDefaults.setState({ model: restored });
   }
 });
