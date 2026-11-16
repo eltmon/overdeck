@@ -324,7 +324,7 @@ interface ProjectSastView {
 function SastGateSetting({ projectKey }: { projectKey: string }) {
   const queryClient = useQueryClient();
   const queryKey = ['project-sast', projectKey] as const;
-  const { data, isError, error: loadError } = useQuery({
+  const { data, isError, error: loadError, isFetching, refetch } = useQuery({
     queryKey,
     queryFn: async (): Promise<ProjectSastView> => {
       const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/sast`);
@@ -345,7 +345,10 @@ function SastGateSetting({ projectKey }: { projectKey: string }) {
       if (!res.ok) throw new Error(payload.error ?? `HTTP ${res.status}`);
       return payload as ProjectSastView;
     },
-    onSuccess: (view) => {
+    onSuccess: async (view) => {
+      // A GET already in flight when this POST resolves could otherwise land after
+      // setQueryData and overwrite the saved value with a stale read.
+      await queryClient.cancelQueries({ queryKey });
       queryClient.setQueryData(queryKey, view);
       setError(null);
     },
@@ -356,9 +359,19 @@ function SastGateSetting({ projectKey }: { projectKey: string }) {
     <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-border pt-3">
       <span className="text-[13px] text-foreground">Semgrep gate</span>
       {isError ? (
-        <span className="text-[11px] text-destructive" data-testid="sast-gate-load-error">
-          {loadError instanceof Error ? loadError.message : 'Failed to load the Semgrep gate'}
-        </span>
+        <>
+          <span className="text-[11px] text-destructive" data-testid="sast-gate-load-error">
+            {loadError instanceof Error ? loadError.message : 'Failed to load the Semgrep gate'}
+          </span>
+          <button
+            type="button"
+            disabled={isFetching}
+            onClick={() => void refetch()}
+            className="text-[11px] font-medium text-primary hover:underline disabled:opacity-50"
+          >
+            {isFetching ? 'Retrying…' : 'Retry'}
+          </button>
+        </>
       ) : (
         <>
           <div style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>

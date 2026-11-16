@@ -84,6 +84,28 @@ describe('SecuritySection (PAN-4594)', () => {
     await waitFor(() => expect(screen.getByTestId('semgrep-install-status')).toHaveTextContent('Turn Semgrep on to install it.'));
   });
 
+  it('shows a failure state and retries the install status check', async () => {
+    let installStatusCalls = 0;
+    installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/semgrep/settings') return Response.json(BASE_VIEW);
+      if (method === 'GET' && url === '/api/prereqs/useSemgrep') {
+        installStatusCalls += 1;
+        if (installStatusCalls === 1) return new Response(JSON.stringify({ error: 'boom' }), { status: 500 });
+        return Response.json({ feature: 'useSemgrep', tools: [{ tool: 'semgrep', installed: true, installable: true }], ready: true, missing: [] });
+      }
+      return undefined;
+    });
+
+    renderSection();
+    await waitFor(() => expect(screen.getByTestId('semgrep-install-status'))
+      .toHaveTextContent('Failed to check the install state: Failed to fetch Semgrep install status (HTTP 500)'));
+    expect(screen.queryByTestId('semgrep-install-button')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('semgrep-install-status-retry'));
+
+    await waitFor(() => expect(screen.getByTestId('semgrep-install-status')).toHaveTextContent('1.180.0 installed'));
+  });
+
   it('install posts tool semgrep and shows the message', async () => {
     let installStatusCalls = 0;
     installStrictFetchMock(({ method, url, init }) => {
@@ -106,6 +128,49 @@ describe('SecuritySection (PAN-4594)', () => {
 
     await waitFor(() => expect(screen.getByTestId('semgrep-install-message')).toHaveTextContent('installed 1.180.0'));
     await waitFor(() => expect(installStatusCalls).toBe(2));
+  });
+
+  it('keeps polling the install status until it reports installed, then stops', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let installStatusCalls = 0;
+    let toolInstalled = false;
+    installStrictFetchMock(({ method, url, init }) => {
+      if (method === 'GET' && url === '/api/semgrep/settings') return Response.json(BASE_VIEW);
+      if (method === 'GET' && url === '/api/prereqs/useSemgrep') {
+        installStatusCalls += 1;
+        return Response.json({
+          feature: 'useSemgrep',
+          tools: [{ tool: 'semgrep', installed: toolInstalled, installable: true }],
+          ready: toolInstalled,
+          missing: toolInstalled ? [] : ['semgrep'],
+        });
+      }
+      if (method === 'POST' && url === '/api/prereqs/install') {
+        expect(JSON.parse(String(init?.body))).toEqual({ tool: 'semgrep' });
+        return Response.json({ success: true, message: 'installing…' });
+      }
+      return undefined;
+    });
+
+    try {
+      renderSection();
+      const button = await screen.findByTestId('semgrep-install-button');
+      await waitFor(() => expect(button).toBeEnabled());
+      fireEvent.click(button);
+      await waitFor(() => expect(screen.getByTestId('semgrep-install-message')).toHaveTextContent('installing…'));
+
+      const callsAfterRequest = installStatusCalls;
+      toolInstalled = true;
+      await vi.advanceTimersByTimeAsync(3_000);
+      await waitFor(() => expect(installStatusCalls).toBeGreaterThan(callsAfterRequest));
+      await waitFor(() => expect(screen.getByTestId('semgrep-install-status')).toHaveTextContent('1.180.0 installed'));
+
+      const callsOnceInstalled = installStatusCalls;
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(installStatusCalls).toBe(callsOnceInstalled);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("shows the server's 400 error", async () => {

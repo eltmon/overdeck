@@ -86,4 +86,13 @@ describe('semgrep settings door (PAN-4594)', () => {
     const view = await readSemgrepSettings({ configPath });
     expect(view.configs).toEqual(['p/default', 'rules/x.yml']);
   });
+
+  it('rejects a config that only becomes a leading dash after trimming', async () => {
+    await writeFile(configPath, 'security:\n  semgrep:\n    gate: advisory\n');
+    const original = await readFile(configPath, 'utf8');
+
+    await expect(saveSemgrepSettings({ configs: [' -bad'] }, { configPath })).rejects.toBeInstanceOf(SemgrepSettingsValidationError);
+
+    expect(await readFile(configPath, 'utf8')).toBe(original);
+  });
 });

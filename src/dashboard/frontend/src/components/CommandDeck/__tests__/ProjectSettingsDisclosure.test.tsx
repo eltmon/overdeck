@@ -496,7 +496,7 @@ describe('ProjectSettingsDisclosure', () => {
       .toBe('Semgrep is off for every project (Settings → Security)');
   });
 
-  it('shows a distinct load error instead of a false off-everywhere message', async () => {
+  it('shows a distinct load error instead of a false off-everywhere message, with a retry', async () => {
     sastGetFails = true;
     renderDisclosure();
 
@@ -504,6 +504,12 @@ describe('ProjectSettingsDisclosure', () => {
       .toBe('Failed to load the Semgrep gate (HTTP 503)');
     expect(screen.queryByTestId('sast-gate-effective')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Semgrep gate:/ })).not.toBeInTheDocument();
+
+    sastGetFails = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    await waitFor(() => expect(screen.getByTestId('sast-gate-effective')).toBeInTheDocument());
+    expect(screen.queryByTestId('sast-gate-load-error')).not.toBeInTheDocument();
   });
 
   it('removes version_sync and returns to the explicit skip state', async () => {

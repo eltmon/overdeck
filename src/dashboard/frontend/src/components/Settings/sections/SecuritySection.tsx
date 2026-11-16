@@ -112,18 +112,26 @@ function TimeoutField({ value, disabled, onSave, onError }: {
   );
 }
 
-function installStatusText(enabled: boolean, installed: boolean | undefined, installing: boolean, pinnedVersion: string): string {
+function installStatusText(
+  enabled: boolean,
+  installed: boolean | undefined,
+  installing: boolean,
+  pinnedVersion: string,
+  statusError: string | null,
+): string {
   if (!enabled) return 'Turn Semgrep on to install it.';
   if (installing) return 'Installing… this can take several minutes';
   if (installed === true) return `Semgrep ${pinnedVersion} installed`;
   if (installed === false) return 'Not installed';
+  if (statusError) return `Failed to check the install state: ${statusError}`;
   return 'Checking install state…';
 }
 
 export function SecuritySection() {
   const {
     settings, loadError, save, saving, serverError,
-    installed, install, installing, installMessage,
+    installed, installStatusError, installStatusFetching, retryInstallStatus,
+    install, installing, installMessage,
   } = useSemgrepSettings();
   const [clientError, setClientError] = useState<string | null>(null);
 
@@ -181,9 +189,19 @@ export function SecuritySection() {
                 data-testid="semgrep-install-status"
                 className={installed === true ? 'text-success text-xs' : 'text-muted-foreground text-xs'}
               >
-                {installStatusText(enabled, installed, installing, settings?.pinnedVersion ?? '')}
+                {installStatusText(enabled, installed, installing, settings?.pinnedVersion ?? '', installStatusError)}
               </span>
-              {installed !== true && (
+              {installStatusError ? (
+                <button
+                  type="button"
+                  data-testid="semgrep-install-status-retry"
+                  disabled={installStatusFetching}
+                  onClick={retryInstallStatus}
+                  className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground disabled:opacity-50 hover:bg-muted/30"
+                >
+                  {installStatusFetching ? 'Retrying…' : 'Retry'}
+                </button>
+              ) : installed !== true && (
                 <button
                   type="button"
                   data-testid="semgrep-install-button"
