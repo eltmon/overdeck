@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:44:03.141Z",
+  "updated": "2026-11-16T11:44:04.652Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -320,6 +320,11 @@
     "migrate-ask-user-question-dialog.ac4": {
       "status": "completed",
       "doneAt": "2026-11-16T11:44:03.140Z"
+    },
+    "migrate-plan-approval-dialog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:44:04.652Z"
     }
   }
 }
