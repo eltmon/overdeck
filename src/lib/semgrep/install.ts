@@ -21,6 +21,11 @@ export function semgrepToolsDir(home = getOverdeckHome()): string {
   return join(home, 'tools', 'semgrep');
 }
 
+/** `~/.overdeck/tools/semgrep/bin/semgrep` — the only target a managed launcher may point at. */
+export function managedSemgrepTarget(home = getOverdeckHome()): string {
+  return join(semgrepToolsDir(home), 'bin', 'semgrep');
+}
+
 export type SemgrepInstallStatus = 'present' | 'installed' | 'failed' | 'unsupported';
 
 export interface SemgrepInstallOutcome {
@@ -53,7 +58,7 @@ export type LauncherOccupant = 'absent' | 'managed' | 'foreign';
 
 const defaultExecFile: ExecFile = async (file, args, opts) => execFileAsync(file, args, opts);
 
-async function defaultInspectLauncher(linkPath: string, expectedTarget: string): Promise<LauncherOccupant> {
+export async function inspectSemgrepLauncher(linkPath: string, expectedTarget: string): Promise<LauncherOccupant> {
   let stats;
   try {
     stats = await lstat(linkPath);
@@ -97,7 +102,7 @@ export async function ensureSemgrepInstalled(deps: SemgrepInstallDeps = {}): Pro
   const platform = deps.platform ?? process.platform;
   const binary = managedSemgrepPath(home);
   const tools = semgrepToolsDir(home);
-  const toolsBin = join(tools, 'bin', 'semgrep');
+  const toolsBin = managedSemgrepTarget(home);
 
   if (platform === 'win32') {
     return {
@@ -112,7 +117,7 @@ export async function ensureSemgrepInstalled(deps: SemgrepInstallDeps = {}): Pro
     return { status: 'present', version: current, message: `Semgrep ${SEMGREP_VERSION} already installed` };
   }
 
-  const inspectLauncher = deps.inspectLauncher ?? ((linkPath: string) => defaultInspectLauncher(linkPath, toolsBin));
+  const inspectLauncher = deps.inspectLauncher ?? ((linkPath: string) => inspectSemgrepLauncher(linkPath, toolsBin));
   const occupant = await inspectLauncher(binary);
   if (occupant === 'foreign') {
     return {
