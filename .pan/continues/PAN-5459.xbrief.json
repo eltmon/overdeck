@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5459",
   "created": "2026-11-16T23:02:28.883Z",
-  "updated": "2026-11-16T23:02:28.883Z",
+  "updated": "2026-11-16T23:06:20.098Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,26 @@
   "sessionHistory": [],
   "items": {
     "wall-clock-budget": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5459",
-      "claimedAt": "2026-11-16T23:02:28.883Z"
+      "claimedAt": "2026-11-16T23:02:28.883Z",
+      "doneAt": "2026-11-16T23:06:20.097Z"
+    },
+    "wall-clock-budget.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:06:20.097Z"
+    },
+    "wall-clock-budget.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:06:20.097Z"
+    },
+    "wall-clock-budget.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:06:20.097Z"
+    },
+    "wall-clock-budget.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:06:20.097Z"
     }
   }
 }
