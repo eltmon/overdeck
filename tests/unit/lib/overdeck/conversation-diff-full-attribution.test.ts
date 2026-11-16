@@ -204,3 +204,83 @@ describe('getConversationDiffFull attribution (PAN-5408)', () => {
     expect(diff).not.toContain('stray.txt');
   });
 });
+
+describe('getConversationDiffFull own changes per file (PAN-5418)', () => {
+  const INITIAL_DATE = '2020-01-01T00:00:00Z';
+  const minutesAfterFuture = (minutes: number): string =>
+    new Date(Date.now() + 86_400_000 + minutes * 60_000).toISOString();
+  const foreignLines = (count: number): string => Array.from({ length: count }, (_, i) => `foreign-${i}\n`).join('');
+
+  /** A repo with x.txt committed in 2020 and a conversation created on it; returns the repo and full-diff deps. */
+  function setup(name: string): { repo: string; fullDeps: Parameters<typeof getConversationDiffFull>[2] } {
+    const repo = join(testRoot, name);
+    mkdirSync(repo, { recursive: true });
+    git(repo, ['init', '--quiet'], INITIAL_DATE);
+    git(repo, ['config', 'user.email', 'test@example.com'], INITIAL_DATE);
+    git(repo, ['config', 'user.name', 'Test User'], INITIAL_DATE);
+    writeFileSync(join(repo, 'x.txt'), 'old\nkeep\n');
+    git(repo, ['add', '.'], INITIAL_DATE);
+    git(repo, ['commit', '--quiet', '-m', 'initial'], INITIAL_DATE);
+    createConversation({ name, tmuxSession: `conv-${name}`, cwd: repo });
+
+    const sessionFile = join(testRoot, `${name}.jsonl`);
+    writeFileSync(sessionFile, '{}\n');
+    const parsed = {
+      messages: [{ role: 'assistant' as const, id: 'a1', createdAt: new Date().toISOString() }],
+      workLog: [],
+      fileEditsByAssistantId: new Map<string, Array<{ filePath: string }>>(),
+    };
+    const changesDeps = {
+      resolveSessionFile: async () => sessionFile,
+      getCachedMessages: async () => parsed,
+      peekCachedMessages: () => null,
+      listConversations: () => [],
+      now: Date.now,
+    };
+    return {
+      repo,
+      fullDeps: {
+        resolveSessionFile: changesDeps.resolveSessionFile,
+        getCachedMessages: changesDeps.getCachedMessages,
+        conversationChanges: async (n: string) =>
+          (await getConversationChanges(n, { scope: 'conversation' }, changesDeps)).body as ConversationChanges,
+      },
+    };
+  }
+
+  function commitX(repo: string, content: string, isoDate: string, subject: string, trailer?: string): string {
+    writeFileSync(join(repo, 'x.txt'), content);
+    git(repo, ['add', 'x.txt'], isoDate);
+    git(repo, ['commit', '--quiet', '-m', subject, ...(trailer ? ['-m', trailer] : [])], isoDate);
+    return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf-8' }).trim();
+  }
+
+  it('shows only the conversation\'s one-line change when a later foreign commit adds 50 lines (PAN-5418)', async () => {
+    const { repo, fullDeps } = setup('own-combined');
+    commitX(repo, 'new\nkeep\n', minutesAfterFuture(1), 'own change', 'Overdeck-Conversation: conv-own-combined');
+    commitX(repo, `new\nkeep\n${foreignLines(50)}`, minutesAfterFuture(2), 'foreign 50 lines');
+
+    const fullResult = await getConversationDiffFull('own-combined', 'x.txt', fullDeps);
+    const body = fullResult.body as { diff: string; files: Array<{ path: string; additions: number; deletions: number }> };
+    expect(body.files).toEqual([expect.objectContaining({ path: 'x.txt', additions: 1, deletions: 1 })]);
+    expect(body.diff).toContain('+new');
+    expect(body.diff).not.toContain('foreign-');
+  });
+
+  it('renders commit sections when a foreign commit sits between two conversation commits (PAN-5418)', async () => {
+    const { repo, fullDeps } = setup('own-sections');
+    const trailer = 'Overdeck-Conversation: conv-own-sections';
+    const older = commitX(repo, 'first\nkeep\n', minutesAfterFuture(1), 'own first', trailer);
+    commitX(repo, `first\nkeep\n${foreignLines(5)}`, minutesAfterFuture(2), 'foreign between');
+    const newer = commitX(repo, `first\nsecond\n${foreignLines(5)}`, minutesAfterFuture(3), 'own second', trailer);
+
+    const fullResult = await getConversationDiffFull('own-sections', undefined, fullDeps);
+    const body = fullResult.body as { diff: string; files: Array<{ path: string; additions: number; deletions: number }> };
+    expect(body.files).toEqual([expect.objectContaining({ path: 'x.txt', additions: 2, deletions: 2 })]);
+    const olderAt = body.diff.indexOf(`From ${older} `);
+    const newerAt = body.diff.indexOf(`From ${newer} `);
+    expect(olderAt).toBeGreaterThanOrEqual(0);
+    expect(newerAt).toBeGreaterThan(olderAt);
+    expect(body.diff).not.toMatch(/^\+foreign-/m);
+  });
+});

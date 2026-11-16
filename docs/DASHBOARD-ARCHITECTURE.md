@@ -473,10 +473,18 @@ door that does not exist; a real record read door would be a separate change.
     `main`; `pr_target` is not used), resolving the local branch before `origin/<branch>`;
     a missing branch yields `baseRef: null` and an empty file list. For the cwd
     repository, `/diffs/full` returns only the conversation's attributed files (the
-    `GET /api/conversations/:name/changes?scope=conversation` set), diffed from the
-    commit before the earlier of the conversation start and its earliest attributed
-    commit; untracked attributed files render as new-file patches; other repositories
-    are still scoped from the transcript's edit records (PAN-5408). It returns `files`
+    `GET /api/conversations/:name/changes?scope=conversation` set) (PAN-5408), and
+    each file's patch holds only the conversation's own changes (PAN-5418,
+    `src/lib/overdeck/conversation-diff-own.ts`). When nothing else changed the file
+    between the conversation's commits, the patch is one ordinary diff from the parent
+    of its first attributed commit to its last attributed commit (or to the working
+    tree when it has an uncommitted edit). Otherwise the file gets one per-commit
+    section per attributed commit, plus an `Uncommitted changes` section; each section
+    starts with an mbox `From <sha>` / `Subject:` preamble that the diff window shows
+    as a label, and every plain patch comes before the first section. Each file's
+    counts are the per-file sums of the Changes API. Untracked attributed files render
+    as new-file patches; other repositories are still scoped from the transcript's
+    edit records. It returns `files`
     and honors `?file=`. The conversation diff routes live in
     `routes/conversation-diffs.ts`.
 - Global issue updates use `issues.delta`: complete changed rows at their original

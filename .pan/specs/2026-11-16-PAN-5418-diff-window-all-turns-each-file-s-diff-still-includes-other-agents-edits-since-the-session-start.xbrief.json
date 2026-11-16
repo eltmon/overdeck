@@ -1,0 +1,342 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-16T03:59:33Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5418: Diff window All turns: each file's diff still includes other agents' edits since the session start",
+    "updated": "2026-11-16T04:03:46.239Z"
+  },
+  "plan": {
+    "id": "pan-5418",
+    "title": "Diff window All turns: each file's diff still includes other agents' edits since the session start",
+    "status": "running",
+    "uid": "28c152bf-dcd1-4aef-a1e7-5df5bae79944",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-16T03:59:33Z",
+    "updated": "2026-11-16T04:03:46.239Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5418",
+        "label": "PAN-5418",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5408",
+        "label": "PAN-5408",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "diff-window",
+      "conversations",
+      "git"
+    ],
+    "narratives": {
+      "Problem": "All turns in the conversation diff window lists the right files since PAN-5408, but each file's patch and +/- counts span from a session-start base commit to the working tree, so every foreign commit to the same file (other agents) is shown as this conversation's work (LeftColumn.tsx +214 instead of +2 -2).",
+      "Proposal": "New module conversation-diff-own.ts builds each attributed file's patch from the conversation's own attributed commits and uncommitted edit: one combined git diff <first>^..<last|worktree> when content checks prove nothing foreign changed the file in between, otherwise one git show section per attributed commit plus an Uncommitted section, each with an mbox From/Subject preamble the diff window renders as a header label. Counts are the Changes API per-file sums. getConversationDiffFull's cwd block delegates to it. Docs and changelog describe the new scoping. Full detail: .pan/drafts/PAN-5418.md.",
+      "NonGoals": "- Changing /diffs/:turnId, getConversationDiffs summaries, vs main, Compare or non-cwd repositories\n- Line-level filtering of other agents' uncommitted lines inside a file the conversation also edited\n- Changing the Changes API, its counts or attribution rules\n- Adding new fields to the /diffs/full response (labels travel in the patch text)\n- Commit labels on any route other than conversation All turns"
+    },
+    "metadata": {
+      "canonicalFilename": "2026-11-16-PAN-5418-diff-window-all-turns-each-file-s-diff-still-includes-other-agents-edits-since-the-session-start.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use a combined patch when provably exact, falling back to per-commit sections (issue's option 2 with option 1 fallback)",
+        "rationale": "The issue recommends it; it keeps the common case a normal diff and the fallback is always exact."
+      },
+      {
+        "summary": "Carry section labels as mbox 'From <sha>'/'Subject:' preambles inside the diff text",
+        "rationale": "@pierre/diffs parsePatchFiles already splits on them (verified on 1.1.22), so the /diffs/full response shape stays unchanged."
+      },
+      {
+        "summary": "Decide contiguity by content equality (git diff --quiet a_i a_{i+1}^ -- path, and a_last vs HEAD when uncommitted) rather than rev-list membership",
+        "rationale": "Content equality is exactly the condition under which the combined diff equals the conversation's own changes, independent of merges or author-date order."
+      },
+      {
+        "summary": "List counts are Changes API per-file sums even when a combined patch's net differs",
+        "rationale": "The issue requires the counts to equal the Changes API numbers."
+      },
+      {
+        "summary": "Include a small frontend item to render section labels",
+        "rationale": "Without labels, repeated blocks of the same file in fallback mode are unexplained; the issue asks for sections headed by short sha and subject."
+      }
+    ],
+    "items": [
+      {
+        "id": "own-patch-module",
+        "title": "Add conversation-diff-own.ts that builds a conversation's own per-file patches",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T03:59:33Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5418",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wire-diff-full"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/conversation-diff-own.ts",
+            "tests/unit/lib/overdeck/conversation-diff-own.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-diff-own.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-diff-own.test.ts passes all seven named cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/PAN-5418.md WI-1 exactly: new module src/lib/overdeck/conversation-diff-own.ts exporting UNCOMMITTED_SECTION_SHA, sectionPreamble, ownFileChanges (per-file sums, kind rule D6), untrackedFilePatch (moved unchanged from conversation-diffs.ts) and buildOwnPatches(repoRoot, changes, paths, options) -> { plain, sections } following the FR-3 combined-patch rule (content checks with git diff --quiet), per-commit git show sections with mbox preambles otherwise, an uncommitted section last (D8), renames always sectioned with -M and both paths (D9), unresolvable shas skipped (D4). execFile with arg arrays only; never import conversation-diffs.ts or conversation-changes.ts. Write the seven named tests in tests/unit/lib/overdeck/conversation-diff-own.test.ts against real temp git repos with real shas. Fixture commits use strictly increasing explicit author/committer dates."
+        },
+        "items": [
+          {
+            "id": "own-patch-module.ac1",
+            "title": "Given an attributed one-line commit to X followed by a foreign commit adding 50 lines to X, buildOwnPatches returns one plain patch containing the one-line change and none of the 50 lines, and an empty sections array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "own-patch-module.ac2",
+            "title": "Given a foreign commit between two attributed commits to X, buildOwnPatches returns two sections starting with 'From <sha> ', the older attributed sha in sections[0] and the newer in sections[1], with no foreign lines in either",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "own-patch-module.ac3",
+            "title": "Given an attributed commit, a later foreign commit and an uncommitted attributed edit to X, buildOwnPatches emits the commit section plus a final section starting 'From 0000000000000000000000000000000000000000 ' and the foreign lines appear in neither",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "own-patch-module.ac4",
+            "title": "ownFileChanges returns +4/-1 for commits of +1/-1 and +3/-0, kind 'A' for a file created then edited, kind 'D' for a file deleted last; a commit with an unresolvable sha produces no patch and no exception",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-diff-full",
+        "title": "Route getConversationDiffFull's cwd-repo block through buildOwnPatches",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T03:59:33Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-diffs.ts",
+            "tests/unit/lib/overdeck/conversation-diff-full-attribution.test.ts",
+            "tests/unit/lib/overdeck/conversation-diffs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-diff-full-attribution.test.ts tests/unit/lib/overdeck/conversation-diffs.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both test files pass including the two new PAN-5418 cases",
+            "typecheck and lint (incl. lint:circular, file-size guard) complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2: replace the cwd-repo block of getConversationDiffFull (src/lib/overdeck/conversation-diffs.ts, anchor 'attributionBaseTime(conv, changes)') with ownFileChanges + buildOwnPatches; collect sections separately and return diff: [...patches, ...sections].join('\\n') at all three return sites so non-cwd repo patches stay before every preamble; delete attributedFiles, attributionBaseTime and untrackedFilePatch from conversation-diffs.ts and unused imports. Leave getConversationDiffs, getConversationDiffTurn and getConversationDiffVsMain untouched. Add the 50-line and interleaved PAN-5418 tests to conversation-diff-full-attribution.test.ts; give changesFor in conversation-diffs.test.ts an optional real sha so the PAN-5408 tests keep their assertions. New fixture commits are dated FUTURE_DATE plus 1, 2, 3 minutes (strictly increasing, after conversation creation)."
+        },
+        "items": [
+          {
+            "id": "wire-diff-full.ac1",
+            "title": "Given a conversation that changed one line of x.txt and a later foreign commit that appended 50 lines, getConversationDiffFull(name,'x.txt') returns a files entry for x.txt with additions 1 and deletions 1 and a diff containing none of the 50 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-diff-full.ac2",
+            "title": "Given a foreign commit between two conversation commits to x.txt, getConversationDiffFull returns a diff with the older trailer sha's 'From <sha> ' preamble before the newer one's, no foreign lines, and counts +2 -2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-diff-full.ac3",
+            "title": "Given the existing PAN-5408 and PAN-4503 cases with assertions unchanged, vitest reports them passing, and grep for attributionBaseTime or attributedFiles in conversation-diffs.ts produces no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-labels",
+        "title": "Render commit-section label rows above file diffs in PatchFiles",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T03:59:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/diff/PatchFiles.tsx",
+            "src/dashboard/frontend/src/components/diff/__tests__/PatchFiles.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/diff/__tests__/PatchFiles.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "PatchFiles.test.tsx passes including the label tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3: export sectionLabel(patchMetadata) from PatchFiles.tsx (40-hex 'From <sha> ' line; all-zero sha -> 'Uncommitted'; else '<7-char sha> <Subject: line>'); add optional labels map (FileDiffMetadata -> label) to the RenderablePatch 'files' variant, built in getRenderablePatch from each parsed patch's patchMetadata; render the label as a <div data-testid=\"diff-section-label\"> row (font-mono text-[11px] text-muted-foreground) inside the diff-render-file wrapper directly before <FileDiff>, not via renderHeaderMetadata (PRD D11). No change to DiffPanel.tsx or DockDiffView.tsx. Add the label tests to PatchFiles.test.tsx."
+        },
+        "items": [
+          {
+            "id": "section-labels.ac1",
+            "title": "Given a patch with two 'From' sections for the same path (sha 'a'x40 subject 'first', then the zero sha), PatchFiles renders two file blocks and two diff-section-label rows reading 'aaaaaaa first' then 'Uncommitted' in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-labels.ac2",
+            "title": "Given the plain TWO_FILES patch, PatchFiles renders no diff-section-label element",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-labels.ac3",
+            "title": "sectionLabel returns undefined for undefined input, 'Uncommitted' for the zero sha, and '<7-char sha> <subject>' for a real sha with a Subject line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-changelog",
+        "title": "Document All turns per-file scoping in docs, feature page, changelog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T03:59:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "features/conversations.mdx",
+            "changelog.d/pan-5418.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4: rewrite the /diffs/full sentence in docs/DASHBOARD-ARCHITECTURE.md (anchor 'diffed from the') to describe the combined-patch-or-per-commit-sections rule, the Uncommitted changes section, the From/Subject preambles shown as labels, and Changes API sums (PAN-5418); add the All turns sentences to features/conversations.mdx (anchor '**All turns** lists the files this conversation changed'); create changelog.d/pan-5418.md with the #### Fixed bullet given in the PRD."
+        },
+        "items": [
+          {
+            "id": "docs-changelog.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md no longer contains 'diffed from the commit before the earlier of the conversation start' and its /diffs/full paragraph names per-commit sections, the Uncommitted changes section and PAN-5418",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac2",
+            "title": "features/conversations.mdx states that opening a file under All turns shows only this conversation's own changes and that a file edited by another agent in between appears once per commit headed by short SHA and subject",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac3",
+            "title": "changelog.d/pan-5418.md exists with a '#### Fixed' heading and one bullet linking https://github.com/eltmon/overdeck/issues/5418, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "own-patch-module",
+        "to": "wire-diff-full",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
