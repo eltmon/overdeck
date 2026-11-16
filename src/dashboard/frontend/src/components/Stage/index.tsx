@@ -28,6 +28,8 @@ import {
   type SplitPath,
 } from '../../lib/paneLayout'
 import { selectDeckLayout, useDeckLayoutStore } from '../../lib/deckLayoutStore'
+import { ALL_PROJECTS_KEY } from '../../lib/deckKeys'
+import { LayoutPresetBar } from './LayoutPresetBar'
 import { ForkModal } from '../CommandDeck/ForkModal'
 import { Bot, Terminal as TerminalIcon, Globe, FolderTree, GitCompare, Search } from 'lucide-react'
 import { PaneBar, type NewPaneAction } from './PaneBar'
@@ -690,6 +692,14 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
     [layout, activePane, deckKey, setActivePane, setLayout],
   )
   const effectiveLayout = layout ?? (activePane ? leaf(activePane.paneId) : null)
+  // PAN-5343 H-D7: the Layout presets, in the All projects deck only. Memoized so the memo'd PaneBar keeps equal props.
+  const activePaneIdForBar = activePane?.paneId ?? null
+  const layoutPresetBar = useMemo(
+    () => (deckKey === ALL_PROJECTS_KEY
+      ? <LayoutPresetBar deckKey={deckKey} panes={displayPanes} layout={layout} activePaneId={activePaneIdForBar} />
+      : undefined),
+    [deckKey, displayPanes, layout, activePaneIdForBar],
+  )
 
   // Close every closable tab (HOME/permanent panes stay). Also clears any split.
   const closeAllPanes = useCallback(() => {
@@ -736,6 +746,7 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
             onTabDragStart={setDraggingPaneId}
             onTabDragEnd={() => setDraggingPaneId(null)}
             onTabDetach={handleTabDetach}
+            trailing={layoutPresetBar}
           />
           <div className={styles.paneArea}>
             {effectiveLayout && (

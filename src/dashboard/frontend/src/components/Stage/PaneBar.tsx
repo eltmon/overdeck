@@ -1,4 +1,4 @@
-import { Fragment, memo, useEffect, useRef, useState } from 'react'
+import { Fragment, memo, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Home, CircleDot, Bot, Terminal, FileCode, GitCommit, ListTodo, FileText, Globe, Pencil, Plus, X, ChevronDown, type LucideIcon } from 'lucide-react'
 import type { PaneType, WorkspacePane, PaneId } from '../../lib/panesStore'
@@ -50,6 +50,8 @@ export interface PaneBarProps {
    *  fires for agent panes that carry a `conversationId`. Mirrors the in-pane
    *  detach icon and the ⋮ → "Pop out to window" menu item. */
   onTabDetach?: (paneId: PaneId, conversationId: string) => void
+  /** PAN-5343 H-D7: rendered after the tab list button (the All deck's Layout bar). */
+  trailing?: ReactNode
 }
 
 /**
@@ -60,7 +62,7 @@ export interface PaneBarProps {
  * no shortcut chips (the keys stay in the registry and the `?` sheet), and an
  * "N tabs ▾" list after the strip reaches every tab (PAN-5295 D2-16).
  */
-export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, onClose, onAdd, newActions, onPaneContextMenu, onTabDragStart, onTabDragEnd, onTabDetach }: PaneBarProps) {
+export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, onClose, onAdd, newActions, onPaneContextMenu, onTabDragStart, onTabDragEnd, onTabDetach, trailing }: PaneBarProps) {
   // One portaled menu at a time: the + create menu or the "N tabs" list.
   const [menu, setMenu] = useState<{ kind: 'add' | 'tabs'; top: number; left: number } | null>(null)
   const addBtnRef = useRef<HTMLButtonElement>(null)
@@ -304,6 +306,7 @@ export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, on
           </div>,
           document.body,
         )}
+      {trailing}
     </div>
   )
 })
