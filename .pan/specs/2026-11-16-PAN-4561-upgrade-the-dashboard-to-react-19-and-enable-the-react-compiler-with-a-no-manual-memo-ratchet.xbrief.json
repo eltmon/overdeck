@@ -4,17 +4,17 @@
     "created": "2026-11-16T11:11:49.586Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4561: Upgrade the dashboard to React 19 and enable the React Compiler with a no-manual-memo ratchet",
-    "updated": "2026-11-16T11:21:00.024Z"
+    "updated": "2026-11-16T11:22:10.805Z"
   },
   "plan": {
     "id": "pan-4561",
     "title": "Upgrade the dashboard to React 19 and enable the React Compiler with a no-manual-memo ratchet",
-    "status": "proposed",
+    "status": "running",
     "uid": "b9738b93-cbf6-4cb1-b9d1-e6c24b3abe66",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-16T11:11:49.586Z",
-    "updated": "2026-11-16T11:21:00.024Z",
+    "updated": "2026-11-16T11:22:10.805Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4561",
@@ -989,5 +989,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
