@@ -951,9 +951,12 @@ describe('prompt-time memory injection', () => {
       });
 
       expect(result.status).toBe('injected');
-      const entries = await readRagEntries();
-      const decisionEntries = entries.filter((entry: { type: string }) => entry.type === 'rag-decision');
-      expect(decisionEntries).toHaveLength(1);
+      // writeDecision appends to rag-runs fire-and-forget, so poll until the entry lands.
+      const decisionEntries = await vi.waitFor(async () => {
+        const found = (await readRagEntries().catch(() => [])).filter((entry: { type: string }) => entry.type === 'rag-decision');
+        expect(found).toHaveLength(1);
+        return found;
+      }, { timeout: 2000, interval: 20 });
       expect(decisionEntries[0].hitCounts.facts).toBeGreaterThanOrEqual(1);
       expect(decisionEntries[0].budgets.facts).toBe(1500);
       expect(decisionEntries[0].allocationBytes.facts).toBeGreaterThan(0);
