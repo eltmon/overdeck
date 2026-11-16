@@ -1,0 +1,103 @@
+{
+  "version": "1",
+  "issueId": "PAN-5423",
+  "created": "2026-11-16T05:56:13.176Z",
+  "updated": "2026-11-16T06:08:35.025Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "delivered-toast-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5423",
+      "claimedAt": "2026-11-16T05:56:13.176Z",
+      "doneAt": "2026-11-16T05:59:00.288Z"
+    },
+    "delivered-toast-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T05:59:00.288Z"
+    },
+    "delivered-toast-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T05:59:00.288Z"
+    },
+    "delivered-toast-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T05:59:00.288Z"
+    },
+    "delivered-toast-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T05:59:00.288Z"
+    },
+    "delivered-toast-helper.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T05:59:00.288Z"
+    },
+    "wire-auq-answer-toast": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5423",
+      "claimedAt": "2026-11-16T05:59:30.727Z",
+      "doneAt": "2026-11-16T06:03:52.098Z"
+    },
+    "wire-auq-answer-toast.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T06:03:52.098Z"
+    },
+    "wire-auq-answer-toast.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T06:03:52.098Z"
+    },
+    "wire-auq-answer-toast.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T06:03:52.098Z"
+    },
+    "wire-codex-approval-toast": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5423",
+      "claimedAt": "2026-11-16T06:04:00.033Z",
+      "doneAt": "2026-11-16T06:05:17.882Z"
+    },
+    "wire-codex-approval-toast.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T06:05:17.882Z"
+    },
+    "wire-codex-approval-toast.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T06:05:17.882Z"
+    },
+    "wire-plan-action-toasts": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5423",
+      "claimedAt": "2026-11-16T06:05:35.705Z",
+      "doneAt": "2026-11-16T06:07:23.118Z"
+    },
+    "wire-plan-action-toasts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T06:07:23.118Z"
+    },
+    "wire-plan-action-toasts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T06:07:23.118Z"
+    },
+    "wire-plan-action-toasts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T06:07:23.118Z"
+    },
+    "changelog-entry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5423",
+      "claimedAt": "2026-11-16T06:07:28.682Z",
+      "doneAt": "2026-11-16T06:08:35.024Z"
+    },
+    "changelog-entry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T06:08:35.024Z"
+    },
+    "changelog-entry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T06:08:35.024Z"
+    }
+  }
+}

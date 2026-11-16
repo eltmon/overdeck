@@ -15,6 +15,7 @@ import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 import { navigateToDecisionSubject } from '../../lib/navigateToDecision';
+import { showDeliveredToast } from '../../lib/deliveredToast';
 import { buildPendingAnswerRequest, parseCodexOptionNumber, postPendingAnswer, type PendingAnswerTarget } from '../../lib/pendingInputAnswer';
 import type { Issue } from '../../types';
 import {
@@ -373,6 +374,8 @@ export function usePendingInputDialogs() {
     mutationFn: async (target: PendingAnswerTarget & {
       /** Friendly display label (issue/conversation title) for the toast. */
       label?: string;
+      /** The agent's issue, so the success toast can open it (PAN-5423). */
+      issueId?: string | null;
     }) => {
       const request = buildPendingAnswerRequest(target);
       if ('error' in request) throw new Error(request.error);
@@ -386,7 +389,7 @@ export function usePendingInputDialogs() {
       return { subjectId: variables.id, toolUseId };
     },
     onSuccess: (_data, variables) => {
-      toast.success(`Answer delivered to ${variables.label?.trim() || variables.id}`);
+      showDeliveredToast(`Answer delivered to ${variables.label?.trim() || variables.id}`, variables);
     },
     onError: (error: Error, _variables, context) => {
       if (context?.toolUseId) {
@@ -407,7 +410,7 @@ export function usePendingInputDialogs() {
       return { toolUseId };
     },
     onSuccess: (_data, variables) => {
-      toast.success(`Approval sent to ${variables.label?.trim() || variables.id}`);
+      showDeliveredToast(`Approval sent to ${variables.label?.trim() || variables.id}`, variables);
     },
     onError: (error: Error, _variables, context) => {
       if (context?.toolUseId) unmarkAskUserQuestionAnswered(context.toolUseId);
@@ -441,6 +444,7 @@ export function usePendingInputDialogs() {
       questions: subject.pendingAskUserQuestion?.questions,
       harness: (subject as { harness?: string | null }).harness ?? null,
       toolUseId: subject.pendingAskUserQuestion?.toolUseId,
+      issueId: subject.issueId ?? null,
     });
   }, [askUserQuestionAnswerMutation, codexApprovalMutation, currentAskUserQuestionSubject]);
 
@@ -459,6 +463,8 @@ export function usePendingInputDialogs() {
       action: 'approve-manual' | 'reject-feedback';
       feedback?: string;
       toolUseId?: string;
+      /** The agent's issue, so the success toast can open it (PAN-5423). */
+      issueId?: string | null;
     }) => {
       const url = kind === 'agent'
         ? `/api/agents/${encodeURIComponent(id)}/plan-action`
@@ -480,10 +486,11 @@ export function usePendingInputDialogs() {
       return { toolUseId };
     },
     onSuccess: (_data, variables) => {
-      toast.success(
+      showDeliveredToast(
         variables.action === 'approve-manual'
           ? `Plan approved for ${variables.label?.trim() || variables.id}`
           : `Plan feedback sent to ${variables.label?.trim() || variables.id}`,
+        variables,
       );
     },
     onError: (error: Error, _variables, context) => {
@@ -501,6 +508,7 @@ export function usePendingInputDialogs() {
       label: subject.title?.trim() || subject.issueId || subject.id,
       action: 'approve-manual',
       toolUseId: subject.pendingProposedPlan?.toolUseId,
+      issueId: subject.issueId ?? null,
     });
   }, [currentPlanApprovalSubject, planActionMutation]);
 
@@ -514,6 +522,7 @@ export function usePendingInputDialogs() {
       action: 'reject-feedback',
       feedback,
       toolUseId: subject.pendingProposedPlan?.toolUseId,
+      issueId: subject.issueId ?? null,
     });
   }, [currentPlanApprovalSubject, planActionMutation]);
 
