@@ -188,9 +188,12 @@ describe('CodePane', () => {
       if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] })
       return undefined
     })
-    render(withQueryClient(<CodePane pane={pane({ explorerRootId: 'workspace:w1' })} ctx={ctx} />))
+    const { unmount } = render(withQueryClient(<CodePane pane={pane({ explorerRootId: 'workspace:w1' })} ctx={ctx} />))
     expect((await screen.findByTestId('code-pane-stale')).textContent).toContain('This edit workspace was merged or discarded.')
     expect(screen.queryByTestId('code-pane-error')).toBeNull()
+    // Unmount before the stub goes: a root-label query that starts late must
+    // still reach the stub, not the global fetch guard.
+    unmount()
     await guard.assertNoUnexpectedRequests()
     vi.unstubAllGlobals()
   })
@@ -205,9 +208,12 @@ describe('CodePane', () => {
       if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] })
       return undefined
     })
-    render(withQueryClient(<CodePane pane={pane({ explorerRootId: 'workspace:w1' })} ctx={ctx} />))
+    const { unmount } = render(withQueryClient(<CodePane pane={pane({ explorerRootId: 'workspace:w1' })} ctx={ctx} />))
     expect(await screen.findByTestId('code-pane-stale')).toBeInTheDocument()
     expect(screen.queryByTestId('monaco')).toBeNull()
+    // Unmount before the stub goes: a root-label query that starts late must
+    // still reach the stub, not the global fetch guard.
+    unmount()
     await guard.assertNoUnexpectedRequests()
     vi.unstubAllGlobals()
   })
