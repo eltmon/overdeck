@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_STORAGE_CAP_BYTES, FREE_PLAN_MAX_MACHINES, entitlementFor, quotaDecision } from '../../../../services/account/src/entitlement.ts';
+import { DEFAULT_STORAGE_CAP_BYTES, FREE_PLAN_MAX_MACHINES, FREE_STORAGE_CAP_BYTES, entitlementFor, quotaDecision } from '../../../../services/account/src/entitlement.ts';
 import {
   addGrant,
   getActiveGrant,
@@ -10,6 +10,7 @@ import {
   recordPendingAttempt,
   revokeGrant,
 } from '../../../../services/account/src/grants.ts';
+import { seedSubscription } from './helpers/billing.ts';
 import { dbOf, makeDeps, makeEnv, makeRc, TEST_OWNER_GITHUB_ID } from './helpers/harness.ts';
 
 const HOUR = 3_600_000;
@@ -59,6 +60,16 @@ describe('allowlist (PAN-4293 account-grants)', () => {
 
     deps.clock.advance(2 * HOUR);
     expect(await isAllowed(rc, 100)).toBe(false);
+  });
+
+  it('a subscriber without a grant is allowed until its row is revoked (PAN-4294 FR-7)', async () => {
+    const { rc, deps } = setup();
+    await rc.env.DB.prepare('INSERT INTO users (user_id, github_id, github_login, created_at) VALUES (?, ?, ?, ?)').bind('u-sub', 400, 'sub', 1).run();
+    expect(await isAllowed(rc, 400)).toBe(false);
+    await seedSubscription(rc.env, { subscriptionId: 'sub_1', userId: 'u-sub', status: 'expired', paidThrough: deps.now() - HOUR });
+    expect(await isAllowed(rc, 400)).toBe(true);
+    await rc.env.DB.prepare('UPDATE subscriptions SET revoked_at = ? WHERE subscription_id = ?').bind(deps.now(), 'sub_1').run();
+    expect(await isAllowed(rc, 400)).toBe(false);
   });
 
   it('a grant without expiry never expires', async () => {
@@ -139,7 +150,7 @@ describe('allowlist (PAN-4293 account-grants)', () => {
 describe('entitlement and storage cap (D-26, D-27)', () => {
   it('entitlementFor(null) is the tester plan with the 5 GB default cap', () => {
     expect(DEFAULT_STORAGE_CAP_BYTES).toBe(5368709120);
-    expect(entitlementFor(null)).toEqual({ plan: 'tester', storageBytesCap: 5368709120, maxDevices: null });
+    expect(entitlementFor(null)).toEqual({ plan: 'tester', storageBytesCap: 5368709120, maxDevices: null, relay: true, inbox: true, vaultMaxMachines: null, lapse: null });
   });
 
   it('a grant with storage_cap_bytes = 2147483648 yields that cap', async () => {
@@ -152,10 +163,10 @@ describe('entitlement and storage cap (D-26, D-27)', () => {
   it('a free grant is the free plan with 3 machines; any other grant is tester (PAN-2356)', () => {
     expect(FREE_PLAN_MAX_MACHINES).toBe(3);
     expect(entitlementFor({ storage_cap_bytes: null, entitlement: 'free' })).toEqual({
-      plan: 'free', storageBytesCap: DEFAULT_STORAGE_CAP_BYTES, maxDevices: 3,
+      plan: 'free', storageBytesCap: FREE_STORAGE_CAP_BYTES, maxDevices: 3, relay: false, inbox: false, vaultMaxMachines: 2, lapse: null,
     });
     expect(entitlementFor({ storage_cap_bytes: null, entitlement: 'tester' })).toEqual({
-      plan: 'tester', storageBytesCap: DEFAULT_STORAGE_CAP_BYTES, maxDevices: null,
+      plan: 'tester', storageBytesCap: DEFAULT_STORAGE_CAP_BYTES, maxDevices: null, relay: true, inbox: true, vaultMaxMachines: null, lapse: null,
     });
   });
 

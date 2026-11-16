@@ -3,6 +3,8 @@ import { boundHolders, requestDeletion, runDeletionJob, type DeletionJobRow } fr
 import { mintDevice, verifyDeviceToken } from '../../../../services/account/src/devices.ts';
 import type { AccountDataHolder, Env } from '../../../../services/account/src/env.ts';
 import { addGrant, getActiveGrant, getPendingAttempt, recordPendingAttempt } from '../../../../services/account/src/grants.ts';
+import { runMaintenance } from '../../../../services/account/src/maintenance.ts';
+import { billingEnv, fakeCreem, seedSubscription } from './helpers/billing.ts';
 import { call, dbOf, fakeCtx, makeDeps, makeEnv, makeRc, type TestDeps } from './helpers/harness.ts';
 
 const ENV_A = '11111111-2222-4333-8444-555555555555';
@@ -203,5 +205,66 @@ describe('account deletion (PAN-4293 account-deletion)', () => {
     const { env, deps, ctx } = await setup();
     expect((await call('DELETE', '/v1/account', { env, deps, ctx })).status).toBe(401);
     expect(await count(env, 'deletion_jobs')).toBe(0);
+  });
+});
+
+describe('billing holder (PAN-4294 cancel-on-delete-revoke)', () => {
+  async function billingSetup(cancelStatus: () => number) {
+    const creem = fakeCreem({
+      'POST /v1/subscriptions/sub_live/cancel': () => ({ status: cancelStatus(), body: {} }),
+      'POST /v1/subscriptions/sub_due/cancel': () => ({ status: cancelStatus(), body: {} }),
+    });
+    const env = makeEnv(billingEnv());
+    const deps = makeDeps({ now: Date.UTC(2026, 9, 1, 12), fetch: creem.fetch });
+    const ctx = fakeCtx();
+    const rc = makeRc({ env, deps, ctx });
+    await env.DB.prepare('INSERT INTO users (user_id, github_id, github_login, created_at) VALUES (?, ?, ?, ?)').bind('u-alice', 100, 'alice', deps.now()).run();
+    await addGrant(rc, 100, 'alice', {}, 'admin-add');
+    const alice = await mintDevice(rc, 'u-alice', 'linux-x64', ENV_A);
+    await seedSubscription(env, { subscriptionId: 'sub_live', userId: 'u-alice', paidThrough: deps.now() + 86_400_000 });
+    await seedSubscription(env, { subscriptionId: 'sub_due', userId: 'u-alice', status: 'past_due', paidThrough: deps.now() });
+    await seedSubscription(env, { subscriptionId: 'sub_ended', userId: 'u-alice', status: 'expired', paidThrough: 1 });
+    await env.DB.prepare('INSERT INTO checkouts (checkout_id, user_id, product_key, created_at, expires_at) VALUES (?, ?, ?, ?, ?)').bind('co_1', 'u-alice', 'anywhere_annual', 1, 2).run();
+    return { env, deps, ctx, rc, creem, alice };
+  }
+
+  it('billing is the first holder when configured and absent otherwise', () => {
+    expect(boundHolders(makeEnv(billingEnv()))).toEqual(['billing']);
+    expect(boundHolders(makeEnv())).toEqual([]);
+  });
+
+  it('deleting a paying account cancels each live subscription once, then removes its billing rows and completes', async () => {
+    const { env, deps, ctx, creem, alice } = await billingSetup(() => 200);
+    expect((await del(env, deps, ctx, alice.token)).status).toBe(202);
+    expect(await job(env, 'u-alice')).toMatchObject({ holders_pending: '["billing"]' });
+    await ctx.drain();
+    expect(creem.requests.map((r) => [r.path, r.body])).toEqual([
+      ['/v1/subscriptions/sub_live/cancel', { mode: 'immediate' }],
+      ['/v1/subscriptions/sub_due/cancel', { mode: 'immediate' }],
+    ]);
+    expect(await count(env, 'subscriptions')).toBe(0);
+    expect(await count(env, 'checkouts')).toBe(0);
+    expect(await job(env, 'u-alice')).toMatchObject({ completed_at: deps.now(), holders_pending: '[]', last_error: null });
+  });
+
+  it('a Creem 500 keeps billing pending with its error; the next maintenance run completes the job', async () => {
+    let status = 500;
+    const { env, deps, ctx, creem, alice } = await billingSetup(() => status);
+    await del(env, deps, ctx, alice.token);
+    await ctx.drain();
+    expect(await job(env, 'u-alice')).toMatchObject({ holders_pending: '["billing"]', attempts: 1, last_error: 'billing cancel pending', completed_at: null });
+    expect(await dbOf(env).prepare("SELECT cancel_attempts, cancel_error FROM subscriptions WHERE subscription_id = 'sub_live'").first()).toEqual({
+      cancel_attempts: 1,
+      cancel_error: '500 {}',
+    });
+    expect(await count(env, 'users')).toBe(1);
+
+    status = 404;
+    deps.clock.advance(3_600_000);
+    await runMaintenance(env, deps);
+    expect(await job(env, 'u-alice')).toMatchObject({ holders_pending: '[]', completed_at: deps.now() });
+    expect(await count(env, 'subscriptions')).toBe(0);
+    expect(await count(env, 'users')).toBe(0);
+    expect(creem.requests.filter((r) => r.path.endsWith('/sub_ended/cancel'))).toEqual([]);
   });
 });

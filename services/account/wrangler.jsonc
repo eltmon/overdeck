@@ -18,7 +18,15 @@
     "bindings": [{ "name": "DIRECTORY", "class_name": "AccountDirectory", "script_name": "overdeck-connect" }]
   },
   "triggers": { "crons": ["0 * * * *"] },
-  "vars": { "PUBLIC_BASE_URL": "https://account.overdeck.ai", "SHARE_BASE_URL": "https://share.overdeck.ai" }
+  "vars": {
+    "PUBLIC_BASE_URL": "https://account.overdeck.ai",
+    "SHARE_BASE_URL": "https://share.overdeck.ai",
+    // Creem live API (PAN-4294 D-3). Test deployments use https://test-api.creem.io.
+    "CREEM_API_BASE": "https://api.creem.io"
+  }
   // GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, OWNER_GITHUB_ID: Worker secrets set by the operator (docs/ACCOUNT-SERVICE.md "Deploy").
+  // Billing (PAN-4294): CREEM_API_KEY and CREEM_WEBHOOK_SECRET are Worker secrets; the operator adds the CREEM_PRODUCTS var
+  // (JSON, each of the six product keys -> its Creem product id) and optionally FOUNDING_ENDS_AT (ISO 8601) once the
+  // products exist in Creem. Until all are set, billing stays off.
   // "services": [{ "binding": "VAULT", "service": "overdeck-vault", "entrypoint": "VaultRpc" }] — added by PAN-4297.
 }

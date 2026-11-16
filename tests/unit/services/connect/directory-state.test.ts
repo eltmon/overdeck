@@ -10,6 +10,8 @@ import { machineKeyFingerprint } from '../../../../src/lib/anywhere/machine-key.
 const NOW = Date.UTC(2026, 10, 1, 12, 0, 0);
 const FREE: SocketIdentity = { deviceId: 'd-1', plan: 'free', maxDevices: 3 };
 const TESTER: SocketIdentity = { deviceId: 'd-1', plan: 'tester', maxDevices: null };
+const ANYWHERE: SocketIdentity = { deviceId: 'd-1', plan: 'anywhere', maxDevices: null };
+const ANYWHERE_RELAY: SocketIdentity = { deviceId: 'd-1', plan: 'anywhere_relay', maxDevices: null };
 const env = (n: number) => `00000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;
 const key = (n: number) => n.toString(16).padStart(2, '0').repeat(32);
 
@@ -396,5 +398,35 @@ describe('directory reducer: the account page removes a machine (PAN-4959 WI-2)'
     const { state: next, effects } = reduce(state, { kind: 'remove-machine', environmentId: env(9) }, CTX);
     expect(next).toBe(state);
     expect(effects).toEqual([{ kind: 'log', type: 'remove-machine', environmentId: env(9), outcome: 'unknown_machine' }]);
+  });
+});
+
+describe('directory reducer: the paid plans (PAN-4294 connect-paid-plans)', () => {
+  const ctx = { now: NOW, online: new Set<string>(), stunUrls: [], relayCapBytes: RELAY_MONTHLY_CAP_BYTES, turnConfigured: true };
+
+  it('welcomes anywhere as wire plan tester with tier anywhere, inbox but no relay', () => {
+    const { effects } = hello(EMPTY_DIRECTORY, 1, ANYWHERE);
+    expect(sends(effects)[0]).toMatchObject({ frame: { type: 'welcome', plan: 'tester', tier: 'anywhere', maxMachines: null, relayAllowed: false, inboxAllowed: true } });
+  });
+
+  it('welcomes anywhere_relay with relay and inbox, and mints relay credentials for it', () => {
+    const { state, effects } = hello(EMPTY_DIRECTORY, 1, ANYWHERE_RELAY);
+    expect(sends(effects)[0]).toMatchObject({ frame: { type: 'welcome', plan: 'tester', tier: 'anywhere_relay', relayAllowed: true, inboxAllowed: true } });
+    const asked = reduce(state, { kind: 'frame', registeredAs: env(1), frame: { type: 'ice-servers', requestId: 'r', relay: true } }, ctx);
+    expect(asked.effects).toContainEqual({ kind: 'fetch-turn', requestId: 'r' });
+  });
+
+  it('refuses the relay to anywhere without the add-on but accepts its inbox-create', () => {
+    const { state } = hello(EMPTY_DIRECTORY, 1, ANYWHERE);
+    const asked = reduce(state, { kind: 'frame', registeredAs: env(1), frame: { type: 'ice-servers', requestId: 'r', relay: true } }, ctx);
+    expect(sends(asked.effects)[0]).toMatchObject({ frame: { type: 'error', code: 'relay_not_allowed', requestId: 'r' } });
+    const inbox = reduce(state, { kind: 'frame', registeredAs: env(1), frame: { type: 'inbox-create', requestId: 'r2' } }, ctx);
+    expect(inbox.effects.some((e) => e.kind === 'send' && (e.frame as { type: string }).type === 'error')).toBe(false);
+    expect(inbox.effects.some((e) => e.kind === 'log' && e.outcome === 'plan_required')).toBe(false);
+  });
+
+  it('keeps free on the wire as free, tier free', () => {
+    const { effects } = hello(EMPTY_DIRECTORY, 1, FREE);
+    expect(sends(effects)[0]).toMatchObject({ frame: { type: 'welcome', plan: 'free', tier: 'free', relayAllowed: false, inboxAllowed: false } });
   });
 });

@@ -11,6 +11,9 @@ import {
   CONNECT_CLOSE_CODES,
   CONNECT_PROTOCOL_VERSION,
   FREE_MACHINE_LIMIT_MESSAGE,
+  planAllowsInbox,
+  planAllowsRelay,
+  wirePlanOf,
 } from '../../../packages/contracts/src/connect.ts';
 import type {
   ApsEnvironment,
@@ -356,10 +359,11 @@ function hello(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'he
       frame: {
         type: 'welcome',
         protocol: CONNECT_PROTOCOL_VERSION,
-        plan,
+        plan: wirePlanOf(plan),
+        tier: plan,
         maxMachines: identity.maxDevices,
-        relayAllowed: plan !== 'free',
-        inboxAllowed: plan !== 'free',
+        relayAllowed: planAllowsRelay(plan),
+        inboxAllowed: planAllowsInbox(plan),
         relay: relayStatusOf(next.relay, ctx.now, ctx.relayCapBytes),
         machines,
       },
@@ -475,7 +479,7 @@ function frame(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'fr
     case 'ice-servers':
       return iceServersAnswer(state, f, ctx, { environmentId: self });
     case 'inbox-create':
-      if (state.plan !== 'tester') {
+      if (!planAllowsInbox(state.plan)) {
         return {
           state,
           effects: [

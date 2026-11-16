@@ -1,0 +1,994 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-16T20:01:25Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4294: Overdeck Anywhere: subscription and billing (Creem, entitlements, quotas)",
+    "updated": "2026-11-16T20:10:26.614Z"
+  },
+  "plan": {
+    "id": "pan-4294",
+    "title": "Overdeck Anywhere: subscription and billing (Creem, entitlements, quotas)",
+    "status": "running",
+    "uid": "4344c041-b94e-497d-89bd-0dd8ecaff0fd",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-16T20:01:25Z",
+    "updated": "2026-11-16T20:10:26.614Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4294",
+        "label": "PAN-4294",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4294.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5453",
+        "label": "PAN-5453 (split out)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5454",
+        "label": "PAN-5454 (split out)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5455",
+        "label": "PAN-5455 (split out)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5456",
+        "label": "PAN-5456 (split out)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "billing",
+      "creem",
+      "account-service",
+      "connect-service",
+      "entitlements"
+    ],
+    "narratives": {
+      "Problem": "Overdeck Anywhere's prices are decided but nothing can be bought: the account service's entitlementFor() is a grant-only stub returning free or tester, no table records a payment, no route talks to Creem, the account page says billing is not available, and the connect service refuses any plan other than free and tester.",
+      "Proposal": "Add Creem billing to services/account: a billing schema and product catalog (six subscription products), a Creem client with HMAC webhook verification, a /webhooks/creem endpoint that turns events into subscription rows idempotently and in order, an entitlement computed from subscription rows (plan 'anywhere', relay/inbox/vault-machine fields and a lapse timeline), subscribe/relay/portal actions and Billing sections on the account page, a race-free founding cap, cancellation on deletion and revoke, and an admin view. Teach services/connect the plans 'anywhere' and 'anywhere_relay'. Document billing, terms and the operator runbook.",
+      "NonGoals": "- Opening sign-up to the public (PAN-5455); sign-up stays invite-only.\n- The one-time extra 50 GB relay purchase and per-account relay caps (PAN-5453).\n- Showing the new plan in the local dashboard or pan account status (PAN-5454).\n- The hosted-vault storage add-on (PAN-5456).\n- Hosted vault quota and lapse enforcement (PAN-4297 implements the documented contract).\n- Hosted compute billing (PAN-4298).\n- In-app interval switching, in-app cancel, refunds, dispute handling, invoices or email sent by Overdeck.\n- Team plans.\n- Any feature gate on self-hosted features (git vault backend, federation, SSH hosts, pan vault migrate).\n- Storing card data, email, name or address.\n- Deploying anything or creating Creem products: deployment and Creem setup are operator-only."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Implement OD-3 pricing (relay as a +$3/mo or +$30/yr add-on, founding ends at 500 or a configured date) instead of the issue body's 2026-09-28 bundle.",
+        "rationale": ".pan/drafts/pan-2350.md OD-3 (operator-approved 2026-11-01) is later, states it wins over other Anywhere drafts, and anywhere.mdx already publishes it; this is supersession, not a contradiction."
+      },
+      {
+        "summary": "Split the separable work into sibling issues PAN-5453 (extra 50 GB relay purchase), PAN-5454 (local plan display), PAN-5455 (open sign-up) and PAN-5456 (storage add-on); vault lapse enforcement stays with PAN-4297.",
+        "rationale": "Each is independently shippable; what remains is the money path plus the connect change needed so a paying account never gets a wrong entitlement."
+      },
+      {
+        "summary": "Model each tier x interval x relay combination as its own Creem product (six subscription products) and change the relay with the upgrade endpoint.",
+        "rationale": "Creem's upgrade endpoint supports single-item subscriptions only (verified in docs.creem.io), and OD-3 requires the relay in the same charge."
+      },
+      {
+        "summary": "Keep sign-up invite-only; allowlisted accounts and the owner may subscribe, and any non-revoked subscriber stays allowed without a grant.",
+        "rationale": "Smallest opening; nothing in the drafts says billing opens sign-up, and a subscriber must never lose read/export access to a grant expiry."
+      },
+      {
+        "summary": "Paid access lasts until current_period_end_date for active, trialing, scheduled_cancel and canceled; past_due adds 7 days; paused, unpaid and expired give none.",
+        "rationale": "Creem's portal cancels immediately although the period is paid; Creem retries failed renewals; access derives from stored timestamps at lookup, matching how grant expiry works."
+      },
+      {
+        "summary": "Lapse timeline: 30-day read-only grace, then a 30-day export window, then deletion of hosted vault data above the free 1 GiB at day 60.",
+        "rationale": "The issue names the three stages but no durations; 30/30 is a common, generous default and keeps 'at the cap nothing is deleted' true for vaults within the free cap."
+      },
+      {
+        "summary": "Founding cap = founding subscription rows plus founding reservations younger than 60 minutes, checked and reserved in one SQL statement; FOUNDING_ENDS_AT is an operator var.",
+        "rationale": "The issue requires enforcement in the account system; one statement makes the 500th place race-free on D1."
+      },
+      {
+        "summary": "Checkout, portal and relay actions answer an interstitial page with one link instead of a 303 redirect.",
+        "rationale": "The page CSP form-action allows only self and github.com and browsers apply it to post-redirects; Creem's checkout host is unverified."
+      },
+      {
+        "summary": "Inside connect the directory plan gains 'anywhere' and 'anywhere_relay' (helpers planAllowsRelay/planAllowsInbox); on the wire welcome.plan keeps 'free'|'tester' (paid -> 'tester') and a new optional tier field carries the exact plan.",
+        "rationale": "Released dashboards gate inbox creation on plan === 'tester' (directoryApi.ts inboxAvailable) and the view schema allows only free/tester; relay use already follows relayAllowed, so a wire 'tester' grants nothing extra. PAN-5454 moves the dashboard to tier."
+      },
+      {
+        "summary": "Refunds and disputes are recorded and ignored; a refund does not end paid access automatically.",
+        "rationale": "Creem's refund payload shape is unverified; the operator who refunds also revokes or cancels, as the runbook states."
+      },
+      {
+        "summary": "Webhook mapping never depends on Creem copying checkout metadata to subscriptions: checkout.completed maps by request_id, subscriptions by checkouts.subscription_id; unresolved events are kept in billing_unresolved and shown to the operator.",
+        "rationale": "A charged-but-unmapped subscriber must be visible, not silently dropped after Creem's 24-hour retry window."
+      },
+      {
+        "summary": "Account deletion cancels Creem subscriptions through a new 'billing' data holder; operator revoke marks rows revoked and cancels; failures retry hourly and show on the admin screen.",
+        "rationale": "Reuses the existing deletion-job retry machinery so nobody keeps paying for a deleted or revoked account."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "The account-service money path (schema, Creem client, webhook, entitlement from subscriptions, checkout actions, page, cancel-on-delete) is one unit: no part can be sold or verified alone, and selling without the connect plan change would give paying accounts a 503 from the directory. Everything separable was split into PAN-5453, PAN-5454, PAN-5455 and PAN-5456. The file count is high because each slice carries its own unit test file and the docs item touches five documents.",
+      "canonicalFilename": "2026-11-16-PAN-4294-overdeck-anywhere-subscription-and-billing-creem-entitlements-quotas.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "billing-schema-catalog",
+        "title": "Add the billing schema migration and the Creem product catalog with its configuration parser",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T20:01:25Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4294",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/migrations/0004_billing.sql",
+            "services/account/src/billing/catalog.ts",
+            "services/account/src/env.ts",
+            "services/account/wrangler.jsonc",
+            "services/account/.dev.vars.example",
+            "tests/unit/services/account/schema.test.ts",
+            "tests/unit/services/account/billing-catalog.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/schema.test.ts tests/unit/services/account/billing-catalog.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:account exits 0",
+            "schema.test.ts and billing-catalog.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "entitlement-from-subscriptions",
+            "creem-client",
+            "creem-webhook",
+            "billing-actions",
+            "cancel-on-delete-revoke"
+          ]
+        },
+        "narrative": {
+          "Action": "Full detail: .pan/drafts/PAN-4294.md WI-1. Create services/account/migrations/0004_billing.sql with the exact subscriptions, checkouts, billing_events and billing_unresolved tables in the PRD (no ';' inside comments). Create services/account/src/billing/catalog.ts exporting PRODUCT_KEYS (anywhere_monthly, anywhere_monthly_relay, anywhere_annual, anywhere_annual_relay, founding_annual, founding_annual_relay), PRODUCTS (interval, relay, founding, label, priceText as listed in the PRD), relayPair, chooseProduct (founding forces year), FOUNDING_LIMIT = 500, CHECKOUT_RESERVATION_MS = 3_600_000, and parseBillingConfig(env) returning null unless CREEM_API_KEY, CREEM_WEBHOOK_SECRET, CREEM_API_BASE (https, or http on 127.0.0.1/localhost) and CREEM_PRODUCTS (JSON with a non-empty string for all six keys) are present and an optional FOUNDING_ENDS_AT parses. Add the five optional names to Env in env.ts (parseConfig unchanged), CREEM_API_BASE=https://api.creem.io to wrangler.jsonc vars with a comment naming the secrets, and placeholders (test-api base) to .dev.vars.example. No hardcoded defaults beyond the committed var."
+        },
+        "items": [
+          {
+            "id": "billing-schema-catalog.ac1",
+            "title": "Given the migrations are applied to the test D1, when schema.test.ts lists tables, then it returns subscriptions, checkouts, billing_events and billing_unresolved alongside the existing eleven tables.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "billing-schema-catalog.ac2",
+            "title": "Given an Env missing any one of CREEM_API_KEY, CREEM_WEBHOOK_SECRET, CREEM_API_BASE or CREEM_PRODUCTS, or a CREEM_PRODUCTS lacking one of the six keys, or an unparseable FOUNDING_ENDS_AT, when parseBillingConfig runs, then it returns null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "billing-schema-catalog.ac3",
+            "title": "Given a complete configuration, when parseBillingConfig runs, then it returns productIds for all six keys and a productKeyById map that resolves each product id back to its key.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "billing-schema-catalog.ac4",
+            "title": "relayPair applied twice returns the original key for all six keys, and chooseProduct({interval:'month', relay:true, founding:true}) returns founding_annual_relay.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "entitlement-from-subscriptions",
+        "title": "Compute the entitlement from subscription rows and keep subscribers allowed",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T20:01:25Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4294",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "services/account/src/billing/access.ts",
+            "services/account/src/entitlement.ts",
+            "services/account/src/contract.ts",
+            "services/account/src/devices.ts",
+            "services/account/src/grants.ts",
+            "services/account/src/account-page/page.ts",
+            "tests/unit/services/account/billing-access.test.ts",
+            "tests/unit/services/account/devices.test.ts",
+            "tests/unit/services/account/grants.test.ts",
+            "tests/unit/services/account/api.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/billing-access.test.ts tests/unit/services/account/devices.test.ts tests/unit/services/account/grants.test.ts tests/unit/services/account/api.test.ts tests/unit/services/account/account-page.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:account exits 0",
+            "billing-access, devices, grants, api and account-page tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-5",
+            "NFR-7"
+          ],
+          "foundationFor": [
+            "creem-webhook",
+            "billing-actions",
+            "account-page-billing",
+            "cancel-on-delete-revoke",
+            "connect-paid-plans"
+          ],
+          "parallelSafeReason": "Runs alone in its wave next to creem-client, which touches only the new billing/creem.ts and its test; shared files with later items are ordered by blocks edges."
+        },
+        "narrative": {
+          "Action": "Full detail: .pan/drafts/PAN-4294.md WI-2. Create services/account/src/billing/access.ts (SubscriptionRow, PAST_DUE_GRACE_MS, GRACE_MS, EXPORT_WINDOW_MS, BillingState with paid/lapse/pastDue/hasLiveRow, billingStateFor(rows, now) implementing D-6 and D-7 exactly, loadSubscriptions). Widen Entitlement in entitlement.ts to plan 'free'|'tester'|'anywhere' plus relay, inbox, vaultMaxMachines, lapse; add FREE_STORAGE_CAP_BYTES (1 GiB), ANYWHERE_STORAGE_CAP_BYTES (100 GiB), FREE_VAULT_MAX_MACHINES = 2; change entitlementFor to (grant, billing = null, owner = false) with the six-step precedence in the PRD (step 6 keeps today's entitlementFor(null) = tester). Re-export Lapse from contract.ts. In devices.ts lookupDevice add the json_group_array subquery so it stays one statement, compute billing state, and set grantExpired = !owner && !grantActive && !billing.hasLiveRow. In grants.ts isAllowed add the EXISTS check for a non-revoked subscription row. In account-page/page.ts renderAccountPage compute the entitlement with billing and owner (no section changes here)."
+        },
+        "items": [
+          {
+            "id": "entitlement-from-subscriptions.ac1",
+            "title": "Given a subscription row with status active and paid_through in the future, when verifyDevice runs for that user's token with no grant row, then it returns ok: true with entitlement plan 'anywhere', storageBytesCap 100 GiB, maxDevices null and inbox true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "entitlement-from-subscriptions.ac2",
+            "title": "Given a past_due row, when the clock is at paid_through + 7 days - 1 ms the plan is 'anywhere', and at paid_through + 7 days the plan is 'free' with lapse.lapsedAt = paid_through + 7 days, graceEndsAt +30 days and deletesAt +60 days.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "entitlement-from-subscriptions.ac3",
+            "title": "Given each row of the D-5 precedence table, when entitlementFor runs, then it returns exactly the listed plan, storageBytesCap, maxDevices, relay, inbox, vaultMaxMachines and lapse (one test per row), and entitlementFor(null) still returns plan 'tester'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "entitlement-from-subscriptions.ac4",
+            "title": "Given a user whose only subscription row has revoked_at set and no grant, when verifyDevice runs, then it returns error grant_expired and isAllowed returns false.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "creem-client",
+        "title": "Add the Creem HTTP client and the webhook signature check",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T20:01:25Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/billing/creem.ts",
+            "tests/unit/services/account/billing-creem.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/billing-creem.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:account exits 0",
+            "billing-creem.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Full detail: .pan/drafts/PAN-4294.md WI-3. Create services/account/src/billing/creem.ts with createCheckout, upgradeSubscription (update_behavior proration-charge-immediately), cancelSubscription (body {mode:'immediate'}, 404 -> not_found), portalLink (POST ${apiBase}${CREEM_PORTAL_PATH} with {customer_id}, CREEM_PORTAL_PATH = '/v1/customers/billing'), verifySignature (HMAC-SHA256 hex over the raw body via crypto.subtle, constant-time compare) and idOf. All calls use deps.fetch with x-api-key and a 10 s AbortController timeout; checkout and portal URLs must be https or the result is a failure."
+        },
+        "items": [
+          {
+            "id": "creem-client.ac1",
+            "title": "Given a recording fake fetch, when each of createCheckout, upgradeSubscription, cancelSubscription and portalLink runs, then it sends the documented method, path, x-api-key header and exact JSON body asserted in billing-creem.test.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "creem-client.ac2",
+            "title": "Given a fetch that returns a non-2xx status or throws, when any call runs, then it returns a failure result instead of throwing, and an http: checkout_url is refused.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "creem-client.ac3",
+            "title": "Given a body signed with node:crypto createHmac in the test, when verifySignature runs, then it accepts the exact signature and rejects a one-character change, a different-length value and a missing header.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "creem-webhook",
+        "title": "Accept signed Creem webhooks and turn them into subscription rows",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T20:01:25Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-4294",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "services/account/src/billing/webhook.ts",
+            "services/account/src/billing/subscriptions.ts",
+            "services/account/src/routes.ts",
+            "services/account/src/http.ts",
+            "tests/unit/services/account/billing-webhook.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/billing-webhook.test.ts tests/unit/services/account/routes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:account exits 0",
+            "billing-webhook.test.ts and routes.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "billing-actions",
+            "account-page-billing",
+            "cancel-on-delete-revoke",
+            "miniflare-webhook-e2e"
+          ],
+          "parallelSafeReason": "Its only shared file with other items (routes.ts) is ordered by the creem-webhook -> billing-actions edge; cancel-on-delete-revoke in the same wave touches disjoint files."
+        },
+        "narrative": {
+          "Action": "Full detail: .pan/drafts/PAN-4294.md WI-4. Give guardBody in http.ts a maxBytes parameter; give Route in routes.ts an optional maxBodyBytes and register POST /webhooks/creem with no rate-limit bucket and WEBHOOK_MAX_BODY_BYTES = 65_536. Create services/account/src/billing/webhook.ts (config null -> 503 billing_not_configured, bad signature -> 401 invalid_signature, bad envelope -> 400 invalid_event, duplicate event id -> 200 duplicate) and services/account/src/billing/subscriptions.ts applyEvent following PRD D-8: checkout.completed finds the checkouts row by object.request_id, then metadata.overdeck_checkout_id, and stores subscription_id; the eleven subscription.* types resolve the user by metadata.overdeck_user_id -> existing subscription row -> checkouts.subscription_id = object.id -> metadata checkout id (unresolved -> 503 unknown_subscription, upsert into billing_unresolved, no billing_events row); paid_through advances only on subscription.paid and checkout.completed and only forward; unknown product -> 200 recorded; metadata naming a missing or deleted user -> 200 recorded and ignored; older events (created_at < last_event_at) are recorded but do not overwrite; the row write and the billing_events insert run in one DB.batch."
+        },
+        "items": [
+          {
+            "id": "creem-webhook.ac1",
+            "title": "Given a correctly signed subscription.paid event carrying overdeck_user_id for an allowlisted user, when it is posted to /webhooks/creem, then the endpoint returns 200, persists a subscriptions row, and GET /v1/me for that user returns entitlement plan 'anywhere'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "creem-webhook.ac2",
+            "title": "Given the same event id posted twice, when the second request arrives, then it returns 200 with duplicate: true and the row is unchanged; given a bad signature, the endpoint returns 401 and writes nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "creem-webhook.ac3",
+            "title": "Given a 70,000-byte body the endpoint returns 413, and given a 20,000-byte signed body it accepts the request (the per-route limit applies, other routes keep 16 KiB).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "creem-webhook.ac4",
+            "title": "Given a subscription.paid with no metadata at all before checkout.completed, when posted, then it returns 503 unknown_subscription and creates a billing_unresolved row; after checkout.completed with request_id = our checkout id and subscription as a bare id, the retried event returns 200, creates the subscriptions row and deletes the billing_unresolved row.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "creem-webhook.ac5",
+            "title": "Given a newer subscription.paid already applied, when an older subscription.canceled arrives, then the row keeps status active; a subscription.update with a later current_period_end_date leaves paid_through unchanged; and metadata naming a deleted user returns 200 with no row.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "billing-actions",
+        "title": "Add the subscribe, relay add/remove and Manage billing account-page actions",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T20:01:25Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/billing/actions.ts",
+            "services/account/src/routes.ts",
+            "services/account/src/rate-limit.ts",
+            "tests/unit/services/account/billing-actions.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/billing-actions.test.ts tests/unit/services/account/rate-limit.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:account exits 0",
+            "billing-actions.test.ts and rate-limit.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-8",
+            "FR-9"
+          ],
+          "parallelSafeReason": "Shares routes.ts only with creem-webhook, which blocks it; miniflare-webhook-e2e and admin-billing-view in the same wave touch disjoint files."
+        },
+        "narrative": {
+          "Action": "Full detail: .pan/drafts/PAN-4294.md WI-5. Add 'billing-action': { limit: 20, windowMs: 900_000 } to LIMITS in rate-limit.ts. Register POST /account/billing/checkout, /account/billing/relay and /account/billing/portal (bucket billing-action) in routes.ts, handled in services/account/src/billing/actions.ts. Each requires requireUserSession (csrf + Origin) and billing config (else 503 page). Checkout validates plan monthly|annual|founding and relay 0|1, refuses users with paid access (409), expires (never deletes) the user's open reservation and inserts the founding reservation with the single INSERT ... SELECT ... WHERE count < 500 AND end-date statement from the PRD, calls createCheckout with request_id = checkout_id and metadata {overdeck_user_id, overdeck_checkout_id}, expires the reservation on Creem failure (502), and answers the interstitial page (one link, no script). Relay add/remove upgrades to relayPair(key) and updates product_key, updated_at and last_event_at = max(last_event_at, now) so a delayed pre-upgrade webhook cannot revert it. Portal answers the interstitial with the portal link. Export foundingAvailability(rc, cfg)."
+        },
+        "items": [
+          {
+            "id": "billing-actions.ac1",
+            "title": "Given 499 founding subscription rows and no open reservations, when a user posts plan=founding, then the response renders an interstitial page with a link to the stubbed https checkout_url and no <script; given 500 rows, it returns 409 with 'The founding price is no longer available.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "billing-actions.ac2",
+            "title": "Given a user with an open reservation, when they start a second checkout, then exactly one unexpired reservation remains for that user and the first row is still present with expires_at set to now; given FOUNDING_ENDS_AT in the past, a founding checkout returns 409.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "billing-actions.ac3",
+            "title": "Given a paid anywhere_annual row, when the user posts action=add to /account/billing/relay, then Creem receives an upgrade with the anywhere_annual_relay product id and the row's product_key becomes anywhere_annual_relay.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "billing-actions.ac4",
+            "title": "Given a request without the session csrf field or with a cross-site Origin, when any billing action is posted, then it returns 403; given billing unconfigured, it returns 503.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-page-billing",
+        "title": "Render the Plan and Billing sections of the account page for every billing state",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T20:01:25Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/account-page/page.ts",
+            "services/account/src/billing/page-sections.ts",
+            "tests/unit/services/account/account-page.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/account-page.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:account exits 0",
+            "account-page.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Full detail: .pan/drafts/PAN-4294.md WI-6. Create services/account/src/billing/page-sections.ts with the exact exported strings of the PRD and use it from account-page/page.ts: plan labels (Anywhere, Anywhere with the relay, Free account, Tester), 'Paid through <date>', founding line, the subscribe form (founding option and '<n> founding places left' from foundingAvailability), the checkout=done notice, paid state (relay add/remove and Manage billing buttons), past-due warning, the three lapse messages keyed on graceEndsAt and deletesAt, relay section for anywhere without the relay, unlimited machine count for anywhere. Billing unconfigured keeps BILLING_MESSAGE. Every value goes through escapeHtml."
+        },
+        "items": [
+          {
+            "id": "account-page-billing.ac1",
+            "title": "Given each billing state listed in WI-6 (unconfigured, never subscribed, checkout=done pending, paid with and without relay, founding, past due, lapsed in grace, export window, after deletion date), when GET /account renders, then the page contains that state's exact string (one test per state).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-page-billing.ac2",
+            "title": "Given founding places are sold out, when the page renders the subscribe form, then it omits the founding option; otherwise it renders '<n> founding places left'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-page-billing.ac3",
+            "title": "Given billing is unconfigured, when the page renders, then the Billing section equals BILLING_MESSAGE and contains no form posting to /account/billing/.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cancel-on-delete-revoke",
+        "title": "Cancel Creem subscriptions on account deletion and operator revoke, with hourly retries",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T20:01:25Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/billing/cancel.ts",
+            "services/account/src/deletion.ts",
+            "services/account/src/grants.ts",
+            "services/account/src/admin/screen.ts",
+            "services/account/src/maintenance.ts",
+            "tests/unit/services/account/deletion.test.ts",
+            "tests/unit/services/account/maintenance.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/deletion.test.ts tests/unit/services/account/maintenance.test.ts tests/unit/services/account/admin-grants.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:account exits 0",
+            "deletion, maintenance and admin-grants tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ],
+          "parallelSafeReason": "Shares grants.ts with entitlement-from-subscriptions and admin/screen.ts with admin-billing-view, both ordered by blocks edges; creem-webhook in the same wave touches disjoint files."
+        },
+        "narrative": {
+          "Action": "Full detail: .pan/drafts/PAN-4294.md WI-7. Create services/account/src/billing/cancel.ts (runPendingCancels, cancelForUser). In deletion.ts set HOLDER_NAMES = ['billing','vault','directory'], bind 'billing' when billing is configured, and make the billing holder cancel live rows (mode immediate, 404 counts as cancelled), then delete the user's subscriptions and checkouts rows and ack, or throw 'billing cancel pending'. In grants.ts revokeGrant add the UPDATE subscriptions SET revoked_at, cancel_requested_at statement to its batch; in admin/screen.ts revokeGrant handler run runPendingCancels in ctx.waitUntil when billing is configured. In maintenance.ts run runPendingCancels and purge billing_events older than 30 days, billing_unresolved rows last seen over 30 days ago and uncompleted checkouts expired over 7 days ago, reporting the three counts."
+        },
+        "items": [
+          {
+            "id": "cancel-on-delete-revoke.ac1",
+            "title": "Given a paying account, when DELETE /v1/account runs, then Creem receives one cancel request with mode immediate per live subscription, the user's subscriptions and checkouts rows are deleted, and the deletion job completes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cancel-on-delete-revoke.ac2",
+            "title": "Given Creem answers 500 to the cancel, when the deletion job runs, then the billing holder stays pending with last_error 'billing cancel pending', and the next runMaintenance with a 200 stub completes the job.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cancel-on-delete-revoke.ac3",
+            "title": "Given an operator revoke of a subscriber, when the admin revoke handler runs, then the user's rows get revoked_at and cancel_requested_at and Creem receives the cancel request.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cancel-on-delete-revoke.ac4",
+            "title": "Given billing unconfigured, when a deletion job opens, then holders_pending does not include billing; and runMaintenance purges a 31-day-old billing_events row while keeping a 29-day-old one.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "admin-billing-view",
+        "title": "Show billing state, founding sales and failing cancels on the admin screen",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T20:01:25Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/admin/screen.ts",
+            "services/account/src/billing/admin-view.ts",
+            "tests/unit/services/account/admin-grants.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/admin-grants.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:account exits 0",
+            "admin-grants.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Full detail: .pan/drafts/PAN-4294.md WI-8. Create services/account/src/billing/admin-view.ts and use it from admin/screen.ts: a Billing column in Allowlisted accounts ('Anywhere annual with the relay, paid through <date>', 'Lapsed on <date>', 'Past due', '—'), the line 'Founding places sold: <n> of 500', a 'Subscribers without an invite' table, a 'Subscription cancels failing' section listing rows with cancel_error and cancel_done_at null plus 'Cancel these by hand in the Creem dashboard.', and a 'Webhook events not matched to an account' section listing billing_unresolved rows plus 'Creem retries these for 24 hours. Match them by hand if they stay.'. Everything billing-related is absent when billing is not configured."
+        },
+        "items": [
+          {
+            "id": "admin-billing-view.ac1",
+            "title": "Given a grant whose user has a paid anywhere_annual_relay row, when GET /admin renders for the owner, then that grant's row shows 'Anywhere annual with the relay, paid through <date>'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admin-billing-view.ac2",
+            "title": "Given three founding subscription rows, when the admin screen renders, then it shows 'Founding places sold: 3 of 500'; given a row with cancel_error, it lists it under 'Subscription cancels failing'; given a billing_unresolved row, it lists its event id under 'Webhook events not matched to an account'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admin-billing-view.ac3",
+            "title": "Given billing unconfigured, when the admin screen renders, then it contains none of 'Founding places sold', 'Billing' column header or 'Subscription cancels failing'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "connect-paid-plans",
+        "title": "Let the connect service accept the anywhere plans and gate relay and inbox by plan helpers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T20:01:25Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/connect.ts",
+            "packages/contracts/src/__tests__/connect.test.ts",
+            "services/connect/src/account.ts",
+            "services/connect/src/directory.ts",
+            "services/connect/src/directory-store.ts",
+            "services/connect/src/directory-state.ts",
+            "services/connect/src/client-state.ts",
+            "services/connect/src/ice-relay.ts",
+            "services/connect/src/inbox.ts",
+            "tests/unit/services/connect/directory-state.test.ts",
+            "tests/unit/services/connect/client-state.test.ts",
+            "tests/unit/services/connect/inbox.test.ts",
+            "tests/unit/services/connect/account.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npm run typecheck",
+            "npx vitest run tests/unit/services/connect/ packages/contracts/src/__tests__/connect.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:connect and typecheck exit 0",
+            "every test under tests/unit/services/connect and the contracts connect test pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Full detail: .pan/drafts/PAN-4294.md WI-9. In packages/contracts/src/connect.ts widen ConnectPlan to 'free'|'tester'|'anywhere'|'anywhere_relay' and add CONNECT_PLANS, isConnectPlan, planAllowsRelay (tester, anywhere_relay), planAllowsInbox (all but free), ConnectWirePlan = 'free'|'tester' and wirePlanOf (paid plans -> 'tester'); change the welcome and welcome-client frame types to plan: ConnectWirePlan plus optional tier: ConnectPlan (PRD D-13: released dashboards gate inbox creation on plan === 'tester'), keeping the file runtime-import-free and in its double-quote no-semicolon style. In services/connect/src/account.ts add exported connectPlanOf(entitlement) (anywhere + relay true -> anywhere_relay) and keep 503 account_service_outdated for unknown plans. Replace the plan literals at directory.ts:84 and directory-store.ts:238 with isConnectPlan, at directory-state.ts:359-362 (plan: wirePlanOf(plan), tier: plan, relayAllowed, inboxAllowed via helpers) and :478, client-state.ts:112-113 (plan: wirePlanOf, tier, relayAllowed), ice-relay.ts:38 and inbox.ts:169 with the helpers. Messages unchanged."
+        },
+        "items": [
+          {
+            "id": "connect-paid-plans.ac1",
+            "title": "Given a hello from a machine whose identity plan is 'anywhere', when the directory reduces it, then the welcome frame carries plan 'tester', tier 'anywhere', relayAllowed false and inboxAllowed true, and inbox-create is accepted.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-paid-plans.ac2",
+            "title": "Given the plan 'anywhere_relay', when a hello and an ice-servers relay request are reduced, then welcome carries plan 'tester', tier 'anywhere_relay' and relayAllowed true, the relay request emits fetch-turn, and a free hello's welcome carries plan 'free' and tier 'free'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-paid-plans.ac3",
+            "title": "Given entitlement plans free, tester, anywhere with relay, anywhere without relay and an unknown 'gold', when connectPlanOf runs, then it returns free, tester, anywhere_relay, anywhere and null, and verifyIdentity answers 503 account_service_outdated for 'gold'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-paid-plans.ac4",
+            "title": "Given the existing free and tester tests, when the connect unit suite runs, then they still pass unchanged (free refused relay and inbox, tester allowed both).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "billing-docs",
+        "title": "Document billing, the lapse terms and the Creem runbook in the account, connect and Anywhere docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T20:01:25Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ACCOUNT-SERVICE.md",
+            "docs/CONNECT-SERVICE.md",
+            "anywhere.mdx",
+            "changelog.d/PAN-4294.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '## Billing' docs/ACCOUNT-SERVICE.md",
+            "grep -n 'When a subscription ends' anywhere.mdx",
+            "grep -n 'anywhere_relay' docs/CONNECT-SERVICE.md"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Full detail: .pan/drafts/PAN-4294.md WI-10. docs/ACCOUNT-SERVICE.md: rewrite the invite-only sentence, extend 'What it stores', add a 'Billing' section (product keys, entitlement table D-5, paid-access rule D-6, lapse timeline D-7, founding rule, webhook route and status codes, account-page routes), add API rows for POST /webhooks/creem and the three /account/billing/* routes, the billing-action rate-limit row, the new entitlement fields in /v1/me and RPC text, item 6 'Lapse' in the Hosted vault contract (incl. vaultMaxMachines), the five config names, and Deploy steps for Creem test mode then live mode with the connect-first order (D-14), the IC-1 portal check and the refund note (D-16); also update the stale Account page section (drop 'no price appears anywhere', list the new strings and routes), the Admin screen section, Account deletion (holder order billing, vault, directory) and the hourly-cron purge list. docs/CONNECT-SERVICE.md: the four directory plans and what each allows. anywhere.mdx: Availability paragraph and a 'When a subscription ends' section stating the D-7 timeline in plain words. Add changelog.d/PAN-4294.md per changelog.d/README.md. Update the services/account row (line 22) of .overdeck/context/codebase/architecture.md to mention src/billing/ and /webhooks/creem without changing its last-verified line."
+        },
+        "items": [
+          {
+            "id": "billing-docs.ac1",
+            "title": "docs/ACCOUNT-SERVICE.md contains a '## Billing' heading, an API table row for 'POST | `/webhooks/creem`', the three '/account/billing/' routes, the row 'billing-action', and Deploy steps that name https://test-api.creem.io and say to deploy overdeck-connect first.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "billing-docs.ac2",
+            "title": "anywhere.mdx contains a 'When a subscription ends' heading whose text states 30 days readable, 30 more days of deletion warning, deletion of hosted data above the free 1 GB after 60 days, and that pan vault migrate works throughout.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "billing-docs.ac3",
+            "title": "docs/CONNECT-SERVICE.md contains the four directory plans free, tester, anywhere and anywhere_relay with which of relay and inbox each allows plus the wire rule that paid plans are sent as 'tester' with a tier field, and changelog.d/PAN-4294.md contains an entry in the format changelog.d/README.md describes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "miniflare-webhook-e2e",
+        "title": "Prove a signed webhook becomes the anywhere plan under real workerd",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T20:01:25Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/integration/services/account/miniflare.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/integration/services/account/miniflare.test.ts"
+          ],
+          "expected_outputs": [
+            "miniflare.test.ts passes, including the new webhook test"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Full detail: .pan/drafts/PAN-4294.md WI-11. Extend tests/integration/services/account/miniflare.test.ts: configure the billing vars with CREEM_API_BASE pointed at the stubbed outbound service, sign a subscription.paid body for the signed-in test user with node:crypto, POST it to /webhooks/creem, then GET /v1/me with the device token from the existing flow."
+        },
+        "items": [
+          {
+            "id": "miniflare-webhook-e2e.ac1",
+            "title": "Given the Worker bundled by wrangler deploy --dry-run and loaded in Miniflare with a local D1, when a signed subscription.paid is posted to /webhooks/creem, then it returns 200 and GET /v1/me returns entitlement.plan 'anywhere'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "miniflare-webhook-e2e.ac2",
+            "title": "Given the same body with a wrong signature, when posted, then Miniflare's Worker returns 401 invalid_signature.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "billing-schema-catalog",
+        "to": "entitlement-from-subscriptions",
+        "type": "blocks"
+      },
+      {
+        "from": "billing-schema-catalog",
+        "to": "creem-client",
+        "type": "blocks"
+      },
+      {
+        "from": "entitlement-from-subscriptions",
+        "to": "creem-webhook",
+        "type": "blocks"
+      },
+      {
+        "from": "creem-client",
+        "to": "creem-webhook",
+        "type": "blocks"
+      },
+      {
+        "from": "creem-webhook",
+        "to": "billing-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "entitlement-from-subscriptions",
+        "to": "billing-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "billing-actions",
+        "to": "account-page-billing",
+        "type": "blocks"
+      },
+      {
+        "from": "entitlement-from-subscriptions",
+        "to": "account-page-billing",
+        "type": "blocks"
+      },
+      {
+        "from": "entitlement-from-subscriptions",
+        "to": "cancel-on-delete-revoke",
+        "type": "blocks"
+      },
+      {
+        "from": "creem-client",
+        "to": "cancel-on-delete-revoke",
+        "type": "blocks"
+      },
+      {
+        "from": "cancel-on-delete-revoke",
+        "to": "admin-billing-view",
+        "type": "blocks"
+      },
+      {
+        "from": "creem-webhook",
+        "to": "miniflare-webhook-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "creem-webhook",
+        "to": "billing-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "account-page-billing",
+        "to": "billing-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "cancel-on-delete-revoke",
+        "to": "billing-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "admin-billing-view",
+        "to": "billing-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "connect-paid-plans",
+        "to": "billing-docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -28,6 +28,16 @@ export interface Env {
    * Absent in tests and local dev: the page shows machines as unavailable.
    */
   DIRECTORY?: DurableObjectNamespace;
+  /** Billing (PAN-4294 D-3): all optional; billing is off unless `parseBillingConfig` accepts every value. Secret. */
+  CREEM_API_KEY?: string;
+  /** Secret: the Creem webhook signing secret. */
+  CREEM_WEBHOOK_SECRET?: string;
+  /** Var: `https://api.creem.io` (live) or `https://test-api.creem.io` (test mode). */
+  CREEM_API_BASE?: string;
+  /** Var: JSON object mapping each of the six product keys to a Creem product id. */
+  CREEM_PRODUCTS?: string;
+  /** Var, optional: ISO 8601 date-time when the founding price ends; unset means no date limit yet. */
+  FOUNDING_ENDS_AT?: string;
 }
 
 /** Time and outbound HTTP are injected so tests control both without waiting (D-24). */

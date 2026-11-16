@@ -14,6 +14,7 @@ import {
   verifyDeviceToken,
 } from '../../../../services/account/src/devices.ts';
 import { addGrant } from '../../../../services/account/src/grants.ts';
+import { seedSubscription } from './helpers/billing.ts';
 import { dumpAllTables } from './helpers/d1.ts';
 import { dbOf, makeDeps, makeEnv, makeRc, TEST_OWNER_GITHUB_ID } from './helpers/harness.ts';
 
@@ -158,7 +159,7 @@ describe('verifyDeviceToken (FR-5, FR-6)', () => {
       githubId: 100,
       githubLogin: 'user100',
       deviceId: tester.deviceId,
-      entitlement: { plan: 'tester', storageBytesCap: 2147483648, maxDevices: null },
+      entitlement: { plan: 'tester', storageBytesCap: 2147483648, maxDevices: null, relay: true, inbox: true, vaultMaxMachines: null, lapse: null },
     });
 
     await seedUser(rc, 'u-owner', TEST_OWNER_GITHUB_ID);
@@ -182,6 +183,27 @@ describe('verifyDeviceToken (FR-5, FR-6)', () => {
     await seedUser(rc, 'u-owner', TEST_OWNER_GITHUB_ID);
     const owner = await mintDevice(rc, 'u-owner', 'linux-x64', ENV_A);
     expect(await verifyDeviceToken(rc, owner.token)).toMatchObject({ ok: true, entitlement: { plan: 'tester', maxDevices: null } });
+  });
+
+  it('a subscriber without a grant verifies as anywhere, then free with a lapse; a revoked row alone is grant_expired (PAN-4294 FR-7)', async () => {
+    const { rc, deps, db } = setup();
+    await seedUser(rc, 'u-sub', 400);
+    const paidThrough = deps.now() + 10 * MIN;
+    await seedSubscription(rc.env, { subscriptionId: 'sub_1', userId: 'u-sub', productKey: 'anywhere_monthly_relay', paidThrough });
+    const sub = await mintDevice(rc, 'u-sub', 'linux-x64', ENV_A);
+    expect(await verifyDeviceToken(rc, sub.token)).toMatchObject({
+      ok: true,
+      entitlement: { plan: 'anywhere', relay: true, inbox: true, maxDevices: null, storageBytesCap: 100 * 1024 ** 3, lapse: null },
+    });
+
+    deps.clock.advance(11 * MIN);
+    expect(await verifyDeviceToken(rc, sub.token)).toMatchObject({
+      ok: true,
+      entitlement: { plan: 'free', relay: false, inbox: false, maxDevices: 3, lapse: { lapsedAt: paidThrough, graceEndsAt: paidThrough + 30 * 86_400_000 } },
+    });
+
+    await db.prepare('UPDATE subscriptions SET revoked_at = ? WHERE subscription_id = ?').bind(deps.now(), 'sub_1').run();
+    expect(await verifyDeviceToken(rc, sub.token)).toEqual({ ok: false, error: 'grant_expired' });
   });
 
   it('reflects a changed github_login on the next verify (AC2)', async () => {

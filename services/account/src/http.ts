@@ -67,7 +67,7 @@ export type BodyGuardResult = { ok: true; req: Request } | { ok: false; response
  * Content-Length is not trusted (it may be absent or wrong); the stream is what counts.
  * On success the body is handed back inside a fresh Request so handlers can still call `text()`/`formData()`.
  */
-export async function guardBody(req: Request): Promise<BodyGuardResult> {
+export async function guardBody(req: Request, maxBytes: number = MAX_BODY_BYTES): Promise<BodyGuardResult> {
   if (req.body === null) return { ok: true, req };
   const reader = req.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -76,9 +76,9 @@ export async function guardBody(req: Request): Promise<BodyGuardResult> {
     const { done, value } = await reader.read();
     if (done) break;
     total += value.byteLength;
-    if (total > MAX_BODY_BYTES) {
+    if (total > maxBytes) {
       await reader.cancel();
-      return { ok: false, response: json({ error: 'payload_too_large', maxBytes: MAX_BODY_BYTES }, 413) };
+      return { ok: false, response: json({ error: 'payload_too_large', maxBytes }, 413) };
     }
     chunks.push(value);
   }

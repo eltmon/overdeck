@@ -37,7 +37,7 @@ The wire protocol is `packages/contracts/src/connect.ts` (runtime-import-free so
 - **Role.** A socket's first valid hello fixes its role: `hello` makes it a machine, `hello-client` a client. The decoder then accepts only that role's frames; a cross-role frame is `bad_frame`. A client's `platform` is `ios` or `android` (a phone) or `node` (an Overdeck connector, `pan mcp connector`, PAN-4927 D-18).
 - **Phone key.** A phone's `hello-client.publicKeyHex` is its install-level push public key (PAN-4837 C-2). Link keys are per machine and never reach the directory.
 - **Connector.** A connector sends the same frames as a phone; its `hello-client.publicKeyHex` is its install key, not a push key. `push-register` from a `node` client is always `bad_frame`. A re-hello that changes a client's family (phone ↔ connector) counts against the new family's cap and clears its push registration.
-- **Welcome.** `welcome-client` carries the protocol, the plan, `relayAllowed` and the account's machines with their online state.
+- **Welcome.** `welcome-client` carries the protocol, the wire plan and the exact `tier` (see "Plans"), `relayAllowed` and the account's machines with their online state.
 - **Broadcasts.** Phones receive every `directory` frame machines receive and every `relay-status`, but never approvals or inbox frames. No machine frame ever lists a phone.
 - **Signals.** A phone signals an online machine with `purpose: 'link'` only, and the machine sees `from` = the phone's `clientId`. A machine's `link` signal to an online phone arrives with `from` = its environment id. Phone to phone is `bad_frame`; an offline target is `peer_offline`.
 - **ICE and relay.** `ice-servers` and `relay-usage` from a phone follow the machine rules and meter the account's relay allowance.
@@ -88,9 +88,24 @@ The account page at `https://account.overdeck.ai/account` reads and changes an a
 
 The page revokes a machine's device token before calling `/remove-machine`, so an offline machine cannot register again on its next `hello`. Account deletion calls `/delete-account` as the `directory` data holder and completes only after a 200.
 
+## Plans
+
+The directory plan comes from the account service's entitlement when a device token is verified (`connectPlanOf` in `src/account.ts`), is stored in the Durable Object's `meta` row and is checked through two helpers in `packages/contracts/src/connect.ts`:
+
+| Plan | From the entitlement | Relay (`planAllowsRelay`) | Webhook inbox (`planAllowsInbox`) |
+| --- | --- | --- | --- |
+| `free` | `plan: 'free'` | no | no |
+| `tester` | `plan: 'tester'` (invited testers and the owner) | yes | yes |
+| `anywhere` | `plan: 'anywhere'`, `relay: false` (a paying subscriber, PAN-4294) | no | yes |
+| `anywhere_relay` | `plan: 'anywhere'`, `relay: true` (the relay add-on) | yes | yes |
+
+Any other plan answers 503 `account_service_outdated`.
+
+**Wire rule.** In `welcome` and `welcome-client`, `plan` keeps the released vocabulary `free | tester` (`ConnectWirePlan`): every paid plan is sent as `tester`, because released dashboards turn on the inbox when `plan === 'tester'`. The exact plan travels in the optional `tier` field. Relay use always follows `relayAllowed`, so a wire `tester` never grants the relay by itself. Deploy this Worker before the account service sells anything (`docs/ACCOUNT-SERVICE.md` "Deploy", Billing).
+
 ## Limits
 
-- **Machines:** a `free` account holds at most 3 (`hello` for a fourth environment id → `error machine_limit` "The free account includes 3 machines", close 4009). `tester` (every allowlisted account until billing) has no limit.
+- **Machines:** a `free` account holds at most 3 (`hello` for a fourth environment id → `error machine_limit` "The free account includes 3 machines", close 4009). `tester`, `anywhere` and `anywhere_relay` have no limit. When a subscription lapses the plan becomes `free`: machines already registered keep their rows, and only new machines past 3 are refused.
 - **Phones (clients):** at most 5 per account on every plan (`hello-client` for a sixth `clientId` → `error client_limit` "This account already has 5 phones. Remove one in the app or on a machine.", close 4013). Phones never count against the machine limit. One socket per phone (a newer one closes the older with 4011); `forget-client` deletes the phone and closes with 4012.
 - **Connectors (clients):** at most 10 per account on every plan (`hello-client` with `platform: node` for an eleventh `clientId` → `error client_limit` "This account already has 10 Overdeck connectors. Remove one in Settings → Anywhere → Bots.", close 4013). Connectors never count against the machine or phone limit.
 - **Sockets:** one per machine; a newer socket for the same machine closes the older with 4011. `forget` closes with 4012. `ping`/`pong` is a runtime auto-response, so an idle socket never wakes the object.

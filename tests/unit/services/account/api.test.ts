@@ -43,7 +43,7 @@ describe('device API (PAN-4293 account-device-api)', () => {
       githubId: 100,
       githubLogin: 'alice',
       deviceId: alice.deviceId,
-      entitlement: { plan: 'tester', storageBytesCap: 2147483648, maxDevices: null },
+      entitlement: { plan: 'tester', storageBytesCap: 2147483648, maxDevices: null, relay: true, inbox: true, vaultMaxMachines: null, lapse: null },
       access: { status: 'active', expiresAt: deps.now() - 1_000 + HOUR },
     });
   });

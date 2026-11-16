@@ -1,14 +1,14 @@
 # overdeck.ai account service
 
-Source: `services/account/`, licensed under FSL-1.1-MIT (`services/LICENSE.md`), not the repo's MIT license. Issue: PAN-4293. Design: `.pan/drafts/PAN-4293.md` (the PRD) and `.pan/drafts/anywhere-accounts.md` §6.9.
+Source: `services/account/`, licensed under FSL-1.1-MIT (`services/LICENSE.md`), not the repo's MIT license. Issue: PAN-4293. Design: `.pan/drafts/PAN-4293.md` (the PRD) and `.pan/drafts/anywhere-accounts.md` §6.9. Billing: PAN-4294, `.pan/drafts/PAN-4294.md`.
 
 ## What it is
 
 A Cloudflare Worker at `https://account.overdeck.ai` that is the identity service for every hosted Overdeck feature: the hosted Session Vault (PAN-4297), the relay (PAN-2356) and shared sessions (PAN-658). It signs people in with GitHub (OAuth scope `read:user`, nothing else), mints revocable device tokens, and keeps the invite-only allowlist the operator manages from an admin screen.
 
-It is **invite-only** until billing (PAN-4294) exists: a GitHub account can sign in only if it is the owner or holds an unexpired grant in the `grants` table. Everyone else sees the invite-only page and leaves one bounded "pending attempt" row that the operator can allow with one click.
+It is **invite-only**; billing (PAN-4294) sells Anywhere to allowlisted accounts, and PAN-5455 opens sign-up later. A GitHub account can sign in only if it is the owner, holds an unexpired grant in the `grants` table, or has a subscription row that is not revoked (a subscriber whose grant lapsed can still read and export). Everyone else sees the invite-only page and leaves one bounded "pending attempt" row that the operator can allow with one click.
 
-What it stores (D1 database `overdeck-account`): users (GitHub numeric id, login, timestamps), grants, pending attempts, device records (SHA-256 hashes of tokens, never the tokens), short-lived sign-in continuations and codes (hashed), admin sessions and account-page web sessions (hashed), deletion jobs and rate-limit counters (hashed client IPs).
+What it stores (D1 database `overdeck-account`): users (GitHub numeric id, login, timestamps), grants, pending attempts, device records (SHA-256 hashes of tokens, never the tokens), short-lived sign-in continuations and codes (hashed), admin sessions and account-page web sessions (hashed), deletion jobs and rate-limit counters (hashed client IPs). For billing it stores only Creem ids (customer, subscription, checkout), product keys, subscription statuses, paid-through times and processed webhook event ids: never card data, email, name or address.
 
 What it never stores: the GitHub access token (used once per sign-in and discarded), any plaintext token or code, raw client IPs, the vault key, a vault passphrase or any user content. It has no CORS headers: `/v1/*` is called by the local Overdeck server or CLI, never from a browser.
 
@@ -57,12 +57,13 @@ Fixed windows per (bucket, `sha256(CF-Connecting-IP)`) in the `rate_limits` tabl
 | `admin-login` | `POST /admin/login` | 10 per 10 min |
 | `account-login` | `POST /account/login` | 10 per 10 min |
 | `account-action` | `POST /account/logout`, `POST /account/machines/:environmentId/remove`, `POST /account/delete`, `POST /account/delete/confirm` | 30 per 15 min |
+| `billing-action` | `POST /account/billing/checkout`, `POST /account/billing/relay`, `POST /account/billing/portal` | 20 per 15 min |
 
-`/v1/*` and `GET /admin` are not rate limited (they need a valid token or session).
+`/v1/*` and `GET /admin` are not rate limited (they need a valid token or session). `POST /webhooks/creem` is not rate limited either: Creem retries on its own schedule and the signature check is the gate.
 
 ## API
 
-Every response carries `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`; HTML responses also carry `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://github.com; frame-ancestors 'none'; base-uri 'none'` and `Referrer-Policy: same-origin` (not `no-referrer`: that would make browsers send `Origin: null` on the service's own form posts, which the `/activate` and `/admin` Origin checks must refuse). Request bodies over 16 KiB → 413. Unknown path → 404 `{"error":"not_found"}`; wrong method → 405 with `Allow`; `OPTIONS` → 405. When `PUBLIC_BASE_URL`, `GITHUB_CLIENT_ID` or `GITHUB_CLIENT_SECRET` is missing, every route except `/healthz` returns 503 `{"error":"not_configured","missing":[…]}`; `/admin*` also returns 503 listing `OWNER_GITHUB_ID` when that is unset or non-numeric.
+Every response carries `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`; HTML responses also carry `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://github.com; frame-ancestors 'none'; base-uri 'none'` and `Referrer-Policy: same-origin` (not `no-referrer`: that would make browsers send `Origin: null` on the service's own form posts, which the `/activate` and `/admin` Origin checks must refuse). Request bodies over 16 KiB → 413 (64 KiB on `POST /webhooks/creem`). Unknown path → 404 `{"error":"not_found"}`; wrong method → 405 with `Allow`; `OPTIONS` → 405. When `PUBLIC_BASE_URL`, `GITHUB_CLIENT_ID` or `GITHUB_CLIENT_SECRET` is missing, every route except `/healthz` returns 503 `{"error":"not_configured","missing":[…]}`; `/admin*` also returns 503 listing `OWNER_GITHUB_ID` when that is unset or non-numeric.
 
 | Method | Path | Auth | Request → response |
 | --- | --- | --- | --- |
@@ -91,6 +92,10 @@ Every response carries `Cache-Control: no-store` and `X-Content-Type-Options: no
 | POST | `/account/machines/:environmentId/remove` | web session + csrf | → 303 `/account`; the page with 404 when the machine is not listed, 503 when the directory is unavailable |
 | POST | `/account/delete` | web session + csrf | → the confirm page |
 | POST | `/account/delete/confirm` | web session + csrf | form `confirm` (the GitHub login, any case) → "Your account is being deleted." with the cookie cleared, or the confirm page with 400 |
+| POST | `/account/billing/checkout` | web session + csrf | form `plan` (`monthly` \| `annual` \| `founding`), `relay` (`0` \| `1`) → 200 interstitial with one link to Creem's checkout; the page with 400 "Choose a plan.", 409 (already paid, or founding sold out), 502 (Creem failed) or 503 (billing off) |
+| POST | `/account/billing/relay` | web session + csrf | form `action` (`add` \| `remove`) → 303 `/account`; the page with 404 (no paid subscription), 409 (subscription cancelled), 502 or 503 |
+| POST | `/account/billing/portal` | web session + csrf | → 200 interstitial with one link to the Creem customer portal; the page with 404 (no subscription), 502 or 503 |
+| POST | `/webhooks/creem` | `creem-signature` HMAC | raw Creem event → 200 `{"ok":true}` (also for events ignored as not ours), 200 `{"ok":true,"duplicate":true}`, 400 `invalid_event`, 401 `invalid_signature`, 503 `unknown_subscription` (Creem retries) or 503 `billing_not_configured` |
 
 Bearer failures: `invalid_token`, `device_revoked` and `account_deleted` → 401 `{"error":<code>}` with `WWW-Authenticate: Bearer error="invalid_token"`; an expired grant → 403 `{"error":"grant_expired"}` except where noted.
 
@@ -112,11 +117,24 @@ type SignOutResult = { ok: true } | { ok: false; error: VerifyError };
 
 `redeemWebCode` applies exactly the rules of `POST /oauth/token` (single use, 5-minute expiry, identical redirect, S256 verifier, allowlist re-check) and refuses with `invalid_request` any `redirectUri` that is not the share redirect. `signOutDevice` revokes the token's own device with `revoked_by = 'user'`; a device whose grant lapsed still signs out.
 
-`verifyDevice` is one D1 lookup per call (no cache), so revocation is immediate. `entitlement` comes from `entitlementFor(grant)`: a grant whose `entitlement` column is `free` gives `{ plan: 'free', storageBytesCap, maxDevices: 3 }`; any other grant, and the owner, gives `{ plan: 'tester', storageBytesCap, maxDevices: null }`. The owner gets the default cap.
+`verifyDevice` is one D1 statement per call (no cache; the subscription rows join in as a JSON subquery), so revocation is immediate. `entitlement` comes from `entitlementFor(grant, billing, owner)` and has the shape below; `GET /v1/me` returns the same object. The values follow the precedence table in "Billing" below: a paying account is `anywhere`; otherwise a grant whose `entitlement` column is `free` is `free`, any other grant and the owner are `tester`.
+
+```ts
+interface Lapse { lapsedAt: number; graceEndsAt: number; deletesAt: number } // ms since epoch
+interface Entitlement {
+  plan: 'free' | 'tester' | 'anywhere';
+  storageBytesCap: number;
+  maxDevices: number | null;        // directory machines; null = unlimited
+  relay: boolean;                   // relay fallback allowed
+  inbox: boolean;                   // webhook inbox allowed
+  vaultMaxMachines: number | null;  // machines syncing the hosted vault; null = unlimited
+  lapse: Lapse | null;              // only when plan is 'free' and a lapsed subscription exists
+}
+```
 
 ### The free entitlement (PAN-2356)
 
-Until billing (PAN-4294) ships, every allowlisted account is `tester`, which carries the paid Anywhere tiers (unlimited directory machines, the relay add-on and the webhook inbox). A **free** account is an allowlisted GitHub id whose grant row has `entitlement = 'free'`; the connect service (`docs/CONNECT-SERVICE.md`) then limits it to 3 directory machines and refuses the relay and the inbox. Sign-up stays invite-only. Set or clear it with Wrangler (operator only):
+An allowlisted account is `tester` unless its grant says `free`; `tester` carries the paid Anywhere tiers (unlimited directory machines, the relay add-on and the webhook inbox) at no charge. A **free** account is an allowlisted GitHub id whose grant row has `entitlement = 'free'`; the connect service (`docs/CONNECT-SERVICE.md`) then limits it to 3 directory machines and refuses the relay and the inbox. Sign-up stays invite-only. Set or clear it with Wrangler (operator only):
 
 ```bash
 cd services/account
@@ -126,37 +144,80 @@ npx wrangler d1 execute overdeck-account --remote --command "UPDATE grants SET e
 
 The change applies on the account's next `verifyDevice`, so a connected machine sees it when its directory socket next reconnects.
 
+## Billing
+
+PAN-4294. Creem (`https://api.creem.io`, test mode `https://test-api.creem.io`) is the payment provider and merchant of record. Code: `services/account/src/billing/`. Billing is on only when `CREEM_API_KEY`, `CREEM_WEBHOOK_SECRET`, `CREEM_API_BASE` and `CREEM_PRODUCTS` are all set and valid (`parseBillingConfig`); otherwise every billing route answers 503 and the account page keeps "Billing is not available yet.".
+
+**Products.** Creem's upgrade call works on single-item subscriptions only, so each combination is its own Creem product. `CREEM_PRODUCTS` maps these six keys to Creem product ids:
+
+| Key | Price |
+| --- | --- |
+| `anywhere_monthly` | &#36;10 a month |
+| `anywhere_monthly_relay` | &#36;13 a month with the relay |
+| `anywhere_annual` | &#36;96 a year |
+| `anywhere_annual_relay` | &#36;126 a year with the relay |
+| `founding_annual` | &#36;60 a year (founding price) |
+| `founding_annual_relay` | &#36;90 a year with the relay (founding price) |
+
+Adding or removing the relay moves the subscription to the paired key with `proration-charge-immediately`. Switching between monthly and annual is not offered in-app: the user cancels in the Creem portal and subscribes again. The display prices live in `billing/catalog.ts` and must match the Creem products; Creem's checkout shows the binding price.
+
+**Founding price.** Annual only, locked while subscribed. A founding checkout is refused when founding subscription rows plus open founding reservations younger than 60 minutes reach 500, or when `FOUNDING_ENDS_AT` is set and has passed. The count and the reservation insert are one SQL statement, so two checkouts cannot both take the 500th place. A reservation that is replaced or fails is expired, never deleted, so a late payment on its Creem link still maps to the user.
+
+**Entitlement.** First match wins (GiB = 1024³ bytes):
+
+| Case | plan | storageBytesCap | maxDevices | relay | inbox | vaultMaxMachines | lapse |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| paid access, any account including the owner | `anywhere` | max(100 GiB, grant cap) | null | the product's relay | true | null | null |
+| owner | `tester` | 5 GiB | null | true | true | null | null |
+| active grant `free` | `free` | grant cap or 1 GiB | 3 | false | false | 2 | from billing |
+| any other active grant | `tester` | grant cap or 5 GiB | null | true | true | null | null |
+| no active grant, a subscription row not revoked | `free` | 1 GiB | 3 | false | false | 2 | from billing |
+
+**Paid access.** A subscription row gives paid access while it is not revoked, has a `paid_through`, and either its status is `active`, `trialing`, `scheduled_cancel` or `canceled` and now is before `paid_through`, or its status is `past_due` and now is before `paid_through` + 7 days (Creem is retrying the card). `paused`, `unpaid`, `expired` and unknown statuses give none. `canceled` keeps access to the end of the paid period because the portal cancels immediately. `paid_through` moves only forward, and only from `subscription.paid` and `checkout.completed` events, whatever order they arrive in.
+
+**Lapse.** When no row gives paid access and a non-revoked row was paid at some point, `lapsedAt` is when the last access ended, `graceEndsAt` = `lapsedAt` + 30 days and `deletesAt` = `lapsedAt` + 60 days. At `lapsedAt` the plan becomes `free` at once: the relay and the inbox stop, and registered directory machines keep their rows (the directory refuses only new machines past 3). Subscribing again before `deletesAt` restores everything. The hosted vault enforces the rest (contract item 6 below).
+
+**Webhook.** `POST /webhooks/creem` checks `creem-signature` (lowercase hex HMAC-SHA256 of the raw body, compared in constant time), skips an event id it has already applied, and writes the change and the `billing_events` row in one batch, so a failed apply is retried by Creem. `checkout.completed` completes our `checkouts` row, found by `request_id` (we send our checkout id) or by `metadata.overdeck_checkout_id`. `subscription.*` events find the user by `metadata.overdeck_user_id`, then the existing subscription row, then the checkout that created it; never by email. An unresolved subscription answers 503 (Creem retries for 24 hours) and is listed on the admin screen from `billing_unresolved`. Product, status and customer follow only the newest event (`created_at` ≥ the row's `last_event_at`). An unknown product and event types this service does not use (`refund.created`, `dispute.created` and others) are recorded and ignored. A subscription that resolves to a deleted or missing user, or to a revoked one (not the owner, no grant row and no subscription row that is not revoked), is stored revoked with a cancel requested and answered `{"ok":true,"cancelled":"gone"|"revoked"}`: its payment may land after the deletion's billing holder or the revoke already ran. The cancel is sent at once and retried by the hourly cron, so the account is not charged again and is not re-admitted.
+
+**Account-page actions.** Checkout, relay and portal are the `/account/billing/*` routes above. Checkout and portal answer an interstitial page with one link to Creem instead of a redirect, because the page's CSP allows form posts only to the service itself and GitHub.
+
+**Refunds.** A refund or dispute does not end paid access by itself. An operator who refunds a subscription in the Creem dashboard also revokes the account on the admin screen or cancels the subscription in Creem.
+
 ## Hosted vault contract
 
 Fixed here for PAN-4297, which implements it:
 
 1. **Auth.** Every vault request carries `Authorization: Bearer odd_…`. The vault calls `env.ACCOUNT.verifyDevice(token)` and refuses anything but `ok: true`.
-2. **Storage cap.** One Durable Object per vault holds `usedBytes`. Before accepting an object `PUT`, the vault calls `quotaDecision(entitlement, usedBytes, body.length)` from `services/account/src/contract.ts`; `{ allowed: false, reason: 'quota_exceeded', capBytes, usedBytes }` → 507 `{"error":"quota_exceeded","capBytes":…,"usedBytes":…}` and nothing is written. The rule is exactly `usedBytes + incomingBytes > storageBytesCap`. Re-putting an existing id is free (content-addressed). The default cap is 5 GB (5,368,709,120 bytes); the operator may set a different cap per grant on the admin screen.
+2. **Storage cap.** One Durable Object per vault holds `usedBytes`. Before accepting an object `PUT`, the vault calls `quotaDecision(entitlement, usedBytes, body.length)` from `services/account/src/contract.ts`; `{ allowed: false, reason: 'quota_exceeded', capBytes, usedBytes }` → 507 `{"error":"quota_exceeded","capBytes":…,"usedBytes":…}` and nothing is written. The rule is exactly `usedBytes + incomingBytes > storageBytesCap`. Re-putting an existing id is free (content-addressed). The cap comes from the entitlement: 1 GiB for `free`, 5 GiB (5,368,709,120 bytes) for `tester` and the owner, at least 100 GiB for `anywhere`; the operator may set a different cap per grant on the admin screen.
 3. **CAS.** Refs live in the per-vault Durable Object's storage. Create-if-absent (`If-None-Match: *`) and swap (`If-Match: <version>`) run inside the object's single-threaded `fetch`; a mismatch → 412.
 4. **Chunks** live in R2 under content-derived keys; immutable.
 5. **Deletion.** The vault's RPC entrypoint implements `AccountDataHolder.deleteAccountData(userId)` idempotently, deleting every R2 object and the Durable Object's storage for that user's vault within 24 hours. The account service's optional `VAULT` service binding points at it (`"services": [{ "binding": "VAULT", "service": "overdeck-vault", "entrypoint": "VaultRpc" }]`).
+6. **Lapse** (PAN-4294). When `entitlement.lapse` is set the account was a subscriber. During the grace period (`lapsedAt` to `graceEndsAt`) all vault data stays readable and `pan vault migrate` works; writes follow the free cap, so a vault over 1 GiB is read-only. During the export window (`graceEndsAt` to `deletesAt`) the same holds and the account page warns of deletion. At `deletesAt` a vault holding more than the free cap is deleted entirely and the account continues as Free; a vault within the cap is kept. `vaultMaxMachines` limits how many machines sync the vault (2 on `free`, unlimited otherwise). This deletion is the vault's job; `pan vault migrate` is never gated.
 
 ## Account deletion
 
-`DELETE /v1/account` runs one batch: `users.deleted_at` set, every device revoked (`revoked_by = 'account-deletion'`), the grant and pending row deleted, every web session deleted, and a `deletion_jobs` row opened listing the bound data holders (`vault` when `VAULT` is bound, then `directory` when `DIRECTORY` is bound; `[]` when neither is). The job runs immediately via `ctx.waitUntil` and again every hour (see `src/maintenance.ts`): each pending holder is asked to `deleteAccountData(userId)`; a failure increments `attempts` and stores a 200-character `last_error`; a holder that is no longer bound stays pending with `last_error = 'holder <name> not bound'`. The `directory` holder calls `POST /delete-account` on the account's Directory Durable Object in the connect Worker, which closes every machine and phone socket and empties its tables (machine labels, public keys, phone push tokens, approvals, relay use, sealed inbox events); a non-200 is recorded as `directory delete failed: HTTP <status>`. When no holder remains, the user's device and user rows are deleted and `completed_at` is set. With no holders bound the job completes in the same request. Every device token of a deleting account is refused as `account_deleted` until the rows are gone, then as `invalid_token`. The admin screen flags jobs older than 24 hours as overdue.
+`DELETE /v1/account` runs one batch: `users.deleted_at` set, every device revoked (`revoked_by = 'account-deletion'`), the grant and pending row deleted, every web session deleted, and a `deletion_jobs` row opened listing the bound data holders (`billing` when billing is configured, then `vault` when `VAULT` is bound, then `directory` when `DIRECTORY` is bound; `[]` when none is). The job runs immediately via `ctx.waitUntil` and again every hour (see `src/maintenance.ts`): each pending holder is asked to `deleteAccountData(userId)`; a failure increments `attempts` and stores a 200-character `last_error`; a holder that is no longer bound stays pending with `last_error = 'holder <name> not bound'`. The `directory` holder calls `POST /delete-account` on the account's Directory Durable Object in the connect Worker, which closes every machine and phone socket and empties its tables (machine labels, public keys, phone push tokens, approvals, relay use, sealed inbox events); a non-200 is recorded as `directory delete failed: HTTP <status>`. The `billing` holder asks Creem to cancel, mode `immediate`, each of the user's subscriptions Creem has not ended (a 404 counts as cancelled), then deletes the user's `subscriptions` and `checkouts` rows; while any cancel fails, the job keeps `billing` pending with `last_error = 'billing cancel pending'` and the failing row shows on the admin screen. No refund is issued by code. When no holder remains, the user's device and user rows are deleted and `completed_at` is set. With no holders bound the job completes in the same request. Every device token of a deleting account is refused as `account_deleted` until the rows are gone, then as `invalid_token`. The admin screen flags jobs older than 24 hours as overdue.
 
-Grant expiry, operator revoke and deletion are distinct: an **expired grant** keeps the devices and makes `verifyDevice` answer `grant_expired` (re-allowing restores access without a new sign-in); an **operator revoke** deletes the grant and revokes every device of that account (`revoked_by = 'operator'`), keeping the user row; **deletion** is the above.
+Grant expiry, operator revoke and deletion are distinct: an **expired grant** keeps the devices and makes `verifyDevice` answer `grant_expired` (re-allowing restores access without a new sign-in); an **operator revoke** deletes the grant and revokes every device of that account (`revoked_by = 'operator'`), keeping the user row, and marks its subscriptions revoked and cancels them in Creem (failed cancels retry hourly); **deletion** is the above.
 
-The hourly cron (`0 * * * *`) also purges expired `auth_requests`, `auth_codes`, `admin_sessions` and `user_sessions`; `device_grants` one hour past expiry; `pending_attempts` 30 days after their last attempt; devices revoked 90 days ago; rate-limit windows older than an hour; and deletion jobs completed 30 days ago.
+The hourly cron (`0 * * * *`) also purges expired `auth_requests`, `auth_codes`, `admin_sessions` and `user_sessions`; `device_grants` one hour past expiry; `pending_attempts` 30 days after their last attempt; devices revoked 90 days ago; rate-limit windows older than an hour; and deletion jobs completed 30 days ago; `billing_events` and `billing_unresolved` rows 30 days old; unpaid `checkouts` 7 days after they expired; and subscription rows of a user that no longer exists once their cancel succeeded. When billing is configured it also retries pending Creem cancels.
 
 ## Account page
 
-`https://account.overdeck.ai/account` (PAN-4959), server-rendered HTML with no JavaScript, for any allowlisted user. Every value is escaped and no price appears anywhere.
+`https://account.overdeck.ai/account` (PAN-4959), server-rendered HTML with no JavaScript, for any allowlisted user or subscriber. Every value is escaped; prices appear only in the Billing section, and only when billing is configured.
 
-**Sign-in.** Without a valid web session the page shows "Sign in with GitHub", which posts to `/account/login` and runs the GitHub leg with purpose `account`. Then, in order: an account being deleted gets 403 "This account is being deleted."; the owner or an active grant gets a session; an existing user whose grant expired also gets a session (as `GET /v1/me` allows), so they can still see the page and delete the account; anyone else gets the invite-only page and **no** pending-attempt row (invitations keep coming from device and PKCE sign-ins). A session lives in `user_sessions` (SHA-256 of the cookie value, a random csrf token, 12 hours), cookie `__Host-od_account` (`HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=43200`). A session of a user whose grant the operator revoked renders "Access to this account was removed." and is deleted. Every POST except `/account/login` must carry the session's `csrf` field and an `Origin` equal to `PUBLIC_BASE_URL`, else 403 "Request rejected."; `/account/login` checks the `Origin` only.
+**Sign-in.** Without a valid web session the page shows "Sign in with GitHub", which posts to `/account/login` and runs the GitHub leg with purpose `account`. Then, in order: an account being deleted gets 403 "This account is being deleted."; the owner, an active grant or a subscriber with a row that is not revoked gets a session; an existing user whose grant expired also gets a session (as `GET /v1/me` allows), so they can still see the page and delete the account; anyone else gets the invite-only page and **no** pending-attempt row (invitations keep coming from device and PKCE sign-ins). A session lives in `user_sessions` (SHA-256 of the cookie value, a random csrf token, 12 hours), cookie `__Host-od_account` (`HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=43200`). A session of a user who has neither a grant row nor a non-revoked subscription (for example after an operator revoke) renders "Access to this account was removed." and is deleted. Every POST except `/account/login` must carry the session's `csrf` field and an `Origin` equal to `PUBLIC_BASE_URL`, else 403 "Request rejected."; `/account/login` checks the `Origin` only.
 
 Sections, top to bottom:
 
 1. "Your Overdeck account", "Signed in as <login> (GitHub id <id>)" and **Sign out**.
-2. **Plan:** "Free account" or "Tester", from `entitlementFor` of the grant row whether or not it expired (the owner, with no row, is Tester); access "No expiry", "Expires on <date>" or "Expired on <date>"; "Paid plans are invite-only for now."
-3. **Relay:** for Tester, "<used> of <cap> GB relay traffic this month" (decimal GB) and "Resets on <first of next month> (UTC).", plus "Relay allowance used; it resets on <date>." when the relay is stopped; for Free, "The relay is not included in the free account."
-4. **Machines:** "<n> of 3 machines" (Free) or "<n> machines" (Tester), and a table of the account's directory machines oldest first (label, Online/Offline, last seen, Overdeck version, **Remove**). Remove revokes that machine's device token, then forgets it in the Directory DO: its open socket closes with 4012, the other machines and phones get the updated directory, and on a free account the slot is free again. "Sign in on it again to add it back."
-5. **Billing:** "Billing is not available yet. Paid plans are invite-only for now."
+2. **Plan:** "Anywhere with the relay", "Anywhere", "Free account" or "Tester", from `entitlementFor` of the grant row (whether or not it expired) and the subscription rows; for a paid plan "Paid through <date>" and, on a founding price, "Founding price, locked while you stay subscribed."; access "No expiry", "Expires on <date>" or "Expired on <date>"; "Paid plans are invite-only for now." only when billing is not configured.
+3. **Relay:** for Tester, "<used> of <cap> GB relay traffic this month" (decimal GB) and "Resets on <first of next month> (UTC).", plus "Relay allowance used; it resets on <date>." when the relay is stopped; for Free, "The relay is not included in the free account."; for Anywhere without the add-on, "The relay is not included in your plan."
+4. **Machines:** "<n> of 3 machines" (Free) or "<n> machines" (Tester and Anywhere), and a table of the account's directory machines oldest first (label, Online/Offline, last seen, Overdeck version, **Remove**). Remove revokes that machine's device token, then forgets it in the Directory DO: its open socket closes with 4012, the other machines and phones get the updated directory, and on a free account the slot is free again. "Sign in on it again to add it back."
+5. **Billing:** with billing not configured, "Billing is not available yet. Paid plans are invite-only for now." Otherwise:
+   - **No paid access:** a form posting to `/account/billing/checkout` with the plans "&#36;10 a month", "&#36;96 a year (&#36;8 a month)" and, while founding places remain, "&#36;60 a year, founding price" followed by "<n> founding places left"; a checkbox "Add the relay: +&#36;3 a month or +&#36;30 a year, 50 GB of relay traffic a month"; and **Subscribe**. After Creem sends the user back (`?checkout=done`) and before the webhook arrives: "Payment received. Your plan changes as soon as Creem confirms it, usually within a minute." A former subscriber also gets **Manage billing**.
+   - **Paid:** "<product>, <price>", **Add the relay** or **Remove the relay** (for a subscription cancelled in the portal, "Cancelled. Ends on <date>." instead), and **Manage billing (card, invoices, cancel)**; when the last payment failed, "Your last payment failed. Creem is retrying it; update your card in Manage billing."
+   - **Lapsed** (above the subscribe form): during the grace period "Your Anywhere plan ended on <date>. Until <date> your hosted data stays readable and subscribing again restores everything."; during the export window "Hosted vault data above the free 1 GB will be deleted on <date>. Export it now with pan vault migrate, or subscribe again."; after it "Hosted vault data above the free 1 GB was deleted on <date>."
 6. **Delete account:** a two-step delete. The confirm page asks for the GitHub login (any letter case); a match runs the same deletion as `DELETE /v1/account`, ends every web session and clears the cookie; a mismatch answers 400 "Type your GitHub login to confirm."
 
 Machines and relay use come from the account's Directory Durable Object in the connect Worker, through the `DIRECTORY` binding (`src/directory-view.ts`); the plan comes from D1, never from the directory. When `DIRECTORY` is unbound, or the call throws or answers non-200, the page still renders, Relay and Machines say "Machines and relay use are unavailable right now." and no Remove button is shown; a Remove in that state answers 503.
@@ -174,6 +235,8 @@ Sections, top to bottom:
 5. **Pending sign-in attempts:** login, GitHub id, first seen, last seen, attempts, flow, **Allow** — "Allowing an account lets it sign in. Ask the person to sign in again." Allow creates a `tester` grant with the default cap; it does not mint a token.
 6. **Account deletions in progress:** user id, requested at, age in hours, holders pending, attempts, last error; rows older than 24 hours show "overdue".
 
+When billing is configured, the screen also shows "Founding places sold: <n> of 500" under the owner line, a **Billing** column in Allowlisted accounts ("Anywhere annual with the relay, paid through <date>", "Past due", "Lapsed on <date>" or "—"), and, when they have rows: **Subscribers without an invite** (login, GitHub id, billing), **Subscription cancels failing** (login, subscription id, attempts, error; "Cancel these by hand in the Creem dashboard.") and **Webhook events not matched to an account** (event id, type, subscription id, first seen, attempts; "Creem retries these for 24 hours. Match them by hand if they stay.").
+
 **Revoke** deletes the grant and revokes every device token of that account at once. The storage cap shown per grant is what the hosted vault enforces on every write.
 
 ## Configuration
@@ -187,6 +250,11 @@ Sections, top to bottom:
 | `OWNER_GITHUB_ID` | secret | the operator's numeric GitHub id; unset or non-numeric disables the admin screen (503) and the owner bypass |
 | `DB` | D1 binding | database `overdeck-account`, migrations in `services/account/migrations/` |
 | `VAULT` | optional service binding | the hosted vault's RPC entrypoint; added by PAN-4297 |
+| `CREEM_API_KEY` | secret | Creem API key (test-mode key against the test API). Billing is off until all four Creem values are valid |
+| `CREEM_WEBHOOK_SECRET` | secret | the signing secret of the Creem webhook pointing at `/webhooks/creem` |
+| `CREEM_API_BASE` | `wrangler.jsonc` `vars` (committed) | `https://api.creem.io`; `https://test-api.creem.io` for a test deployment |
+| `CREEM_PRODUCTS` | var (set by the operator once the products exist) | JSON object mapping each of the six product keys to its Creem product id |
+| `FOUNDING_ENDS_AT` | optional var | ISO 8601 date-time when the founding price ends; unset means no date limit yet. An unparseable value turns billing off |
 | `DIRECTORY` | optional cross-script Durable Object binding (`wrangler.jsonc` `durable_objects`) | class `AccountDirectory` with `script_name` `overdeck-connect`: the account page reads machines and relay use from it, Remove forgets a machine in it, and deletion empties it (PAN-4959). Absent in unit tests and local dev, where the page says machines are unavailable |
 
 No value has a hardcoded default. Local development reads the same names from `services/account/.dev.vars` (gitignored); `.dev.vars.example` holds placeholders.
@@ -219,6 +287,16 @@ Operator-only. No agent runs any of the commands below; the custom-domain route 
 6. Deploy `overdeck-connect` first (`docs/CONNECT-SERVICE.md` "Deploy"): this Worker's `DIRECTORY` binding names its `AccountDirectory` class and the internal paths the account page calls. Then `npx wrangler deploy` (uploads the Worker, binds D1 and `DIRECTORY`, registers the hourly cron and the `account.overdeck.ai` custom domain).
 7. Smoke test: `curl -s https://account.overdeck.ai/healthz` shows `"configured":true` (after the connect Worker is deployed too, `node scripts/anywhere/smoke-hosted.mjs` checks both services and starts one device sign-in); `pan account login` then `pan account status` shows your GitHub login; open `https://account.overdeck.ai/admin`, sign in with GitHub as the owner, add one tester by username, and have them sign in.
 8. Rollback: `npx wrangler rollback` returns to the previous Worker version (the D1 schema is additive and stays).
+
+**Billing (PAN-4294).** Deploy `overdeck-connect` with the paid-plan support first: until the Creem values below are set nobody can buy, so an older connect Worker never sees the `anywhere` plan. Then:
+
+1. Apply `0004_billing.sql` (`npx wrangler d1 migrations apply overdeck-account --remote`) and deploy this Worker.
+2. In Creem **test mode**, create the six subscription products of "Billing" (prices as in its table) and one webhook with URL `https://account.overdeck.ai/webhooks/creem` for all checkout and subscription events. Note the product ids and the webhook signing secret.
+3. Point a test deployment at `https://test-api.creem.io` (`CREEM_API_BASE`), set `CREEM_API_KEY` and `CREEM_WEBHOOK_SECRET` with `npx wrangler secret put`, and set `CREEM_PRODUCTS` (and optionally `FOUNDING_ENDS_AT`) as vars.
+4. Buy each product with a Creem test card. Confirm the account page and `pan account status` show the plan, add and remove the relay, and open **Manage billing**: the portal link must open (if Creem answers 404, change `CREEM_PORTAL_PATH` in `src/billing/creem.ts` to `/v1/customer-portal` and redeploy).
+5. Repeat steps 2–4 in live mode with `CREEM_API_BASE=https://api.creem.io` and the live key, products and webhook secret.
+
+A refund issued in the Creem dashboard does not end access by itself: also revoke the account on the admin screen or cancel the subscription in Creem.
 
 ## Client
 

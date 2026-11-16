@@ -5,12 +5,16 @@ const TABLES = [
   'admin_sessions',
   'auth_codes',
   'auth_requests',
+  'billing_events',
+  'billing_unresolved',
+  'checkouts',
   'deletion_jobs',
   'device_grants',
   'devices',
   'grants',
   'pending_attempts',
   'rate_limits',
+  'subscriptions',
   'user_sessions',
   'users',
 ];
@@ -37,7 +41,7 @@ function deviceInsert(db: ReturnType<typeof createTestD1>, id: string, user: str
 describe('account service schema (PAN-4293 account-schema)', () => {
   it('applies the migrations on an empty database', () => {
     const { files } = migrated();
-    expect(files).toEqual(['0001_init.sql', '0002_account_page.sql', '0003_device_grant_names.sql']);
+    expect(files).toEqual(['0001_init.sql', '0002_account_page.sql', '0003_device_grant_names.sql', '0004_billing.sql']);
   });
 
   it('device_grants rows inserted without client_name/target_name read both as null (PAN-5071)', async () => {
@@ -52,7 +56,7 @@ describe('account service schema (PAN-4293 account-schema)', () => {
     expect(row).toEqual({ client_name: null, target_name: null });
   });
 
-  it('creates all eleven tables', () => {
+  it('creates the eleven account tables and the four billing tables (PAN-4294)', () => {
     const { db } = migrated();
     expect(listTables(db)).toEqual(TABLES);
   });

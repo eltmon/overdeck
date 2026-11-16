@@ -4,7 +4,7 @@
  * directory-state.ts, so the runtime import graph stays acyclic and directory-state.ts stays
  * under the 600-line module limit (PAN-4829 NFR-5).
  */
-import { RELAY_CAP_MESSAGE } from '../../../packages/contracts/src/connect.ts';
+import { planAllowsRelay, RELAY_CAP_MESSAGE } from '../../../packages/contracts/src/connect.ts';
 import type { ConnectErrorCode } from '../../../packages/contracts/src/connect.ts';
 import type { DirectoryEffect, DirectoryState, ReduceContext, ReduceResult } from './directory-state.ts';
 import { addUsage, bytesThisMonth, relayStatusOf } from './relay-meter.ts';
@@ -35,7 +35,7 @@ export function iceServersAnswer(
         { kind: 'log', type, ...subject, outcome: code },
       ],
     });
-    if (state.plan !== 'tester') return refuse('relay_not_allowed', 'the relay needs the relay plan');
+    if (!planAllowsRelay(state.plan)) return refuse('relay_not_allowed', 'the relay needs the relay plan');
     if (bytesThisMonth(state.relay, ctx.now) >= ctx.relayCapBytes) return refuse('relay_cap_reached', RELAY_CAP_MESSAGE);
     if (!ctx.turnConfigured) return refuse('turn_unavailable', 'relay credentials are not available');
     return {

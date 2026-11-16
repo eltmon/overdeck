@@ -5,13 +5,13 @@
 import { ADMIN_SESSION_TTL_MS } from '../../../../../services/account/src/admin/session.ts';
 import { sha256Hex } from '../../../../../services/account/src/crypto.ts';
 import type { Deps, Env } from '../../../../../services/account/src/env.ts';
-import { call, form, TEST_BASE_URL, TEST_OWNER_GITHUB_ID } from './harness.ts';
+import { call, form, TEST_BASE_URL, TEST_OWNER_GITHUB_ID, type FakeCtx } from './harness.ts';
 
 export interface AdminClient {
   cookie: string;
   csrf: string;
   get(path?: string): Promise<Response>;
-  post(path: string, fields?: Record<string, string>, opts?: { origin?: string | null; csrf?: string | null }): Promise<Response>;
+  post(path: string, fields?: Record<string, string>, opts?: { origin?: string | null; csrf?: string | null; ctx?: FakeCtx }): Promise<Response>;
 }
 
 export async function makeAdminClient(env: Env, deps: Deps, githubId = TEST_OWNER_GITHUB_ID): Promise<AdminClient> {
@@ -29,7 +29,7 @@ export async function makeAdminClient(env: Env, deps: Deps, githubId = TEST_OWNE
       const body = form({ ...(opts.csrf === null ? {} : { csrf: opts.csrf ?? csrf }), ...fields });
       const headers: Record<string, string> = { Cookie: cookie, ...body.headers };
       if (opts.origin !== null) headers.Origin = opts.origin ?? TEST_BASE_URL;
-      return call('POST', path, { env, deps, headers, body: body.body });
+      return call('POST', path, { env, deps, headers, body: body.body, ...(opts.ctx ? { ctx: opts.ctx } : {}) });
     },
   };
 }

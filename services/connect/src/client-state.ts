@@ -14,6 +14,8 @@ import {
   CONNECT_PROTOCOL_VERSION,
   CONNECTOR_LIMIT,
   CONNECTOR_LIMIT_MESSAGE,
+  planAllowsRelay,
+  wirePlanOf,
 } from '../../../packages/contracts/src/connect.ts';
 import type { ClientPlatform, ClientToDirectoryFrame } from '../../../packages/contracts/src/connect.ts';
 import { errorFrame, onlineClientsOf, toDirectoryMachines } from './directory-state.ts';
@@ -109,8 +111,9 @@ function helloClient(state: DirectoryState, event: Extract<ClientEvent, { kind: 
       frame: {
         type: 'welcome-client',
         protocol: CONNECT_PROTOCOL_VERSION,
-        plan: identity.plan,
-        relayAllowed: identity.plan !== 'free',
+        plan: wirePlanOf(identity.plan),
+        tier: identity.plan,
+        relayAllowed: planAllowsRelay(identity.plan),
         machines: toDirectoryMachines(next.machines, ctx.online),
       },
     },

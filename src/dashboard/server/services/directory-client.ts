@@ -22,7 +22,7 @@ import {
   FREE_MACHINE_LIMIT_MESSAGE,
   LINK_PROTOCOL_VERSION,
   type AdvertisedEndpoint,
-  type ConnectPlan,
+  type ConnectWirePlan,
   type DirectoryApprovalView,
   type DirectoryClientState,
   type DirectoryJoinView,
@@ -113,7 +113,8 @@ export class DirectoryClient {
   private state: DirectoryClientState = 'off';
   private signedIn = false;
   private url: string | null = null;
-  private plan: ConnectPlan | null = null;
+  /** The wire plan of the last `welcome` (PAN-4294 D-13: every paid plan arrives as `tester`). */
+  private plan: ConnectWirePlan | null = null;
   private refusal: string | null = null;
   private machines: DirectoryMachine[] = [];
   private relay: RelayStatus | null = null;

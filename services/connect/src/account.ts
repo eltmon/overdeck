@@ -2,9 +2,11 @@
  * Device identity via the account service's `AccountRpc` binding (PAN-4293), typed structurally so
  * this Worker never imports the account Worker's code. Copies services/share/src/account.ts.
  *
- * The plan comes from `entitlement` (PAN-2356 D-2356-3). An account service that returns no
- * entitlement, or a plan this Worker does not know, is reported as `account_service_outdated`.
+ * The plan comes from `entitlement` (PAN-2356 D-2356-3; `anywhere` split by the relay add-on, PAN-4294 D-13). An
+ * account service that returns no entitlement, or a plan this Worker does not know, is reported as
+ * `account_service_outdated`.
  */
+import type { ConnectPlan } from '../../../packages/contracts/src/connect.ts';
 import type { ConnectIdentity, Env } from './env.ts';
 
 export type AccountVerifyResult =
@@ -13,7 +15,7 @@ export type AccountVerifyResult =
     userId: string;
     githubId: number;
     deviceId: string;
-    entitlement?: { plan: string; maxDevices: number | null };
+    entitlement?: { plan: string; maxDevices: number | null; relay?: boolean };
   }
   | { ok: false; error: 'invalid_token' | 'device_revoked' | 'grant_expired' | 'account_deleted' };
 
@@ -47,6 +49,14 @@ export function directoryToken(headers: Headers): { authorization: string | null
   return DEVICE_TOKEN_RE.test(token) ? { authorization: `Bearer ${token}`, protocol } : { authorization: null, protocol: null };
 }
 
+/** The directory plan for an entitlement: `free`/`tester` as-is, `anywhere` by its relay flag, anything else null. */
+export function connectPlanOf(entitlement: { plan: string; relay?: boolean } | undefined): ConnectPlan | null {
+  const plan = entitlement?.plan;
+  if (plan === 'free' || plan === 'tester') return plan;
+  if (plan === 'anywhere') return entitlement?.relay === true ? 'anywhere_relay' : 'anywhere';
+  return null;
+}
+
 export async function verifyIdentity(env: Env, authorization: string | null): Promise<VerifyIdentityResult> {
   const match = DEVICE_BEARER_RE.exec(authorization ?? '');
   if (!match) return { ok: false, status: 401, error: 'invalid_token' };
@@ -61,8 +71,8 @@ export async function verifyIdentity(env: Env, authorization: string | null): Pr
   if (!result.ok) {
     return { ok: false, status: result.error === 'grant_expired' ? 403 : 401, error: result.error };
   }
-  const plan = result.entitlement?.plan;
-  if (plan !== 'free' && plan !== 'tester') return { ok: false, status: 503, error: 'account_service_outdated' };
+  const plan = connectPlanOf(result.entitlement);
+  if (plan === null) return { ok: false, status: 503, error: 'account_service_outdated' };
   return {
     ok: true,
     identity: {

@@ -71,7 +71,10 @@ describe('hourly maintenance (PAN-4293 account-maintenance)', () => {
     );
 
     const report = await runMaintenance(env, deps);
-    expect(report.purged).toEqual({ auth_requests: 1, auth_codes: 1, admin_sessions: 1, user_sessions: 1, device_grants: 1, pending_attempts: 1, devices: 1, rate_limits: 1, deletion_jobs: 1 });
+    expect(report.purged).toEqual({
+      auth_requests: 1, auth_codes: 1, admin_sessions: 1, user_sessions: 1, device_grants: 1, pending_attempts: 1, devices: 1, rate_limits: 1, deletion_jobs: 1,
+      billing_events: 0, billing_unresolved: 0, checkouts: 0, subscriptions: 0,
+    });
     // The open job was retried and, with no holders pending, completed; the user row it referenced ('open') never existed.
     expect(report.deletionJobsRun).toBe(1);
 
@@ -88,6 +91,33 @@ describe('hourly maintenance (PAN-4293 account-maintenance)', () => {
 
     // One millisecond later every 'new' row that sat exactly on its boundary crosses it, except the two with expires_at = now + 1.
     deps.clock.advance(1);
-    expect((await runMaintenance(env, deps)).purged).toEqual({ auth_requests: 1, auth_codes: 0, admin_sessions: 0, user_sessions: 0, device_grants: 1, pending_attempts: 1, devices: 1, rate_limits: 1, deletion_jobs: 1 });
+    expect((await runMaintenance(env, deps)).purged).toEqual({
+      auth_requests: 1, auth_codes: 0, admin_sessions: 0, user_sessions: 0, device_grants: 1, pending_attempts: 1, devices: 1, rate_limits: 1, deletion_jobs: 1,
+      billing_events: 0, billing_unresolved: 0, checkouts: 0, subscriptions: 0,
+    });
+  });
+
+  it('purges billing events and unmatched events after 30 days and abandoned checkouts 7 days after expiry (PAN-4294)', async () => {
+    const env = makeEnv();
+    const now = Date.UTC(2026, 9, 1, 12);
+    const deps = makeDeps({ now });
+    const db = dbOf(env);
+    const ins = (sql: string, ...v: Array<string | number | null>) => db.prepare(sql).bind(...v).run();
+    await ins('INSERT INTO billing_events (event_id, event_type, received_at) VALUES (?, ?, ?), (?, ?, ?)', 'evt_old', 't', now - 31 * DAY, 'evt_new', 't', now - 29 * DAY);
+    await ins(
+      'INSERT INTO billing_unresolved (event_id, event_type, first_seen_at, last_seen_at) VALUES (?, ?, ?, ?), (?, ?, ?, ?)',
+      'evt_old', 't', 0, now - 31 * DAY, 'evt_new', 't', 0, now - 29 * DAY,
+    );
+    await ins(
+      `INSERT INTO checkouts (checkout_id, user_id, product_key, created_at, expires_at, completed_at) VALUES
+       ('old', 'u', 'anywhere_annual', 0, ?, NULL), ('recent', 'u', 'anywhere_annual', 0, ?, NULL), ('paid', 'u', 'anywhere_annual', 0, ?, 5)`,
+      now - 8 * DAY, now - 6 * DAY, now - 8 * DAY,
+    );
+    const report = await runMaintenance(env, deps);
+    expect(report.purged).toMatchObject({ billing_events: 1, billing_unresolved: 1, checkouts: 1 });
+    const keys = async (table: string, key: string) => (await db.prepare(`SELECT ${key} AS k FROM ${table} ORDER BY k`).all<{ k: string }>()).results.map((r) => r.k);
+    expect(await keys('billing_events', 'event_id')).toEqual(['evt_new']);
+    expect(await keys('billing_unresolved', 'event_id')).toEqual(['evt_new']);
+    expect(await keys('checkouts', 'checkout_id')).toEqual(['paid', 'recent']);
   });
 });

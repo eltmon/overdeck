@@ -9,18 +9,23 @@ import {
   CLIENT_LIMIT,
   CLIENT_LIMIT_MESSAGE,
   CONNECT_CLOSE_CODES,
+  CONNECT_PLANS,
   CONNECT_PROTOCOL_VERSION,
   CONNECTOR_LIMIT,
   CONNECTOR_LIMIT_MESSAGE,
   FREE_MACHINE_LIMIT_MESSAGE,
   INBOX_BODY_MAX_BYTES,
   INBOX_HOLD_MS,
+  isConnectPlan,
   NO_DIRECT_PATH_MESSAGE,
+  planAllowsInbox,
+  planAllowsRelay,
   PUSH_PLAINTEXT_MAX_BYTES,
   PUSH_RATE_PER_MINUTE,
   PUSH_SEALED_MAX_CHARS,
   RELAY_CAP_MESSAGE,
   RELAY_MONTHLY_CAP_BYTES,
+  wirePlanOf,
   type ClientToDirectoryFrame,
   type DirectoryEndpoint,
   type DirectoryToClientFrame,
@@ -268,5 +273,22 @@ describe("Live Activity frames and constants (PAN-4839)", () => {
     const withPlatform: ClientToDirectoryFrame = { type: "activity-register", token: "tok", platform: "ios" }
     const rejected = [withTitle, missingRunning, missingToken, badEnvironment, withPlatform]
     expect(rejected).toHaveLength(5)
+  })
+})
+
+describe("connect plans (PAN-4294)", () => {
+  it("lists the four directory plans and gates relay and inbox by plan", () => {
+    expect(CONNECT_PLANS).toEqual(["free", "tester", "anywhere", "anywhere_relay"])
+    expect(CONNECT_PLANS.map((p) => [p, planAllowsRelay(p), planAllowsInbox(p), wirePlanOf(p)])).toEqual([
+      ["free", false, false, "free"],
+      ["tester", true, true, "tester"],
+      ["anywhere", false, true, "tester"],
+      ["anywhere_relay", true, true, "tester"],
+    ])
+    expect(planAllowsRelay(null)).toBe(false)
+    expect(planAllowsInbox(null)).toBe(false)
+    expect(isConnectPlan("anywhere_relay")).toBe(true)
+    expect(isConnectPlan("gold")).toBe(false)
+    expect(isConnectPlan(undefined)).toBe(false)
   })
 })

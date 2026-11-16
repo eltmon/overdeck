@@ -1,0 +1,250 @@
+{
+  "version": "1",
+  "issueId": "PAN-4294",
+  "created": "2026-11-16T20:10:42.311Z",
+  "updated": "2026-11-16T21:21:11.716Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-16T21:21Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-11-16T21:21:11.716Z"
+    }
+  ],
+  "items": {
+    "billing-schema-catalog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4294",
+      "claimedAt": "2026-11-16T20:10:42.311Z",
+      "doneAt": "2026-11-16T20:12:41.948Z"
+    },
+    "billing-schema-catalog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:12:41.948Z"
+    },
+    "billing-schema-catalog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:12:41.948Z"
+    },
+    "billing-schema-catalog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:12:41.948Z"
+    },
+    "billing-schema-catalog.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:12:41.948Z"
+    },
+    "entitlement-from-subscriptions": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4294",
+      "claimedAt": "2026-11-16T20:12:53.984Z",
+      "doneAt": "2026-11-16T20:16:26.226Z"
+    },
+    "entitlement-from-subscriptions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:16:26.226Z"
+    },
+    "entitlement-from-subscriptions.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:16:26.226Z"
+    },
+    "entitlement-from-subscriptions.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:16:26.226Z"
+    },
+    "entitlement-from-subscriptions.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:16:26.226Z"
+    },
+    "creem-client": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4294",
+      "claimedAt": "2026-11-16T20:16:27.458Z",
+      "doneAt": "2026-11-16T20:18:07.748Z"
+    },
+    "creem-client.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:18:07.748Z"
+    },
+    "creem-client.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:18:07.748Z"
+    },
+    "creem-client.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:18:07.748Z"
+    },
+    "creem-webhook": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4294",
+      "claimedAt": "2026-11-16T20:18:12.187Z",
+      "doneAt": "2026-11-16T20:21:02.895Z"
+    },
+    "creem-webhook.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:21:02.895Z"
+    },
+    "creem-webhook.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:21:02.895Z"
+    },
+    "creem-webhook.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:21:02.895Z"
+    },
+    "creem-webhook.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:21:02.895Z"
+    },
+    "creem-webhook.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:21:02.895Z"
+    },
+    "billing-actions": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4294",
+      "claimedAt": "2026-11-16T20:30:58.510Z",
+      "doneAt": "2026-11-16T20:34:02.298Z"
+    },
+    "billing-actions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:34:02.298Z"
+    },
+    "billing-actions.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:34:02.298Z"
+    },
+    "billing-actions.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:34:02.298Z"
+    },
+    "billing-actions.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:34:02.298Z"
+    },
+    "account-page-billing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4294",
+      "claimedAt": "2026-11-16T20:34:07.867Z",
+      "doneAt": "2026-11-16T20:36:35.031Z"
+    },
+    "account-page-billing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:36:35.031Z"
+    },
+    "account-page-billing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:36:35.031Z"
+    },
+    "account-page-billing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:36:35.031Z"
+    },
+    "cancel-on-delete-revoke": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4294",
+      "claimedAt": "2026-11-16T20:36:36.156Z",
+      "doneAt": "2026-11-16T20:40:09.002Z"
+    },
+    "cancel-on-delete-revoke.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:40:09.002Z"
+    },
+    "cancel-on-delete-revoke.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:40:09.002Z"
+    },
+    "cancel-on-delete-revoke.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:40:09.002Z"
+    },
+    "cancel-on-delete-revoke.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:40:09.002Z"
+    },
+    "admin-billing-view": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4294",
+      "claimedAt": "2026-11-16T20:40:10.298Z",
+      "doneAt": "2026-11-16T20:41:55.865Z"
+    },
+    "admin-billing-view.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:41:55.865Z"
+    },
+    "admin-billing-view.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:41:55.865Z"
+    },
+    "admin-billing-view.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:41:55.865Z"
+    },
+    "connect-paid-plans": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4294",
+      "claimedAt": "2026-11-16T20:41:57.230Z",
+      "doneAt": "2026-11-16T20:47:46.202Z"
+    },
+    "connect-paid-plans.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:47:46.202Z"
+    },
+    "connect-paid-plans.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:47:46.202Z"
+    },
+    "connect-paid-plans.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:47:46.202Z"
+    },
+    "connect-paid-plans.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:47:46.202Z"
+    },
+    "miniflare-webhook-e2e": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4294",
+      "claimedAt": "2026-11-16T20:47:50.935Z",
+      "doneAt": "2026-11-16T20:48:49.588Z"
+    },
+    "miniflare-webhook-e2e.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:48:49.588Z"
+    },
+    "miniflare-webhook-e2e.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:48:49.588Z"
+    },
+    "billing-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4294",
+      "claimedAt": "2026-11-16T20:48:50.806Z",
+      "doneAt": "2026-11-16T20:51:15.469Z"
+    },
+    "billing-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:51:15.469Z"
+    },
+    "billing-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:51:15.469Z"
+    },
+    "billing-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:51:15.469Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-16T21:21:11Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4294\n\n# Review — PAN-4294\n## Verdict: CHANGES REQUESTED — a Creem payment that lands after account deletion or operator revoke is never cancelled (deleted account keeps being charged; revoked account is reinstated)\n\n## Context\n- Run ID: agent-pan-4294-review-f975a47d\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4294/.pan/review/agent-pan-4294-review-f975a47d/context.json\n- Branch / workspace: feature/pan-4294 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-4294\n- PR: https://github.com/eltmon/overdeck/pull/5458\n- HEAD reviewed: f975a47debd0d49053f6b7025179d45d752f56bc\n- Base / prior cycle SHA: merge-base c50a8caade5c619ba29e964e289e8e5a29fa6c41; no prior review cycle\n- Spec: .pan/drafts/PAN-4294.md (FR-1..FR-14, NFR-1..NFR-7, D-1..D-16, WI-1..WI-11)\n\n## Blocking Findings\n\n### [correctness/security] A payment that lands after deletion or revoke is never cancelled; after a revoke it also reinstates the account — `services/account/src/billing/subscriptions.ts:354`\n- Severity: ! (fails FR-11; money harm to a deleted user; bypasses the operator's revoke)\n- Classification / requirement scope: specification defect plus implementation, in_pr_scope. D-8 says: \"A resolved user that does not exist or has `deleted_at` set → 200, recorded, ignored (its billing holder already cancelled the subscription).\" That assumption is false for a subscription Creem creates after the holder ran. D-11 marks only the rows that exist at revoke time.\n- Trigger and changed-code connection:\n  - **Deletion:** the user pays on a Creem checkout. The webhook is delayed, which is normal when Creem retries during an outage (5 attempts over 24 h). Meanwhile the user deletes the account. The `billing` holder (`deletion.ts` `holderFor('billing')` → `cancelForUser`) cancels only the rows that exist, then deletes the `subscriptions` and `checkouts` rows, and the job completes and deletes the `users` row. The late `subscription.paid` / `checkout.completed` resolves the user through `metadata.overdeck_user_id`. `liveUser` is false, so `ignore(…, 'unknown_user')` answers 200. Nothing calls `cancelSubscription`, no row is kept and no `billing_unresolved` row is written.\n  - **Revoke:** the same late payment, or a checkout opened before the revoke and paid after it, resolves to the revoked user. `upsertSubscription` inserts the new subscription id with `revoked_at = NULL` and `cancel_requested_at = NULL`.\n- Expected / observed / impact:\n  - Deletion: expected \"a deleted account is never charged again\" (the `deletion.ts` header, FR-11). Observed: the Creem subscription stays live and renews monthly or yearly against a deleted account, and nothing on the admin screen shows it.\n  - Revoke: expected the account to stay revoked and the subscription to be cancelled (FR-11). Observed: `isAllowed` becomes true again, so the account can sign in and mint device tokens. It gets `plan: anywhere`, and no cancel is sent.\n- Evidence: two scratch probes against the unit harness (node:sqlite D1 shim, fake Creem). The probes live outside the repo at /home/eltmon/.overdeck/tmp/claude-1000/-home-eltmon-Projects-overdeck-workspaces-feature-pan-4294/77a8eb34-38cd-46b4-87f7-8d4b171029c4/scratchpad/probe/.\n  - `delete.probe.test.ts`: a checkout row, then `requestDeletion` + `runDeletionJob` (the job completes), then a signed `subscription.paid` with `metadata.overdeck_user_id`. Result: `200 {\"ok\":true,\"ignored\":\"unknown_user\"}`, Creem requests `[]`, no subscription rows.\n  - `revoke.probe.test.ts`: `addGrant`, a checkout row, `revokeGrant`; `isAllowed` is false. Then a signed `subscription.paid`. Result: 200, row `{\"revoked_at\":null,\"cancel_requested_at\":null}`, and `isAllowed` is true.\n  - Limit: the timing of Creem's real deliveries was not measured. The window is a payment whose webhook is delayed or still open across the delete or revoke.\n- Fix (code and spec):\n  1. In `applySubscriptionEvent` and `applyCheckoutCompleted`, a resolved user who is deleted or missing must still produce a cancel. Either call `cancelSubscription` inline and record the outcome, or keep a row with `cancel_requested_at` set and `user_id` kept, so `runPendingCancels` retries it. Let the billing holder or the cron delete that row after `cancel_done_at`. Answer 200 only after the cancel is recorded or durably queued.\n  2. For a user who is not the owner, has no grant and whose existing rows are all revoked, insert the new row with `revoked_at` and `cancel_requested_at` set, so FR-7 cannot re-admit them. The cron or `waitUntil` sends the cancel.\n  3. Amend D-8 (\"deleted or missing user → record and cancel the subscription in Creem\") and D-11 (\"subscriptions that appear after a revoke or deletion are cancelled too\"). Add unit tests for both sequences.\n\n## Non-blocking Findings\n\n### [requirements] A canceled subscription that is still paid shows no end date, and its relay button always fails — `services/account/src/billing/page-sections.ts:121`\n- Severity: ~\n- Classification: UX gap, in_pr_scope. FR-10 lists no \"canceled but paid\" state, so the code follows the spec.\n- Trigger: the user cancels in the Creem portal. The status becomes `canceled`, and D-6 keeps paid access until `paid_through`.\n- Observed: the Billing section still shows \"Add the relay\" or \"Remove the relay\". Posting it always answers 409 `SUBSCRIPTION_ENDING_MESSAGE` (`actions.ts:132`). The page never says that the plan ends on the `paid_through` date.\n- Fix: for `paid.status === 'canceled'`, show \"Ends on <date>\" and hide the relay form.\n\n### [requirements] Connect applies a plan change only when the account's next machine or phone connects — `services/connect/src/directory-state.ts:323`\n- Severity: ~\n- Classification: pre-existing design (D-13: \"stored in the DO meta row `plan` as today\"), with a new consequence. whole_feature_scope.\n- Trace: the plan is written to `meta.plan` / `state.plan` only by `hello` / `hello-client` (`put-plan`, `directory-state.ts:323`, `client-state.ts:68`). `ice-servers` (`ice-relay.ts`), `inbox-create` and inbox intake (`inbox.ts`) read the stored plan, and the DO alarm does not re-verify it.\n- Impact: a lapsed subscriber keeps the relay and the inbox on live sockets until any of the account's machines or phones reconnects. This differs from D-7's \"relay and inbox stop at once\", although the 50 GB monthly relay cap still applies. A new subscriber's open dashboard shows the free plan until it reconnects. The delay is bounded by reconnects, not by time. Grant expiry already behaves this way on main.\n- Suggested follow-up: after a webhook changes paid access, have the account service, which already has the `DIRECTORY` binding, push the new plan to the account's DO, or close its sockets.\n\n### [spec] Renewal boundary: an `active` row loses access the moment `now >= paid_through` until `subscription.paid` arrives — `services/account/src/billing/access.ts:267`\n- Severity: ?\n- Classification: spec concern (D-6 as written).\n- Impact: every renewal has a gap between the period end and the `subscription.paid` webhook, usually seconds and up to hours when retried. During the gap the account is `free`. A machine that connects then would get plan `free`, so new machines past 3 are refused and the relay is off.\n- Possible spec correction: a short renewal grace for `active` rows, for example a few hours past `paid_through`.\n\n### [requirements] Released dashboards label a paying account \"Shows when overdeck.ai is reachable\" — `src/dashboard/frontend/src/components/Settings/anywhere/accountApi.ts:55`\n- Severity: ?\n- Classification: whole_feature_scope, already split to PAN-5454 (D-13). `/v1/me` sends `plan: 'anywhere'` and `account-view.ts:88` passes it through unvalidated. `planLabel` falls to its default text, and `AccountCard.tsx:32` treats the plan as non-free. The card shows the wrong text but nothing breaks.\n\n### [spec] Paid precedence takes the relay away from a tester or the owner who buys Anywhere without it — `services/account/src/entitlement.ts:61`\n- Severity: ?\n- Classification: specification defect. The code implements D-5 as written: \"paid access (D-6), any account incl. owner → `anywhere` … relay: product has relay\".\n- Impact: a tester, or the owner, who subscribes to `anywhere_monthly` or `anywhere_annual` loses the relay they had as `tester` (`relay: false` → connect `anywhere`).\n- Spec correction if wanted: `relay = product.relay || (owner || active non-free grant)`.\n\n### [spec] Any non-revoked subscription row allows the account forever, even one that never paid — `services/account/src/billing/access.ts:279`\n- Severity: ?\n- Classification: spec concern. The code follows FR-7 (\"a non-revoked subscription row\").\n- Impact: an invited user whose grant has an expiry, and who starts a subscription that Creem then ends without any payment (for example `subscription.active` then `expired`, with `paid_through` NULL), keeps a permanent free account without an invite. The account was allowlisted to start the checkout, so the risk is low.\n\n### [correctness] A `paused` row with `paid_through` still in the future gives lapse dates in the future — `services/account/src/billing/access.ts:273`\n- Severity: ?\n- Classification: unconfirmed hypothesis. It depends on whether Creem can pause a subscription in the middle of a period.\n- Impact: the account page would show \"Your Anywhere plan ended on <future date>\".\n\n### Smaller advisories\n- `?` `account-page/page.ts` `accessText(null)` shows \"Access: No expiry\" to a subscriber who has no grant. This is accurate under FR-7 but reads oddly.\n- `?` `admin-view.ts`: a revoked subscriber appears in \"Subscribers without an invite\" with Billing \"—\". That table has no Revoke control, so the operator cannot revoke a subscriber without an invite from the UI. The spec asks for no such control.\n- `?` `cancel.ts` `runPendingCancels` takes the oldest 40 pending rows. More than 40 rows that always fail would hold back newer cancels. The cancels-failing list shows this case.\n- Intentional deviation, accepted: `paid_through` is applied forward-only (max) even from events older than `last_event_at` (commit ba91928). This is correct for out-of-order `subscription.paid` and cannot give free time, because `paid_through` only grows from paid and checkout events.\n- `page.ts` relay section still shows \"Extra traffic: Paid plans are invite-only for now.\" while billing is on. This is acceptable because extra relay traffic is PAN-5453.\n\n## Coverage\n\n### Changed-file ledger\n| File | Status |\n| --- | --- |\n| services/account/migrations/0004_billing.sql | reviewed: matches WI-1; no `;` inside comments |\n| services/account/src/billing/catalog.ts | reviewed: FR-1 gate, no defaults, https-only base, duplicate product ids rejected (extra safety) |\n| services/account/src/billing/access.ts | reviewed: D-6/D-7 logic, revoked/unknown-key rows ignored |\n| services/account/src/billing/creem.ts | reviewed: deps.fetch, 10 s abort, https-only URLs, constant-time HMAC compare |\n| services/account/src/billing/webhook.ts | reviewed: signature checked before parse, envelope validation, dedup |\n| services/account/src/billing/subscriptions.ts | reviewed: D-8 resolution order, D-9 batch + ordering, unresolved 503 path (blocker) |\n| services/account/src/billing/actions.ts | reviewed: csrf/Origin via requireUserSession, founding single-statement reservation (bind order verified), interstitial escaping |\n| services/account/src/billing/founding.ts | reviewed: same SQL rule for page and INSERT |\n| services/account/src/billing/cancel.ts | reviewed: retry bookkeeping, 404 = done |\n| services/account/src/billing/page-sections.ts | reviewed: WI-6 strings, escaping (advisory 2) |\n| services/account/src/billing/admin-view.ts | reviewed: WI-8 sections, escaping, hidden when unconfigured |\n| services/account/src/entitlement.ts | reviewed: D-5 precedence; `entitlementFor(null)` unchanged |\n| services/account/src/devices.ts | reviewed: one statement with json subquery (NFR-7); grantExpired rule |\n| services/account/src/grants.ts | reviewed: isAllowed subscriber clause; revoke marks rows |\n| services/account/src/account-page/session.ts, page.ts | reviewed: subscriber keeps the page; Billing/Plan wiring; `?checkout=done` |\n| services/account/src/admin/screen.ts | reviewed: Billing column, founding line, waitUntil cancels on revoke |\n| services/account/src/deletion.ts | reviewed: `billing` holder first, cancel then delete rows, throws to stay pending; a later payment is never cancelled (blocker) |\n| services/account/src/maintenance.ts | reviewed: cancels retried, three purges |\n| services/account/src/http.ts, routes.ts, rate-limit.ts, env.ts, contract.ts | reviewed: per-route body limit, webhook has no bucket, billing-action bucket |\n| services/account/wrangler.jsonc, .dev.vars.example | reviewed: only CREEM_API_BASE committed; no product ids or secrets |\n| packages/contracts/src/connect.ts | reviewed: ConnectPlan widened, wire plan kept `free/tester`, runtime-import-free |\n| services/connect/src/{account,client-state,directory-state,directory-store,directory,ice-relay,inbox}.ts | reviewed: relay only for tester/anywhere_relay; inbox for all but free |\n| src/dashboard/server/services/directory-client.ts | reviewed: type-only narrowing; released clients parse plain JSON, so the extra `tier` field is harmless |\n| docs/ACCOUNT-SERVICE.md, docs/CONNECT-SERVICE.md, anywhere.mdx, changelog.d/pan-4294.md, .overdeck/context/codebase/architecture.md | reviewed: WI-10 content present (Billing heading, webhook row, \"When a subscription ends\", runbook, deploy order) |\n| tests/** (14 files) and tests/integration/services/account/miniflare.test.ts | reviewed: added `it(` titles cover each WI test list (webhook 16, actions 14, account-page 11, access 13, deletion 3, maintenance 1, admin 4); the full Miniflare test was read; no skipIf, .only or it.skip added. No test covers a payment that arrives after deletion or revoke. |\n| .pan/continues, .pan/drafts, .pan/specs | not applicable: planning artifacts |\n\n### Dimensions\n- **Correctness:** traced each webhook event type through resolution → batch. Traced checkout reservation, relay upgrade, cancel and deletion paths, and the connect plan derivation from verifyIdentity through to the welcome frames. One blocker: a payment that arrives after deletion or revoke. Also advisories on the connect plan staleness and the canceled-but-paid UX.\n- **Security:** the signature is checked over the raw body before parsing, the comparison is constant-time, the body is capped at 64 KiB, and an event id is applied only once. Billing actions require a session, csrf and a same-site Origin. Every interstitial and admin value is escaped, and only https Creem URLs are linked. Mapping never uses email, and only Creem ids are stored (NFR-1). A deleted user is refused at sign-in. The one trust gap is the blocker: a late payment undoes a revoke, and a payment after deletion is never cancelled.\n- **Performance:** verifyDevice is still one statement and uses the `subscriptions_user` index. The account page adds two small COUNT queries. The admin page loads all subscription rows; it is operator-only and its size is in the hundreds. The cron sends at most 40 cancels per run. No concerns.\n- **Requirements / UX:** FR-11 is not met for payments that arrive after deletion or revoke (blocker). The other FRs and NFRs are implemented. The non-goals were respected: sign-up stays invite-only, there is no local display, and there is no vault enforcement.\n\n### Acceptance criteria\n| AC | Status | Evidence |\n| --- | --- | --- |\n| 1 WI-1 schema/catalog | met | schema.test.ts and billing-catalog.test.ts pass (focused run) |\n| 2 WI-2 entitlement | met | billing-access.test.ts, devices.test.ts and grants.test.ts pass |\n| 3 WI-3 Creem client | met | billing-creem.test.ts passes |\n| 4 WI-4 webhook | met | billing-webhook.test.ts passes (duplicate, 401, 413, out-of-order, 503-then-retry) |\n| 5 WI-5 actions | met | billing-actions.test.ts passes |\n| 6 WI-6 page strings | met | account-page.test.ts passes |\n| 7 WI-7 cancel/delete/purge | partly met | deletion.test.ts and maintenance.test.ts pass. FR-11 fails for a payment that arrives after deletion or revoke (probes) |\n| 8 WI-8 admin | met | admin-grants.test.ts passes |\n| 9 WI-9 connect | met | connect account, client-state, directory-state and inbox tests, and the contracts connect.test.ts, pass |\n| 10 WI-10 docs | met | `## Billing` and the `/webhooks/creem` row are in docs/ACCOUNT-SERVICE.md; \"When a subscription ends\" is in anywhere.mdx |\n| 11 WI-11 Miniflare | met | tests/integration/services/account/miniflare.test.ts: 8/8 pass on workerd |\n| 12 typechecks | met (account, connect); root typecheck by gate | `typecheck:account` and `typecheck:connect` exit 0; the `overdeck/test` verification gate passed (typecheck+lint) |\n\n## Verification\n- `npx vitest run tests/unit/services/account tests/unit/services/connect/{account,client-state,directory-state,inbox}.test.ts packages/contracts/src/__tests__/connect.test.ts` → 29 files, 404 tests passed.\n- `npx vitest run tests/integration/services/account/miniflare.test.ts` → 8/8 passed (real workerd and D1, signed webhook → `plan: anywhere`).\n- `npm run typecheck:account`, `npm run typecheck:connect` → exit 0.\n- `npm run lint:effect-diagnostics` → passed (227 known, none new).\n- CI on PR #5458 at f975a47 (`gh pr checks 5458`, rechecked at the end of the review): every check passes or is skipped. That includes test-shard 1–4, test-e2e, build (22) and every lint-group. The overdeck/test verification gate passed.\n- Scratch probes (outside the repo; their own vitest config with `globals`, root = workspace): `delete.probe.test.ts` and `revoke.probe.test.ts` reproduce the blocker as described.\n- Full suite not run (per role).\n\n## Scope Note\nNone.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4294/.pan/review/agent-pan-4294-review-f975a47d/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4294 -m \"Fixed review issues\"`"
+    }
+  ]
+}
