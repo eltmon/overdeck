@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:52:45.887Z",
+  "updated": "2026-11-16T11:53:07.983Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -696,9 +696,22 @@
       "doneAt": "2026-11-16T11:52:44.667Z"
     },
     "migrate-connect-bot-dialog": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4756",
-      "claimedAt": "2026-11-16T11:52:45.886Z"
+      "claimedAt": "2026-11-16T11:52:45.886Z",
+      "doneAt": "2026-11-16T11:53:07.982Z"
+    },
+    "migrate-connect-bot-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:53:07.982Z"
+    },
+    "migrate-connect-bot-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:53:07.982Z"
+    },
+    "migrate-connect-bot-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:53:07.982Z"
     }
   }
 }
