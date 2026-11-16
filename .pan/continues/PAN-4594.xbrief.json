@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4594",
   "created": "2026-11-16T16:04:35.511Z",
-  "updated": "2026-11-16T16:15:27.591Z",
+  "updated": "2026-11-16T16:15:47.686Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "semgrep-settings-door.ac4": {
       "status": "completed",
       "doneAt": "2026-11-16T16:15:27.590Z"
+    },
+    "semgrep-settings-route": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4594",
+      "claimedAt": "2026-11-16T16:15:47.686Z"
     }
   }
 }
