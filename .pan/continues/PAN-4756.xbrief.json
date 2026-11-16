@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:37:18.148Z",
+  "updated": "2026-11-16T11:37:42.337Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,9 +78,22 @@
       "doneAt": "2026-11-16T11:37:16.329Z"
     },
     "migrate-bulk-dialogs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4756",
-      "claimedAt": "2026-11-16T11:37:18.148Z"
+      "claimedAt": "2026-11-16T11:37:18.148Z",
+      "doneAt": "2026-11-16T11:37:42.337Z"
+    },
+    "migrate-bulk-dialogs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:37:42.337Z"
+    },
+    "migrate-bulk-dialogs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:37:42.337Z"
+    },
+    "migrate-bulk-dialogs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:37:42.337Z"
     }
   }
 }
