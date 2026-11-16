@@ -1,0 +1,508 @@
+{
+  "version": "1",
+  "issueId": "PAN-5452",
+  "created": "2026-11-16T18:34:39.411Z",
+  "updated": "2026-11-16T21:08:05.531Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-16T20:35Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-11-16T20:35:05.626Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-16T20:37Z] ci-monitor → FAILED — seq 2",
+      "timestamp": "2026-11-16T20:37:20.410Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-16T20:50Z] coderabbit → FINDINGS — seq 3",
+      "timestamp": "2026-11-16T20:50:35.511Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-16T20:52Z] review-agent → CHANGES-REQUESTED — seq 4",
+      "timestamp": "2026-11-16T20:52:23.842Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-16T21:04Z] ci-monitor → FAILED — seq 5",
+      "timestamp": "2026-11-16T21:04:26.670Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-16T21:08Z] ci-monitor → FAILED — seq 6",
+      "timestamp": "2026-11-16T21:08:05.531Z"
+    }
+  ],
+  "items": {
+    "vendor-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T18:34:39.411Z",
+      "doneAt": "2026-11-16T18:37:38.598Z"
+    },
+    "vendor-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T18:37:38.598Z"
+    },
+    "vendor-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T18:37:38.598Z"
+    },
+    "vendor-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T18:37:38.598Z"
+    },
+    "vendor-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T18:37:38.598Z"
+    },
+    "config-flag": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T18:37:47.594Z",
+      "doneAt": "2026-11-16T18:48:27.095Z"
+    },
+    "config-flag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T18:48:27.095Z"
+    },
+    "config-flag.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T18:48:27.095Z"
+    },
+    "config-flag.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T18:48:27.095Z"
+    },
+    "config-flag.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T18:48:27.095Z"
+    },
+    "paths-and-errors": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T18:48:35.678Z",
+      "doneAt": "2026-11-16T18:53:08.635Z"
+    },
+    "paths-and-errors.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T18:53:08.635Z"
+    },
+    "paths-and-errors.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T18:53:08.635Z"
+    },
+    "paths-and-errors.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T18:53:08.635Z"
+    },
+    "paths-and-errors.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T18:53:08.635Z"
+    },
+    "helper-runner": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T18:57:12.869Z",
+      "doneAt": "2026-11-16T19:02:36.466Z"
+    },
+    "helper-runner.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:02:36.466Z"
+    },
+    "helper-runner.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:02:36.466Z"
+    },
+    "helper-runner.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:02:36.466Z"
+    },
+    "helper-runner.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:02:36.466Z"
+    },
+    "helper-runner.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:02:36.466Z"
+    },
+    "desktop-lease": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T19:02:41.994Z",
+      "doneAt": "2026-11-16T19:09:32.795Z"
+    },
+    "desktop-lease.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:09:32.795Z"
+    },
+    "desktop-lease.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:09:32.795Z"
+    },
+    "desktop-lease.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:09:32.795Z"
+    },
+    "desktop-lease.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:09:32.795Z"
+    },
+    "desktop-lease.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:09:32.795Z"
+    },
+    "desktop-env": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T19:09:40.743Z",
+      "doneAt": "2026-11-16T19:13:43.148Z"
+    },
+    "desktop-env.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:13:43.148Z"
+    },
+    "desktop-env.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:13:43.148Z"
+    },
+    "desktop-env.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:13:43.148Z"
+    },
+    "desktop-env.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:13:43.148Z"
+    },
+    "tree-filter": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T19:13:51.803Z",
+      "doneAt": "2026-11-16T19:17:28.557Z"
+    },
+    "tree-filter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:17:28.557Z"
+    },
+    "tree-filter.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:17:28.557Z"
+    },
+    "tree-filter.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:17:28.557Z"
+    },
+    "tree-filter.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:17:28.557Z"
+    },
+    "blocked-keys": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T19:17:37.942Z",
+      "doneAt": "2026-11-16T19:23:58.406Z"
+    },
+    "blocked-keys.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:23:58.406Z"
+    },
+    "blocked-keys.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:23:58.406Z"
+    },
+    "blocked-keys.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:23:58.406Z"
+    },
+    "blocked-keys.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:23:58.406Z"
+    },
+    "snapshot-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T19:24:15.956Z",
+      "doneAt": "2026-11-16T19:32:11.533Z"
+    },
+    "snapshot-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:32:11.533Z"
+    },
+    "snapshot-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:32:11.533Z"
+    },
+    "snapshot-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:32:11.533Z"
+    },
+    "snapshot-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:32:11.533Z"
+    },
+    "format-output": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T19:32:21.025Z",
+      "doneAt": "2026-11-16T19:36:41.787Z"
+    },
+    "format-output.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:36:41.787Z"
+    },
+    "format-output.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:36:41.787Z"
+    },
+    "format-output.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:36:41.787Z"
+    },
+    "format-output.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:36:41.787Z"
+    },
+    "run-preamble": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T19:36:50.784Z",
+      "doneAt": "2026-11-16T19:42:40.197Z"
+    },
+    "run-preamble.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:42:40.197Z"
+    },
+    "run-preamble.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:42:40.197Z"
+    },
+    "run-preamble.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:42:40.197Z"
+    },
+    "run-preamble.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:42:40.197Z"
+    },
+    "run-preamble.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:42:40.197Z"
+    },
+    "command-builders": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T19:42:49.369Z",
+      "doneAt": "2026-11-16T19:48:38.332Z"
+    },
+    "command-builders.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:48:38.332Z"
+    },
+    "command-builders.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:48:38.332Z"
+    },
+    "command-builders.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:48:38.332Z"
+    },
+    "command-builders.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:48:38.332Z"
+    },
+    "command-builders.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:48:38.332Z"
+    },
+    "wait-command": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T19:48:48.410Z",
+      "doneAt": "2026-11-16T19:53:20.251Z"
+    },
+    "wait-command.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:53:20.251Z"
+    },
+    "wait-command.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:53:20.251Z"
+    },
+    "wait-command.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:53:20.251Z"
+    },
+    "wait-command.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:53:20.251Z"
+    },
+    "wait-command.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:53:20.251Z"
+    },
+    "doctor-row": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T19:53:31.117Z",
+      "doneAt": "2026-11-16T19:58:43.514Z"
+    },
+    "doctor-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:58:43.514Z"
+    },
+    "doctor-row.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:58:43.514Z"
+    },
+    "doctor-row.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:58:43.514Z"
+    },
+    "doctor-row.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:58:43.514Z"
+    },
+    "cli-verb": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T19:58:51.616Z",
+      "doneAt": "2026-11-16T20:06:52.822Z"
+    },
+    "cli-verb.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:06:52.822Z"
+    },
+    "cli-verb.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:06:52.822Z"
+    },
+    "cli-verb.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:06:52.822Z"
+    },
+    "cli-verb.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:06:52.822Z"
+    },
+    "skill": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T20:07:02.190Z",
+      "doneAt": "2026-11-16T20:11:45.151Z"
+    },
+    "skill.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:11:45.151Z"
+    },
+    "skill.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:11:45.151Z"
+    },
+    "skill.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:11:45.151Z"
+    },
+    "skill.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:11:45.151Z"
+    },
+    "docs-pages": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T20:11:56.464Z",
+      "doneAt": "2026-11-16T20:14:18.699Z"
+    },
+    "docs-pages.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:14:18.699Z"
+    },
+    "docs-pages.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:14:18.699Z"
+    },
+    "docs-pages.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:14:18.699Z"
+    },
+    "docs-pages.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:14:18.699Z"
+    },
+    "live-verification": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T20:14:34.605Z",
+      "doneAt": "2026-11-16T20:20:40.167Z"
+    },
+    "live-verification.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:20:40.167Z"
+    },
+    "live-verification.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:20:40.167Z"
+    },
+    "live-verification.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:20:40.167Z"
+    },
+    "live-verification.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:20:40.167Z"
+    },
+    "live-verification.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:20:40.167Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-11-16T20:35:05Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-5452 (attempt 1/3):\n\nFailed check: typecheck\n\nVerification FAILED at typecheck (23474ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5452/.overdeck/verification/2026-11-16T20-34-30-696Z-fc1b7187.json\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the complete gate output at `/home/eltmon/Projects/overdeck/workspaces/feature-pan-5452/.overdeck/verification/2026-11-16T20-34-30-696Z-fc1b7187.json` carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-5452 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-5452 -m \"Fixed typecheck\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\n`pan review request` returns as soon as the request is accepted. When it exits 0 you are done: end your turn and wait. Do not poll `pan show`, files, or terminals — Overdeck will message you when verification passes or fails and when reviewers request changes. If it exits non-zero, reconcile the failure and try again."
+    },
+    {
+      "seq": 2,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-16T20:37:20Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5452\n\nPull request: https://github.com/eltmon/overdeck/pull/5457 (head `fc1b7187`)\n\nSource: check_run:build (22)\n\n## Failing checks (1)\n\n### build (22)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/133593775626/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/43951183907/job/133593775626  \n```\nnot assignable to type 'Record<string, unknown>'.\n  Index signature for type 'string' is missing in type 'CapabilitiesResult'.\n##[error]src/cli/commands/computer.ts(81,108): error TS2322: Type 'CapabilitiesResult' is not assignable to type 'Record<string, unknown>'.\n  Index signature for type 'string' is missing in type 'CapabilitiesResult'.\n##[error]Process completed with exit code 2.\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.1\nTemporarily overriding HOME='/home/runner/work/_temp/9d3cd70d-1937-437e-88b7-41f65e5db436' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 3,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-16T20:50:35Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5452 (PR #5457)\n\nCodeRabbit posted 18 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4591368751 · native/computer-use-linux/runtime.py:1182 [Minor]: Use the Text selection API.\n  https://github.com/eltmon/overdeck/pull/5457#discussion_r4591368751\n- Thread 4591368768 · native/computer-use-linux/runtime.py:1854 [Minor]: Select the clipboard backend for the active session.\n  https://github.com/eltmon/overdeck/pull/5457#discussion_r4591368768\n- Thread 4591368787 · native/computer-use-linux/runtime.py:1923 [Major]: Reject element references that belong to a different window.\n  https://github.com/eltmon/overdeck/pull/5457#discussion_r4591368787\n- Thread 4591368806 · native/computer-use-linux/runtime.py:1953 [Minor]: Preserve native action indexes when selecting a secondary action.\n  https://github.com/eltmon/overdeck/pull/5457#discussion_r4591368806\n- Thread 4591368822 · src/cli/commands/computer.ts:81 [Major]: Fix the type error in `runCapabilities` result rendering. It breaks the build.\n  https://github.com/eltmon/overdeck/pull/5457#discussion_r4591368822\n- Thread 4591368837 · src/cli/commands/doctor-computer-use.ts:132 [Minor]: Report a row when the helper handshake fails.\n  https://github.com/eltmon/overdeck/pull/5457#discussion_r4591368837\n- Thread 4591368899 · src/lib/computer-use/__tests__/desktop-env.test.ts:14 [Minor]: Fill session-scoped desktop keys only from the same session as the display.\n  https://github.com/eltmon/overdeck/pull/5457#discussion_r4591368899\n- Thread 4591368915 · src/lib/computer-use/blocked-key-combos.ts:92 [Major]: Left-side modifier names bypass the shortcut guard.\n  https://github.com/eltmon/overdeck/pull/5457#discussion_r4591368915\n- Thread 4591368943 · src/lib/computer-use/commands.ts:46 [Minor]: Map the CLI's negated screenshot option to `noScreenshot`.\n  https://github.com/eltmon/overdeck/pull/5457#discussion_r4591368943\n- Thread 4591368956 · src/lib/computer-use/desktop-env.ts:45 [Minor]: Decode systemctl values before copying them into the environment.\n  https://github.com/eltmon/overdeck/pull/5457#discussion_r4591368956\n- Thread 4591368972 · src/lib/computer-use/desktop-env.ts:67 [Major]: Initialize the user-bus environment before querying systemctl.\n  https://github.com/eltmon/overdeck/pull/5457#discussion_r4591368972\n- Thread 4591368989 · src/lib/computer-use/helper.ts:80 [Minor]: Include operation-file creation in the cleanup scope.\n  https://github.com/eltmon/overdeck/pull/5457#discussion_r4591368989\n- Thread 4591369008 · src/lib/computer-use/lease.ts:44 [Minor]: The `desktop.lock` reclaim path can admit two holders.\n  https://github.com/eltmon/overdeck/pull/5457#discussion_r4591369008\n- Thread 4591369029 · src/lib/computer-use/lease.ts:67 [Minor]: `release --force` cannot remove a corrupt `lease.json`.\n  https://github.com/eltmon/overdeck/pull/5457#discussion_r4591369029\n- Thread 4591369048 · src/lib/computer-use/run.ts:114 [Minor]: A persistence failure after an input action reports a failed command although the action ran.\n  https://github.com/eltmon/overdeck/pull/5457#discussion_r4591369048\n- Thread 4591369079 · src/lib/computer-use/wait.ts:81 [Minor]: Check the deadline before returning a later poll's matches.\n  https://github.com/eltmon/overdeck/pull/5457#discussion_r4591369079\n- Thread 4591369096 · sync-sources/skills/pan-computer-use/SKILL.md:125 [Minor]: Add the known screenshot-origin limitation to coordinate guidance.\n  https://github.com/eltmon/overdeck/pull/5457#discussion_r4591369096\n- Thread 4591369114 · sync-sources/skills/pan-computer-use/SKILL.md:155 [Major]: Do not retry input operations on `helper_timeout` without checking state first.\n  https://github.com/eltmon/overdeck/pull/5457#discussion_r4591369114\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5457/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5452 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5457 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    },
+    {
+      "seq": 4,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-16T20:52:23Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-5452\n\n# Review — PAN-5452\n## Verdict: CHANGES REQUESTED — `--no-screenshot` is silently ignored on every action and `get-app-state` (Commander stores it as `screenshot: false`, the library reads `noScreenshot`)\n\n## Context\n- Run ID: agent-pan-5452-review-01a05af0\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5452/.pan/review/agent-pan-5452-review-01a05af0/context.json\n- Branch / workspace: feature/pan-5452 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-5452\n- PR: https://github.com/eltmon/overdeck/pull/5457\n- HEAD reviewed: 01a05af009b696ff230949d3740bfcee77e4b1b4\n- Base / prior cycle SHA: origin/main; no prior review cycle\n- Acceptance criteria source: the manifest's `acceptanceCriteria` list is empty, so AC-1 to AC-9 come from `.pan/drafts/pan-5452.md`.\n\n## Blocking Findings\n\n### [correctness] `--no-screenshot` never reaches the helper — `src/cli/commands/computer.ts:31`\n- Severity: ! (MUST)\n- Classification / requirement scope: implementation defect; in_pr_scope.\n- Trigger and changed-code connection: `addActionOptions` declares `.option('--no-screenshot', …)`. Commander treats a `--no-<x>` flag as the negation of `x`, so the parsed options carry `screenshot: false` (default `true`), never `noScreenshot`. Each action handler passes `options` straight to the library (`getAppState(options)`, `click(options)`, …). `baseFields()` in `src/lib/computer-use/commands.ts:42-48` reads only `options.noScreenshot`, which is always `undefined`. So the operation never carries `noScreenshot: true`. This affects `get-app-state` and all ten action commands, because every one of them goes through `baseFields`.\n- Expected / observed / impact: Expected: PRD WI-3c field table (`--no-screenshot` → `noScreenshot: true`) and WI-4 item 1 (\"Every action and `get-app-state` take … `--no-screenshot`\"). The docs (`configuration/computer-use.mdx:45`), the skill (`SKILL.md:112`, `:133`) and the generated composer manifest all advertise the flag. Observed: the flag is accepted and has no effect. Impact: every call captures the window, writes a PNG under `~/.overdeck/computer-use/screenshots/`, and moves up to 64 MB of base64 through the helper pipe, even when the agent or operator asked for no pixels (for example to avoid saving sensitive window content to disk). Nothing else breaks. `wait` is unaffected because it sets `noScreenshot: true` itself.\n- Evidence: a runtime reproduction. A temporary vitest probe registered `registerComputerCommands` on a fresh `Command`, mocked `commands.js`, and parsed `computer get-app-state --app calc --no-screenshot`. `getAppState` received `{ screenshot: false, app: 'calc' }`, and the assertion `toMatchObject({ noScreenshot: true })` failed. The probe file was deleted afterwards and the tree is clean apart from a pipeline-written `.pan/continues` update. Limitation: not reproduced against the live helper, but the operation object never contains the field, so the helper's `include_screenshot = not bool(operation.get(\"noScreenshot\"))` is always true.\n- Fix: in `computer.ts`, map `screenshot === false` to `noScreenshot: true` before calling the library. Either do this in a small adapter used by every action handler, or change `BaseAppOptions` to accept `screenshot?: boolean` and have `baseFields` set `noScreenshot` when `screenshot === false`. Add a CLI test case in `tests/unit/cli/computer-command.test.ts` that asserts `--no-screenshot` produces `noScreenshot: true` (or the equivalent) on the mocked call (see the validation gap below).\n\n### [validation] No test covers the CLI → library flag wiring for `--no-screenshot` — `tests/unit/cli/computer-command.test.ts:1`\n- Severity: ~ (SHOULD; it travels with the blocker above)\n- Classification / requirement scope: validation gap; in_pr_scope.\n- Trigger and changed-code connection: `computer-command.test.ts` mocks `commands.js` and checks only `click --element-index/--click-count`. `commands.test.ts` calls the library with `noScreenshot: true` directly. So no test crosses the Commander boundary for the negated flag, and the defect above passed 131 green tests.\n- Fix: add the CLI assertion described above.\n\n## Non-blocking Findings\n\n1. **~ [correctness] An empty or corrupt `lease.json` blocks every input command and `release --force` — `src/lib/computer-use/lease.ts:60-67`.** This is an implementation defect, in_pr_scope. `readLease` rethrows any error other than ENOENT, and both `claimLease` and `releaseLease` call it before they check `force`. I reproduced it with `npx tsx` against a scratch `OVERDECK_HOME` holding a zero-byte `lease.json`. `claimLease` threw `SyntaxError: Unexpected end of JSON input`, and so did `releaseLease({ force: true })`. The CLI then reports this as `helper_error`. This contradicts the PRD statement that `release` exists \"so an operator can always clear a stuck lease\". A crash mid-write can leave a zero-byte file: this machine has a recorded history of crash-reboot zero-byte truncation, and the lease write is a plain `writeFile`, not an atomic rename. Recovery today is a manual `rm` of the file. Fix: treat an unparseable lease as absent (or as expired), at least on the `force` path, and add a lease test for it.\n2. **~ [requirements/docs] The PR body says the screenshot-geometry anomaly is \"already covered by this PR's docs ('Limits'…)\", but it isn't.** `configuration/computer-use.mdx` \"Limits\" and `SKILL.md` say nothing about occluded or wrong-window screenshots or about wrong window bounds. A grep for `occlu|wrong window|geometry|multi-monitor` found nothing. This is a documentation gap, in_pr_scope. Fix: add a Limits bullet (and a skill note) saying that, on some apps or multi-monitor setups, AT-SPI can report window bounds at `(0,0)`. In that case screenshots can show the wrong area and coordinate input can miss. Agents should verify with the accessibility tree and prefer element (AT-SPI action) clicks.\n3. **? [security/safety] Synthetic pointer input may aim at the wrong screen area on the same geometry bug.** This is an unconfirmed hypothesis about upstream behaviour, and pre_existing in the vendored helper. In `runtime.py`, `screen_point` (line 1372) computes coordinate clicks, scroll and drag as `window_rect.x + x`, with `window_rect = screen_rect(window)`. Element points come from `screen_rect(node)`, using the same `Atspi.CoordType.SCREEN` extents. Live verification recorded `(0,0,360,491)` for gnome-calculator while X11 placed it at `(3829,536)`. If element extents share that offset, a synthetic click, scroll or drag would land on whatever sits near the screen origin, which could be another app. Live verification exercised only the AT-SPI action click path. What would establish it: a coordinate `click` on a GTK4 app on the secondary monitor in a throwaway session, watching where the pointer lands. The remedy cannot be an edit to `runtime.py` (non-goal 5). It would be docs or a TypeScript-side guard (for example, refusing coordinate input when the window rect origin is `(0,0)` but `list_windows` disagrees), or an upstream fix plus re-vendor.\n4. **~ [correctness] `--max-elements` does nothing without `--query`.** `applyTreeFilter` (`commands.ts:108`) applies `maxElements` only inside `filterTree`. The CLI help says so (\"Cap the number of matching lines kept by --query\"), but `SKILL.md:47` says \"`--max-elements <n>` caps how many elements are printed\", which reads as standalone. Fix: align the skill wording, or reject `--max-elements` without `--query` with `invalid_argument`.\n5. **? [spec] `mentionsMissingAtspi` can misclassify runtime errors.** `helper.ts:54` maps any `ok:false` message matching `/\\bgi\\b/` or `/atspi/i` to `helper_missing_dependency`, with the apt fix replacing the real message. An AT-SPI D-Bus runtime error string (for example one naming `org.a11y.atspi`) would then lose its real text. This follows PRD 3c literally, so it's a specification defect, not an implementation one. A narrower match (`ModuleNotFoundError`, `PyGObject unavailable`, `Namespace Atspi not available`) would be safer.\n6. **? [correctness] `maxBuffer` overflow reports as `helper_timeout`.** When stdout exceeds 64 MB, Node kills the child and sets `killed: true`, so `isTimeoutError` reports a timeout. This is unlikely given the screenshot sizes, and the impact is only the wording of the message.\n7. **? [UX] The `pan doctor` row can go silent.** With the feature on, if every probe passes but the helper `handshake` fails for a reason other than `gi`, `checkComputerUse` returns no rows at all, so the operator gets neither `Ready` nor a cause. The `gsettings` probe also runs with the shell's env rather than the resolved desktop env, so it can report accessibility off from an agent shell that has no session bus. Suggest an `error` row carrying the handshake's message when it fails.\n8. **? [UX] The subtree note isn't the last line.** PRD 3e says the note should be \"the command output's last line\". `applyTreeFilter` appends it to `treeLines`, so the text output prints `Focused:` and `Screenshot:` after it. This is cosmetic.\n\n## Coverage\n\n### Changed-file ledger (55 files)\n| File | Status |\n| --- | --- |\n| `.pan/continues/PAN-5452.xbrief.json`, `.pan/drafts/pan-5452.md`, `.pan/specs/…computer-linux-vendored-orca-helper.xbrief.json` | Planning artifacts. I read the PRD fully as the requirement source; the xBRIEF/continue files were not reviewed line-by-line because they are pipeline state, not product code. |\n| `changelog.d/pan-5452.md` | Reviewed; matches the PRD text. |\n| `cli/core-commands.mdx` | Reviewed; the `## pan computer` section is present. |\n| `configuration/computer-use.mdx` | Reviewed; see non-blocking item 2. |\n| `docs.json` | Reviewed; entry sits directly after `configuration/semgrep`. |\n| `native/computer-use-linux/README.md` | Reviewed. |\n| `native/computer-use-linux/runtime.py` | Byte-identical to Orca `c6b9ac9549b` apart from the two header lines (AC-1 diff empty). I read the parts that matter to the TypeScript side: imports/gi exit, `run_operation`, `main`, `screen_rect`, `screen_point`, `restore_pointer_window`, the tree-line format and the error strings. |\n| `package.json` | Reviewed; `native` is in `files`. |\n| `packages/contracts/src/composer-commands.generated.ts` | Reviewed; 16 `pan-computer*` rows, all `\"category\":\"Core\"`. |\n| `scripts/slash-commands-curation.json`, `scripts/upstream-port-diff.sh`, `scripts/upstream-ports.json` | Reviewed. |\n| `src/cli/command-groups.ts`, `src/cli/index.ts`, `src/cli/commands/doctor.ts` | Reviewed. |\n| `src/cli/commands/computer.ts` | Reviewed; this file holds the blocker. |\n| `src/cli/commands/doctor-computer-use.ts` (+ test) | Reviewed; see item 7. |\n| `src/lib/computer-use/{errors,paths,desktop-env,helper,lease,run,commands,wait,snapshot-store,format,tree-filter,blocked-key-combos}.ts` | All reviewed in full. |\n| `src/lib/computer-use/__tests__/*.test.ts` (10 files) | Reviewed for coverage shape; all pass. |\n| `src/lib/config-yaml/{computer-use,defaults,load,merge,schema}.ts` (+ test) | Reviewed. |\n| `src/lib/vault/file-lock.ts` | Reviewed; the `label` option is backward-compatible, and vault keeps its message. |\n| `sync-sources/skills/pan-computer-use/SKILL.md`, `sync-sources/skills/pan/SKILL.md`, `tests/fixtures/synced-skills.txt` | Reviewed. |\n| `tests/unit/cli/computer-command.test.ts`, `tests/unit/scripts/upstream-ports.test.ts` | Reviewed. |\n\n### Dimensions\n- **Correctness:** I traced the preamble order (platform → config → env → lock → lease → helper → cache and screenshot under the same lock), the read-versus-input lease rule, the wait loop's per-poll locking and `appNotFound` retry, and helper error mapping (`killed` timeout, ENOENT, last-line JSON parse, `ok:false`). Snapshot cache semantics (subtree replacement) match PRD 3e. The blocker is in the CLI flag mapping; item 1 is the lease robustness gap.\n- **Security:** D-3 holds end to end. Every project-YAML path goes through `stripProjectSecurity`: `load.ts` lines 104/112 (sync) and 157/164 (async). The remaining `mergeConfigs` callers (`model-presets/apply.ts:161`, `settings-api.ts:644`) never read a project `.pan.yaml`. Op files are written at mode 0600 in a 0700 dir and removed in `finally`. `execFile` is used with an argv array, so there is no shell injection. The stdin flags keep secrets out of argv. The blocked-shortcut port matches Orca's `LINUX_RULES` and `findBlockedKeyCombo` (the diff shows formatting only). Per the threat model, holder-id impersonation by trusted local agents is out of scope. Items 3 and 5 are recorded as hypotheses.\n- **Performance:** every call is async (`execFile` through promises, `fs/promises`); there is no `execSync`, `spawnSync` or `/tmp/` in the new code (grep is empty). Lock waiting is bounded (15 ms retry, about 60 s cap, 60 s stale reclaim, 30 s helper timeout with SIGKILL). Screenshot pruning is bounded at 50 files. The blocker adds an avoidable screenshot capture per call when the operator opts out.\n- **Requirements/UX:** see the AC matrix below. FR-13 `capabilities` never refuses; `release` only touches the lease under the lock.\n\n### AC-to-evidence matrix\n| AC | Status | Evidence |\n| --- | --- | --- |\n| AC-1 | Met | `diff <(sed '2,3d' runtime.py) <(git -C ~/Projects/orca show c6b9ac9549b:…)` prints nothing; `npm run lint:upstream-ports` → \"86 records OK\"; `native` is in `files`. |\n| AC-2 | Met | `computer-use.test.ts` passes; the strip is applied on every project-config load path (traced). |\n| AC-3 | Met | `npx vitest run src/lib/computer-use …` → 15 files and 131 tests pass; the `execSync|spawnSync|/tmp/` grep is empty. |\n| AC-4 | Met (listing) | All 15 subcommands are registered; the manifest is committed with `Core`; CI lint-group (core/skills) is green; the umbrella skill line is present. The FR-2 flag set is **not** fully functional because of the blocker. |\n| AC-5 | Met | The skill exists with the PRD description; `synced-skills.txt` is updated; CI lint-group (skills) passes. I did not re-run the WI-5 shell loop myself: it needs `build:cli`, and the commands it checks are registered. |\n| AC-6 | Met | `doctor-computer-use.test.ts` passes; `checkComputerUse` returns `[]` when disabled. |\n| AC-7 | Met | The `docs.json` order, the `## pan computer` section and the changelog entry are present; CI lint passes. |\n| AC-8 | Met | The PR body has a Live verification section with steps 1–5 and real output (plus the anomaly; see items 2–3). |\n| AC-9 | Met | Verification gate `overdeck/test` passed (typecheck + lint); CI `lint` and `build (22)` pass; no `scripts/file-size-allowlist.txt` change; the new TS files total 1,793 lines across 13 files, each well under 1,000. |\n\n## Verification\n- `gh pr checks 5457` at HEAD `01a05af`: build (22), lint, lint-group core/effect/skills/state, test-shard 1–4, test, test-e2e, integrations, clean-install smoke, flake lane and `overdeck/test` all **pass**. `bare-host-linux` and `bare-host-macos` were still **pending** (unverified).\n- `npx vitest run src/lib/computer-use src/lib/config-yaml/__tests__/computer-use.test.ts src/cli/commands/__tests__/doctor-computer-use.test.ts tests/unit/cli/computer-command.test.ts tests/unit/scripts/upstream-ports.test.ts` → 15 files, 131 tests passed.\n- `npm run lint:effect-diagnostics` → \"Effect diagnostics guard passed (227 known findings; none new)\".\n- `npm run lint:upstream-ports` → OK.\n- The AC-1 byte diff against Orca `c6b9ac9549b` is empty, and the `LINUX_RULES`/`findBlockedKeyCombo` diff against upstream is formatting only.\n- Probes:\n  - A Commander `--no-screenshot` passthrough probe (temporary test, removed) reproduced the blocker.\n  - A `tsx` probe of `claimLease`/`releaseLease({force:true})` against a zero-byte lease in a scratch `OVERDECK_HOME` reproduced item 1.\n- Not run: the full test suite (CI owns it), live desktop input (outside review scope; I did not drive the operator's desktop), and the WI-5 skill-command loop (CI skills lint is green).\n\n## Scope Note\nNone.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5452/.pan/review/agent-pan-5452-review-01a05af0/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-5452 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 5,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-16T21:04:26Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5452\n\nPull request: https://github.com/eltmon/overdeck/pull/5457 (head `24d154c3`)\n\nSource: check_run:build (22)\n\n## Failing checks (1)\n\n### build (22)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/133610333162/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/43955927965/job/133610333162  \n```\nect && npm run typecheck:contracts && npm run typecheck:anywhere-channel && npm run typecheck:mobile\n\n##[error]src/lib/computer-use/commands.ts(121,23): error TS2322: Type 'Record<string, unknown>' is not assignable to type 'HelperResponse'.\n  Property 'ok' is missing in type 'Record<string, unknown>' but required in type '{ ok: boolean; }'.\n##[error]Process completed with exit code 2.\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.1\nTemporarily overriding HOME='/home/runner/work/_temp/fc645795-f1d0-4b66-a3df-8cb952e24915' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 6,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-16T21:08:05Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5452\n\nPull request: https://github.com/eltmon/overdeck/pull/5457 (head `f1a081bf`)\n\nSource: check_run:build (22)\n\n## Failing checks (1)\n\n### build (22)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/133611881484/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/43956296774/job/133611881484  \n```\nect && npm run typecheck:contracts && npm run typecheck:anywhere-channel && npm run typecheck:mobile\n\n##[error]src/lib/computer-use/commands.ts(121,23): error TS2322: Type 'Record<string, unknown>' is not assignable to type 'HelperResponse'.\n  Property 'ok' is missing in type 'Record<string, unknown>' but required in type '{ ok: boolean; }'.\n##[error]Process completed with exit code 2.\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.1\nTemporarily overriding HOME='/home/runner/work/_temp/94ef9379-31b3-4c8b-a65a-52a066a77cb0' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
+}

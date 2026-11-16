@@ -45,6 +45,7 @@ import { checkTierFitnessConfig } from './doctor-tier-fitness.js';
 import { checkMemoryExtraction } from './doctor-memory-provider.js';
 import { checkOllama } from './doctor-ollama.js';
 import { checkSemgrep } from './doctor-semgrep.js';
+import { checkComputerUse } from './doctor-computer-use.js';
 import { checkFlyToken } from './doctor-fly.js';
 import { checkAnywhereRelay } from './doctor-anywhere-relay.js';
 import { loadConfigSync as loadYamlConfig } from '../../lib/config-yaml.js';
@@ -750,6 +751,7 @@ export async function collectDoctorChecks(options: DoctorOptions = {}): Promise<
   // Ollama (PAN-1641): silent unless a local model is configured or installed.
   for (const c of await checkOllama({ config: loadYamlConfig().config })) checks.push(c);
   for (const c of await checkSemgrep({ config: loadYamlConfig().config })) checks.push(c); // PAN-4585: silent unless security.semgrep.enabled
+  for (const c of await checkComputerUse({ config: loadYamlConfig().config })) checks.push(c); // PAN-5452: silent unless computer_use.enabled
   for (const c of await checkFlyToken()) checks.push(c); // PAN-4748: silent unless remote is enabled or a Fly machine exists
   for (const c of await checkAnywhereRelay()) checks.push(c); // PAN-5242: silent unless signed in with the relay plan
   const fileManager = await checkFileManagerIntegration(); // PAN-5349: silent unless pan integrate file-manager ran

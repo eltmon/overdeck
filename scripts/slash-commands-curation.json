@@ -17,6 +17,7 @@
     "install": "Core",
     "integrate": "Core",
     "semgrep": "Core",
+    "computer": "Core",
     "skills": "Core",
     "test": "Core",
     "dev": "Core",

@@ -120,6 +120,20 @@ It needs `security.semgrep.enabled: true` and a single-repo GitHub project. The
 generated commit skips repository hooks. See
 [Semgrep CI workflow](/configuration/semgrep#ci-workflow).
 
+## pan computer
+
+Read and operate a local desktop app's accessibility tree, clicks, keys and
+screenshots through a vendored Orca helper.
+
+```bash
+pan computer list-apps
+pan computer get-app-state --app gnome-calculator --query 7
+pan computer click --app gnome-calculator --element-index 12
+```
+
+It needs `computer_use.enabled: true` (global config only) and a Linux desktop
+with a logged-in session. See [Computer use](/configuration/computer-use).
+
 ## pan diagnose
 
 Collect a redacted diagnostic bundle and, with your consent, start Claude

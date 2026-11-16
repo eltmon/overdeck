@@ -1,0 +1,119 @@
+---
+title: Computer use
+description: Opt-in, off-by-default desktop control (accessibility tree, clicks, keys, screenshots) for agents on Linux
+---
+
+# Computer use
+
+Overdeck agents can read and operate a local desktop app — the accessibility tree, clicks,
+typing, keys, scrolling, dragging, and screenshots — through `pan computer`. It is
+**off by default** and **Linux only**.
+
+## What it does
+
+`pan computer` runs a vendored copy of Orca's Linux computer-use helper (`native/computer-use-linux/runtime.py`,
+MIT, see [its README](https://github.com/eltmon/overdeck/blob/main/native/computer-use-linux/README.md)).
+The helper reads the AT-SPI accessibility tree, takes window screenshots, and sends input
+through AT-SPI actions, XTest and `xdotool`. Agents use it to read a window's state, find
+elements by their accessibility tree index, and act on them — the way a person would, when no
+programmatic path (shell, files, git, HTTP, an existing CLI) can reach the same app.
+
+## Turn it on
+
+Add a `computer_use:` block to `~/.overdeck/config.yaml`:
+
+```yaml
+computer_use:
+  enabled: true
+```
+
+This is a **global-layer-only** setting: a project's `.pan.yaml` can never set it, so a work
+agent committing to its own feature branch can't switch on desktop control for the operator. With
+it off, every `pan computer` command except `capabilities` and `release` refuses with `disabled`.
+
+## Requirements
+
+- A Linux desktop with a logged-in session (X11 or Wayland). A headless host or a linked machine
+  with no desktop session gets `no_desktop_session`.
+- System packages: `python3-gi`, `gir1.2-atspi-2.0`, `xdotool` (X11 hotkeys/clicks), optionally
+  `xclip` or `xsel` (clipboard paste; `wl-copy` on Wayland), and `grim` on Wayland (screenshots).
+- GNOME accessibility on: `gsettings set org.gnome.desktop.interface toolkit-accessibility true`.
+
+## Commands
+
+Every subcommand takes `--json`. Every action and `get-app-state` also take `--window-index <n>`,
+`--restore-window` and `--no-screenshot`.
+
+| Command | What it does |
+| --- | --- |
+| `capabilities` | Reports platform, opt-in and desktop-session readiness. Never refuses. |
+| `list-apps` | Lists open apps with at least one window. |
+| `list-windows --app <app>` | Lists an app's windows. |
+| `get-app-state --app <app>` | Reads a window's accessibility tree and screenshot. |
+| `wait --app <app>` | Polls until a `--text`, `--enabled` or `--window-title` condition holds. |
+| `click --app <app>` | Clicks a cached element or a window-local coordinate. |
+| `perform-secondary-action --app <app>` | Runs one of an element's named secondary accessibility actions. |
+| `set-value --app <app>` | Sets an element's value directly through accessibility. |
+| `type-text --app <app>` | Types text at an element or the current focus. |
+| `press-key --app <app>` | Presses a single key. |
+| `hotkey --app <app>` | Presses a key chord. |
+| `paste-text --app <app>` | Pastes text at the current focus. |
+| `scroll --app <app>` | Scrolls at an element or a coordinate. |
+| `drag --app <app>` | Drags from one element or coordinate to another. |
+| `release` | Releases the desktop lease. |
+
+See the `pan-computer-use` skill for the full field reference and error-handling guidance.
+
+## One agent at a time
+
+A desktop lease, held in a file under [Where files go](#where-files-go), ensures only one holder
+drives the desktop's input at a time. An input command claims the lease for 120 seconds, renewed
+on every call; a holder without it gets `desktop_busy` naming the current holder and when the
+lease expires. Read-only commands (`capabilities`, `list-apps`, `list-windows`, `wait`, and
+`get-app-state` without `--restore-window`) never need the lease, so other agents can still look.
+Run `pan computer release` when a GUI task is finished, or `pan computer release --force` to
+clear a stuck lease held by someone else.
+
+## Where files go
+
+Everything lives under `~/.overdeck/computer-use/`:
+
+| Path | Holds |
+| --- | --- |
+| `ops/` | Short-lived operation files passed to the helper (mode 0600, deleted after each call) |
+| `desktop.lock` | The cross-process file lock that serializes every helper call |
+| `lease.json` | The desktop lease: holder, pid, claimed-at and expiry |
+| `snapshots/<holder>/<app>.json` | The cached element records behind `--element-index` |
+| `screenshots/` | Captured PNGs (the 50 newest are kept) |
+
+## Safety
+
+- `hotkey` and `press-key` refuse a chord that would quit, lock, log out or switch virtual
+  terminals (`alt+F4`, `ctrl+alt+F2`, `super+l`, `ctrl+q`, …) with `system_shortcut_blocked`,
+  unless `--allow-system-shortcut` is passed.
+- `--text-stdin` and `--value-stdin` read sensitive text from stdin so it never lands in argv or
+  shell history.
+- The shipped skill tells agents never to push, submit, send, buy, delete, or change account
+  settings through computer use unless the user explicitly asked for that action.
+
+## Limits
+
+- Linux only. macOS (a signed Swift helper) and Windows (`runtime.ps1`) are follow-ups.
+- Wayland can't do hotkeys (`xdotool` needs X11); screenshots there need `grim`.
+- No remote hosts — a linked machine with no logged-in desktop session always refuses.
+- On some multi-monitor setups, AT-SPI can report a window's bounds at `(0,0)` instead of its
+  real screen position. When that happens, its screenshot can show the wrong area of the
+  desktop, and `click`/`scroll`/`drag` coordinates computed from that screenshot can miss the
+  window entirely. Prefer `--element-index` actions over `--x`/`--y` coordinates when a window's
+  reported bounds look suspicious, and verify a coordinate action's effect against a fresh
+  `get-app-state` rather than trusting the screenshot alone.
+- The helper is a verbatim vendored port of Orca's Linux computer-use bridge; see
+  [`native/computer-use-linux/README.md`](https://github.com/eltmon/overdeck/blob/main/native/computer-use-linux/README.md)
+  for how it's re-vendored.
+
+## Troubleshooting
+
+Run `pan doctor`. With the feature off it prints no `Computer use` row at all. With it on, it
+checks the AT-SPI Python bindings, the desktop session, `xdotool` on X11, a clipboard tool,
+`grim` on Wayland, and GNOME accessibility, ending in a single `Ready (<session>, display <d>)`
+row once the helper's handshake succeeds.

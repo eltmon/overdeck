@@ -1,0 +1,1633 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-16T18:26:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5452: Computer use: let agents drive local desktop apps with `pan computer` (Linux, vendored Orca helper)",
+    "updated": "2026-11-16T18:34:17.624Z"
+  },
+  "plan": {
+    "id": "pan-5452",
+    "title": "Computer use: let agents drive local desktop apps with `pan computer` (Linux, vendored Orca helper)",
+    "status": "running",
+    "uid": "3d23ff06-3e85-4a47-b078-851a2c7a3908",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-16T18:26:00Z",
+    "updated": "2026-11-16T18:34:17.624Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5452",
+        "label": "PAN-5452",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5452/.pan/drafts/pan-5452.md",
+        "label": "PRD draft (.pan/drafts/pan-5452.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "computer-use",
+      "cli",
+      "desktop",
+      "linux",
+      "config",
+      "skill",
+      "orca-port"
+    ],
+    "narratives": {
+      "Problem": "Overdeck agents cannot see or operate desktop apps. Orca's MIT-licensed Linux computer-use helper (one Python file reading AT-SPI, taking screenshots and sending xdotool/XTest input) runs standalone, but Overdeck has no way to call it, no guard against two agents driving the one shared pointer and keyboard, no way to find the desktop session env from agent shells that lack DISPLAY, and no opt-in switch.",
+      "Proposal": "Vendor the helper verbatim at native/computer-use-linux/runtime.py pinned to Orca c6b9ac9549b with a port record; add src/lib/computer-use/ (paths, errors, desktop env resolution via systemctl --user show-environment, a helper runner with private 0600 operation files, a file lock plus a 120 s renewable desktop lease, a per-holder snapshot cache, the ported Linux blocked-shortcut list, a tree filter, text/JSON formatting, a guarded run preamble, per-command operation builders and a fake-timer-tested wait); expose it as the pan computer CLI verb with 15 subcommands; gate everything except capabilities and release behind global-only computer_use.enabled; ship a pan-computer-use skill, a pan doctor row, docs and a changelog entry; verify live on the operator's X11 desktop.",
+      "NonGoals": "- macOS (signed Swift helper) and Windows (runtime.ps1) support; both refuse with unsupported_platform\n- MCP tools for computer use in the overdeck MCP server\n- Any dashboard route, Settings toggle, lease display or live view (no new HTTP route, no no-loss-matrix row)\n- Tree diffs, suspected-noop verification and Orca's agent-facing error-code mapping (helper errors pass through as helper_error)\n- Any local edit to the vendored runtime.py beyond the two port header lines\n- Setting computer_use from a project .pan.yaml (the project layer is stripped)\n- Turning computer_use on in the operator's real ~/.overdeck/config.yaml during implementation or verification\n- Wayland hotkey support beyond what the helper reports\n- Remote-host or Fly detection logic beyond refusing when no display resolves\n- Shipping the helper inside the Electron desktop app bundle\n- New npm or Python dependencies\n- Raising any scripts/file-size-allowlist.txt cap"
+    },
+    "metadata": {
+      "sizeJustification": "One opt-in feature defined as a single deliverable by the issue body. About 40 files across many top-level paths, but the logic lives in one new directory (src/lib/computer-use/, 12 modules each with its own test); the rest are mandatory one-to-five-line touchpoints of adding a CLI verb and config key (command-groups, index, curation, generated manifest, umbrella skill, skill fixture, docs nav, changelog, CLI reference, port records, package files). Splitting would ship a verb without its gate, skill or docs. The plan is decomposed into 18 items with a parallel-friendly DAG instead.",
+      "canonicalFilename": "2026-11-16-PAN-5452-computer-use-let-agents-drive-local-desktop-apps-with-pan-computer-linux-vendored-orca-helper.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Kept the PRD's single-issue scope and set plan.metadata.sizeJustification instead of splitting into sibling issues.",
+        "rationale": "The issue body defines one opt-in feature; the wide surface is mandatory per-verb touchpoints (docs nav, changelog, skill fixture, curation, generated manifest), while the logic lives in one new directory, and a verb without its config gate, skill or docs would ship a half feature."
+      },
+      {
+        "summary": "Defined pan computer capabilities as never refusing (new FR-13) and release as lease-only under the lock.",
+        "rationale": "The PRD exempted capabilities from the config gate but left the platform and desktop checks ambiguous; a readiness query that refuses is useless, and an operator must always be able to clear a stuck lease."
+      },
+      {
+        "summary": "Split the command layer into run.ts (preamble), commands.ts and wait.ts, and pulled paths.ts plus errors.ts into a foundation item.",
+        "rationale": "Lets the library modules run in parallel, keeps every file far under the 1,000-line ceiling, and gives the security-relevant preamble its own reviewed commit."
+      },
+      {
+        "summary": "Helper calls use killSignal SIGKILL and treat execFile killed === true as helper_timeout.",
+        "rationale": "The vendored helper traps SIGTERM, and a hung AT-SPI D-Bus call never reaches a Python signal handler."
+      },
+      {
+        "summary": "Added the umbrella pan skill line, the computer Core curation category, a cli/core-commands.mdx section and tests/unit/cli placement.",
+        "rationale": "These are the files the semgrep verb precedent (PAN-4585, PAN-4592) touched that the draft omitted."
+      },
+      {
+        "summary": "Kept the skill name pan-computer-use and replaced the lint:skills coverage it misses with an explicit loop over its commands.",
+        "rationale": "The issue body names the skill; lint-skills.sh only validates pan-<verb> skills, so the loop is the only check that the skill's flags exist."
+      },
+      {
+        "summary": "Live verification runs the workspace build in a throwaway home at a literal path under ~/.overdeck/tmp.",
+        "rationale": "The global pan is the deployed build without the feature, the operator's real config must never be switched on by an agent, and rm targets must be literal paths."
+      }
+    ],
+    "items": [
+      {
+        "id": "vendor-helper",
+        "title": "Vendor the Orca Linux computer-use helper with a port record",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T18:26:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5452",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "native/computer-use-linux/runtime.py",
+            "native/computer-use-linux/README.md",
+            "scripts/upstream-ports.json",
+            "scripts/upstream-port-diff.sh",
+            "package.json",
+            "tests/unit/scripts/upstream-ports.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "diff <(sed '2,3d' native/computer-use-linux/runtime.py) <(git -C ~/Projects/orca show c6b9ac9549b:native/computer-use-linux/runtime.py)",
+            "npm run lint:upstream-ports",
+            "node -e \"process.exit(require('./package.json').files.includes('native')?0:1)\"",
+            "npx vitest run tests/unit/scripts/upstream-ports.test.ts"
+          ],
+          "expected_outputs": [
+            "the diff prints nothing",
+            "lint:upstream-ports prints 'upstream-ports: <n> records OK'",
+            "the node check exits 0",
+            "upstream-ports.test.ts reports all tests passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work item 1 exactly: copy native/computer-use-linux/runtime.py from Orca commit c6b9ac9549b (git -C ~/Projects/orca show c6b9ac9549b:native/computer-use-linux/runtime.py), insert the two '# Ported from Orca ...' and '# upstream: ... @ c6b9ac9549b' lines after the shebang and change nothing else; teach scripts/upstream-port-diff.sh the '#' comment form for .py ports (sibling of the CSS branch, and update its header comment); append the port record to scripts/upstream-ports.json; add \"native\" to package.json files; write native/computer-use-linux/README.md (verbatim-port rule, re-vendor steps, required system packages). Add two cases to tests/unit/scripts/upstream-ports.test.ts: a .py port with the '#' lines passes --check, a .py port with the '//' form fails naming the '#' header."
+        },
+        "items": [
+          {
+            "id": "vendor-helper.ac1",
+            "title": "Given the vendored file, when lines 2-3 are removed and the rest is diffed against Orca c6b9ac9549b's runtime.py, then the diff prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vendor-helper.ac2",
+            "title": "Given the new .py port record, when npm run lint:upstream-ports runs, then it exits 0 and prints 'records OK'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vendor-helper.ac3",
+            "title": "Given a temp .py port carrying the '//' header form, when upstream-ports.test.ts runs upstream-port-diff.sh --check on it, then the script exits 1 naming the missing '#' header; with the '#' form it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vendor-helper.ac4",
+            "title": "package.json files contains \"native\", so npm pack includes native/computer-use-linux/runtime.py",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config-flag",
+        "title": "Add the global-only computer_use.enabled config flag",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T18:26:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5452",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/computer-use.ts",
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/merge.ts",
+            "src/lib/config-yaml/load.ts",
+            "src/lib/config-yaml/__tests__/computer-use.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/config-yaml/__tests__/computer-use.test.ts src/lib/config-yaml/__tests__/semgrep-project-layer.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "both test files report all tests passed",
+            "npm run typecheck exits 0 with no errors",
+            "lint-file-size reports no file over its cap"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work item 2: create src/lib/config-yaml/computer-use.ts (YamlComputerUseConfig, NormalizedComputerUseConfig, DEFAULT_NORMALIZED_COMPUTER_USE, normalizeComputerUseConfig with the two error messages), wire it into schema.ts (YamlConfig.computer_use and normalized computerUse), defaults.ts, merge.ts (default copy and the normalize call next to normalizeSecurityConfig), and drop computer_use from the project layer in stripProjectSecurity in load.ts with the doc-comment line. Add src/lib/config-yaml/__tests__/computer-use.test.ts."
+        },
+        "items": [
+          {
+            "id": "config-flag.ac1",
+            "title": "Given a config.yaml with no computer_use block, when the config loads, then computerUse.enabled defaults to false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-flag.ac2",
+            "title": "Given computer_use: { enabled: true } in the global config, when it loads, then computerUse.enabled resolves to true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-flag.ac3",
+            "title": "Given computer_use: { enabled: 'yes' }, when the config loads, then it throws 'config.yaml: computer_use.enabled must be true or false (got: yes)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-flag.ac4",
+            "title": "Given a project-layer config containing computer_use: { enabled: true }, when stripProjectSecurity runs, then the returned config contains no computer_use key and computerUse.enabled stays false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "paths-and-errors",
+        "title": "Create the computer-use paths module and the shared error type",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T18:26:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5452",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/computer-use/paths.ts",
+            "src/lib/computer-use/errors.ts",
+            "src/lib/computer-use/__tests__/paths.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/paths.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "paths.test.ts reports all tests passed",
+            "npm run typecheck exits 0 with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "desktop-env",
+            "helper-runner",
+            "desktop-lease",
+            "snapshot-store",
+            "blocked-keys",
+            "format-output",
+            "run-preamble"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD 3a and 3a': create src/lib/computer-use/paths.ts (computerUseDir, opsDir, lockPath, leasePath, snapshotDir(holderKey), screenshotDir, helperPath via packageRoot from src/lib/paths.ts, SYSTEM_PYTHON) with every location derived from getOverdeckHome(), and src/lib/computer-use/errors.ts (ComputerUseErrorCode union of the 11 codes, ComputerUseError class with readonly code, isComputerUseError guard). Add __tests__/paths.test.ts. Every later computer-use module imports these two files."
+        },
+        "items": [
+          {
+            "id": "paths-and-errors.ac1",
+            "title": "Given OVERDECK_HOME=/x, when the path helpers run, then they return /x/computer-use, /x/computer-use/ops, /x/computer-use/desktop.lock, /x/computer-use/lease.json, /x/computer-use/snapshots/<key> and /x/computer-use/screenshots",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "paths-and-errors.ac2",
+            "title": "helperPath() returns <packageRoot>/native/computer-use-linux/runtime.py and SYSTEM_PYTHON equals /usr/bin/python3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "paths-and-errors.ac3",
+            "title": "Given new ComputerUseError('desktop_busy', 'm'), then isComputerUseError returns true, .code returns 'desktop_busy' and .message returns 'm'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "paths-and-errors.ac4",
+            "title": "A search for '/tmp' in src/lib/computer-use/paths.ts returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "desktop-env",
+        "title": "Resolve the desktop session env from the shell or systemd user manager",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T18:26:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5452",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/computer-use/desktop-env.ts",
+            "src/lib/computer-use/__tests__/desktop-env.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/desktop-env.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "desktop-env.test.ts reports all tests passed",
+            "npm run typecheck exits 0 with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD 3b: create src/lib/computer-use/desktop-env.ts exporting resolveDesktopEnv(deps) that fills DISPLAY, WAYLAND_DISPLAY, XAUTHORITY, XDG_SESSION_TYPE, XDG_RUNTIME_DIR and DBUS_SESSION_BUS_ADDRESS from process.env first, then from `systemctl --user show-environment` (async execFile, 5 s timeout, failure ignored), then the /run/user/<uid> and <runtime>/bus fallbacks, and returns { ok: false, code: 'no_desktop_session', message } with the PRD message when no display resolves. Inject execFile, env, uid and existsSync-style checks through deps. Add __tests__/desktop-env.test.ts."
+        },
+        "items": [
+          {
+            "id": "desktop-env.ac1",
+            "title": "Given DISPLAY=:0 in process env and DISPLAY=:1 from systemctl, when resolveDesktopEnv runs, then the result env contains DISPLAY=:0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "desktop-env.ac2",
+            "title": "Given an empty process env and systemctl output with DISPLAY=:1 and XAUTHORITY, when resolveDesktopEnv runs, then it returns ok with both values filled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "desktop-env.ac3",
+            "title": "Given systemctl failing and no DISPLAY or WAYLAND_DISPLAY, when resolveDesktopEnv runs, then it returns code 'no_desktop_session' with the PRD message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "desktop-env.ac4",
+            "title": "Given no DBUS_SESSION_BUS_ADDRESS and an existing <XDG_RUNTIME_DIR>/bus, when resolveDesktopEnv runs, then it sets DBUS_SESSION_BUS_ADDRESS=unix:path=<XDG_RUNTIME_DIR>/bus",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "helper-runner",
+        "title": "Run the vendored helper through a private operation file",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T18:26:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5452",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/computer-use/helper.ts",
+            "src/lib/computer-use/__tests__/helper.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/helper.test.ts",
+            "npm run typecheck",
+            "grep -nE 'execSync|spawnSync' src/lib/computer-use/helper.ts || true"
+          ],
+          "expected_outputs": [
+            "helper.test.ts reports all tests passed",
+            "npm run typecheck exits 0 with no errors",
+            "the grep prints no lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD 3c: create src/lib/computer-use/helper.ts exporting runHelper(operation, { env, execFile, ... }) that writes <opsDir>/<uuid>.json with mode 0600 (dir 0700), runs /usr/bin/python3 -I <helperPath> <opFile> with async execFile (timeout 30000, killSignal 'SIGKILL', maxBuffer 64 MiB), always removes the op file in finally, parses the last non-empty stdout line, and maps failures to ComputerUseError codes: killed === true -> helper_timeout; ENOENT -> helper_missing_dependency; non-JSON stdout -> helper_error with the last 500 chars of stderr; { ok: false } -> helper_error, or helper_missing_dependency with the apt fix when the message mentions gi or Atspi. The env comes in as a parameter (the preamble resolves it). Add __tests__/helper.test.ts with an injected execFile."
+        },
+        "items": [
+          {
+            "id": "helper-runner.ac1",
+            "title": "Given a successful helper call, when runHelper returns, then the op file was created with mode 0600 and no longer exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "helper-runner.ac2",
+            "title": "Given the helper fails or times out, when runHelper rejects, then the op file still no longer exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "helper-runner.ac3",
+            "title": "Given stderr 'dbind-WARNING ...' and stdout ending in '{\"ok\":true,\"apps\":[]}', when runHelper runs, then it returns the parsed object",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "helper-runner.ac4",
+            "title": "Given an execFile error with killed: true, then runHelper throws ComputerUseError code helper_timeout; given ENOENT it throws helper_missing_dependency",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "helper-runner.ac5",
+            "title": "Given helper output {\"ok\":false,\"error\":\"Namespace Atspi not available\"}, then runHelper throws helper_missing_dependency whose message contains 'sudo apt install python3-gi gir1.2-atspi-2.0'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "desktop-lease",
+        "title": "Add the desktop lease and the cross-process desktop lock",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T18:26:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5452",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/computer-use/lease.ts",
+            "src/lib/vault/file-lock.ts",
+            "src/lib/computer-use/__tests__/lease.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/lease.test.ts",
+            "npx vitest run tests/unit/lib/vault",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lease.test.ts reports all tests passed",
+            "the vault test files report all tests passed",
+            "npm run typecheck exits 0 with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD 3d: create src/lib/computer-use/lease.ts with holderId() (OVERDECK_AGENT_ID, else conv:${OVERDECK_CONVERSATION}, else operator), holderKey(), withDesktopLock(fn) over withFileLock(lockPath(), fn, { staleMs: 60_000, label: 'pan computer' }), DESKTOP_LEASE_TTL_MS = 120_000, claimLease(now) and releaseLease({ force }) with the exact desktop_busy message. In src/lib/vault/file-lock.ts add optional label?: string to FileLockOptions and use `another ${options.label ?? 'pan vault'} process may be stuck` so vault's message stays the same. Add __tests__/lease.test.ts with vi.useFakeTimers() and an injected clock."
+        },
+        "items": [
+          {
+            "id": "desktop-lease.ac1",
+            "title": "Given no lease file, when holder a calls claimLease, then it writes lease.json with holder 'a' and expiresAt 120 s later; a second claim by a renews expiresAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "desktop-lease.ac2",
+            "title": "Given holder a holds an unexpired lease, when holder b calls claimLease, then it throws desktop_busy naming a and the expiry; after the clock advances past expiresAt, b's claim succeeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "desktop-lease.ac3",
+            "title": "Given holder a's lease, when b calls releaseLease without force, then it throws desktop_busy; with force it deletes lease.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "desktop-lease.ac4",
+            "title": "Given OVERDECK_AGENT_ID=x and OVERDECK_CONVERSATION=y, holderId returns 'x'; with only OVERDECK_CONVERSATION=y it returns 'conv:y'; with neither it returns 'operator'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "desktop-lease.ac5",
+            "title": "Given a vault lock that cannot be acquired, the thrown message still contains 'another pan vault process may be stuck'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "snapshot-store",
+        "title": "Cache snapshot element records and save screenshots as PNG files",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T18:26:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5452",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/computer-use/snapshot-store.ts",
+            "src/lib/computer-use/__tests__/snapshot-store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/snapshot-store.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "snapshot-store.test.ts reports all tests passed",
+            "npm run typecheck exits 0 with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD 3e: create src/lib/computer-use/snapshot-store.ts with saveSnapshot(holderKey, appQuery, response) writing snapshots/<holderKey>/<appKey>.json ({ snapshotId, app, windowIndex, elements }), elementRecord(holderKey, appQuery, index) returning the matching record or throwing element_not_found with the PRD message, and saveScreenshot(snapshot) writing screenshots/<snapshotId>.png from screenshotPngBase64, pruning to the 50 newest PNGs by mtime, and returning { path, width, height, scale } (null when no screenshot). Never return or print the base64. Add __tests__/snapshot-store.test.ts using a temp OVERDECK_HOME."
+        },
+        "items": [
+          {
+            "id": "snapshot-store.ac1",
+            "title": "Given saveSnapshot stored elements with index 3, when elementRecord(holder, app, 3) runs, then it returns that exact record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snapshot-store.ac2",
+            "title": "Given no element 9 in the latest snapshot, when elementRecord(..., 9) runs, then it throws element_not_found whose message tells the agent to rerun get-app-state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snapshot-store.ac3",
+            "title": "Given 51 existing PNGs, when saveScreenshot writes one more, then the screenshots folder keeps only the 50 newest files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snapshot-store.ac4",
+            "title": "Given a snapshot with screenshotPngBase64, when saveScreenshot runs, then it returns a path to a decoded .png file and the returned object contains no base64 field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "blocked-keys",
+        "title": "Port Orca's Linux blocked system-shortcut list",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T18:26:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5452",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/computer-use/blocked-key-combos.ts",
+            "src/lib/computer-use/__tests__/blocked-key-combos.test.ts",
+            "scripts/upstream-ports.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/blocked-key-combos.test.ts",
+            "npm run lint:upstream-ports",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "blocked-key-combos.test.ts reports all tests passed",
+            "lint:upstream-ports prints 'records OK'",
+            "npm run typecheck exits 0 with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD 3f: create src/lib/computer-use/blocked-key-combos.ts as a port of the Linux part of Orca's src/main/computer/action-contracts/computer-blocked-key-combos.ts at c6b9ac9549b, with the two '//' port header lines and the vercel-labs design line, porting LINUX_RULES, SHARED_KEY_ALIASES, NUMERIC_KEYSYM canonicalization and findBlockedKeyCombo logic exactly (repo style: semicolons), dropping the macOS and Windows tables and the platform argument. Export assertKeyComboAllowed(key, allowSystemShortcut) throwing system_shortcut_blocked with the PRD message. Append its record to scripts/upstream-ports.json. Add __tests__/blocked-key-combos.test.ts."
+        },
+        "items": [
+          {
+            "id": "blocked-keys.ac1",
+            "title": "Given each of alt+F4, ctrl+alt+F2, super+l, CmdOrCtrl+Q, ctrl+alt+BackSpace and 0xff, when assertKeyComboAllowed(key, false) runs, then it throws system_shortcut_blocked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "blocked-keys.ac2",
+            "title": "Given ctrl+a, ctrl+shift+p or Return, when assertKeyComboAllowed(key, false) runs, then it returns without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "blocked-keys.ac3",
+            "title": "Given alt+F4 with allowSystemShortcut true, when assertKeyComboAllowed runs, then it returns without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "blocked-keys.ac4",
+            "title": "Given the new port record, when npm run lint:upstream-ports runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tree-filter",
+        "title": "Filter a rendered accessibility tree by query with ancestors kept",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T18:26:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5452",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/computer-use/tree-filter.ts",
+            "src/lib/computer-use/__tests__/tree-filter.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/tree-filter.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tree-filter.test.ts reports all tests passed",
+            "npm run typecheck exits 0 with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD 3g: create src/lib/computer-use/tree-filter.ts exporting filterTree(lines, query, maxElements) that keeps lines containing the query case-insensitively plus each kept line's ancestors (the nearest earlier line with strictly fewer leading tabs, repeated to the root), preserves order without duplicates, caps matching lines (not ancestors) at maxElements, and returns ['No element matches \"<query>\".'] on no match. Pure function, no I/O. Add __tests__/tree-filter.test.ts using tab-indented input shaped like the glossary example."
+        },
+        "items": [
+          {
+            "id": "tree-filter.ac1",
+            "title": "Given a tab-nested tree with one match at depth 3, when filterTree runs, then it returns the root, the depth-1 and depth-2 ancestors and the match, in original order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tree-filter.ac2",
+            "title": "Given two matches that share ancestors, when filterTree runs, then each shared ancestor appears exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tree-filter.ac3",
+            "title": "Given 5 matches and maxElements 2, when filterTree runs, then the output contains only the first 2 matching lines plus their ancestors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tree-filter.ac4",
+            "title": "Given a query with no match, when filterTree runs, then it returns the single line 'No element matches \"<query>\".'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "format-output",
+        "title": "Render pan computer results as text and as stable JSON",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T18:26:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5452",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/computer-use/format.ts",
+            "src/lib/computer-use/__tests__/format.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/format.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "format.test.ts reports all tests passed",
+            "npm run typecheck exits 0 with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD 3i: create src/lib/computer-use/format.ts exporting text and JSON renderers for snapshots (App/Window line, tree lines, Focused line, Screenshot line), actions (extra first 'Action:' line with verification state), apps, windows, capabilities and wait matches, plus an error renderer (text: 'pan computer: <message>'; JSON: { ok: false, error: { code, message } }). JSON uses the exact PRD shape and never includes screenshotPngBase64. Pure functions; the CLI layer chooses stdout/stderr and exit code. Add __tests__/format.test.ts."
+        },
+        "items": [
+          {
+            "id": "format-output.ac1",
+            "title": "Given a snapshot result, when the text renderer runs, then it returns the App/Window line, the tree lines, 'Focused: ...' and 'Screenshot: <path>' in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "format-output.ac2",
+            "title": "Given an action result with verification { state: 'unverified', reason: 'synthetic_input' }, then the first rendered line is 'Action: synthetic/typeText, verification: unverified (synthetic_input)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "format-output.ac3",
+            "title": "Given a snapshot containing screenshotPngBase64, when the JSON renderer runs, then the output contains screenshot.path and no screenshotPngBase64 key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "format-output.ac4",
+            "title": "Given ComputerUseError('desktop_busy', 'm'), then the text renderer returns 'pan computer: m' and the JSON renderer returns {\"ok\":false,\"error\":{\"code\":\"desktop_busy\",\"message\":\"m\"}}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "run-preamble",
+        "title": "Add the guarded run preamble every pan computer command goes through",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T18:26:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5452",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/computer-use/run.ts",
+            "src/lib/computer-use/__tests__/run.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/run.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "run.test.ts reports all tests passed",
+            "npm run typecheck exits 0 with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-13",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "command-builders",
+            "wait-command",
+            "cli-verb"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD 3h (run.ts part): create src/lib/computer-use/run.ts exporting runComputerOperation({ kind: 'read' | 'input', operation, deps }) that runs, in order: platform check (non-linux -> unsupported_platform), config check (computerUse.enabled false -> disabled), resolveDesktopEnv (failure -> no_desktop_session), then withDesktopLock around claimLease (input only) + runHelper(operation, { env }) + saveSnapshot + saveScreenshot. Also export runCapabilities() per FR-13 (never refuses; handshake only on linux with a desktop env, under the lock, no lease; helper failure fills helperError) and runRelease({ force }) (releaseLease inside withDesktopLock only). All side effects come through injectable deps with real defaults. Add __tests__/run.test.ts."
+        },
+        "items": [
+          {
+            "id": "run-preamble.ac1",
+            "title": "Given computerUse.enabled false, when runComputerOperation runs, then it throws disabled and the injected runHelper is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-preamble.ac2",
+            "title": "Given platform 'darwin', when runComputerOperation runs, then it throws unsupported_platform before the config or env checks; runCapabilities on 'darwin' returns ok with helper null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-preamble.ac3",
+            "title": "Given another holder's unexpired lease, when an 'input' operation runs, then it throws desktop_busy and runHelper is never called; a 'read' operation runs the helper and never calls claimLease",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-preamble.ac4",
+            "title": "Given the feature off and no desktop session, when runCapabilities runs, then it returns ok with enabled false, desktopSession.ok false and helper null, and never calls runHelper",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-preamble.ac5",
+            "title": "Given a held lease, when runRelease({ force: true }) runs with the feature disabled, then it deletes the lease without running the platform, config or env checks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "command-builders",
+        "title": "Build helper operations for every pan computer subcommand except wait",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T18:26:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5452",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/computer-use/commands.ts",
+            "src/lib/computer-use/__tests__/commands.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/commands.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "commands.test.ts reports all tests passed",
+            "npm run typecheck exits 0 with no errors",
+            "lint-file-size reports no file over its cap"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-6",
+            "FR-8",
+            "FR-9",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD 3h (commands.ts part) and the 3c field table: create src/lib/computer-use/commands.ts with one exported async function per command (listApps, listWindows, getAppState, click, performSecondaryAction, setValue, typeText, pressKey, hotkey, pasteText, scroll, drag; capabilities and release delegate to run.ts). Each validates its arguments (invalid_argument for missing/conflicting flags such as --text with --text-stdin), reads stdin for --text-stdin/--value-stdin before the lock, runs assertKeyComboAllowed for press-key and hotkey, resolves --element-index/--from-/--to-element-index through elementRecord (get-app-state --element-index sends root), builds the operation with the exact helper field names, calls runComputerOperation with kind 'read' (list-apps, list-windows, get-app-state without --restore-window) or 'input' (everything else), and applies filterTree for --query/--max-elements, adding the subtree note line after a subtree read. Add __tests__/commands.test.ts."
+        },
+        "items": [
+          {
+            "id": "command-builders.ac1",
+            "title": "Given cached record 3, when click --element-index 3 runs, then the operation sent to runComputerOperation contains element equal to record 3 and kind 'input'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "command-builders.ac2",
+            "title": "Given drag with --from-x 1 --from-y 2 --to-x 3 --to-y 4, then the operation contains from_x, from_y, to_x and to_y; with element indexes it contains fromElement and toElement records",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "command-builders.ac3",
+            "title": "Given type-text --text-stdin with stdin 'hunter2', then the operation text equals 'hunter2' and no argv value contains 'hunter2'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "command-builders.ac4",
+            "title": "Given hotkey --key alt+F4 without --allow-system-shortcut, then it throws system_shortcut_blocked and runComputerOperation is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "command-builders.ac5",
+            "title": "Given get-app-state without --restore-window, then it calls runComputerOperation with kind 'read'; with --restore-window it uses kind 'input'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wait-command",
+        "title": "Poll app state until a text, enabled or window-title condition holds",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T18:26:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5452",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/computer-use/wait.ts",
+            "src/lib/computer-use/__tests__/wait.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/wait.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "wait.test.ts reports all tests passed",
+            "npm run typecheck exits 0 with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD 3h (wait part): create src/lib/computer-use/wait.ts exporting waitFor({ app, text | enabled | windowTitle, timeoutMs }) that polls every 500 ms through runComputerOperation (get_app_state with noScreenshot true, or list_windows for --window-title), taking and releasing the lock per poll, keeps polling while the helper error contains appNotFound, succeeds when the condition holds (enabled: a line contains t and no line containing t contains ' (disabled)'), saves the snapshot on success and returns the matching lines, rejects --timeout above 120000 with invalid_argument, defaults to 10000, and throws wait_timeout when time runs out. Add __tests__/wait.test.ts using vi.useFakeTimers() and vi.advanceTimersByTimeAsync (never real delays, no skipIf, no .only)."
+        },
+        "items": [
+          {
+            "id": "wait-command.ac1",
+            "title": "Given the third poll returns a tree line containing 'Saved', when wait --text Saved runs and fake timers advance 1000 ms, then it resolves with that line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wait-command.ac2",
+            "title": "Given no poll ever matches, when fake timers advance 10000 ms, then wait throws wait_timeout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wait-command.ac3",
+            "title": "Given the first two polls fail with appNotFound(\"calc\"), when the third finds the app with the text, then wait resolves instead of throwing helper_error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wait-command.ac4",
+            "title": "Given --timeout 120001, then wait throws invalid_argument before any poll runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wait-command.ac5",
+            "title": "Given a line containing 'Save (disabled)', when wait --enabled Save polls, then it keeps polling until no line containing 'Save' contains ' (disabled)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-verb",
+        "title": "Register the pan computer CLI verb with all 15 subcommands",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T18:26:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5452",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/computer.ts",
+            "src/cli/command-groups.ts",
+            "src/cli/index.ts",
+            "scripts/slash-commands-curation.json",
+            "sync-sources/skills/pan/SKILL.md",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "tests/unit/cli/computer-command.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/computer-command.test.ts",
+            "npm run build:cli",
+            "node dist/cli/index.js computer --help",
+            "npm run lint:slash-commands",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "computer-command.test.ts reports all tests passed",
+            "computer --help lists capabilities, list-apps, list-windows, get-app-state, wait, click, perform-secondary-action, set-value, type-text, press-key, hotkey, paste-text, scroll, drag and release",
+            "lint:slash-commands prints 'composer-command manifest matches the CLI registry'",
+            "npm run typecheck exits 0 with no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-7",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work item 4: create src/cli/commands/computer.ts (registerComputerCommands, modeled on semgrep.ts, lazy-importing src/lib/computer-use/commands.js, wait.js and format.js) with the 15 subcommands and flags listed in the PRD, --json on all, --window-index/--restore-window/--no-screenshot on actions and get-app-state; errors print via format.ts to stderr (text) or stdout (--json) and exit through exitCli(1). Add the computer group in src/cli/command-groups.ts after semgrep, groups.register('computer') in src/cli/index.ts after semgrep, \"computer\": \"Core\" in scripts/slash-commands-curation.json, the umbrella line in sync-sources/skills/pan/SKILL.md, regenerate packages/contracts/src/composer-commands.generated.ts (npm run build:cli && npm run generate:slash-commands), and add tests/unit/cli/computer-command.test.ts following tests/unit/cli/semgrep-command.test.ts."
+        },
+        "items": [
+          {
+            "id": "cli-verb.ac1",
+            "title": "Given the built CLI, when node dist/cli/index.js computer --help runs, then it prints all 15 subcommand names from the PRD",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-verb.ac2",
+            "title": "Given click --app calc --element-index 3 --click-count 2, when the command parses, then the mocked click function receives app 'calc', elementIndex 3 and clickCount 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-verb.ac3",
+            "title": "Given the mocked command throws ComputerUseError('disabled', 'm'), then the CLI prints 'pan computer: m' to stderr and calls exitCli(1); with --json it prints {\"ok\":false,\"error\":{\"code\":\"disabled\",\"message\":\"m\"}} to stdout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-verb.ac4",
+            "title": "The regenerated composer-commands.generated.ts contains a pan-computer row with \"category\":\"Core\" and npm run lint:slash-commands exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill",
+        "title": "Ship the pan-computer-use skill to every harness",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T18:26:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5452",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-computer-use/SKILL.md",
+            "tests/fixtures/synced-skills.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/fixtures/synced-skills.test.ts",
+            "npm run build:cli",
+            "subs=$(node dist/cli/index.js computer --help | awk '/^Commands:/{f=1;next} f && /^  [a-z]/{print $1}'); grep -oE '(^[[:space:]]*|`)pan computer [a-z-]+[^`]*' sync-sources/skills/pan-computer-use/SKILL.md | sed -E 's/^[[:space:]`]*//' | while read -r _ _ sub rest; do grep -qx -- \"$sub\" <<<\"$subs\" || { echo \"unknown subcommand: $sub\"; exit 1; }; help=$(node dist/cli/index.js computer \"$sub\" --help); for flag in $(grep -oE -- '--[a-z-]+' <<<\"$rest\"); do grep -qE -- \"(^|[[:space:],])${flag}([[:space:],=]|\\$)\" <<<\"$help\" || { echo \"unknown flag $flag for $sub\"; exit 1; }; done; done",
+            "npm run lint:skills"
+          ],
+          "expected_outputs": [
+            "synced-skills.test.ts reports all tests passed",
+            "the skill-command loop prints nothing and exits 0",
+            "lint:skills prints 'skill CLI lint passed'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work item 5: create sync-sources/skills/pan-computer-use/SKILL.md with the frontmatter shape of pan-semgrep (name, the exact PRD description, triggers, allowed-tools Bash and Read) and a body adapted from Orca's skill-guides/orca-computer-use.md at c6b9ac9549b (ORCA computer -> pan computer, the MIT attribution line, the listed sections trimmed to v1, macOS/treeDiff/background/Windows material dropped) plus the Overdeck section (desktop_busy, non-retryable codes, stdin for secrets, release when done, the 11-code error table). Add pan-computer-use to tests/fixtures/synced-skills.txt in sorted position. Then run the PRD Work item 5 loop verbatim; it must print nothing and exit 0."
+        },
+        "items": [
+          {
+            "id": "skill.ac1",
+            "title": "Given the skill file, its frontmatter name returns 'pan-computer-use' and its description starts with 'Read and operate a visible local desktop app'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill.ac2",
+            "title": "Given every 'pan computer <sub> --flag' in SKILL.md, when the PRD Work item 5 loop runs against the built CLI, then it prints nothing and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill.ac3",
+            "title": "The skill contains an error table with a row for each of the 11 codes in ComputerUseErrorCode and tells agents to run pan computer release when finished",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill.ac4",
+            "title": "Given tests/fixtures/synced-skills.txt contains pan-computer-use, when synced-skills.test.ts runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-row",
+        "title": "Report computer-use readiness in pan doctor when the feature is on",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T18:26:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5452",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor-computer-use.ts",
+            "src/cli/commands/doctor.ts",
+            "src/cli/commands/__tests__/doctor-computer-use.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/doctor-computer-use.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "doctor-computer-use.test.ts reports all tests passed",
+            "npm run typecheck exits 0 with no errors",
+            "lint-file-size reports no file over its cap"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work item 6: create src/cli/commands/doctor-computer-use.ts exporting checkComputerUse({ config, platform?, deps? }) with a locally re-declared CheckResult, returning [] when computerUse.enabled is false, otherwise the rows in the PRD order (non-Linux warn, missing gi/Atspi error, no desktop warn, X11 without xdotool error, no clipboard tool warn, Wayland without grim warn, GNOME toolkit-accessibility not true warn, and a single ok 'Ready (<session>, display <d>)' row when the handshake succeeds), each probe through async execFile with a 5 s timeout. Add the import and the one-line call after checkSemgrep in src/cli/commands/doctor.ts. Add src/cli/commands/__tests__/doctor-computer-use.test.ts."
+        },
+        "items": [
+          {
+            "id": "doctor-row.ac1",
+            "title": "Given computerUse.enabled false, when checkComputerUse runs, then it returns an empty array and runs no probe",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-row.ac2",
+            "title": "Given the gi import probe fails, then checkComputerUse returns an error row whose fix is 'sudo apt install python3-gi gir1.2-atspi-2.0'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-row.ac3",
+            "title": "Given resolveDesktopEnv returns no_desktop_session, then checkComputerUse returns a warn row 'No desktop session here; pan computer refuses on this host'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-row.ac4",
+            "title": "Given every probe succeeds on X11 with DISPLAY=:1, then checkComputerUse returns exactly one ok row 'Ready (x11, display :1)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-pages",
+        "title": "Document computer use in the config docs, CLI reference and changelog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T18:26:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5452",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/computer-use.mdx",
+            "docs.json",
+            "cli/core-commands.mdx",
+            "changelog.d/pan-5452.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "node -e \"const p=require('./docs.json');const s=JSON.stringify(p);process.exit(s.indexOf('configuration/computer-use')>s.indexOf('configuration/semgrep')?0:1)\""
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "the docs.json order check exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work item 7: create configuration/computer-use.mdx (title 'Computer use', description, sections What it does, Turn it on, Requirements, Commands table of all 15 subcommands, One agent at a time, Where files go, Safety, Limits, Troubleshooting) in the voice of configuration/semgrep.mdx; add \"configuration/computer-use\" to docs.json directly after \"configuration/semgrep\"; add a '## pan computer' section after '## pan semgrep ci-setup' in cli/core-commands.mdx with the three PRD examples and a link to /configuration/computer-use; add changelog.d/pan-5452.md with the PRD's '#### New' bullet. Use &#36; and &lt; escapes where lint:docs requires them."
+        },
+        "items": [
+          {
+            "id": "docs-pages.ac1",
+            "title": "configuration/computer-use.mdx contains a Commands table with a row for each of the 15 subcommands that node dist/cli/index.js computer --help prints",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pages.ac2",
+            "title": "docs.json contains configuration/computer-use directly after configuration/semgrep in the same nav group",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pages.ac3",
+            "title": "cli/core-commands.mdx contains a '## pan computer' section that links to /configuration/computer-use and states that it needs computer_use.enabled: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pages.ac4",
+            "title": "changelog.d/pan-5452.md contains one '#### New' heading with a '**Computer use:**' bullet, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-verification",
+        "title": "Verify pan computer on the operator's real X11 desktop",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T18:26:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5452",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/computer-use/*.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "OVERDECK_HOME=$HOME/.overdeck/tmp/pan-5452-verify node dist/cli/index.js computer capabilities --json",
+            "OVERDECK_HOME=$HOME/.overdeck/tmp/pan-5452-verify node dist/cli/index.js computer list-apps"
+          ],
+          "expected_outputs": [
+            "capabilities prints JSON with ok true and platform linux",
+            "list-apps prints the names of running desktop apps"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "FR-8",
+            "FR-13"
+          ],
+          "readinessReason": "Drives the one shared physical desktop, so it must run alone after every code item lands."
+        },
+        "narrative": {
+          "Action": "Follow PRD Work item 8 (implementation checkpoint, runs on the host, alone): build with npm run build:cli; create the throwaway home ~/.overdeck/tmp/pan-5452-verify with a config.yaml enabling computer_use; prefix each command with OVERDECK_HOME=$HOME/.overdeck/tmp/pan-5452-verify (never export it, never start a dashboard with it) and run node dist/cli/index.js computer for steps 1-5 (capabilities, list-apps, get-app-state + click on gnome-calculator or gnome-text-editor launched with the systemd desktop env, alt+F4 refusal, two-holder lease contention then release --force). Never click in a browser window. Fix any defect found in the module that owns it with its own test. Paste commands and trimmed output into the PR body under 'Live verification', then rm -rf ~/.overdeck/tmp/pan-5452-verify."
+        },
+        "items": [
+          {
+            "id": "live-verification.ac1",
+            "title": "Given the throwaway home with computer_use enabled, when capabilities --json runs, then it prints ok true and platform linux",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-verification.ac2",
+            "title": "Given gnome-calculator (or gnome-text-editor) open, when get-app-state runs and then click acts on the '7' button, then the returned tree shows the change and the printed screenshot path exists as a PNG file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-verification.ac3",
+            "title": "When hotkey --app <name> --key alt+F4 runs, then it exits 1 with code system_shortcut_blocked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-verification.ac4",
+            "title": "Given OVERDECK_AGENT_ID=a holds the lease, when an input command runs with OVERDECK_AGENT_ID=b, then it exits 1 with desktop_busy, and release --force then clears it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-verification.ac5",
+            "title": "The PR body contains a 'Live verification' section with the commands and trimmed real output, and ~/.overdeck/tmp/pan-5452-verify no longer exists afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "vendor-helper",
+        "to": "blocked-keys",
+        "type": "blocks"
+      },
+      {
+        "from": "paths-and-errors",
+        "to": "desktop-env",
+        "type": "blocks"
+      },
+      {
+        "from": "paths-and-errors",
+        "to": "helper-runner",
+        "type": "blocks"
+      },
+      {
+        "from": "paths-and-errors",
+        "to": "desktop-lease",
+        "type": "blocks"
+      },
+      {
+        "from": "paths-and-errors",
+        "to": "snapshot-store",
+        "type": "blocks"
+      },
+      {
+        "from": "paths-and-errors",
+        "to": "blocked-keys",
+        "type": "blocks"
+      },
+      {
+        "from": "paths-and-errors",
+        "to": "format-output",
+        "type": "blocks"
+      },
+      {
+        "from": "paths-and-errors",
+        "to": "run-preamble",
+        "type": "blocks"
+      },
+      {
+        "from": "config-flag",
+        "to": "run-preamble",
+        "type": "blocks"
+      },
+      {
+        "from": "desktop-env",
+        "to": "run-preamble",
+        "type": "blocks"
+      },
+      {
+        "from": "helper-runner",
+        "to": "run-preamble",
+        "type": "blocks"
+      },
+      {
+        "from": "desktop-lease",
+        "to": "run-preamble",
+        "type": "blocks"
+      },
+      {
+        "from": "snapshot-store",
+        "to": "run-preamble",
+        "type": "blocks"
+      },
+      {
+        "from": "run-preamble",
+        "to": "command-builders",
+        "type": "blocks"
+      },
+      {
+        "from": "run-preamble",
+        "to": "wait-command",
+        "type": "blocks"
+      },
+      {
+        "from": "blocked-keys",
+        "to": "command-builders",
+        "type": "blocks"
+      },
+      {
+        "from": "tree-filter",
+        "to": "command-builders",
+        "type": "blocks"
+      },
+      {
+        "from": "command-builders",
+        "to": "cli-verb",
+        "type": "blocks"
+      },
+      {
+        "from": "wait-command",
+        "to": "cli-verb",
+        "type": "blocks"
+      },
+      {
+        "from": "format-output",
+        "to": "cli-verb",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-verb",
+        "to": "skill",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-verb",
+        "to": "docs-pages",
+        "type": "blocks"
+      },
+      {
+        "from": "config-flag",
+        "to": "doctor-row",
+        "type": "blocks"
+      },
+      {
+        "from": "desktop-env",
+        "to": "doctor-row",
+        "type": "blocks"
+      },
+      {
+        "from": "helper-runner",
+        "to": "doctor-row",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-verb",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "doctor-row",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "vendor-helper",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "paths-and-errors",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "desktop-env",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "helper-runner",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "desktop-lease",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "snapshot-store",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "blocked-keys",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "tree-filter",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "format-output",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "run-preamble",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "command-builders",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "wait-command",
+        "to": "live-verification",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

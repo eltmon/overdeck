@@ -139,6 +139,7 @@
               "configuration/memory-governor",
               "configuration/jev",
               "configuration/semgrep",
+              "configuration/computer-use",
               "configuration/context-layers",
               "configuration/skills",
               "configuration/memory",

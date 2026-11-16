@@ -9,6 +9,7 @@ import type { NormalizedConfig } from './schema.js';
 import { DEFAULT_NORMALIZED_OLLAMA } from './ollama.js';
 import { DEFAULT_NORMALIZED_JEV } from './jev.js';
 import { DEFAULT_NORMALIZED_SECURITY } from './semgrep.js';
+import { DEFAULT_NORMALIZED_COMPUTER_USE } from './computer-use.js';
 import { defaultPushConfig } from './push-config.js';
 import { defaultMcpConfig } from './mcp-config.js';
 
@@ -55,6 +56,7 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   jev: { ...DEFAULT_NORMALIZED_JEV },
   // PAN-4585: Semgrep support is off until security.semgrep.enabled is true.
   security: { semgrep: { ...DEFAULT_NORMALIZED_SECURITY.semgrep } },
+  computerUse: { ...DEFAULT_NORMALIZED_COMPUTER_USE }, // PAN-5452: desktop control is off until the operator turns it on
   enabledProviders: new Set(['anthropic']), // Only Anthropic by default
   // Seeded conversation-model default for brand-new installs (operator
   // decision, 2026-07-12): the new-conversation picker must never be empty.

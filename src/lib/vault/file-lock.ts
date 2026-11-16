@@ -17,6 +17,8 @@ export interface FileLockOptions {
   retryMs?: number;
   /** Give up after this many attempts. */
   maxAttempts?: number;
+  /** Names the process family in the timeout message (PAN-5452); defaults to 'pan vault'. */
+  label?: string;
 }
 
 export const DEFAULT_LOCK_STALE_MS = 30_000;
@@ -43,7 +45,7 @@ async function acquire(lockPath: string, options: FileLockOptions): Promise<void
       await new Promise((resolve) => setTimeout(resolve, retryMs));
     }
   }
-  throw new Error(`Could not acquire lock ${lockPath}; another pan vault process may be stuck`);
+  throw new Error(`Could not acquire lock ${lockPath}; another ${options.label ?? 'pan vault'} process may be stuck`);
 }
 
 /** Run `fn` while holding the O_EXCL lock at `lockPath`. Not reentrant. */
