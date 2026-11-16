@@ -4,17 +4,17 @@
     "created": "2026-11-16T15:50:12Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4594: Dashboard Semgrep controls: Settings security section, per-project override, findings in issue view",
-    "updated": "2026-11-16T16:03:03.178Z"
+    "updated": "2026-11-16T16:04:15.219Z"
   },
   "plan": {
     "id": "pan-4594",
     "title": "Dashboard Semgrep controls: Settings security section, per-project override",
-    "status": "proposed",
+    "status": "running",
     "uid": "757dc1ba-80ae-4c19-b02c-ae198fa68379",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-16T15:50:12Z",
-    "updated": "2026-11-16T16:03:03.178Z",
+    "updated": "2026-11-16T16:04:15.219Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4594",
@@ -662,5 +662,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
