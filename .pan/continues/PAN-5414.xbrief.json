@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5414",
   "created": "2026-11-16T03:24:08.774Z",
-  "updated": "2026-11-16T03:40:35.423Z",
+  "updated": "2026-11-16T03:40:46.045Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
     "row-actions-group.ac5": {
       "status": "completed",
       "doneAt": "2026-11-16T03:40:35.422Z"
+    },
+    "row-right-padding": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5414",
+      "claimedAt": "2026-11-16T03:40:46.045Z"
     }
   }
 }
