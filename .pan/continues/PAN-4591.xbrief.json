@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4591",
   "created": "2026-11-16T11:39:00.796Z",
-  "updated": "2026-11-16T11:54:59.357Z",
+  "updated": "2026-11-16T12:01:23.704Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,30 @@
     "config-keys.ac3": {
       "status": "completed",
       "doneAt": "2026-11-16T11:54:59.357Z"
+    },
+    "mcp-resolver": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:01:23.703Z"
+    },
+    "mcp-resolver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:01:23.703Z"
+    },
+    "mcp-resolver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:01:23.703Z"
+    },
+    "mcp-resolver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:01:23.703Z"
+    },
+    "mcp-resolver.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:01:23.703Z"
+    },
+    "mcp-resolver.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:01:23.703Z"
     }
   }
 }
