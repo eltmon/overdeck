@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5459",
   "created": "2026-11-16T23:02:28.883Z",
-  "updated": "2026-11-16T23:06:44.560Z",
+  "updated": "2026-11-16T23:09:03.742Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,9 +32,22 @@
       "doneAt": "2026-11-16T23:06:20.097Z"
     },
     "nslots-pressure-waits": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5459",
-      "claimedAt": "2026-11-16T23:06:44.559Z"
+      "claimedAt": "2026-11-16T23:06:44.559Z",
+      "doneAt": "2026-11-16T23:09:03.741Z"
+    },
+    "nslots-pressure-waits.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:09:03.741Z"
+    },
+    "nslots-pressure-waits.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:09:03.741Z"
+    },
+    "nslots-pressure-waits.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:09:03.741Z"
     }
   }
 }
