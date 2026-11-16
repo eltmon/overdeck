@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:25:51.179Z",
+  "updated": "2026-11-16T11:30:25.712Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,11 @@
     "modal-form-styles.ac2": {
       "status": "completed",
       "doneAt": "2026-11-16T11:25:51.179Z"
+    },
+    "delete-dead-dialogs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:30:25.712Z"
     }
   }
 }
