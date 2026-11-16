@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4561",
   "created": "2026-11-16T11:22:23.903Z",
-  "updated": "2026-11-16T11:41:43.738Z",
+  "updated": "2026-11-16T11:41:48.491Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,6 +58,11 @@
     "visx-4.ac2": {
       "status": "completed",
       "doneAt": "2026-11-16T11:41:43.738Z"
+    },
+    "compiler-on": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4561",
+      "claimedAt": "2026-11-16T11:41:48.491Z"
     }
   }
 }
