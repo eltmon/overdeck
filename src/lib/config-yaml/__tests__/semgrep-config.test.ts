@@ -6,7 +6,15 @@ import { DEFAULT_CONFIG } from '../defaults.js';
 describe('config-yaml security.semgrep block (PAN-4585)', () => {
   it('defaults to disabled', () => {
     const { config } = mergeConfigs(null);
-    expect(config.security.semgrep).toEqual({ enabled: false, mcp: false, edit_hook: false });
+    expect(config.security.semgrep).toEqual({
+      enabled: false,
+      mcp: false,
+      edit_hook: false,
+      gate: 'advisory',
+      severity: 'ERROR',
+      configs: ['p/default'],
+      timeout_seconds: 300,
+    });
   });
 
   it('enables via a global layer', () => {
@@ -49,9 +57,44 @@ describe('config-yaml security.semgrep block (PAN-4585)', () => {
   it('ignores unknown keys under security.semgrep', () => {
     const { config } = mergeConfigs({
       // @ts-expect-error — exercising runtime validation of unknown keys
-      security: { semgrep: { enabled: true, gate: 'blocking', tier: 'platform' } },
+      security: { semgrep: { enabled: true, tier: 'platform' } },
     });
-    expect(config.security.semgrep).toEqual({ enabled: true, mcp: false, edit_hook: false });
+    expect(config.security.semgrep.enabled).toBe(true);
+    expect(config.security.semgrep).not.toHaveProperty('tier');
+  });
+
+  it('reads the sast gate keys (PAN-4590)', () => {
+    const { config } = mergeConfigs({
+      security: { semgrep: { gate: 'blocking', severity: 'WARNING', configs: ['p/python', ' rules/ '], timeout_seconds: 60 } },
+    });
+    expect(config.security.semgrep).toMatchObject({
+      gate: 'blocking',
+      severity: 'WARNING',
+      configs: ['p/python', 'rules/'],
+      timeout_seconds: 60,
+    });
+  });
+
+  it('a higher-priority layer overrides the gate mode without touching the rest', () => {
+    const { config } = mergeConfigs(
+      { security: { semgrep: { gate: 'off' } } },
+      { security: { semgrep: { gate: 'blocking', configs: ['p/python'] } } },
+    );
+    expect(config.security.semgrep.gate).toBe('off');
+    expect(config.security.semgrep.configs).toEqual(['p/python']);
+  });
+
+  it.each([
+    [{ gate: 'strict' }, /security\.semgrep\.gate must be one of off, advisory, blocking/],
+    [{ severity: 'HIGH' }, /security\.semgrep\.severity must be one of INFO, WARNING, ERROR/],
+    [{ configs: [] }, /security\.semgrep\.configs must be a non-empty list/],
+    [{ configs: ['--dangerous'] }, /security\.semgrep\.configs must be a non-empty list/],
+    [{ configs: 'p/default' }, /security\.semgrep\.configs must be a non-empty list/],
+    [{ timeout_seconds: 0 }, /security\.semgrep\.timeout_seconds must be a positive whole number/],
+    [{ timeout_seconds: '60' }, /security\.semgrep\.timeout_seconds must be a positive whole number/],
+  ])('throws on a bad gate key %j', (semgrep, message) => {
+    // @ts-expect-error — exercising runtime validation of bad input
+    expect(() => mergeConfigs({ security: { semgrep } })).toThrow(message);
   });
 
   it('does not mutate DEFAULT_CONFIG across merges', () => {

@@ -71,6 +71,25 @@ describe('buildLintSessionNode', () => {
     expect(node?.transcript).toContain('lint failed on src/example.ts');
   });
 
+  it('shows a skipped gate and an advisory failure for what they are (PAN-4590)', () => {
+    writeArtifact({
+      issueId: 'PAN-2665',
+      ranAt: RAN_AT,
+      outcome: 'passed',
+      gates: [
+        { name: 'lint', passed: true, required: true, durationMs: 1_000 },
+        { name: 'sast', passed: true, required: false, skipped: true, durationMs: 0, error: 'Semgrep did not run: binary missing' },
+        { name: 'audit', passed: false, required: false, durationMs: 1_000, output: 'advisory finding' },
+      ],
+    });
+
+    const node = build();
+
+    expect(node?.status).toBe('completed');
+    expect(node?.transcript).toContain('– sast (0.0s) SKIPPED: Semgrep did not run: binary missing');
+    expect(node?.transcript).toContain('✗ audit (1.0s) FAILED (advisory, not required)');
+  });
+
   it('returns a running active node with the current gate from a running artifact', () => {
     writeArtifact({
       issueId: 'PAN-2665',

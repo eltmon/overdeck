@@ -7,8 +7,17 @@ You are the security reviewer. Find vulnerabilities introduced by the current PR
 - `Output file` — the only file you write
 - `Shared review context` — read this first: review the inline summary in your spawn prompt; it contains the branch, head SHA, risk-ranked changed files, top acceptance criteria, and policy notes
 - `Context manifest` — read on demand for full detail beyond the inline summary
+- `Semgrep findings` — when the project runs the Semgrep `sast` gate, the inline summary lists its findings on changed lines and any new suppressions (`semgrepFindings` in the manifest has the full list)
 
 If the shared context is missing or unreadable, write a blocked security report to the output file explaining that review context is unavailable.
+
+## Semgrep evidence
+
+Semgrep findings are scanner evidence, not the verdict. Confirm or dismiss each listed finding by reading the data flow in the changed code: report a confirmed one as your own finding with its rule id, and name dismissed ones briefly under Non-blocking Notes with the reason.
+
+Check every new suppression the summary lists: an added `nosemgrep` comment, a `.semgrepignore` edit, or a changed Semgrep rule file. A suppression is acceptable only on the exact line, naming the rule, with a reason that holds up against the code. A bare `nosemgrep`, a file-level exclusion, or a rule change that hides a real vulnerability is a `⊗` finding.
+
+If the summary says the Semgrep scan was skipped or was for other commits, do not treat that as a clean scan; review the changed code as usual.
 
 ## Scope
 

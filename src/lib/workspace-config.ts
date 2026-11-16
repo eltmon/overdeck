@@ -119,9 +119,13 @@ export interface TestConfig {
  * with or without a matrix suffix) as the test gate; `local` runs it on the
  * host. Unset = `ci` when the project has a `github_repo` and a
  * `.github/workflows/` directory, else `local`.
+ *
+ * PAN-4590: `sast` overrides `security.semgrep.gate` for this project only.
+ * It cannot turn Semgrep on: with `security.semgrep.enabled: false` no scan runs.
  */
 export interface ProjectVerificationConfig {
   tests?: 'ci' | 'local';
+  sast?: 'off' | 'advisory' | 'blocking';
 }
 
 export interface QualityGateConfig {

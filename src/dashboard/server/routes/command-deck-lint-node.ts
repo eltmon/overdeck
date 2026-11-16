@@ -47,9 +47,14 @@ export function buildLintSessionNode(options: {
     '',
   ];
   for (const gate of artifact.gates) {
-    const mark = gate.passed ? '✓' : '✗';
     const secs = (gate.durationMs / 1000).toFixed(1);
-    transcriptParts.push(`${mark} ${gate.name} (${secs}s)${gate.passed ? '' : ' FAILED'}`);
+    // PAN-4590: a skipped gate checked nothing; say so instead of a bare check mark.
+    if (gate.skipped) {
+      transcriptParts.push(`– ${gate.name} (${secs}s) SKIPPED${gate.error ? `: ${gate.error}` : ''}`);
+      continue;
+    }
+    const mark = gate.passed ? '✓' : '✗';
+    transcriptParts.push(`${mark} ${gate.name} (${secs}s)${gate.passed ? '' : gate.required ? ' FAILED' : ' FAILED (advisory, not required)'}`);
   }
   if (isRunning && artifact.currentGate) {
     transcriptParts.push(`▶ ${artifact.currentGate} running…`);

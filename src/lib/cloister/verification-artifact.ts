@@ -22,6 +22,8 @@ export interface VerificationGateRecord {
   /** Complete gate stdout+stderr for failed gates. */
   output?: string;
   error?: string;
+  /** PAN-4590: the gate checked nothing; `error` says why. Never a failure. */
+  skipped?: boolean;
 }
 
 export interface VerificationArtifact {
@@ -116,10 +118,13 @@ export function writeVerificationArtifact(
       passed: r.passed,
       required: r.required !== false,
       durationMs: r.durationMs,
-      // Keep full output only where it matters: failures. Passing gates get a
-      // clean record without megabytes of build noise.
-      ...(r.passed ? {} : { output: r.output }),
+      // Keep full output only where it matters: failures, skipped gates and
+      // passing gates that ask for it (PAN-4590), so a skip or a listed
+      // suppression stays visible. Other passing gates get a clean record
+      // without megabytes of build noise.
+      ...(r.passed && !r.skipped && !r.keepOutput ? {} : { output: r.output }),
       ...(r.error ? { error: r.error } : {}),
+      ...(r.skipped ? { skipped: true } : {}),
     })),
     ...(options?.deferredToCi && options.deferredToCi.length > 0 ? { deferredToCi: [...options.deferredToCi] } : {}),
     ...(options?.testsMode ? { testsMode: { ...options.testsMode } } : {}),
