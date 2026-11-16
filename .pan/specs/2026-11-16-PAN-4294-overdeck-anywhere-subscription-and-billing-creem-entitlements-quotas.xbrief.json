@@ -4,17 +4,17 @@
     "created": "2026-11-16T20:01:25Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4294: Overdeck Anywhere: subscription and billing (Creem, entitlements, quotas)",
-    "updated": "2026-11-16T20:09:15.654Z"
+    "updated": "2026-11-16T20:10:26.614Z"
   },
   "plan": {
     "id": "pan-4294",
     "title": "Overdeck Anywhere: subscription and billing (Creem, entitlements, quotas)",
-    "status": "proposed",
+    "status": "running",
     "uid": "4344c041-b94e-497d-89bd-0dd8ecaff0fd",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-16T20:01:25Z",
-    "updated": "2026-11-16T20:09:15.654Z",
+    "updated": "2026-11-16T20:10:26.614Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4294",
@@ -990,5 +990,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
