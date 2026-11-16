@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { PaneBar } from './PaneBar'
 import type { WorkspacePane } from '../../lib/panesStore'
 
@@ -236,3 +236,23 @@ describe('PaneBar', () => {
     expect(onTabDetach).not.toHaveBeenCalled()
   })
 })
+
+describe('PaneBar tab prefix (PAN-5343 H-D9)', () => {
+  it('renders the prefix before each tab label', () => {
+    render(
+      <PaneBar
+        panes={makePanes()}
+        activePaneId="h"
+        onSelect={() => {}}
+        onClose={() => {}}
+        onAdd={() => {}}
+        renderTabPrefix={(pane) => <span data-testid={`prefix-${pane.paneId}`}>P</span>}
+      />,
+    )
+    const tab = screen.getAllByRole('tab')[1]!
+    const prefix = within(tab).getByTestId('prefix-t')
+    const label = within(tab).getByText('Terminal')
+    expect(prefix.compareDocumentPosition(label) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+})
+

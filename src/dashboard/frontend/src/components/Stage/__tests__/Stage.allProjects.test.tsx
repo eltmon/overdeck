@@ -19,6 +19,7 @@ import { flushPanesPersistence, usePanesStore, type WorkspacePane } from '../../
 import { resetDeckLayoutStore, useDeckLayoutStore } from '../../../lib/deckLayoutStore'
 import { presetLayout, type PaneLayout } from '../../../lib/paneLayout'
 import { installWorkDockFetchMock } from '../../../test-utils/strictFetchMock'
+import type { Conversation } from '../../CommandDeck/ConversationList'
 import { CONVERSATION_DRAG_TYPE, useConversationDragStore } from '../conversationDragStore'
 
 const ALL = '__all-projects__'
@@ -41,13 +42,24 @@ function agent(id: string): WorkspacePane {
   return { paneId: id, paneType: 'agent', label: `Chat ${id}`, createdAt: 1, conversationId: `conv-${id}` }
 }
 
-function renderStage(deckKey: string): void {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+function renderStage(deckKey: string, conversations?: Conversation[]): void {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
+  qc.setQueryData(['registered-projects'], [
+    { key: 'overdeck', name: 'overdeck', path: '/p/overdeck' },
+    { key: 'dfai', name: 'DFAI', path: '/p/dfai' },
+  ])
   render(
     <QueryClientProvider client={qc}>
-      <Stage deckKey={deckKey} renderHome={() => <div data-testid="home" />} renderIssue={(id: string) => <div>{id}</div>} />
+      <Stage deckKey={deckKey} conversations={conversations} renderHome={() => <div data-testid="home" />} renderIssue={(id: string) => <div>{id}</div>} />
     </QueryClientProvider>,
   )
+}
+
+function conversationOf(name: string, projectKey: string | null): Conversation {
+  return {
+    id: name.length, name, title: name, projectKey, cwd: projectKey ? `/p/${projectKey}` : '/tmp/x', tmuxSession: `conv-${name}`,
+    status: 'active', issueId: null, createdAt: '2026-11-15T00:00:00Z', endedAt: null, lastAttachedAt: null, sessionAlive: true,
+  } as Conversation
 }
 
 function renderBar(panes: WorkspacePane[], layout: PaneLayout | null, activePaneId: string | null): void {
@@ -157,6 +169,32 @@ describe('Stage conversation drop (PAN-5343 H-D8)', () => {
     const created = panes.find((p) => p.conversationId === 'conv-new')
     expect(layout).toEqual(presetLayout(['a', created!.paneId], 2))
     expect(useConversationDragStore.getState().dragging).toBeNull()
+  })
+})
+
+describe('Stage project marks (PAN-5343 H-D9)', () => {
+  const dfaiPane: WorkspacePane = { paneId: 'd', paneType: 'agent', label: 'Tune the model', createdAt: 1, conversationId: 'df-model' }
+  const orphanPane: WorkspacePane = { paneId: 'n', paneType: 'agent', label: 'Scratch', createdAt: 1, conversationId: 'scratch' }
+
+  it('marks agent tabs and split headers with their project in the All deck', () => {
+    localStorage.setItem(`pan-panes:${ALL}`, JSON.stringify([dfaiPane, orphanPane]))
+    localStorage.setItem(`pan-active-pane:${ALL}`, 'd')
+    localStorage.setItem(`pan-layout:${ALL}`, JSON.stringify(presetLayout(['d', 'n'], 2)))
+    renderStage(ALL, [conversationOf('df-model', 'dfai'), conversationOf('scratch', null)])
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs[0]).toHaveTextContent('DF')
+    expect(tabs[1]).toHaveTextContent('–')
+    // Each split header carries the same mark.
+    expect(screen.getAllByText('DF').length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('renders no project mark on agent tabs in a project deck', () => {
+    localStorage.setItem('pan-panes:dfai', JSON.stringify([{ paneId: 'home', paneType: 'home', label: 'Home', createdAt: 1, isPermanent: true }, dfaiPane]))
+    localStorage.setItem('pan-active-pane:dfai', 'd')
+    renderStage('dfai', [conversationOf('df-model', 'dfai')])
+    const agentTab = screen.getAllByRole('tab').find((t) => t.getAttribute('data-tab-type') === 'agent')!
+    expect(agentTab).not.toHaveTextContent('DF')
+    expect(screen.queryByText('DF')).not.toBeInTheDocument()
   })
 })
 

@@ -52,6 +52,8 @@ export interface PaneBarProps {
   onTabDetach?: (paneId: PaneId, conversationId: string) => void
   /** PAN-5343 H-D7: rendered after the tab list button (the All deck's Layout bar). */
   trailing?: ReactNode
+  /** PAN-5343 H-D9: rendered before each tab's label (the All deck's project marks). */
+  renderTabPrefix?: (pane: WorkspacePane) => ReactNode
 }
 
 /**
@@ -62,7 +64,7 @@ export interface PaneBarProps {
  * no shortcut chips (the keys stay in the registry and the `?` sheet), and an
  * "N tabs ▾" list after the strip reaches every tab (PAN-5295 D2-16).
  */
-export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, onClose, onAdd, newActions, onPaneContextMenu, onTabDragStart, onTabDragEnd, onTabDetach, trailing }: PaneBarProps) {
+export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, onClose, onAdd, newActions, onPaneContextMenu, onTabDragStart, onTabDragEnd, onTabDetach, trailing, renderTabPrefix }: PaneBarProps) {
   // One portaled menu at a time: the + create menu or the "N tabs" list.
   const [menu, setMenu] = useState<{ kind: 'add' | 'tabs'; top: number; left: number } | null>(null)
   const addBtnRef = useRef<HTMLButtonElement>(null)
@@ -195,6 +197,7 @@ export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, on
             <span className={styles.panetabIcon}>
               <Icon size={14} />
             </span>
+            {renderTabPrefix?.(pane)}
             <span className={`${styles.panetabLabel} ${pane.paneType === 'code' && pane.explorerPreview ? 'italic' : ''}`}>{pane.label}</span>
             {pane.paneType === 'code' ? <CodeTabDirtyDot rootId={pane.explorerRootId} path={pane.explorerPath} /> : null}
             {closable && (
@@ -299,6 +302,7 @@ export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, on
                   onClick={() => { setMenu(null); onSelect(pane.paneId) }}
                 >
                   <Icon size={14} />
+                  {renderTabPrefix?.(pane)}
                   <span className={styles.panetabLabel}>{pane.label}</span>
                 </button>
               )

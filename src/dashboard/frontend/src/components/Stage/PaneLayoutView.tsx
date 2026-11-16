@@ -31,6 +31,8 @@ export interface PaneLayoutViewProps {
   draggingConversation?: boolean
   /** PAN-5343 H-D8: a conversation row was dropped on a leaf. */
   onDropConversation?: (targetPaneId: string, name: string, zone: DropZone) => void
+  /** PAN-5343 H-D9: rendered before each split header's label (the All deck's project marks). */
+  renderHeaderPrefix?: (pane: WorkspacePane) => ReactNode
 }
 
 /** Pick the drop zone from the pointer position within a region. */
@@ -69,7 +71,7 @@ function zoneStyle(zone: DropZone): React.CSSProperties {
  * is being dragged, each leaf shows edge drop zones for split-by-drag.
  */
 export function PaneLayoutView(props: PaneLayoutViewProps) {
-  const { node, path, panesById, renderPaneContent, focusedPaneId, showHeaders, draggingPaneId, onFocus, onCloseLeaf, onRatioChange, onDropTab, onMakeOnly, draggingConversation, onDropConversation } = props
+  const { node, path, panesById, renderPaneContent, focusedPaneId, showHeaders, draggingPaneId, onFocus, onCloseLeaf, onRatioChange, onDropTab, onMakeOnly, draggingConversation, onDropConversation, renderHeaderPrefix } = props
   const containerRef = useRef<HTMLDivElement>(null)
   const [hoverZone, setHoverZone] = useState<DropZone | null>(null)
 
@@ -112,6 +114,7 @@ export function PaneLayoutView(props: PaneLayoutViewProps) {
       >
         {showHeaders && (
           <div className={`${styles.splitHeader} ${focused ? styles.splitHeaderFocused : ''}`}>
+            {pane && renderHeaderPrefix?.(pane)}
             <span className={styles.splitHeaderLabel}>{pane?.label ?? 'Pane'}</span>
             {onMakeOnly && (
               <button

@@ -54,6 +54,8 @@ import { useWorkDockStore } from '../dock/workDockStore'
 import { WorkDock } from '../dock/WorkDock'
 import { useRootContext } from '../explorer/rootForConversation'
 import { findRegisteredProject } from '../CommandDeck/UnknownProjectState'
+import { NO_PROJECT_LABEL, resolveEffectiveProjectKey } from '../CommandDeck/projectsData'
+import { ProjectMark } from '../frame/ProjectMark'
 import styles from './stage.module.css'
 
 export type { StageContext, PaneWrapperProps, StageApi } from './types'
@@ -451,7 +453,23 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
   // than guessing. Fallback (⌘T / no menu) toggles the terminal drawer.
   const handleAddPane = useCallback(() => toggleTerminal(), [toggleTerminal])
   // B-D11: the deck's project, found by key or name.
-  const deckProject = findRegisteredProject(useRootContext().projects, deckKey)
+  const registeredProjects = useRootContext().projects
+  const deckProject = findRegisteredProject(registeredProjects, deckKey)
+  // PAN-5343 H-D9: in the All deck, agent tabs and split headers carry their
+  // conversation's project mark (muted for No project).
+  const renderPaneMark = useMemo(() => {
+    if (deckKey !== ALL_PROJECTS_KEY) return undefined
+    return (pane: WorkspacePane): ReactNode => {
+      if (pane.paneType !== 'agent' || !pane.conversationId) return null
+      const conv = conversations.find((c) => c.name === pane.conversationId)
+      if (!conv) return null
+      const key = resolveEffectiveProjectKey(conv, registeredProjects)
+      const project = key ? registeredProjects.find((p) => p.key === key) : undefined
+      return project
+        ? <ProjectMark size="sm" name={project.name ?? project.key} projectKey={project.key} />
+        : <ProjectMark size="sm" name={NO_PROJECT_LABEL} muted />
+    }
+  }, [deckKey, conversations, registeredProjects])
   // PAN-5295 D2-17: create actions first, then a separator, then the drawers;
   // each shows its registered shortcut's keycap for this platform.
   const newActions = useMemo<NewPaneAction[]>(() => {
@@ -774,6 +792,7 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
             onTabDragEnd={() => setDraggingPaneId(null)}
             onTabDetach={handleTabDetach}
             trailing={layoutPresetBar}
+            renderTabPrefix={renderPaneMark}
           />
           <div className={styles.paneArea}>
             {effectiveLayout && (
@@ -790,6 +809,7 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
                 onRatioChange={onRatioChange}
                 onDropTab={onDropTab}
                 onMakeOnly={makeOnlyPane}
+                renderHeaderPrefix={renderPaneMark}
                 draggingConversation={draggingConversation}
                 onDropConversation={onDropConversation}
               />
