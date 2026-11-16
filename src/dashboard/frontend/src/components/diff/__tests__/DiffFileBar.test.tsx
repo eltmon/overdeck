@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
-import { DiffFileBar } from '../DiffFileBar'
+import { DiffFileBar, DiffViewSwitch } from '../DiffFileBar'
 
 describe('DiffFileBar', () => {
   it('renders no tablist when previewable is false', () => {
@@ -38,5 +38,22 @@ describe('DiffFileBar', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Open file' }))
     expect(onOpenFile).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('DiffViewSwitch', () => {
+  it('renders Diff and Preview tabs with aria-selected following view', () => {
+    render(<DiffViewSwitch view="preview" onView={vi.fn()} />)
+
+    expect(screen.getByRole('tab', { name: 'Diff' })).toHaveAttribute('aria-selected', 'false')
+    expect(screen.getByRole('tab', { name: 'Preview' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('calls onView("diff") when the Diff tab is clicked while view is preview', async () => {
+    const onView = vi.fn()
+    render(<DiffViewSwitch view="preview" onView={onView} />)
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Diff' }))
+    expect(onView).toHaveBeenCalledWith('diff')
   })
 })

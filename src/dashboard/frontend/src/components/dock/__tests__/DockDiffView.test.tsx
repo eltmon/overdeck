@@ -4,6 +4,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { PanRpcError } from '@overdeck/contracts'
 
+const MODIFIED_MD = `diff --git a/docs/a.md b/docs/a.md\nindex 1111111..2222222 100644\n--- a/docs/a.md\n+++ b/docs/a.md\n@@ -1 +1 @@\n-# Old\n+# New\n`
+const ADDED_MD = `diff --git a/docs/a.md b/docs/a.md\nnew file mode 100644\nindex 0000000..2222222\n--- /dev/null\n+++ b/docs/a.md\n@@ -0,0 +1,3 @@\n+# Title\n+\n+body\n`
+const DELETED_MD = `diff --git a/docs/a.md b/docs/a.md\ndeleted file mode 100644\nindex 2222222..0000000\n--- a/docs/a.md\n+++ /dev/null\n@@ -1 +0,0 @@\n-# Gone\n`
+
 const rpc = vi.hoisted(() => ({ readFile: vi.fn() }))
 vi.mock('../../explorer/explorer-rpc', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../explorer/explorer-rpc')>()),
@@ -167,5 +171,136 @@ describe('DockDiffView', () => {
     renderView({ scope: scopeFor('workspace:w1'), list: [{ path: 'docs/x.md', committedVsMain: true }] })
     expect(await screen.findByText(NO_WORKSPACE_COMMIT_DIFF)).toBeInTheDocument()
     expect(rpc.readFile).not.toHaveBeenCalled()
+    expect(screen.queryByRole('tablist')).toBeNull()
+  })
+
+  it('previews an uncommitted Markdown file as the working-tree text', async () => {
+    rpc.readFile.mockImplementation(async (_root: string, _path: string, ref?: string) => ({
+      kind: 'text',
+      text: ref === 'HEAD' ? '# Old\n' : '# New\n',
+      size: 4,
+      mtimeMs: 0,
+      signature: 's',
+      lang: 'md',
+      writable: true,
+    }))
+    renderView({ scope: scopeFor('issue:PAN-1'), list: [{ path: 'docs/a.md' }] })
+    expect(await screen.findByTestId('file-diff')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Diff' })).toHaveAttribute('aria-selected', 'true')
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+    expect(await screen.findByTestId('diff-markdown-preview')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'New' })).toBeInTheDocument()
+    expect(screen.queryByTestId('file-diff')).toBeNull()
+  })
+
+  it('previews a committedVsMain Markdown file at HEAD', async () => {
+    useDashboardStore.setState({
+      agentsById: { 'agent-pan-1': { id: 'agent-pan-1', issueId: 'PAN-1', role: 'work', status: 'running' } },
+    } as unknown as Parameters<typeof useDashboardStore.setState>[0])
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === '/api/agents/agent-pan-1/diffs/vs-main?file=docs%2Fa.md') return Response.json({ diff: MODIFIED_MD })
+      return Response.json({ error: `unexpected ${url}` }, { status: 500 })
+    })
+    rpc.readFile.mockResolvedValue({ kind: 'text', text: '# Head\n', size: 4, mtimeMs: 0, signature: 's', lang: 'md', writable: true })
+    renderView({ scope: scopeFor('issue:PAN-1'), list: [{ path: 'docs/a.md', committedVsMain: true }] })
+    expect(await screen.findByRole('tab', { name: 'Preview' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+    await waitFor(() => expect(rpc.readFile).toHaveBeenCalledWith('issue:PAN-1', 'docs/a.md', 'HEAD'))
+  })
+
+  it('previews a commit-added Markdown file from the patch text without reading the file', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.startsWith('/api/diffs/compare')) return Response.json({ diff: ADDED_MD })
+      return Response.json({ error: `unexpected ${url}` }, { status: 500 })
+    })
+    renderView({
+      scope: scopeFor('project:p'),
+      list: [{ path: 'docs/a.md', sha: 'abc', repoRoot: '/r', repoPath: 'docs/a.md' }],
+    })
+    expect(await screen.findByRole('tab', { name: 'Preview' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+    expect(await screen.findByRole('heading', { name: 'Title' })).toBeInTheDocument()
+    expect(rpc.readFile).not.toHaveBeenCalled()
+  })
+
+  it('previews a commit-modified Markdown file as the current working-tree text, with the note', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.startsWith('/api/diffs/compare')) return Response.json({ diff: MODIFIED_MD })
+      return Response.json({ error: `unexpected ${url}` }, { status: 500 })
+    })
+    rpc.readFile.mockResolvedValue({ kind: 'text', text: '# Current\n', size: 4, mtimeMs: 0, signature: 's', lang: 'md', writable: true })
+    renderView({
+      scope: scopeFor('project:p'),
+      list: [{ path: 'docs/a.md', sha: 'abc', repoRoot: '/r', repoPath: 'docs/a.md' }],
+    })
+    expect(await screen.findByRole('tab', { name: 'Preview' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+    expect(await screen.findByText('Showing the current file')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Current' })).toBeInTheDocument()
+    expect(rpc.readFile).toHaveBeenCalledWith('project:p', 'docs/a.md', undefined)
+  })
+
+  it('shows no switch for a .ts file, a deleted Markdown file, a commit-deleted Markdown file, or an edit-workspace committed file', async () => {
+    rpc.readFile.mockResolvedValue({ kind: 'text', text: 'x', size: 1, mtimeMs: 0, signature: 's', lang: 'ts', writable: true })
+    renderView({ scope: scopeFor('issue:PAN-1'), list: [{ path: 'src/a.ts' }] })
+    await screen.findByTestId('file-diff')
+    expect(screen.queryByRole('tablist')).toBeNull()
+  })
+
+  it('shows no switch for an uncommitted Markdown file deleted from the working tree', async () => {
+    rpc.readFile.mockImplementation(async (_root: string, _path: string, ref?: string) => {
+      if (ref === 'HEAD') return { kind: 'text', text: '# Gone\n', size: 5, mtimeMs: 0, signature: 's', lang: 'md', writable: true }
+      throw new PanRpcError({ message: '"docs/gone.md" does not exist', code: 'NOT_FOUND' })
+    })
+    renderView({ scope: scopeFor('issue:PAN-1'), list: [{ path: 'docs/gone.md' }] })
+    await screen.findByTestId('file-diff')
+    expect(screen.queryByRole('tablist')).toBeNull()
+  })
+
+  it('shows no switch for a commit-deleted Markdown file', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.startsWith('/api/diffs/compare')) return Response.json({ diff: DELETED_MD })
+      return Response.json({ error: `unexpected ${url}` }, { status: 500 })
+    })
+    renderView({
+      scope: scopeFor('project:p'),
+      list: [{ path: 'docs/a.md', sha: 'abc', repoRoot: '/r', repoPath: 'docs/a.md' }],
+    })
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    expect(screen.queryByRole('tablist')).toBeNull()
+  })
+
+  it('resets the switch to Diff when stepping to another target', async () => {
+    rpc.readFile.mockImplementation(async (_root: string, _path: string, ref?: string) => ({
+      kind: 'text',
+      text: ref === 'HEAD' ? '# Old\n' : '# New\n',
+      size: 4,
+      mtimeMs: 0,
+      signature: 's',
+      lang: 'md',
+      writable: true,
+    }))
+    const list = [{ path: 'docs/a.md' }, { path: 'docs/b.md' }]
+    const scope = scopeFor('issue:PAN-1')
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const { rerender } = render(
+      <QueryClientProvider client={qc}>
+        <DockDiffView deckKey="p" scope={scope} list={list} index={0} onIndex={vi.fn()} onBack={vi.fn()} />
+      </QueryClientProvider>,
+    )
+    fireEvent.click(await screen.findByRole('tab', { name: 'Preview' }))
+    expect(await screen.findByTestId('diff-markdown-preview')).toBeInTheDocument()
+
+    rerender(
+      <QueryClientProvider client={qc}>
+        <DockDiffView deckKey="p" scope={scope} list={list} index={1} onIndex={vi.fn()} onBack={vi.fn()} />
+      </QueryClientProvider>,
+    )
+    expect(await screen.findByTestId('file-diff')).toBeInTheDocument()
+    expect(screen.queryByTestId('diff-markdown-preview')).toBeNull()
   })
 })

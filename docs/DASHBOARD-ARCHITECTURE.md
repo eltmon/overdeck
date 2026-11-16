@@ -2488,7 +2488,11 @@ recent commits. Children B, D1, D2, F and G of the workflow redesign
 
 The Changes tab's per-file diffs use `GET /api/diffs/compare`, `GET
 /api/agents/:id/diffs/vs-main` and the explorer's `readFile` (`DockDiffView.tsx`); the
-diff window's All turns uses `GET /api/conversations/:name/diffs/full` (PAN-5408).
+diff window's All turns uses `GET /api/conversations/:name/diffs/full` (PAN-5408). A
+Markdown file gets the `DiffViewSwitch` from `diff/DiffFileBar.tsx` and renders
+`DiffMarkdownPreview`; `dock/changes/dockDiffPreview.ts` maps the target onto PAN-5338's
+`markdownPreviewSource` (uncommitted → working tree, `committedVsMain` → `HEAD`, a commit
+→ the added file's patch text or the current file with the note) (PAN-5341).
 
 ### Commits
 

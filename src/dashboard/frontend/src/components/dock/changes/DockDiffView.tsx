@@ -5,12 +5,14 @@
 // through the issue's agent (GET /api/agents/:id/diffs/vs-main). An
 // uncommitted file diffs its HEAD version against the working copy, read
 // through the explorer (B-D7). Previous/next wrap; J and K step through the
-// list while focus is not in a text field (§6.7).
+// list while focus is not in a text field (§6.7). A Markdown file gets the
+// Diff | Preview switch from the conversation diff window; dockDiffPreview.ts
+// picks the after side to preview (PAN-5341).
 
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, ChevronDown, ChevronUp, Columns2, LocateFixed } from 'lucide-react'
-import { parseDiffFromFile, type FileDiffMetadata } from '@pierre/diffs'
+import { parseDiffFromFile } from '@pierre/diffs'
 
 import { useShortcut, type ShortcutDef } from '../../../lib/shortcuts/registry'
 import { useDashboardStore } from '../../../lib/store'
@@ -20,10 +22,13 @@ import { useExplorerStore } from '../../explorer/explorerStore'
 import { useRootContext } from '../../explorer/rootForConversation'
 import { fileIconFor } from '../../explorer/tree/fileIcons'
 import { baseName, parentPath } from '../../explorer/tree/explorer-tree-model'
+import { DiffMarkdownPreview } from '../../diff/DiffMarkdownPreview'
+import { DiffViewSwitch, type DiffFileView } from '../../diff/DiffFileBar'
 import { PatchFiles } from '../../diff/PatchFiles'
 import { useStageDeck } from '../../Stage/StageDeckContext'
 import type { DockScope } from '../dockScope'
 import { useWorkDockStore, type DockDiffTarget } from '../workDockStore'
+import { dockMarkdownPreview, type DockDiffBody } from './dockDiffPreview'
 
 export const TOO_LARGE_SENTENCE = 'This file is too large or binary to diff here.'
 export const NO_FOLDER_SENTENCE = "Open this conversation's folder on this machine to see the diff"
@@ -37,8 +42,6 @@ export interface DockDiffViewProps {
   onIndex(index: number): void
   onBack(): void
 }
-
-type DiffData = { kind: 'patch'; patch: string } | { kind: 'files'; files: FileDiffMetadata[] } | { kind: 'message'; text: string }
 
 async function readJson(res: Response): Promise<{ diff?: string; error?: string }> {
   const body = (await res.json().catch(() => null)) as { diff?: string; error?: string } | null
@@ -88,7 +91,7 @@ export function DockDiffView({ deckKey, scope, list, index, onIndex, onBack }: D
     queryKey: ['dock-diff', rootId, target?.path, target?.sha ?? null, target?.committedVsMain ?? false, target?.repoRoot ?? null, agentId],
     enabled: target !== undefined,
     staleTime: 4000,
-    queryFn: async (): Promise<DiffData> => {
+    queryFn: async (): Promise<DockDiffBody> => {
       if (!target) return { kind: 'message', text: '' }
       if (target.sha) {
         const repo = target.repoRoot ?? projectPath ?? rootAbs
@@ -106,6 +109,7 @@ export function DockDiffView({ deckKey, scope, list, index, onIndex, onBack }: D
       }
       if (!rootId) return { kind: 'message', text: NO_FOLDER_SENTENCE }
       let workText: string
+      let deleted = false
       try {
         const work = await readFile(rootId, target.path)
         if (work.kind !== 'text') return { kind: 'message', text: TOO_LARGE_SENTENCE }
@@ -114,6 +118,7 @@ export function DockDiffView({ deckKey, scope, list, index, onIndex, onBack }: D
         // A file deleted in the working tree: diff its HEAD version against nothing.
         if (explorerErrorCode(e) !== 'NOT_FOUND') throw e
         workText = ''
+        deleted = true
       }
       let head: string
       try {
@@ -125,9 +130,21 @@ export function DockDiffView({ deckKey, scope, list, index, onIndex, onBack }: D
         if (explorerErrorCode(e) !== 'NOT_FOUND') throw e
         head = ''
       }
-      return { kind: 'files', files: [parseDiffFromFile({ name: target.path, contents: head }, { name: target.path, contents: workText })] }
+      return {
+        kind: 'files',
+        files: [parseDiffFromFile({ name: target.path, contents: head }, { name: target.path, contents: workText })],
+        deleted,
+      }
     },
   })
+
+  const [fileView, setFileView] = useState<{ key: string; view: DiffFileView } | null>(null)
+  const viewKey = target ? `${target.path}\u0000${target.sha ?? ''}\u0000${target.committedVsMain ? 'main' : ''}` : ''
+  const view: DiffFileView = fileView?.key === viewKey ? fileView.view : 'diff'
+  const previewSource = useMemo(
+    () => (target && query.isSuccess ? dockMarkdownPreview({ target, body: query.data, rootId }) : null),
+    [target, query.isSuccess, query.data, rootId],
+  )
 
   if (!target) return null
   const { Icon, label } = fileIconFor(target.path, 'file', false)
@@ -149,7 +166,8 @@ export function DockDiffView({ deckKey, scope, list, index, onIndex, onBack }: D
       : 'not committed'
 
   let body
-  if (query.isPending) body = <p className="px-3 py-3 text-xs text-muted-foreground">Loading the diff…</p>
+  if (previewSource && view === 'preview') body = <DiffMarkdownPreview source={previewSource} />
+  else if (query.isPending) body = <p className="px-3 py-3 text-xs text-muted-foreground">Loading the diff…</p>
   else if (query.isError) body = <p className="px-3 py-3 text-xs text-destructive">Couldn't load this diff: {explorerErrorMessage(query.error)}</p>
   else if (query.data.kind === 'message') body = <p className="px-3 py-3 text-xs text-muted-foreground">{query.data.text}</p>
   else if (query.data.kind === 'patch') {
@@ -179,6 +197,7 @@ export function DockDiffView({ deckKey, scope, list, index, onIndex, onBack }: D
       </div>
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1 text-xs">
         <span className="min-w-0 truncate rounded border border-border px-1.5 font-mono text-[11px] leading-[18px] text-muted-foreground">{tag}</span>
+        {previewSource && <DiffViewSwitch view={view} onView={(v) => setFileView({ key: viewKey, view: v })} />}
         <span className="ml-auto flex shrink-0 items-center gap-1">
           <button
             type="button"
