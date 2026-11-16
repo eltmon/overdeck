@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, createEvent, fireEvent, render, screen } from '@testing-library/react'
 
-import { PaneLayoutView } from '../PaneLayoutView'
+import { PaneLayoutView, type DropZone } from '../PaneLayoutView'
 import { CONVERSATION_DRAG_TYPE } from '../conversationDragStore'
 import { leaf } from '../../../lib/paneLayout'
 import type { WorkspacePane } from '../../../lib/panesStore'
@@ -11,7 +11,9 @@ const panes = new Map<string, WorkspacePane>([
   ['p1', { paneId: 'p1', label: 'One' } as unknown as WorkspacePane],
 ])
 
-function renderLeaf(props: { draggingConversation?: boolean; onDropConversation?: ReturnType<typeof vi.fn>; onDropTab?: ReturnType<typeof vi.fn> }) {
+type DropHandler = (targetPaneId: string, name: string, zone: DropZone) => void
+
+function renderLeaf(props: { draggingConversation?: boolean; onDropConversation?: DropHandler; onDropTab?: DropHandler }) {
   render(
     <PaneLayoutView
       node={leaf('p1')}
