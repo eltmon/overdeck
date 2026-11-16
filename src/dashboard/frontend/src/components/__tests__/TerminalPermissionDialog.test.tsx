@@ -20,6 +20,7 @@ import {
   useTerminalPermissionDialog,
   type TerminalPermissionFeedRow,
 } from '../../App/hooks/useTerminalPermissionDialog';
+import formStyles from '../shared/ModalForm.module.css';
 
 const DANGEROUS_RM: TerminalPendingPermission = {
   signature: 'Bash command · from the general-purpose agent::rm::1:Yes|2:No',
@@ -110,7 +111,7 @@ describe('TerminalPermissionDialog', () => {
   it('non-answerable prompt says to answer in the terminal and makes Open terminal primary', () => {
     renderDialog({ ...DANGEROUS_RM, answerable: false, signature: null, options: [] });
     expect(screen.getByText(/open the terminal and answer it there/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Open terminal' })).toHaveClass('bg-warning');
+    expect(screen.getByRole('button', { name: 'Open terminal' })).toHaveClass(formStyles.primaryButton);
     expect(screen.queryByRole('button', { name: 'Allow once' })).toBeNull();
   });
 
