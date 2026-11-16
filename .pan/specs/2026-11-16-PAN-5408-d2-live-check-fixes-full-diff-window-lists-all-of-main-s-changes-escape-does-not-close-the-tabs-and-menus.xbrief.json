@@ -4,17 +4,17 @@
     "created": "2026-11-16T02:41:28Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5408: D2 live-check fixes: full diff window lists all of main's changes, Escape does not close the tabs and + menus",
-    "updated": "2026-11-16T02:44:38.513Z"
+    "updated": "2026-11-16T02:45:44.624Z"
   },
   "plan": {
     "id": "pan-5408",
     "title": "D2 live-check fixes: full diff window lists all of main's changes, Escape does not close the tabs and + menus",
-    "status": "proposed",
+    "status": "running",
     "uid": "72eeda17-78cb-457d-a82a-7c9f245bc141",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-16T02:41:28Z",
-    "updated": "2026-11-16T02:44:38.513Z",
+    "updated": "2026-11-16T02:45:44.624Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5408",
@@ -342,5 +342,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
