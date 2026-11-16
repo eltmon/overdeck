@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-5418",
   "created": "2026-11-16T04:03:53.810Z",
-  "updated": "2026-11-16T04:14:28.569Z",
+  "updated": "2026-11-16T04:27:49.787Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-16T04:27Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-16T04:27:49.787Z"
+    }
+  ],
   "items": {
     "own-patch-module": {
       "status": "completed",
@@ -85,5 +91,14 @@
       "status": "completed",
       "doneAt": "2026-11-16T04:14:28.568Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-16T04:27:49Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5418\n\nPull request: https://github.com/eltmon/overdeck/pull/5420 (head `7abfe414`)\n\nSource: check_run:test-shard (4/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (4/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/133088911203/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/43803511376/job/133088911203  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/overdeck/__tests__/conversation-diffs.test.ts\u001b[2m [ src/lib/overdeck/__tests__/conversation-diffs.test.ts ]\u001b[22m\n\u001b[31m\u001b[1mError\u001b[22m: [vitest] No \"execFile\" export is defined on the \"node:child_process\" mock. Did you forget to return it from \"vi.mock\"?\nIf you need to partially mock a module, you can use \"importOriginal\" helper inside:\n\u001b[39m\nvi.mock(import(\"node:child_process\"), async (importOriginal) => {\n  const actual = await importOriginal()\n  return {\n    ...actual,\n    // your mocked methods\n  }\n})\n\n\u001b[36m \u001b[2m❯\u001b[22m src/lib/overdeck/conversation-diff-own.ts:\u001b[2m40:33\u001b[22m\u001b[39m\n    \u001b[90m 38|\u001b[39m import { diffOptionArgs, type DiffOptions } from '../diffs/diff-output…\n    \u001b[90m 39|\u001b[39m\n    \u001b[90m 40|\u001b[39m \u001b[35mconst\u001b[39m execFileAsync \u001b[33m=\u001b[39m \u001b[34mpromisify\u001b[39m(execFile)\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                                 \u001b[31m^\u001b[39m\n    \u001b[90m 41|\u001b[39m \u001b[35mconst\u001b[39m \u001b[33mMAX_BUFFER\u001b[39m \u001b[33m=\u001b[39m \u001b[34m50\u001b[39m \u001b[33m*\u001b[39m \u001b[34m1024\u001b[39m \u001b[33m*\u001b[39m \u001b[34m1024\u001b[39m\u001b[33m;\u001b[39m\n    \u001b[90m 42|\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m src/lib/overdeck/conversation-diffs.ts:\u001b[2m17:1\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m684 passed\u001b[39m\u001b[22m\u001b[90m (685)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
 }
