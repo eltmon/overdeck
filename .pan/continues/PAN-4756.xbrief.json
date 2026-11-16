@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:50:37.763Z",
+  "updated": "2026-11-16T11:51:05.053Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -606,9 +606,22 @@
       "doneAt": "2026-11-16T11:50:29.833Z"
     },
     "migrate-fork-modal": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4756",
-      "claimedAt": "2026-11-16T11:50:37.762Z"
+      "claimedAt": "2026-11-16T11:50:37.762Z",
+      "doneAt": "2026-11-16T11:51:05.052Z"
+    },
+    "migrate-fork-modal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:51:05.052Z"
+    },
+    "migrate-fork-modal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:51:05.052Z"
+    },
+    "migrate-fork-modal.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:51:05.052Z"
     }
   }
 }
