@@ -15,6 +15,7 @@ import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 import { navigateToDecisionSubject } from '../../lib/navigateToDecision';
+import { showDeliveredToast } from '../../lib/deliveredToast';
 import { buildPendingAnswerRequest, parseCodexOptionNumber, postPendingAnswer, type PendingAnswerTarget } from '../../lib/pendingInputAnswer';
 import type { Issue } from '../../types';
 import {
@@ -373,6 +374,8 @@ export function usePendingInputDialogs() {
     mutationFn: async (target: PendingAnswerTarget & {
       /** Friendly display label (issue/conversation title) for the toast. */
       label?: string;
+      /** The agent's issue, so the success toast can open it (PAN-5423). */
+      issueId?: string | null;
     }) => {
       const request = buildPendingAnswerRequest(target);
       if ('error' in request) throw new Error(request.error);
@@ -386,7 +389,7 @@ export function usePendingInputDialogs() {
       return { subjectId: variables.id, toolUseId };
     },
     onSuccess: (_data, variables) => {
-      toast.success(`Answer delivered to ${variables.label?.trim() || variables.id}`);
+      showDeliveredToast(`Answer delivered to ${variables.label?.trim() || variables.id}`, variables);
     },
     onError: (error: Error, _variables, context) => {
       if (context?.toolUseId) {
@@ -441,6 +444,7 @@ export function usePendingInputDialogs() {
       questions: subject.pendingAskUserQuestion?.questions,
       harness: (subject as { harness?: string | null }).harness ?? null,
       toolUseId: subject.pendingAskUserQuestion?.toolUseId,
+      issueId: subject.issueId ?? null,
     });
   }, [askUserQuestionAnswerMutation, codexApprovalMutation, currentAskUserQuestionSubject]);
 
