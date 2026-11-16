@@ -10,6 +10,24 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: do not edit this page for an unreleased change. Each PR adds its bullets to changelog.d/<issue>.md (format: changelog.d/README.md), and pan release stable folds them into a dated <Update> block here. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so in its entry and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.87.1" description="2026-11-16">
+  #### New
+
+  - **Preview Markdown in the Changes tab:** the side panel's diff view now has the same Diff and Preview switch as the diff window, so a document a conversation changed can be read as rendered text. ([#5341](https://github.com/eltmon/overdeck/issues/5341))
+
+  #### Improved
+
+  - **Open what you just answered:** the "Answer delivered", "Approval sent" and plan notifications now have an Open button that takes you to the conversation or issue that received your answer. ([#5423](https://github.com/eltmon/overdeck/issues/5423))
+
+  #### Fixed
+
+  - **One Needs-you number on the board:** the **Needs you** strip above the board's columns now matches the top bar's **Needs you · N** and lists the same items, including Flywheel requests and system decisions. Plans waiting for Start work and work that hit a problem show in the same strip under **Ready to start** and **Having trouble**, outside the number. ([#5413](https://github.com/eltmon/overdeck/issues/5413))
+  - **Desktop npm package publishes again:** the desktop app no longer bundles about 720 MB of unused machine-learning runtime, so `@overdeck/desktop` and the GitHub Release ship with the release. Releases now stop before publishing anything if the desktop package grows past 300 MB. ([#5424](https://github.com/eltmon/overdeck/issues/5424))
+  - **Front matter in Markdown Preview:** a Markdown or MDX file that starts with YAML front matter now shows it as a short key/value list above the document, instead of a stray bold paragraph and rule. ([#5427](https://github.com/eltmon/overdeck/issues/5427))
+
+  [Compare v0.87.0...v0.87.1](https://github.com/eltmon/overdeck/compare/v0.87.0...v0.87.1)
+</Update>
+
 <Update label="v0.87.0" description="2026-11-16">
   #### New
 
