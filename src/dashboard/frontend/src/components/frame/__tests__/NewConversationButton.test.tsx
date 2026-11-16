@@ -129,4 +129,20 @@ describe('NewConversationButton (PAN-5293 F-D12)', () => {
     act(() => { useNewConversationDefaults.getState().setEffort('low'); });
     expect(screen.getByTestId('new-conversation-summary')).toHaveTextContent('Opus 5.5 · Low');
   });
+
+  it('in the All projects deck creates in the last project and names it first on the second line (PAN-5343 H-D13)', () => {
+    localStorage.setItem('overdeck.ui.lastProjectKey', 'overdeck');
+    useNewConversationDefaults.setState({ model: 'claude-opus-5-5', harness: 'claude-code', effort: 'high' });
+    const view = render(<Harness selectedProject="__all-projects__" />);
+    expect(screen.getByTestId('new-conversation-summary')).toHaveTextContent(/^overdeck · Opus 5.5 · High$/);
+    fireEvent.click(screen.getByTestId('new-conversation-button'));
+    expect(create).toHaveBeenCalledWith('overdeck');
+    view.unmount();
+
+    localStorage.removeItem('overdeck.ui.lastProjectKey');
+    render(<Harness selectedProject="__all-projects__" />);
+    expect(screen.getByTestId('new-conversation-summary')).toHaveTextContent(/^No project · Opus 5.5 · High$/);
+    fireEvent.click(screen.getByTestId('new-conversation-button'));
+    expect(create).toHaveBeenLastCalledWith(undefined);
+  });
 });

@@ -4,7 +4,7 @@
  * restores it instead of opening to no project.
  */
 
-import { NO_PROJECT_KEY } from '../components/CommandDeck/projectsData';
+import { isRealProjectKey, NO_PROJECT_KEY } from '../components/CommandDeck/projectsData';
 import { ALL_PROJECTS_KEY } from './deckKeys';
 
 export const LAST_PROJECT_STORAGE_KEY = 'overdeck.ui.lastProjectKey';
@@ -61,6 +61,16 @@ export function rememberDeckSelection(key: string): void {
   }
   writeAllProjectsDeck(false);
   writeLastProjectKey(key);
+}
+
+/**
+ * PAN-5343 H-D13: the project a new conversation from this deck belongs to —
+ * the deck's own project, or in the All projects deck the last real project.
+ * Undefined means unscoped.
+ */
+export function newConversationProjectKey(deckKey: string | null): string | undefined {
+  const key = deckKey === ALL_PROJECTS_KEY ? readLastProjectKey() : deckKey;
+  return isRealProjectKey(key) ? key : undefined;
 }
 
 export function clearLastProjectKey(): void {

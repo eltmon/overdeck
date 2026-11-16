@@ -5,19 +5,23 @@
  * model, harness and effort, and opens it in the deck. The caret menu holds
  * the model, harness and effort pickers, the Retrospective button and
  * "New conversation with options…". It owns the `N` shortcut.
+ *
+ * PAN-5343 H-D13: in the All projects deck it creates in the last real
+ * project, and the second line starts with that project's name.
  */
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Plus } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useShortcut, type ShortcutDef } from '../../lib/shortcuts/registry';
-import { NO_PROJECT_KEY } from '../CommandDeck/projectsData';
+import { ALL_PROJECTS_KEY, NO_PROJECT_LABEL } from '../CommandDeck/projectsData';
 import { NewConversationPickers } from '../CommandDeck/NewConversationPickers';
 import { openNewConversationDialog } from '../newConversation/newConversationDialogStore';
 import { MenuOverlay, MenuSeparator, PopoverSurface } from '../shared/ContextMenu';
 import { ProviderIcon } from '../shared/branding';
 import { useAvailableModels } from '../shared/ModelPicker';
 import { useCreateConversation } from './deck/useCreateConversation';
+import { newConversationProjectKey } from '../../lib/lastProject';
 import { useNewConversationDefaults } from './deck/newConversationDefaults';
 import { newConversationSummary, newConversationTitle } from './newConversationSummary';
 
@@ -34,7 +38,8 @@ export function NewConversationButton({ selectedProject, collapsed }: NewConvers
   const defaults = useNewConversationDefaults(useShallow((d) => ({
     model: d.model, harness: d.harness, effort: d.effort, setModel: d.setModel, setHarness: d.setHarness, setEffort: d.setEffort,
   })));
-  const projectKey = selectedProject && selectedProject !== NO_PROJECT_KEY ? selectedProject : undefined;
+  const allProjects = selectedProject === ALL_PROJECTS_KEY;
+  const projectKey = newConversationProjectKey(selectedProject);
   const { groups } = useAvailableModels();
   const summary = useMemo(
     () => newConversationSummary({ model: defaults.model, harness: defaults.harness, effort: defaults.effort, groups }),
@@ -84,7 +89,9 @@ export function NewConversationButton({ selectedProject, collapsed }: NewConvers
         </span>
         <span data-testid="new-conversation-summary" className="flex min-w-0 items-center gap-1 pl-6 text-[11px] text-muted-foreground">
           {summary.provider && <ProviderIcon provider={summary.provider} label={summary.providerLabel} className="h-3 w-3 shrink-0" />}
-          <span className="truncate">{[summary.shortName, summary.harnessLabel, summary.effortLabel].filter(Boolean).join(' · ')}</span>
+          <span className="truncate">
+            {[allProjects ? projectKey ?? NO_PROJECT_LABEL : null, summary.shortName, summary.harnessLabel, summary.effortLabel].filter(Boolean).join(' · ')}
+          </span>
         </span>
       </button>
       <button
