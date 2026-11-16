@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:38:05.748Z",
+  "updated": "2026-11-16T11:38:27.473Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,9 +110,18 @@
       "doneAt": "2026-11-16T11:38:04.500Z"
     },
     "migrate-costs-page-issue-modal": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4756",
-      "claimedAt": "2026-11-16T11:38:05.748Z"
+      "claimedAt": "2026-11-16T11:38:05.748Z",
+      "doneAt": "2026-11-16T11:38:27.472Z"
+    },
+    "migrate-costs-page-issue-modal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:38:27.472Z"
+    },
+    "migrate-costs-page-issue-modal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:38:27.472Z"
     }
   }
 }
