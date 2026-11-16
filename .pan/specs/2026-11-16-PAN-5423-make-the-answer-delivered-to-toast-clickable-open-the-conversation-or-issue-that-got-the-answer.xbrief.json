@@ -1,0 +1,428 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-16T05:53:01Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5423: Make the 'Answer delivered to …' toast clickable: open the conversation or issue that got the answer",
+    "updated": "2026-11-16T05:54:50.303Z"
+  },
+  "plan": {
+    "id": "pan-5423",
+    "title": "Make the 'Answer delivered to …' toast clickable: open the conversation or issue that got the answer",
+    "status": "proposed",
+    "uid": "42dc4ae0-d120-46fa-bbcb-7ec46b16976c",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-16T05:53:01Z",
+    "updated": "2026-11-16T05:54:50.303Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5423",
+        "label": "PAN-5423",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-5423.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "toast",
+      "pending-input",
+      "ux"
+    ],
+    "narratives": {
+      "Problem": "After the operator answers a pending AskUserQuestion, Codex approval or plan approval from the dashboard dialog, a success toast names the subject ('Answer delivered to X', 'Approval sent to X', 'Plan approved for X', 'Plan feedback sent to X') but has no click target, so clicking it does nothing. The operator expects it to open the conversation or issue that received the answer.",
+      "Proposal": "Add a small frontend module src/dashboard/frontend/src/lib/deliveredToast.ts exporting showDeliveredToast(message, { kind, id, issueId }). It calls toast.success(message, { action: { label: 'Open', onClick } }) where onClick goes through the existing decision door navigateToDecisionSubject (conversation -> /conv/<name>, agent -> /issues/<issueId>); an agent with no issueId gets a plain toast. usePendingInputDialogs.ts calls it at the four success sites and threads subject.issueId into the AskUserQuestion and plan-action mutation variables (PendingAnswerTarget does not carry it). A mocked-sonner unit test proves the action navigates; its path joins scripts/frontend-test-subset.txt so CI runs it. A changelog.d entry documents the change.",
+      "NonGoals": "- Changing the channel-permission success toasts ('Allowed <agent> to continue' / 'Denied permission request for <agent>').\n- Making the whole toast body clickable via a custom JSX toast (toast.custom).\n- Changing any toast message wording, or adding actions to error toasts.\n- Adding a desktop Notification for a delivered answer.\n- Changing PendingAnswerTarget, buildPendingAnswerRequest, or any server route.\n- Adding route logic or window.location assignments outside navigateToDecision.ts.\n- Rendering usePendingInputDialogs in a hook-level test."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Click target is a sonner action button labelled 'Open', not a whole-toast click.",
+        "rationale": "The issue lists the action button first; the hook already uses this pattern ('Open terminal', 'Answer'); sonner 1.7.4 has no whole-toast onClick option and a custom JSX toast would lose success styling."
+      },
+      {
+        "summary": "Extract showDeliveredToast into src/dashboard/frontend/src/lib/deliveredToast.ts and test it with sonner mocked, instead of rendering the 664-line hook.",
+        "rationale": "The issue allows testing an extracted toast builder; making the helper own the toast.success call proves the action wiring, and a source-reading test would fail lint:source-introspection."
+      },
+      {
+        "summary": "Navigate through navigateToDecisionSubject; agent subjects with no issueId get a plain toast without an action.",
+        "rationale": "The issue requires the app's existing navigation helper; decisionSubjectPath already returns null for an issue-less agent, and a button that goes nowhere is worse than no button."
+      },
+      {
+        "summary": "A conversation subject opens /conv/<name> even when it is linked to an issue.",
+        "rationale": "The issue says a conversation target opens its conversation route; the conversation is what received the answer."
+      },
+      {
+        "summary": "Thread issueId from the dialog subject into the AskUserQuestion and plan-action mutation variables as a local optional field; PendingAnswerTarget is unchanged.",
+        "rationale": "The issue's claim that variables already identify the destination is wrong for agents: their route is /issues/<issueId>, and PendingAnswerTarget carries only kind and id. buildPendingAnswerRequest ignores extra fields."
+      },
+      {
+        "summary": "Sibling scope covers the Codex 'Approval sent to' toast and both plan-action toasts; channel-permission toasts are excluded.",
+        "rationale": "The issue names exactly the Codex approval and proposed-plan answer toasts as siblings."
+      },
+      {
+        "summary": "Documentation = changelog.d/pan-5423.md plus the new module's header comment; no docs/ or Mintlify page changes.",
+        "rationale": "A search of docs/, configuration/, reference/, concepts.mdx and introduction.mdx found no page describing these success toasts."
+      }
+    ],
+    "items": [
+      {
+        "id": "delivered-toast-helper",
+        "title": "Add showDeliveredToast helper with an Open action and its CI-listed unit test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T05:53:01Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5423",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/deliveredToast.ts",
+            "src/dashboard/frontend/src/lib/__tests__/deliveredToast.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/deliveredToast.test.ts",
+            "grep -n 'deliveredToast.test.ts' scripts/frontend-test-subset.txt",
+            "npx eslint src/dashboard/frontend/src/lib/deliveredToast.ts src/dashboard/frontend/src/lib/__tests__/deliveredToast.test.ts"
+          ],
+          "expected_outputs": [
+            "deliveredToast.test.ts passes with the five named cases",
+            "grep prints exactly one line, located between deckLayoutStore.test.ts and explorer-drag-paths.test.ts",
+            "eslint reports no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. Create src/dashboard/frontend/src/lib/deliveredToast.ts exporting interface DeliveredSubject { kind: 'agent' | 'conv'; id: string; issueId?: string | null } and function showDeliveredToast(message: string, subject: DeliveredSubject): void. Map kind 'conv' to DecisionSubjectTarget { id, source: 'conversation' } and kind 'agent' to { id, source: 'agent', issueId: issueId ?? undefined }. If decisionSubjectPath(target) is null call toast.success(message) with no second argument; otherwise call toast.success(message, { action: { label: 'Open', onClick: () => navigateToDecisionSubject(target) } }). Import toast from 'sonner' and the door from './navigateToDecision'; do not add a sonner import to navigateToDecision.ts. Give the module the header comment from the PRD. Create src/dashboard/frontend/src/lib/__tests__/deliveredToast.test.ts mocking sonner with vi.hoisted + vi.mock (pattern in src/App/hooks/usePendingInputDialogs.permission-notify.test.tsx), resetting history to '/' in beforeEach, with the five named cases from the PRD: conversation -> /conv/c1; conversation with issueId -> /conv/c2; linked machine '@laptop/c3' -> /conv/@laptop/c3; agent with issueId PAN-1 -> /issues/PAN-1; agent without issueId -> toast.success called with exactly one argument. Each navigation case invokes toastSuccess.mock.calls[0][1].action.onClick() and asserts window.location.pathname. Add 'src/lib/__tests__/deliveredToast.test.ts' to scripts/frontend-test-subset.txt in sorted position (after src/lib/__tests__/deckLayoutStore.test.ts, before src/lib/__tests__/explorer-drag-paths.test.ts). No source-reading tests, no skipIf/.only."
+        },
+        "items": [
+          {
+            "id": "delivered-toast-helper.ac1",
+            "title": "Given a conversation subject { kind: 'conv', id: 'c1' }, when showDeliveredToast is called and the toast's action onClick runs, then toast.success receives an action labelled 'Open' and window.location.pathname becomes /conv/c1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delivered-toast-helper.ac2",
+            "title": "Given an agent subject { kind: 'agent', id: 'agent-pan-1', issueId: 'PAN-1' }, when the action onClick runs, then window.location.pathname becomes /issues/PAN-1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delivered-toast-helper.ac3",
+            "title": "Given an agent subject with issueId null, when showDeliveredToast is called, then toast.success is called with exactly one argument (the message) and renders no action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delivered-toast-helper.ac4",
+            "title": "Given a linked-machine conversation id '@laptop/c3' or a conversation carrying issueId 'PAN-9', when the action runs, then the path resolves to /conv/@laptop/c3 and /conv/c2 respectively (conversation route, not the issue)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delivered-toast-helper.ac5",
+            "title": "scripts/frontend-test-subset.txt contains the line src/lib/__tests__/deliveredToast.test.ts exactly once, between deckLayoutStore.test.ts and explorer-drag-paths.test.ts, so CI's test:frontend-subset runs it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-auq-answer-toast",
+        "title": "Route the 'Answer delivered to' toast through showDeliveredToast with the subject's issueId",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T05:53:01Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5423",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'showDeliveredToast(`Answer delivered to' src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
+            "npm run typecheck:frontend",
+            "npx eslint src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts"
+          ],
+          "expected_outputs": [
+            "grep prints one line inside askUserQuestionAnswerMutation.onSuccess",
+            "frontend typecheck completes without errors",
+            "eslint reports no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts: add import { showDeliveredToast } from '../../lib/deliveredToast'; next to the navigateToDecision import (line 17). Extend askUserQuestionAnswerMutation's mutationFn parameter type with the optional field issueId?: string | null (comment: the agent's issue, so the success toast can open it, PAN-5423). Replace the onSuccess line toast.success(`Answer delivered to ${variables.label?.trim() || variables.id}`) with showDeliveredToast(`Answer delivered to ${variables.label?.trim() || variables.id}`, variables). In handleSubmitAskUserQuestion, add issueId: subject.issueId ?? null to the askUserQuestionAnswerMutation.mutate({...}) call. Do not change PendingAnswerTarget, the message text, onMutate or onError."
+        },
+        "items": [
+          {
+            "id": "wire-auq-answer-toast.ac1",
+            "title": "Given an AskUserQuestion answer the server accepted, when askUserQuestionAnswerMutation.onSuccess runs, then it emits the unchanged 'Answer delivered to …' message through showDeliveredToast(message, variables), which renders the Open action, and that onSuccess no longer calls toast.success directly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-auq-answer-toast.ac2",
+            "title": "The askUserQuestionAnswerMutation.mutate call in handleSubmitAskUserQuestion passes issueId: subject.issueId ?? null, so an agent subject's toast resolves to /issues/<issueId>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-auq-answer-toast.ac3",
+            "title": "npm run typecheck:frontend exits 0 and src/dashboard/frontend/src/lib/pendingInputAnswer.ts shows no diff (PendingAnswerTarget unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-codex-approval-toast",
+        "title": "Route the Codex 'Approval sent to' toast through showDeliveredToast",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T05:53:01Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5423",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'showDeliveredToast(`Approval sent to' src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "grep prints one line inside codexApprovalMutation.onSuccess",
+            "frontend typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ],
+          "acJustification": "A one-line call-site swap; two criteria cover the change and the unchanged message."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In codexApprovalMutation.onSuccess of src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts, replace toast.success(`Approval sent to ${variables.label?.trim() || variables.id}`) with showDeliveredToast(`Approval sent to ${variables.label?.trim() || variables.id}`, variables). The variables always have kind 'conv' here, so no issueId is needed and handleSubmitAskUserQuestion's codex branch stays unchanged."
+        },
+        "items": [
+          {
+            "id": "wire-codex-approval-toast.ac1",
+            "title": "Given a Codex approval the server accepted, when codexApprovalMutation.onSuccess runs, then it emits the unchanged 'Approval sent to …' message through showDeliveredToast(message, variables) with kind 'conv', which renders an Open action that navigates to /conv/<name>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-codex-approval-toast.ac2",
+            "title": "codexApprovalMutation.onError still emits toast.error('Failed to send approval: …') with no action, unchanged by the diff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-plan-action-toasts",
+        "title": "Route the plan approve / request-changes toasts through showDeliveredToast with the subject's issueId",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T05:53:01Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5423",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'showDeliveredToast(' src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
+            "grep -n 'toast.success' src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
+            "npm run typecheck:frontend",
+            "npx eslint src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
+            "wc -l src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts"
+          ],
+          "expected_outputs": [
+            "grep -c prints 3 (answer, approval, plan call sites; the plan site is one call spanning lines)",
+            "the only remaining toast.success is the channel-permission toast in channelPermissionResponseMutation.onSuccess",
+            "frontend typecheck completes without errors",
+            "eslint reports no errors",
+            "line count stays below 1000"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. In src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts, add issueId?: string | null to planActionMutation's mutationFn parameter type (do not destructure it in mutationFn). Replace the toast.success(...) in planActionMutation.onSuccess with showDeliveredToast(<the same ternary message: 'Plan approved for …' or 'Plan feedback sent to …'>, variables). Add issueId: subject.issueId ?? null to the planActionMutation.mutate calls in handleApprovePlan and handleRequestPlanChanges. Keep the toast import: info and error toasts still use it."
+        },
+        "items": [
+          {
+            "id": "wire-plan-action-toasts.ac1",
+            "title": "Given a plan approve or request-changes action the server accepted, when planActionMutation.onSuccess runs, then it emits the unchanged 'Plan approved for …' or 'Plan feedback sent to …' message through showDeliveredToast(message, variables), which renders the Open action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-plan-action-toasts.ac2",
+            "title": "handleApprovePlan and handleRequestPlanChanges both pass issueId: subject.issueId ?? null to planActionMutation.mutate, so an agent plan's toast resolves to /issues/<issueId>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-plan-action-toasts.ac3",
+            "title": "grep -n 'toast.success' on usePendingInputDialogs.ts returns only the channel-permission toast, and the file's line count stays below the 1000-line ceiling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "changelog-entry",
+        "title": "Add changelog.d/pan-5423.md describing the Open button on delivered-answer notifications",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T05:53:01Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5423",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "changelog.d/pan-5423.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c '—' changelog.d/pan-5423.md"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "grep -c prints 0 (no em dashes)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. Create changelog.d/pan-5423.md in the changelog.d/README.md format: a single '#### Improved' heading and one bullet: '- **Open what you just answered:** the \"Answer delivered\", \"Approval sent\" and plan notifications now have an Open button that takes you to the conversation or issue that received your answer. ([#5423](https://github.com/eltmon/overdeck/issues/5423))'. No em dashes. Do not edit changelog.mdx. No other doc page describes these toasts, so no docs/ or Mintlify page changes."
+        },
+        "items": [
+          {
+            "id": "changelog-entry.ac1",
+            "title": "changelog.d/pan-5423.md contains exactly one '#### Improved' heading and one bullet that says the notifications have an Open button opening the conversation or issue, linking https://github.com/eltmon/overdeck/issues/5423",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changelog-entry.ac2",
+            "title": "npm run lint:docs exits 0 with the new file present, and grep -c '—' changelog.d/pan-5423.md prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "delivered-toast-helper",
+        "to": "wire-auq-answer-toast",
+        "type": "blocks"
+      },
+      {
+        "from": "delivered-toast-helper",
+        "to": "wire-codex-approval-toast",
+        "type": "blocks"
+      },
+      {
+        "from": "delivered-toast-helper",
+        "to": "wire-plan-action-toasts",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-auq-answer-toast",
+        "to": "wire-codex-approval-toast",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-codex-approval-toast",
+        "to": "wire-plan-action-toasts",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-auq-answer-toast",
+        "to": "wire-plan-action-toasts",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-16-PAN-5423-make-the-answer-delivered-to-toast-clickable-open-the-conversation-or-issue-that-got-the-answer.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
