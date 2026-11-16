@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T15:48:16.624592Z · model: claude-opus-5-5 · open: 895_
+_Last sequenced: 2026-11-16T16:21:13.354995Z · model: claude-opus-5-5 · open: 894_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -883,11 +883,11 @@ _Last sequenced: 2026-11-16T15:48:16.624592Z · model: claude-opus-5-5 · open: 
 | 885 | PAN-2883 | M | high | needs-refinement |  |  | Appears already fixed: resolveIssuePullRequestRef probes strike/<id> at pull-requests.ts:209, which is exactly the fix. Verify and close. |
 | 886 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
 | 887 | PAN-4555 | XS | low | ok |  |  | Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then. |
-| 888 | PAN-4590 | L | medium | ok |  |  | Semgrep sast verification gate + review-context findings; first buildable Semgrep child (epic PAN-4585 closed), needs config. |
+| 888 | PAN-5449 | M | low | ok |  |  | Unblocked: PAN-4590 sast gate merged. A skipped sast scan renders as a green pass; add skipped state + findings list. |
 | 889 | PAN-5434 | M | low | ok |  |  | Codex apply_patch post-edit Semgrep scan; needs a hooks.json composer shared with SageOx. PAN-4591 merged; live Codex probe first. |
-| 890 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
-| 891 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
-| 892 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
+| 890 | PAN-4592 | M | low | ok |  |  | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
+| 891 | PAN-4594 | M | low | ok |  |  | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
+| 892 | PAN-4593 | L | low | needs-refinement |  |  | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
 | 893 | PAN-5022 | L | medium | ok |  |  | Phone app: relay notification preferences to offline machines via the directory, and drop muted pushes on the phone. |
 | 894 | PAN-5021 | M | low | needs-refinement |  |  | PAN-5100 landed phone telemetry with conflicting decisions; re-scope to any remaining gap or close as superseded. |
 | 895 | PAN-5029 | M | medium | needs-refinement |  |  | Grok Build Tailscale reach can't work: pan mcp serve verifies tokens only against its own machine. Needs a design choice. |
@@ -895,7 +895,6 @@ _Last sequenced: 2026-11-16T15:48:16.624592Z · model: claude-opus-5-5 · open: 
 | 897 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
 | 898 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
 | 899 | PAN-5207 | L | low | needs-refinement |  | PAN-5202 | Parked by the operator: Flux meeting bots for Zoom, Teams, Meet, Slack as a paid integration. Do not start. |
-| 900 | PAN-5449 | M | low | ok |  | PAN-4590 | Semgrep visibility half split from PAN-4594: neutral skipped state in Test/Lint panel plus findings list in issue view |
 | 901 | PAN-5181 | XS | low | ok |  |  | Fix shipped in PR #5179 (merged 2026-11-13); the body says it closes on merge. Verify and close. |
 | 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
 | 903 | PAN-5444 | XS | low | ok |  |  | Two Minor CodeRabbit findings left on merged PR #5443: semgrep repo rules resolve from event cwd; hook tests not isolated from Docker. |
@@ -1230,10 +1229,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T15:48:16.624592Z",
+  "generatedAt": "2026-11-16T16:21:13.354995Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 895,
+  "openCount": 894,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -12143,15 +12142,15 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "skip"
     },
     {
-      "issue": "PAN-4590",
+      "issue": "PAN-5449",
       "rank": 888,
-      "size": "L",
-      "importance": "medium",
-      "score": 50,
+      "size": "M",
+      "importance": "low",
+      "score": 36,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Semgrep sast verification gate + review-context findings; first buildable Semgrep child (epic PAN-4585 closed), needs config.",
-      "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
+      "why": "Unblocked: PAN-4590 sast gate merged. A skipped sast scan renders as a green pass; add skipped state + findings list.",
+      "rationale": "PAN-4590 merged on 2026-11-16, so this issue is now startable. The live gate shows a skipped scan as a pass, so it takes the freed rank 888, ahead of the pinned Semgrep children.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12175,9 +12174,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "importance": "low",
       "score": 38,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4590"
-      ],
+      "dependsOn": [],
       "why": "pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590.",
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
@@ -12190,9 +12187,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "importance": "low",
       "score": 36,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4590"
-      ],
+      "dependsOn": [],
       "why": "Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590.",
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
@@ -12205,11 +12200,9 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "importance": "low",
       "score": 30,
       "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-4590"
-      ],
+      "dependsOn": [],
       "why": "Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work.",
-      "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
+      "rationale": "PAN-4590 merged 2026-11-16, so its dependency was removed; rank unchanged because operator decisions are still open.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12300,21 +12293,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
         "PAN-5202"
       ],
       "why": "Parked by the operator: Flux meeting bots for Zoom, Teams, Meet, Slack as a paid integration. Do not start.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5449",
-      "rank": 900,
-      "size": "M",
-      "importance": "low",
-      "score": 36,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4590"
-      ],
-      "why": "Semgrep visibility half split from PAN-4594: neutral skipped state in Test/Lint panel plus findings list in issue view",
-      "rationale": "New issue split from PAN-4594 at planning time; ranked beside it with the same low importance as the other Semgrep dashboard work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13286,41 +13264,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4590",
-      "to": "PAN-4592",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4590",
-      "to": "PAN-4593",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4590",
-      "to": "PAN-4594",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4590",
-      "to": "PAN-5446",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4590",
-      "to": "PAN-5449",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
     },
     {
       "from": "PAN-465",
