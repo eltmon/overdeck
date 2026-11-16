@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5371",
   "created": "2026-11-16T01:41:59.414Z",
-  "updated": "2026-11-16T01:41:59.415Z",
+  "updated": "2026-11-16T01:48:10.155Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,30 @@
   "sessionHistory": [],
   "items": {
     "simple-needs-you-split": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5371",
-      "claimedAt": "2026-11-16T01:41:59.414Z"
+      "claimedAt": "2026-11-16T01:41:59.414Z",
+      "doneAt": "2026-11-16T01:48:10.155Z"
+    },
+    "simple-needs-you-split.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:48:10.155Z"
+    },
+    "simple-needs-you-split.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:48:10.155Z"
+    },
+    "simple-needs-you-split.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:48:10.155Z"
+    },
+    "simple-needs-you-split.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:48:10.155Z"
+    },
+    "simple-needs-you-split.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:48:10.155Z"
     }
   }
 }
