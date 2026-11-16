@@ -1,4 +1,4 @@
-import { exec, execFile } from 'node:child_process';
+import { exec } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -15,6 +15,7 @@ import {
 } from '../checkpoint/checkpoint-manager.js';
 import { diffVsDefaultBranch } from '../checkpoint/vs-default-branch.js';
 import { diffOptionArgs, type DiffOptions } from '../diffs/diff-output.js';
+import { untrackedFilePatch } from './conversation-diff-own.js';
 import {
   getConversationById,
   getConversationByName,
@@ -203,21 +204,6 @@ async function diffPatchForFiles(
     return diffPatchFilesAgainstHead(repoRoot, filePaths, options);
   }
   return diffPatchSinceBase(repoRoot, baseCommit, filePaths, options);
-}
-
-/** PAN-5408 FR-5: a new-file patch for an untracked path; `git diff --no-index` exits 1 when the files differ. */
-async function untrackedFilePatch(repoRoot: string, path: string, options: DiffOptions = {}): Promise<string> {
-  try {
-    const { stdout } = await promisify(execFile)(
-      'git',
-      ['diff', '--no-index', '--patch', '--minimal', '--no-color', ...diffOptionArgs(options), '--', '/dev/null', path],
-      { cwd: repoRoot, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 },
-    );
-    return stdout;
-  } catch (error: unknown) {
-    const stdout = (error as { stdout?: unknown }).stdout;
-    return typeof stdout === 'string' ? stdout : '';
-  }
 }
 
 /** PAN-5408: the attributed file set, keyed by repo-relative path, stats summed per path. */
