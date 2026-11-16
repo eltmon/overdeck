@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:52:21.477Z",
+  "updated": "2026-11-16T11:52:22.936Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -676,6 +676,11 @@
     "migrate-anywhere-trigger-dialogs.ac3": {
       "status": "completed",
       "doneAt": "2026-11-16T11:52:21.477Z"
+    },
+    "migrate-anywhere-approval-remove-dialogs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:52:22.936Z"
     }
   }
 }
