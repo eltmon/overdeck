@@ -264,13 +264,16 @@ describe('quality gate admission', () => {
       let secondResolved = false
       void secondPromise.then(() => { secondResolved = true })
 
-      await driveTurns(20)
+      // B has reached the CPU check and seen high pressure.
+      await driveUntil(() => samplePressure.mock.calls.length > 0)
       expect(secondResolved).toBe(false)
       expect(existsSync(join(rootDir, 'slot-1.json'))).toBe(false)
 
       await first.release()
-      // Let B finish any pass that listed slot 0 as held before it sees low pressure.
-      await driveTurns(5)
+      // A pass that listed slot 0 as held may still be in flight. Two more samples mean
+      // the later pass started after the release, so B sees slot 0 free once pressure clears.
+      const samplesAtRelease = samplePressure.mock.calls.length
+      await driveUntil(() => samplePressure.mock.calls.length >= samplesAtRelease + 2)
       samplePressure.mockResolvedValue(low)
       const second = await driveUntilResolved(secondPromise)
       expect(second.slot).toBe(0)
