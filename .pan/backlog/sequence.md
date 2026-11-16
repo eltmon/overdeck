@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T11:05:46.821824Z · model: claude-opus-5-5 · open: 886_
+_Last sequenced: 2026-11-16T11:36:01.575231Z · model: claude-opus-5-5 · open: 887_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -888,6 +888,7 @@ _Last sequenced: 2026-11-16T11:05:46.821824Z · model: claude-opus-5-5 · open: 
 | 897 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
 | 898 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
 | 899 | PAN-5207 | L | low | needs-refinement |  | PAN-5202 | Parked by the operator: Flux meeting bots for Zoom, Teams, Meet, Slack as a paid integration. Do not start. |
+| 900 | PAN-5434 | M | low | ok |  | PAN-4591 | Codex apply_patch post-edit Semgrep scan; needs a hooks.json composer shared with SageOx. Blocked by PAN-4591; live Codex probe first. |
 | 901 | PAN-5181 | XS | low | ok |  |  | Fix shipped in PR #5179 (merged 2026-11-13); the body says it closes on merge. Verify and close. |
 | 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
 | 904 | PAN-5405 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus. |
@@ -1221,10 +1222,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T11:05:46.821824Z",
+  "generatedAt": "2026-11-16T11:36:01.575231Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 886,
+  "openCount": 887,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -12204,6 +12205,21 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
+      "issue": "PAN-5434",
+      "rank": 900,
+      "size": "M",
+      "importance": "low",
+      "score": 32,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4591"
+      ],
+      "why": "Codex apply_patch post-edit Semgrep scan; needs a hooks.json composer shared with SageOx. Blocked by PAN-4591; live Codex probe first.",
+      "rationale": "New issue filed as a deferred slice of PAN-4591; it is blocked by that issue and ranks just after the Semgrep cluster.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-5181",
       "rank": 901,
       "size": "XS",
@@ -13183,6 +13199,13 @@ New this pass. The test role evaluates the workspace working tree rather than th
     {
       "from": "PAN-4590",
       "to": "PAN-4594",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4591",
+      "to": "PAN-5434",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
