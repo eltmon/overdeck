@@ -12,10 +12,10 @@ analysis (SAST) scanner. It is **off by default**.
 
 Phase 1 covers config, the managed install, and `pan doctor` rows: turning the feature on makes
 Overdeck install a pinned Semgrep binary and report its health. In-session tools (#4591) are now
-available too — a `semgrep` MCP server, a post-edit scan hook, and a `semgrep` skill — plus a
-Codex edit hook (#5434). Later phases — a verification-gate scan with review-lane findings
-(#4590), CI (#4592), a Platform/Guardian tier (#4593), and dashboard controls (#4594) — are
-planned but not part of this release.
+available too — a `semgrep` MCP server, a post-edit scan hook, and a `semgrep` skill. Later
+phases — a verification-gate scan with review-lane findings (#4590), a Codex edit hook (#5434),
+CI (#4592), a Platform/Guardian tier (#4593), and dashboard controls (#4594) — are planned but
+not part of this release.
 
 ## Turn it on
 
@@ -77,8 +77,7 @@ With `security.semgrep.mcp: true`, work agents and the review security lane get 
 MCP server: `semgrep_scan_with_custom_rule`, `semgrep_rule_schema`, `get_abstract_syntax_tree`,
 and `get_supported_languages`. `semgrep_scan` is intentionally absent — it needs
 `--config auto`, which this setup never runs; use the CLI through the `semgrep` skill instead.
-The server adds about 100&nbsp;MB per agent (the managed Semgrep install, shared across every
-agent on the machine, not per-launch).
+The server adds about 100&nbsp;MB per agent.
 
 ### Post-edit scan hook
 
