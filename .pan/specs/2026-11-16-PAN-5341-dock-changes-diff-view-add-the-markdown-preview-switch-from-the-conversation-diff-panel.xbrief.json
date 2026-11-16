@@ -1,0 +1,384 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-16T05:06:43Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5341: Dock Changes diff view: add the Markdown Preview switch from the conversation diff panel",
+    "updated": "2026-11-16T05:08:12.832Z"
+  },
+  "plan": {
+    "id": "pan-5341",
+    "title": "Dock Changes diff view: add the Markdown Preview switch from the conversation diff panel",
+    "status": "proposed",
+    "uid": "6a1d7f53-6f78-40f9-8b8f-8141edd464ca",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-16T05:06:43Z",
+    "updated": "2026-11-16T05:08:12.832Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5341",
+        "label": "PAN-5341",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5338",
+        "label": "PAN-5338 (dependency, merged)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5341.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "dock",
+      "diff",
+      "markdown"
+    ],
+    "narratives": {
+      "Problem": "The work dock's Changes diff view (DockDiffView.tsx) shows a Markdown file only as diff rows. PAN-5338 gave the conversation diff window a Diff | Preview switch and a reusable preview body (DiffMarkdownPreview, markdownPreviewSource) but left DockDiffView unchanged (its D-13). With the inline diff panel removed by PAN-5295, the dock diff view is the main place to read a conversation's changes, and it cannot render a document.",
+      "Proposal": "Reuse PAN-5338's pieces without forking them. A new pure module dock/changes/dockDiffPreview.ts maps a DockDiffTarget onto PAN-5338's PreviewScope (uncommitted -> full with no parsed file, committedVsMain -> vs-main, sha -> compare) and calls markdownPreviewSource, returning null when the target gets no switch (non-Markdown, message body, deleted file). DiffFileBar.tsx exports its tablist as DiffViewSwitch; DockDiffView renders that switch in its tag row and swaps the body for DiffMarkdownPreview when Preview is chosen. The switch state is keyed on path+sha+committedVsMain so stepping to another file returns to Diff. Docs in features/file-explorer.mdx and docs/DASHBOARD-ARCHITECTURE.md plus changelog.d/pan-5341.md. See .pan/drafts/PAN-5341.md for exact code.",
+      "NonGoals": "- No change to the conversation diff window's behavior; DiffFileBar only delegates to DiffViewSwitch\n- No exact after side for a commit's modified file: it shows the current working-tree file with the note \"Showing the current file\"\n- No Open file button in the dock diff view (Open beside chat already exists)\n- No Preview for non-Markdown viewer types (CSV, SVG)\n- No persistence of the Diff/Preview choice across targets, sessions or reloads\n- No switch while loading, on load errors, or for message states (too large, no folder, edit-workspace committed file, no agent)\n- No server change and no new HTTP route\n- No second Markdown renderer and no second preview-source rule function\n- No change to relative-link behavior inside a patch-source preview (stays inert)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Map dock target sources onto PAN-5338's markdownPreviewSource (uncommitted->full, committedVsMain->vs-main, sha->compare) instead of writing a new rule",
+        "rationale": "The issue forbids a second renderer and the existing function already encodes exactly the three required after-side rules; one rule means the two views cannot drift."
+      },
+      {
+        "summary": "Uncommitted Preview re-reads the working tree through DiffMarkdownPreview's read source (file passed as undefined) rather than reusing the already-read string",
+        "rationale": "A read source passes docLocation so PAN-5337 relative links resolve; the cost is one extra cached readFile on clicking Preview."
+      },
+      {
+        "summary": "Uncommitted deleted = the working-tree readFile threw NOT_FOUND (new DockDiffBody.files.deleted flag); patch-based deleted = parsed type 'deleted'",
+        "rationale": "parseDiffFromFile marks an emptied file as 'deleted' too, so the parsed type cannot tell deleted from emptied for uncommitted files."
+      },
+      {
+        "summary": "Place the switch in DockDiffView's existing tag row via an extracted DiffViewSwitch, not a third DiffFileBar row",
+        "rationale": "DiffFileBar would repeat the path and add an Open file slot the dock already covers; extracting the tablist keeps the markup identical by construction."
+      },
+      {
+        "summary": "Switch state keyed on path + sha + committedVsMain (the sameTarget identity); default Diff; not persisted",
+        "rationale": "Mirrors PAN-5338 D-4 (choice belongs to one file) and the dock's own target identity in ChangesTab.tsx."
+      },
+      {
+        "summary": "Extend the existing DockDiffView.test.tsx rather than add a new component test file",
+        "rationale": "It is already in scripts/frontend-test-subset.txt and has the mocks needed; only the new pure-helper test needs a subset line."
+      }
+    ],
+    "items": [
+      {
+        "id": "dock-preview-source",
+        "title": "Add the pure dockDiffPreview.ts mapping from a dock diff target to a PreviewSource",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T05:06:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5341",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/dock/changes/dockDiffPreview.ts",
+            "src/dashboard/frontend/src/components/dock/__tests__/dockDiffPreview.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/dock/__tests__/dockDiffPreview.test.ts",
+            "node scripts/run-frontend-test-subset.mjs --dry-run | grep dockDiffPreview",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "dockDiffPreview.test.ts passes all 13 cases",
+            "the dry-run output lists src/components/dock/__tests__/dockDiffPreview.test.ts",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/dock/changes/dockDiffPreview.ts exactly as PRD WI-1 shows: export type DockDiffBody (patch | files with deleted:boolean | message), dockPreviewScope(target) (sha->compare, committedVsMain->vs-main, else full), patchFileOf(patch) (parsePatchFiles from '@pierre/diffs', first file, undefined when empty or on throw), and dockMarkdownPreview({target, body, rootId}) returning null for non-Markdown (isMarkdownPath), message bodies, files bodies with deleted:true, or a patch whose parsed file isDeletedDiffFile; otherwise markdownPreviewSource({file, scope: dockPreviewScope(target), agentRoute:false, rootId, rootPath: target.outsideRoot ? null : target.path}). For a files body pass file undefined. Do not import DockDiffView.tsx or PatchFiles.tsx. Write the 13 test cases of PRD WI-1 in src/dashboard/frontend/src/components/dock/__tests__/dockDiffPreview.test.ts using the MODIFIED_MD / ADDED_MD / DELETED_MD patch literals given there. Add the line src/components/dock/__tests__/dockDiffPreview.test.ts to scripts/frontend-test-subset.txt directly before src/components/dock/__tests__/DockDiffView.test.tsx."
+        },
+        "items": [
+          {
+            "id": "dock-preview-source.ac1",
+            "title": "Given an uncommitted docs/a.md target with a files body (deleted:false, file type 'new') and rootId issue:PAN-1, dockMarkdownPreview returns { kind: 'read', rootId: 'issue:PAN-1', path: 'docs/a.md', note: false } with no ref",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-preview-source.ac2",
+            "title": "Given a committedVsMain target, dockMarkdownPreview returns a read with ref 'HEAD' for a modified-file patch and { kind: 'patch', text: '# Title\\n\\nbody\\n' } for a new-file-mode patch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-preview-source.ac3",
+            "title": "Given a sha target, dockMarkdownPreview returns patch text for an added file, a read with note:true and no ref for a modified file or an empty patch, and null for a deleted-file-mode patch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-preview-source.ac4",
+            "title": "dockMarkdownPreview returns null for a .ts path, a message body, and a files body with deleted:true; it returns OUTSIDE_ROOT_PREVIEW for outsideRoot and NO_ROOT_PREVIEW for a null rootId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-preview-source.ac5",
+            "title": "When node scripts/run-frontend-test-subset.mjs --dry-run runs, its output lists src/components/dock/__tests__/dockDiffPreview.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "diff-view-switch",
+        "title": "Extract the Diff | Preview tablist from DiffFileBar as an exported DiffViewSwitch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T05:06:43Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5341",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/diff/DiffFileBar.tsx",
+            "src/dashboard/frontend/src/components/diff/__tests__/DiffFileBar.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/diff/__tests__/DiffFileBar.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "DiffFileBar.test.tsx passes, including the new DiffViewSwitch describe block",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/diff/DiffFileBar.tsx, move the role=\"tablist\" aria-label=\"View\" block (lines 25-39) into a new exported component DiffViewSwitch({ view, onView }: { view: DiffFileView; onView(view: DiffFileView): void }) with the same buttons and styles.subTab/styles.subTabActive classes, and className \"flex shrink-0\" on the tablist. DiffFileBar renders {previewable ? <DiffViewSwitch view={view} onView={onView} /> : null}. Update the header comment to name DiffViewSwitch and PAN-5341. In DiffFileBar.test.tsx keep every existing case unchanged; add describe('DiffViewSwitch') with: tabs Diff and Preview render with aria-selected following view; clicking Diff while view='preview' calls onView('diff')."
+        },
+        "items": [
+          {
+            "id": "diff-view-switch.ac1",
+            "title": "Given view='preview', DiffViewSwitch renders a tablist named View whose Preview tab has aria-selected=\"true\" and Diff has aria-selected=\"false\"; clicking Diff calls onView('diff')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diff-view-switch.ac2",
+            "title": "The pre-existing DiffFileBar tests (no tablist when previewable is false, Diff selected by default, Preview click calls onView('preview'), Open file presence) pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dock-diff-wiring",
+        "title": "Render the Diff | Preview switch and DiffMarkdownPreview in DockDiffView",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T05:06:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5341",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/dock/changes/DockDiffView.tsx",
+            "src/dashboard/frontend/src/components/dock/__tests__/DockDiffView.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/dock/__tests__/DockDiffView.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "DockDiffView.test.tsx passes, including the uncommitted, committedVsMain, added-commit, modified-commit, no-switch and reset-on-step cases",
+            "typecheck completes without errors",
+            "lint completes without errors (including lint:circular and lint-file-size)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "acJustification": "Five ACs: four map to unit-test groups and one to the required browser check at the dock's default width."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 step by step in src/dashboard/frontend/src/components/dock/changes/DockDiffView.tsx: (1) import useState, DiffViewSwitch + type DiffFileView from '../../diff/DiffFileBar', DiffMarkdownPreview from '../../diff/DiffMarkdownPreview', dockMarkdownPreview + type DockDiffBody from './dockDiffPreview'; (2) delete the local DiffData type and use DockDiffBody; (3) in the uncommitted branch add `let deleted = false`, set it true in the NOT_FOUND catch of the working-tree read, and return { kind: 'files', files: [...], deleted }; (4) before `if (!target) return null`, add the fileView state, viewKey = `${target.path}\\u0000${target.sha ?? ''}\\u0000${target.committedVsMain ? 'main' : ''}`, view (preview only when fileView.key === viewKey), and previewSource = useMemo(() => target && query.isSuccess ? dockMarkdownPreview({ target, body: query.data, rootId }) : null, [...]); (5) make `if (previewSource && view === 'preview') body = <DiffMarkdownPreview source={previewSource} />` the first branch of the body chain; (6) in the tag row, right after the tag span, render {previewSource && <DiffViewSwitch view={view} onView={(v) => setFileView({ key: viewKey, view: v })} />}; (7) add a header-comment sentence naming PAN-5341. Extend DockDiffView.test.tsx with the PRD WI-3 cases (reuse renderView/scopeFor/rpc.readFile/fetchMock; for the reset case rerender inside the same QueryClientProvider). Then do the browser check: npm run build, open a conversation tab whose dock Changes tab lists a modified .md file in an isolated Playwright profile at the default 340 px dock width, screenshot and inspect it. If the tag row overflows, make only the Open beside chat button icon-only (keep title/aria-label) and note it in the commit message."
+        },
+        "items": [
+          {
+            "id": "dock-diff-wiring.ac1",
+            "title": "Given an uncommitted docs/a.md whose working tree is '# New', the tag row renders the Diff tab with aria-selected=\"true\"; when Preview is clicked, diff-markdown-preview renders a heading 'New' and no file-diff element renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-diff-wiring.ac2",
+            "title": "When Preview is clicked: a committedVsMain modified file calls readFile('issue:PAN-1','docs/a.md','HEAD'); a commit's added file renders heading 'Title' without calling readFile; a commit's modified file renders 'Showing the current file' and calls readFile('project:p','docs/a.md') with no ref",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-diff-wiring.ac3",
+            "title": "No tablist renders for an uncommitted .ts file, an uncommitted Markdown file whose working-tree read throws NOT_FOUND, a commit whose patch has deleted file mode, or the edit-workspace NO_WORKSPACE_COMMIT_DIFF message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-diff-wiring.ac4",
+            "title": "Given Preview was selected on docs/a.md at index 0, when the view re-renders with index 1 (docs/b.md), file-diff renders and diff-markdown-preview does not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dock-diff-wiring.ac5",
+            "title": "In an isolated Playwright profile at the 340 px default dock width, the tag row shows the tag, Diff, Preview, Open beside chat and the reveal icon on one line, the page has no horizontal scroll, and Preview renders the Markdown headings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-changelog",
+        "title": "Document the dock diff view's Markdown Preview in file-explorer.mdx, DASHBOARD-ARCHITECTURE.md and changelog.d",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T05:06:43Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5341",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/file-explorer.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "changelog.d/pan-5341.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'Showing the current file' features/file-explorer.mdx",
+            "grep -n 'dockDiffPreview.ts' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "the grep prints a line in the ## Changes section of features/file-explorer.mdx",
+            "the grep prints the sentence appended to the Changes tab paragraph"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply PRD WI-4 verbatim: (1) in features/file-explorer.mdx section ## Changes, after the paragraph starting 'The diff view shows one file with previous and next buttons', add the Markdown Preview paragraph from the PRD; (2) in docs/DASHBOARD-ARCHITECTURE.md append the PRD sentence to the paragraph starting \"The Changes tab's per-file diffs use\"; (3) create changelog.d/pan-5341.md with the #### New bullet from the PRD (no em dashes). Run npm run lint:docs."
+        },
+        "items": [
+          {
+            "id": "docs-and-changelog.ac1",
+            "title": "features/file-explorer.mdx ## Changes contains a paragraph naming **Diff**, **Preview**, the note \"Showing the current file\", and that a deleted file has no Preview",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac2",
+            "title": "When grep runs on docs/DASHBOARD-ARCHITECTURE.md, the Changes-tab diff paragraph returns a sentence that names DiffViewSwitch, DiffMarkdownPreview and dock/changes/dockDiffPreview.ts with the uncommitted/committedVsMain/commit mapping",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac3",
+            "title": "changelog.d/pan-5341.md exists with one #### New bullet linking #5341, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "dock-preview-source",
+        "to": "dock-diff-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "diff-view-switch",
+        "to": "dock-diff-wiring",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-16-PAN-5341-dock-changes-diff-view-add-the-markdown-preview-switch-from-the-conversation-diff-panel.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
