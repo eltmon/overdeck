@@ -4,17 +4,17 @@
     "created": "2026-11-16T11:18:10Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4591: Semgrep in-session for agents: semgrep mcp server, post-edit scan hook, and semgrep skill",
-    "updated": "2026-11-16T11:36:36.382Z"
+    "updated": "2026-11-16T11:37:49.741Z"
   },
   "plan": {
     "id": "pan-4591",
     "title": "Semgrep in-session for agents: semgrep mcp server, post-edit scan hook, and semgrep skill",
-    "status": "proposed",
+    "status": "running",
     "uid": "f591a766-8a23-4069-b545-06ded46c6551",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-16T11:18:10Z",
-    "updated": "2026-11-16T11:36:36.382Z",
+    "updated": "2026-11-16T11:37:49.741Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4591",
@@ -723,5 +723,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
