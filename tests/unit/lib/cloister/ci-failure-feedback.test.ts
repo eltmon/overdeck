@@ -1245,6 +1245,7 @@ describe('PAN-4534: failures come from the head\'s check runs, with the failing 
 
       expect(section(body, 'Semgrep OSS')).toContain('This is the Semgrep check from `.github/workflows/semgrep.yml`.');
       expect(section(body, 'Semgrep OSS')).toContain('nosemgrep: <rule-id> -- <reason>');
+      expect(section(body, 'Semgrep OSS')).toContain('the scan itself failed rather than finding anything');
     });
   });
 });

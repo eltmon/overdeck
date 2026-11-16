@@ -22,6 +22,7 @@ const PROJECT: ProjectConfig = {
 } as ProjectConfig;
 
 const PR_URL = 'https://github.com/eltmon/overdeck/pull/9001';
+const BASE_SHA = '0123456789abcdef0123456789abcdef01234567';
 
 interface Call { file: 'git' | 'gh'; args: string[]; cwd?: string }
 type Answer = { stdout?: string; stderr?: string; fail?: boolean };
@@ -30,7 +31,8 @@ type Answer = { stdout?: string; stderr?: string; fail?: boolean };
 function label(call: Call): string {
   const [first, second] = call.args;
   if (call.file === 'gh') return `gh ${first} ${second}`;
-  if (first === 'remote' || first === 'worktree') return `git ${first} ${second}`;
+  if (first === 'remote') return call.args.includes('--push') ? 'git remote push-url' : 'git remote get-url';
+  if (first === 'worktree') return `git ${first} ${second}`;
   return `git ${first}`;
 }
 
@@ -38,8 +40,10 @@ function label(call: Call): string {
 const HAPPY: Record<string, Answer> = {
   'git symbolic-ref': { stdout: 'origin/main\n' },
   'git remote get-url': { stdout: 'git@github.com:eltmon/overdeck.git\n' },
+  'git remote push-url': { stdout: 'git@github.com:eltmon/overdeck.git\n' },
   'git fetch': {},
-  'git cat-file': { fail: true, stderr: 'fatal: path does not exist' },
+  'git rev-parse': { stdout: `${BASE_SHA}\n` },
+  'git ls-tree': { stdout: '' },
   'gh pr list': { stdout: '[]\n' },
   'git ls-remote': { stdout: '' },
   'git worktree add': {},
@@ -93,7 +97,11 @@ describe('runSemgrepCiSetup refusals (PAN-4592)', () => {
     ['a config climbs out of the repo', { semgrep: { configs: ['../rules'] } }, 'security.semgrep.configs entry "../rules" is not a registry id or a repo-relative path'],
     ['the base branch has unsafe characters', { project: { ...PROJECT, workspace: { default_branch: 'main;x' } } as ProjectConfig }, 'base branch "main;x" has characters ci-setup does not write into a workflow'],
     ['origin is a fork', { answers: { 'git remote get-url': { stdout: 'git@github.com:someone/fork.git\n' } } }, 'origin of /repos/overdeck is git@github.com:someone/fork.git, not eltmon/overdeck; ci-setup pushes to origin and opens the pull request there.'],
-    ['the workflow already exists', { answers: { 'git cat-file': {} } }, 'eltmon/overdeck already has .github/workflows/semgrep.yml on main; ci-setup never overwrites it.'],
+    ['a push URL is a fork', { answers: { 'git remote push-url': { stdout: 'git@github.com:eltmon/overdeck.git\ngit@github.com:someone/fork.git\n' } } }, 'origin of /repos/overdeck is git@github.com:someone/fork.git, not eltmon/overdeck; ci-setup pushes to origin and opens the pull request there.'],
+    ['origin is the same path on another host', { answers: { 'git remote get-url': { stdout: 'https://gitlab.com/eltmon/overdeck.git\n' } } }, 'origin of /repos/overdeck is https://gitlab.com/eltmon/overdeck.git, not eltmon/overdeck; ci-setup pushes to origin and opens the pull request there.'],
+    ['the workflow already exists', { answers: { 'git ls-tree': { stdout: '.github/workflows/semgrep.yml\n' } } }, 'eltmon/overdeck already has .github/workflows/semgrep.yml on main; ci-setup never overwrites it.'],
+    ['the workflow check fails', { answers: { 'git ls-tree': { fail: true, stderr: 'fatal: timed out\n' } } }, 'git ls-tree failed: fatal: timed out'],
+    ['the base branch cannot be fetched', { answers: { 'git fetch': { fail: true, stderr: "fatal: couldn't find remote ref develop\n" } } }, "git fetch origin main failed: fatal: couldn't find remote ref develop"],
     ['a leftover setup branch has no open pull request', { answers: { 'git ls-remote': { stdout: 'abc123\trefs/heads/overdeck/semgrep-ci\n' } } }, 'Branch overdeck/semgrep-ci already exists on origin with no open pull request. Delete it or open a pull request from it.'],
   ];
 
@@ -120,7 +128,10 @@ describe('runSemgrepCiSetup refusals (PAN-4592)', () => {
   });
 
   it('accepts an HTTPS origin URL in any case', async () => {
-    const h = harness({ answers: { 'git remote get-url': { stdout: 'https://github.com/Eltmon/Overdeck.git\n' } } });
+    const h = harness({ answers: {
+      'git remote get-url': { stdout: 'https://github.com/Eltmon/Overdeck.git\n' },
+      'git remote push-url': { stdout: 'https://github.com/Eltmon/Overdeck.git\n' },
+    } });
 
     expect(await runSemgrepCiSetup({ projectKey: 'overdeck' }, h.deps)).toMatchObject({ ok: true });
   });
@@ -173,17 +184,22 @@ describe('runSemgrepCiSetup (PAN-4592)', () => {
 
     expect(result).toEqual({ ok: true, prUrl: PR_URL, existing: false, dryRun: false });
     expect(h.labels()).toEqual([
-      'git remote get-url', 'git fetch', 'git cat-file', 'gh pr list', 'git ls-remote',
+      'git remote get-url', 'git remote push-url', 'git fetch', 'git rev-parse', 'git ls-tree', 'gh pr list', 'git ls-remote',
       'git worktree add', 'git add', 'git commit', 'git push', 'gh pr create', 'git worktree remove',
     ]);
     const argv = (name: string) => h.calls.find((call) => label(call) === name)!;
-    expect(argv('git worktree add').args).toEqual(['worktree', 'add', '--detach', WORKTREE, 'origin/main']);
+    expect(argv('git fetch').args).toEqual(['fetch', 'origin', '+refs/heads/main:refs/remotes/origin/main']);
+    expect(argv('git ls-tree').args).toEqual(['ls-tree', '--name-only', BASE_SHA, '--', '.github/workflows/semgrep.yml']);
+    expect(argv('git worktree add').args).toEqual(['worktree', 'add', '--detach', WORKTREE, BASE_SHA]);
     expect(argv('git commit').args).toContain('--no-verify');
     expect(argv('git push').args).toEqual(['push', '--no-verify', 'origin', 'HEAD:refs/heads/overdeck/semgrep-ci']);
     expect(argv('git push').cwd).toBe(WORKTREE);
     expect(argv('gh pr create').args).toEqual(expect.arrayContaining(['--repo', 'eltmon/overdeck', '--base', 'main', '--head', 'overdeck/semgrep-ci']));
     expect(argv('git worktree remove').args).toEqual(['worktree', 'remove', '--force', WORKTREE]);
-    for (const call of h.calls) expect(call.args.join(' ')).not.toContain('refs/heads/main');
+    // The base branch is only ever read (the fetch refspec), never pushed to.
+    const pushes = h.calls.filter((call) => call.args[0] === 'push');
+    expect(pushes).toHaveLength(1);
+    for (const call of pushes) expect(call.args.join(' ')).not.toContain('refs/heads/main');
     expect(h.written).toHaveLength(1);
     expect(h.written[0]!.path).toBe(`${WORKTREE}/.github/workflows/semgrep.yml`);
     expect(h.written[0]!.content).toContain('OVERDECK_SEMGREP_GATE: advisory');
@@ -198,7 +214,7 @@ describe('runSemgrepCiSetup (PAN-4592)', () => {
     await runSemgrepCiSetup({ projectKey: 'overdeck' }, h.deps);
 
     expect(h.labels()[0]).toBe('git symbolic-ref');
-    expect(h.calls.find((call) => label(call) === 'git worktree add')!.args.at(-1)).toBe('origin/develop');
+    expect(h.calls.find((call) => label(call) === 'git fetch')!.args.at(-1)).toBe('+refs/heads/develop:refs/remotes/origin/develop');
   });
 
   it('names the workflow scope when GitHub refuses the push, and still removes the worktree', async () => {

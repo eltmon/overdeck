@@ -191,33 +191,46 @@ export async function runSemgrepCiSetup(
 
   const read = (args: string[]) => deps.run('git', args, { cwd: project.path, timeoutMs: READ_TIMEOUT_MS });
 
-  // 7. origin must be github_repo: the branch goes to origin, the pull request to github_repo.
+  // 7. origin must be github_repo on github.com, for fetch and for every push URL:
+  // the branch goes to origin, the pull request to github_repo.
+  const repoLower = githubRepo.toLowerCase();
+  const namesRepo = (url: string) => {
+    const normalized = url.toLowerCase().replace(/\.git$/, '');
+    return normalized.endsWith(`github.com/${repoLower}`) || normalized.endsWith(`github.com:${repoLower}`);
+  };
+  const wrongOrigin = (url: string) =>
+    `origin of ${project.path} is ${url}, not ${githubRepo}; ci-setup pushes to origin and opens the pull request there.`;
   let originUrl: string;
+  let pushUrls: string[];
   try {
     originUrl = (await read(['remote', 'get-url', 'origin'])).stdout.trim();
+    pushUrls = (await read(['remote', 'get-url', '--push', '--all', 'origin'])).stdout.split('\n').map((line) => line.trim()).filter(Boolean);
   } catch (err) {
     return refuse(`git remote get-url origin failed: ${firstStderrLine(err)}`);
   }
-  const normalizedOrigin = originUrl.toLowerCase().replace(/\.git$/, '');
-  const repoLower = githubRepo.toLowerCase();
-  if (!normalizedOrigin.endsWith(`/${repoLower}`) && !normalizedOrigin.endsWith(`:${repoLower}`)) {
-    return refuse(`origin of ${project.path} is ${originUrl}, not ${githubRepo}; ci-setup pushes to origin and opens the pull request there.`);
-  }
+  if (!namesRepo(originUrl)) return refuse(wrongOrigin(originUrl));
+  const wrongPush = pushUrls.find((url) => !namesRepo(url));
+  if (wrongPush) return refuse(wrongOrigin(wrongPush));
+  if (pushUrls.length === 0) return refuse(wrongOrigin('(no push URL)'));
 
-  // 8. The current base branch.
+  // 8. The current base branch, fetched into an explicit tracking ref and pinned to one commit:
+  // the existence check and the worktree both use that commit.
+  let baseSha: string;
   try {
-    await deps.run('git', ['fetch', 'origin', base], { cwd: project.path, timeoutMs: NETWORK_TIMEOUT_MS });
+    await deps.run('git', ['fetch', 'origin', `+refs/heads/${base}:refs/remotes/origin/${base}`], { cwd: project.path, timeoutMs: NETWORK_TIMEOUT_MS });
+    baseSha = (await read(['rev-parse', '--verify', `refs/remotes/origin/${base}^{commit}`])).stdout.trim();
   } catch (err) {
     return refuse(`git fetch origin ${base} failed: ${firstStderrLine(err)}`);
   }
 
-  // 9. Never overwrite an existing workflow.
-  let workflowExists = false;
+  // 9. Never overwrite an existing workflow. A failed read is a refusal, never "absent".
+  let listed: string;
   try {
-    await read(['cat-file', '-e', `origin/${base}:${SEMGREP_WORKFLOW_PATH}`]);
-    workflowExists = true;
-  } catch { /* absent: the expected case */ }
-  if (workflowExists) return refuse(`${githubRepo} already has ${SEMGREP_WORKFLOW_PATH} on ${base}; ci-setup never overwrites it.`);
+    listed = (await read(['ls-tree', '--name-only', baseSha, '--', SEMGREP_WORKFLOW_PATH])).stdout.trim();
+  } catch (err) {
+    return refuse(`git ls-tree failed: ${firstStderrLine(err)}`);
+  }
+  if (listed) return refuse(`${githubRepo} already has ${SEMGREP_WORKFLOW_PATH} on ${base}; ci-setup never overwrites it.`);
 
   // 10. An open pull request from the setup branch is success.
   let openPrs: Array<{ url?: string }>;
@@ -244,12 +257,12 @@ export async function runSemgrepCiSetup(
     return refuse(`Branch ${SEMGREP_SETUP_BRANCH} already exists on origin with no open pull request. Delete it or open a pull request from it.`);
   }
 
-  // 12. A detached throwaway worktree off origin/<base>.
+  // 12. A detached throwaway worktree at the checked base commit.
   const root = deps.tmpRoot();
   const path = join(root, `${key}-${deps.now()}`);
   try {
     await deps.mkdirp(root);
-    await deps.run('git', ['worktree', 'add', '--detach', path, `origin/${base}`], { cwd: project.path, timeoutMs: READ_TIMEOUT_MS });
+    await deps.run('git', ['worktree', 'add', '--detach', path, baseSha], { cwd: project.path, timeoutMs: READ_TIMEOUT_MS });
   } catch (err) {
     return refuse(`git worktree add failed: ${firstStderrLine(err)}`);
   }

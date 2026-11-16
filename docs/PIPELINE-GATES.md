@@ -293,8 +293,11 @@ the **CI test job on the PR head is the test gate**:
   the `Ran N rules on M files` line, about 2000 characters), followed by
   instructions to fix each finding, rescan with the managed Semgrep CLI, and
   suppress only a confirmed false positive with
-  `nosemgrep: <rule-id> -- <reason>`. A Semgrep check is never the CI test
-  gate.
+  `nosemgrep: <rule-id> -- <reason>`. In blocking mode a scanner error (a
+  non-1 exit, or a failed `git merge-base`) also fails the check; the
+  instructions tell the agent that an excerpt with no `Code Finding` block is
+  such a failure, with nothing to suppress. A Semgrep check is never the CI
+  test gate.
 - **A later failure on the same head (PAN-4625).** The relay records, per
   issue, the head it last delivered feedback for and the failed check names
   that feedback named. A later relay for the same head (a `test-shard (4/4)`

@@ -544,7 +544,10 @@ const SEMGREP_FAILURE_GUIDANCE =
   'on code this PR adds (`--baseline-commit` at the merge base). For each finding in the excerpt: fix the code, ' +
   'then rescan the changed files with the managed Semgrep CLI as the `semgrep` skill shows, using the `--config` ' +
   'values from the workflow. Suppress only a confirmed false positive, on that line only, with ' +
-  '`nosemgrep: <rule-id> -- <reason>`; the security review lane sees every new suppression.\n\n';
+  '`nosemgrep: <rule-id> -- <reason>`; the security review lane sees every new suppression. ' +
+  'If the excerpt shows no `Code Finding` block, the scan itself failed rather than finding anything (for example a ' +
+  'missing rule file, an unreachable registry, or a base branch git could not resolve): fix that cause or push again; ' +
+  'there is nothing to suppress.\n\n';
 
 function buildFeedbackBody(opts: {
   issueId: string;
