@@ -1,7 +1,9 @@
 /**
  * Billing fixtures for the account-service unit tests (PAN-4294).
  */
-import type { Env } from '../../../../../services/account/src/env.ts';
+import { createHmac } from 'node:crypto';
+import type { Deps, Env } from '../../../../../services/account/src/env.ts';
+import { call } from './harness.ts';
 
 export interface SubscriptionSeed {
   subscriptionId: string;
@@ -92,4 +94,21 @@ export function fakeCreem(routes: Record<string, CreemRoute> = {}) {
     });
   };
   return { fetch: fetchFn, requests };
+}
+
+/** The creem-signature header value for a raw body. */
+export function creemSignature(body: string, secret: string = TEST_WEBHOOK_SECRET): string {
+  return createHmac('sha256', secret).update(body).digest('hex');
+}
+
+/** POST a signed Creem webhook through the route table. `signature` overrides the computed header. */
+export function postWebhook(env: Env, deps: Deps, payload: unknown, opts: { signature?: string | null } = {}): Promise<Response> {
+  const body = typeof payload === 'string' ? payload : JSON.stringify(payload);
+  const signature = opts.signature === undefined ? creemSignature(body) : opts.signature;
+  return call('POST', '/webhooks/creem', {
+    env,
+    deps,
+    headers: { 'content-type': 'application/json', ...(signature === null ? {} : { 'creem-signature': signature }) },
+    body,
+  });
 }

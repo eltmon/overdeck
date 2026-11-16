@@ -3,7 +3,7 @@
  *
  * Order per request: OPTIONS → 405; match path → 404; match method → 405 with Allow;
  * config gate → 503 for everything but /healthz (D-23); /admin* → 503 without OWNER_GITHUB_ID;
- * rate-limit bucket → 429 (D-12); 16 KiB body guard → 413 (D-28); handler.
+ * rate-limit bucket → 429 (D-12); body guard → 413 (D-28: 16 KiB, or the route's own limit); handler.
  *
  * Each work item adds its rows here and its handlers in its own module.
  */
@@ -24,12 +24,16 @@ import * as adminPending from './admin/pending.ts';
 import * as accountActions from './account-page/actions.ts';
 import * as accountPage from './account-page/page.ts';
 import * as accountSession from './account-page/session.ts';
+import * as creemWebhook from './billing/webhook.ts';
+import { WEBHOOK_MAX_BODY_BYTES } from './billing/webhook.ts';
 
 interface Route {
   method: string;
   pattern: string;
   handler: Handler;
   bucket?: Bucket;
+  /** Body limit for this route; every other route keeps MAX_BODY_BYTES (16 KiB). */
+  maxBodyBytes?: number;
 }
 
 /** GET /healthz: liveness plus whether the required configuration is present; reveals no value (FR-14). */
@@ -63,6 +67,8 @@ const ROUTES: Route[] = [
   { method: 'POST', pattern: '/account/machines/:environmentId/remove', handler: accountActions.removeMachine, bucket: 'account-action' },
   { method: 'POST', pattern: '/account/delete', handler: accountActions.deleteAccount, bucket: 'account-action' },
   { method: 'POST', pattern: '/account/delete/confirm', handler: accountActions.confirmDeleteAccount, bucket: 'account-action' },
+  // No bucket: Creem retries on its own schedule, and the signature check is the gate (PAN-4294 NFR-2).
+  { method: 'POST', pattern: '/webhooks/creem', handler: creemWebhook.handle, maxBodyBytes: WEBHOOK_MAX_BODY_BYTES },
 ];
 
 function matchPattern(pattern: string, pathname: string): Record<string, string> | null {
@@ -136,7 +142,7 @@ export async function handle(req: Request, env: Env, ctx: ExecutionContext, deps
     }
   }
 
-  const guarded = await guardBody(req);
+  const guarded = await guardBody(req, matched.route.maxBodyBytes);
   if (!guarded.ok) return guarded.response;
 
   try {
