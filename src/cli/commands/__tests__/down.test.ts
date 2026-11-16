@@ -78,6 +78,23 @@ describe('pan down (PAN-5342 extraction)', () => {
     expect(mocks.isCliproxyRunning).toHaveBeenCalledOnce();
   });
 
+  it('kills review sessions after the dashboard stops and before Traefik stops (PAN-931)', async () => {
+    const order: string[] = [];
+    mocks.stopDashboard.mockImplementation(async () => { order.push('dashboard'); });
+    mocks.killAllReviewSessions.mockImplementation(async () => {
+      order.push('review-sessions');
+      return { killed: [], failed: [] };
+    });
+    mocks.execFile.mockImplementation((_file: string, _args: string[], _options: unknown, callback: ExecFileCallback) => {
+      order.push('traefik');
+      callback(null, '', '');
+    });
+
+    await downCommand({});
+
+    expect(order).toEqual(['dashboard', 'review-sessions', 'traefik']);
+  });
+
   it('skips Traefik with --skip-traefik', async () => {
     await downCommand({ skipTraefik: true });
 

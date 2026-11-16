@@ -32,7 +32,8 @@ vi.mock('../../../../src/lib/issue-id.js', () => ({ resolveIssueId: (id: string)
 vi.mock('../../../../src/lib/xbrief/io.js', () => ({ readWorkspacePlanSync: mocks.readPlan }));
 vi.mock('node:fs', async (importOriginal) => ({
   ...(await importOriginal<typeof import('node:fs')>()),
-  existsSync: (path: string) => mocks.exists(path),
+  // The shutdown record (PAN-5342) is absent: spawn refuses while it exists.
+  existsSync: (path: string) => (String(path).endsWith('shutdown.json') ? false : mocks.exists(path)),
 }));
 
 import { spawnCommand } from '../../../../src/cli/commands/spawn.js';

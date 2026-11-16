@@ -783,61 +783,9 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
   });
 });
 
-// ── pan down integration (PAN-931) ────────────────────────────────────────────
-// Regression: verifies that `pan down` imports and calls killAllReviewSessions
-// so review sessions are cleaned up during dashboard shutdown.
-
-describe('pan down integration (PAN-931)', () => {
-  it('src/cli/index.ts imports killAllReviewSessions from review-agent.js', async () => {
-    const { readFileSync } = await import('fs');
-    const { resolve } = await import('path');
-    const src = readFileSync(
-      resolve(import.meta.dirname, '../../../src/cli/index.ts'),
-      'utf-8',
-    );
-    expect(src).toContain('killAllReviewSessions');
-    expect(src).toContain("import('../lib/cloister/review-agent.js')");
-  });
-
-  it('src/cli/index.ts calls killAllReviewSessions inside the down command handler', async () => {
-    const { readFileSync } = await import('fs');
-    const { resolve } = await import('path');
-    const src = readFileSync(
-      resolve(import.meta.dirname, '../../../src/cli/index.ts'),
-      'utf-8',
-    );
-    // Isolate the down command block: from `.command('down')` to the next `.command(`
-    const downBlockMatch = src.match(/\.command\(['"]down['"]\)[\s\S]*?\.command\(/);
-    expect(downBlockMatch).not.toBeNull();
-    const downBlock = downBlockMatch![0];
-    expect(downBlock).toContain('killAllReviewSessions');
-    expect(downBlock).toContain('killed');
-    expect(downBlock).toContain('failed');
-  });
-
-  it('pan down calls killAllReviewSessions after dashboard stop and before Traefik stop', async () => {
-    const { readFileSync } = await import('fs');
-    const { resolve } = await import('path');
-    const src = readFileSync(
-      resolve(import.meta.dirname, '../../../src/cli/index.ts'),
-      'utf-8',
-    );
-    const downBlockMatch = src.match(/\.command\(['"]down['"]\)[\s\S]*?\.command\(/);
-    expect(downBlockMatch).not.toBeNull();
-    const downBlock = downBlockMatch![0];
-
-    // Dashboard stop comes before review session cleanup
-    const dashboardStopIdx = downBlock.indexOf('stopDashboard');
-    const reviewCleanupIdx = downBlock.indexOf('killAllReviewSessions');
-    const traefikStopIdx = downBlock.indexOf('docker compose down');
-
-    expect(dashboardStopIdx).toBeGreaterThanOrEqual(0);
-    expect(reviewCleanupIdx).toBeGreaterThanOrEqual(0);
-    expect(traefikStopIdx).toBeGreaterThanOrEqual(0);
-    expect(reviewCleanupIdx).toBeGreaterThan(dashboardStopIdx);
-    expect(reviewCleanupIdx).toBeLessThan(traefikStopIdx);
-  });
-});
+// pan down integration (PAN-931) moved with the `pan down` body to
+// src/cli/commands/down.ts (PAN-5342); src/cli/commands/__tests__/down.test.ts
+// checks the stop order by behaviour.
 
 // ── passed-state rerun uses spawnReviewRoleForIssue ──────────────────────────
 // Regression: the passed-state rerun path in /api/review/:issueId/request must
