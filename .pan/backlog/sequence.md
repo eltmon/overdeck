@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-15T23:27:33.766833Z · model: claude-opus-5-5 · open: 898_
+_Last sequenced: 2026-11-16T00:05:33.590020Z · model: claude-opus-5-5 · open: 897_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,7 +8,6 @@ _Last sequenced: 2026-11-15T23:27:33.766833Z · model: claude-opus-5-5 · open: 
 | 1 | PAN-5401 | S | critical | ok |  |  | In pipeline: close-out DoD row 1 reads only reviewDecision, rejecting comment verdicts the merge door accepts. |
 | 2 | PAN-5402 | XS | medium | ok |  |  | In pipeline: re-vendor the OKF skill at eltmon/okf v0.1.1 so the bundled skill gains okf publish. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
-| 5 | PAN-5398 | S | medium | ok |  |  | In pipeline: pan open uses the project key as deck key, opening a phantom deck where key differs from name. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
@@ -209,7 +208,7 @@ _Last sequenced: 2026-11-15T23:27:33.766833Z · model: claude-opus-5-5 · open: 
 | 205 | PAN-3050 | XS | high | ok |  |  | Idle-stack reaper's regex only matches overdeck-feature-*-server|frontend, so MYN stacks run for hours after their agents are gone. |
 | 206 | PAN-4365 | S | medium | ok |  |  | Stale defaults: workhorses.expensive is Opus 4.8 and the flywheel role is a literal that ignores the slot; evals now unblocked |
 | 207 | PAN-2980 | XS | high | ok |  |  | The pre-push file-size guard reads the shared working tree, so another session's uncommitted edits block an unrelated, guard-clean push. |
-| 208 | PAN-5295 | L | high | ok |  |  | Workflow redesign D2: turn card, file chips, composer controls, subagents rail and tab strip per mockup screen 1. |
+| 208 | PAN-5408 | S | medium | ok |  |  | D2 live-check fixes: full diff window lists all of main's changes, not the conversation's; Escape leaves tab/+ menus open. |
 | 209 | PAN-3769 | S | high | needs-refinement |  |  | Red main 707089c5→e4b280b3 blocked deploys ~14h: missing no-loss lock entry + stale OpenRouter expectation. Verify still reproducing. |
 | 210 | PAN-3760 | S | high | ok |  |  | permissionMode 'auto' undocumented as non-bypass, launcher can emit invalid --permission-mode, invalid values drop silently. |
 | 211 | PAN-3629 | M | high | ok |  |  | No sanctioned door to re-scope a live agent; the operator must violate pan tell doctrine or let the rejected design land. |
@@ -435,7 +434,7 @@ _Last sequenced: 2026-11-15T23:27:33.766833Z · model: claude-opus-5-5 · open: 
 | 432 | PAN-1624 | S | medium | ok |  |  | pan handoff --author external: authored doc is socket_write-ten but never submitted |
 | 433 | PAN-3901 | S | medium | ok |  |  | test-skip gate has no audited exemption for opt-in live suites (skipIf on env/binary); allowlist row with justification |
 | 434 | PAN-3852 | S | medium | ok |  |  | Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping |
-| 435 | PAN-5343 | L | medium | ok |  | PAN-5295 | Workflow redesign H: All projects deck listing conversations across projects, 1-4 side by side. Waits on four siblings. |
+| 435 | PAN-5343 | L | medium | ok |  |  | Workflow redesign H: All projects deck listing conversations across projects, 1-4 side by side. Waits on four siblings. |
 | 436 | PAN-3862 | L | medium | needs-refinement |  |  | /agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model |
 | 437 | PAN-1572 | M | medium | needs-refinement |  |  | Settings permission-mode can desync from the resolved mode; body cites the removed DSP flag and a renamed symbol — rewrite first |
 | 438 | PAN-4627 | S | medium | ok |  |  | Homebrew Claude Code installs get a copy-only upgrade banner; make the brew plan runnable and auto-upgrade outdated runnable installs. |
@@ -918,10 +917,6 @@ New in-pipeline chore already in review; a scripted re-vendor plus changelog ent
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
 
-### PAN-5398 (rank 5)
-
-New in-pipeline bug from the PAN-5349 live check, added to the workflow-redesign order book; pinned into a free top rank.
-
 ### PAN-5385 (rank 8)
 
 New issue. Phones (iOS, Android) and the connector cannot reach the machine at all, directly or through the relay, because RtcTransport.accept awaits ICE servers before registering the signalling session and drops trickle candidates that arrive in that window. The root cause and the fix (buffer candidates from offer acceptance) are stated in the body and touch only the dashboard server, so this is a small, well-defined fix for a full outage of a shipped feature. It takes the open rank-8 slot ahead of the remaining pipeline-substrate bugs.
@@ -1226,6 +1221,10 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
 
 New substrate bug placed in a freed high-tier slot. With several workspace stacks up, browser checks hit the wrong backend and flake, which corrupts verification.
 
+### PAN-3234 (rank 84)
+
+Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1233,10 +1232,10 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-15T23:27:33.766833Z",
+  "generatedAt": "2026-11-16T00:05:33.590020Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 898,
+  "openCount": 897,
   "nodes": [
     {
       "issue": "PAN-5401",
@@ -1274,19 +1273,6 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
       "dependsOn": [],
       "why": "Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned.",
       "rationale": "Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5398",
-      "rank": 5,
-      "size": "S",
-      "importance": "medium",
-      "score": 64,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: pan open uses the project key as deck key, opening a phantom deck where key differs from name.",
-      "rationale": "New in-pipeline bug from the PAN-5349 live check, added to the workflow-redesign order book; pinned into a free top rank.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3862,15 +3848,15 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
       "planning": "auto"
     },
     {
-      "issue": "PAN-5295",
+      "issue": "PAN-5408",
       "rank": 208,
-      "size": "L",
-      "importance": "high",
-      "score": 72,
+      "size": "S",
+      "importance": "medium",
+      "score": 62,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Workflow redesign D2: turn card, file chips, composer controls, subagents rail and tab strip per mockup screen 1.",
-      "rationale": "New child of the PAN-5284 epic, placed in a freed high-tier slot; it is a prerequisite for PAN-5343 and reshapes where PAN-5341 matters.",
+      "why": "D2 live-check fixes: full diff window lists all of main's changes, not the conversation's; Escape leaves tab/+ menus open.",
+      "rationale": "New child of epic PAN-5284 from the epic owner's live check of the just-merged D2 (PAN-5295); takes D2's freed rank 208 beside its sibling live-check fixes PAN-5370.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6660,9 +6646,7 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
       "importance": "medium",
       "score": 58,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5295"
-      ],
+      "dependsOn": [],
       "why": "Workflow redesign H: All projects deck listing conversations across projects, 1-4 side by side. Waits on four siblings.",
       "rationale": "Dependency PAN-5335 merged and closed, so it is dropped from dependsOn; rank unchanged while PAN-5295 remains open.",
       "gate": "auto",
@@ -13522,13 +13506,6 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
     },
     {
       "from": "PAN-5284",
-      "to": "PAN-5295",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5284",
       "to": "PAN-5343",
       "type": "contains",
       "source": "github-ref",
@@ -13549,23 +13526,9 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
       "confidence": 1
     },
     {
-      "from": "PAN-5295",
-      "to": "PAN-5341",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-5295",
-      "to": "PAN-5343",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5295",
-      "to": "PAN-5405",
-      "type": "informs",
+      "from": "PAN-5284",
+      "to": "PAN-5408",
+      "type": "contains",
       "source": "github-ref",
       "confidence": 1
     },
