@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T13:42:22.399849Z · model: claude-opus-5-5 · open: 892_
+_Last sequenced: 2026-11-16T14:13:01.724397Z · model: claude-opus-5-5 · open: 893_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -896,6 +896,7 @@ _Last sequenced: 2026-11-16T13:42:22.399849Z · model: claude-opus-5-5 · open: 
 | 900 | PAN-5434 | M | low | ok |  | PAN-4591 | Codex apply_patch post-edit Semgrep scan; needs a hooks.json composer shared with SageOx. Blocked by PAN-4591; live Codex probe first. |
 | 901 | PAN-5181 | XS | low | ok |  |  | Fix shipped in PR #5179 (merged 2026-11-13); the body says it closes on merge. Verify and close. |
 | 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
+| 903 | PAN-5444 | XS | low | ok |  |  | Two Minor CodeRabbit findings left on merged PR #5443: semgrep repo rules resolve from event cwd; hook tests not isolated from Docker. |
 | 904 | PAN-5405 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus. |
 
 ## Rationale detail
@@ -1227,10 +1228,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T13:42:22.399849Z",
+  "generatedAt": "2026-11-16T14:13:01.724397Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 892,
+  "openCount": 893,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -12322,6 +12323,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "condition": "ok",
       "dependsOn": [],
       "why": "Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5444",
+      "rank": 903,
+      "size": "XS",
+      "importance": "low",
+      "score": 36,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Two Minor CodeRabbit findings left on merged PR #5443: semgrep repo rules resolve from event cwd; hook tests not isolated from Docker.",
+      "rationale": "New this pass: advisory CodeRabbit follow-up to merged PAN-4591, ranked with the other minor-finding follow-ups.",
       "gate": "auto",
       "planning": "auto"
     },
