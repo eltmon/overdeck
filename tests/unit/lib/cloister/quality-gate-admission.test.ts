@@ -1009,13 +1009,19 @@ describe('head-of-line fairness (PAN-5285)', () => {
     await seedPeaks(rootDir)
     let clock = 1
     // 16 GiB host: a soft-reserve clamp would cut the 9 GiB estimate to 4 GiB and pass 10 - 4 >= 4.
+    let reads = 0
     const promise = pending(acquireQualityGateAdmission(big, fairDeps(rootDir, () => clock, () => 10 * GiB, {
       maxWaitMs: 10_000,
-      sampleMemory: async () => ({ memAvailableBytes: 10 * GiB, memTotalBytes: 16 * GiB }),
+      sampleMemory: async () => {
+        reads++
+        return { memAvailableBytes: 10 * GiB, memTotalBytes: 16 * GiB }
+      },
     })))
     await driveUntil(() => blockedSince(rootDir, 'vitest') === 1)
     clock = 5_000
-    await driveTurns(10)
+    // Two more reads: a whole poll pass ran past the bound and still did not start alone.
+    const readsAtBound = reads
+    await driveUntil(() => reads >= readsAtBound + 2)
     expect(readdirSync(rootDir).filter((entry) => entry === 'owner.json')).toEqual([])
 
     clock = 20_000
@@ -1038,8 +1044,8 @@ describe('head-of-line fairness (PAN-5285)', () => {
     const settled = settledFlag(promise)
     await driveUntil(() => blockedSince(rootDir, 'vitest') === 1)
     clock = 5_000
-    await driveUntil(() => droppedOnce)
-    await driveTurns(5)
+    // The settle re-check saw the drop and gave the slot back.
+    await driveUntil(() => droppedOnce && !existsSync(join(rootDir, 'owner.json')))
     expect(settled()).toBe(false)
 
     dropWhileHeld = false
@@ -1064,11 +1070,14 @@ describe('head-of-line fairness (PAN-5285)', () => {
   it('re-reads the estimate every poll, so a corrected footprint unblocks a queued waiter', async () => {
     const rootDir = home()
     let estimate = 9 * GiB
+    const onWaiting = vi.fn()
     const promise = acquireQualityGateAdmission(big, fairDeps(rootDir, () => 1, () => 16 * GiB, {
       readFootprintEstimate: async () => estimate,
+      onWaiting,
     }))
     const settled = settledFlag(promise)
-    await driveTurns(10)
+    // The 9 GiB estimate blocked it on memory.
+    await driveUntil(() => onWaiting.mock.calls.some(([reason]) => reason.kind === 'memory'))
     expect(settled()).toBe(false)
 
     estimate = 1 * GiB
