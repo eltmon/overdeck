@@ -1,5 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
-import { Upload, FileText, X } from 'lucide-react';
+import { Upload, FileText } from 'lucide-react';
+import { Modal } from '../../shared/Modal';
+import formStyles from '../../shared/ModalForm.module.css';
 import styles from '../styles/command-deck.module.css';
 
 interface TranscriptUploadProps {
@@ -71,73 +73,70 @@ export function TranscriptUpload({ issueId, onClose }: TranscriptUploadProps) {
   }, [handleUpload]);
 
   return (
-    <div className={styles.modalOverlay} onClick={onClose}>
-      <div className={styles.modalContent} onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
-        <div className={styles.modalHeader}>
-          <h2 className={styles.modalTitle}>Upload Artifact</h2>
-          <button className={styles.modalClose} onClick={onClose}>
-            <X size={18} />
+    <Modal title="Upload Artifact" size="narrow" onClose={onClose}>
+      <div className={formStyles.content}>
+        {/* Type selection */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+          <button
+            type="button"
+            className={formStyles.button}
+            style={uploadType === 'transcript' ? { borderColor: 'var(--primary)', color: 'var(--primary)' } : {}}
+            onClick={() => setUploadType('transcript')}
+          >
+            Transcript
+          </button>
+          <button
+            type="button"
+            className={formStyles.button}
+            style={uploadType === 'note' ? { borderColor: 'var(--primary)', color: 'var(--primary)' } : {}}
+            onClick={() => setUploadType('note')}
+          >
+            Note
           </button>
         </div>
-        <div className={styles.modalBody}>
-          {/* Type selection */}
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-            <button
-              className={styles.badge}
-              style={uploadType === 'transcript' ? { borderColor: 'var(--primary)', color: 'var(--primary)' } : {}}
-              onClick={() => setUploadType('transcript')}
-            >
-              Transcript
-            </button>
-            <button
-              className={styles.badge}
-              style={uploadType === 'note' ? { borderColor: 'var(--primary)', color: 'var(--primary)' } : {}}
-              onClick={() => setUploadType('note')}
-            >
-              Note
-            </button>
+
+        {/* Drop zone */}
+        <div
+          className={`${styles.uploadZone} ${dragActive ? styles.uploadZoneActive : ''}`}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <div className={styles.uploadIcon}>
+            {uploading ? (
+              <FileText size={32} className={styles.spinning} />
+            ) : (
+              <Upload size={32} />
+            )}
           </div>
+          <p className={styles.uploadText}>
+            {uploading ? 'Uploading...' : 'Drop a file here or click to browse'}
+          </p>
+          <p className={styles.uploadHint}>Accepts .md, .txt, and .vtt files</p>
+        </div>
 
-          {/* Drop zone */}
-          <div
-            className={`${styles.uploadZone} ${dragActive ? styles.uploadZoneActive : ''}`}
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <div className={styles.uploadIcon}>
-              {uploading ? (
-                <FileText size={32} className={styles.spinning} />
-              ) : (
-                <Upload size={32} />
-              )}
-            </div>
-            <p className={styles.uploadText}>
-              {uploading ? 'Uploading...' : 'Drop a file here or click to browse'}
-            </p>
-            <p className={styles.uploadHint}>Accepts .md, .txt, and .vtt files</p>
-          </div>
+        {/* `hidden` (not display: none) keeps the input out of Modal's Tab trap. */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".md,.txt,.vtt"
+          onChange={handleFileSelect}
+          hidden
+        />
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".md,.txt,.vtt"
-            onChange={handleFileSelect}
-            style={{ display: 'none' }}
-          />
-
-          {uploadResult && (
-            <p style={{
-              fontSize: '12px',
+        {uploadResult && (
+          <p
+            className={uploadResult.startsWith('Error') ? formStyles.error : formStyles.status}
+            style={{
               marginTop: '12px',
               color: uploadResult.startsWith('Error') ? 'var(--destructive)' : 'var(--success)',
-            }}>
-              {uploadResult}
-            </p>
-          )}
-        </div>
+            }}
+          >
+            {uploadResult}
+          </p>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }
