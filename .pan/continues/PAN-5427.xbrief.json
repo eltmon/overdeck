@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5427",
   "created": "2026-11-16T06:55:17.473Z",
-  "updated": "2026-11-16T07:23:51.452Z",
+  "updated": "2026-11-16T07:30:32.443Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,9 @@
     "docs-frontmatter.ac3": {
       "status": "completed",
       "doneAt": "2026-11-16T07:23:51.451Z"
+    },
+    "markdowntab-frontmatter-list.ac5": {
+      "status": "cancelled"
     }
   }
 }
