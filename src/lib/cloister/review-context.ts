@@ -17,6 +17,7 @@ import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { findPlanSync, readPlan } from '../xbrief/io.js';
 import { scanStubUi, type StubUiFinding } from './lint-stub-ui.js';
 import { fetchCodeRabbitFindings, type CodeRabbitFinding } from './coderabbit-ingestion.js';
+import { SAST_LATEST_RELATIVE_PATH, sastFindingsForReview, type ReviewSemgrepFindings, type SastLatestRecord } from './sast-gate.js';
 import { findXBriefByIssueSync } from '../xbrief/lifecycle-io.js';
 import { getDevrootPath } from '../config.js';
 import { resolveWorkspaceRepoRoots } from '../project-repos.js';
@@ -103,6 +104,8 @@ export interface ReviewContextManifest {
   policyNotes: string[];
   stubUiFindings: StubUiFinding[];
   codeRabbitFindings: CodeRabbitFinding[];
+  /** PAN-4590: the `sast` gate's findings and new suppressions for these heads. */
+  semgrepFindings: ReviewSemgrepFindings;
   manifestPath: string;
 }
 
@@ -310,6 +313,17 @@ function flattenTraces(doc: { plan?: { items?: PanItem[] } }): ReviewItemTrace[]
   return traces;
 }
 
+/** PAN-4590: reuse the verification gate's scan; the review path never runs Semgrep. */
+async function readSemgrepFindings(workspace: string, heads: ReadonlyMap<string, string>): Promise<ReviewSemgrepFindings> {
+  let record: SastLatestRecord | null = null;
+  try {
+    record = JSON.parse(await readFile(join(workspace, SAST_LATEST_RELATIVE_PATH), 'utf-8')) as SastLatestRecord;
+  } catch {
+    // No record: the gate is off or has not run.
+  }
+  return sastFindingsForReview(record, heads);
+}
+
 async function readPolicyNotes(workspace: string): Promise<string[]> {
   const notes: string[] = [];
 
@@ -356,7 +370,7 @@ export function formatTier1Summary(
   manifest: Pick<
     ReviewContextManifest,
     | 'issueId' | 'branch' | 'headSha' | 'repos' | 'changedFiles' | 'acceptanceCriteria' | 'nonGoals' | 'traces' | 'policyNotes' | 'stubUiFindings' | 'codeRabbitFindings' | 'diff' | 'largeChangeset'
-  >,
+  > & Partial<Pick<ReviewContextManifest, 'semgrepFindings'>>,
 ): string {
   const lines: string[] = [];
 
@@ -466,10 +480,40 @@ export function formatTier1Summary(
     }
   }
 
+  lines.push(...formatSemgrepSection(manifest.semgrepFindings));
+
   lines.push('');
   lines.push(`Diff stat: ${manifest.diff.stat}`);
 
   return lines.join('\n');
+}
+
+/** PAN-4590: Semgrep evidence for the reviewers; empty when the gate never ran. */
+function formatSemgrepSection(semgrep: ReviewSemgrepFindings | undefined): string[] {
+  if (!semgrep || semgrep.status === 'absent') return [];
+  if (semgrep.status === 'stale') {
+    return ['', 'Semgrep: the last sast gate scan was for other commits, so no findings are listed for this head.'];
+  }
+  const lines: string[] = [''];
+  const findings = Array.isArray(semgrep.findings) ? semgrep.findings : [];
+  const suppressions = Array.isArray(semgrep.suppressions) ? semgrep.suppressions : [];
+  if (semgrep.skipped) {
+    lines.push('Semgrep: the sast gate scan did not run (scanner missing or failed); no findings are available.');
+  } else {
+    lines.push(`Semgrep findings on changed lines (${semgrep.mode ?? 'advisory'} gate; scanner evidence, confirm or dismiss each): ${findings.length}`);
+    for (const f of findings.slice(0, 10)) {
+      lines.push(`  - ${f.path}:${f.startLine} [${f.severity}] ${f.ruleId} ${truncateWellFormed(f.message ?? '', 160)}`);
+    }
+    if (findings.length > 10) lines.push(`  ... and ${findings.length - 10} more (see manifest)`);
+  }
+  if (suppressions.length > 0) {
+    lines.push('New Semgrep suppressions or rule changes (justify or flag each):');
+    for (const s of suppressions.slice(0, 10)) {
+      lines.push(`  - ${s.kind} ${s.path}${s.line ? `:${s.line}` : ''}: ${truncateWellFormed(s.detail ?? '', 160)}`);
+    }
+    if (suppressions.length > 10) lines.push(`  ... and ${suppressions.length - 10} more (see manifest)`);
+  }
+  return lines;
 }
 
 /**
@@ -548,13 +592,14 @@ export async function buildReviewContext(opts: BuildReviewContextOpts): Promise<
     fileCount: repo.changedFiles.length,
   }));
 
-  const [planRequirements, policyNotes, codeRabbitFindings] = await Promise.all([
+  const [planRequirements, policyNotes, codeRabbitFindings, semgrepFindings] = await Promise.all([
     extractPlanReviewRequirements(workspace, issueId),
     readPolicyNotes(workspace),
     fetchCodeRabbitFindings({ workspace, branch: currentBranch }).catch((err) => {
       console.warn(`[buildReviewContext] CodeRabbit ingestion failed: ${err instanceof Error ? err.message : String(err)}`);
       return [] as CodeRabbitFinding[];
     }),
+    readSemgrepFindings(workspace, new Map(perRepo.map(repo => [repo.root.repoKey, repo.headSha]))),
   ]);
 
   const fileCount = changedFiles.length;
@@ -585,6 +630,7 @@ export async function buildReviewContext(opts: BuildReviewContextOpts): Promise<
     policyNotes,
     stubUiFindings,
     codeRabbitFindings,
+    semgrepFindings,
     manifestPath,
   };
 

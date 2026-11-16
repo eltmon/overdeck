@@ -25,6 +25,7 @@ import {
 } from './verification-artifact.js';
 import { evaluateTestSkipGate } from './test-skip-run.js';
 import { evaluatePlanIntegrityGate } from './plan-integrity-run.js';
+import { runSastGate } from './sast-run.js';
 import { buildFinalFailureInstructions } from './verification-feedback.js';
 import {
   announceVerificationFailure,
@@ -470,11 +471,23 @@ export async function runVerificationForIssueInProcess(
         ? [{ name: 'plan-integrity', passed: false, required: true, output: planIntegrity.evidence, durationMs: Date.now() - planIntegrityStart, error: planIntegrity.error ?? 'Diff changes the spec beyond lifecycle status fields' }]
         : [{ name: 'test-skip', passed: false, required: true, output: testSkip.evidence, durationMs: Date.now() - testSkipStart, error: testSkip.error ?? 'Diff adds skipped or only-tests or removes test cases' }];
 
+    // PAN-4590: the Semgrep `sast` gate runs once every other local gate passed.
+    // Null when off; advisory (never blocking) unless the mode is `blocking`.
+    const sastGate = testSkip && !rawGateResults.some((r) => !r.passed && r.required !== false) && !await decided.isDecided()
+      ? await runSastGate({
+        issueId, workspacePath, repoRoots, projectOverride: projectConfig?.verification?.sast, logPrefix,
+        onAdmissionPhase: (state) => markVerificationWorkerAdmissionPhase(issueId, state),
+      })
+      : null;
     // PAN-3906: an operator override stays visible in the verification artifact
     // even though it let the gate pass.
-    const localGateResults = testSkip && !testSkip.failed && testSkip.waiverApplied
-      ? [{ name: 'test-skip', passed: true, required: true, output: testSkip.evidence, durationMs: Date.now() - testSkipStart }, ...rawGateResults]
-      : rawGateResults;
+    const localGateResults = [
+      ...(testSkip && !testSkip.failed && testSkip.waiverApplied
+        ? [{ name: 'test-skip', passed: true, required: true, output: testSkip.evidence, durationMs: Date.now() - testSkipStart }]
+        : []),
+      ...rawGateResults,
+      ...(sastGate ? [sastGate] : []),
+    ];
     // PAN-4531: a commit that landed during the last gate is caught here, before
     // the verdict, rather than producing a verdict for a tree that moved. A
     // failed gate is checked too: a commit during it supersedes the failure.

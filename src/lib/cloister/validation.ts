@@ -185,6 +185,9 @@ export interface QualityGateResult {
    *  Callers must treat this as retryable infrastructure failure — never as a
    *  code failure, and never count it against verification attempt budgets. */
   infraUnavailable?: boolean;
+  /** PAN-4590: the gate checked nothing (e.g. Semgrep missing or failed). Always
+   *  paired with `passed: true, required: false`; `error` carries the reason. */
+  skipped?: boolean;
 }
 
 /**

@@ -65,6 +65,7 @@ vi.mock('../coderabbit-ingestion.js', () => ({
 // ── import after mocks ─────────────────────────────────────────────────────
 import { buildReviewContext, formatTier1Summary, REVIEW_LARGE_CHANGESET_FILES, REVIEW_LARGE_CHANGESET_LINES } from '../review-context.js';
 import { findPlanSync } from '../../xbrief/io.js';
+import { resolveWorkspaceRepoRoots } from '../../project-repos.js';
 import { scanStubUi } from '../lint-stub-ui.js';
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -520,5 +521,82 @@ describe('CodeRabbit findings integration', () => {
     expect(summary).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
     expect(summary).toContain('x'.repeat(199) + '...');
     expect(JSON.stringify(summary)).not.toMatch(/\\ud[89ab][0-9a-f]{2}(?!\\ud[c-f])/i);
+  });
+});
+
+describe('Semgrep sast findings in the review context (PAN-4590)', () => {
+  const workspace = '/tmp/fake-workspace';
+  const runId = 'agent-pan-4590-review-abc12345';
+  const issueId = 'PAN-4590';
+  const finding = {
+    path: 'src/app.py', startLine: 3, endLine: 3, ruleId: 'rule.shell', severity: 'ERROR' as const, message: 'avoid shell=True',
+  };
+  const suppression = { kind: 'nosemgrep' as const, path: 'src/app.py', line: 9, detail: 'x()  # nosemgrep' };
+
+  function sastRecord(head: string) {
+    const repoKey = resolveWorkspaceRepoRoots(issueId, workspace)[0]!.repoKey;
+    return JSON.stringify({
+      version: 1, ranAt: '2026-11-16T00:00:00.000Z', mode: 'advisory', severity: 'ERROR', configs: ['p/default'], skipped: false,
+      repos: [{ repoKey, head, status: 'scanned' }], findings: [finding], suppressions: [suppression],
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockReadPlan.mockReturnValue(Effect.fail(new Error('no plan')));
+    mockExistsSync.mockImplementation((p: string) => p === workspace);
+    vi.mocked(scanStubUi).mockResolvedValue([]);
+    mockFetchCodeRabbitFindings.mockResolvedValue([]);
+    mockGitOutput({
+      'rev-parse HEAD': { stdout: 'abc12345\n' },
+      'branch --show-current': { stdout: 'feature-pan-4590\n' },
+      'merge-base origin/main HEAD': { stdout: 'base\n' },
+      '--name-status': { stdout: '' },
+      '--numstat': { stdout: '' },
+      'diff --stat': { stdout: '' },
+    });
+  });
+
+  it('reuses the gate record for the same head', async () => {
+    mockReadFile.mockImplementation(async (path: unknown) => (String(path).endsWith(join('.overdeck', 'sast-latest.json')) ? sastRecord('abc12345') : ''));
+    const manifest = await buildReviewContext({ runId, issueId, workspace });
+    expect(manifest.semgrepFindings).toEqual({ status: 'fresh', mode: 'advisory', findings: [finding], suppressions: [suppression] });
+    expect(JSON.parse(String(mockWriteFile.mock.calls.at(-1)?.[1])).semgrepFindings.status).toBe('fresh');
+  });
+
+  it('marks a record for another head stale', async () => {
+    mockReadFile.mockImplementation(async (path: unknown) => (String(path).endsWith('sast-latest.json') ? sastRecord('0ldhead') : ''));
+    const manifest = await buildReviewContext({ runId, issueId, workspace });
+    expect(manifest.semgrepFindings).toMatchObject({ status: 'stale', findings: [], suppressions: [] });
+  });
+
+  it('records absent when the gate never ran', async () => {
+    mockReadFile.mockImplementation(async () => { throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' }); });
+    const manifest = await buildReviewContext({ runId, issueId, workspace });
+    expect(manifest.semgrepFindings).toEqual({ status: 'absent', findings: [], suppressions: [] });
+  });
+
+  it('renders findings and suppressions in the Tier-1 summary', () => {
+    const summary = formatTier1Summary({
+      ...baseManifest,
+      semgrepFindings: { status: 'fresh', mode: 'blocking', findings: [finding], suppressions: [suppression] },
+    });
+    expect(summary).toContain('Semgrep findings on changed lines (blocking gate; scanner evidence, confirm or dismiss each): 1');
+    expect(summary).toContain('  - src/app.py:3 [ERROR] rule.shell avoid shell=True');
+    expect(summary).toContain('New Semgrep suppressions or rule changes (justify or flag each):');
+    expect(summary).toContain('  - nosemgrep src/app.py:9: x()  # nosemgrep');
+  });
+
+  it('says when the scan was skipped or stale', () => {
+    expect(formatTier1Summary({ ...baseManifest, semgrepFindings: { status: 'fresh', skipped: true, findings: [], suppressions: [] } }))
+      .toContain('the sast gate scan did not run');
+    expect(formatTier1Summary({ ...baseManifest, semgrepFindings: { status: 'stale', findings: [], suppressions: [] } }))
+      .toContain('the last sast gate scan was for other commits');
+  });
+
+  it('adds nothing when Semgrep findings are absent or missing (older manifests)', () => {
+    const without = formatTier1Summary(baseManifest);
+    expect(formatTier1Summary({ ...baseManifest, semgrepFindings: { status: 'absent', findings: [], suppressions: [] } })).toBe(without);
+    expect(without).not.toContain('Semgrep');
   });
 });

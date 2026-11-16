@@ -71,6 +71,32 @@ describe('verification artifact', () => {
     expect(readVerificationArtifact(workspace)?.outcome).toBe('passed');
   });
 
+  it('keeps a skipped gate visible: output, reason and the skipped flag (PAN-4590)', () => {
+    writeVerificationArtifact(workspace, 'PAN-4590', [
+      gate({ name: 'lint', output: 'noise' }),
+      gate({ name: 'sast', passed: true, required: false, skipped: true, output: 'SKIPPED: no scan', error: 'Semgrep did not run: binary missing' }),
+    ]);
+
+    const read = readVerificationArtifact(workspace);
+    expect(read?.outcome).toBe('passed');
+    expect(read?.gates.find((g) => g.name === 'lint')).not.toHaveProperty('skipped');
+    expect(read?.gates.find((g) => g.name === 'sast')).toMatchObject({
+      passed: true, required: false, skipped: true, output: 'SKIPPED: no scan', error: 'Semgrep did not run: binary missing',
+    });
+  });
+
+  it('an advisory sast failure keeps its findings but does not fail the run (PAN-4590)', () => {
+    writeVerificationArtifact(workspace, 'PAN-4590', [
+      gate({ name: 'lint' }),
+      gate({ name: 'sast', passed: false, required: false, output: 'src/app.py:3 [ERROR] rule.shell' }),
+    ]);
+
+    const read = readVerificationArtifact(workspace);
+    expect(read?.outcome).toBe('passed');
+    expect(read?.failedCheck).toBeUndefined();
+    expect(read?.gates.find((g) => g.name === 'sast')?.output).toContain('rule.shell');
+  });
+
   it('marks an in-progress run as running with the current gate (PAN-2665 live view)', () => {
     writeVerificationArtifact(workspace, 'PAN-5', [gate({ name: 'typecheck' })], { currentGate: 'lint' });
 
