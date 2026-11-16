@@ -1,0 +1,314 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-16T05:04:14Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5413: Kanban Needs-you strip counts with the old Simple Home rule, not the shared needs-you selector",
+    "updated": "2026-11-16T05:07:28.787Z"
+  },
+  "plan": {
+    "id": "pan-5413",
+    "title": "Kanban Needs-you strip counts with the old Simple Home rule, not the shared needs-you selector",
+    "status": "proposed",
+    "uid": "9a87133f-829a-4dd5-ac71-4c6b8697d444",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-16T05:04:14Z",
+    "updated": "2026-11-16T05:07:28.787Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5413",
+        "label": "PAN-5413",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5371",
+        "label": "PAN-5371 (precedent)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5413.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "kanban",
+      "needs-you",
+      "workflow-redesign"
+    ],
+    "narratives": {
+      "Problem": "The Kanban board's Needs-you strip (components/KanbanBoard/NeedsYouStrip.tsx) counts bucketSimpleHome(...).needsYou plus each conversation question separately. It counts plans waiting for Start work, stuck agents and changes-requested issues, and it never lists Flywheel rows, decisions or issue-less pending input. So its number disagrees with the top bar's 'Needs you · N', which is useNeedsYouItems().length. PAN-5284 N-D8 requires one Needs-you count everywhere.",
+      "Proposal": "Apply PAN-5371's split to the strip (PRD .pan/drafts/PAN-5413.md, decisions K-D1..K-D12). The strip's number is useNeedsYouItems().length; its Needs-you rows are one per shared item, chosen by the existing pure simpleNeedsYouCards() helper, with a new generic NeedsYouItemRow for items without an issue derivation. The displaced Simple reasons (start-work, stuck, problems) render in two labelled groups in the same strip, Ready to start and Having trouble, via simpleSecondarySections(), outside the number. One countAgreement test renders NeedsYouIndicator and NeedsYouStrip with the real selectors and proves the numbers agree. Docs and a changelog entry describe the strip.",
+      "NonGoals": "- No change to buildNeedsYouItems/useNeedsYouItems semantics or to the top bar, Advanced Home, project Home or Simple Home numbers\n- No change to lib/simple/needsYouCards.ts, bucketSimpleHome, deriveSimpleIssue, userFacingDisplay, or NeedsYouRow's props\n- KanbanBoard.tsx is not modified (993 lines, file-size CEILING=1000)\n- The strip does not start following the board filter bar or project scope\n- Questions the selector treats as answered or dismissed are not shown in the strip\n- A second conversation question on an issue that already has a Needs-you item is not its own row\n- No refactor of derivation code duplicated between NeedsYouStrip.tsx and SimpleHomePage.tsx\n- No edit to the external OKF knowledge bundle (../overdeck-knowledge)\n- No server change, no new HTTP route, no new store field"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Apply PAN-5371 option 1 to the strip: count useNeedsYouItems().length; no selector change.",
+        "rationale": "PAN-5284 N-D8 rules pipeline states out of the Needs-you list, and PAN-5371 already rejected changing the selector; the issue body names #5371's split as the model."
+      },
+      {
+        "summary": "Displaced kinds (start-work, stuck, problems) stay in the strip as two labelled groups, Ready to start and Having trouble, outside the number.",
+        "rationale": "The issue requires them to stay visible on the board outside the count, and the strip is the only board surface with their Start work / Get it unstuck / Tell the agent to fix them buttons and PAN-4399's 'Work agent not started' card."
+      },
+      {
+        "summary": "Reuse simpleNeedsYouCards and simpleSecondarySections from lib/simple/needsYouCards.ts instead of writing a second pure split.",
+        "rationale": "They are already unit-tested and encode the exact same rule; one implementation keeps Simple Home and the board from drifting."
+      },
+      {
+        "summary": "Generic rows for Flywheel rows, decisions and issue-less pending input show the selector's item.title and one Open button calling item.open().",
+        "rationale": "The board is Advanced mode, where 'Flywheel' is not a banned word; the top bar menu shows the same title."
+      },
+      {
+        "summary": "Two conversations asking on one issue become one row.",
+        "rationale": "The selector folds them into one issue:<ID> item and the top bar counts one; showing two rows would break the count agreement."
+      },
+      {
+        "summary": "The Needs-you number renders 0 when only secondary groups have rows; the strip is hidden only when all three groups are empty.",
+        "rationale": "Whenever the strip is visible its number must equal the top bar's, which always shows its count."
+      },
+      {
+        "summary": "Each group keeps the existing 6-row cap with its own '+k more'; the number is never capped.",
+        "rationale": "Preserves today's strip width behaviour while keeping the count exact."
+      }
+    ],
+    "items": [
+      {
+        "id": "strip-shared-count",
+        "title": "Render the Kanban Needs-you strip from the shared selector with Ready to start and Having trouble groups",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T05:04:14Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5413",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/KanbanBoard/NeedsYouStrip.tsx",
+            "src/dashboard/frontend/src/__tests__/fr7-conversation-pending-input.test.tsx",
+            "src/dashboard/frontend/src/components/KanbanBoard.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/__tests__/fr7-conversation-pending-input.test.tsx src/components/KanbanBoard/NeedsYouStrip.test.tsx src/components/KanbanBoard.test.tsx src/lib/simple/needsYouCards.test.ts",
+            "npm run typecheck",
+            "grep -n \"usePendingInputSubjects\\|questionBySubject\" src/dashboard/frontend/src/components/KanbanBoard/NeedsYouStrip.tsx"
+          ],
+          "expected_outputs": [
+            "all four vitest files pass, including the renamed K-D9 case and the new Open-row case in fr7-conversation-pending-input.test.tsx",
+            "npm run typecheck completes without errors",
+            "the grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-5413.md WI-1 and decisions K-D1..K-D12 exactly. In NeedsYouStrip.tsx: import useNeedsYouItems and type NeedsYouItem from ../../lib/selectors/needsYou, simpleNeedsYouCards/simpleSecondarySections/type SimpleNeedsYouCard from ../../lib/simple/needsYouCards, SIMPLE_STRINGS from ../../lib/simple/strings; delete the usePendingInputSubjects import, the local NeedsYouItem union, the questionBySubject map and the conversation-only loop. Build byIdentifier (lower-case identifier -> derivation) and bucketNeeds from the existing derivations. Count = useNeedsYouItems().length in a span with data-testid=needs-you-strip-count. Needs-you rows: cards.slice(0,6) wrapped in data-testid=needs-you-strip-row with data-needs-you-key, rendered by a local StripCardView (NeedsYouRow when the card has a derivation and a question/start-work/stuck/problems kind, with question=item.ask when item.subject exists, isConversation from subject.source, conversationName=subject.agentId for conversations; else a new local NeedsYouItemRow showing item.title, item.ask and an Open button calling item.open()). Then Ready to start (data-testid=needs-you-strip-ready-to-start, SIMPLE_STRINGS.home.readyToStartTitle, NeedsYouRow kind=start-work) and Having trouble (data-testid=needs-you-strip-having-trouble, SIMPLE_STRINGS.home.troubleTitle, NeedsYouRow kind=t.kind) groups, each only when non-empty, each capped at 6 with '+k more'. Return null only when the count and both groups are empty; call all hooks before that return. Do not change NeedsYouRow, KIND_META or KanbanBoard.tsx. Rewrite the four NeedsYouStrip cases in fr7-conversation-pending-input.test.tsx to drive vi.mocked(needsYou.useNeedsYouItems) with subjects carrying source, add vi.mocked(needsYou.useNeedsYouItems).mockReturnValue([]) to the top-level beforeEach so no case inherits another's mock value, rename the multiple-conversations case to the one-row K-D9 case, and add the conversation-without-issue Open-row case (WI-1 step 3). Run KanbanBoard.test.tsx; only if a case fails because of the strip, add explicit routes (/api/disk-alert -> { level: 'ok' } and any route the failure names) to that describe's fetch stub (WI-1 step 4 checkpoint)."
+        },
+        "items": [
+          {
+            "id": "strip-shared-count.ac1",
+            "title": "Given a mocked useNeedsYouItems returning one issue:PAN-1 item whose subject has source 'conversation', when NeedsYouStrip renders and the operator types an answer and clicks Answer, then answer.mutate is called with that subject's agentId and isConversation: true; for a subject with source 'agent' it is called with isConversation: false (fr7 cases pass)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strip-shared-count.ac2",
+            "title": "Given one shared item for an issue with two conversation questions, when the strip renders, then exactly one needs-you-strip-row renders, needs-you-strip-count shows 1, and the second question text is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strip-shared-count.ac3",
+            "title": "Given a conversation:helper item with no issue, when the strip renders, then it renders the item's title and ask with an Open button that calls item.open() once on click and renders no answer input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strip-shared-count.ac4",
+            "title": "NeedsYouStrip.test.tsx (PAN-4399) and KanbanBoard.test.tsx pass, npm run typecheck exits 0, and grep for usePendingInputSubjects or questionBySubject in NeedsYouStrip.tsx returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strip-shared-count.ac5",
+            "title": "git diff $(git merge-base origin/main HEAD) -- src/dashboard/frontend/src/components/KanbanBoard.tsx src/dashboard/frontend/src/lib/simple/needsYouCards.ts src/dashboard/frontend/src/lib/selectors/needsYou.ts produces no output (those files are unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "strip-count-agreement-test",
+        "title": "Prove the Kanban strip number equals the top bar Needs-you number with the real selectors",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T05:04:14Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5413",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/__tests__/countAgreement.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/App/__tests__/countAgreement.test.tsx"
+          ],
+          "expected_outputs": [
+            "countAgreement.test.tsx passes all three describes: PAN-5292, PAN-5371 and PAN-5413"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In countAgreement.test.tsx add a third describe 'top bar and Kanban Needs-you strip counts agree (PAN-5413)' that reuses the PAN-5371 fixture constants (ISSUES_5371, AGENTS_5371, DERIVED_5371, HELPER_CONVERSATION_PENDING_INPUT, LAST_TICK_5371, ROUTES_5371) and the same beforeEach/afterEach shape, without mocking any selector and without changing the two existing describes. Compute expected items with buildNeedsYouItems exactly as the PAN-5371 case does (in a local helper used only by the new describe), assert the expected keys include issue:PAN-11, issue:PAN-12, conversation:helper and one flywheel: key and exclude issue:PAN-13/14/15, and assert N <= 6. Render NeedsYouIndicator and NeedsYouStrip (onOpenIssue=vi.fn()) inside QueryClientProvider (retry off) and DialogProvider, then assert the indicator text, needs-you-strip-count text, needs-you-strip-row count and key set, the Ready to start group (Write onboarding docs + Start work button), the Having trouble group (Flaky E2E test investigation, Review findings on the ingest job), and that no needs-you-strip-row contains those three titles. Never type N."
+        },
+        "items": [
+          {
+            "id": "strip-count-agreement-test.ac1",
+            "title": "Given the PAN-5371 fixture, when NeedsYouIndicator and NeedsYouStrip render with the real selectors, then the indicator shows 'Needs you · N' and needs-you-strip-count shows N, where N is computed by buildNeedsYouItems over the same fixture",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strip-count-agreement-test.ac2",
+            "title": "Given the same fixture, when the strip renders, then it renders N needs-you-strip-row elements whose data-needs-you-key set equals the expected item keys (issue:PAN-11, issue:PAN-12, conversation:helper, one flywheel: key)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strip-count-agreement-test.ac3",
+            "title": "needs-you-strip-ready-to-start renders PAN-13's title with a Start work button, needs-you-strip-having-trouble renders PAN-14's and PAN-15's titles, and no needs-you-strip-row contains any of those three titles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strip-count-agreement-test.ac4",
+            "title": "When npx vitest run src/App/__tests__/countAgreement.test.tsx runs, it exits 0 with the PAN-5292 and PAN-5371 describes passing and their assertions preserved unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the board strip's shared count and its two groups",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T05:04:14Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5413",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/mission-control.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "docs/PIPELINE-GATES.md",
+            "changelog.d/pan-5413.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n \"PAN-5413\" docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n \"Ready to start\" features/mission-control.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "docs/DASHBOARD-ARCHITECTURE.md has a line naming PAN-5413 and NeedsYouStrip.tsx",
+            "features/mission-control.mdx has the new board-strip paragraph naming Ready to start and Having trouble"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 with the exact text given there and no em dashes. features/mission-control.mdx: after the Simple-mode paragraph ending 'Those two sections are not part of the count.', add the board-strip paragraph. docs/DASHBOARD-ARCHITECTURE.md: append the PAN-5413 sentence to Top bar item 4 (after 'sections, outside the count (PAN-5371).'), and around line 1422 reword \"the Needs-you strip's \\\"Start work\\\" card\" to name the Ready to start group. docs/PIPELINE-GATES.md around line 2031: the same rewording. Create changelog.d/pan-5413.md with the #### Fixed entry from the PRD."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "features/mission-control.mdx renders a paragraph stating the board's Needs you strip shows the top bar's number and lists Ready to start and Having trouble outside that number",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "When grep runs on docs/DASHBOARD-ARCHITECTURE.md, it returns a Top bar item 4 line naming components/KanbanBoard/NeedsYouStrip.tsx and PAN-5413, and the 'Start work' card sentences in DASHBOARD-ARCHITECTURE.md and PIPELINE-GATES.md each return a match for 'Ready to start'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "changelog.d/pan-5413.md exists with a '#### Fixed' heading and one bullet linking #5413, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "strip-shared-count",
+        "to": "strip-count-agreement-test",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-16-PAN-5413-kanban-needs-you-strip-counts-with-the-old-simple-home-rule-not-the-shared-needs-you-selector.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
