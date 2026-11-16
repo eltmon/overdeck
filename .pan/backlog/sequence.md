@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T10:35:39.905521Z · model: claude-opus-5-5 · open: 887_
+_Last sequenced: 2026-11-16T11:05:46.821824Z · model: claude-opus-5-5 · open: 886_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -891,7 +891,6 @@ _Last sequenced: 2026-11-16T10:35:39.905521Z · model: claude-opus-5-5 · open: 
 | 901 | PAN-5181 | XS | low | ok |  |  | Fix shipped in PR #5179 (merged 2026-11-13); the body says it closes on merge. Verify and close. |
 | 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
 | 904 | PAN-5405 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus. |
-| 905 | PAN-5432 | XS | low | ok |  |  | Fixed by PR #5433 (merged) and issue closed; still in manifest as open. Nothing left to pick up. |
 
 ## Rationale detail
 
@@ -1222,10 +1221,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T10:35:39.905521Z",
+  "generatedAt": "2026-11-16T11:05:46.821824Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 887,
+  "openCount": 886,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -12238,19 +12237,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus.",
       "rationale": "New CodeRabbit follow-up from the merged PAN-5295 PR; one Major and four Minor frontend findings, ranked with comparable follow-ups.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5432",
-      "rank": 905,
-      "size": "XS",
-      "importance": "low",
-      "score": 5,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fixed by PR #5433 (merged) and issue closed; still in manifest as open. Nothing left to pick up.",
-      "rationale": "Demoted from the in-pipeline pin at rank 1 to the bottom because PR #5433 merged and the issue is now closed and closed-out, so no work remains.",
       "gate": "auto",
       "planning": "auto"
     }
