@@ -6,6 +6,7 @@
  * the PKCE and device flows end to end.
  */
 import { execFile } from 'node:child_process';
+import { createHmac } from 'node:crypto';
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -30,6 +31,15 @@ const ENV_ID = '11111111-2222-4333-8444-555555555555';
 const VERIFIER = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
 const CHALLENGE = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
 const SLOW = 30_000;
+const WEBHOOK_SECRET = 'whsec_miniflare';
+const PRODUCT_IDS = {
+  anywhere_monthly: 'prod_m',
+  anywhere_monthly_relay: 'prod_mr',
+  anywhere_annual: 'prod_a',
+  anywhere_annual_relay: 'prod_ar',
+  founding_annual: 'prod_f',
+  founding_annual_relay: 'prod_fr',
+};
 
 let tmp = '';
 let mf: Miniflare;
@@ -77,6 +87,11 @@ beforeAll(async () => {
             GITHUB_CLIENT_ID: { type: 'text', value: 'test-id' },
             GITHUB_CLIENT_SECRET: { type: 'text', value: 'test-secret' },
             OWNER_GITHUB_ID: { type: 'text', value: String(OWNER_ID) },
+            // Billing on (PAN-4294); the webhook path makes no Creem call, so the API base is never reached.
+            CREEM_API_KEY: { type: 'text', value: 'creem_test_key' },
+            CREEM_WEBHOOK_SECRET: { type: 'text', value: WEBHOOK_SECRET },
+            CREEM_API_BASE: { type: 'text', value: 'https://creem.test' },
+            CREEM_PRODUCTS: { type: 'text', value: JSON.stringify(PRODUCT_IDS) },
           },
         },
         dev: {
@@ -185,7 +200,7 @@ describe('account service on real workerd (PAN-4293 account-miniflare-integratio
   it('after the PKCE flow no table holds the stubbed GitHub token', async () => {
     const db = await mf.getD1Database('DB');
     const tables = (await db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'").all<{ name: string }>()).results;
-    expect(tables.length).toBe(11); // 0001 creates ten, 0002 adds user_sessions (PAN-4959)
+    expect(tables.length).toBe(15); // 0001 creates ten, 0002 adds user_sessions (PAN-4959), 0004 adds four billing tables (PAN-4294)
     let dump = '';
     for (const { name } of tables) dump += JSON.stringify((await db.prepare(`SELECT * FROM "${name}"`).all()).results);
     expect(dump).toContain('"github_login":"owner"');
@@ -251,6 +266,47 @@ describe('account service on real workerd (PAN-4293 account-miniflare-integratio
     expect(limited.headers.get('Content-Type')).toContain('text/html');
     expect((await pkceStart('203.0.113.201')).status).toBe(302);
   }, 60_000);
+
+  it('a signed subscription.paid makes the owner anywhere through crypto.subtle and the D1 subquery (PAN-4294)', async () => {
+    githubIdentity = { id: OWNER_ID, login: 'owner' };
+    const back = new URL((await githubCallback(stateFrom(await pkceStart()))).headers.get('Location') ?? '');
+    const token = await req(
+      '/oauth/token',
+      formBody({ grant_type: 'authorization_code', code: back.searchParams.get('code') ?? '', code_verifier: VERIFIER, redirect_uri: 'http://127.0.0.1:4567/cb' }),
+    );
+    const { access_token: accessToken } = (await token.json()) as { access_token: string };
+    const db = await mf.getD1Database('DB');
+    const userId = await db.prepare('SELECT user_id FROM users WHERE github_id = ?').bind(OWNER_ID).first<string>('user_id');
+    expect(userId).toBeTruthy();
+
+    const body = JSON.stringify({
+      id: 'evt_miniflare_1',
+      eventType: 'subscription.paid',
+      created_at: Date.now(),
+      object: {
+        id: 'sub_miniflare',
+        status: 'active',
+        product: { id: PRODUCT_IDS.anywhere_annual_relay },
+        customer: { id: 'cust_miniflare' },
+        current_period_end_date: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+        metadata: { overdeck_user_id: userId },
+      },
+    });
+    const sign = (payload: string) => createHmac('sha256', WEBHOOK_SECRET).update(payload).digest('hex');
+    const post = (signature: string) => req('/webhooks/creem', { method: 'POST', headers: { 'Content-Type': 'application/json', 'creem-signature': signature }, body });
+
+    const forged = await post(sign(`${body} `));
+    expect(forged.status).toBe(401);
+    expect(await forged.json()).toEqual({ error: 'invalid_signature' });
+
+    const ok = await post(sign(body));
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({ ok: true });
+
+    const me = await req('/v1/me', { headers: { Authorization: `Bearer ${accessToken}` } });
+    expect(me.status).toBe(200);
+    expect(await me.json()).toMatchObject({ entitlement: { plan: 'anywhere', relay: true, inbox: true, storageBytesCap: 100 * 1024 ** 3 } });
+  }, SLOW);
 
   it('OPTIONS is 405 and the stub saw no unexpected outbound request', async () => {
     const res = await req('/v1/me', { method: 'OPTIONS' });
