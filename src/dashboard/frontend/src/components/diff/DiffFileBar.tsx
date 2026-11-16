@@ -1,4 +1,5 @@
-// The file bar above the diff/preview viewport (PAN-5338 D-3, WI-4).
+// The file bar above the diff/preview viewport (PAN-5338 D-3, WI-4); the DiffViewSwitch
+// tablist is also reused by the dock diff view (PAN-5341 D-5).
 
 import { FileText } from 'lucide-react'
 
@@ -16,28 +17,33 @@ export interface DiffFileBarProps {
   onOpenFile?: () => void
 }
 
+/** The Diff | Preview tablist, shared by DiffFileBar and the dock diff view (PAN-5341 D-5). */
+export function DiffViewSwitch({ view, onView }: { view: DiffFileView; onView(view: DiffFileView): void }) {
+  return (
+    <div role="tablist" aria-label="View" className="flex shrink-0">
+      {(['diff', 'preview'] as const).map((v) => (
+        <button
+          key={v}
+          type="button"
+          role="tab"
+          aria-selected={view === v}
+          className={`${styles.subTab} ${view === v ? styles.subTabActive : ''}`}
+          onClick={() => onView(v)}
+        >
+          {v === 'diff' ? 'Diff' : 'Preview'}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function DiffFileBar({ path, previewable, view, onView, onOpenFile }: DiffFileBarProps) {
   return (
     <div data-testid="diff-file-bar" className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1 text-xs">
       <span className="min-w-0 truncate font-mono text-xs text-muted-foreground" title={path}>
         {path}
       </span>
-      {previewable ? (
-        <div role="tablist" aria-label="View" className="flex">
-          {(['diff', 'preview'] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              role="tab"
-              aria-selected={view === v}
-              className={`${styles.subTab} ${view === v ? styles.subTabActive : ''}`}
-              onClick={() => onView(v)}
-            >
-              {v === 'diff' ? 'Diff' : 'Preview'}
-            </button>
-          ))}
-        </div>
-      ) : null}
+      {previewable ? <DiffViewSwitch view={view} onView={onView} /> : null}
       <span className="ml-auto" />
       {onOpenFile ? (
         <button
