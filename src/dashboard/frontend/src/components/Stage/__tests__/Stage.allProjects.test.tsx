@@ -3,7 +3,7 @@
  * CI subset, so the All-deck Stage assertions live here.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, createEvent, fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 vi.mock('../panes/AgentPane', () => ({
@@ -19,6 +19,7 @@ import { flushPanesPersistence, usePanesStore, type WorkspacePane } from '../../
 import { resetDeckLayoutStore, useDeckLayoutStore } from '../../../lib/deckLayoutStore'
 import { presetLayout, type PaneLayout } from '../../../lib/paneLayout'
 import { installWorkDockFetchMock } from '../../../test-utils/strictFetchMock'
+import { CONVERSATION_DRAG_TYPE, useConversationDragStore } from '../conversationDragStore'
 
 const ALL = '__all-projects__'
 
@@ -29,6 +30,7 @@ beforeEach(() => {
   localStorage.clear()
   usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} })
   resetDeckLayoutStore()
+  useConversationDragStore.setState({ dragging: null })
 })
 afterEach(async () => {
   await workDockFetch.assertNoUnexpectedRequests()
@@ -125,6 +127,36 @@ describe('Stage make-only button (PAN-5343 H-D19)', () => {
     expect(agentTabs).toHaveLength(2)
     expect(agentTabs[1]).toHaveAttribute('aria-selected', 'true')
     expect(agentTabs[0]).toHaveAttribute('aria-selected', 'false')
+  })
+})
+
+describe('Stage conversation drop (PAN-5343 H-D8)', () => {
+  it('a project deck shows no overlay for another project\'s conversation, but does for its own', () => {
+    localStorage.setItem('pan-panes:overdeck', JSON.stringify([{ paneId: 'home', paneType: 'home', label: 'Home', createdAt: 1, isPermanent: true }]))
+    renderStage('overdeck')
+    act(() => { useConversationDragStore.getState().start({ name: 'df-model', deckKey: 'dfai' }) })
+    expect(screen.queryByTestId('pane-drop-overlay')).not.toBeInTheDocument()
+    act(() => { useConversationDragStore.getState().start({ name: 'od-build', deckKey: 'overdeck' }) })
+    expect(screen.getByTestId('pane-drop-overlay')).toBeInTheDocument()
+  })
+
+  it('dropping on the right edge of a one-pane All deck gives two leaves', () => {
+    localStorage.setItem(`pan-panes:${ALL}`, JSON.stringify([agent('a')]))
+    localStorage.setItem(`pan-active-pane:${ALL}`, 'a')
+    renderStage(ALL)
+    act(() => { useConversationDragStore.getState().start({ name: 'conv-new', deckKey: 'dfai' }) })
+    const overlay = screen.getByTestId('pane-drop-overlay')
+    vi.spyOn(overlay, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 100, height: 100, right: 100, bottom: 100, x: 0, y: 0, toJSON: () => ({}) })
+    // happy-dom ignores clientX/clientY in a drag event's init, so set them on the event (right edge).
+    const drop = createEvent.drop(overlay, { dataTransfer: { getData: (type: string) => (type === CONVERSATION_DRAG_TYPE ? 'conv-new' : '') } })
+    Object.defineProperty(drop, 'clientX', { value: 95 })
+    Object.defineProperty(drop, 'clientY', { value: 50 })
+    fireEvent(overlay, drop)
+    const layout = JSON.parse(localStorage.getItem(`pan-layout:${ALL}`) ?? 'null') as PaneLayout
+    const panes = usePanesStore.getState().panesByWorkspace[ALL] ?? []
+    const created = panes.find((p) => p.conversationId === 'conv-new')
+    expect(layout).toEqual(presetLayout(['a', created!.paneId], 2))
+    expect(useConversationDragStore.getState().dragging).toBeNull()
   })
 })
 

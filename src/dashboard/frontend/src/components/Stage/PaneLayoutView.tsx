@@ -3,6 +3,7 @@ import { Maximize2, X } from 'lucide-react'
 import type { WorkspacePane } from '../../lib/panesStore'
 import type { PaneLayout, SplitPath } from '../../lib/paneLayout'
 import styles from './stage.module.css'
+import { CONVERSATION_DRAG_TYPE } from './conversationDragStore'
 
 /** Where a dragged tab would land relative to a pane region. */
 export type DropZone = 'left' | 'right' | 'top' | 'bottom' | 'center'
@@ -26,6 +27,10 @@ export interface PaneLayoutViewProps {
   onDropTab: (targetPaneId: string, draggedPaneId: string, zone: DropZone) => void
   /** PAN-5343 H-D19: the split header's ⤢ button — show only this pane; the others stay as tabs. */
   onMakeOnly?: (paneId: string) => void
+  /** PAN-5343 H-D8: a conversation row this deck accepts is being dragged. Enables drop zones. */
+  draggingConversation?: boolean
+  /** PAN-5343 H-D8: a conversation row was dropped on a leaf. */
+  onDropConversation?: (targetPaneId: string, name: string, zone: DropZone) => void
 }
 
 /** Pick the drop zone from the pointer position within a region. */
@@ -64,7 +69,7 @@ function zoneStyle(zone: DropZone): React.CSSProperties {
  * is being dragged, each leaf shows edge drop zones for split-by-drag.
  */
 export function PaneLayoutView(props: PaneLayoutViewProps) {
-  const { node, path, panesById, renderPaneContent, focusedPaneId, showHeaders, draggingPaneId, onFocus, onCloseLeaf, onRatioChange, onDropTab, onMakeOnly } = props
+  const { node, path, panesById, renderPaneContent, focusedPaneId, showHeaders, draggingPaneId, onFocus, onCloseLeaf, onRatioChange, onDropTab, onMakeOnly, draggingConversation, onDropConversation } = props
   const containerRef = useRef<HTMLDivElement>(null)
   const [hoverZone, setHoverZone] = useState<DropZone | null>(null)
 
@@ -132,9 +137,10 @@ export function PaneLayoutView(props: PaneLayoutViewProps) {
         )}
         <div className={styles.pane} style={{ position: 'relative' }}>
           {pane ? renderPaneContent(pane) : null}
-          {draggingPaneId && (
+          {(draggingPaneId || draggingConversation) && (
             <div
               className={styles.dropOverlay}
+              data-testid="pane-drop-overlay"
               onDragOver={(e) => {
                 e.preventDefault()
                 e.dataTransfer.dropEffect = 'move'
@@ -147,9 +153,14 @@ export function PaneLayoutView(props: PaneLayoutViewProps) {
               }}
               onDrop={(e) => {
                 e.preventDefault()
-                const dragged = e.dataTransfer.getData('application/x-pane-id') || draggingPaneId
                 const zone = hoverZone ?? zoneFromPointer(e.currentTarget.getBoundingClientRect(), e.clientX, e.clientY)
                 setHoverZone(null)
+                const conversationName = e.dataTransfer.getData(CONVERSATION_DRAG_TYPE)
+                if (conversationName && onDropConversation) {
+                  onDropConversation(paneId, conversationName, zone)
+                  return
+                }
+                const dragged = e.dataTransfer.getData('application/x-pane-id') || draggingPaneId
                 if (dragged) onDropTab(paneId, dragged, zone)
               }}
             >

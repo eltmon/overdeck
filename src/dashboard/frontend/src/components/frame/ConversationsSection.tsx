@@ -80,7 +80,12 @@ export function ConversationsSection({ selectedProject }: { selectedProject: str
     setScopeState(next);
     try { localStorage.setItem(CONVERSATION_SCOPE_STORAGE_KEY, next); } catch { /* storage unavailable: the choice holds for this view */ }
   }, []);
-  const { conversations, projectConvs, projectConvIdSet } = useProjectScope(selectedProject);
+  const { conversations, projectConvs, projectConvIdSet, resolveConversationProjectName } = useProjectScope(selectedProject);
+  // PAN-5343 H-D8: rows drag onto Stage panes, tagged with their own project deck.
+  const deckKeyOf = useCallback(
+    (conv: Conversation) => resolveConversationProjectName(conv) ?? NO_PROJECT_KEY,
+    [resolveConversationProjectName],
+  );
   const selectedConversation = useCommandDeckSelection((s) => s.selectedConversation);
   const openConversation = useOpenConversation(selectedProject);
   // PAN-5343 H-D5: Ctrl/Cmd+Click and Beside open beside; Open in its project switches decks.
@@ -140,6 +145,7 @@ export function ConversationsSection({ selectedProject }: { selectedProject: str
         paneSlots={paneSlots}
         onOpenBeside={openConversationBesideInDeck}
         onOpenInProject={openConversationInProject}
+        deckKeyOf={deckKeyOf}
         scope={scope}
       />
     </section>

@@ -265,6 +265,8 @@ interface ConversationListProps {
   onOpenBeside?: (name: string) => void;
   /** PAN-5343 H-D5: the Open in its project menu item. */
   onOpenInProject?: (name: string) => void;
+  /** PAN-5343 H-D8: a conversation's own project deck; when given, rows drag onto Stage panes. */
+  deckKeyOf?: (conv: Conversation) => string;
 }
 
 /** The sections the 'active' scope shows. */
@@ -365,6 +367,7 @@ interface ConversationListItemProps {
   paneSlot?: number;
   onOpenBeside?: (name: string) => void;
   onOpenInProject?: (name: string) => void;
+  dragDeckKey?: string;
 }
 
 /** The non-zero group counts, in the order the PRD fixes (WI-10 step 3). */
@@ -395,6 +398,7 @@ function ConversationListItemImpl({
   paneSlot,
   onOpenBeside,
   onOpenInProject,
+  dragDeckKey,
 }: ConversationListItemProps) {
   return (
     <motion.div
@@ -419,6 +423,7 @@ function ConversationListItemImpl({
         paneSlot={paneSlot}
         onOpenBeside={onOpenBeside}
         onOpenInProject={onOpenInProject}
+        dragDeckKey={dragDeckKey}
       />
       {node.descendants.length > 0 && (
         <button
@@ -461,6 +466,7 @@ function itemPropsEqual(a: ConversationListItemProps, b: ConversationListItemPro
   if (a.isMultiSelected !== b.isMultiSelected) return false;
   if (a.markProjectKey !== b.markProjectKey || a.markName !== b.markName) return false;
   if (a.paneSlot !== b.paneSlot) return false;
+  if (a.dragDeckKey !== b.dragDeckKey) return false;
   if ((a.selectedConversation === a.node.conv.name) !== (b.selectedConversation === b.node.conv.name)) return false;
   if (a.node.descendants.length !== b.node.descendants.length) return false;
   for (let i = 0; i < a.node.descendants.length; i += 1) {
@@ -483,7 +489,7 @@ function itemPropsEqual(a: ConversationListItemProps, b: ConversationListItemPro
 
 const ConversationListItem = memo(ConversationListItemImpl, itemPropsEqual);
 
-export function ConversationList({ selectedConversation, onSelectConversation, excludeIds, includeIds, scope = 'all', groupByProject, paneSlots, onOpenBeside, onOpenInProject }: ConversationListProps) {
+export function ConversationList({ selectedConversation, onSelectConversation, excludeIds, includeIds, scope = 'all', groupByProject, paneSlots, onOpenBeside, onOpenInProject, deckKeyOf }: ConversationListProps) {
   const shownSections = scope === 'active' ? ACTIVE_SECTION_ORDER : SECTION_ORDER;
   const [sort, setSort] = useState<SortOption>(loadSort);
   const [tab, setTab] = useState<ListTab>(loadTab);
@@ -747,6 +753,7 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
         paneSlot={paneSlots?.get(node.conv.name)}
         onOpenBeside={onOpenBeside}
         onOpenInProject={onOpenInProject}
+        dragDeckKey={deckKeyOf?.(node.conv)}
       />
     );
   };

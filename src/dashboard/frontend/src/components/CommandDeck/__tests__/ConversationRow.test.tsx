@@ -713,3 +713,24 @@ describe('ConversationRow open-beside controls (PAN-5343 H-D5)', () => {
     expect(onOpenBeside).toHaveBeenCalledWith(conversation.name);
   });
 });
+
+describe('ConversationRow drag onto a pane (PAN-5343 H-D8)', () => {
+  it('is draggable with a deck key and records the drag', async () => {
+    const { useConversationDragStore, CONVERSATION_DRAG_TYPE } = await import('../../Stage/conversationDragStore');
+    renderRow({}, { dragDeckKey: 'dfai' });
+    const row = screen.getByTitle(conversation.name);
+    expect(row).toHaveAttribute('draggable', 'true');
+    const setData = vi.fn();
+    fireEvent.dragStart(row, { dataTransfer: { setData, effectAllowed: '' } });
+    expect(setData).toHaveBeenCalledWith(CONVERSATION_DRAG_TYPE, conversation.name);
+    expect(useConversationDragStore.getState().dragging).toEqual({ name: conversation.name, deckKey: 'dfai' });
+    fireEvent.dragEnd(row);
+    expect(useConversationDragStore.getState().dragging).toBeNull();
+  });
+
+  it('is not draggable without a deck key', () => {
+    renderRow({});
+    expect(screen.getByTitle(conversation.name)).not.toHaveAttribute('draggable');
+  });
+});
+

@@ -12,7 +12,7 @@ import type { SessionNode as SessionNodeType } from '@overdeck/contracts'
 import { useConversationMutations } from '../CommandDeck/useConversationMutations'
 import { ConversationActionMenu } from '../CommandDeck/ConversationActionMenu'
 import { PaneTabMenu } from './PaneTabMenu'
-import { PaneLayoutView } from './PaneLayoutView'
+import { PaneLayoutView, type DropZone } from './PaneLayoutView'
 import {
   leaf,
   isSplit,
@@ -30,6 +30,8 @@ import {
 import { selectDeckLayout, useDeckLayoutStore } from '../../lib/deckLayoutStore'
 import { ALL_PROJECTS_KEY } from '../../lib/deckKeys'
 import { LayoutPresetBar } from './LayoutPresetBar'
+import { useConversationDragStore } from './conversationDragStore'
+import { openConversationBeside, showConversation } from './openConversationInDeck'
 import { ForkModal } from '../CommandDeck/ForkModal'
 import { Bot, Terminal as TerminalIcon, Globe, FolderTree, GitCompare, Search } from 'lucide-react'
 import { PaneBar, type NewPaneAction } from './PaneBar'
@@ -655,6 +657,22 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
     [layout, activeId, deckKey, setActivePane, setLayout],
   )
 
+  // PAN-5343 H-D8: a conversation row dragged onto a pane. The All deck takes
+  // any conversation; a project deck takes only its own. The centre replaces
+  // the target leaf; an edge opens the conversation beside it.
+  const conversationDrag = useConversationDragStore((s) => s.dragging)
+  const draggingConversation = conversationDrag !== null && (deckKey === ALL_PROJECTS_KEY || conversationDrag.deckKey === deckKey)
+  const onDropConversation = useCallback(
+    (targetPaneId: string, name: string, zone: DropZone) => {
+      useConversationDragStore.getState().end()
+      setActivePane(deckKey, targetPaneId)
+      const label = conversations.find((c) => c.name === name)?.title ?? 'Agent'
+      if (zone === 'center') showConversation(deckKey, name, label)
+      else openConversationBeside(deckKey, name, label)
+    },
+    [deckKey, conversations, setActivePane],
+  )
+
   // PAN-5343 H-D19: the split header's ⤢ — show only this pane; the others stay as tabs.
   const makeOnlyPane = useCallback(
     (paneId: string) => {
@@ -772,6 +790,8 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
                 onRatioChange={onRatioChange}
                 onDropTab={onDropTab}
                 onMakeOnly={makeOnlyPane}
+                draggingConversation={draggingConversation}
+                onDropConversation={onDropConversation}
               />
             )}
           </div>

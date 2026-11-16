@@ -177,6 +177,7 @@ src/components/Stage/HomePane/Launcher.test.tsx
 src/components/Stage/IssueOverview.test.tsx
 src/components/Stage/PaneBar.test.tsx
 src/components/Stage/ProjectHome.test.tsx
+src/components/Stage/__tests__/PaneLayoutView.drop.test.tsx
 src/components/Stage/__tests__/PaneLayoutView.focus.test.tsx
 src/components/Stage/__tests__/explorer-migration.test.tsx
 src/components/Stage/__tests__/PaneLayoutView.only.test.tsx

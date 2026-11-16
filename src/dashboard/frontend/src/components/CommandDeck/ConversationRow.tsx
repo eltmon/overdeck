@@ -15,6 +15,7 @@ import type { RegisteredProject } from './UnknownProjectState';
 import { NO_PROJECT_KEY, resolveEffectiveProjectKey } from './projectsData';
 import { ProjectMark } from '../frame/ProjectMark';
 import { currentPlatform } from '../../lib/shortcuts/keys';
+import { CONVERSATION_DRAG_TYPE, useConversationDragStore } from '../Stage/conversationDragStore';
 import { fallbackBadgeTone } from './fallbackBadge';
 import { isScrollInsideMenu, MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
 import { isOfflineLinked, LinkedMachineChip, LinkedOfflineMeta, LinkedRowMenuItems } from './LinkedConversationRow';
@@ -105,6 +106,8 @@ interface ConversationRowProps {
   onOpenBeside?: (name: string) => void;
   /** PAN-5343 H-D5: switch to the conversation's own project deck (menu item). */
   onOpenInProject?: (name: string) => void;
+  /** PAN-5343 H-D8: the conversation's own project deck; when set, the row drags onto a pane. */
+  dragDeckKey?: string;
 }
 
 /** D28: WOWED and PASS use the done token; every other verdict is neutral (routine work, not an alarm). */
@@ -176,6 +179,7 @@ export function ConversationRow({
   paneSlot,
   onOpenBeside,
   onOpenInProject,
+  dragDeckKey,
 }: ConversationRowProps) {
   const [copiedId, setCopiedId] = useState(false);
   const [editingName, setEditingName] = useState(false);
@@ -478,6 +482,13 @@ export function ConversationRow({
         setMenuOpen(true);
       }}
       title={conv.name}
+      draggable={dragDeckKey ? true : undefined}
+      onDragStart={dragDeckKey ? (e) => {
+        e.dataTransfer.setData(CONVERSATION_DRAG_TYPE, conv.name);
+        e.dataTransfer.effectAllowed = 'copyMove';
+        useConversationDragStore.getState().start({ name: conv.name, deckKey: dragDeckKey });
+      } : undefined}
+      onDragEnd={dragDeckKey ? () => useConversationDragStore.getState().end() : undefined}
       aria-busy={leavingKind ? true : undefined}
       aria-selected={isMultiSelected || undefined}
     >
