@@ -90,8 +90,9 @@ interface SubscriptionWrite {
 }
 
 /**
- * Insert the row, or update it when this event is not older than the last one applied (D-9). paid_through only
- * moves forward. Older events leave the row as it is; the caller still records them.
+ * Insert the row, or update it. Product, status and customer change only when this event is not older than the
+ * last one applied (D-9). paid_through is a forward-only maximum, so it applies whatever the delivery order: a
+ * `subscription.paid` delivered after a newer `subscription.active` must still grant the paid period.
  */
 function upsertSubscription(rc: RequestContext, env: CreemEnvelope, w: SubscriptionWrite): D1PreparedStatement {
   const now = rc.deps.now();
@@ -102,16 +103,16 @@ function upsertSubscription(rc: RequestContext, env: CreemEnvelope, w: Subscript
     `INSERT INTO subscriptions (subscription_id, user_id, customer_id, product_key, status, paid_through, founding, created_at, updated_at, last_event_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (subscription_id) DO UPDATE SET
-       product_key = excluded.product_key,
-       status = excluded.status,
-       customer_id = CASE WHEN excluded.customer_id = '' THEN subscriptions.customer_id ELSE excluded.customer_id END,
+       product_key = CASE WHEN excluded.last_event_at >= subscriptions.last_event_at THEN excluded.product_key ELSE subscriptions.product_key END,
+       status = CASE WHEN excluded.last_event_at >= subscriptions.last_event_at THEN excluded.status ELSE subscriptions.status END,
+       customer_id = CASE WHEN excluded.last_event_at >= subscriptions.last_event_at AND excluded.customer_id <> ''
+         THEN excluded.customer_id ELSE subscriptions.customer_id END,
        paid_through = CASE
          WHEN excluded.paid_through IS NULL THEN subscriptions.paid_through
          WHEN subscriptions.paid_through IS NULL THEN excluded.paid_through
          ELSE MAX(subscriptions.paid_through, excluded.paid_through) END,
        updated_at = excluded.updated_at,
-       last_event_at = excluded.last_event_at
-     WHERE excluded.last_event_at >= subscriptions.last_event_at`,
+       last_event_at = MAX(subscriptions.last_event_at, excluded.last_event_at)`,
   ).bind(
     w.subscriptionId,
     w.userId,

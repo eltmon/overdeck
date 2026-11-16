@@ -201,6 +201,17 @@ describe('POST /webhooks/creem (PAN-4294 creem-webhook)', () => {
     expect(await rows(env, 'billing_events')).toHaveLength(2);
   });
 
+  it('an older subscription.paid after a newer subscription.active still sets paid_through and keeps the newer status', async () => {
+    const { env, deps } = await setup();
+    await postWebhook(env, deps, event('evt_active', 'subscription.active', subscription({ status: 'trialing', metadata: { overdeck_user_id: 'u1' } }), T0 + 5));
+    expect(await rows(env, 'subscriptions')).toEqual([expect.objectContaining({ paid_through: null, status: 'trialing' })]);
+    const res = await postWebhook(env, deps, event('evt_paid', 'subscription.paid', subscription({ status: 'active' }), T0));
+    expect(res.status).toBe(200);
+    expect(await rows(env, 'subscriptions')).toEqual([
+      expect.objectContaining({ paid_through: Date.parse(PERIOD_END), status: 'trialing', last_event_at: T0 + 5 }),
+    ]);
+  });
+
   it('a later subscription.canceled updates the status from the existing row', async () => {
     const { env, deps } = await setup();
     await postWebhook(env, deps, event('evt_1', 'subscription.paid', subscription({ metadata: { overdeck_user_id: 'u1' } })));
