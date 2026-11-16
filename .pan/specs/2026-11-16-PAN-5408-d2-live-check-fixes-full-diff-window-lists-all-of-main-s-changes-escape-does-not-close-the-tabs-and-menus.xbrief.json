@@ -1,0 +1,346 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-16T02:41:28Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5408: D2 live-check fixes: full diff window lists all of main's changes, Escape does not close the tabs and + menus",
+    "updated": "2026-11-16T02:44:38.513Z"
+  },
+  "plan": {
+    "id": "pan-5408",
+    "title": "D2 live-check fixes: full diff window lists all of main's changes, Escape does not close the tabs and + menus",
+    "status": "proposed",
+    "uid": "72eeda17-78cb-457d-a82a-7c9f245bc141",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-16T02:41:28Z",
+    "updated": "2026-11-16T02:44:38.513Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5408",
+        "label": "PAN-5408",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5408.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "diff-window",
+      "conversation-changes",
+      "stage",
+      "keyboard",
+      "bugfix"
+    ],
+    "narratives": {
+      "Problem": "Two defects from the epic owner's live check of D2 (PAN-5295). (1) The diff window's All turns view (GET /api/conversations/:name/diffs/full) diffs the whole cwd repository since the conversation started, so a conversation in the main checkout lists every agent's changes on main (2058 files) instead of its own (9 files in the dock's Changes tab). (2) PaneBar's + menu and N tabs list register no keydown handler, so Escape leaves them open over the header.",
+      "Proposal": "Slice A (server): getConversationDiffFull takes an injected conversationChanges dependency (wired in the route to getConversationChanges scope=conversation) and, for the cwd repo, lists exactly the attributed file set (commit files + uncommitted files), diffs only those paths from the commit before the earlier of the conversation start and its earliest attributed commit, takes stats from the net numstat with an attribution fallback, and renders untracked attributed files as new-file patches. Other repos and all other diff routes are unchanged. Slice B (frontend): PaneBar's open-menu effect adds a document keydown listener that closes the open menu on Escape and focuses its trigger. Docs and a changelog entry describe both.",
+      "NonGoals": "- Changing /diffs/:turnId (it still returns the whole cwd-repo patch without ?file; DiffPanel never requests it that way)\n- Changing the per-turn summaries route /diffs (stays edit-record based)\n- Filtering other agents' hunks out of a file both this conversation and another agent changed (line-level filtering)\n- Changing /diffs/vs-main, /api/diffs/compare, the dock's Changes tab, or /api/agents/:id/diffs/*\n- Falling back to the whole repository when attribution is empty or unavailable\n- Migrating PaneBar's menus to MenuSurface, restyling them, autofocusing menu items, or adding arrow-key navigation\n- Importing conversation-changes.ts from conversation-diffs.ts"
+    },
+    "autoDecisions": [
+      {
+        "summary": "All turns uses pure attribution for every conversation, including one in its own worktree; files changed only by shell commands without a conversation commit drop out of All turns (still visible under vs main / Compare…).",
+        "rationale": "The issue's acceptance test requires the All turns list to equal the /changes?scope=conversation set exactly; the issue's 'own worktree is the same as today' sentence reads as an observation, and one definition of 'this conversation's changes' matches the dock's Changes tab."
+      },
+      {
+        "summary": "Attribution reaches getConversationDiffFull through an injected ConversationDiffFullDependencies.conversationChanges, wired in the route, instead of an import.",
+        "rationale": "conversation-changes.ts already imports conversation-diffs.ts, so a direct import back is a cycle that lint:circular rejects; extending a new deps type leaves getConversationDiffs/getConversationDiffTurn callers untouched."
+      },
+      {
+        "summary": "Base commit = findCommitAtTime(cwdRepo, earlier of conv.createdAt and earliest attributed commit authoredAt minus 1 s); stats from net numstat with attribution fallback; a file with an empty net diff stays listed.",
+        "rationale": "Attribution looks back 10 minutes before the conversation start and tool-output commits can predate the conversation row, so the plain createdAt base could leave attributed commits outside the patch; keeping every attributed path guarantees the list equals the /changes set."
+      },
+      {
+        "summary": "Untracked attributed files get a new-file patch via git diff --no-index -- /dev/null <path> (exit 1 handled).",
+        "rationale": "git diff <base> never shows untracked files; listing a file whose patch is empty would show nothing on click. Probed during planning: the command prints '+++ b/<path>' and exits 1."
+      },
+      {
+        "summary": "Escape is handled by a document keydown listener in PaneBar's existing open-menu effect (PaneTabMenu pattern), guarded by defaultPrevented, focusing the open menu's trigger.",
+        "rationale": "After a click-open focus stays on the trigger, so a handler on the menu element never fires; MenuSurface would restyle the menu and autofocus items, a visual change outside this issue."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Two small independent slices (one server function + route, one frontend component) plus docs; 12 files total, 3 subsystems.",
+      "canonicalFilename": "2026-11-16-PAN-5408-d2-live-check-fixes-full-diff-window-lists-all-of-main-s-changes-escape-does-not-close-the-tabs-and-menus.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "full-diff-attributed-files",
+        "title": "/diffs/full lists only the conversation's attributed files for the cwd repo",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T02:41:28Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5408",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "full-diff-untracked-patch"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/conversation-diffs.ts",
+            "src/dashboard/server/routes/conversation-diffs.ts",
+            "tests/unit/lib/overdeck/conversation-diffs.test.ts",
+            "tests/unit/lib/overdeck/conversation-diff-full-attribution.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-diffs.test.ts tests/unit/lib/overdeck/conversation-diff-full-attribution.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "both test files pass, including the new attribution test",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 steps 1-15 exactly. In src/lib/overdeck/conversation-diffs.ts: add ConversationDiffFullDependencies (extends ConversationDiffDependencies with conversationChanges(name): Promise<ConversationChanges | null>), the exported attributedFiles() helper and attributionBaseTime(), split diffPatchForFiles into diffPatchSinceBase(repoRoot, baseCommit, paths, options), and replace the cwd-repo block of getConversationDiffFull with the PRD's 'after' snippet (attributed paths only; base from attributionBaseTime; patch filtered by ?file; files from net numstat with attribution fallback). Leave the other-repos loops unchanged. In src/dashboard/server/routes/conversation-diffs.ts: move conversationChangesDependencies above the routes, add conversationDiffFullDependencies wiring conversationChanges to getConversationChanges(name, {scope:'conversation'}) (non-200 -> null), and pass it to the /diffs/full route. Update (never delete) the existing tests per PRD steps 9-11, and write the new acceptance test file per steps 12-15 with the git isolation block copied from conversation-changes.test.ts."
+        },
+        "items": [
+          {
+            "id": "full-diff-attributed-files.ac1",
+            "title": "Given a repo whose branch diff since the conversation start lists at least 6 paths and whose attribution is mine-committed.txt (trailer commit) and mine-edited.txt (edit record), when getConversationDiffFull runs with the real getConversationChanges wired in, then it returns files exactly ['mine-committed.txt', 'mine-edited.txt'] (conversation-diff-full-attribution.test.ts passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "full-diff-attributed-files.ac2",
+            "title": "The returned diff contains mine-committed.txt and mine-edited.txt and contains none of other-1.txt, other-2.txt, other-dirty.txt, .pan/backlog/sequence.md; with ?file=<an unattributed path> the cwd-repo patch is empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "full-diff-attributed-files.ac3",
+            "title": "GET /api/conversations/:name/diffs/full through conversationDiffRoutes returns 200 with a trailer-attributed file and honors ignoreWhitespace=1 (the updated 'serves /diffs/full?ignoreWhitespace=1' route test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "full-diff-attributed-files.ac4",
+            "title": "src/lib/overdeck/conversation-diffs.ts has no import of conversation-changes.js and npm run lint:circular exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "full-diff-untracked-patch",
+        "title": "Untracked attributed files render a new-file patch in All turns",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T02:41:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5408",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-diffs.ts",
+            "tests/unit/lib/overdeck/conversation-diff-full-attribution.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-diff-full-attribution.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the untracked-file test passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. Add the async untrackedFilePatch(repoRoot, path, options) helper (promisified execFile running git diff --no-index --patch --minimal --no-color <diffOptionArgs> -- /dev/null <path>, returning error.stdout when git exits 1). In getConversationDiffFull's cwd block, for each patch path absent from the net numstat map that appears in changes.uncommitted with status 'A' and exists on disk under the cwd repo, append its new-file patch. Add the PRD's untracked test to conversation-diff-full-attribution.test.ts."
+        },
+        "items": [
+          {
+            "id": "full-diff-untracked-patch.ac1",
+            "title": "Given an untracked mine-new.txt recorded in the transcript's edit records, getConversationDiffFull lists it in files and getConversationDiffFull(name, 'mine-new.txt') returns a diff containing '+++ b/mine-new.txt' and '+new line'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "full-diff-untracked-patch.ac2",
+            "title": "Given an untracked stray.txt with no edit record, it appears in neither files nor diff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "panebar-escape-closes-menus",
+        "title": "Escape closes PaneBar's + menu and N tabs list and focuses the trigger",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T02:41:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5408",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/PaneBar.tsx",
+            "src/dashboard/frontend/src/components/Stage/PaneBar.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/PaneBar.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "PaneBar.test.tsx passes including the two new Escape tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In PaneBar.tsx replace `const menuOpen = menu !== null` with `const menuKind = menu?.kind ?? null`, key the open-menu effect on menuKind, and add a document keydown listener (registered and removed alongside the mousedown listener) that on Escape, when !e.defaultPrevented, calls e.preventDefault(), setMenu(null) and focuses addBtnRef for 'add' or tabsBtnRef for 'tabs'. Add the PRD's two tests to PaneBar.test.tsx (already in scripts/frontend-test-subset.txt). Do not touch menu markup or styles."
+        },
+        "items": [
+          {
+            "id": "panebar-escape-closes-menus.ac1",
+            "title": "Given the N tabs list is open, when Escape is pressed (fireEvent.keyDown(document, {key:'Escape'})), then menu 'All tabs' is no longer rendered and document.activeElement is the '3 tabs, list all tabs' button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panebar-escape-closes-menus.ac2",
+            "title": "Given the + menu is open with a 'Terminal' action, when Escape is pressed, then no 'Terminal' menuitem is rendered, document.activeElement is the 'Open new tab' button, and the action's onSelect was not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panebar-escape-closes-menus.ac3",
+            "title": "Choosing an item still closes the menu and calls onSelect, and a mousedown outside still closes it (the existing 'N tabs ▾ lists every tab' test still finds no 'All tabs' menu after the click)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-diff-window-and-tab-menus",
+        "title": "Document the All turns file set, Escape on the tab-strip menus, and the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T02:41:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5408",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "features/keyboard-shortcuts.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "changelog.d/pan-5408.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4 exactly: add the All turns paragraph to features/conversations.mdx '## Reviewing changes in the diff window'; append the Escape sentence to the N tabs line in features/keyboard-shortcuts.mdx; in docs/DASHBOARD-ARCHITECTURE.md describe /diffs/full's attributed-file behavior in the conversation diff routes bullet and correct the stale 'Per-file diffs reuse … /diffs/full' sentence (the Changes tab uses /api/diffs/compare, /api/agents/:id/diffs/vs-main and explorer readFile); create changelog.d/pan-5408.md with the PRD's two Fixed bullets."
+        },
+        "items": [
+          {
+            "id": "docs-diff-window-and-tab-menus.ac1",
+            "title": "features/conversations.mdx's '## Reviewing changes in the diff window' section contains a paragraph saying All turns lists the files this conversation changed, the same list as the Changes tab's This conversation, and that vs main and Compare… show wider comparisons",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-diff-window-and-tab-menus.ac2",
+            "title": "features/keyboard-shortcuts.mdx states that Escape closes the N tabs list and the + menu and returns focus to the button that opened it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-diff-window-and-tab-menus.ac3",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a statement that /diffs/full returns only the conversation's attributed files for the cwd repository, and no longer contains the claim that the Changes tab's per-file diffs use /diffs/full",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-diff-window-and-tab-menus.ac4",
+            "title": "changelog.d/pan-5408.md exists with a '#### Fixed' section holding both bullets, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "full-diff-attributed-files",
+        "to": "full-diff-untracked-patch",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
