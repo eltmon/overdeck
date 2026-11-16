@@ -1,12 +1,10 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T00:05:33.590020Z · model: claude-opus-5-5 · open: 897_
+_Last sequenced: 2026-11-16T00:35:35.072764Z · model: claude-opus-5-5 · open: 895_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-5401 | S | critical | ok |  |  | In pipeline: close-out DoD row 1 reads only reviewDecision, rejecting comment verdicts the merge door accepts. |
-| 2 | PAN-5402 | XS | medium | ok |  |  | In pipeline: re-vendor the OKF skill at eltmon/okf v0.1.1 so the bundled skill gains okf publish. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
@@ -905,14 +903,6 @@ _Last sequenced: 2026-11-16T00:05:33.590020Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
-### PAN-5401 (rank 1)
-
-New in-pipeline substrate bug: the merge door and close-out disagree on the same review, so comment-posted verdicts force a manual --accept-review override; pinned into the rank freed by closed PAN-5396.
-
-### PAN-5402 (rank 2)
-
-New in-pipeline chore already in review; a scripted re-vendor plus changelog entry, pinned into the free rank 2.
-
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
@@ -1225,6 +1215,14 @@ New substrate bug placed in a freed high-tier slot. With several workspace stack
 
 Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
 
+### PAN-3205 (rank 85)
+
+New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
+
+### PAN-3118 (rank 86)
+
+Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1232,37 +1230,11 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T00:05:33.590020Z",
+  "generatedAt": "2026-11-16T00:35:35.072764Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 897,
+  "openCount": 895,
   "nodes": [
-    {
-      "issue": "PAN-5401",
-      "rank": 1,
-      "size": "S",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: close-out DoD row 1 reads only reviewDecision, rejecting comment verdicts the merge door accepts.",
-      "rationale": "New in-pipeline substrate bug: the merge door and close-out disagree on the same review, so comment-posted verdicts force a manual --accept-review override; pinned into the rank freed by closed PAN-5396.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5402",
-      "rank": 2,
-      "size": "XS",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: re-vendor the OKF skill at eltmon/okf v0.1.1 so the bundled skill gains okf publish.",
-      "rationale": "New in-pipeline chore already in review; a scripted re-vendor plus changelog entry, pinned into the free rank 2.",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-5013",
       "rank": 3,
@@ -13531,13 +13503,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-5401",
-      "to": "PAN-4547",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
     },
     {
       "from": "PAN-750",
