@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5452",
   "created": "2026-11-16T18:34:39.411Z",
-  "updated": "2026-11-16T19:09:32.796Z",
+  "updated": "2026-11-16T19:09:40.743Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,6 +126,11 @@
     "desktop-lease.ac5": {
       "status": "completed",
       "doneAt": "2026-11-16T19:09:32.795Z"
+    },
+    "desktop-env": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T19:09:40.743Z"
     }
   }
 }
