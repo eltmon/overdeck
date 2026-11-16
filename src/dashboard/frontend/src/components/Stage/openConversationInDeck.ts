@@ -11,7 +11,8 @@
  *   screen as an equal 2/3/4 grid; at four it replaces the least recently
  *   focused leaf other than the active one, keeping the 2×2 shape.
  */
-import { usePanesStore, type PaneId } from '../../lib/panesStore';
+import { usePanesStore, type PaneId, type WorkspacePane } from '../../lib/panesStore';
+import { ALL_PROJECTS_KEY } from '../../lib/deckKeys';
 import { useDeckLayoutStore } from '../../lib/deckLayoutStore';
 import { collectLeafIds, leafCount, presetLayout, replaceLeaf, type LayoutPreset, type PaneLayout } from '../../lib/paneLayout';
 
@@ -94,4 +95,32 @@ export function openConversationBeside(deckKey: string, name: string, label: str
     setLayout(deckKey, presetLayout([...visible, paneId], (visible.length + 1) as LayoutPreset));
   }
   return focus(deckKey, paneId);
+}
+
+/**
+ * PAN-5343 H-D12: a /conv/<id> deep link while the All projects deck is
+ * selected. Shows the conversation in that deck, then applies the message
+ * target and view mode the same way `openConversationTab` does.
+ */
+export function showConversationInAllDeck(
+  name: string,
+  label: string,
+  target?: { messageId: string; messageIndex?: number; nonce: number; subagentId?: string },
+  viewMode?: WorkspacePane['viewMode'],
+): PaneId {
+  const paneId = showConversation(ALL_PROJECTS_KEY, name, label);
+  const effectiveViewMode = viewMode ?? (target ? 'conversation' : undefined);
+  const patch: Partial<WorkspacePane> = {
+    ...(effectiveViewMode ? { viewMode: effectiveViewMode } : {}),
+    ...(target
+      ? {
+          targetMessageId: target.messageId,
+          targetMessageIndex: target.messageIndex,
+          targetMessageNonce: target.nonce,
+          targetSubagentId: target.subagentId,
+        }
+      : {}),
+  };
+  if (Object.keys(patch).length > 0) usePanesStore.getState().updatePane(ALL_PROJECTS_KEY, paneId, patch);
+  return paneId;
 }
