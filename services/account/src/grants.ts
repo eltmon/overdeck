@@ -60,10 +60,16 @@ export async function getGrant(rc: GrantsContext, githubId: number): Promise<Gra
   return rc.env.DB.prepare('SELECT * FROM grants WHERE github_id = ?').bind(githubId).first<GrantRow>();
 }
 
-/** D-22: the owner, or anyone holding an unexpired grant. */
+/** D-22: the owner, anyone holding an unexpired grant, or a subscriber with a non-revoked row (PAN-4294 FR-7). */
 export async function isAllowed(rc: GrantsContext, githubId: number): Promise<boolean> {
   if (isOwner(rc, githubId)) return true;
-  return (await getActiveGrant(rc, githubId)) !== null;
+  if ((await getActiveGrant(rc, githubId)) !== null) return true;
+  const subscriber = await rc.env.DB.prepare(
+    'SELECT EXISTS (SELECT 1 FROM subscriptions s JOIN users u ON u.user_id = s.user_id WHERE u.github_id = ? AND s.revoked_at IS NULL) AS found',
+  )
+    .bind(githubId)
+    .first<number>('found');
+  return subscriber === 1;
 }
 
 /** Upsert: re-adding an account updates its login, note, expiry and cap and drops any pending attempt (§7.12). */

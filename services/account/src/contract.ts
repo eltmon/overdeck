@@ -5,7 +5,7 @@
  */
 import type { Entitlement } from './entitlement.ts';
 
-export type { Entitlement } from './entitlement.ts';
+export type { Entitlement, Lapse } from './entitlement.ts';
 export { quotaDecision, DEFAULT_STORAGE_CAP_BYTES } from './entitlement.ts';
 export type { AccountDataHolder } from './env.ts';
 

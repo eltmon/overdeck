@@ -2,14 +2,15 @@
  * The account page (PRD PAN-4959 WI-6; FR-3 to FR-9, FR-12; NFR-2).
  *
  * Server-rendered, no JavaScript; every value passes through escapeHtml(). The plan comes from D1
- * (entitlementFor of the grant row, expired or not), never from the Directory DO. Machines and relay use
+ * (entitlementFor of the grant row, expired or not, and the subscription rows), never from the Directory DO. Machines and relay use
  * come from the Directory DO; when it cannot answer, both sections say so and no Remove form is shown.
  */
 import { formatDate, formatDateTime } from '../admin/screen.ts';
+import { billingStateFor, loadSubscriptions } from '../billing/access.ts';
 import { readDirectoryView, type DirectoryMachine, type DirectoryView } from '../directory-view.ts';
 import { entitlementFor, FREE_PLAN_MAX_MACHINES, type Entitlement } from '../entitlement.ts';
 import type { Handler, RequestContext } from '../env.ts';
-import { getGrant, type GrantRow } from '../grants.ts';
+import { getGrant, isOwner, type GrantRow } from '../grants.ts';
 import { html } from '../http.ts';
 import { escapeHtml, layout } from '../pages.ts';
 import { ACCOUNT_TITLE, identitySection, requireUserSession, type UserSession } from './session.ts';
@@ -110,8 +111,8 @@ function deleteSection(csrf: string): string {
 export async function renderAccountPage(rc: RequestContext, session: UserSession, notice: PageNotice = {}): Promise<Response> {
   const now = rc.deps.now();
   const grant = await getGrant(rc, session.githubId);
-  // The owner has no grant row; entitlementFor(null) is Tester.
-  const entitlement = entitlementFor(grant);
+  const billing = billingStateFor(await loadSubscriptions(rc, session.userId), now);
+  const entitlement = entitlementFor(grant, billing, isOwner(rc, session.githubId));
   const view = await readDirectoryView(rc.env, session.userId);
   const error = notice.error ? `<p class="warn">${escapeHtml(notice.error)}</p>\n` : '';
   const body = [

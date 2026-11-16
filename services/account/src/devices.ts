@@ -7,6 +7,7 @@
  */
 import type { SignOutResult, VerifyError, VerifyResult } from './contract.ts';
 import { randomHex, sha256Hex } from './crypto.ts';
+import { billingStateFor, type SubscriptionAccessRow } from './billing/access.ts';
 import { entitlementFor, type Entitlement } from './entitlement.ts';
 import type { RequestContext } from './env.ts';
 import { isOwner, type GrantsContext } from './grants.ts';
@@ -116,6 +117,8 @@ interface LookupRow {
   storage_cap_bytes: number | null;
   grant_entitlement: string | null;
   grant_expires_at: number | null;
+  /** JSON array of the user's subscription rows (PAN-4294 NFR-7: still one statement). */
+  subscriptions_json: string;
 }
 
 /** Everything a request handler needs about an authenticated device. */
@@ -125,21 +128,24 @@ export interface DeviceAuth {
   githubLogin: string;
   deviceId: string;
   entitlement: Entitlement;
-  /** D-15: true when the account is neither the owner nor holds an unexpired grant. */
+  /** D-15: true when the account is neither the owner nor holds an unexpired grant nor has a non-revoked subscription. */
   grantExpired: boolean;
   grantExpiresAt: number | null;
 }
 
 export type DeviceLookup = { ok: true; auth: DeviceAuth } | { ok: false; error: VerifyError };
 
-/** One D1 lookup by token hash across devices → users → grants, then the D-18 last_used_at throttle. */
+/** One D1 lookup by token hash across devices → users → grants (+ subscriptions subquery), then the D-18 last_used_at throttle. */
 export async function lookupDevice(rc: DeviceContext, token: string): Promise<DeviceLookup> {
   if (!TOKEN_RE.test(token)) return { ok: false, error: 'invalid_token' };
   const now = rc.deps.now();
   const row = await rc.env.DB.prepare(
     `SELECT d.device_id, d.user_id, d.revoked_at, d.last_used_at,
             u.github_id, u.github_login, u.deleted_at,
-            g.github_id AS grant_github_id, g.storage_cap_bytes, g.entitlement AS grant_entitlement, g.expires_at AS grant_expires_at
+            g.github_id AS grant_github_id, g.storage_cap_bytes, g.entitlement AS grant_entitlement, g.expires_at AS grant_expires_at,
+            (SELECT json_group_array(json_object('subscription_id', s.subscription_id, 'product_key', s.product_key,
+                     'status', s.status, 'paid_through', s.paid_through, 'founding', s.founding, 'revoked_at', s.revoked_at))
+               FROM subscriptions s WHERE s.user_id = d.user_id) AS subscriptions_json
      FROM devices d
      JOIN users u ON u.user_id = d.user_id
      LEFT JOIN grants g ON g.github_id = u.github_id
@@ -153,9 +159,9 @@ export async function lookupDevice(rc: DeviceContext, token: string): Promise<De
 
   const owner = isOwner(rc, row.github_id);
   const grantActive = row.grant_github_id !== null && (row.grant_expires_at === null || row.grant_expires_at > now);
-  const entitlement = owner
-    ? entitlementFor(null)
-    : entitlementFor(grantActive ? { storage_cap_bytes: row.storage_cap_bytes, entitlement: row.grant_entitlement ?? 'tester' } : null);
+  const billing = billingStateFor(JSON.parse(row.subscriptions_json) as SubscriptionAccessRow[], now);
+  const grantPick = grantActive ? { storage_cap_bytes: row.storage_cap_bytes, entitlement: row.grant_entitlement ?? 'tester' } : null;
+  const entitlement = entitlementFor(grantPick, billing, owner);
 
   if (row.last_used_at === null || row.last_used_at < now - LAST_USED_THROTTLE_MS) {
     await rc.env.DB.prepare('UPDATE devices SET last_used_at = ? WHERE device_id = ? AND (last_used_at IS NULL OR last_used_at < ?)')
@@ -171,7 +177,8 @@ export async function lookupDevice(rc: DeviceContext, token: string): Promise<De
       githubLogin: row.github_login,
       deviceId: row.device_id,
       entitlement,
-      grantExpired: !owner && !grantActive,
+      // A subscriber stays allowed without a grant, so a lapsed one can always read and export (PAN-4294 FR-7).
+      grantExpired: !owner && !grantActive && !billing.hasLiveRow,
       grantExpiresAt: owner ? null : row.grant_expires_at,
     },
   };
