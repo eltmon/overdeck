@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5343",
   "created": "2026-11-16T00:09:01.559Z",
-  "updated": "2026-11-16T00:48:56.346Z",
+  "updated": "2026-11-16T00:49:05.112Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -298,6 +298,11 @@
     "preset-bar.ac4": {
       "status": "completed",
       "doneAt": "2026-11-16T00:48:56.345Z"
+    },
+    "crumb": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:49:05.112Z"
     }
   }
 }
