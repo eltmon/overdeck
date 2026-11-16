@@ -10,11 +10,12 @@ analysis (SAST) scanner. It is **off by default**.
 
 ## What it is
 
-Phase 1 (this page) covers config, the managed install, and `pan doctor` rows only: turning
-the feature on makes Overdeck install a pinned Semgrep binary and report its health, nothing
-more. Later phases — a verification-gate scan with review-lane findings (#4590), in-session
-MCP/hooks and a Semgrep skill (#4591), CI (#4592), a Platform/Guardian tier (#4593), and dashboard
-controls (#4594) — are planned but not part of this release.
+Phase 1 covers config, the managed install, and `pan doctor` rows: turning the feature on makes
+Overdeck install a pinned Semgrep binary and report its health. In-session tools (#4591) are now
+available too — a `semgrep` MCP server, a post-edit scan hook, and a `semgrep` skill — plus a
+Codex edit hook (#5434). Later phases — a verification-gate scan with review-lane findings
+(#4590), CI (#4592), a Platform/Guardian tier (#4593), and dashboard controls (#4594) — are
+planned but not part of this release.
 
 ## Turn it on
 
@@ -24,9 +25,13 @@ Add a `security:` block to `~/.overdeck/config.yaml`:
 security:
   semgrep:
     enabled: true
+    mcp: true
+    edit_hook: true
 ```
 
-Then run `pan sync` (or `pan install`) to trigger the managed install.
+`mcp` and `edit_hook` each default to `false` and do nothing unless `enabled` is also `true`.
+Then run `pan sync` (or `pan install`) to trigger the managed install. A config change reaches
+new agent sessions only — it does not affect an agent already running.
 
 A repo-committed `.pan.yaml` project layer **cannot** set `security` — any `security:` block
 there is silently ignored. A work agent can commit a `.pan.yaml` to its own feature branch, so
@@ -64,14 +69,53 @@ With the feature off, `pan doctor` prints no Semgrep rows at all. With it on:
 | `semgrep.dev` unreachable, non-2xx/3xx, or a 5s timeout | `semgrep.dev unreachable — registry rule packs such as p/default cannot be downloaded` | warn |
 | Platform is Windows | `Enabled, but Semgrep support is Linux and macOS only` | warn |
 
+## In-session tools
+
+### semgrep MCP server
+
+With `security.semgrep.mcp: true`, work agents and the review security lane get a `semgrep`
+MCP server: `semgrep_scan_with_custom_rule`, `semgrep_rule_schema`, `get_abstract_syntax_tree`,
+and `get_supported_languages`. `semgrep_scan` is intentionally absent — it needs
+`--config auto`, which this setup never runs; use the CLI through the `semgrep` skill instead.
+The server adds about 100&nbsp;MB per agent (the managed Semgrep install, shared across every
+agent on the machine, not per-launch).
+
+### Post-edit scan hook
+
+With `security.semgrep.edit_hook: true`, a Claude Code work agent gets Semgrep's findings for
+each file it edits. The hook scans only the edited file with `p/default` plus the repo's own
+`.semgrep.yml`/`.semgrep/` rules, and takes about 2&nbsp;seconds per edit. It skips files over
+1&nbsp;MiB, files under `node_modules/`, `.git/` or `dist/`, and non-code extensions such as
+`.md`, `.svg` or `.lock`. It stays silent when the scan is clean or on any error — it never
+blocks the edit — and a finding arrives as context for the agent to triage, not as a block.
+
+### semgrep skill
+
+The `semgrep` skill covers triage, a justified `nosemgrep`, and custom rules. It is hidden at
+launch while Semgrep is off (`security.semgrep.enabled: false`).
+
+## Harness support
+
+| Harness | MCP server | Edit hook |
+| --- | --- | --- |
+| Claude Code | Yes | Yes |
+| Codex | Yes | No (#5434) |
+| ACP host (Kimi over ACP, OpenCode, Grok Build) | Yes | No |
+| pi, oh-my-pi, Kimi Code native, Muse, Prime Agent | No (one launch warning) | No |
+
 ## Data egress
 
 | Action | Talks to | Sends code? |
 | --- | --- | --- |
 | Install (`uv`/`pipx`) | PyPI (`pypi.org`, `files.pythonhosted.org`) | No |
 | `pan doctor` registry check | `semgrep.dev` (bare `HEAD` request) | No |
+| MCP `semgrep_rule_schema` | `semgrep.dev` | No |
+| Post-edit scan | `semgrep.dev` (registry download of `p/default`) | No |
 | Version check / metrics | Disabled (`SEMGREP_ENABLE_VERSION_CHECK=0`, `SEMGREP_SEND_METRICS=off`) | n/a |
 | Semgrep Platform / Guardian | Not available in this release | — |
+
+MCP tracing is disabled (`SEMGREP_MCP_DISABLE_TRACING=true`), and every in-session Semgrep
+process writes its state to `~/.overdeck/tools/semgrep/` instead of the default `~/.semgrep/`.
 
 ## Licensing
 
