@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:40:59.756Z",
+  "updated": "2026-11-16T11:41:22.535Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -166,9 +166,26 @@
       "doneAt": "2026-11-16T11:39:43.223Z"
     },
     "migrate-dialog-provider": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4756",
-      "claimedAt": "2026-11-16T11:40:59.756Z"
+      "claimedAt": "2026-11-16T11:40:59.756Z",
+      "doneAt": "2026-11-16T11:41:22.535Z"
+    },
+    "migrate-dialog-provider.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:41:22.535Z"
+    },
+    "migrate-dialog-provider.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:41:22.535Z"
+    },
+    "migrate-dialog-provider.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:41:22.535Z"
+    },
+    "migrate-dialog-provider.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:41:22.535Z"
     }
   }
 }
