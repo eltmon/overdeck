@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T01:54:11.809907Z · model: claude-opus-5-5 · open: 892_
+_Last sequenced: 2026-11-16T02:34:19.198393Z · model: claude-opus-5-5 · open: 892_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -430,7 +430,7 @@ _Last sequenced: 2026-11-16T01:54:11.809907Z · model: claude-opus-5-5 · open: 
 | 432 | PAN-1624 | S | medium | ok |  |  | pan handoff --author external: authored doc is socket_write-ten but never submitted |
 | 433 | PAN-3901 | S | medium | ok |  |  | test-skip gate has no audited exemption for opt-in live suites (skipIf on env/binary); allowlist row with justification |
 | 434 | PAN-3852 | S | medium | ok |  |  | Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping |
-| 435 | PAN-5343 | L | medium | ok |  |  | Workflow redesign H: All projects deck listing conversations across projects, 1-4 side by side. Waits on four siblings. |
+| 435 | PAN-5414 | S | medium | ok |  |  | Workflow redesign H polish: hidden hover buttons truncate left-column rows, Stop × overlaps Settle box, empty All-deck crumb. |
 | 436 | PAN-3862 | L | medium | needs-refinement |  |  | /agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model |
 | 437 | PAN-1572 | M | medium | needs-refinement |  |  | Settings permission-mode can desync from the resolved mode; body cites the removed DSP flag and a renamed symbol — rewrite first |
 | 438 | PAN-4627 | S | medium | ok |  |  | Homebrew Claude Code installs get a copy-only upgrade banner; make the brew plan runnable and auto-upgrade outdated runnable installs. |
@@ -1227,7 +1227,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T01:54:11.809907Z",
+  "generatedAt": "2026-11-16T02:34:19.198393Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 892,
@@ -6585,15 +6585,15 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-5343",
+      "issue": "PAN-5414",
       "rank": 435,
-      "size": "L",
+      "size": "S",
       "importance": "medium",
-      "score": 58,
+      "score": 56,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Workflow redesign H: All projects deck listing conversations across projects, 1-4 side by side. Waits on four siblings.",
-      "rationale": "Dependency PAN-5335 merged and closed, so it is dropped from dependsOn; rank unchanged while PAN-5295 remains open.",
+      "why": "Workflow redesign H polish: hidden hover buttons truncate left-column rows, Stop × overlaps Settle box, empty All-deck crumb.",
+      "rationale": "New child of epic PAN-5284 filed from the live check of H (PAN-5343, now merged); it takes the rank slot H vacated. Well-specified CSS and crumb fixes with tests and acceptance criteria.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13439,13 +13439,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
     },
     {
       "from": "PAN-5284",
-      "to": "PAN-5343",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5284",
       "to": "PAN-5371",
       "type": "contains",
       "source": "github-ref",
@@ -13461,6 +13454,13 @@ New this pass. The test role evaluates the workspace working tree rather than th
     {
       "from": "PAN-5284",
       "to": "PAN-5413",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5284",
+      "to": "PAN-5414",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
