@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5423",
   "created": "2026-11-16T05:56:13.176Z",
-  "updated": "2026-11-16T06:04:00.033Z",
+  "updated": "2026-11-16T06:05:17.882Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -54,9 +54,18 @@
       "doneAt": "2026-11-16T06:03:52.098Z"
     },
     "wire-codex-approval-toast": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5423",
-      "claimedAt": "2026-11-16T06:04:00.033Z"
+      "claimedAt": "2026-11-16T06:04:00.033Z",
+      "doneAt": "2026-11-16T06:05:17.882Z"
+    },
+    "wire-codex-approval-toast.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T06:05:17.882Z"
+    },
+    "wire-codex-approval-toast.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T06:05:17.882Z"
     }
   }
 }
