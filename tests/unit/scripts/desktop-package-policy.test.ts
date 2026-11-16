@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { scanImportClosure } from '../../../apps/desktop/scripts/import-closure.mjs';
-import { findForbiddenPackages, SERVER_SKIP_PACKAGES } from '../../../apps/desktop/scripts/package-policy.mjs';
+import { checkDesktopPackSize, findForbiddenPackages, SERVER_SKIP_PACKAGES } from '../../../apps/desktop/scripts/package-policy.mjs';
 
 /**
  * PAN-5424: PAN-5358's namespace dynamic import of index-builder left a JSDoc
@@ -85,5 +85,37 @@ describe('findForbiddenPackages', () => {
   it('returns empty for a missing directory', () => {
     const dir = makeRoot();
     expect(findForbiddenPackages(join(dir, 'does-not-exist'))).toEqual([]);
+  });
+});
+
+describe('checkDesktopPackSize', () => {
+  it('passes a tarball under the limit', () => {
+    const result = checkDesktopPackSize({ size: 133_300_000, unpackedSize: 300_000_000, entryCount: 100 });
+    expect(result.ok).toBe(true);
+    expect(result.message).toContain('133.3 MB');
+  });
+
+  it('passes a tarball exactly at the limit (inclusive)', () => {
+    const result = checkDesktopPackSize({ size: 300_000_000 });
+    expect(result.ok).toBe(true);
+  });
+
+  it('fails a tarball over the limit', () => {
+    const result = checkDesktopPackSize({ size: 515_200_000 });
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('515.2 MB');
+    expect(result.message).toContain('300.0 MB');
+  });
+
+  it('fails closed when size is missing or non-numeric', () => {
+    expect(checkDesktopPackSize({ size: 'not-a-number' }).ok).toBe(false);
+    expect(checkDesktopPackSize({ size: 'not-a-number' }).message).toContain('could not be measured');
+    expect(checkDesktopPackSize(undefined).ok).toBe(false);
+    expect(checkDesktopPackSize(undefined).message).toContain('could not be measured');
+  });
+
+  it('honors a custom limit', () => {
+    expect(checkDesktopPackSize({ size: 100 }, 50).ok).toBe(false);
+    expect(checkDesktopPackSize({ size: 50 }, 50).ok).toBe(true);
   });
 });

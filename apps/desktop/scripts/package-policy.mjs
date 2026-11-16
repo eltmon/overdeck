@@ -57,3 +57,27 @@ export const findForbiddenPackages = (nodeModulesDir, forbidden = FORBIDDEN_SERV
   walkForbidden(nodeModulesDir, nodeModulesDir, forbidden, hits);
   return hits.sort();
 };
+
+/** npm's decimal-MB display cap for the published @overdeck/desktop tarball (PAN-5424). */
+export const MAX_DESKTOP_TARBALL_BYTES = 300_000_000;
+
+/**
+ * Judges one `npm pack --dry-run --json` entry (or the statSync-derived
+ * equivalent). Never throws. `size` above `limit` fails; `size === limit`
+ * passes. A missing or non-numeric `size` fails closed.
+ */
+export const checkDesktopPackSize = (entry, limit = MAX_DESKTOP_TARBALL_BYTES) => {
+  const size = entry?.size;
+  const limitMb = (limit / 1e6).toFixed(1);
+  if (typeof size !== "number" || !Number.isFinite(size)) {
+    return {
+      ok: false,
+      message: `@overdeck/desktop tarball size could not be measured; limit ${limitMb} MB`,
+    };
+  }
+  const unpackedSize = entry?.unpackedSize;
+  const unpackedMb = typeof unpackedSize === "number" ? (unpackedSize / 1e6).toFixed(1) : "?";
+  const entryCount = entry?.entryCount ?? "?";
+  const message = `@overdeck/desktop tarball ${(size / 1e6).toFixed(1)} MB (unpacked ${unpackedMb} MB, ${entryCount} files); limit ${limitMb} MB`;
+  return { ok: size <= limit, message };
+};
