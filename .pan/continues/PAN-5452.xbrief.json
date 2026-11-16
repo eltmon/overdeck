@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5452",
   "created": "2026-11-16T18:34:39.411Z",
-  "updated": "2026-11-16T19:32:11.533Z",
+  "updated": "2026-11-16T19:32:21.025Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -214,6 +214,11 @@
     "snapshot-store.ac4": {
       "status": "completed",
       "doneAt": "2026-11-16T19:32:11.533Z"
+    },
+    "format-output": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T19:32:21.025Z"
     }
   }
 }
