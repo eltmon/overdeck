@@ -49,6 +49,10 @@ export interface ModalProps {
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+// Render order of every Modal. A nested Modal renders after its parent, so a
+// higher number is a higher layer even when both mount in the same commit.
+let modalLayerSeq = 0;
+
 function focusableElements(container: HTMLElement): HTMLElement[] {
   return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
     (element) => !element.closest('[hidden]'),
@@ -94,6 +98,7 @@ export function Modal({
   // Captured at first render, before a child's autoFocus or this component's
   // effect moves focus into the panel (PAN-4756 FR-1).
   const [opener] = useState(() => (document.activeElement instanceof HTMLElement ? document.activeElement : null));
+  const [layer] = useState(() => ++modalLayerSeq);
 
   useEffect(() => {
     const restore = () => {
@@ -101,11 +106,15 @@ export function Modal({
     };
     // A child already placed focus (autoFocus): keep it.
     if (panelRef.current?.contains(document.activeElement)) return restore;
+    // A nested Modal mounted in the same commit ran its effect first and holds
+    // focus in a higher layer: keep it there.
+    const focusedPanel = document.activeElement?.closest<HTMLElement>('[data-component="modal"]');
+    if (focusedPanel && Number(focusedPanel.dataset.modalLayer) > layer) return restore;
     const body = bodyRef.current;
     const target = (body && focusableElements(body)[0]) ?? panelRef.current;
     target?.focus();
     return restore;
-  }, [opener]);
+  }, [opener, layer]);
 
   // A dialog that swaps its body (a form replaced by its result) removes the
   // focused control, and focus falls to <body>, outside the panel: Escape and
@@ -182,6 +191,7 @@ export function Modal({
         tabIndex={-1}
         className={panelClassName}
         data-component="modal"
+        data-modal-layer={layer}
         onKeyDown={onKeyDown}
         onSubmit={onSubmit}
       >

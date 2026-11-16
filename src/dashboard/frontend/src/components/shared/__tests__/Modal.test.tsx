@@ -221,7 +221,9 @@ describe('Modal', () => {
         </Modal>
       </Modal>,
     );
-    fireEvent.keyDown(screen.getByRole('dialog', { name: 'Inner' }), { key: 'Escape' });
+    expect(screen.getByRole('dialog', { name: 'Inner' })).toContainElement(document.activeElement as HTMLElement);
+    expect(screen.getByRole('button', { name: 'inner body' })).toHaveFocus();
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
     expect(innerClose).toHaveBeenCalledTimes(1);
     expect(outerClose).not.toHaveBeenCalled();
   });
