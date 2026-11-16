@@ -4,17 +4,17 @@
     "created": "2026-11-16T00:18:33Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5330: Workspace devcontainers share the DNS name 'server' on the external overdeck network, so a frontend can proxy to another workspace's backend",
-    "updated": "2026-11-16T00:25:40.717Z"
+    "updated": "2026-11-16T00:26:53.462Z"
   },
   "plan": {
     "id": "pan-5330",
     "title": "Workspace devcontainers share the DNS name 'server' on the external overdeck network, so a frontend can proxy to another workspace's backend",
-    "status": "proposed",
+    "status": "running",
     "uid": "bc72e8fd-1ac4-442e-a504-576613269dec",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-16T00:18:33Z",
-    "updated": "2026-11-16T00:25:40.717Z",
+    "updated": "2026-11-16T00:26:53.462Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5330",
@@ -289,5 +289,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
