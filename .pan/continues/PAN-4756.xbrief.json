@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:51:05.053Z",
+  "updated": "2026-11-16T11:51:06.833Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -622,6 +622,11 @@
     "migrate-fork-modal.ac3": {
       "status": "completed",
       "doneAt": "2026-11-16T11:51:05.052Z"
+    },
+    "migrate-feature-metadata-modals": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:51:06.832Z"
     }
   }
 }
