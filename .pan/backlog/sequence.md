@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T03:48:20.005000Z · model: claude-opus-5-5 · open: 889_
+_Last sequenced: 2026-11-16T04:18:28.912470Z · model: claude-opus-5-5 · open: 889_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -203,7 +203,7 @@ _Last sequenced: 2026-11-16T03:48:20.005000Z · model: claude-opus-5-5 · open: 
 | 205 | PAN-3050 | XS | high | ok |  |  | Idle-stack reaper's regex only matches overdeck-feature-*-server|frontend, so MYN stacks run for hours after their agents are gone. |
 | 206 | PAN-4365 | S | medium | ok |  |  | Stale defaults: workhorses.expensive is Opus 4.8 and the flywheel role is a literal that ignores the slot; evals now unblocked |
 | 207 | PAN-2980 | XS | high | ok |  |  | The pre-push file-size guard reads the shared working tree, so another session's uncommitted edits block an unrelated, guard-clean push. |
-| 208 | PAN-5408 | S | medium | ok |  |  | D2 live-check fixes: full diff window lists all of main's changes, not the conversation's; Escape leaves tab/+ menus open. |
+| 208 | PAN-5418 | S | medium | ok |  |  | D2 follow-up: All turns diff per file still spans session-start..HEAD, so it shows other agents' edits as this conversation's. |
 | 209 | PAN-3769 | S | high | needs-refinement |  |  | Red main 707089c5→e4b280b3 blocked deploys ~14h: missing no-loss lock entry + stale OpenRouter expectation. Verify still reproducing. |
 | 210 | PAN-3760 | S | high | ok |  |  | permissionMode 'auto' undocumented as non-bypass, launcher can emit invalid --permission-mode, invalid values drop silently. |
 | 211 | PAN-3629 | M | high | ok |  |  | No sanctioned door to re-scope a live agent; the operator must violate pan tell doctrine or let the rejected design land. |
@@ -1224,7 +1224,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T03:48:20.005000Z",
+  "generatedAt": "2026-11-16T04:18:28.912470Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 889,
@@ -3775,15 +3775,15 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-5408",
+      "issue": "PAN-5418",
       "rank": 208,
       "size": "S",
       "importance": "medium",
       "score": 62,
       "condition": "ok",
       "dependsOn": [],
-      "why": "D2 live-check fixes: full diff window lists all of main's changes, not the conversation's; Escape leaves tab/+ menus open.",
-      "rationale": "New child of epic PAN-5284 from the epic owner's live check of the just-merged D2 (PAN-5295); takes D2's freed rank 208 beside its sibling live-check fixes PAN-5370.",
+      "why": "D2 follow-up: All turns diff per file still spans session-start..HEAD, so it shows other agents' edits as this conversation's.",
+      "rationale": "New child of epic PAN-5284 from the epic owner's live check of the just-merged PAN-5408; it takes 5408's freed rank 208 because it finishes the same All-turns diff fix, with a named cause, approach and tests.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13393,13 +13393,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "from": "PAN-5284",
-      "to": "PAN-5408",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5284",
       "to": "PAN-5413",
       "type": "contains",
       "source": "github-ref",
@@ -13408,6 +13401,13 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     {
       "from": "PAN-5284",
       "to": "PAN-5414",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5284",
+      "to": "PAN-5418",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
