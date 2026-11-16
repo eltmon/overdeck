@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { dashboardMutationJsonHeaders, ensureDashboardSession } from '../../../lib/wsTransport';
 
@@ -65,7 +65,7 @@ export function useSemgrepSettings() {
   const pendingRef = useRef<SemgrepSettingsPatch | null>(null);
   const inFlightRef = useRef<Promise<void> | null>(null);
 
-  const drain = useCallback((): Promise<void> => {
+  const drain = (): Promise<void> => {
     if (inFlightRef.current) return inFlightRef.current;
     const run = (async () => {
       while (pendingRef.current) {
@@ -99,18 +99,18 @@ export function useSemgrepSettings() {
       setSaving(pendingRef.current !== null);
     });
     return inFlightRef.current;
-  }, [queryClient]);
+  };
 
-  const save = useCallback((patch: SemgrepSettingsPatch) => {
+  const save = (patch: SemgrepSettingsPatch) => {
     pendingRef.current = { ...pendingRef.current, ...patch };
     setSaving(true);
     void drain();
-  }, [drain]);
+  };
 
   const [installing, setInstalling] = useState(false);
   const [installMessage, setInstallMessage] = useState<string | null>(null);
 
-  const install = useCallback(() => {
+  const install = () => {
     setInstalling(true);
     void (async () => {
       try {
@@ -130,7 +130,7 @@ export function useSemgrepSettings() {
         void queryClient.invalidateQueries({ queryKey: ['semgrep-install-status'] });
       }
     })();
-  }, [queryClient]);
+  };
 
   return {
     settings,
