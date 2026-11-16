@@ -4,17 +4,17 @@
     "created": "2026-11-16T02:20:16Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5391: Editor bar offers a primary Merge while the PR's checks are still running (UNSTABLE treated as clean)",
-    "updated": "2026-11-16T02:24:40.919Z"
+    "updated": "2026-11-16T02:25:43.875Z"
   },
   "plan": {
     "id": "pan-5391",
     "title": "Editor bar offers a primary Merge while the PR's checks are still running (UNSTABLE treated as clean)",
-    "status": "proposed",
+    "status": "running",
     "uid": "e23ea4da-d678-4359-b563-34adb82f2491",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-16T02:20:16Z",
-    "updated": "2026-11-16T02:24:40.919Z",
+    "updated": "2026-11-16T02:25:43.875Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5391",
@@ -451,5 +451,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
