@@ -113,6 +113,11 @@ export async function revokeGrant(rc: GrantsContext, githubId: number): Promise<
       `UPDATE devices SET revoked_at = ?, revoked_by = 'operator'
        WHERE revoked_at IS NULL AND user_id IN (SELECT user_id FROM users WHERE github_id = ?)`,
     ).bind(now, githubId),
+    // PAN-4294 D-11: a revoked account loses its subscriptions too; the admin handler and the hourly cron send the cancels.
+    rc.env.DB.prepare(
+      `UPDATE subscriptions SET revoked_at = ?, cancel_requested_at = COALESCE(cancel_requested_at, ?)
+       WHERE revoked_at IS NULL AND user_id IN (SELECT user_id FROM users WHERE github_id = ?)`,
+    ).bind(now, now, githubId),
   ]);
   return (results[0]?.results.length ?? 0) > 0;
 }

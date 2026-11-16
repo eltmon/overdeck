@@ -2,6 +2,8 @@
  * Admin screen: header, owner line, allowlisted accounts table, add form, revoke (PRD PAN-4293 §7.12 parts 1–4; D-9, D-14, D-15, D-26).
  * Server-rendered, no JavaScript; every value passes through escapeHtml().
  */
+import { runPendingCancels } from '../billing/cancel.ts';
+import { parseBillingConfig } from '../billing/catalog.ts';
 import { DEFAULT_STORAGE_CAP_BYTES } from '../entitlement.ts';
 import type { Handler, RequestContext } from '../env.ts';
 import { lookupUserByLogin } from '../github.ts';
@@ -158,5 +160,7 @@ export const revokeGrant: Handler = async (req, rc) => {
   const githubId = /^\d+$/.test(rc.params.githubId ?? '') ? Number(rc.params.githubId) : null;
   if (githubId === null) return errorPage(404, 'No such account.', 'Not found');
   await revokeGrantRow(rc, githubId);
+  const billing = parseBillingConfig(rc.env);
+  if (billing !== null) rc.ctx.waitUntil(runPendingCancels(rc, billing));
   return redirect('/admin', 303);
 };

@@ -2,11 +2,14 @@
  * Account deletion with data-holder fan-out (PRD PAN-4293 §7.10; D-15, D-16; FR-7).
  *
  * DELETE /v1/account revokes every device, removes the grant and pending row and opens a deletion job in one
- * batch, then runs the job via ctx.waitUntil. The job asks each bound data holder (the optional VAULT binding, and
- * the connect Directory DO through DIRECTORY, PAN-4959 D-4) to delete the user's data; once every holder acked, the
- * user's device and user rows are deleted.
+ * batch, then runs the job via ctx.waitUntil. The job asks each bound data holder (billing when Creem is configured,
+ * PAN-4294 D-11; the optional VAULT binding; the connect Directory DO through DIRECTORY, PAN-4959 D-4) to delete the
+ * user's data; once every holder acked, the user's device and user rows are deleted. The billing holder cancels every
+ * live subscription first, so a deleted account is never charged again.
  * The hourly cron (maintenance.ts) retries jobs that are still open.
  */
+import { cancelForUser } from './billing/cancel.ts';
+import { parseBillingConfig } from './billing/catalog.ts';
 import { authenticateRequest } from './devices.ts';
 import { deleteDirectoryAccount } from './directory-view.ts';
 import type { AccountDataHolder, Env, Handler, RequestContext } from './env.ts';
@@ -23,15 +26,34 @@ export interface DeletionJobRow {
   completed_at: number | null;
 }
 
-export const HOLDER_NAMES = ['vault', 'directory'] as const;
+export const HOLDER_NAMES = ['billing', 'vault', 'directory'] as const;
 export type HolderName = (typeof HOLDER_NAMES)[number];
 
 /** Names of the data holders bound in this deployment. */
 export function boundHolders(env: Env): HolderName[] {
-  return [...(env.VAULT ? (['vault'] as const) : []), ...(env.DIRECTORY ? (['directory'] as const) : [])];
+  return [
+    ...(parseBillingConfig(env) !== null ? (['billing'] as const) : []),
+    ...(env.VAULT ? (['vault'] as const) : []),
+    ...(env.DIRECTORY ? (['directory'] as const) : []),
+  ];
 }
 
-function holderFor(env: Env, name: string): AccountDataHolder | undefined {
+function holderFor(rc: DeletionContext, name: string): AccountDataHolder | undefined {
+  const env = rc.env;
+  if (name === 'billing') {
+    const cfg = parseBillingConfig(env);
+    if (cfg === null) return undefined;
+    return {
+      deleteAccountData: async (userId) => {
+        if (!(await cancelForUser(rc, cfg, userId))) throw new Error('billing cancel pending');
+        await env.DB.batch([
+          env.DB.prepare('DELETE FROM subscriptions WHERE user_id = ?').bind(userId),
+          env.DB.prepare('DELETE FROM checkouts WHERE user_id = ?').bind(userId),
+        ]);
+        return { deleted: true };
+      },
+    };
+  }
   if (name === 'vault') return env.VAULT;
   if (name === 'directory' && env.DIRECTORY) {
     return {
@@ -82,7 +104,7 @@ export async function runDeletionJob(rc: DeletionContext, userId: string): Promi
   let attempts = job.attempts;
   let lastError = job.last_error;
   for (const name of parseHolders(job.holders_pending)) {
-    const holder = holderFor(rc.env, name);
+    const holder = holderFor(rc, name);
     if (!holder) {
       remaining.push(name);
       lastError = `holder ${name} not bound`;

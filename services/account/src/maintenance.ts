@@ -1,7 +1,10 @@
 /**
- * Hourly cron (`0 * * * *`): retry open deletion jobs, then purge expired short-lived rows (PRD PAN-4293 §7.10, FR-13).
+ * Hourly cron (`0 * * * *`): retry open deletion jobs and, when billing is configured, pending Creem cancels
+ * (PAN-4294 D-11), then purge expired short-lived rows (PRD PAN-4293 §7.10, FR-13).
  * Retention boundaries are measured with deps.now(), so tests drive them with an injected clock.
  */
+import { runPendingCancels } from './billing/cancel.ts';
+import { parseBillingConfig } from './billing/catalog.ts';
 import { runDeletionJob } from './deletion.ts';
 import type { Deps, Env } from './env.ts';
 
@@ -14,11 +17,28 @@ export const RETENTION = {
   revokedDevicesMs: 90 * DAY_MS,
   rateLimitWindowsMs: HOUR_MS,
   completedDeletionJobsMs: 30 * DAY_MS,
+  billingEventsMs: 30 * DAY_MS,
+  billingUnresolvedMs: 30 * DAY_MS,
+  checkoutsAfterExpiryMs: 7 * DAY_MS,
 } as const;
 
 export interface MaintenanceReport {
   deletionJobsRun: number;
-  purged: Record<'auth_requests' | 'auth_codes' | 'admin_sessions' | 'user_sessions' | 'device_grants' | 'pending_attempts' | 'devices' | 'rate_limits' | 'deletion_jobs', number>;
+  purged: Record<
+    | 'auth_requests'
+    | 'auth_codes'
+    | 'admin_sessions'
+    | 'user_sessions'
+    | 'device_grants'
+    | 'pending_attempts'
+    | 'devices'
+    | 'rate_limits'
+    | 'deletion_jobs'
+    | 'billing_events'
+    | 'billing_unresolved'
+    | 'checkouts',
+    number
+  >;
 }
 
 export async function runMaintenance(env: Env, deps: Deps): Promise<MaintenanceReport> {
@@ -28,6 +48,9 @@ export async function runMaintenance(env: Env, deps: Deps): Promise<MaintenanceR
 
   const open = await db.prepare('SELECT user_id FROM deletion_jobs WHERE completed_at IS NULL ORDER BY requested_at ASC').all<{ user_id: string }>();
   for (const job of open.results) await runDeletionJob(rc, job.user_id);
+
+  const billing = parseBillingConfig(env);
+  if (billing !== null) await runPendingCancels(rc, billing);
 
   const purge = async (sql: string, ...values: number[]) => (await db.prepare(sql).bind(...values).run()).meta.changes;
   const purged: MaintenanceReport['purged'] = {
@@ -40,6 +63,9 @@ export async function runMaintenance(env: Env, deps: Deps): Promise<MaintenanceR
     devices: await purge('DELETE FROM devices WHERE revoked_at IS NOT NULL AND revoked_at < ?', now - RETENTION.revokedDevicesMs),
     rate_limits: await purge('DELETE FROM rate_limits WHERE window_start < ?', now - RETENTION.rateLimitWindowsMs),
     deletion_jobs: await purge('DELETE FROM deletion_jobs WHERE completed_at IS NOT NULL AND completed_at < ?', now - RETENTION.completedDeletionJobsMs),
+    billing_events: await purge('DELETE FROM billing_events WHERE received_at < ?', now - RETENTION.billingEventsMs),
+    billing_unresolved: await purge('DELETE FROM billing_unresolved WHERE last_seen_at < ?', now - RETENTION.billingUnresolvedMs),
+    checkouts: await purge('DELETE FROM checkouts WHERE completed_at IS NULL AND expires_at < ?', now - RETENTION.checkoutsAfterExpiryMs),
   };
   return { deletionJobsRun: open.results.length, purged };
 }

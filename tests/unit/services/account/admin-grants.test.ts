@@ -4,7 +4,8 @@ import { mintDevice, verifyDeviceToken } from '../../../../services/account/src/
 import { addGrant, getActiveGrant, getPendingAttempt, recordPendingAttempt } from '../../../../services/account/src/grants.ts';
 import { makeAdminClient } from './helpers/admin.ts';
 import { githubMock, type GitHubMockOptions } from './helpers/github-mock.ts';
-import { dbOf, makeDeps, makeEnv, makeRc } from './helpers/harness.ts';
+import { billingEnv, fakeCreem, seedSubscription } from './helpers/billing.ts';
+import { dbOf, fakeCtx, makeDeps, makeEnv, makeRc } from './helpers/harness.ts';
 
 const NOW = Date.UTC(2026, 9, 1, 12);
 const DAY = 86_400_000;
@@ -120,6 +121,23 @@ describe('admin screen: accounts, add, revoke (PAN-4293 account-admin-grants-scr
     expect(deps.fetchCalls).toHaveLength(0);
     expect(await db.prepare('SELECT COUNT(*) AS n FROM grants').first<number>('n')).toBe(0);
     expect(parseAddForm(new URLSearchParams({ username: 'octocat', cap_gb: '1000' }))).toMatchObject({ ok: true, storageCapBytes: 1000 * 1024 ** 3 });
+  });
+
+  it('revoke marks the account’s subscriptions revoked and sends the cancel (PAN-4294 D-11)', async () => {
+    const creem = fakeCreem({ 'POST /v1/subscriptions/sub_1/cancel': () => ({ status: 200, body: { id: 'sub_1', status: 'canceled' } }) });
+    const env = makeEnv(billingEnv());
+    const deps = makeDeps({ now: NOW, fetch: creem.fetch });
+    const rc = makeRc({ env, deps });
+    const admin = await makeAdminClient(env, deps);
+    await addGrant(rc, 100, 'alice', {}, 'admin-add');
+    await env.DB.prepare('INSERT INTO users (user_id, github_id, github_login, created_at) VALUES (?, ?, ?, ?)').bind('u-alice', 100, 'alice', NOW).run();
+    await seedSubscription(env, { subscriptionId: 'sub_1', userId: 'u-alice', paidThrough: NOW + DAY });
+    const ctx = fakeCtx();
+    expect((await admin.post('/admin/grants/100/revoke', {}, { ctx })).status).toBe(303);
+    expect(await env.DB.prepare('SELECT revoked_at, cancel_requested_at FROM subscriptions').first()).toEqual({ revoked_at: NOW, cancel_requested_at: NOW });
+    await ctx.drain();
+    expect(creem.requests).toEqual([expect.objectContaining({ path: '/v1/subscriptions/sub_1/cancel', body: { mode: 'immediate' } })]);
+    expect(await env.DB.prepare('SELECT cancel_done_at FROM subscriptions').first('cancel_done_at')).toBe(NOW);
   });
 
   it('revoke deletes the grant and that account’s tokens answer device_revoked', async () => {
