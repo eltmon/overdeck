@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:53:07.983Z",
+  "updated": "2026-11-16T11:53:09.347Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -712,6 +712,11 @@
     "migrate-connect-bot-dialog.ac3": {
       "status": "completed",
       "doneAt": "2026-11-16T11:53:07.982Z"
+    },
+    "migrate-mcp-url-dialog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:53:09.346Z"
     }
   }
 }
