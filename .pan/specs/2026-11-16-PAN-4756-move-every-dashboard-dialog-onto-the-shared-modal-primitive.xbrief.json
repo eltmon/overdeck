@@ -4,17 +4,17 @@
     "created": "2026-11-16T12:00:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4756: Move every dashboard dialog onto the shared Modal primitive",
-    "updated": "2026-11-16T11:18:22.507Z"
+    "updated": "2026-11-16T11:19:29.385Z"
   },
   "plan": {
     "id": "pan-4756",
     "title": "Move every dashboard dialog onto the shared Modal primitive",
-    "status": "proposed",
+    "status": "running",
     "uid": "5deacd6e-da74-4a4c-b265-394c001aac46",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-16T12:00:00Z",
-    "updated": "2026-11-16T11:18:22.507Z",
+    "updated": "2026-11-16T11:19:29.385Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4756",
@@ -3501,5 +3501,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
