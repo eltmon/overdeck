@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5341",
+  "created": "2026-11-16T05:09:54.013Z",
+  "updated": "2026-11-16T05:09:54.013Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "dock-preview-source": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5341",
+      "claimedAt": "2026-11-16T05:09:54.013Z"
+    }
+  }
+}
