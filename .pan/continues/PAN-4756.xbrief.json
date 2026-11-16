@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:53:29.396Z",
+  "updated": "2026-11-16T11:55:24.742Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -730,6 +730,11 @@
     "migrate-mcp-url-dialog.ac3": {
       "status": "completed",
       "doneAt": "2026-11-16T11:53:29.395Z"
+    },
+    "docs-modal-rule-and-audit": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:55:24.741Z"
     }
   }
 }
