@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5408",
   "created": "2026-11-16T02:46:02.692Z",
-  "updated": "2026-11-16T02:57:57.793Z",
+  "updated": "2026-11-16T02:58:05.023Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "full-diff-attributed-files.ac4": {
       "status": "completed",
       "doneAt": "2026-11-16T02:57:57.793Z"
+    },
+    "full-diff-untracked-patch": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5408",
+      "claimedAt": "2026-11-16T02:58:05.022Z"
     }
   }
 }
