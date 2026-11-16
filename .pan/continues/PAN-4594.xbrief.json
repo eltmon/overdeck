@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4594",
   "created": "2026-11-16T16:04:35.511Z",
-  "updated": "2026-11-16T16:53:41.643Z",
+  "updated": "2026-11-16T17:19:28.217Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,6 +72,118 @@
       "claimedBy": "agent-pan-4594",
       "claimedAt": "2026-11-16T16:52:16.541Z",
       "doneAt": "2026-11-16T16:53:41.643Z"
+    },
+    "semgrep-settings-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "semgrep-settings-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "semgrep-settings-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "semgrep-settings-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "security-settings-section.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "security-settings-section.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "security-settings-section.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "security-settings-section.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "security-settings-section.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "project-sast-override-door.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "project-sast-override-door.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "project-sast-override-door.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "project-sast-override-door.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "project-sast-override-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "project-sast-override-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "project-sast-override-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "project-sast-override-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "project-sast-override-route.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "project-sast-override-ui.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "project-sast-override-ui.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "project-sast-override-ui.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "project-sast-override-ui.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "semgrep-dashboard-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "semgrep-dashboard-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "semgrep-dashboard-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "prereqs-install-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "prereqs-install-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
+    },
+    "prereqs-install-guard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T17:19:28.217Z"
     }
   }
 }
