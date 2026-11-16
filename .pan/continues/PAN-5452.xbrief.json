@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5452",
   "created": "2026-11-16T18:34:39.411Z",
-  "updated": "2026-11-16T18:48:27.096Z",
+  "updated": "2026-11-16T18:48:35.679Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,11 @@
     "config-flag.ac4": {
       "status": "completed",
       "doneAt": "2026-11-16T18:48:27.095Z"
+    },
+    "paths-and-errors": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T18:48:35.678Z"
     }
   }
 }
