@@ -75,6 +75,8 @@ export const HOOK_SCRIPT_NAMES: readonly string[] = [
   'rtk-bash-filter',
   'permission-event-hook',   // PermissionRequest — emits conversation.permission_changed(waiting)
   'tmux-send-keys-guard',    // PAN-1084: blocks work agents from driving other agents' tmux sessions
+  'semgrep-edit-hook',      // PAN-4591: injected per launch by `pan skills launch-settings`; never in OVERDECK_HOOK_REGISTRATIONS
+  'semgrep-edit-hook.js',
 ];
 
 export interface HookRegistration {
