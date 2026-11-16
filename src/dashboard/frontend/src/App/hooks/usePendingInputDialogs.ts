@@ -410,7 +410,7 @@ export function usePendingInputDialogs() {
       return { toolUseId };
     },
     onSuccess: (_data, variables) => {
-      toast.success(`Approval sent to ${variables.label?.trim() || variables.id}`);
+      showDeliveredToast(`Approval sent to ${variables.label?.trim() || variables.id}`, variables);
     },
     onError: (error: Error, _variables, context) => {
       if (context?.toolUseId) unmarkAskUserQuestionAnswered(context.toolUseId);
