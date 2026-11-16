@@ -56,6 +56,7 @@ import { useRootContext } from '../explorer/rootForConversation'
 import { findRegisteredProject } from '../CommandDeck/UnknownProjectState'
 import { NO_PROJECT_LABEL, resolveEffectiveProjectKey } from '../CommandDeck/projectsData'
 import { ProjectMark } from '../frame/ProjectMark'
+import { currentPlatform } from '../../lib/shortcuts/keys'
 import styles from './stage.module.css'
 
 export type { StageContext, PaneWrapperProps, StageApi } from './types'
@@ -795,6 +796,12 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
             renderTabPrefix={renderPaneMark}
           />
           <div className={styles.paneArea}>
+            {/* PAN-5343 H-D10: the Home-less All deck with nothing open. */}
+            {deckKey === ALL_PROJECTS_KEY && displayPanes.length === 0 && (
+              <div data-testid="all-projects-empty" className="flex flex-1 items-center justify-center p-8 text-center text-sm text-muted-foreground">
+                {`Pick conversations on the left. ${currentPlatform() === 'mac' ? 'Cmd' : 'Ctrl'}+Click opens one beside another.`}
+              </div>
+            )}
             {effectiveLayout && (
               <PaneLayoutView
                 node={effectiveLayout}

@@ -198,3 +198,25 @@ describe('Stage project marks (PAN-5343 H-D9)', () => {
   })
 })
 
+describe('Stage empty All deck (PAN-5343 H-D10)', () => {
+  it('shows the empty state and no Home tab when the All deck has no panes', () => {
+    renderStage(ALL)
+    expect(screen.getByTestId('all-projects-empty')).toHaveTextContent('Pick conversations on the left. Ctrl+Click opens one beside another.')
+    expect(screen.queryAllByRole('tab').filter((t) => t.getAttribute('data-tab-type') === 'home')).toHaveLength(0)
+  })
+
+  it('offers no "Changes in" action in the new-pane menu', () => {
+    renderStage(ALL)
+    fireEvent.click(screen.getByRole('button', { name: 'Open new tab' }))
+    const items = screen.getAllByRole('menuitem').map((item) => item.textContent ?? '')
+    expect(items.length).toBeGreaterThan(0)
+    expect(items.some((label) => label.startsWith('Changes in'))).toBe(false)
+  })
+
+  it('hides the empty state once a pane is open', () => {
+    localStorage.setItem(`pan-panes:${ALL}`, JSON.stringify([agent('a')]))
+    renderStage(ALL)
+    expect(screen.queryByTestId('all-projects-empty')).not.toBeInTheDocument()
+  })
+})
+
