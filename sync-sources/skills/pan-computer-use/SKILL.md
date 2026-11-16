@@ -154,7 +154,7 @@ For browser-hosted forms, verify the focused element after each field action. If
   | `unsupported_platform` | Not retryable. This host is not Linux; computer use only works on Linux desktops. |
   | `no_desktop_session` | Not retryable. No `DISPLAY`/`WAYLAND_DISPLAY` resolved; this host has no logged-in desktop. |
   | `helper_missing_dependency` | Install the package the message names, then retry once. |
-  | `helper_timeout` | The helper did not respond in time. Retry once; if it recurs, stop and report it. |
+  | `helper_timeout` | The helper did not respond in time. The input may already have been applied. For read-only commands, retry once; if it recurs, stop and report it. For `click`, `type-text`, `paste-text` or `press-key`, run `get-app-state` first and repeat the input only if the state shows it did not take effect. |
   | `helper_error` | The helper reported a specific failure (read its message). Adjust your command; do not retry unchanged. |
   | `desktop_busy` | Another holder has the desktop. Don't retry in a loop; report it and wait for the time in the message. |
   | `element_not_found` | The cached index is stale. Run `get-app-state` again and use a fresh index. |
