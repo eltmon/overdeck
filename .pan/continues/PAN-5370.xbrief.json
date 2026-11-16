@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5370",
   "created": "2026-11-15T20:57:54.789Z",
-  "updated": "2026-11-16T00:10:54.517Z",
+  "updated": "2026-11-16T00:10:59.250Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,6 +106,11 @@
     "home-actions-one-line.ac2": {
       "status": "completed",
       "doneAt": "2026-11-16T00:10:54.516Z"
+    },
+    "default-model-on-load": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5370",
+      "claimedAt": "2026-11-16T00:10:59.250Z"
     }
   }
 }
