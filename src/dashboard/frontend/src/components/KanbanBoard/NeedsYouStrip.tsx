@@ -132,12 +132,20 @@ function StripCardView({ card, onOpenIssue }: { card: SimpleNeedsYouCard; onOpen
   const isConversation = subject?.source === 'conversation';
   return (
     <NeedsYouRow
+      // card.item.key stays `issue:<ID>` even when the first subject on that
+      // issue changes (a question answered, a different agent asking next);
+      // keying on the subject's agent remounts the row so a typed-but-unsent
+      // draft never survives onto a different agent's question.
+      key={subject?.agentId ?? card.item.key}
       item={card.derivation}
       kind={card.card}
       question={subject ? card.item.ask : undefined}
       onOpen={onOpenIssue}
       isConversation={isConversation}
-      conversationName={isConversation ? subject!.agentId : undefined}
+      // The answer target is always the subject that asked, not whichever
+      // agent `deriveSimpleIssue` happened to pick as `pendingInputAgent` —
+      // two agents can be waiting on one issue at once (PAN-5413 review).
+      conversationName={subject?.agentId}
     />
   );
 }
