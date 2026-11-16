@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4594",
   "created": "2026-11-16T16:04:35.511Z",
-  "updated": "2026-11-16T16:52:16.541Z",
+  "updated": "2026-11-16T16:53:41.643Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,9 +68,10 @@
       "doneAt": "2026-11-16T16:52:10.006Z"
     },
     "semgrep-dashboard-docs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4594",
-      "claimedAt": "2026-11-16T16:52:16.541Z"
+      "claimedAt": "2026-11-16T16:52:16.541Z",
+      "doneAt": "2026-11-16T16:53:41.643Z"
     }
   }
 }
