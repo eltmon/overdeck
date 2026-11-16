@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5341",
   "created": "2026-11-16T05:09:54.013Z",
-  "updated": "2026-11-16T05:36:47.158Z",
+  "updated": "2026-11-16T05:36:51.077Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,11 @@
     "dock-diff-wiring.ac5": {
       "status": "completed",
       "doneAt": "2026-11-16T05:36:47.157Z"
+    },
+    "docs-and-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5341",
+      "claimedAt": "2026-11-16T05:36:51.077Z"
     }
   }
 }
