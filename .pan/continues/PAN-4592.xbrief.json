@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4592",
   "created": "2026-11-16T16:14:58.639Z",
-  "updated": "2026-11-16T16:28:30.602Z",
+  "updated": "2026-11-16T16:28:36.911Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -144,6 +144,11 @@
     "pan-semgrep-skill.ac3": {
       "status": "completed",
       "doneAt": "2026-11-16T16:28:30.602Z"
+    },
+    "docs-semgrep-ci": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4592",
+      "claimedAt": "2026-11-16T16:28:36.911Z"
     }
   }
 }
