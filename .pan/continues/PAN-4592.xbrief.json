@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4592",
   "created": "2026-11-16T16:14:58.639Z",
-  "updated": "2026-11-16T16:16:36.896Z",
+  "updated": "2026-11-16T16:17:47.831Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,9 +32,22 @@
       "doneAt": "2026-11-16T16:16:27.914Z"
     },
     "relay-semgrep-guidance": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4592",
-      "claimedAt": "2026-11-16T16:16:36.896Z"
+      "claimedAt": "2026-11-16T16:16:36.896Z",
+      "doneAt": "2026-11-16T16:17:47.830Z"
+    },
+    "relay-semgrep-guidance.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T16:17:47.830Z"
+    },
+    "relay-semgrep-guidance.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T16:17:47.830Z"
+    },
+    "relay-semgrep-guidance.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T16:17:47.830Z"
     }
   }
 }
