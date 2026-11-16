@@ -1022,7 +1022,12 @@ the uncommitted files its edits touched, the same list as the Changes tab's
 **This conversation** — and nothing other agents changed in the same
 checkout; **vs main** and **Compare…** show the wider comparisons. A file
 changed only through a shell command without a commit made by this
-conversation is not listed under All turns.
+conversation is not listed under All turns. Opening a file under All turns
+shows only this conversation's own changes to it, and its +/− counts are the
+sum of those changes. When another agent changed the same file between this
+conversation's commits, the file appears once per commit, headed by the
+commit's short SHA and subject, and once more under **Uncommitted** for edits
+not yet committed.
 
 1. Click **Compare…**.
 2. Pick a **base** and a **head**. Each box suggests branches, tags and recent
