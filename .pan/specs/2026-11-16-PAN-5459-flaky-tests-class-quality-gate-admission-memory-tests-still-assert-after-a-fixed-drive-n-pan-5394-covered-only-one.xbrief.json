@@ -4,17 +4,17 @@
     "created": "2026-11-16T22:51:11Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5459: Flaky tests (class): quality-gate-admission memory tests still assert after a fixed drive(N) (PAN-5394 covered only one)",
-    "updated": "2026-11-16T23:01:03.378Z"
+    "updated": "2026-11-16T23:02:07.129Z"
   },
   "plan": {
     "id": "pan-5459",
     "title": "Flaky tests (class): quality-gate-admission memory tests still assert after a fixed drive(N) (PAN-5394 covered only one)",
-    "status": "proposed",
+    "status": "running",
     "uid": "2c0e4165-8044-4a95-ad89-35c16daa76a8",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-16T22:51:11Z",
-    "updated": "2026-11-16T23:01:03.378Z",
+    "updated": "2026-11-16T23:02:07.129Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5459",
@@ -546,5 +546,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
