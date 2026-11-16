@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T04:18:28.912470Z · model: claude-opus-5-5 · open: 889_
+_Last sequenced: 2026-11-16T05:22:15.338718Z · model: claude-opus-5-5 · open: 886_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -203,7 +203,6 @@ _Last sequenced: 2026-11-16T04:18:28.912470Z · model: claude-opus-5-5 · open: 
 | 205 | PAN-3050 | XS | high | ok |  |  | Idle-stack reaper's regex only matches overdeck-feature-*-server|frontend, so MYN stacks run for hours after their agents are gone. |
 | 206 | PAN-4365 | S | medium | ok |  |  | Stale defaults: workhorses.expensive is Opus 4.8 and the flywheel role is a literal that ignores the slot; evals now unblocked |
 | 207 | PAN-2980 | XS | high | ok |  |  | The pre-push file-size guard reads the shared working tree, so another session's uncommitted edits block an unrelated, guard-clean push. |
-| 208 | PAN-5418 | S | medium | ok |  |  | D2 follow-up: All turns diff per file still spans session-start..HEAD, so it shows other agents' edits as this conversation's. |
 | 209 | PAN-3769 | S | high | needs-refinement |  |  | Red main 707089c5→e4b280b3 blocked deploys ~14h: missing no-loss lock entry + stale OpenRouter expectation. Verify still reproducing. |
 | 210 | PAN-3760 | S | high | ok |  |  | permissionMode 'auto' undocumented as non-bypass, launcher can emit invalid --permission-mode, invalid values drop silently. |
 | 211 | PAN-3629 | M | high | ok |  |  | No sanctioned door to re-scope a live agent; the operator must violate pan tell doctrine or let the rejected design land. |
@@ -226,7 +225,6 @@ _Last sequenced: 2026-11-16T04:18:28.912470Z · model: claude-opus-5-5 · open: 
 | 228 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 229 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
 | 230 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
-| 231 | PAN-5284 | XL | high | ok | ✓ |  | Epic: workflow redesign — one left column, Files/Changes/Search dock, code beside chat, rebuilt Home. Open children: C, G, D2, F+, H. |
 | 232 | PAN-5116 | S | high | ok |  |  | restart-all closes the pane but the launcher ignores SIGHUP, so the old ACP host and agent child keep running; stop runtime first. |
 | 233 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 234 | PAN-4909 | S | high | ok |  |  | Mac set up with connect: Safari on localhost:3011 gets HTTP 401 from the loopback session mint, so the Mac's own dashboard won't load. |
@@ -427,7 +425,6 @@ _Last sequenced: 2026-11-16T04:18:28.912470Z · model: claude-opus-5-5 · open: 
 | 432 | PAN-1624 | S | medium | ok |  |  | pan handoff --author external: authored doc is socket_write-ten but never submitted |
 | 433 | PAN-3901 | S | medium | ok |  |  | test-skip gate has no audited exemption for opt-in live suites (skipIf on env/binary); allowlist row with justification |
 | 434 | PAN-3852 | S | medium | ok |  |  | Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping |
-| 435 | PAN-5414 | S | medium | ok |  |  | Workflow redesign H polish: hidden hover buttons truncate left-column rows, Stop × overlaps Settle box, empty All-deck crumb. |
 | 436 | PAN-3862 | L | medium | needs-refinement |  |  | /agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model |
 | 437 | PAN-1572 | M | medium | needs-refinement |  |  | Settings permission-mode can desync from the resolved mode; body cites the removed DSP flag and a renamed symbol — rewrite first |
 | 438 | PAN-4627 | S | medium | ok |  |  | Homebrew Claude Code installs get a copy-only upgrade banner; make the brew plan runnable and auto-upgrade outdated runnable installs. |
@@ -1224,10 +1221,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T04:18:28.912470Z",
+  "generatedAt": "2026-11-16T05:22:15.338718Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 889,
+  "openCount": 886,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -3775,19 +3772,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-5418",
-      "rank": 208,
-      "size": "S",
-      "importance": "medium",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "D2 follow-up: All turns diff per file still spans session-start..HEAD, so it shows other agents' edits as this conversation's.",
-      "rationale": "New child of epic PAN-5284 from the epic owner's live check of the just-merged PAN-5408; it takes 5408's freed rank 208 because it finishes the same All-turns diff fix, with a named cause, approach and tests.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3769",
       "rank": 209,
       "size": "S",
@@ -4059,20 +4043,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "rationale": "Source-verified cause: effect-acp serializes every notification with an empty id, so session/cancel never reaches Kimi, the provider keeps generating and spending, and 318 late chunks render after turn_completed. Its prerequisite PAN-4563 (replay fixture and pinned host-replay test) merged in #4576, so the dependency is cleared; the rank stays at 224 because it already sat in the high tier with peers of equal score and nothing else about the issue changed.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-5284",
-      "rank": 231,
-      "size": "XL",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Epic: workflow redesign — one left column, Files/Changes/Search dock, code beside chat, rebuilt Home. Open children: C, G, D2, F+, H.",
-      "rationale": "New epic placed beside its children; scored on its open children (PAN-5290, 5294, 5295, 5335, 5343), which the Flywheel's order book drives.",
-      "gate": "auto",
-      "planning": "auto",
-      "isEpic": true
     },
     {
       "issue": "PAN-5116",
@@ -6537,19 +6507,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "dependsOn": [],
       "why": "Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping",
       "rationale": "New this run: medium/55 — Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5414",
-      "rank": 435,
-      "size": "S",
-      "importance": "medium",
-      "score": 56,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Workflow redesign H polish: hidden hover buttons truncate left-column rows, Stop × overlaps Settle box, empty All-deck crumb.",
-      "rationale": "New child of epic PAN-5284 filed from the live check of H (PAN-5343, now merged); it takes the rank slot H vacated. Well-specified CSS and crumb fixes with tests and acceptance criteria.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13390,27 +13347,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
-    },
-    {
-      "from": "PAN-5284",
-      "to": "PAN-5413",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5284",
-      "to": "PAN-5414",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5284",
-      "to": "PAN-5418",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
     },
     {
       "from": "PAN-750",
