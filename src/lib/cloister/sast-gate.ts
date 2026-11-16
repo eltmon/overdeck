@@ -325,8 +325,7 @@ export function formatSastOutput(input: SastGateInput): string {
   ];
   if (sastScanSkipped(input.repos)) {
     lines.push('SKIPPED: Semgrep did not complete a scan, so this gate checked nothing.');
-  }
-  if (input.findings.length === 0) {
+  } else if (input.findings.length === 0) {
     lines.push('No findings on lines this branch added.');
   } else {
     lines.push(`${input.findings.length} finding(s) on lines this branch added:`);

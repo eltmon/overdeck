@@ -268,6 +268,7 @@ describe('decideSastGate: advisory unless blocking', () => {
       expect(result).toMatchObject({ passed: true, required: false, skipped: true });
       expect(result.error).toContain('Semgrep did not run: Semgrep exited 2');
       expect(result.output).toContain('SKIPPED');
+      expect(result.output).not.toContain('No findings');
     }
   });
 
