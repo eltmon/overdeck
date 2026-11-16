@@ -5,9 +5,13 @@
  * Every applied or ignored event is written to `billing_events` in the same `DB.batch` as its row change, so a
  * failed apply leaves nothing behind and Creem's retry applies it again. An unresolved subscription event is
  * answered 503 (Creem retries) and kept in `billing_unresolved` for the admin screen, without a `billing_events` row.
+ * A subscription that resolves to a deleted, missing or revoked account is stored revoked and cancelled in Creem
+ * (FR-11): its payment may land after the deletion's billing holder or the revoke already ran.
  */
 import type { RequestContext } from '../env.ts';
 import { PRODUCTS, type BillingConfig, type ProductKey } from './catalog.ts';
+import { isOwner } from '../grants.ts';
+import { runPendingCancels } from './cancel.ts';
 import { idOf } from './creem.ts';
 
 export interface CreemEnvelope {
@@ -73,10 +77,43 @@ async function ignore(rc: RequestContext, env: CreemEnvelope, reason: string): P
   return { status: 200, body: { ok: true, ignored: reason } };
 }
 
-/** The user exists and is not deleted. */
-async function liveUser(rc: RequestContext, userId: string): Promise<boolean> {
-  const row = await rc.env.DB.prepare('SELECT deleted_at FROM users WHERE user_id = ?').bind(userId).first<{ deleted_at: number | null }>();
-  return row !== null && row.deleted_at === null;
+/**
+ * Whether a resolved user may hold this subscription. `gone`: the user row is missing or being deleted. `revoked`:
+ * not the owner, no grant row and no subscription row that is not revoked, which is what an operator revoke leaves.
+ * A payment can land after either (a delayed webhook, or a checkout paid later), so the caller keeps the row revoked
+ * and cancels it in Creem instead of ignoring it or re-admitting the account (FR-11).
+ */
+async function refusal(rc: RequestContext, userId: string): Promise<'gone' | 'revoked' | null> {
+  const row = await rc.env.DB.prepare(
+    `SELECT u.deleted_at, u.github_id,
+            (SELECT COUNT(*) FROM grants g WHERE g.github_id = u.github_id) AS grant_rows,
+            (SELECT COUNT(*) FROM subscriptions s WHERE s.user_id = u.user_id AND s.revoked_at IS NULL) AS live_rows
+     FROM users u WHERE u.user_id = ?`,
+  )
+    .bind(userId)
+    .first<{ deleted_at: number | null; github_id: number; grant_rows: number; live_rows: number }>();
+  if (row === null || row.deleted_at !== null) return 'gone';
+  if (!isOwner(rc, row.github_id) && row.grant_rows === 0 && row.live_rows === 0) return 'revoked';
+  return null;
+}
+
+/**
+ * Mark a subscription that must not give access: revoked, and a cancel requested unless Creem already ended it.
+ * runPendingCancels sends the cancel (now in waitUntil, and again from the hourly cron until it succeeds).
+ */
+function refuseSubscription(rc: RequestContext, subscriptionId: string): D1PreparedStatement {
+  const now = rc.deps.now();
+  return rc.env.DB.prepare(
+    `UPDATE subscriptions SET revoked_at = COALESCE(revoked_at, ?),
+       cancel_requested_at = CASE WHEN cancel_done_at IS NULL AND status NOT IN ('canceled', 'expired')
+         THEN COALESCE(cancel_requested_at, ?) ELSE cancel_requested_at END
+     WHERE subscription_id = ?`,
+  ).bind(now, now, subscriptionId);
+}
+
+/** Send the queued cancels for this user after the response; the cron retries whatever fails. */
+function cancelInBackground(rc: RequestContext, cfg: BillingConfig, userId: string): void {
+  rc.ctx.waitUntil(runPendingCancels(rc, cfg, userId).catch(() => 0));
 }
 
 interface SubscriptionWrite {
@@ -96,7 +133,7 @@ interface SubscriptionWrite {
  */
 function upsertSubscription(rc: RequestContext, env: CreemEnvelope, w: SubscriptionWrite): D1PreparedStatement {
   const now = rc.deps.now();
-  const status = str(w.subscription.status) ?? w.eventType.replace(/^subscription\./, '');
+  const status = str(w.subscription.status) ?? (w.eventType.startsWith('subscription.') ? w.eventType.slice('subscription.'.length) : 'unknown');
   const customerId = idOf(w.subscription.customer) ?? '';
   const paidThrough = w.advancesPaidThrough ? periodEnd(w.subscription) : null;
   return rc.env.DB.prepare(
@@ -164,7 +201,7 @@ async function applySubscriptionEvent(rc: RequestContext, cfg: BillingConfig, en
       .run();
     return { status: 503, body: { error: 'unknown_subscription' } };
   }
-  if (!(await liveUser(rc, userId))) return ignore(rc, env, 'unknown_user');
+  const refused = await refusal(rc, userId);
 
   const now = rc.deps.now();
   await rc.env.DB.batch([
@@ -176,10 +213,13 @@ async function applySubscriptionEvent(rc: RequestContext, cfg: BillingConfig, en
       advancesPaidThrough: env.eventType === 'subscription.paid',
       eventType: env.eventType,
     }),
+    ...(refused === null ? [] : [refuseSubscription(rc, subscriptionId)]),
     clearUnresolved(rc, env),
     recordEvent(rc, env, now),
   ]);
-  return { status: 200, body: { ok: true } };
+  if (refused === null) return { status: 200, body: { ok: true } };
+  cancelInBackground(rc, cfg, userId);
+  return { status: 200, body: { ok: true, cancelled: refused } };
 }
 
 async function findCheckout(rc: RequestContext, checkoutId: string | null): Promise<{ checkout_id: string; user_id: string } | null> {
@@ -194,7 +234,7 @@ async function applyCheckoutCompleted(rc: RequestContext, cfg: BillingConfig, en
   const row = (await findCheckout(rc, str(checkout.request_id))) ?? (await findCheckout(rc, str(meta.overdeck_checkout_id)));
   const userId = row?.user_id ?? str(meta.overdeck_user_id);
   if (userId === null) return ignore(rc, env, 'not_ours');
-  if (!(await liveUser(rc, userId))) return ignore(rc, env, 'unknown_user');
+  const refused = await refusal(rc, userId);
 
   const now = rc.deps.now();
   const subscriptionId = idOf(checkout.subscription);
@@ -206,20 +246,29 @@ async function applyCheckoutCompleted(rc: RequestContext, cfg: BillingConfig, en
       ).bind(now, str(checkout.id), subscriptionId, row.checkout_id),
     );
   }
-  if (isObject(checkout.subscription) && subscriptionId !== null) {
-    const productId = idOf(checkout.subscription.product) ?? idOf(checkout.product);
+  // A refused user's subscription is stored even when the checkout names it only by id, so it can be cancelled.
+  const embedded = isObject(checkout.subscription) ? checkout.subscription : refused !== null && subscriptionId !== null ? { id: subscriptionId } : null;
+  let queued = false;
+  if (embedded !== null && subscriptionId !== null) {
+    const productId = idOf(embedded.product) ?? idOf(checkout.product);
     const productKey = productId === null ? undefined : cfg.productKeyById.get(productId);
     if (productKey !== undefined) {
       // The checkout carries the customer when its embedded subscription does not.
-      const subscription = checkout.subscription.customer === undefined ? { ...checkout.subscription, customer: checkout.customer } : checkout.subscription;
+      const subscription = embedded.customer === undefined ? { ...embedded, customer: checkout.customer } : embedded;
       writes.push(
         upsertSubscription(rc, env, { subscriptionId, userId, productKey, subscription, advancesPaidThrough: true, eventType: env.eventType }),
       );
+      if (refused !== null) {
+        writes.push(refuseSubscription(rc, subscriptionId));
+        queued = true;
+      }
     }
   }
   writes.push(clearUnresolved(rc, env), recordEvent(rc, env, now));
   await rc.env.DB.batch(writes);
-  return { status: 200, body: { ok: true } };
+  if (refused === null) return { status: 200, body: { ok: true } };
+  if (queued) cancelInBackground(rc, cfg, userId);
+  return { status: 200, body: queued ? { ok: true, cancelled: refused } : { ok: true, ignored: 'unknown_user' } };
 }
 
 /** Apply a verified, not-yet-seen event. Event types this service does not use are recorded and ignored. */

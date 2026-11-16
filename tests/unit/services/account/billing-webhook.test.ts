@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { mintDevice } from '../../../../services/account/src/devices.ts';
-import { addGrant } from '../../../../services/account/src/grants.ts';
-import { billingEnv, creemSignature, postWebhook, TEST_PRODUCT_IDS } from './helpers/billing.ts';
-import { call, makeDeps, makeEnv, makeRc } from './helpers/harness.ts';
+import { requestDeletion, runDeletionJob } from '../../../../services/account/src/deletion.ts';
+import { addGrant, isAllowed, revokeGrant } from '../../../../services/account/src/grants.ts';
+import { runMaintenance } from '../../../../services/account/src/maintenance.ts';
+import { billingEnv, creemSignature, fakeCreem, postWebhook, TEST_PRODUCT_IDS } from './helpers/billing.ts';
+import { call, fakeCtx, makeDeps, makeEnv, makeRc } from './helpers/harness.ts';
 
 const ENV_A = '11111111-2222-4333-8444-555555555555';
 const T0 = Date.UTC(2026, 10, 16, 12);
@@ -228,21 +230,111 @@ describe('POST /webhooks/creem (PAN-4294 creem-webhook)', () => {
     expect(await rows(env, 'billing_events')).toHaveLength(1);
   });
 
-  it('metadata naming a deleted or unknown user is recorded with no row', async () => {
-    const { env, deps } = await setup();
-    await env.DB.prepare('UPDATE users SET deleted_at = ? WHERE user_id = ?').bind(T0, 'u1').run();
-    const deleted = await postWebhook(env, deps, event('evt_1', 'subscription.paid', subscription({ metadata: { overdeck_user_id: 'u1' } })));
-    expect(deleted.status).toBe(200);
-    expect(await deleted.json()).toEqual({ ok: true, ignored: 'unknown_user' });
-    const unknown = await postWebhook(env, deps, event('evt_2', 'subscription.paid', subscription({ id: 'sub_2', metadata: { overdeck_user_id: 'ghost' } })));
-    expect(unknown.status).toBe(200);
-    expect(await rows(env, 'subscriptions')).toEqual([]);
-  });
-
   it('billing unconfigured answers 503 billing_not_configured', async () => {
     const { env, deps } = await setup({});
     const res = await postWebhook(env, deps, event('evt_1', 'subscription.paid', subscription({ metadata: { overdeck_user_id: 'u1' } })));
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ error: 'billing_not_configured' });
+  });
+});
+
+describe('late payments for a deleted or revoked account (PAN-4294 FR-11)', () => {
+  async function lateSetup() {
+    const creem = fakeCreem({
+      'POST /v1/subscriptions/sub_late/cancel': () => ({ status: 200, body: { id: 'sub_late', status: 'canceled' } }),
+    });
+    const env = makeEnv(billingEnv());
+    const deps = makeDeps({ now: T0, fetch: creem.fetch });
+    const rc = makeRc({ env, deps });
+    await env.DB.prepare('INSERT INTO users (user_id, github_id, github_login, created_at) VALUES (?, ?, ?, ?)').bind('u1', 100, 'alice', T0).run();
+    await addGrant(rc, 100, 'alice', {}, 'admin-add');
+    await env.DB.prepare('INSERT INTO checkouts (checkout_id, user_id, product_key, founding, created_at, expires_at) VALUES (?, ?, ?, 0, ?, ?)')
+      .bind('co_1', 'u1', 'anywhere_annual', T0, T0 + 3_600_000)
+      .run();
+    return { env, deps, rc, creem };
+  }
+
+  const latePaid = (id = 'evt_late') =>
+    event(id, 'subscription.paid', subscription({ id: 'sub_late', metadata: { overdeck_user_id: 'u1', overdeck_checkout_id: 'co_1' } }));
+  const cancels = (creem: ReturnType<typeof fakeCreem>) => creem.requests.filter((r) => r.path === '/v1/subscriptions/sub_late/cancel');
+
+  it('a payment that lands after the deletion completed is cancelled in Creem, and the row is purged afterwards', async () => {
+    const { env, deps, rc, creem } = await lateSetup();
+    await requestDeletion(rc, 'u1');
+    expect(await runDeletionJob(rc, 'u1')).toMatchObject({ holders_pending: '[]' });
+    expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM users').first('n')).toBe(0);
+
+    const ctx = fakeCtx();
+    const res = await postWebhook(env, deps, latePaid(), { ctx });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, cancelled: 'gone' });
+    expect(await rows(env, 'subscriptions')).toEqual([expect.objectContaining({ subscription_id: 'sub_late', user_id: 'u1', revoked_at: T0, cancel_requested_at: T0 })]);
+    await ctx.drain();
+    expect(cancels(creem)).toEqual([expect.objectContaining({ body: { mode: 'immediate' } })]);
+    expect(await rows(env, 'subscriptions')).toEqual([expect.objectContaining({ cancel_done_at: T0 })]);
+
+    expect((await runMaintenance(env, deps)).purged.subscriptions).toBe(1);
+    expect(await rows(env, 'subscriptions')).toEqual([]);
+  });
+
+  it('a failed cancel stays queued and the hourly cron retries it', async () => {
+    let status = 500;
+    const creem = fakeCreem({ 'POST /v1/subscriptions/sub_late/cancel': () => ({ status, body: {} }) });
+    const { env, rc } = await lateSetup();
+    const deps = makeDeps({ now: T0, fetch: creem.fetch });
+    await requestDeletion(makeRc({ env, deps }), 'u1');
+    await runDeletionJob(rc, 'u1');
+    const ctx = fakeCtx();
+    await postWebhook(env, deps, latePaid(), { ctx });
+    await ctx.drain();
+    expect(await rows(env, 'subscriptions')).toEqual([expect.objectContaining({ cancel_done_at: null, cancel_attempts: 1 })]);
+    status = 404;
+    deps.clock.advance(3_600_000);
+    await runMaintenance(env, deps);
+    expect(cancels(creem)).toHaveLength(2);
+    expect(await rows(env, 'subscriptions')).toEqual([]);
+  });
+
+  it('a checkout.completed naming the subscription only by id is cancelled too after deletion', async () => {
+    const { env, deps, rc, creem } = await lateSetup();
+    await requestDeletion(rc, 'u1');
+    await runDeletionJob(rc, 'u1');
+    const ctx = fakeCtx();
+    const res = await postWebhook(
+      env,
+      deps,
+      event('evt_co', 'checkout.completed', { id: 'ch_1', request_id: 'co_1', subscription: 'sub_late', product: TEST_PRODUCT_IDS.anywhere_annual, metadata: { overdeck_user_id: 'u1' } }),
+      { ctx },
+    );
+    expect(await res.json()).toEqual({ ok: true, cancelled: 'gone' });
+    await ctx.drain();
+    expect(cancels(creem)).toHaveLength(1);
+  });
+
+  it('a payment that lands after an operator revoke stays revoked, is cancelled and does not re-admit the account', async () => {
+    const { env, deps, rc, creem } = await lateSetup();
+    await revokeGrant(rc, 100);
+    expect(await isAllowed(rc, 100)).toBe(false);
+
+    const ctx = fakeCtx();
+    const res = await postWebhook(env, deps, latePaid(), { ctx });
+    expect(await res.json()).toEqual({ ok: true, cancelled: 'revoked' });
+    expect(await isAllowed(rc, 100)).toBe(false);
+    expect(await rows(env, 'subscriptions')).toEqual([expect.objectContaining({ revoked_at: T0, cancel_requested_at: T0 })]);
+    await ctx.drain();
+    expect(cancels(creem)).toHaveLength(1);
+
+    // A later event for the same subscription keeps it revoked and asks for no second cancel.
+    await postWebhook(env, deps, event('evt_later', 'subscription.canceled', subscription({ id: 'sub_late', status: 'canceled' }), T0 + 1_000), { ctx: fakeCtx() });
+    expect(await isAllowed(rc, 100)).toBe(false);
+    expect(cancels(creem)).toHaveLength(1);
+  });
+
+  it('an allowlisted account paying normally is not refused', async () => {
+    const { env, deps, creem } = await lateSetup();
+    const res = await postWebhook(env, deps, latePaid());
+    expect(await res.json()).toEqual({ ok: true });
+    expect(await rows(env, 'subscriptions')).toEqual([expect.objectContaining({ revoked_at: null, cancel_requested_at: null })]);
+    expect(creem.requests).toEqual([]);
   });
 });

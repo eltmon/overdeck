@@ -36,7 +36,8 @@ export interface MaintenanceReport {
     | 'deletion_jobs'
     | 'billing_events'
     | 'billing_unresolved'
-    | 'checkouts',
+    | 'checkouts'
+    | 'subscriptions',
     number
   >;
 }
@@ -66,6 +67,8 @@ export async function runMaintenance(env: Env, deps: Deps): Promise<MaintenanceR
     billing_events: await purge('DELETE FROM billing_events WHERE received_at < ?', now - RETENTION.billingEventsMs),
     billing_unresolved: await purge('DELETE FROM billing_unresolved WHERE last_seen_at < ?', now - RETENTION.billingUnresolvedMs),
     checkouts: await purge('DELETE FROM checkouts WHERE completed_at IS NULL AND expires_at < ?', now - RETENTION.checkoutsAfterExpiryMs),
+    // A late payment for a deleted account leaves a row whose user is gone (PAN-4294 FR-11); drop it once nothing is left to cancel.
+    subscriptions: await purge('DELETE FROM subscriptions WHERE user_id NOT IN (SELECT user_id FROM users) AND (cancel_done_at IS NOT NULL OR cancel_requested_at IS NULL)'),
   };
   return { deletionJobsRun: open.results.length, purged };
 }

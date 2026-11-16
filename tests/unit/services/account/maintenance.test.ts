@@ -73,7 +73,7 @@ describe('hourly maintenance (PAN-4293 account-maintenance)', () => {
     const report = await runMaintenance(env, deps);
     expect(report.purged).toEqual({
       auth_requests: 1, auth_codes: 1, admin_sessions: 1, user_sessions: 1, device_grants: 1, pending_attempts: 1, devices: 1, rate_limits: 1, deletion_jobs: 1,
-      billing_events: 0, billing_unresolved: 0, checkouts: 0,
+      billing_events: 0, billing_unresolved: 0, checkouts: 0, subscriptions: 0,
     });
     // The open job was retried and, with no holders pending, completed; the user row it referenced ('open') never existed.
     expect(report.deletionJobsRun).toBe(1);
@@ -93,7 +93,7 @@ describe('hourly maintenance (PAN-4293 account-maintenance)', () => {
     deps.clock.advance(1);
     expect((await runMaintenance(env, deps)).purged).toEqual({
       auth_requests: 1, auth_codes: 0, admin_sessions: 0, user_sessions: 0, device_grants: 1, pending_attempts: 1, devices: 1, rate_limits: 1, deletion_jobs: 1,
-      billing_events: 0, billing_unresolved: 0, checkouts: 0,
+      billing_events: 0, billing_unresolved: 0, checkouts: 0, subscriptions: 0,
     });
   });
 

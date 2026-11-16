@@ -3,7 +3,7 @@
  */
 import { createHmac } from 'node:crypto';
 import type { Deps, Env } from '../../../../../services/account/src/env.ts';
-import { call } from './harness.ts';
+import { call, type FakeCtx } from './harness.ts';
 
 export interface SubscriptionSeed {
   subscriptionId: string;
@@ -102,7 +102,7 @@ export function creemSignature(body: string, secret: string = TEST_WEBHOOK_SECRE
 }
 
 /** POST a signed Creem webhook through the route table. `signature` overrides the computed header. */
-export function postWebhook(env: Env, deps: Deps, payload: unknown, opts: { signature?: string | null } = {}): Promise<Response> {
+export function postWebhook(env: Env, deps: Deps, payload: unknown, opts: { signature?: string | null; ctx?: FakeCtx } = {}): Promise<Response> {
   const body = typeof payload === 'string' ? payload : JSON.stringify(payload);
   const signature = opts.signature === undefined ? creemSignature(body) : opts.signature;
   return call('POST', '/webhooks/creem', {
@@ -110,5 +110,6 @@ export function postWebhook(env: Env, deps: Deps, payload: unknown, opts: { sign
     deps,
     headers: { 'content-type': 'application/json', ...(signature === null ? {} : { 'creem-signature': signature }) },
     body,
+    ...(opts.ctx ? { ctx: opts.ctx } : {}),
   });
 }
