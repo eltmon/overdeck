@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5452",
   "created": "2026-11-16T18:34:39.411Z",
-  "updated": "2026-11-16T20:11:45.152Z",
+  "updated": "2026-11-16T20:11:56.465Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -380,6 +380,11 @@
     "skill.ac4": {
       "status": "completed",
       "doneAt": "2026-11-16T20:11:45.151Z"
+    },
+    "docs-pages": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T20:11:56.464Z"
     }
   }
 }
