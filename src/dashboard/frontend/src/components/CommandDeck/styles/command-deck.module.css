@@ -3329,6 +3329,9 @@
 /* Empty state shown when no messages have been sent yet */
 .conversationEmptyState {
   flex: 1;
+  /* PAN-5343 NFR-3: shrink (and scroll) in a short split pane so the composer stays on screen. */
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -3353,6 +3356,9 @@
 
 .conversationConnecting {
   flex: 1;
+  /* PAN-5343 NFR-3: shrink in a short split pane so the composer stays on screen. */
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;

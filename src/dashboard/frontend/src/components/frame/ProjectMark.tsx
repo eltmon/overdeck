@@ -25,18 +25,20 @@ export function projectInitials(name: string): string {
   return (words[0] ?? name).slice(0, 2).toUpperCase();
 }
 
-export function ProjectMark({ name, projectKey, size = 'md', muted = false }: {
+export function ProjectMark({ name, projectKey, size = 'md', muted = false, glyph }: {
   name: string;
   projectKey?: string;
   size?: 'md' | 'sm';
   muted?: boolean;
+  /** PAN-5343 H-D2: a glyph on the muted background instead of initials or '–' (e.g. ✱ for All projects). */
+  glyph?: string;
 }) {
   const sizeClasses = size === 'md' ? 'h-7 w-7 rounded-md text-[11px]' : 'h-[18px] w-[18px] rounded-[5px] text-[9.5px]';
 
-  if (muted) {
+  if (muted || glyph) {
     return (
       <span aria-hidden="true" className={`flex shrink-0 items-center justify-center bg-muted text-muted-foreground ${sizeClasses}`}>
-        –
+        {glyph ?? '–'}
       </span>
     );
   }

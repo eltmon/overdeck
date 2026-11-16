@@ -854,13 +854,13 @@ describe('Multi-select and bulk bar (PAN-4639 WI-10)', () => {
     };
   }
 
-  function renderThree() {
+  function renderThree(onOpenBeside?: (name: string) => void) {
     const client = makeClient();
     client.setQueryData(['conversations'], [selectConv(1, 'a'), selectConv(2, 'b'), selectConv(3, 'c')]);
     render(
       <DialogProvider>
         <QueryClientProvider client={client}>
-          <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+          <ConversationList selectedConversation={null} onSelectConversation={() => {}} onOpenBeside={onOpenBeside} />
         </QueryClientProvider>
       </DialogProvider>,
     );
@@ -880,6 +880,35 @@ describe('Multi-select and bulk bar (PAN-4639 WI-10)', () => {
     expect(screen.getByTitle('a')).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByTitle('b')).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByTitle('c')).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('PAN-5343 H-D5: with onOpenBeside, Ctrl-click and Meta-click open beside and select nothing', () => {
+    const onOpenBeside = vi.fn();
+    renderThree(onOpenBeside);
+    fireEvent.click(screen.getByTitle('a'), { ctrlKey: true });
+    fireEvent.click(screen.getByTitle('b'), { metaKey: true });
+    expect(onOpenBeside).toHaveBeenNthCalledWith(1, 'a');
+    expect(onOpenBeside).toHaveBeenNthCalledWith(2, 'b');
+    expect(screen.queryByText(/selected$/)).not.toBeInTheDocument();
+    expect(screen.getByTitle('a')).not.toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTitle('b')).not.toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('PAN-5343 H-D5: with onOpenBeside, Shift-click still multi-selects', () => {
+    const onOpenBeside = vi.fn();
+    renderThree(onOpenBeside);
+    fireEvent.click(screen.getByTitle('a'), { shiftKey: true });
+    fireEvent.click(screen.getByTitle('b'), { shiftKey: true });
+    expect(onOpenBeside).not.toHaveBeenCalled();
+    expect(screen.getByText('2 selected')).toBeInTheDocument();
+    expect(screen.getByRole('toolbar', { name: 'Selected conversations' })).toBeInTheDocument();
+  });
+
+  it('PAN-5343 H-D5: without onOpenBeside, Ctrl-click still toggles the selection', () => {
+    renderThree();
+    fireEvent.click(screen.getByTitle('a'), { ctrlKey: true });
+    expect(screen.getByText('1 selected')).toBeInTheDocument();
+    expect(screen.getByTitle('a')).toHaveAttribute('aria-selected', 'true');
   });
 
   it('bulk-select.ac2: clicking the bulk bar Settle sends one request with three updates and closes the bar', async () => {
@@ -930,5 +959,89 @@ describe('Multi-select and bulk bar (PAN-4639 WI-10)', () => {
 
     fireEvent.keyDown(screen.getByTitle('a'), { key: 'Escape' });
     expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+  });
+});
+
+describe('ConversationList grouped by project (PAN-5343 H-D3)', () => {
+  function projectConv(id: number, name: string, cwd: string, extra: Record<string, unknown> = {}) {
+    return {
+      ...mockConversation,
+      id,
+      name,
+      cwd,
+      tmuxSession: `conv-${name}`,
+      title: name,
+      lastAttachedAt: `2026-10-05T00:0${id}:00.000Z`,
+      endedAt: '2026-10-05T09:00:00.000Z',
+      ...extra,
+    };
+  }
+
+  const groupOf = (conv: { cwd: string }) => {
+    if (conv.cwd.startsWith('/p/alpha')) return { key: 'alpha', label: 'alpha' };
+    if (conv.cwd.startsWith('/p/beta')) return { key: 'beta', label: 'beta' };
+    return { key: '__no-project__', label: 'No project' };
+  };
+
+  function renderGrouped() {
+    const client = makeClient();
+    client.setQueryData(['conversations'], [
+      projectConv(1, 'beta-1', '/p/beta'),
+      projectConv(2, 'none-1', '/tmp/x'),
+      projectConv(3, 'alpha-1', '/p/alpha', { isWorking: true }),
+      projectConv(4, 'beta-2', '/p/beta'),
+      projectConv(5, 'alpha-2', '/p/alpha'),
+      projectConv(6, 'needs', '/p/beta', { pendingInputCount: 1 }),
+    ]);
+    render(
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationList selectedConversation={null} onSelectConversation={() => {}} groupByProject={groupOf} />
+        </QueryClientProvider>
+      </DialogProvider>,
+    );
+  }
+
+  it('renders project headers alpha, beta, No project in that order with working counts', () => {
+    renderGrouped();
+    const headers = screen.getAllByRole('heading').filter((h) => h.hasAttribute('data-project-group'));
+    expect(headers.map((h) => h.getAttribute('data-project-group'))).toEqual(['alpha', 'beta', '__no-project__']);
+    expect(headers[0]).toHaveTextContent('alpha');
+    expect(headers[0]).toHaveTextContent('1 working');
+    expect(headers[1]).toHaveTextContent('idle');
+    expect(headers[2]).toHaveTextContent('No project');
+  });
+
+  it('renders a needs-you row once, above the first project header, with its project mark', () => {
+    renderGrouped();
+    const rows = screen.getAllByTitle('needs');
+    expect(rows).toHaveLength(1);
+    const firstHeader = screen.getByTestId('conversation-project-group-alpha');
+    expect(firstHeader.compareDocumentPosition(rows[0]!) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+    expect(rows[0]).toHaveTextContent('BE');
+    // Rows under a project header carry no mark of their own.
+    expect(screen.getByTitle('alpha-1')).not.toHaveTextContent('AL');
+  });
+
+  it('Shift-click ranges over the rows in grouped order', () => {
+    renderGrouped();
+    const rowNames = ['alpha-1', 'alpha-2', 'beta-1', 'beta-2', 'none-1'];
+    const inDomOrder = rowNames
+      .map((name) => screen.getByTitle(name))
+      .sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1))
+      .map((el) => el.getAttribute('title'));
+    const firstAlpha = inDomOrder.find((name) => name!.startsWith('alpha'))!;
+    const firstBeta = inDomOrder.find((name) => name!.startsWith('beta'))!;
+    const expected = inDomOrder.slice(inDomOrder.indexOf(firstAlpha), inDomOrder.indexOf(firstBeta) + 1);
+    expect(expected).toHaveLength(3);
+
+    fireEvent.click(screen.getByTitle(firstAlpha), { shiftKey: true });
+    fireEvent.click(screen.getByTitle(firstBeta), { shiftKey: true });
+
+    expect(screen.getByText(`${expected.length} selected`)).toBeInTheDocument();
+    for (const name of rowNames) {
+      if (expected.includes(name)) expect(screen.getByTitle(name)).toHaveAttribute('aria-selected', 'true');
+      else expect(screen.getByTitle(name)).not.toHaveAttribute('aria-selected', 'true');
+    }
   });
 });

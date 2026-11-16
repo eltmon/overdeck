@@ -113,4 +113,15 @@ describe('ActivityPanel Feed tab (PAN-5293 F-D21)', () => {
     expect(unscoped.projectIssueIds).toBeUndefined();
     expect(unscoped.projectConversationIds).toBeUndefined();
   });
+
+  it('is unscoped in the All projects deck (PAN-5343 H-D17)', () => {
+    renderPanel({ experimental: true, selectedProjectKey: '__all-projects__' });
+    const props = feedProps.mock.lastCall?.[0];
+    expect(props.projectScopeAvailable).toBe(false);
+    expect(props.projectIssueIds).toBeUndefined();
+    expect(props.projectConversationIds).toBeUndefined();
+    const scopes = screen.getByRole('tablist', { name: 'Awareness scope' });
+    expect(within(scopes).queryByRole('tab', { name: /Project/ })).not.toBeInTheDocument();
+    expect(within(scopes).getByRole('tab', { name: /Global/ })).toBeInTheDocument();
+  });
 });

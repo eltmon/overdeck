@@ -9,6 +9,10 @@ describe('projectCrumbLabel (PAN-5000)', () => {
     expect(projectCrumbLabel('__no-project__')).toBe('No project');
   });
 
+  it('renders the All projects deck as "All projects" (PAN-5343)', () => {
+    expect(projectCrumbLabel('__all-projects__')).toBe('All projects');
+  });
+
   it('renders a registered project key as-is', () => {
     expect(projectCrumbLabel('overdeck')).toBe('overdeck');
   });

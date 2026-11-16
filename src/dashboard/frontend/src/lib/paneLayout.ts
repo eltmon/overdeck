@@ -116,3 +116,51 @@ export function isValidLayout(value: unknown): value is PaneLayout {
   }
   return false
 }
+
+// ─── Equal layout presets (PAN-5343 H-D7) ─────────────────────────────────────
+
+/** The four equal layouts: One, Two side by side, Three columns, Grid of four. */
+export type LayoutPreset = 1 | 2 | 3 | 4
+
+function rowSplit(a: PaneLayout, b: PaneLayout, ratio = 0.5): PaneLayout {
+  return { kind: 'split', dir: 'row', a, b, ratio }
+}
+
+/**
+ * Build the equal layout for `preset` from the first `preset` ids, in reading
+ * order: 1 → one leaf; 2 → two halves side by side; 3 → three equal columns;
+ * 4 → a 2×2 grid. Throws when fewer ids than `preset` are given.
+ */
+export function presetLayout(paneIds: readonly string[], preset: LayoutPreset): PaneLayout {
+  if (paneIds.length < preset) throw new Error(`presetLayout needs ${preset} panes`)
+  const [a, b, c, d] = paneIds
+  switch (preset) {
+    case 1:
+      return leaf(a)
+    case 2:
+      return rowSplit(leaf(a), leaf(b))
+    case 3:
+      return rowSplit(leaf(a), rowSplit(leaf(b), leaf(c)), 1 / 3)
+    case 4:
+      return { kind: 'split', dir: 'col', a: rowSplit(leaf(a), leaf(b)), b: rowSplit(leaf(c), leaf(d)), ratio: 0.5 }
+  }
+}
+
+/** Same kind/dir nesting, ratios and pane ids ignored. */
+function sameShape(x: PaneLayout, y: PaneLayout): boolean {
+  if (x.kind === 'leaf' || y.kind === 'leaf') return x.kind === y.kind
+  return x.dir === y.dir && sameShape(x.a, y.a) && sameShape(x.b, y.b)
+}
+
+/**
+ * Which preset a layout is, ignoring ratios: a null layout or a single leaf is
+ * 1; otherwise the preset with the same leaf count and nesting, else null.
+ */
+export function presetOf(layout: PaneLayout | null): LayoutPreset | null {
+  if (!layout || layout.kind === 'leaf') return 1
+  const n = leafCount(layout)
+  if (n < 2 || n > 4) return null
+  const preset = n as LayoutPreset
+  const ids = Array.from({ length: n }, (_, i) => `p${i}`)
+  return sameShape(layout, presetLayout(ids, preset)) ? preset : null
+}

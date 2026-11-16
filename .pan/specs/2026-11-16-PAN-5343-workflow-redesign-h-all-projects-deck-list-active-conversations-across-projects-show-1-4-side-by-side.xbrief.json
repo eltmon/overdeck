@@ -1,0 +1,1765 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T23:55:23Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5343: Workflow redesign H: All projects deck — list active conversations across projects, show 1–4 side by side",
+    "updated": "2026-11-16T00:08:42.878Z"
+  },
+  "plan": {
+    "id": "pan-5343",
+    "title": "Workflow redesign H: All projects deck — list active conversations across projects, show 1–4 side by side",
+    "status": "running",
+    "uid": "c4269c34-2826-4c65-bb2d-4b2f6f8b9ef8",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-15T23:55:23Z",
+    "updated": "2026-11-16T00:08:42.878Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5343",
+        "label": "PAN-5343",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5343/.pan/drafts/pan-5343.md",
+        "label": "PRD draft (.pan/drafts/pan-5343.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "docs/design/multi-conversation-mockup.html",
+        "label": "Operator-approved mockup (2026-11-15)",
+        "type": "design"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5284",
+        "label": "Epic PAN-5284",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "dashboard",
+      "command-deck",
+      "stage",
+      "left-column",
+      "workflow-redesign"
+    ],
+    "metadata": {
+      "sizeJustification": "One operator-approved mockup (docs/design/multi-conversation-mockup.html) for one child (H) of epic PAN-5284, which the operator already decomposed into children A-H. Every item depends on the same three foundations (the All deck key, Home-less decks in panesStore, the deck layout store), and the list files (ConversationList/ConversationRow/ConversationsSection) and Stage files (Stage/index, PaneBar, PaneLayoutView) are mutated in sequence; splitting would ship a deck that cannot open conversations beside each other. The surface is ~30 source/test files in one subsystem (src/dashboard/frontend) plus four docs files.",
+      "canonicalFilename": "2026-11-16-PAN-5343-workflow-redesign-h-all-projects-deck-list-active-conversations-across-projects-show-1-4-side-by-side.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The operator works in several conversations across several projects at once. A conversation always opens in its own project's deck, so clicking a DFAI conversation switches away from overdeck, there is no list of active conversations across projects, and there is no quick way to see 2-4 conversations side by side with equal panes.",
+      "Proposal": "Add an All projects deck (key '__all-projects__') reachable from the project switcher and a This project / All projects switch in the Conversations section. Its list shows every project's conversations (Needs you first, then one group per project, pane-number badges). The deck has no Home pane, shows 1, 2, 3 or a 2x2 grid of conversations from any projects (Layout presets), and opens conversations beside each other by Ctrl/Cmd+Click, a hover Beside button, a row-menu item or dragging a row onto a pane. Layout and focus history move into a store so the left column and the top bar can use them, panesStore gains Home-less decks, and a reload flag keeps the All deck across /conv/ reloads.",
+      "NonGoals": "- No collapsing of project groups.\n- Layout presets arrange agent panes only; no code, terminal or issue panes in presets.\n- No change to Ctrl+Alt+1..9 pane focus.\n- No per-pane Needs-you banners or compact pane headers beyond what ConversationPanel already shows.\n- No 'Open here' row-menu item.\n- Conversation-reference links in transcripts (ConversationLinkOpener) keep opening in the conversation's own project deck.\n- No change to the project-deck crumb or to the project-deck plain click.\n- No change to the mobile conversation list (components/mobile/).\n- No server or API change and no new polling.\n- Never POST projectKey '__all-projects__' to the server.\n- No allowlist raise in scripts/file-size-allowlist.txt."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Layout and focus history move from Stage state to a new zustand deckLayoutStore (H-D14) instead of exposing openers on StageDeckContext.",
+        "rationale": "The left column, the top-bar crumb and the row badges render outside the Stage, so a Stage-only context cannot serve them; the store keeps the pan-layout:<deck> key and rule so existing tests hold."
+      },
+      {
+        "summary": "The All deck is a Home-less deck inside panesStore (H-D15) rather than 'skip ensureHome'.",
+        "rationale": "Hydration only happens in ensureHome and addPane seeds a Home pane over persisted panes; skipping it would lose the deck on reload and closing the last pane would throw."
+      },
+      {
+        "summary": "A separate localStorage flag overdeck.ui.allProjectsDeck restores the All deck on a /conv/ or storage-fallback reload (H-D16).",
+        "rationale": "Focusing a pane writes /conv/<id> and initialProjectKey returns null for /conv/ paths, so without the flag a reload selects the conversation's own project and FR-5/AC-15 fail."
+      },
+      {
+        "summary": "Open beside (Ctrl/Cmd+Click, Beside, drag to an edge) rebuilds an equal preset grid of the visible panes plus the new one, up to four; at four it replaces the least recently focused leaf. The same rule applies in project decks.",
+        "rationale": "Repeated splitAtLeaf gives 1/2,1/4,1/8,1/8 widths, which contradicts the approved mockup's equal grid and NFR-3; one rule in every deck is simpler to test and explain."
+      },
+      {
+        "summary": "Row drag keeps the existing centre-replaces / edge-opens-beside drop zones instead of the mockup's left-half/right-half split.",
+        "rationale": "Tab drags already use those zones; one drop vocabulary avoids two meanings for the same overlay."
+      },
+      {
+        "summary": "The row menu adds 'Open beside' and 'Open in its project' (from the mockup notes); 'Open here' is not added.",
+        "rationale": "A plain click already does 'Open here'; the mockup notes name only the other two."
+      },
+      {
+        "summary": "Each split header gets a 'Make this the only pane' (⤢) button in every deck.",
+        "rationale": "The approved mockup's grid scene shows it and it is the only quick way back to one pane besides the Layout bar."
+      },
+      {
+        "summary": "In grouped mode only the Inbox rows are grouped by project; Needs you, Snoozed and Settled keep their sections and prefix each row with its project mark.",
+        "rationale": "Keeps the existing triage sections intact while matching the mockup's 'Needs you first, then per-project groups' for the default Active filter."
+      },
+      {
+        "summary": "Pane-number badges show in every deck whenever its layout has two or more leaves, not only in the All deck.",
+        "rationale": "The mockup renders the badge whenever more than one pane is shown, and the rule is the same for project decks."
+      },
+      {
+        "summary": "The All deck crumb shows the active pane label with 0-1 leaves (falling back to 'Conversation'), and 'N conversations side by side' with 2+ leaves.",
+        "rationale": "Matches the existing project-deck crumb, which shows the active pane label; the mockup's literal 'Conversation' is its placeholder."
+      },
+      {
+        "summary": "ALL_PROJECTS_KEY lives in a new import-free leaf module FE/lib/deckKeys.ts, re-exported by projectsData.ts.",
+        "rationale": "panesStore must import the key; importing projectsData from panesStore would pull in wsTransport and risks a lint:circular failure."
+      },
+      {
+        "summary": "Planned as one issue with 21 items instead of sibling issues; plan.metadata.sizeJustification states why.",
+        "rationale": "The operator already split the epic into children A-H and approved this child's mockup as one unit; every item hangs off the same deck key, Home-less panes and layout store, and the list/Stage files are mutated in sequence."
+      }
+    ],
+    "items": [
+      {
+        "id": "deck-key",
+        "title": "Add the All projects deck key, the real-project helper and the reload flag",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:55:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5343",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/deckKeys.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/UnknownProjectState.tsx",
+            "src/dashboard/frontend/src/lib/lastProject.ts",
+            "src/dashboard/frontend/src/App.tsx",
+            "src/dashboard/frontend/src/App/appChromeLabels.ts",
+            "src/dashboard/frontend/src/lib/__tests__/lastProject.test.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/projectsData.isRealProjectKey.test.ts",
+            "src/dashboard/frontend/src/App/appChromeLabels.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/lastProject.test.ts src/components/CommandDeck/__tests__/projectsData.isRealProjectKey.test.ts src/App/appChromeLabels.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the three named test files pass",
+            "lint-file-size reports no file over its cap"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-11",
+            "FR-12",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (H-D1, H-D16, H-D17). Create src/dashboard/frontend/src/lib/deckKeys.ts with NO imports exporting ALL_PROJECTS_KEY = '__all-projects__' and ALL_PROJECTS_LABEL = 'All projects'. projectsData.ts re-exports both and adds isRealProjectKey(key): key is string (true only for a non-empty key that is neither NO_PROJECT_KEY nor ALL_PROJECTS_KEY). isKnownProject (UnknownProjectState.tsx lines 28-34) and isKnownProjectKey (lastProject.ts line 53) accept ALL_PROJECTS_KEY. lastProject.ts: add ALL_PROJECTS_DECK_STORAGE_KEY = 'overdeck.ui.allProjectsDeck', readAllProjectsDeck(), writeAllProjectsDeck(on) (try/catch like the others), and a new initialProjectKey input allProjectsDeck: boolean — route project wins; for a /conv/ path or the storage fallback, allProjectsDeck true returns { key: ALL_PROJECTS_KEY, fromStorage: false }; bare /command-deck still returns { key: null }. App.tsx: pass allProjectsDeck: readAllProjectsDeck() to initialProjectKey (around line 188) and change the write effect (line 202-204): ALL key -> writeAllProjectsDeck(true) only; other non-null key -> writeAllProjectsDeck(false) + writeLastProjectKey(key). appChromeLabels.projectCrumbLabel returns ALL_PROJECTS_LABEL for the All key. App.tsx must stay <= 1019 lines. Add every NEW frontend test file to scripts/frontend-test-subset.txt in sorted position (the file is merge=union, so parallel edits are safe)."
+        },
+        "items": [
+          {
+            "id": "deck-key.ac1",
+            "title": "Given allProjectsDeck true and pathname '/conv/abc' with no route project, initialProjectKey returns { key: '__all-projects__', fromStorage: false }; with allProjectsDeck false it returns key null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-key.ac2",
+            "title": "Given routeProject 'overdeck' and allProjectsDeck true, initialProjectKey returns { key: 'overdeck', fromStorage: false } (route wins)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-key.ac3",
+            "title": "isRealProjectKey returns false for null, '', '__no-project__' and '__all-projects__' and true for 'overdeck'; isKnownProjectKey('__all-projects__', []) returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-key.ac4",
+            "title": "projectCrumbLabel('__all-projects__') returns 'All projects', and selecting the All key in App never writes '__all-projects__' to overdeck.ui.lastProjectKey",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "homeless-panes",
+        "title": "Make panesStore support a Home-less All projects deck",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:55:23Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5343",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/panesStore.ts",
+            "src/dashboard/frontend/src/lib/__tests__/panesStore.homeless.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/panesStore.homeless.test.ts src/lib/panesStore.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "panesStore.homeless.test.ts and the existing panesStore.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-11"
+          ],
+          "foundationFor": [
+            "deck-openers",
+            "empty-all-deck",
+            "open-routing"
+          ],
+          "parallelSafeReason": "Its shared-file neighbours are ordered by blocks edges; once its predecessors land it touches no file another unblocked item edits."
+        },
+        "narrative": {
+          "Action": "PRD WI-2 (H-D15). In src/dashboard/frontend/src/lib/panesStore.ts add `const isHomeless = (id: WorkspaceId) => id === ALL_PROJECTS_KEY` importing ALL_PROJECTS_KEY from './deckKeys' (NOT from projectsData). For a Home-less deck: readPanes drops home panes and returns the rest ([] when storage is empty, never null); ensureHome hydrates without synthesizing Home (keep the method name); addPane on a deck not in memory hydrates from storage first instead of seeding [makeHomePane()] (line 359); resolveActiveId returns PaneId | null and when null the activePaneByWorkspace entry is deleted and pan-active-pane:<key> removed (persist must not write undefined); closePane may close the last pane. Project decks must behave exactly as today (keep their Home logic untouched). Add every NEW frontend test file to scripts/frontend-test-subset.txt in sorted position (the file is merge=union, so parallel edits are safe)."
+        },
+        "items": [
+          {
+            "id": "homeless-panes.ac1",
+            "title": "Given empty storage, ensureHome('__all-projects__') leaves panesByWorkspace['__all-projects__'] equal to [] and no active pane id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "homeless-panes.ac2",
+            "title": "Given stored panes [home, agentA] for the All deck, ensureHome hydrates exactly [agentA]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "homeless-panes.ac3",
+            "title": "Given stored panes for the All deck that are not in memory, addPane appends to the stored panes instead of replacing them with a Home pane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "homeless-panes.ac4",
+            "title": "Closing the last pane of the All deck leaves [] without throwing and removes localStorage pan-active-pane:__all-projects__, while ensureHome('overdeck') on empty storage still creates one Home pane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "preset-layout",
+        "title": "Add presetLayout and presetOf to paneLayout",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:55:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5343",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/paneLayout.ts",
+            "src/dashboard/frontend/src/lib/__tests__/paneLayout.preset.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/paneLayout.preset.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "paneLayout.preset.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 (H-D7). Add to src/dashboard/frontend/src/lib/paneLayout.ts: presetLayout(paneIds: readonly string[], preset: 1|2|3|4): PaneLayout using the first `preset` ids and throwing Error('presetLayout needs N panes') when fewer are given: 1 -> leaf(a); 2 -> row split (a,b) ratio 0.5; 3 -> row split (a, row split (b,c) 0.5) ratio 1/3; 4 -> col split (row split (a,b) 0.5, row split (c,d) 0.5) ratio 0.5. And presetOf(layout: PaneLayout | null): 1|2|3|4|null — null or a leaf -> 1; otherwise the preset n = leafCount(layout) whose tree has the same kind/dir nesting (ratios ignored), else null. Match the file's no-semicolon style. Add every NEW frontend test file to scripts/frontend-test-subset.txt in sorted position (the file is merge=union, so parallel edits are safe)."
+        },
+        "items": [
+          {
+            "id": "preset-layout.ac1",
+            "title": "presetLayout(['a','b','c','d'], n) returns exactly the H-D7 tree with the stated ratios for n = 1, 2, 3 and 4, and collectLeafIds of each returns the ids in input order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preset-layout.ac2",
+            "title": "presetLayout(['a','b'], 3) throws an Error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preset-layout.ac3",
+            "title": "presetOf returns n for presetLayout(ids, n) and for the same tree after updateRatio changes a ratio, returns 1 for null, and returns null for the 3-leaf tree built by two splitAtLeaf calls on the same leaf",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deck-layout-store",
+        "title": "Move the deck layout into deckLayoutStore",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:55:23Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5343",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/deckLayoutStore.ts",
+            "src/dashboard/frontend/src/components/Stage/index.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/deckLayoutStore.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/deckLayoutStore.test.ts src/components/Stage/__tests__/openBeside.test.tsx src/components/Stage/__tests__/revealPane.test.tsx src/components/Stage/__tests__/PaneLayoutView.focus.test.tsx src/components/dock/__tests__/WorkDock.test.tsx",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all five named test files pass",
+            "lint-file-size reports no file over its cap"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-11",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "deck-openers",
+            "pane-badges",
+            "preset-bar",
+            "crumb",
+            "only-pane"
+          ],
+          "parallelSafeReason": "Its shared-file neighbours are ordered by blocks edges; once its predecessors land it touches no file another unblocked item edits."
+        },
+        "narrative": {
+          "Action": "PRD WI-4 (H-D14). Create src/dashboard/frontend/src/lib/deckLayoutStore.ts (zustand) with layoutStorageKey(deckKey) = `pan-layout:${deckKey}`, layoutByDeck, focusHistoryByDeck (most recent first, no duplicates, max 32, session only), hydrateLayout(deckKey) that ALWAYS re-reads localStorage and keeps a valid (isValidLayout) layout with >1 leaf else null, getLayout(deckKey) that hydrates when the deck is not in memory, setLayout(deckKey, next) storing null and removing the key for <=1 leaf and writing through otherwise (try/catch), noteFocus(deckKey, paneId), selectDeckLayout(deckKey), resetDeckLayoutStore() for tests. In Stage/index.tsx replace the useState layout, the hydrate effect and the setLayout localStorage code (lines ~335-357) with: useEffect -> hydrateLayout(deckKey); layout = useDeckLayoutStore(selectDeckLayout(deckKey)); setLayout callback -> store.setLayout(deckKey, next); plus a useEffect calling noteFocus(deckKey, activeId) when activeId changes. Keep every existing Stage behaviour. Add every NEW frontend test file to scripts/frontend-test-subset.txt in sorted position (the file is merge=union, so parallel edits are safe)."
+        },
+        "items": [
+          {
+            "id": "deck-layout-store.ac1",
+            "title": "setLayout with a 2-leaf tree writes it to localStorage pan-layout:<deck>; setLayout with a single leaf stores null and removes the key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-layout-store.ac2",
+            "title": "hydrateLayout returns a layout written to localStorage after the store first read the deck (it re-reads storage)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-layout-store.ac3",
+            "title": "When noteFocus is called repeatedly, focusHistoryByDeck stores ids most-recent-first without duplicates and caps the list at 32 ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-layout-store.ac4",
+            "title": "Given the store migration, the existing Stage/__tests__/openBeside.test.tsx, revealPane.test.tsx, PaneLayoutView.focus.test.tsx and dock/__tests__/WorkDock.test.tsx still pass with no assertion removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deck-openers",
+        "title": "Add showConversation and openConversationBeside openers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:55:23Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5343",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/openConversationInDeck.ts",
+            "src/dashboard/frontend/src/components/Stage/__tests__/openConversationInDeck.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/__tests__/openConversationInDeck.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "openConversationInDeck.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ],
+          "foundationFor": [
+            "open-routing",
+            "conv-deeplink",
+            "row-drag",
+            "new-conversation"
+          ],
+          "parallelSafeReason": "Its shared-file neighbours are ordered by blocks edges; once its predecessors land it touches no file another unblocked item edits."
+        },
+        "narrative": {
+          "Action": "PRD WI-5 (H-D6). New src/dashboard/frontend/src/components/Stage/openConversationInDeck.ts exporting showConversation(deckKey, name, label): string and openConversationBeside(deckKey, name, label): string. Both use usePanesStore.getState() and useDeckLayoutStore.getState() only (no React), call ensureHome(deckKey) and getLayout(deckKey) first, and read the active pane id BEFORE adding a pane. showConversation: a visible conversation is only focused; otherwise find-or-add its agent pane and, when the layout has >=2 leaves, replaceLeaf the focused leaf (active id if it is a leaf, else the first leaf). openConversationBeside: visible = layout leaves, or [activeId] for a null layout with an active pane, or []; visible already holding the conversation -> focus only; else find-or-add the pane; 0 visible -> done; 1..3 visible -> setLayout(presetLayout([...visible, paneId], visible.length+1)); 4 visible -> replaceLeaf the least recently focused leaf other than the active one (oldest focus-history index; never-focused counts oldest; ties go to the later leaf in leaf order). Both end with setActivePane(deckKey, paneId) and noteFocus(deckKey, paneId) and return paneId. Add every NEW frontend test file to scripts/frontend-test-subset.txt in sorted position (the file is merge=union, so parallel edits are safe)."
+        },
+        "items": [
+          {
+            "id": "deck-openers.ac1",
+            "title": "Given a 2-leaf All deck focused on leaf A, showConversation for a new conversation replaces leaf A in the layout and pane A still exists in panesByWorkspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-openers.ac2",
+            "title": "Given 1, 2 and 3 visible panes, openConversationBeside produces exactly presetLayout of the visible ids plus the new pane for 2, 3 and 4 panes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-openers.ac3",
+            "title": "Given a 2x2 layout, openConversationBeside replaces the least recently focused non-active leaf and the layout keeps the 2x2 shape (presetOf returns 4)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-openers.ac4",
+            "title": "Given a conversation already in a visible leaf, both openers leave the layout unchanged and make that pane active",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-openers.ac5",
+            "title": "Given an All deck whose panes and layout exist only in localStorage, both openers hydrate them and never add a Home pane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "switcher-door",
+        "title": "Add the All projects item to the project switcher",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:55:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5343",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/frame/ProjectSwitcher.tsx",
+            "src/dashboard/frontend/src/components/frame/ProjectMark.tsx",
+            "src/dashboard/frontend/src/components/frame/__tests__/ProjectSwitcher.test.tsx",
+            "src/dashboard/frontend/src/components/frame/__tests__/ProjectMark.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/frame/__tests__/ProjectSwitcher.test.tsx src/components/frame/__tests__/ProjectMark.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "ProjectSwitcher.test.tsx and ProjectMark.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 (H-D2). ProjectMark.tsx: add glyph?: string — renders the glyph on the muted background instead of initials or '–'. ProjectSwitcher.tsx: add an All projects menuitem as the FIRST item in the menu (data-testid='project-switcher-row-all-projects', aria-current when selected) with <ProjectMark size='sm' name='All projects' muted glyph='✱' />, label 'All projects' and subtitle '<N> projects · <M> active' where N = number of projects the switcher lists and M = conversations in the ['conversations'] query with sessionAlive === true (reuse the query, no new polling). Picking it calls pick(ALL_PROJECTS_KEY). With the All key selected the closed button shows the ✱ mark, 'All projects' and that subtitle instead of a path. Add every NEW frontend test file to scripts/frontend-test-subset.txt in sorted position (the file is merge=union, so parallel edits are safe)."
+        },
+        "items": [
+          {
+            "id": "switcher-door.ac1",
+            "title": "Given two projects and one conversation with sessionAlive true, opening the menu renders 'All projects' as the first menuitem with the text '2 projects · 1 active'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switcher-door.ac2",
+            "title": "When the All projects menuitem is clicked, the switcher calls onSelectProject('__all-projects__')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switcher-door.ac3",
+            "title": "Given selectedProject '__all-projects__', the closed switcher button renders 'All projects'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switcher-door.ac4",
+            "title": "ProjectMark with glyph='✱' renders the ✱ character",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scope-switch",
+        "title": "Add the This project / All projects switch to the Conversations section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:55:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5343",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/frame/ConversationsSection.tsx",
+            "src/dashboard/frontend/src/components/frame/__tests__/ConversationsSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/frame/__tests__/ConversationsSection.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "ConversationsSection.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 (H-D2, H-D3). In ConversationsSection.tsx add a second segmented row under the header (reuse SegmentButton) with 'This project' (data-testid='conversation-deck-scope-project') and 'All projects' (data-testid='conversation-deck-scope-all'), pressed by selectedProject === ALL_PROJECTS_KEY. All projects -> useDeckNavigation().selectProject(ALL_PROJECTS_KEY). This project -> selectProject(readLastProjectKey() when isRealProjectKey, else the first registered project name, else NO_PROJECT_KEY). In All mode pass no includeIds and show the full conversation count in 'All N'. Add every NEW frontend test file to scripts/frontend-test-subset.txt in sorted position (the file is merge=union, so parallel edits are safe)."
+        },
+        "items": [
+          {
+            "id": "scope-switch.ac1",
+            "title": "When All projects is pressed, the section calls selectProject('__all-projects__')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-switch.ac2",
+            "title": "Given overdeck.ui.lastProjectKey = 'dfai' in localStorage and the All deck selected, pressing This project calls selectProject('dfai')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-switch.ac3",
+            "title": "Given selectedProject '__all-projects__', a conversation belonging to another registered project renders in the list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hide-project-items",
+        "title": "Hide project-only chrome in All projects mode",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:55:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5343",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/frame/LeftColumn.tsx",
+            "src/dashboard/frontend/src/components/frame/LeftNav.tsx",
+            "src/dashboard/frontend/src/components/ActivityFeedTab.tsx",
+            "src/dashboard/frontend/src/components/frame/__tests__/LeftColumn.test.tsx",
+            "src/dashboard/frontend/src/components/frame/__tests__/LeftNav.test.tsx",
+            "src/dashboard/frontend/src/components/__tests__/ActivityFeedTab.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/frame/__tests__/LeftColumn.test.tsx src/components/frame/__tests__/LeftNav.test.tsx src/components/__tests__/ActivityFeedTab.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the three named test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 (H-D4, H-D17). LeftColumn.tsx: when selectedProject === ALL_PROJECTS_KEY render ConversationsSection only (no IssuesSection, no WorkspacesSection). LeftNav.tsx: hide the Project home NavButton when selectedProject is the All key. ActivityFeedTab.tsx line 17: scoped = isRealProjectKey(selectedProjectKey). Add every NEW frontend test file to scripts/frontend-test-subset.txt in sorted position (the file is merge=union, so parallel edits are safe)."
+        },
+        "items": [
+          {
+            "id": "hide-project-items.ac1",
+            "title": "Given selectedProject '__all-projects__', LeftColumn renders the Conversations section and renders neither the Issues nor the Workspaces section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hide-project-items.ac2",
+            "title": "Given selectedProject '__all-projects__', LeftNav renders no element with data-testid 'left-nav-project-home'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hide-project-items.ac3",
+            "title": "Given selectedProjectKey '__all-projects__', ActivityFeedTab renders feed items from any project (unscoped)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "grouped-list",
+        "title": "Group the All projects list by project",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:55:23Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5343",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/conversationProjectGroups.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/frame/ConversationsSection.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/conversationProjectGroups.test.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationList.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/conversationProjectGroups.test.ts src/components/CommandDeck/__tests__/ConversationList.test.tsx src/components/CommandDeck/__tests__/ConversationList.render-count.test.tsx",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both named test files pass",
+            "lint-file-size reports no file over its cap"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "Its shared-file neighbours are ordered by blocks edges; once its predecessors land it touches no file another unblocked item edits."
+        },
+        "narrative": {
+          "Action": "PRD WI-9 (H-D3). New components/CommandDeck/conversationProjectGroups.tsx: groupNodesByProject(nodes, groupOf) -> ordered [{ key, label, nodes, working }] (label sort case-insensitive, the No-project group last, working = count of nodes whose root conv has isWorking === true) and a ProjectGroupHeader component (ProjectMark size sm, name, right-aligned 'N working' or 'idle'; not collapsible). ConversationList.tsx: new prop groupByProject?: (conv) => { key: string; label: string }. With it: Needs you section unchanged; Inbox rows render under project group headers; Snoozed/Settled keep their collapsible headers; rows outside the Inbox groups get their project mark through new ConversationRow props markProjectKey?: string and markName?: string (ProjectMark size sm rendered before the title; markProjectKey === NO_PROJECT_KEY renders it muted). ConversationListItem is memo(..., itemPropsEqual) (ConversationList.tsx ~line 428): every new per-row prop must be a primitive or stable callback AND be compared in itemPropsEqual; never pass a per-render ReactNode. ConversationList.render-count.test.tsx must keep passing. visibleTopLevelNamesRef must follow the grouped render order. ConversationsSection passes groupByProject only in All mode: key = the registered project's key and label = its name (resolveEffectiveProjectKey(conv, registeredProjects) from projectsData plus the registered-projects query), so ProjectMark colors match the project switcher (projectKey={key}); a conversation under no registered project -> { key: NO_PROJECT_KEY, label: 'No project' } rendered with ProjectMark muted. Keep ConversationList.tsx and ConversationRow.tsx <= 1000 lines. Add every NEW frontend test file to scripts/frontend-test-subset.txt in sorted position (the file is merge=union, so parallel edits are safe)."
+        },
+        "items": [
+          {
+            "id": "grouped-list.ac1",
+            "title": "Given nodes from projects beta, Alpha and none, groupNodesByProject returns groups ordered Alpha, beta, No project, each with its working count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grouped-list.ac2",
+            "title": "Given groupByProject and conversations in projects beta, alpha and none, ConversationList renders group headers 'alpha', 'beta', 'No project' in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grouped-list.ac3",
+            "title": "A needs-you conversation renders exactly once, above the first project group header, with its project mark",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grouped-list.ac4",
+            "title": "When the operator Shift+clicks from the first row under 'alpha' to the first row under 'beta', the selection contains exactly the rows rendered between them in grouped order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pane-badges",
+        "title": "Show pane-number badges on visible rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:55:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5343",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/frame/ConversationsSection.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+            "src/dashboard/frontend/src/components/frame/__tests__/ConversationsSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/ConversationRow.test.tsx src/components/frame/__tests__/ConversationsSection.test.tsx src/components/CommandDeck/__tests__/ConversationList.render-count.test.tsx",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both named test files pass",
+            "lint-file-size reports no file over its cap"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10 (H-D18). ConversationList.tsx: prop paneSlots?: ReadonlyMap<string, number> forwarded per row. ConversationRow.tsx: prop paneSlot?: number renders a small mono badge (bordered, Broadsheet tokens, title 'Shown in pane N') at the row's right. ConversationsSection.tsx: compute paneSlots from useDeckLayoutStore(selectDeckLayout(selectedProject)) and usePanesStore panes of that deck — only when the layout has >= 2 leaves; map each agent leaf's conversationId to its 1-based position in collectLeafIds. Read in-memory state only; never hydrate from the list. ConversationListItem is memo(..., itemPropsEqual) (ConversationList.tsx ~line 428): every new per-row prop must be a primitive or stable callback AND be compared in itemPropsEqual; never pass a per-render ReactNode. ConversationList.render-count.test.tsx must keep passing. Add every NEW frontend test file to scripts/frontend-test-subset.txt in sorted position (the file is merge=union, so parallel edits are safe)."
+        },
+        "items": [
+          {
+            "id": "pane-badges.ac1",
+            "title": "ConversationRow with paneSlot={2} renders the text '2' with title 'Shown in pane 2'; without paneSlot it renders no badge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-badges.ac2",
+            "title": "Given a 2-leaf layout for the selected deck, the row of the conversation in the second leaf shows the badge '2' and a conversation not in any leaf shows no badge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-badges.ac3",
+            "title": "Given a null layout for the selected deck, no row renders a pane badge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-badges.ac4",
+            "title": "Given a row showing badge 2, when the deck layout is set back to null the badge disappears on the next render",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "row-open-controls",
+        "title": "Add Ctrl/Cmd+Click, the Beside button and the Open beside / Open in its project menu items",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:55:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5343",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationList.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/ConversationList.test.tsx src/components/CommandDeck/__tests__/ConversationRow.test.tsx src/components/CommandDeck/__tests__/ConversationList.render-count.test.tsx",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both named test files pass",
+            "lint-file-size reports no file over its cap"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11 (H-D5). ConversationList.tsx: new props onOpenBeside?(name) and onOpenInProject?(name), forwarded to rows. handleRowClick: when onOpenBeside is given and (e.metaKey || e.ctrlKey) -> call onOpenBeside(name) and change no selection; Shift+click keeps the range/toggle code; with no onOpenBeside, Ctrl/Meta+click keeps today's toggle. ConversationRow.tsx: a hover 'Beside' control (role=button span like the other inline controls, aria-label 'Open beside', title 'Open beside (Ctrl+Click)' or 'Open beside (⌘+Click)' when currentPlatform() === 'mac'), shown only when onOpenBeside is given; its click stops propagation and calls onOpenBeside. Row menu: 'Open beside' and 'Open in its project' items at the top, each only when its prop is given. Do not delete existing test assertions; update a test that expected Ctrl+click to select only where the test now passes onOpenBeside. ConversationListItem is memo(..., itemPropsEqual) (ConversationList.tsx ~line 428): every new per-row prop must be a primitive or stable callback AND be compared in itemPropsEqual; never pass a per-render ReactNode. ConversationList.render-count.test.tsx must keep passing. Add every NEW frontend test file to scripts/frontend-test-subset.txt in sorted position (the file is merge=union, so parallel edits are safe)."
+        },
+        "items": [
+          {
+            "id": "row-open-controls.ac1",
+            "title": "Given onOpenBeside, Ctrl+click and Meta+click on a row call onOpenBeside with the row's name and leave no row multi-selected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-open-controls.ac2",
+            "title": "When the operator Shift+clicks two rows, both are multi-selected and the bulk bar renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-open-controls.ac3",
+            "title": "Given no onOpenBeside, Ctrl+click toggles the row into the multi-selection as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-open-controls.ac4",
+            "title": "When the row's Open beside control is clicked, onOpenBeside is called and onSelect is not; the row menu renders 'Open beside' and 'Open in its project'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "open-routing",
+        "title": "Route list opens through the deck openers in the All deck",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:55:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5343",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/frame/deck/useOpenConversation.ts",
+            "src/dashboard/frontend/src/components/frame/ConversationsSection.tsx",
+            "src/dashboard/frontend/src/components/frame/deck/__tests__/useOpenConversation.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/frame/deck/__tests__/useOpenConversation.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "useOpenConversation.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12 (H-D5, H-D6). useOpenConversation.ts: when deckKey === ALL_PROJECTS_KEY, after the selection updates call showConversation(ALL_PROJECTS_KEY, name, conv?.title ?? 'Agent') instead of openConversationTab, and openInDeck({ projectKey: ALL_PROJECTS_KEY, conversationRouteKey }) when conv is known; never call selectProject. Add export useOpenConversationBeside(deckKey): same shape, calls openConversationBeside(deck, ...) where deck = ALL_PROJECTS_KEY when deckKey is the All key, else the resolved project (?? NO_PROJECT_KEY), then openInDeck({ projectKey: deck, conversationRouteKey }). ConversationsSection.tsx: pass onOpenBeside = useOpenConversationBeside(selectedProject) and onOpenInProject = useOpenConversation(null) to ConversationList. Project decks keep today's plain-click behavior. Add every NEW frontend test file to scripts/frontend-test-subset.txt in sorted position (the file is merge=union, so parallel edits are safe)."
+        },
+        "items": [
+          {
+            "id": "open-routing.ac1",
+            "title": "Given deckKey '__all-projects__', opening a 'dfai' conversation records openInDeck with projectKey '__all-projects__', records no selectProject call, and creates its agent pane in panesByWorkspace['__all-projects__']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-routing.ac2",
+            "title": "Given an All deck showing one agent pane, the beside hook for a second conversation produces a 2-leaf layout in deckLayoutStore",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-routing.ac3",
+            "title": "Given deckKey 'overdeck', a plain open still records openInDeck with projectKey equal to the conversation's project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conv-deeplink",
+        "title": "Keep /conv/<id> deep links in the All deck",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:55:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5343",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/CommandDeck.allProjects.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/CommandDeck.allProjects.test.tsx src/components/CommandDeck/CommandDeck.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "CommandDeck.allProjects.test.tsx and CommandDeck.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13 (H-D12). In the /conv/<id> effect of components/CommandDeck/index.tsx (lines ~148-182): when selectedProject === ALL_PROJECTS_KEY, do not call onSelectProject; call showConversation(ALL_PROJECTS_KEY, conv.name, label) instead of openConversationTabIn, then apply the message target and ?view=terminal through usePanesStore.getState().updatePane on the returned pane id (same fields openConversationTab sets). Add selectedProject to the effect deps. Add every NEW frontend test file to scripts/frontend-test-subset.txt in sorted position (the file is merge=union, so parallel edits are safe)."
+        },
+        "items": [
+          {
+            "id": "conv-deeplink.ac1",
+            "title": "Given selectedProject '__all-projects__' and convId of a conversation in project 'dfai', CommandDeck does not call onSelectProject",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-deeplink.ac2",
+            "title": "Given the same input, the conversation's agent pane exists in panesByWorkspace['__all-projects__'] and is active",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-deeplink.ac3",
+            "title": "Given selectedProject 'overdeck' and convId of a 'dfai' conversation, onSelectProject('dfai', { updateUrl: false }) is still called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-deeplink.ac4",
+            "title": "In the browser, reloading the /conv/<id> URL while the All deck shows two conversations from different projects renders the All deck again with both panes and the same layout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "preset-bar",
+        "title": "Add the Layout preset bar to the All deck tab strip",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:55:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5343",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/LayoutPresetBar.tsx",
+            "src/dashboard/frontend/src/components/Stage/PaneBar.tsx",
+            "src/dashboard/frontend/src/components/Stage/index.tsx",
+            "src/dashboard/frontend/src/components/Stage/__tests__/LayoutPresetBar.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/__tests__/Stage.allProjects.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/stage.module.css"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/__tests__/LayoutPresetBar.test.tsx src/components/Stage/__tests__/Stage.allProjects.test.tsx src/components/Stage/PaneBar.test.tsx",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the three named test files pass",
+            "lint-file-size reports no file over its cap"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14 (H-D7). New components/Stage/LayoutPresetBar.tsx: label 'Layout' and four buttons with the mockup's SVG icons (docs/design/multi-conversation-mockup.html lines 213-217) and titles 'One', 'Two side by side', 'Three columns', 'Grid of four', each aria-label = title and aria-pressed = (presetOf(layout ?? null) === n). Candidates = agent panes only: visible agent leaves in leaf order, then other agent panes by focusHistoryByDeck order, then the rest in tab order. Button n disabled when candidates.length < n. Press n -> setLayout(deckKey, n === 1 ? null : presetLayout(candidates, n)); if the active pane is not among the first n candidates, setActivePane(candidates[0]). PaneBar.tsx: optional trailing?: ReactNode rendered inside panebarWrap after the tab list button. Stage/index.tsx: pass <LayoutPresetBar> as trailing only when deckKey === ALL_PROJECTS_KEY. New Stage assertions go in the NEW file components/Stage/__tests__/Stage.allProjects.test.tsx (Stage.test.tsx is not in the CI subset); add it to scripts/frontend-test-subset.txt. PaneBar's trailing prop is optional. Live checkpoint (NFR-3): with four conversations in Grid of four at a 1920x1000 viewport (Playwright, isolated browser profile), every composer must be visible; if one is cut off, add min-height: 0 to .splitPanel and .pane in components/Stage/stage.module.css and re-check; if still cut off, stop and report through pan tell with a screenshot path. Attach 2-pane and 4-pane screenshots (dark and light) to the PR description. Add every NEW frontend test file to scripts/frontend-test-subset.txt in sorted position (the file is merge=union, so parallel edits are safe)."
+        },
+        "items": [
+          {
+            "id": "preset-bar.ac1",
+            "title": "Given an All deck with 3 agent panes, 'Grid of four' is disabled and 'Three columns' is enabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preset-bar.ac2",
+            "title": "Pressing 'Two side by side' stores presetLayout of the first two candidates in localStorage pan-layout:__all-projects__",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preset-bar.ac3",
+            "title": "Given a 2x2 preset layout, the 'Grid of four' button has aria-pressed='true'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preset-bar.ac4",
+            "title": "A project-deck Stage renders no 'Grid of four' button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preset-bar.ac5",
+            "title": "In the browser at a 1920x1000 viewport with four conversations in Grid of four, every pane's composer textbox is inside the viewport and accepts typed text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "only-pane",
+        "title": "Add the Make this the only pane button to split headers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:55:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5343",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/PaneLayoutView.tsx",
+            "src/dashboard/frontend/src/components/Stage/index.tsx",
+            "src/dashboard/frontend/src/components/Stage/__tests__/PaneLayoutView.only.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/__tests__/PaneLayoutView.only.test.tsx src/components/Stage/__tests__/PaneLayoutView.focus.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both named test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15 (H-D19). PaneLayoutView.tsx: in each split header, before the close button, a button with aria-label and title 'Make this the only pane' (lucide Maximize2 icon, size 13, same class as splitHeaderClose) calling a new OPTIONAL prop onMakeOnly?(paneId) with stopPropagation (the button renders only when the prop is given). Stage/index.tsx: onMakeOnly = (id) => { setLayout(null); setActivePane(deckKey, id) }. All decks. Add every NEW frontend test file to scripts/frontend-test-subset.txt in sorted position (the file is merge=union, so parallel edits are safe)."
+        },
+        "items": [
+          {
+            "id": "only-pane.ac1",
+            "title": "When 'Make this the only pane' is clicked in a split header, PaneLayoutView calls onMakeOnly with that leaf's pane id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "only-pane.ac2",
+            "title": "Given a Stage with a 2-leaf layout, when the button is clicked the Stage deletes localStorage pan-layout:<deck> and that pane becomes active",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "only-pane.ac3",
+            "title": "Given the collapse, the tab strip still renders the other pane's tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "row-drag",
+        "title": "Drag a conversation row onto a pane",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:55:23Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5343",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/conversationDragStore.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/frame/ConversationsSection.tsx",
+            "src/dashboard/frontend/src/components/Stage/PaneLayoutView.tsx",
+            "src/dashboard/frontend/src/components/Stage/index.tsx",
+            "src/dashboard/frontend/src/components/Stage/__tests__/PaneLayoutView.drop.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/__tests__/PaneLayoutView.drop.test.tsx src/components/CommandDeck/__tests__/ConversationRow.test.tsx src/components/CommandDeck/__tests__/ConversationList.render-count.test.tsx",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both named test files pass",
+            "lint-file-size reports no file over its cap"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "Its shared-file neighbours are ordered by blocks edges; once its predecessors land it touches no file another unblocked item edits."
+        },
+        "narrative": {
+          "Action": "PRD WI-16 (H-D8). New components/Stage/conversationDragStore.ts (zustand) { dragging: { name: string; deckKey: string } | null, start(v), end() }. ConversationRow.tsx: draggable; onDragStart sets dataTransfer 'application/x-conversation-name' = conv.name, effectAllowed 'copyMove', and start({ name, deckKey: dragDeckKey }) where dragDeckKey is a new prop; onDragEnd -> end(). ConversationList.tsx: new prop deckKeyOf?: (conv) => string forwarded as dragDeckKey (rows without it are not draggable). ConversationsSection.tsx: deckKeyOf = conv => resolveConversationProjectName(conv) ?? NO_PROJECT_KEY. PaneLayoutView.tsx: new props draggingConversation: boolean and onDropConversation(targetPaneId, name, zone); show the overlay when draggingPaneId || draggingConversation; onDrop reads 'application/x-conversation-name' first and calls onDropConversation, else today's tab path. Stage/index.tsx: draggingConversation = store.dragging !== null && (deckKey === ALL_PROJECTS_KEY || store.dragging.deckKey === deckKey); onDropConversation: setActivePane(deckKey, target) then center -> showConversation(deckKey, name, label), edge -> openConversationBeside(deckKey, name, label); end() the drag. The new PaneLayoutView props are optional. ConversationListItem is memo(..., itemPropsEqual) (ConversationList.tsx ~line 428): every new per-row prop must be a primitive or stable callback AND be compared in itemPropsEqual; never pass a per-render ReactNode. ConversationList.render-count.test.tsx must keep passing. Add every NEW frontend test file to scripts/frontend-test-subset.txt in sorted position (the file is merge=union, so parallel edits are safe)."
+        },
+        "items": [
+          {
+            "id": "row-drag.ac1",
+            "title": "Given the drag store holds a conversation, PaneLayoutView renders the drop overlay",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-drag.ac2",
+            "title": "When a drop carrying application/x-conversation-name lands near a leaf's right edge, PaneLayoutView calls onDropConversation with that leaf's pane id, the name and 'right'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-drag.ac3",
+            "title": "Given a project-deck Stage and a drag store holding another project's deck key, no drop overlay renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-drag.ac4",
+            "title": "Dropping a conversation on the right edge of a one-pane All deck produces a 2-leaf layout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pane-marks",
+        "title": "Show project marks on All deck tabs and split headers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:55:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5343",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/PaneBar.tsx",
+            "src/dashboard/frontend/src/components/Stage/PaneLayoutView.tsx",
+            "src/dashboard/frontend/src/components/Stage/index.tsx",
+            "src/dashboard/frontend/src/components/Stage/PaneBar.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/__tests__/Stage.allProjects.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/PaneBar.test.tsx src/components/Stage/__tests__/Stage.allProjects.test.tsx",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both named test files pass",
+            "lint-file-size reports no file over its cap"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-17 (H-D9). PaneBar.tsx: optional renderTabPrefix?: (pane) => ReactNode rendered before the tab label (both the strip and the 'N tabs' list). PaneLayoutView.tsx: optional renderHeaderPrefix?: (pane) => ReactNode before splitHeaderLabel. Put the new Stage assertions in components/Stage/__tests__/Stage.allProjects.test.tsx. Stage/index.tsx: only when deckKey === ALL_PROJECTS_KEY, pass both, rendering <ProjectMark size='sm'> for an agent pane's conversation: project = registered project from resolveEffectiveProjectKey(conv, useRootContext().projects) (name for the label, key for the color); no project -> ProjectMark muted name 'No project'; non-agent panes get no prefix. Add every NEW frontend test file to scripts/frontend-test-subset.txt in sorted position (the file is merge=union, so parallel edits are safe)."
+        },
+        "items": [
+          {
+            "id": "pane-marks.ac1",
+            "title": "Given renderTabPrefix, PaneBar renders the prefix element before each tab's label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-marks.ac2",
+            "title": "In an All deck, the agent tab for a conversation of project 'dfai' contains the mark text 'DF'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-marks.ac3",
+            "title": "Given a project deck, agent tabs render no project mark",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "empty-all-deck",
+        "title": "Render the empty All deck with no Home tab",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:55:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5343",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/index.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "src/dashboard/frontend/src/components/Stage/__tests__/Stage.allProjects.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/__tests__/Stage.allProjects.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "Stage.allProjects.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-18 (H-D10, H-D11). Stage/index.tsx: when deckKey === ALL_PROJECTS_KEY and displayPanes is empty, render a centered empty state (data-testid='all-projects-empty') reading 'Pick conversations on the left. Ctrl+Click opens one beside another.' with 'Cmd+Click' when currentPlatform() === 'mac'. The 'Changes in <project>' new action is absent because deckProject is undefined for the All key — keep it so. CommandDeck/index.tsx: terminalCwd stays undefined for the All key (selectedRegisteredProject is undefined); no ProjectHome render path runs. Add every NEW frontend test file to scripts/frontend-test-subset.txt in sorted position (the file is merge=union, so parallel edits are safe)."
+        },
+        "items": [
+          {
+            "id": "empty-all-deck.ac1",
+            "title": "Given an All deck with empty storage, the Stage renders no Home tab and renders the text 'Pick conversations on the left. Ctrl+Click opens one beside another.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "empty-all-deck.ac2",
+            "title": "Given an All deck, the '+' new-pane menu contains no item whose label starts with 'Changes in'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "empty-all-deck.ac3",
+            "title": "Given an All deck with one agent pane, the empty state is not rendered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "crumb",
+        "title": "Show the All projects crumb in the top bar",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:55:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5343",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/topbar/Breadcrumb.tsx",
+            "src/dashboard/frontend/src/App/topbar/Breadcrumb.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/App/topbar/Breadcrumb.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "Breadcrumb.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-19 (H-D4). Breadcrumb.tsx: when selectedProjectKey === ALL_PROJECTS_KEY render an AllProjectsCrumb: 'All projects' / then, with N = leafCount of useDeckLayoutStore(selectDeckLayout(ALL_PROJECTS_KEY)) when that layout is non-null, 'N conversations side by side' for N >= 2, else the active pane's label (selectActivePane), else 'Conversation'. Keep data-testid='topbar-crumb'. Project decks are unchanged. Add every NEW frontend test file to scripts/frontend-test-subset.txt in sorted position (the file is merge=union, so parallel edits are safe)."
+        },
+        "items": [
+          {
+            "id": "crumb.ac1",
+            "title": "Given the All deck with one active pane labelled 'Fix the build', the crumb reads 'All projects / Fix the build'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crumb.ac2",
+            "title": "Given the All deck with a 3-leaf layout, the crumb reads 'All projects / 3 conversations side by side'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crumb.ac3",
+            "title": "Given selectedProjectKey 'overdeck', the crumb still reads the project name and the active pane label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "new-conversation",
+        "title": "Create new conversations from the All deck in the last project, opened beside",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:55:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5343",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/frame/deck/useCreateConversation.ts",
+            "src/dashboard/frontend/src/components/frame/NewConversationButton.tsx",
+            "src/dashboard/frontend/src/components/frame/deck/__tests__/useCreateConversation.test.tsx",
+            "src/dashboard/frontend/src/components/frame/__tests__/NewConversationButton.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/frame/deck/__tests__/useCreateConversation.test.tsx src/components/frame/__tests__/NewConversationButton.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both named test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-20 (H-D13, H-D17). useCreateConversation.ts: when deckKey === ALL_PROJECTS_KEY, createForAgent uses readLastProjectKey() when isRealProjectKey, else no projectKey (line 78 becomes isRealProjectKey(deckKey) ? deckKey : …); create opens the new conversation with openConversationBeside(ALL_PROJECTS_KEY, conv.name, title) and openInDeck({ projectKey: ALL_PROJECTS_KEY, conversationRouteKey: String(conv.id) }). NewConversationButton.tsx line 37: use isRealProjectKey; in All mode projectKey = last real project; the second line starts with that project's name ('No project' when none) followed by ' · '. Add every NEW frontend test file to scripts/frontend-test-subset.txt in sorted position (the file is merge=union, so parallel edits are safe)."
+        },
+        "items": [
+          {
+            "id": "new-conversation.ac1",
+            "title": "Given the All deck and overdeck.ui.lastProjectKey 'overdeck', creating posts a body with projectKey 'overdeck' and never '__all-projects__'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-conversation.ac2",
+            "title": "Given the All deck, a created conversation is opened through openInDeck with projectKey '__all-projects__' and lands beside the focused pane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-conversation.ac3",
+            "title": "Given the All deck and last project 'overdeck', the New conversation summary line starts with 'overdeck ·'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the All projects deck for users and developers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T23:55:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5343",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/mission-control.mdx",
+            "features/conversations.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "changelog.d/pan-5343.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'All projects' features/mission-control.mdx docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep prints the new headings"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-21. features/mission-control.mdx '## Left column': add '### All projects and side-by-side conversations' covering the two doors, grouping (Needs you first, then one group per project), plain click / Ctrl-Cmd+Click / Beside / Open beside / Open in its project, the Layout presets, drag a row onto a pane (centre replaces, edge opens beside), the 'Make this the only pane' button, and that panes and layout survive a reload; name the All projects item in the project switcher bullet. features/conversations.mdx line ~1075: Shift-click selects multiple rows; Ctrl/Cmd-click opens the conversation beside the focused pane. docs/DASHBOARD-ARCHITECTURE.md: new '## All projects deck (PAN-5343)' after '## Left column (PAN-5293)' covering deckKeys.ts, Home-less decks in panesStore, deckLayoutStore, presetLayout/presetOf, the two openers with a click-rule table, conversationDragStore, the overdeck.ui.allProjectsDeck reload flag. changelog.d/pan-5343.md: one '#### New' bullet per changelog.d/README.md format linking #5343."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "features/mission-control.mdx contains the heading '### All projects and side-by-side conversations' and names Ctrl/Cmd+Click as opening beside",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "features/conversations.mdx contains the sentence that Shift-click selects multiple rows and contains no claim that Cmd/Ctrl-click selects rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains '## All projects deck (PAN-5343)' naming deckLayoutStore, presetLayout and ALL_PROJECTS_KEY",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "changelog.d/pan-5343.md exists with a '#### New' heading and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "deck-key",
+        "to": "homeless-panes",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-key",
+        "to": "switcher-door",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-key",
+        "to": "scope-switch",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-key",
+        "to": "hide-project-items",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-key",
+        "to": "crumb",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-key",
+        "to": "new-conversation",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-key",
+        "to": "conv-deeplink",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-key",
+        "to": "deck-openers",
+        "type": "blocks"
+      },
+      {
+        "from": "homeless-panes",
+        "to": "deck-openers",
+        "type": "blocks"
+      },
+      {
+        "from": "homeless-panes",
+        "to": "empty-all-deck",
+        "type": "blocks"
+      },
+      {
+        "from": "preset-layout",
+        "to": "deck-openers",
+        "type": "blocks"
+      },
+      {
+        "from": "preset-layout",
+        "to": "preset-bar",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-layout-store",
+        "to": "deck-openers",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-layout-store",
+        "to": "pane-badges",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-layout-store",
+        "to": "preset-bar",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-layout-store",
+        "to": "crumb",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-openers",
+        "to": "open-routing",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-openers",
+        "to": "conv-deeplink",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-openers",
+        "to": "row-drag",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-openers",
+        "to": "new-conversation",
+        "type": "blocks"
+      },
+      {
+        "from": "scope-switch",
+        "to": "grouped-list",
+        "type": "blocks"
+      },
+      {
+        "from": "grouped-list",
+        "to": "pane-badges",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-badges",
+        "to": "row-open-controls",
+        "type": "blocks"
+      },
+      {
+        "from": "row-open-controls",
+        "to": "open-routing",
+        "type": "blocks"
+      },
+      {
+        "from": "open-routing",
+        "to": "row-drag",
+        "type": "blocks"
+      },
+      {
+        "from": "preset-bar",
+        "to": "only-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "only-pane",
+        "to": "row-drag",
+        "type": "blocks"
+      },
+      {
+        "from": "row-drag",
+        "to": "pane-marks",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-marks",
+        "to": "empty-all-deck",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-key",
+        "to": "preset-bar",
+        "type": "blocks"
+      },
+      {
+        "from": "conv-deeplink",
+        "to": "empty-all-deck",
+        "type": "blocks"
+      },
+      {
+        "from": "open-routing",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "preset-bar",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "only-pane",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "row-drag",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

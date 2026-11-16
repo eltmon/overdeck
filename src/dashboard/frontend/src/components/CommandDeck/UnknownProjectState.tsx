@@ -1,5 +1,5 @@
 import { CircleAlert, Compass } from 'lucide-react';
-import { NO_PROJECT_KEY } from './projectsData';
+import { ALL_PROJECTS_KEY, NO_PROJECT_KEY } from './projectsData';
 import styles from './styles/command-deck.module.css';
 
 export interface RegisteredProject {
@@ -30,6 +30,7 @@ export function isKnownProject(
   registeredProjects: readonly RegisteredProject[],
 ): boolean {
   return selectedProject === NO_PROJECT_KEY
+    || selectedProject === ALL_PROJECTS_KEY
     || findRegisteredProject(registeredProjects, selectedProject) !== undefined;
 }
 

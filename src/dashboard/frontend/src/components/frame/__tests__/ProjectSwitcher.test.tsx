@@ -29,9 +29,10 @@ let props: {
   onNewWorkspace: ReturnType<typeof vi.fn>;
 };
 
-function renderSwitcher(projects: ProjectData[], selectedProject: string | null = null) {
+function renderSwitcher(projects: ProjectData[], selectedProject: string | null = null, conversations?: Array<{ name: string; sessionAlive: boolean }>) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
   client.setQueryData(['command-deck-projects'], projects);
+  if (conversations) client.setQueryData(['conversations'], conversations);
   const view = render(
     <QueryClientProvider client={client}>
       <ProjectSwitcher selectedProject={selectedProject} collapsed={false} {...props} />
@@ -116,6 +117,34 @@ describe('ProjectSwitcher (PAN-5293 F-D7)', () => {
     fireEvent.click(screen.getByTestId('project-switcher'));
     fireEvent.click(screen.getByTestId('project-switcher-row-no-project'));
     expect(props.onSelectProject).toHaveBeenLastCalledWith(NO_PROJECT_KEY);
+  });
+
+  // PAN-5343 H-D2: the All projects door.
+  it('lists All projects first with its project and active-conversation counts', () => {
+    renderSwitcher([project('Overdeck'), project('DFAI')], 'Overdeck', [
+      { name: 'a', sessionAlive: true },
+      { name: 'b', sessionAlive: false },
+    ]);
+    const items = screen.getAllByRole('menuitem');
+    expect(items[0]).toBe(screen.getByTestId('project-switcher-row-all-projects'));
+    expect(items[0]).toHaveTextContent('All projects');
+    expect(items[0]).toHaveTextContent('2 projects · 1 active');
+    expect(items[0].querySelector('[aria-hidden="true"]')).toHaveTextContent('✱');
+  });
+
+  it('picks All projects by ALL_PROJECTS_KEY', () => {
+    renderSwitcher([project('Overdeck')]);
+    fireEvent.click(screen.getByTestId('project-switcher-row-all-projects'));
+    expect(props.onSelectProject).toHaveBeenCalledWith('__all-projects__');
+  });
+
+  it('shows the All projects mark, name and subtitle on the closed button when selected', () => {
+    renderSwitcher([project('Overdeck'), project('DFAI')], '__all-projects__', [{ name: 'a', sessionAlive: true }]);
+    const trigger = screen.getByTestId('project-switcher');
+    expect(screen.getByTestId('project-switcher-name')).toHaveTextContent('All projects');
+    expect(trigger.querySelector('[aria-hidden="true"]')).toHaveTextContent('✱');
+    expect(screen.getByTestId('project-switcher-subtitle')).toHaveTextContent('2 projects · 1 active');
+    expect(screen.getByTestId('project-switcher-row-all-projects')).toHaveAttribute('aria-current', 'true');
   });
 
   it('reads "2 working", "1 in review" and "idle" (F-D8)', () => {

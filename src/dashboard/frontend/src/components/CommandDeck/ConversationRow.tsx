@@ -1,7 +1,7 @@
 import { Fragment, useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useDashboardStore } from '../../lib/store';
-import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Info, Scissors, TriangleAlert, FileText, FileX, ExternalLink, Share2, MoreVertical, FolderInput, MonitorSmartphone, CheckSquare, Square, CalendarClock } from 'lucide-react';
+import { Columns2, Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Info, Scissors, TriangleAlert, FileText, FileX, ExternalLink, Share2, MoreVertical, FolderInput, MonitorSmartphone, CheckSquare, Square, CalendarClock } from 'lucide-react';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
 import { useConfirm } from '../DialogProvider';
 import { continueTargetOf, openContinueOnDevice } from '../chat/continueOnDevice/continueOnDeviceStore';
@@ -12,7 +12,10 @@ import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import type { Conversation } from './ConversationList';
 import type { ConversationMutations } from './useConversationMutations';
 import type { RegisteredProject } from './UnknownProjectState';
-import { resolveEffectiveProjectKey } from './projectsData';
+import { NO_PROJECT_KEY, resolveEffectiveProjectKey } from './projectsData';
+import { ProjectMark } from '../frame/ProjectMark';
+import { currentPlatform } from '../../lib/shortcuts/keys';
+import { CONVERSATION_DRAG_TYPE, useConversationDragStore } from '../Stage/conversationDragStore';
 import { fallbackBadgeTone } from './fallbackBadge';
 import { isScrollInsideMenu, MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
 import { isOfflineLinked, LinkedMachineChip, LinkedOfflineMeta, LinkedRowMenuItems } from './LinkedConversationRow';
@@ -94,6 +97,17 @@ interface ConversationRowProps {
   flattenedFrom?: number | null;
   /** PAN-4223 D27: the judged builder's id when this critic nests under it. */
   criticOf?: number | null;
+  /** PAN-5343 H-D3: the row's project mark in the All projects list (NO_PROJECT_KEY renders muted). */
+  markProjectKey?: string;
+  markName?: string;
+  /** PAN-5343 H-D18: the 1-based split leaf showing this conversation, when the deck is split. */
+  paneSlot?: number;
+  /** PAN-5343 H-D5: open this conversation beside the panes on screen (the Beside control and menu item). */
+  onOpenBeside?: (name: string) => void;
+  /** PAN-5343 H-D5: switch to the conversation's own project deck (menu item). */
+  onOpenInProject?: (name: string) => void;
+  /** PAN-5343 H-D8: the conversation's own project deck; when set, the row drags onto a pane. */
+  dragDeckKey?: string;
 }
 
 /** D28: WOWED and PASS use the done token; every other verdict is neutral (routine work, not an alarm). */
@@ -160,6 +174,12 @@ export function ConversationRow({
   orphanOf = null,
   flattenedFrom = null,
   criticOf = null,
+  markProjectKey,
+  markName,
+  paneSlot,
+  onOpenBeside,
+  onOpenInProject,
+  dragDeckKey,
 }: ConversationRowProps) {
   const [copiedId, setCopiedId] = useState(false);
   const [editingName, setEditingName] = useState(false);
@@ -462,6 +482,13 @@ export function ConversationRow({
         setMenuOpen(true);
       }}
       title={conv.name}
+      draggable={dragDeckKey ? true : undefined}
+      onDragStart={dragDeckKey ? (e) => {
+        e.dataTransfer.setData(CONVERSATION_DRAG_TYPE, conv.name);
+        e.dataTransfer.effectAllowed = 'copyMove';
+        useConversationDragStore.getState().start({ name: conv.name, deckKey: dragDeckKey });
+      } : undefined}
+      onDragEnd={dragDeckKey ? () => useConversationDragStore.getState().end() : undefined}
       aria-busy={leavingKind ? true : undefined}
       aria-selected={isMultiSelected || undefined}
     >
@@ -566,6 +593,10 @@ export function ConversationRow({
         />
       )}
 
+      {markProjectKey && (
+        <ProjectMark size="sm" name={markName ?? markProjectKey} projectKey={markProjectKey} muted={markProjectKey === NO_PROJECT_KEY} />
+      )}
+
       {/* Title + metadata */}
       {editingName ? (
         <input
@@ -655,6 +686,33 @@ export function ConversationRow({
         </span>
       )}
 
+      {paneSlot !== undefined && (
+        <span
+          className="shrink-0 rounded border border-border px-1 font-mono text-[10px] leading-4 text-muted-foreground"
+          title={`Shown in pane ${paneSlot}`}
+          data-testid="conversation-pane-slot"
+        >
+          {paneSlot}
+        </span>
+      )}
+
+      {/* PAN-5343 H-D5: open beside the panes on screen. */}
+      {onOpenBeside && !editingName && (
+        <span
+          role="button"
+          tabIndex={0}
+          className={styles.conversationKebabBtn}
+          onClick={(e) => { e.stopPropagation(); onOpenBeside(conv.name); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onOpenBeside(conv.name); }
+          }}
+          title={`Open beside (${currentPlatform() === 'mac' ? '⌘' : 'Ctrl'}+Click)`}
+          aria-label="Open beside"
+        >
+          <Columns2 size={iconSize} />
+        </span>
+      )}
+
       {/* Overflow actions (⋮) — replaces the inline icon swarm */}
       {!editingName && (
         <span
@@ -715,6 +773,19 @@ export function ConversationRow({
           className="fixed z-[1000] min-w-[220px]"
           style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, right: 'auto' }}
         >
+          {onOpenBeside && (
+            <MenuItemButton onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onOpenBeside(conv.name); }}>
+              <Columns2 size={14} />
+              Open beside
+            </MenuItemButton>
+          )}
+          {onOpenInProject && (
+            <MenuItemButton onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onOpenInProject(conv.name); }}>
+              <FolderInput size={14} />
+              Open in its project
+            </MenuItemButton>
+          )}
+          {(onOpenBeside || onOpenInProject) && <MenuSeparator />}
           {conv.origin === 'linked' ? <LinkedRowMenuItems conv={conv} onCopyLink={handleCopyLink} onClose={() => setMenuOpen(false)} /> : <>
           <MenuItemButton
             onClick={() => { beginRename(); setMenuOpen(false); }}
