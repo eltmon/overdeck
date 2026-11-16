@@ -54,6 +54,12 @@ describe('LeftNav (PAN-5293 F-D11)', () => {
     expect(screen.queryByTestId('left-nav-project-home')).not.toBeInTheDocument();
   });
 
+  it('hides Project home in the All projects deck (PAN-5343 H-D4)', () => {
+    renderNav({ selectedProject: '__all-projects__' });
+    expect(screen.queryByTestId('left-nav-project-home')).not.toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-flywheel')).toBeInTheDocument();
+  });
+
   it('Flywheel shows "running" only while a run is going', () => {
     flywheelRunning = true;
     const view = renderNav();

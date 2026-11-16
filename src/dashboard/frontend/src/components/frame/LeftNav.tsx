@@ -12,6 +12,7 @@ import type { Tab } from '../Header';
 import { fetchExperimentalFeaturesEnabled, isExperimentalTab } from '../../lib/experimentalFeatures';
 import { useFlywheelRunning } from '../../lib/flywheelApi';
 import { selectActivePane, usePanesStore } from '../../lib/panesStore';
+import { ALL_PROJECTS_KEY } from '../../lib/deckKeys';
 import { MenuItemButton, MenuOverlay, MenuSurface } from '../shared/ContextMenu';
 import { MORE_GROUPS } from './navGroups';
 
@@ -82,7 +83,7 @@ export function LeftNav({ activeTab, selectedProject, onTabChange, onOpenProject
 
   return (
     <nav aria-label="Primary" className="flex flex-col gap-0.5" data-testid="left-nav">
-      {selectedProject && (
+      {selectedProject && selectedProject !== ALL_PROJECTS_KEY && (
         <NavButton
           testId="left-nav-project-home"
           label="Project home"
