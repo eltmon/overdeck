@@ -6,6 +6,9 @@
  * Resume all resumes them one at a time and waits while memory or CPU pressure
  * is high; the server skips any conversation paused, held, or stopped on
  * purpose. Dismiss drops the row and stops a running Resume all.
+ *
+ * PAN-5342: after `pan shutdown` the same card offers the agents the drain
+ * stopped, listed after the conversations and resumed after them.
  */
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -34,6 +37,8 @@ export function BackendRestartCard({ decision }: { decision: Decision }) {
   const [error, setError] = useState<string | null>(null);
   if (!snapshot) return null;
   const running = snapshot.run?.state === 'running';
+  const agents = snapshot.agents ?? [];
+  const names = [...snapshot.conversations.map((conv) => conv.title || conv.name), ...agents.map((agent) => agent.label)];
   const failures = snapshot.run?.results.filter((result) => result.outcome === 'failed') ?? [];
 
   async function act(action: 'resume-all' | 'dismiss') {
@@ -49,9 +54,9 @@ export function BackendRestartCard({ decision }: { decision: Decision }) {
         <div className={styles.rowTop}>
           <span className={styles.badge}>{decision.label}</span>
         </div>
-        {snapshot.conversations.length > 0 && (
+        {names.length > 0 && (
           <p className={styles.prompt} data-testid="backend-restart-list">
-            {snapshot.conversations.map((conv) => conv.title || conv.name).join(', ')}
+            {names.join(', ')}
           </p>
         )}
         {snapshot.run && <p className={styles.meta} data-testid="backend-restart-run">{runLine(snapshot.run)}</p>}
@@ -60,16 +65,23 @@ export function BackendRestartCard({ decision }: { decision: Decision }) {
             <span className={styles.mono}>{failure.name}</span>: {failure.reason ?? 'failed'}
           </p>
         ))}
-        <p className={styles.meta}>
-          Overdeck does not resume these by itself. Resume all starts them one at a time and waits while memory
-          or CPU pressure is high. It skips conversations that are paused, held, or stopped on purpose. Dismiss
-          drops this row; during Resume all it stops before the next conversation.
-        </p>
+        {snapshot.cause === 'shutdown' ? (
+          <p className={styles.meta}>
+            Overdeck was shut down with pan shutdown. It does not resume these by itself. Resume all starts them
+            one at a time and waits while memory or CPU pressure is high.
+          </p>
+        ) : (
+          <p className={styles.meta}>
+            Overdeck does not resume these by itself. Resume all starts them one at a time and waits while memory
+            or CPU pressure is high. It skips conversations that are paused, held, or stopped on purpose. Dismiss
+            drops this row; during Resume all it stops before the next conversation.
+          </p>
+        )}
         <div className={styles.secretForm}>
           <button
             type="button"
             className={styles.answer}
-            disabled={sending || running || snapshot.conversations.length === 0}
+            disabled={sending || running || names.length === 0}
             onClick={() => void act('resume-all')}
           >
             Resume all

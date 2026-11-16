@@ -38,11 +38,22 @@
  *    `resumeFlywheel`, as `pan flywheel resume` does. Dismiss cancels a run
  *    before its next resume.
  *
- * State is in memory only. It runs in the primary dashboard (main.ts); a
- * dashboard restart forgets the offer. tmux hosts never fire the edges, because
- * the tmux adapter has no event stream. Work agents are out of scope.
+ * 5. **Shutdown (PAN-5342).** `seedShutdownOffer` turns the sessions a safe
+ *    shutdown's drain stopped into the same offer, settled at once, with cause
+ *    `shutdown`: the mid-turn conversations, plus every work agent. The drain's
+ *    own stops recorded stop marks, so the stopped-on-purpose mark rule is off
+ *    for that cause; the `ended_at` baseline still drops a conversation the
+ *    operator stops after the offer. Resume all then resumes conversations with
+ *    resume cause `operator`, and afterwards each agent through `resumeAgent`,
+ *    with the same pressure wait before each one.
+ *
+ * State is in memory only, read by polling the GET route; nothing is emitted.
+ * It runs in the primary dashboard (main.ts); a dashboard restart forgets the
+ * offer. tmux hosts never fire the edges, because the tmux adapter has no
+ * event stream. Work agents are offered only after a shutdown.
  */
 import type {
+  BackendRestartAgent,
   BackendRestartConversation,
   BackendRestartRecoverySnapshot,
   BackendRestartResumeResult,
@@ -58,6 +69,9 @@ import { conversationStoppedSince } from '../../../lib/overdeck/conversation-sto
 import { getConversationByName, listConversations } from '../../../lib/overdeck/conversations.js';
 import { decodeDoorResponse } from '../../../lib/overdeck/scheduled-message-delivery.js';
 import { FLYWHEEL_CONVERSATION_SESSION } from '../../../lib/flywheel/constants.js';
+import type { ResumeCause } from '../../../lib/resume-contract.js';
+import type { ShutdownStoppedSession } from '../../../lib/shutdown/drain-record.js';
+import { listLiveAgentIds } from '../../../lib/terminal-backends/inventory.js';
 import { onBackendConnectionChange } from './backend-inventory.js';
 
 /** A row that ended this long before the loss still counts as live at the loss. */
@@ -86,7 +100,15 @@ export interface BackendRestartRecoveryDeps {
   isHeld: (name: string) => boolean;
   stoppedSince: (name: string, sinceMs: number) => boolean;
   pressureBand: () => Promise<MemoryPressureBand>;
-  resume: (name: string) => Promise<{ status: number; body: unknown }>;
+  resume: (name: string, resumeCause: ResumeCause) => Promise<{ status: number; body: unknown }>;
+  /** Agent ids whose pane runs now; null when the inventory could not be read. One read per pass. */
+  liveAgentIds: () => Promise<ReadonlySet<string> | null>;
+  hasAgentState: (agentId: string) => boolean;
+  resumeAgent: (
+    agentId: string,
+    message: string | undefined,
+    opts: { resumeCause: ResumeCause },
+  ) => Promise<{ success: boolean; error?: string }>;
   sleep: (ms: number) => Promise<void>;
   now: () => number;
 }
@@ -117,16 +139,23 @@ const defaultDeps: BackendRestartRecoveryDeps = {
   isHeld: (name) => readHeldKickoff(name) !== null,
   stoppedSince: conversationStoppedSince,
   pressureBand: async () => (await assessMemoryPressure()).band,
-  resume: async (name) => (name === FLYWHEEL_CONVERSATION_SESSION
+  resume: async (name, resumeCause) => (name === FLYWHEEL_CONVERSATION_SESSION
     ? resumeFlywheelConversation()
-    : decodeDoorResponse(await handleConversationResume(name, {}, { resolveSessionFile, resumeCause: 'system' }))),
+    : decodeDoorResponse(await handleConversationResume(name, {}, { resolveSessionFile, resumeCause }))),
+  liveAgentIds: () => listLiveAgentIds(),
+  hasAgentState: (agentId) => getAgentState(agentId) !== null,
+  resumeAgent: async (agentId, message, opts) => (await import('../../../lib/agents/resume.js')).resumeAgent(agentId, message, opts),
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   now: Date.now,
 };
 
 interface Capture {
+  /** What stopped the sessions: `shutdown` turns the stop-mark rule off. */
+  cause: BackendRestartRecoverySnapshot['cause'];
   lostAtMs: number;
   names: string[];
+  /** Work agents a shutdown stopped, resumed after the conversations. */
+  agents: BackendRestartAgent[];
   /** The backend is back; false while it is down. */
   restored: boolean;
   /** `names` holds only conversations the restart left stopped. */
@@ -162,7 +191,8 @@ function dropReason(row: RecoveryConversationRow | null, live: ReadonlySet<strin
   if (row.archivedAt) return 'archived';
   if (row.origin === 'vault' || row.releasedTo) return 'owned by another machine';
   if (live.has(row.tmuxSession)) return 'already running';
-  if (deps.stoppedSince(row.name, current.lostAtMs - RESTART_EXIT_WINDOW_MS)) return 'stopped on purpose';
+  // The drain's own stops recorded stop marks: after a shutdown they say nothing.
+  if (current.cause !== 'shutdown' && deps.stoppedSince(row.name, current.lostAtMs - RESTART_EXIT_WINDOW_MS)) return 'stopped on purpose';
   if (row.status === 'ended' && row.endedAt) {
     const seen = current.endedAtSeen.get(row.name);
     if (seen === undefined) current.endedAtSeen.set(row.name, row.endedAt);
@@ -188,12 +218,53 @@ export function noteBackendLost(): void {
   // conversation resumed after the last restart is never read as stopped on
   // purpose. Names the last offer still holds carry over.
   const carried = capture?.names ?? [];
+  const agents = capture?.agents ?? [];
+  const cause = capture?.cause ?? 'backend-restart';
   if (run?.state === 'running') run.cancelled = true;
   run = null;
   const merged = [...new Set([...carried, ...names])];
-  capture = merged.length > 0
-    ? { lostAtMs: now, names: merged, restored: false, settled: false, endedAtSeen: new Map(), rebaseline: new Set() }
+  capture = merged.length > 0 || agents.length > 0
+    ? { cause, lostAtMs: now, names: merged, agents, restored: false, settled: false, endedAtSeen: new Map(), rebaseline: new Set() }
     : null;
+}
+
+/**
+ * Offer what a safe shutdown stopped (PAN-5342, D-9/D-10): every agent, plus
+ * the conversations that were mid-turn (`wasWorking`). The offer is settled at
+ * once; names an existing offer still holds carry over.
+ */
+export function seedShutdownOffer(sessions: readonly ShutdownStoppedSession[]): void {
+  const names = sessions
+    .filter((session) => session.kind === 'conversation' && session.wasWorking)
+    .map((session) => session.name ?? session.id.replace(/^conv-/, ''));
+  const agents = new Map((capture?.agents ?? []).map((agent) => [agent.id, agent]));
+  for (const session of sessions) {
+    if (session.kind !== 'agent') continue;
+    agents.set(session.id, { id: session.id, issueId: session.issueId ?? null, label: session.label });
+  }
+  const merged = [...new Set([...(capture?.names ?? []), ...names])];
+  if (run?.state === 'running') run.cancelled = true;
+  run = null;
+  if (merged.length === 0 && agents.size === 0) {
+    capture = null;
+    return;
+  }
+  const endedAtSeen = new Map<string, string>();
+  for (const name of merged) {
+    const row = deps.getConversation(name);
+    if (row?.status === 'ended' && row.endedAt) endedAtSeen.set(name, row.endedAt);
+  }
+  capture = {
+    cause: 'shutdown',
+    lostAtMs: deps.now(),
+    names: merged,
+    agents: [...agents.values()],
+    restored: true,
+    settled: true,
+    endedAtSeen,
+    rebaseline: new Set(),
+  };
+  console.log(`[backend-restart-recovery] shutdown stopped ${merged.length} conversation(s) and ${agents.size} agent(s); offering Resume all`);
 }
 
 /** The backend is back: settle which recorded conversations it left stopped. */
@@ -218,36 +289,58 @@ async function settle(): Promise<void> {
     return true;
   });
   current.settled = true;
-  if (current.names.length === 0) {
+  if (current.names.length === 0 && current.agents.length === 0) {
     capture = null;
     return;
   }
   console.log(`[backend-restart-recovery] ${current.names.length} conversation(s) stopped when the terminal backend restarted; offering Resume all`);
 }
 
-/** The conversations Resume all would resume now, pruning the ones that dropped out. */
-async function offeredConversations(): Promise<BackendRestartConversation[]> {
+/** Why an agent drops out of the offer, or null; `unknown` when the inventory did not answer. */
+function agentDropReason(agentId: string, live: ReadonlySet<string> | null): 'already running' | 'not found' | 'unknown' | null {
+  if (!deps.hasAgentState(agentId)) return 'not found';
+  if (live === null) return 'unknown';
+  return live.has(agentId) ? 'already running' : null;
+}
+
+interface Offer {
+  conversations: BackendRestartConversation[];
+  agents: BackendRestartAgent[];
+}
+
+/** What Resume all would resume now, pruning the conversations and agents that dropped out. */
+async function offered(): Promise<Offer> {
   await settle();
   const current = capture;
-  if (!current?.settled) return [];
+  if (!current?.settled) return { conversations: [], agents: [] };
   const live = await deps.liveSessions();
-  if (!live || capture !== current) return [];
-  const offered: BackendRestartConversation[] = [];
+  if (!live || capture !== current) return { conversations: [], agents: [] };
+  const conversations: BackendRestartConversation[] = [];
   current.names = current.names.filter((name) => {
     const row = deps.getConversation(name);
     if (!row || dropReason(row, live, current) !== null) return false;
-    offered.push({ name: row.name, title: row.title });
+    conversations.push({ name: row.name, title: row.title });
     return true;
   });
-  if (current.names.length === 0 && run?.state !== 'running') capture = null;
-  return offered;
+  const liveAgents = current.agents.length > 0 ? await deps.liveAgentIds() : null;
+  if (capture !== current) return { conversations: [], agents: [] };
+  // An unreadable inventory keeps every agent: only a live pane or a missing state drops one.
+  const kept = current.agents.filter((agent) => {
+    const drop = agentDropReason(agent.id, liveAgents);
+    return drop === null || drop === 'unknown';
+  });
+  current.agents = kept;
+  if (current.names.length === 0 && current.agents.length === 0 && run?.state !== 'running') capture = null;
+  return { conversations, agents: [...kept] };
 }
 
 export async function getBackendRestartRecoverySnapshot(): Promise<BackendRestartRecoverySnapshot> {
-  const conversations = await offeredConversations();
+  const { conversations, agents } = await offered();
   return {
-    lostAt: conversations.length > 0 && capture ? new Date(capture.lostAtMs).toISOString() : null,
+    lostAt: (conversations.length > 0 || agents.length > 0) && capture ? new Date(capture.lostAtMs).toISOString() : null,
+    cause: capture?.cause ?? 'backend-restart',
     conversations,
+    agents,
     run: run
       ? {
         state: run.state,
@@ -287,7 +380,7 @@ async function resumeOne(name: string, current: Capture): Promise<BackendRestart
   if (drop) return { name, outcome: 'skipped', reason: drop };
   let failed = false;
   try {
-    const response = await deps.resume(name);
+    const response = await deps.resume(name, current.cause === 'shutdown' ? 'operator' : 'system');
     const body = response.body as { error?: unknown; reattached?: unknown } | null;
     if (response.status >= 400) {
       failed = true;
@@ -308,13 +401,37 @@ async function resumeOne(name: string, current: Capture): Promise<BackendRestart
   }
 }
 
-async function runResumeAll(active: MutableRun, names: readonly string[], current: Capture): Promise<void> {
+async function resumeOneAgent(agentId: string): Promise<BackendRestartResumeResult> {
+  const drop = agentDropReason(agentId, await deps.liveAgentIds());
+  if (drop === 'already running') return { name: agentId, outcome: 'already-running' };
+  if (drop === 'not found') return { name: agentId, outcome: 'skipped', reason: 'not found' };
+  if (drop === 'unknown') return { name: agentId, outcome: 'failed', reason: 'the terminal backend did not answer' };
   try {
-    for (const name of names) {
+    const result = await deps.resumeAgent(agentId, undefined, { resumeCause: 'operator' });
+    return result.success
+      ? { name: agentId, outcome: 'resumed' }
+      : { name: agentId, outcome: 'failed', reason: result.error ?? 'resume failed' };
+  } catch (error) {
+    return { name: agentId, outcome: 'failed', reason: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+async function runResumeAll(
+  active: MutableRun,
+  names: readonly string[],
+  agentIds: readonly string[],
+  current: Capture,
+): Promise<void> {
+  const steps: Array<{ id: string; resume: () => Promise<BackendRestartResumeResult> }> = [
+    ...names.map((name) => ({ id: name, resume: () => resumeOne(name, current) })),
+    ...agentIds.map((id) => ({ id, resume: () => resumeOneAgent(id) })),
+  ];
+  try {
+    for (const step of steps) {
       await waitForPressure(active);
       if (active.cancelled) break;
-      active.current = name;
-      active.results.push(await resumeOne(name, current));
+      active.current = step.id;
+      active.results.push(await step.resume());
       active.current = null;
     }
   } finally {
@@ -323,12 +440,12 @@ async function runResumeAll(active: MutableRun, names: readonly string[], curren
     active.state = 'done';
     active.finishedAt = new Date(deps.now()).toISOString();
     const resumed = active.results.filter((result) => result.outcome === 'resumed').length;
-    console.log(`[backend-restart-recovery] Resume all ${active.cancelled ? 'cancelled' : 'finished'}: ${resumed} of ${names.length} resumed`);
+    console.log(`[backend-restart-recovery] Resume all ${active.cancelled ? 'cancelled' : 'finished'}: ${resumed} of ${steps.length} resumed`);
   }
 }
 
 export type ResumeAllStart =
-  | { started: true; conversations: number }
+  | { started: true; conversations: number; agents?: number }
   | { started: false; reason: 'running' | 'nothing-to-resume' };
 
 /** Start Resume all in the background. Refuses while a run is in progress. */
@@ -346,15 +463,22 @@ export async function startBackendRestartResumeAll(): Promise<ResumeAllStart> {
     results: [],
   };
   run = active;
-  const offered = await offeredConversations();
+  const offer = await offered();
   const current = capture;
   if (run !== active || active.cancelled) return { started: false, reason: 'nothing-to-resume' };
-  if (offered.length === 0 || !current) {
+  if ((offer.conversations.length === 0 && offer.agents.length === 0) || !current) {
     run = previous;
     return { started: false, reason: 'nothing-to-resume' };
   }
-  void runResumeAll(active, offered.map((row) => row.name), current).catch(() => undefined);
-  return { started: true, conversations: offered.length };
+  void runResumeAll(
+    active,
+    offer.conversations.map((row) => row.name),
+    offer.agents.map((agent) => agent.id),
+    current,
+  ).catch(() => undefined);
+  return offer.agents.length > 0
+    ? { started: true, conversations: offer.conversations.length, agents: offer.agents.length }
+    : { started: true, conversations: offer.conversations.length };
 }
 
 /** Drop the offer. A running Resume all stops before its next resume; the one in flight finishes. */

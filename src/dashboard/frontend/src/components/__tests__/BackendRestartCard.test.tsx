@@ -1,6 +1,7 @@
 /**
  * PAN-5091: the terminal-backend restart card lists the stopped conversations,
  * posts Resume all and Dismiss, shows the run, and disables both while it runs.
+ * PAN-5342: after `pan shutdown` it lists the agents too, with the shutdown text.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -33,7 +34,9 @@ function renderCard(snapshot: BackendRestartRecoverySnapshot) {
 
 const OFFER: BackendRestartRecoverySnapshot = {
   lostAt: '2026-11-06T09:13:00.000Z',
+  cause: 'backend-restart',
   conversations: [{ name: 'a', title: 'Fernkite deploy' }, { name: 'b', title: null }],
+  agents: [],
   run: null,
 };
 
@@ -47,6 +50,25 @@ describe('BackendRestartCard', () => {
     expect(screen.getByText('2 conversations stopped when the terminal backend restarted')).toBeTruthy();
     expect(screen.getByTestId('backend-restart-list').textContent).toBe('Fernkite deploy, b');
     fireEvent.click(screen.getByRole('button', { name: 'Resume all' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/backend-restart-recovery/resume-all', { method: 'POST' }));
+  });
+
+  it('after a shutdown lists the agents after the conversations and enables Resume all for agents alone', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ started: true, conversations: 0, agents: 1 }), { status: 202 }));
+    renderCard({
+      ...OFFER,
+      cause: 'shutdown',
+      conversations: [{ name: 'a', title: 'Fernkite deploy' }],
+      agents: [{ id: 'agent-pan-7', issueId: 'PAN-7', label: 'PAN-7 work agent' }],
+    });
+    expect(screen.getByTestId('backend-restart-list').textContent).toBe('Fernkite deploy, PAN-7 work agent');
+    expect(screen.getByText(/Overdeck was shut down with pan shutdown\. It does not resume these by itself\./)).toBeTruthy();
+    expect(screen.queryByText(/stopped on purpose/)).toBeNull();
+
+    renderCard({ ...OFFER, cause: 'shutdown', conversations: [], agents: [{ id: 'agent-pan-8', issueId: null, label: 'agent-pan-8' }] });
+    const buttons = screen.getAllByRole('button', { name: 'Resume all' });
+    expect((buttons[1] as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(buttons[1]!);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/backend-restart-recovery/resume-all', { method: 'POST' }));
   });
 
