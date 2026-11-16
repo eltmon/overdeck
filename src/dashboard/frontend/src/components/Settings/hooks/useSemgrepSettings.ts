@@ -92,6 +92,9 @@ export function useSemgrepSettings() {
           const body = await res.json().catch(() => null);
           if (res.ok) {
             setServerError(null);
+            // An older GET still in flight when this PUT resolves could otherwise land
+            // after setQueryData and overwrite the saved value with a stale read.
+            await queryClient.cancelQueries({ queryKey: ['semgrep-settings'] });
             queryClient.setQueryData(['semgrep-settings'], body);
             if ('enabled' in next) void queryClient.invalidateQueries({ queryKey: ['semgrep-install-status'] });
           } else if (res.status === 400) {

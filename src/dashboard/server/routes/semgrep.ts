@@ -116,10 +116,13 @@ const postProjectSastRoute = HttpRouter.add(
       return jsonResponse({ error: "value must be 'off', 'advisory', 'blocking', or null" }, { status: 400 });
     }
 
-    yield* Effect.promise(() => setProjectSastOverride(key, value as SemgrepGateMode | null));
-    const updated = yield* getProject(key);
+    // Validate the global block before writing: an invalid config.yaml must not let the
+    // write through only to report it as failed (the override would have changed anyway).
     const semgrepConfig = yield* Effect.promise(() => loadSemgrepGateConfig());
     if ('error' in semgrepConfig) return jsonResponse({ error: semgrepConfig.error }, { status: 422 });
+
+    yield* Effect.promise(() => setProjectSastOverride(key, value as SemgrepGateMode | null));
+    const updated = yield* getProject(key);
     return jsonResponse(projectSastView(updated!, semgrepConfig.config));
   })),
 );

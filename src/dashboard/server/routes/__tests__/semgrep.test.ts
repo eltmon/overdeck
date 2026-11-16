@@ -193,10 +193,11 @@ describe('POST /api/projects/:projectKey/sast', () => {
     expect(mockSetProjectSastOverride).not.toHaveBeenCalled();
   });
 
-  it('answers 422 when the global security block is invalid', async () => {
+  it('answers 422 when the global security block is invalid, without writing the override', async () => {
     mockSetProjectSastOverride.mockResolvedValue(undefined);
     mockLoadConfigNoMigration.mockRejectedValue(new Error('config.yaml: security.semgrep.gate must be one of off, advisory, blocking'));
     const res = await callProjectSast('POST', { value: 'blocking' });
     expect(res).toEqual({ status: 422, body: { error: 'config.yaml: security.semgrep.gate must be one of off, advisory, blocking' } });
+    expect(mockSetProjectSastOverride).not.toHaveBeenCalled();
   });
 });

@@ -71,6 +71,44 @@ describe('SecuritySection (PAN-4594)', () => {
     })));
   });
 
+  it('keeps the saved view when a stale settings GET resolves after the save', async () => {
+    let getCalls = 0;
+    let resolveSecondGet: ((response: Response) => void) | undefined;
+    installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/semgrep/settings') {
+        getCalls += 1;
+        if (getCalls === 1) return Response.json(BASE_VIEW);
+        return new Promise<Response>((resolve) => { resolveSecondGet = resolve; });
+      }
+      if (method === 'GET' && url === '/api/prereqs/useSemgrep') {
+        return Response.json({ feature: 'useSemgrep', tools: [{ tool: 'semgrep', installed: true, installable: true }], ready: true, missing: [] });
+      }
+      if (method === 'PUT' && url === '/api/semgrep/settings') return Response.json({ ...BASE_VIEW, gate: 'blocking' });
+      return undefined;
+    });
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(<QueryClientProvider client={client}><SecuritySection /></QueryClientProvider>);
+    await waitFor(() => expect(screen.getByTestId('semgrep-gate-select')).toHaveValue('advisory'));
+
+    // A background refetch of the settings query starts and stays in flight while the
+    // save below runs — the exact race CodeRabbit flagged.
+    void client.refetchQueries({ queryKey: ['semgrep-settings'] });
+    await waitFor(() => expect(getCalls).toBe(2));
+
+    fireEvent.change(screen.getByTestId('semgrep-gate-select'), { target: { value: 'blocking' } });
+    await waitFor(() => expect(screen.getByTestId('semgrep-gate-select')).toHaveValue('blocking'));
+
+    // The stale GET resolves after the save landed; cancelQueries must stop it from
+    // reverting the cache (and the select) back to the pre-save value.
+    resolveSecondGet?.(Response.json({ ...BASE_VIEW, gate: 'advisory' }));
+    // The stale response resolves through a real microtask/macrotask chain
+    // (fetch -> res.json() -> query dispatch -> observer notify); give it room to land,
+    // then assert it did not win.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.getByTestId('semgrep-gate-select')).toHaveValue('blocking');
+  });
+
   it('disables the install button while Semgrep is off', async () => {
     const view = { ...BASE_VIEW, enabled: false };
     installStrictFetchMock(({ method, url }) => {
