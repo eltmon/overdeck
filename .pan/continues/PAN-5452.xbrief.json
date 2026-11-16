@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5452",
   "created": "2026-11-16T18:34:39.411Z",
-  "updated": "2026-11-16T19:13:43.148Z",
+  "updated": "2026-11-16T19:13:51.803Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,6 +148,11 @@
     "desktop-env.ac4": {
       "status": "completed",
       "doneAt": "2026-11-16T19:13:43.148Z"
+    },
+    "tree-filter": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T19:13:51.803Z"
     }
   }
 }
