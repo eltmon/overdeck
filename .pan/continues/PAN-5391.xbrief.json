@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5391",
   "created": "2026-11-16T02:26:12.740Z",
-  "updated": "2026-11-16T02:51:24.246Z",
+  "updated": "2026-11-16T02:52:25.520Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,9 +94,22 @@
       "doneAt": "2026-11-16T02:51:16.155Z"
     },
     "docs-amber-state": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5391",
-      "claimedAt": "2026-11-16T02:51:24.246Z"
+      "claimedAt": "2026-11-16T02:51:24.246Z",
+      "doneAt": "2026-11-16T02:52:25.520Z"
+    },
+    "docs-amber-state.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:52:25.520Z"
+    },
+    "docs-amber-state.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:52:25.520Z"
+    },
+    "docs-amber-state.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:52:25.520Z"
     }
   }
 }
