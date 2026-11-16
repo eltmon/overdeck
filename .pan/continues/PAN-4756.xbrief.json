@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:59:55.530Z",
+  "updated": "2026-11-16T12:00:16.906Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -754,9 +754,18 @@
       "doneAt": "2026-11-16T11:55:45.486Z"
     },
     "uat-five-dialogs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4756",
-      "claimedAt": "2026-11-16T11:59:55.530Z"
+      "claimedAt": "2026-11-16T11:59:55.530Z",
+      "doneAt": "2026-11-16T12:00:16.905Z"
+    },
+    "uat-five-dialogs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:00:16.905Z"
+    },
+    "uat-five-dialogs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:00:16.905Z"
     }
   }
 }
