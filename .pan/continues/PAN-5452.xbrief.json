@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5452",
   "created": "2026-11-16T18:34:39.411Z",
-  "updated": "2026-11-16T19:58:43.514Z",
+  "updated": "2026-11-16T19:58:51.616Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -336,6 +336,11 @@
     "doctor-row.ac4": {
       "status": "completed",
       "doneAt": "2026-11-16T19:58:43.514Z"
+    },
+    "cli-verb": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T19:58:51.616Z"
     }
   }
 }
