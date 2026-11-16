@@ -276,7 +276,7 @@ async function start(options: ShutdownOptions, deps: ShutdownDeps): Promise<numb
       deps.log(await errorText(response));
       return 1;
     }
-    snapshot = (await response.json() as { snapshot: ShutdownSnapshot }).snapshot;
+    snapshot = (await response.json() as { shutdown: ShutdownSnapshot }).shutdown;
   }
 
   if (detach) {

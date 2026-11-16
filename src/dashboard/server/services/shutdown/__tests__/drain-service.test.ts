@@ -170,7 +170,7 @@ describe('drain service (PAN-5342 WI-5)', () => {
     expect(h.deps.spawnFinalStage).toHaveBeenCalledWith({ reboot: true });
     await vi.advanceTimersByTimeAsync(5 * DRAIN_TICK_MS);
     expect(h.deps.spawnFinalStage).toHaveBeenCalledTimes(1);
-    expect(await cancelShutdown()).toBe(false);
+    expect(await cancelShutdown()).toBe('complete');
   });
 
   it('7. cancel deletes the record and offers agents plus mid-turn conversations only', async () => {
@@ -185,7 +185,7 @@ describe('drain service (PAN-5342 WI-5)', () => {
     h.sessions.get('conv-busy')!.boundary = true;
     await vi.advanceTimersByTimeAsync(DRAIN_TICK_MS);
     expect(h.state.record?.stopped.map((s) => s.id).sort()).toEqual(['agent-a', 'conv-busy', 'conv-idle']);
-    expect(await cancelShutdown()).toBe(true);
+    expect(await cancelShutdown()).toBe('cancelled');
     expect(h.state.record).toBeNull();
     const offered = vi.mocked(h.deps.seedResumeOffer).mock.calls[0]![0];
     expect(offered.map((s) => s.id).sort()).toEqual(['agent-a', 'conv-busy']);
@@ -253,10 +253,10 @@ describe('drain service (PAN-5342 WI-5)', () => {
     expect(h.state.record?.stopped.map((s) => s.id)).toEqual(['agent-b']);
   });
 
-  it('forceAll and cancel answer false when no drain runs', async () => {
+  it('forceAll answers false and cancel answers not-running when no drain runs', async () => {
     harness({});
     expect(await forceAll()).toBe(false);
-    expect(await cancelShutdown()).toBe(false);
+    expect(await cancelShutdown()).toBe('not-running');
   });
 });
 

@@ -10,13 +10,16 @@
  *   `{ deadlineSeconds?: 10..3600 (default 120), reboot?: boolean, force?: boolean }`.
  *   202, or 409 `{ error, code }` with `already-running` or `restart-in-progress` (D-11).
  * - `POST /api/shutdown/cancel` (`admin`): end the drain; 409 `complete` once
- *   the final stage has started.
+ *   the final stage has started, 409 `not-running` when no drain runs.
  * - `POST /api/shutdown/force-stop` (`admin`): body `{ id }`; stop that pending
  *   session now; 404 when it is not pending.
  * - `POST /api/shutdown/force-all` (`admin`): stop every pending session at the
  *   next tick; 409 `not-running` when no drain runs.
  *
- * Every POST checks the request origin and answers 403 on failure.
+ * Every POST checks the request origin and answers 403 on failure. A request
+ * that carries a header-borne credential (the internal token `pan shutdown`
+ * sends, an access token, a phone or a connector) skips the check, because a
+ * cross-site page cannot send those headers (the PAN-2351 FR-9 rule).
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -30,8 +33,11 @@ import {
   startShutdown,
 } from '../services/shutdown/drain-service.js';
 import { getShutdownPreview } from '../services/shutdown/preview.js';
+import { resolveRequestCredential } from './dashboard-auth.js';
 import { httpHandler } from './http-handler.js';
 import { validateOrigin } from './origin-validation.js';
+
+const HEADER_BORNE_CREDENTIALS = new Set(['internal-token', 'token', 'phone', 'connector']);
 
 const SHUTDOWN_DEFAULT_DEADLINE_SECONDS = 120;
 const SHUTDOWN_MIN_DEADLINE_SECONDS = 10;
@@ -77,6 +83,8 @@ const readJsonBody = Effect.gen(function* () {
 
 const forbiddenOrigin = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
+  const credentialKind = resolveRequestCredential(request)?.kind;
+  if (credentialKind && HEADER_BORNE_CREDENTIALS.has(credentialKind)) return null;
   const originCheck = validateOrigin(request);
   return originCheck.ok ? null : jsonResponse({ error: originCheck.error }, { status: 403 });
 });
@@ -124,8 +132,11 @@ const cancelShutdownRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const forbidden = yield* forbiddenOrigin;
     if (forbidden) return forbidden;
-    const cancelled = yield* Effect.promise(() => cancelShutdown());
-    if (cancelled) return jsonResponse({ cancelled: true });
+    const result = yield* Effect.promise(() => cancelShutdown());
+    if (result === 'cancelled') return jsonResponse({ cancelled: true });
+    if (result === 'not-running') {
+      return jsonResponse({ error: 'No shutdown is running.', code: 'not-running' }, { status: 409 });
+    }
     return jsonResponse({
       error: 'The shutdown is complete and can no longer be cancelled.',
       code: 'complete',

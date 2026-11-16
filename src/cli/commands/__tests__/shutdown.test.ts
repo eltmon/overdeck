@@ -69,7 +69,7 @@ function harness(options: {
       if (next instanceof Error) throw next;
       return json({ shutdown: next ?? null });
     }
-    if (path === '/api/shutdown') return options.post ?? json({ snapshot: snapshot() }, 202);
+    if (path === '/api/shutdown') return options.post ?? json({ shutdown: snapshot() }, 202);
     return json({ ok: true });
   });
   return {

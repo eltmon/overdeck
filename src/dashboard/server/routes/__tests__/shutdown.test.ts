@@ -27,8 +27,13 @@ vi.mock('../../services/shutdown/drain-service.js', () => ({
 vi.mock('../../services/shutdown/preview.js', () => ({
   getShutdownPreview: mocks.getShutdownPreview,
 }));
-vi.mock('../origin-validation.js', () => ({
+vi.mock('../origin-validation.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../origin-validation.js')>()),
   validateOrigin: mocks.validateOrigin,
+}));
+vi.mock('../../../../lib/internal-token.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/internal-token.js')>()),
+  getInternalToken: () => 'test-internal-token',
 }));
 
 import { shutdownRouteLayer } from '../shutdown.js';
@@ -47,11 +52,11 @@ const SNAPSHOT: ShutdownSnapshot = {
   warnings: [],
 };
 
-async function call(method: 'GET' | 'POST', path: string, body?: unknown | string) {
-  const init: RequestInit = { method };
+async function call(method: 'GET' | 'POST', path: string, body?: unknown | string, headers: Record<string, string> = {}) {
+  const init: RequestInit = { method, headers: { ...headers } };
   if (body !== undefined) {
     init.body = typeof body === 'string' ? body : JSON.stringify(body);
-    init.headers = { 'content-type': 'application/json' };
+    init.headers = { ...headers, 'content-type': 'application/json' };
   }
   const request = HttpServerRequest.fromWeb(new Request(`http://localhost${path}`, init));
   const response = await Effect.runPromise(Effect.scoped(Effect.flatMap(
@@ -68,7 +73,7 @@ beforeEach(() => {
   mocks.validateOrigin.mockReturnValue({ ok: true });
   mocks.getShutdownSnapshot.mockReturnValue(null);
   mocks.startShutdown.mockResolvedValue({ started: true, snapshot: SNAPSHOT });
-  mocks.cancelShutdown.mockResolvedValue(true);
+  mocks.cancelShutdown.mockResolvedValue('cancelled');
   mocks.forceStopSession.mockResolvedValue(true);
   mocks.forceAll.mockResolvedValue(true);
 });
@@ -179,10 +184,17 @@ describe('POST /api/shutdown/cancel', () => {
   });
 
   it('answers 409 complete once the drain has completed', async () => {
-    mocks.cancelShutdown.mockResolvedValue(false);
+    mocks.cancelShutdown.mockResolvedValue('complete');
     const res = await call('POST', '/api/shutdown/cancel');
     expect(res.status).toBe(409);
     expect(res.json.code).toBe('complete');
+  });
+
+  it('answers 409 not-running when no drain runs', async () => {
+    mocks.cancelShutdown.mockResolvedValue('not-running');
+    const res = await call('POST', '/api/shutdown/cancel');
+    expect(res.status).toBe(409);
+    expect(res.json).toEqual({ error: 'No shutdown is running.', code: 'not-running' });
   });
 });
 
@@ -241,6 +253,37 @@ describe('origin check', () => {
     expect(mocks.cancelShutdown).not.toHaveBeenCalled();
     expect(mocks.forceStopSession).not.toHaveBeenCalled();
     expect(mocks.forceAll).not.toHaveBeenCalled();
+  });
+
+  describe('with the real origin check', () => {
+    beforeEach(async () => {
+      const actual = await vi.importActual<typeof import('../origin-validation.js')>('../origin-validation.js');
+      mocks.validateOrigin.mockImplementation(actual.validateOrigin);
+    });
+
+    it.each([
+      ['/api/shutdown', { deadlineSeconds: 120 }, 202, mocks.startShutdown],
+      ['/api/shutdown/cancel', undefined, 200, mocks.cancelShutdown],
+      ['/api/shutdown/force-stop', { id: 'agent-pan-1' }, 200, mocks.forceStopSession],
+      ['/api/shutdown/force-all', undefined, 200, mocks.forceAll],
+    ])('POST %s accepts the CLI request: internal token, no Origin', async (path, body, status, door) => {
+      const res = await call('POST', path, body, { 'x-overdeck-internal-token': 'test-internal-token' });
+      expect(res.status).toBe(status);
+      expect(door).toHaveBeenCalledTimes(1);
+    });
+
+    it('answers 403 Missing origin to a POST with no Origin and no credential', async () => {
+      const res = await call('POST', '/api/shutdown', { deadlineSeconds: 120 });
+      expect(res.status).toBe(403);
+      expect(res.json).toEqual({ error: 'Missing origin' });
+      expect(mocks.startShutdown).not.toHaveBeenCalled();
+    });
+
+    it('answers 403 to a POST with a wrong internal token', async () => {
+      const res = await call('POST', '/api/shutdown/cancel', undefined, { 'x-overdeck-internal-token': 'wrong' });
+      expect(res.status).toBe(403);
+      expect(mocks.cancelShutdown).not.toHaveBeenCalled();
+    });
   });
 });
 

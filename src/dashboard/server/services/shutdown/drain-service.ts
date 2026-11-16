@@ -333,20 +333,24 @@ export async function startShutdown(opts: { deadlineSeconds: number; reboot: boo
 /**
  * Cancel (D-10): stop the loop, let an in-flight tick finish (bounded), then
  * end through `endShutdown`. With no drain in this process, a leftover record
- * that is not `complete` ends the same way.
+ * that is not `complete` ends the same way. Answers why nothing was cancelled:
+ * `complete` once the final stage has started, `not-running` with no drain.
  */
-export async function cancelShutdown(): Promise<boolean> {
+export type CancelShutdownResult = 'cancelled' | 'complete' | 'not-running';
+
+export async function cancelShutdown(): Promise<CancelShutdownResult> {
   const d = drain;
   const dd = d?.deps ?? deps;
   if (d) {
-    if (d.record.phase === 'complete') return false;
+    if (d.record.phase === 'complete') return 'complete';
     d.cancelled = true;
     d.wake();
     await Promise.race([d.currentTick, dd.sleep(CANCEL_TICK_WAIT_MS)]);
     await d.persisting;
   }
   const onDisk = await dd.readRecord().catch(() => null);
-  if (!d && (!onDisk || onDisk.phase === 'complete')) return false;
+  if (!d && !onDisk) return 'not-running';
+  if (!d && onDisk?.phase === 'complete') return 'complete';
   const record = onDisk ?? d!.record;
   // The in-memory list wins for a session stopped after the last write.
   const stopped = [...record.stopped, ...(d?.record.stopped ?? []).filter((s) => !record.stopped.some((r) => r.id === s.id))];
@@ -354,7 +358,7 @@ export async function cancelShutdown(): Promise<boolean> {
   drain = null;
   snapshot = null;
   attempt('emit', () => dd.emit(null), undefined);
-  return true;
+  return 'cancelled';
 }
 
 export async function forceStopSession(id: string): Promise<boolean> {
