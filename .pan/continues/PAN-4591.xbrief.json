@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4591",
   "created": "2026-11-16T11:39:00.796Z",
-  "updated": "2026-11-16T12:31:41.435Z",
+  "updated": "2026-11-16T12:31:50.217Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -154,6 +154,11 @@
     "hide-skill-when-off.ac3": {
       "status": "completed",
       "doneAt": "2026-11-16T12:31:41.435Z"
+    },
+    "semgrep-skill": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4591",
+      "claimedAt": "2026-11-16T12:31:50.217Z"
     }
   }
 }
