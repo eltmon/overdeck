@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4294",
   "created": "2026-11-16T20:10:42.311Z",
-  "updated": "2026-11-16T20:16:27.458Z",
+  "updated": "2026-11-16T20:18:07.748Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -54,9 +54,22 @@
       "doneAt": "2026-11-16T20:16:26.226Z"
     },
     "creem-client": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4294",
-      "claimedAt": "2026-11-16T20:16:27.458Z"
+      "claimedAt": "2026-11-16T20:16:27.458Z",
+      "doneAt": "2026-11-16T20:18:07.748Z"
+    },
+    "creem-client.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:18:07.748Z"
+    },
+    "creem-client.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:18:07.748Z"
+    },
+    "creem-client.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:18:07.748Z"
     }
   }
 }
