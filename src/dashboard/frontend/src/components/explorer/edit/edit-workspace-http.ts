@@ -5,7 +5,8 @@
  * the dashboard CSRF header. A non-2xx answer throws ExplorerHttpError with
  * the server's `{ error, code }`. The status query polls only for the editor
  * bar, every 15 s, and only while GitHub is still deciding whether an open PR
- * can merge (PAN-5290 C-D6); otherwise it is refreshed after a push, a merge
+ * can merge (PAN-5290 C-D6), or while it can merge but its checks have not
+ * all passed (PAN-5391); otherwise it is refreshed after a push, a merge
  * attempt and on Refresh. The changes
  * query (what will land, PAN-5290 C-D5) refetches on every explorer watch
  * batch of the edit root; its route never calls gh.
@@ -67,11 +68,13 @@ export const editWorkspaceStatusKey = (workspaceId: string) => ['explorer', 'edi
 export const PR_STATUS_REFETCH_MS = 15_000
 
 /**
- * True while GitHub is still deciding whether an open PR can merge. A draft,
- * conflicting (DIRTY) or out-of-date (BEHIND) PR cannot change by itself.
+ * True while GitHub is still deciding whether an open PR can merge, or while
+ * it can merge but its checks have not all passed (UNSTABLE, PAN-5391). A
+ * draft, conflicting (DIRTY) or out-of-date (BEHIND) PR cannot change by itself.
  */
 export function shouldPollPr(pr: EditWorkspacePr | null | undefined): boolean {
-  if (!pr || pr.state !== 'OPEN' || pr.isDraft || pr.canMerge) return false
+  if (!pr || pr.state !== 'OPEN' || pr.isDraft) return false
+  if (pr.canMerge) return !pr.checksPassing
   return pr.mergeable === 'UNKNOWN' || pr.mergeStateStatus === 'UNKNOWN' || pr.mergeStateStatus === 'BLOCKED'
 }
 

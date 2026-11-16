@@ -14,7 +14,10 @@
  * land (files, +/−) and the save state, and offers Discard… and Create PR.
  * Once a PR is open it follows it: the merge verdict's reason while GitHub
  * blocks it (the status refetches every 15 s while GitHub is still deciding,
- * C-D6), then an enabled Merge. Merge, a pipeline send and a discard set the
+ * C-D6), then an enabled Merge. While GitHub allows the merge but the PR's
+ * checks have not all passed (UNSTABLE) the row is amber, Merge is an
+ * outline button and asks for confirmation, and the status keeps refetching
+ * every 15 s (PAN-5391). Merge, a pipeline send and a discard set the
  * project's landed note and move the panes back to main
  * (leaveEditWorkspace). A workspace that is not an edit workspace gets no
  * bar; one that no longer exists calls `onStale` (C-D13b).
@@ -34,6 +37,7 @@ import { ExplorerHttpError } from '../explorer-http'
 import { explorerErrorMessage, parseRootId } from '../explorer-rpc'
 import { CreatePrDialog } from './CreatePrDialog'
 import { DiscardDialog } from './DiscardDialog'
+import { MergeAnywayDialog } from './MergeAnywayDialog'
 import {
   editWorkspaceChangesKey,
   mergeEditWorkspace,
@@ -61,13 +65,14 @@ export const PRIMARY_BUTTON =
 
 const ROW = 'flex items-center gap-2 border-b border-border px-3 py-1.5 text-xs text-muted-foreground'
 
-export type BarDot = 'editing' | 'live' | 'done' | 'rest'
+export type BarDot = 'editing' | 'live' | 'done' | 'rest' | 'unchecked'
 
 const DOT_CLASS: Record<BarDot, string> = {
   editing: 'bg-state-needs-you',
   live: 'bg-state-live',
   done: 'bg-state-done',
   rest: 'bg-muted-foreground',
+  unchecked: 'bg-state-needs-you',
 }
 
 export function StatusDot({ dot }: { dot: BarDot }) {
@@ -262,7 +267,7 @@ function WorkspaceBar({
   const queryClient = useQueryClient()
   const status = useEditWorkspaceStatus(workspaceId, { poll: true })
   const changes = useEditWorkspaceChanges(workspaceId)
-  const [dialog, setDialog] = useState<'pr' | 'discard' | null>(null)
+  const [dialog, setDialog] = useState<'pr' | 'discard' | 'merge' | null>(null)
   const [merging, setMerging] = useState(false)
   // Unsaved code-pane edits never reach a commit, and leaving the edit workspace drops
   // its drafts, so merge, Create PR and Push changes wait until they are saved.
@@ -373,6 +378,7 @@ function WorkspaceBar({
   )
 
   let row: ReactNode
+  let unchecked = false
   if (pr?.state === 'OPEN') {
     // Unknown changes are never a clean workspace: Merge waits for the changes query.
     const blocked = !pr.canMerge
@@ -386,9 +392,11 @@ function WorkspaceBar({
             : needsPush
               ? UNCOMMITTED_REASON
               : null
+    // PAN-5391: GitHub allows UNSTABLE, but its checks have not all passed.
+    unchecked = blocked === null && !pr.checksPassing
     row = (
       <BarRow
-        lead={<StatusDot dot={blocked ? 'live' : 'done'} />}
+        lead={<StatusDot dot={blocked ? 'live' : unchecked ? 'unchecked' : 'done'} />}
         actions={
           <>
             {viewButton}
@@ -401,10 +409,10 @@ function WorkspaceBar({
             {discardButton}
             <button
               type="button"
-              className={blocked ? BUTTON : PRIMARY_BUTTON}
+              className={blocked || unchecked ? BUTTON : PRIMARY_BUTTON}
               disabled={blocked !== null || merging}
               title={blocked ?? undefined}
-              onClick={() => void merge()}
+              onClick={() => (unchecked ? setDialog('merge') : void merge())}
             >
               {merging ? 'Merging…' : 'Merge'}
             </button>
@@ -414,6 +422,10 @@ function WorkspaceBar({
         {blocked ? (
           <>
             PR <Strong>#{pr.number}</Strong> is {pr.isDraft ? 'a draft' : 'open'} · <span data-testid="edit-pr-merge-reason">{sentenceEnd(blocked)}</span>
+          </>
+        ) : unchecked ? (
+          <>
+            PR <Strong>#{pr.number}</Strong> · no conflicts, but its checks have not all passed.
           </>
         ) : (
           <>
@@ -473,6 +485,17 @@ function WorkspaceBar({
           unsavedPaths={unsavedPaths}
           onClose={() => setDialog(null)}
           onDiscarded={onDiscarded}
+        />
+      )}
+      {dialog === 'merge' && unchecked && pr && (
+        <MergeAnywayDialog
+          prNumber={pr.number}
+          defaultBranch={defaultBranch}
+          onCancel={() => setDialog(null)}
+          onConfirm={() => {
+            setDialog(null)
+            void merge()
+          }}
         />
       )}
     </>

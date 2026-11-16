@@ -278,6 +278,11 @@ export interface EditWorkspacePr {
   canMerge: boolean
   /** D-F7 text; null when canMerge. */
   reason: string | null
+  /**
+   * True when canMerge and GitHub reports CLEAN or HAS_HOOKS. False for UNSTABLE
+   * (a pending or failing non-required check) and whenever canMerge is false (PAN-5391).
+   */
+  checksPassing: boolean
 }
 
 export interface EditWorkspaceStatus {

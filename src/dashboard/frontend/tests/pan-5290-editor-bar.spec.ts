@@ -232,6 +232,7 @@ for (const theme of ['light', 'dark'] as const) {
     let prBody: Record<string, unknown> = {
       url: 'https://github.com/eltmon/workflow-fixture/pull/42', number: 42, state: 'OPEN', isDraft: false,
       mergeable: 'MERGEABLE', mergeStateStatus: 'BLOCKED', headSha: 'abc', canMerge: false, reason: 'Required checks or reviews are not met',
+      checksPassing: false,
     };
     await page.route(`**/api/explorer/edit-workspaces/${workspaceId}`, async (route) => {
       const real = await route.fetch();
@@ -243,7 +244,11 @@ for (const theme of ['light', 'dark'] as const) {
       const changes = (await real.json()) as Record<string, unknown>;
       await route.fulfill({ json: { ...changes, uncommittedPaths: [] } });
     });
-    await page.route(`**/api/explorer/edit-workspaces/${workspaceId}/merge`, (route) => route.fulfill({ json: { merged: true } }));
+    let mergeCalls = 0;
+    await page.route(`**/api/explorer/edit-workspaces/${workspaceId}/merge`, (route) => {
+      mergeCalls += 1;
+      return route.fulfill({ json: { merged: true } });
+    });
 
     // The status was read before the stubs; without a PR the bar has no Refresh, so reload to read it again.
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -253,7 +258,19 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(merge).toHaveAttribute('title', 'Required checks or reviews are not met');
     await shot(page, 'pr-open', theme);
 
-    prBody = { ...prBody, mergeStateStatus: 'CLEAN', canMerge: true, reason: null };
+    prBody = { ...prBody, mergeStateStatus: 'UNSTABLE', canMerge: true, reason: null, checksPassing: false };
+    await bar(page).getByRole('button', { name: 'Refresh' }).click();
+    await expect(barText(page)).toHaveText('PR #42 · no conflicts, but its checks have not all passed.');
+    await expect(merge).toBeEnabled();
+    await merge.click();
+    const confirm = page.getByTestId('merge-anyway-dialog');
+    await expect(confirm).toBeVisible();
+    await shot(page, 'pr-checks-pending', theme);
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(confirm).toHaveCount(0);
+    expect(mergeCalls).toBe(0);
+
+    prBody = { ...prBody, mergeStateStatus: 'CLEAN', canMerge: true, reason: null, checksPassing: true };
     await bar(page).getByRole('button', { name: 'Refresh' }).click();
     await expect(barText(page)).toHaveText('PR #42 · no conflicts. Merging squashes it into main.');
     await expect(merge).toBeEnabled();

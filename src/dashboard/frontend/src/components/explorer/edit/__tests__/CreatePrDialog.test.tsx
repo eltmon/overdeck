@@ -46,7 +46,7 @@ function changes(over: Partial<EditWorkspaceChanges> = {}): EditWorkspaceChanges
 
 const OPEN_PR = {
   url: 'https://github.com/o/r/pull/4', number: 4, state: 'OPEN' as const, isDraft: false, mergeable: 'MERGEABLE',
-  mergeStateStatus: 'CLEAN', headSha: 'abc', canMerge: true, reason: null,
+  mergeStateStatus: 'CLEAN', headSha: 'abc', canMerge: true, reason: null, checksPassing: true,
 }
 
 const choice = (name: RegExp) => screen.getByRole('radio', { name })

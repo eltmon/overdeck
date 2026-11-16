@@ -1,0 +1,115 @@
+{
+  "version": "1",
+  "issueId": "PAN-5391",
+  "created": "2026-11-16T02:26:12.740Z",
+  "updated": "2026-11-16T02:52:25.520Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "verdict-checks-passing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5391",
+      "claimedAt": "2026-11-16T02:26:12.739Z",
+      "doneAt": "2026-11-16T02:32:30.816Z"
+    },
+    "verdict-checks-passing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:32:30.816Z"
+    },
+    "verdict-checks-passing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:32:30.816Z"
+    },
+    "verdict-checks-passing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:32:30.816Z"
+    },
+    "verdict-checks-passing.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:32:30.816Z"
+    },
+    "poll-unstable": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5391",
+      "claimedAt": "2026-11-16T02:32:39.599Z",
+      "doneAt": "2026-11-16T02:42:40.532Z"
+    },
+    "poll-unstable.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:42:40.532Z"
+    },
+    "poll-unstable.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:42:40.532Z"
+    },
+    "poll-unstable.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:42:40.532Z"
+    },
+    "bar-amber-confirm": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5391",
+      "claimedAt": "2026-11-16T02:42:47.441Z",
+      "doneAt": "2026-11-16T02:47:39.160Z"
+    },
+    "bar-amber-confirm.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:47:39.160Z"
+    },
+    "bar-amber-confirm.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:47:39.160Z"
+    },
+    "bar-amber-confirm.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:47:39.160Z"
+    },
+    "bar-amber-confirm.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:47:39.160Z"
+    },
+    "bar-amber-confirm.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:47:39.160Z"
+    },
+    "e2e-amber-step": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5391",
+      "claimedAt": "2026-11-16T02:47:46.825Z",
+      "doneAt": "2026-11-16T02:51:16.155Z"
+    },
+    "e2e-amber-step.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:51:16.155Z"
+    },
+    "e2e-amber-step.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:51:16.155Z"
+    },
+    "e2e-amber-step.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:51:16.155Z"
+    },
+    "docs-amber-state": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5391",
+      "claimedAt": "2026-11-16T02:51:24.246Z",
+      "doneAt": "2026-11-16T02:52:25.520Z"
+    },
+    "docs-amber-state.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:52:25.520Z"
+    },
+    "docs-amber-state.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:52:25.520Z"
+    },
+    "docs-amber-state.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:52:25.520Z"
+    }
+  }
+}

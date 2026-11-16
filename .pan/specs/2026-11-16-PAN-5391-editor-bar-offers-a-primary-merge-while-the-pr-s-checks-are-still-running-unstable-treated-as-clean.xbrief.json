@@ -1,0 +1,455 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-16T02:20:16Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5391: Editor bar offers a primary Merge while the PR's checks are still running (UNSTABLE treated as clean)",
+    "updated": "2026-11-16T02:25:43.875Z"
+  },
+  "plan": {
+    "id": "pan-5391",
+    "title": "Editor bar offers a primary Merge while the PR's checks are still running (UNSTABLE treated as clean)",
+    "status": "running",
+    "uid": "e23ea4da-d678-4359-b563-34adb82f2491",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-16T02:20:16Z",
+    "updated": "2026-11-16T02:25:43.875Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5391",
+        "label": "PAN-5391",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-5391.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "file-explorer",
+      "edit-workspace",
+      "editor-bar",
+      "merge"
+    ],
+    "narratives": {
+      "Problem": "mergeVerdict (src/dashboard/server/services/explorer/edit-workspace-gh.ts) treats GitHub's mergeStateStatus UNSTABLE like CLEAN. On a repo without required checks a PR whose CI is still running reads UNSTABLE, so the editor bar shows the emerald 'no conflicts' row with an enabled primary Merge that squash-merges untested code in one click. shouldPollPr also stops polling once canMerge is true, so the bar never learns the checks finished.",
+      "Proposal": "Keep UNSTABLE mergeable but make it deliberate: mergeVerdict and the EditWorkspacePr contract gain checksPassing (true only for CLEAN/HAS_HOOKS). The editor bar shows an amber row 'PR #N · no conflicts, but its checks have not all passed.' with an outline Merge that opens a shared/Modal confirmation ('Merge PR #N before its checks pass?', Cancel / Merge anyway). shouldPollPr polls every 15 s while canMerge && !checksPassing so the bar turns into today's emerald primary-Merge row when GitHub reports CLEAN. Docs and changelog describe the amber state. Full detail, before/after snippets and exact strings: .pan/drafts/pan-5391.md.",
+      "NonGoals": "- No server-side confirmation flag on POST /api/explorer/edit-workspaces/:workspaceId/merge; the server still merges UNSTABLE.\n- No distinction between pending and failing checks in the sentence, and no per-check list.\n- No polling backoff; a failing-check PR polls every 15 s while the bar is mounted, like BLOCKED today.\n- No change to the pipeline merge path (src/dashboard/server/routes/workspaces/merge-ops.ts) or the merge train.\n- No edits to the historical decision records .pan/drafts/pan-5191.md or .pan/drafts/pan-5290.md.\n- No use of useConfirm/DialogProvider for the confirmation (EditorBar renders outside DialogProvider in tests).\n- No change to the number of gh calls per status read."
+    },
+    "autoDecisions": [
+      {
+        "summary": "checksPassing is false on every canMerge:false verdict",
+        "rationale": "The issue defines checksPassing only for CLEAN/UNSTABLE/HAS_HOOKS; false is the conservative value and the client reads it only when canMerge is true."
+      },
+      {
+        "summary": "checksPassing is a required contract field",
+        "rationale": "Dashboard server and frontend ship together, so there is no version skew; a required field makes every fixture state its value."
+      },
+      {
+        "summary": "Confirmation is a new MergeAnywayDialog.tsx on shared/Modal, not useConfirm",
+        "rationale": "useConfirm throws outside DialogProvider and EditorBar.test.tsx renders without one; DiscardDialog/CreatePrDialog already use shared/Modal with editDialog.module.css."
+      },
+      {
+        "summary": "Local blockers (unsaved, uncommitted, unpushed, changes loading/failed) take precedence over the amber state",
+        "rationale": "Those already disable Merge with a reason; the amber state only replaces the emerald 'ready' row, so it applies only when the existing blocked chain is null."
+      },
+      {
+        "summary": "New BarDot key 'unchecked' mapped to bg-state-needs-you",
+        "rationale": "The issue names the state-needs-you amber dot; a dedicated key keeps data-dot meaningful in tests instead of reusing 'editing'."
+      },
+      {
+        "summary": "The confirmation renders only while dialog === 'merge' and the amber state holds",
+        "rationale": "If a 15 s refetch turns the PR CLEAN or unmergeable under an open dialog, the dialog disappears instead of offering a stale choice; no effect hook needed."
+      },
+      {
+        "summary": "Add an UNSTABLE step to the existing Playwright spec pan-5290-editor-bar.spec.ts",
+        "rationale": "The browser UAT already stubs PR states there; the new field also has to be added to its stub bodies or the CLEAN step breaks."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Small fix: 1 contract file, 1 server module, 2 frontend modules plus 1 new dialog, their tests, 1 e2e spec and 3 doc files.",
+      "canonicalFilename": "2026-11-16-PAN-5391-editor-bar-offers-a-primary-merge-while-the-pr-s-checks-are-still-running-unstable-treated-as-clean.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "verdict-checks-passing",
+        "title": "Add checksPassing to mergeVerdict and the EditWorkspacePr contract",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T02:20:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5391",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/explorer.ts",
+            "src/dashboard/server/services/explorer/edit-workspace-gh.ts",
+            "src/dashboard/server/services/explorer/__tests__/edit-workspace-gh.test.ts",
+            "src/dashboard/server/services/explorer/__tests__/edit-workspace-pr.test.ts",
+            "src/dashboard/frontend/src/components/explorer/edit/__tests__/EditorBar.test.tsx",
+            "src/dashboard/frontend/src/components/explorer/edit/__tests__/DiscardDialog.test.tsx",
+            "src/dashboard/frontend/src/components/explorer/edit/__tests__/CreatePrDialog.test.tsx",
+            "src/dashboard/frontend/tests/pan-5290-editor-bar.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/explorer/__tests__/edit-workspace-gh.test.ts src/dashboard/server/services/explorer/__tests__/edit-workspace-pr.test.ts",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/explorer/edit/__tests__/EditorBar.test.tsx src/components/explorer/edit/__tests__/DiscardDialog.test.tsx src/components/explorer/edit/__tests__/CreatePrDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "edit-workspace-gh.test.ts and edit-workspace-pr.test.ts pass",
+            "EditorBar, DiscardDialog and CreatePrDialog tests pass with the new fixture field",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In packages/contracts/src/explorer.ts add required `checksPassing: boolean` to EditWorkspacePr after `reason`, with the doc comment from the PRD. In edit-workspace-gh.ts add `checksPassing: boolean` to MergeVerdict, add `const CHECKS_PASSING_STATUSES = new Set(['CLEAN', 'HAS_HOOKS'])` beside MERGEABLE_STATUSES (keep MERGEABLE_STATUSES unchanged), return `{ canMerge: true, reason: null, checksPassing: CHECKS_PASSING_STATUSES.has(mergeStateStatus) }` on the mergeable path and `{ canMerge: false, reason, checksPassing: false }` otherwise; extend the header comment. toEditWorkspacePr spreads mergeVerdict, so no change there. Tests: in edit-workspace-gh.test.ts replace the it.each(['CLEAN','UNSTABLE','HAS_HOOKS']) case with a table asserting checksPassing true/false/true, add checksPassing:false to the refusal-table toEqual, add checksPassing:true to the readPrWithVerdict full-object toEqual, and add a readPrWithVerdict case for view('MERGEABLE','UNSTABLE') returning canMerge:true, checksPassing:false. In edit-workspace-pr.test.ts (fixture is CLEAN) add checksPassing:true to the toMatchObject at line ~58. Add `checksPassing: true` to the typed PR fixtures: the pr() helper default in EditorBar.test.tsx (line ~140), DiscardDialog.test.tsx (line ~12), CreatePrDialog.test.tsx (line ~49). In pan-5290-editor-bar.spec.ts add checksPassing:false to the initial BLOCKED prBody and checksPassing:true to the CLEAN update so the one-click CLEAN merge keeps working."
+        },
+        "items": [
+          {
+            "id": "verdict-checks-passing.ac1",
+            "title": "Given an open, non-draft MERGEABLE PR, when mergeVerdict runs with mergeStateStatus CLEAN, HAS_HOOKS and UNSTABLE, then it returns { canMerge: true, reason: null } with checksPassing true, true and false respectively (asserted with toEqual in edit-workspace-gh.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-checks-passing.ac2",
+            "title": "Given any refusal row of the D-F7 table (merged, closed, draft, conflicting, blocked, behind, unknown), when mergeVerdict runs, then it returns its unchanged reason with canMerge false and checksPassing false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-checks-passing.ac3",
+            "title": "Given gh pr view reports MERGEABLE/UNSTABLE, when readPrWithVerdict runs, then the returned EditWorkspacePr has canMerge true and checksPassing false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-checks-passing.ac4",
+            "title": "EditWorkspacePr in packages/contracts/src/explorer.ts declares a required checksPassing: boolean, every typed PR fixture in the edit __tests__ files and the pan-5290 Playwright stubs sets it, and npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "poll-unstable",
+        "title": "Poll the PR status every 15 s while an UNSTABLE PR's checks run",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T02:20:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5391",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/edit/edit-workspace-http.ts",
+            "src/dashboard/frontend/src/components/explorer/edit/__tests__/EditorBar.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/explorer/edit/__tests__/EditorBar.test.tsx src/components/explorer/edit/__tests__/edit-workspace-http.test.ts"
+          ],
+          "expected_outputs": [
+            "EditorBar.test.tsx passes, including the shouldPollPr truth table and the new UNSTABLE fake-timer refetch test",
+            "edit-workspace-http.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-9",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Rewrite shouldPollPr in edit-workspace-http.ts: `if (!pr || pr.state !== 'OPEN' || pr.isDraft) return false; if (pr.canMerge) return !pr.checksPassing; return pr.mergeable === 'UNKNOWN' || pr.mergeStateStatus === 'UNKNOWN' || pr.mergeStateStatus === 'BLOCKED'`. Update its JSDoc and the module header to say it also polls while the PR can merge but its checks have not all passed (PAN-5391). In the `shouldPollPr (PAN-5290 C-D6)` describe block of EditorBar.test.tsx: add truth-table rows (UNSTABLE+checksPassing:false → true; same with isDraft → false; CLEAN default stays false) and a fake-timer test using vi.useFakeTimers({ shouldAdvanceTime: false }) + vi.advanceTimersByTimeAsync: render an UNSTABLE PR (checksPassing:false), advance 10 ms → statusCalls()===1, set statusAnswer to status(pr()) (CLEAN), advance PR_STATUS_REFETCH_MS + 100 → statusCalls()===2 and sentence is 'PR #7 · no conflicts. Merging squashes it into main.' with a bg-primary Merge, advance PR_STATUS_REFETCH_MS*3 → statusCalls() still 2. Never use real timers for the 15 s wait."
+        },
+        "items": [
+          {
+            "id": "poll-unstable.ac1",
+            "title": "shouldPollPr returns true for an open, non-draft PR with canMerge true and checksPassing false, and returns false for the same PR as a draft and for a CLEAN PR with checksPassing true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poll-unstable.ac2",
+            "title": "Given an UNSTABLE PR in the editor bar under fake timers, when 15 000 ms pass, then the bar makes a second status read, and once that read returns CLEAN no further reads happen over the next 45 000 ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poll-unstable.ac3",
+            "title": "Given a BLOCKED PR the bar makes a second status read after 15 000 ms, and given a DIRTY PR it makes no second read over 45 000 ms (the existing PAN-5290 refetch tests keep their assertions)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bar-amber-confirm",
+        "title": "Render the amber checks-pending row with an outline Merge that asks for confirmation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T02:20:16Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5391",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/edit/MergeAnywayDialog.tsx",
+            "src/dashboard/frontend/src/components/explorer/edit/EditorBar.tsx",
+            "src/dashboard/frontend/src/components/explorer/edit/__tests__/EditorBar.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/explorer/edit/__tests__/EditorBar.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "EditorBar.test.tsx passes, including the UNSTABLE amber-row, confirmation, Cancel and local-blocker precedence tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Create MergeAnywayDialog.tsx on shared/Modal (copy the DiscardDialog pattern): title `Merge PR #${prNumber} before its checks pass?`, body `GitHub allows this merge, but the PR's checks have not all passed. Merging now squashes it into <code>{defaultBranch}</code> without waiting for them.` inside `<div className={styles.form} data-testid=\"merge-anyway-dialog\">`, footer Cancel (styles.button) and Merge anyway (styles.primaryButton); props prNumber, defaultBranch, onCancel, onConfirm. In EditorBar.tsx: add BarDot 'unchecked' → 'bg-state-needs-you'; widen dialog state to 'pr' | 'discard' | 'merge' | null; declare `let unchecked = false` beside `let row: ReactNode`; in the OPEN branch ASSIGN it (plain assignment, no const/let, so the dialog render below sees it): `unchecked = blocked === null && !pr.checksPassing`; lead dot `blocked ? 'live' : unchecked ? 'unchecked' : 'done'`; Merge className `blocked || unchecked ? BUTTON : PRIMARY_BUTTON`, onClick `unchecked ? setDialog('merge') : void merge()` (disabled/title unchanged); add the sentence branch `PR <Strong>#{pr.number}</Strong> · no conflicts, but its checks have not all passed.` between the blocked and 'no conflicts' branches; render `{dialog === 'merge' && unchecked && pr && <MergeAnywayDialog … onCancel={() => setDialog(null)} onConfirm={() => { setDialog(null); void merge() }} />}`; extend the header comment. Tests in EditorBar.test.tsx 'EditorBar with a PR': amber row (exact sentence, data-dot='unchecked', enabled Merge without bg-primary); Merge opens merge-anyway-dialog and only Merge anyway calls mergeEditWorkspace('w1') then leaveEditWorkspace(ROOT,'p'); Cancel closes with zero merge calls; UNSTABLE + uncommittedPaths shows UNCOMMITTED_REASON with Merge disabled. Extend poll-unstable's fake-timer test to assert the amber sentence before the CLEAN swap. Keep the existing CLEAN one-click merge test passing."
+        },
+        "items": [
+          {
+            "id": "bar-amber-confirm.ac1",
+            "title": "Given a status whose PR is UNSTABLE (canMerge true, checksPassing false) with no local blocker, the editor bar renders 'PR #7 · no conflicts, but its checks have not all passed.', a lead dot with data-dot='unchecked', and an enabled Merge whose className does not contain bg-primary",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bar-amber-confirm.ac2",
+            "title": "When the operator clicks that Merge, the bar opens merge-anyway-dialog titled 'Merge PR #7 before its checks pass?' and mergeEditWorkspace is not called; clicking Merge anyway then calls mergeEditWorkspace once with 'w1' and leaveEditWorkspace with (ROOT, 'p')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bar-amber-confirm.ac3",
+            "title": "Clicking Cancel in merge-anyway-dialog closes it (queryByTestId returns null) with zero mergeEditWorkspace calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bar-amber-confirm.ac4",
+            "title": "Given an UNSTABLE PR with uncommittedPaths ['README.md'], the bar renders UNCOMMITTED_REASON in edit-pr-merge-reason with Merge disabled instead of the amber sentence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bar-amber-confirm.ac5",
+            "title": "Under fake timers the bar first renders the amber sentence and, after the 15 000 ms refetch returns CLEAN, renders 'PR #7 · no conflicts. Merging squashes it into main.' with a bg-primary Merge that merges on one click",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e2e-amber-step",
+        "title": "Add the UNSTABLE amber step to the pan-5290 editor-bar Playwright spec",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T02:20:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5391",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-5290-editor-bar.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-5290-editor-bar.spec.ts"
+          ],
+          "expected_outputs": [
+            "build completes without errors (the spec serves the built frontend from dist)",
+            "pan-5290-editor-bar.spec.ts passes in its isolated dashboard and browser, including the UNSTABLE amber step and the one-click CLEAN merge"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In src/dashboard/frontend/tests/pan-5290-editor-bar.spec.ts, between the BLOCKED step and the CLEAN step (around line 255), add: set prBody to { ...prBody, mergeStateStatus: 'UNSTABLE', canMerge: true, reason: null, checksPassing: false }; click Refresh; expect barText toHaveText 'PR #42 · no conflicts, but its checks have not all passed.'; expect merge enabled; click merge; expect page.getByTestId('merge-anyway-dialog') visible; shot(page, 'pr-checks-pending', theme); click Cancel; expect the dialog count 0; and assert no merge request was made during this step: count calls in the existing `/merge` page.route stub (e.g. a `let mergeCalls = 0` incremented inside that handler) and expect it to be 0 after Cancel. The CLEAN step that follows (checksPassing: true from verdict-checks-passing) must still merge on one click. The frontend tsconfig does not cover tests/, so verify by running the spec: `npm run build` first (it serves the built frontend from dist), then `cd src/dashboard/frontend && npx playwright test tests/pan-5290-editor-bar.spec.ts`; the spec starts its own isolated dashboard (startIsolatedDashboard) and is not in CI's test:playwright list. Browser runs use an isolated Playwright browser/profile, never another agent's session. IMPLEMENTATION CHECKPOINT: if the isolated dashboard cannot start for environment reasons unrelated to this change (build or fixture seeding fails the same way on origin/main), commit the spec edit, record the exact failure output in the item's task_done note and in the PR body, and rely on the EditorBar.test.tsx coverage from bar-amber-confirm; do not skip or weaken the spec's assertions."
+        },
+        "items": [
+          {
+            "id": "e2e-amber-step.ac1",
+            "title": "Given the stub reports UNSTABLE with checksPassing false, when Refresh is clicked, then the bar shows 'PR #42 · no conflicts, but its checks have not all passed.' with an enabled Merge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-amber-step.ac2",
+            "title": "Clicking Merge in that step shows merge-anyway-dialog, and Cancel closes it with the /merge route stub's call counter still 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-amber-step.ac3",
+            "title": "The following CLEAN step still renders 'PR #42 · no conflicts. Merging squashes it into main.' and one Merge click produces the 'Merged PR #42 into main.' note",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-amber-state",
+        "title": "Document the amber checks-pending state and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T02:20:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5391",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/file-explorer.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "changelog.d/pan-5391.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c 'no conflicts, but its checks have not all passed' features/file-explorer.mdx",
+            "grep -c 'checksPassing' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "each grep prints a count of at least 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. features/file-explorer.mdx '## Editing and PRs': in the 'While the PR is open, the bar follows it.' paragraph (line ~103), after the sentence ending 'squash-merges the PR into the default branch.', insert the PRD's paragraph describing the amber line 'PR #N · no conflicts, but its checks have not all passed.', the 'Merge PR #N before its checks pass?' question, Merge anyway, and the 15-second recheck; change the 'Open a pull request' bullet (line ~98) to say Merge asks for confirmation while the PR's checks have not all passed. docs/DASHBOARD-ARCHITECTURE.md '**PR status refetch.**' paragraph (line ~3016): rewrite the shouldPollPr condition to include canMerge with checksPassing false (UNSTABLE) and add the sentence that checksPassing is true only for CLEAN and HAS_HOOKS and the bar confirms before merging an UNSTABLE PR. Create changelog.d/pan-5391.md with a '#### Fixed' heading and the single bullet from the PRD linking #5391. Run npm run lint:docs."
+        },
+        "items": [
+          {
+            "id": "docs-amber-state.ac1",
+            "title": "features/file-explorer.mdx 'Editing and PRs' contains the sentence 'no conflicts, but its checks have not all passed' and names the Merge anyway confirmation and the 15-second recheck",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-amber-state.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md 'PR status refetch' states that shouldPollPr also returns true for a mergeable PR with checksPassing false (UNSTABLE)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-amber-state.ac3",
+            "title": "changelog.d/pan-5391.md exists with one '#### Fixed' bullet linking #5391, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "verdict-checks-passing",
+        "to": "poll-unstable",
+        "type": "blocks"
+      },
+      {
+        "from": "verdict-checks-passing",
+        "to": "bar-amber-confirm",
+        "type": "blocks"
+      },
+      {
+        "from": "verdict-checks-passing",
+        "to": "e2e-amber-step",
+        "type": "blocks"
+      },
+      {
+        "from": "poll-unstable",
+        "to": "bar-amber-confirm",
+        "type": "blocks"
+      },
+      {
+        "from": "bar-amber-confirm",
+        "to": "e2e-amber-step",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
