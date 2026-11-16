@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5391",
   "created": "2026-11-16T02:26:12.740Z",
-  "updated": "2026-11-16T02:32:30.816Z",
+  "updated": "2026-11-16T02:32:39.599Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "verdict-checks-passing.ac4": {
       "status": "completed",
       "doneAt": "2026-11-16T02:32:30.816Z"
+    },
+    "poll-unstable": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5391",
+      "claimedAt": "2026-11-16T02:32:39.599Z"
     }
   }
 }
