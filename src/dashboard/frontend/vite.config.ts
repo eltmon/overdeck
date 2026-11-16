@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 
 import { defineConfig, type Plugin, type ViteDevServer } from 'vite';
 import react from '@vitejs/plugin-react';
+import { reactCompilerOptions } from './reactCompiler';
 import pdfjsPkg from 'pdfjs-dist/package.json' with { type: 'json' };
 
 // "In container" and "behind Traefik" are two different things and must NOT be
@@ -107,7 +108,7 @@ const profileOverrides = {
 } as const;
 
 export default defineConfig(async ({ command, mode }) => ({
-  plugins: [react(), panDevFullReloadOnSignal()],
+  plugins: [react({ compiler: reactCompilerOptions }), panDevFullReloadOnSignal()],
   define: {
     __OVERDECK_FRONTEND_BUILD_COMMIT__: JSON.stringify(await resolveFrontendBuildCommit(command)),
   },

@@ -5,7 +5,9 @@
  * Node built-ins: `events` → `bare-events` and `sodium-native` → `sodium-javascript`, resolved
  * from `packages/anywhere-channel` because bun's isolated layout hides them from other packages
  * (see `packages/anywhere-channel/cp1/vite.config.ts`). The frontend's `public/` is shared so the
- * stylesheet's `/fonts/*.woff2` URLs resolve inside the WebView.
+ * stylesheet's `/fonts/*.woff2` URLs resolve inside the WebView. The React Compiler runs with the
+ * dashboard's shared options (`src/dashboard/frontend/reactCompiler.ts`, PAN-4561), so the phone app
+ * ships, and its Vitest suite tests, the same compiled components.
  */
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -14,13 +16,15 @@ import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
+import { reactCompilerOptions } from '../../src/dashboard/frontend/reactCompiler';
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 const channelRequire = createRequire(path.resolve(here, '../../packages/anywhere-channel/package.json'));
 
 export default defineConfig({
   root: here,
   publicDir: path.resolve(here, '../../src/dashboard/frontend/public'),
-  plugins: [react()],
+  plugins: [react({ compiler: reactCompilerOptions })],
   resolve: {
     dedupe: ['react', 'react-dom', '@tanstack/react-query'],
     alias: [

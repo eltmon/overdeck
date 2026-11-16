@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { defineConfig } from 'vitest/config';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { reactCompilerOptions } from './reactCompiler';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -79,10 +80,14 @@ function ensureFrontendNodeModules(): void {
 }
 
 ensureFrontendNodeModules();
-const { default: react } = await import(/* @vite-ignore */ resolvePackage('@vitejs/plugin-react'));
+// Load the plugin natively, not through `--configLoader runner`: with the React
+// Compiler on, its `config` hook lazily imports `oxc-transform-react`, and the
+// runner that evaluated this file has closed by then (PAN-4561). Node 22
+// `require()` of this ESM package returns its `module.exports` export, the plugin.
+const react = require(resolvePackage('@vitejs/plugin-react')) as typeof import('@vitejs/plugin-react').default;
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react({ compiler: reactCompilerOptions })],
   cacheDir: '../../../.cache/vitest-frontend',
   server: { watch: null },
   test: {
