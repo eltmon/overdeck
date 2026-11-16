@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5343",
   "created": "2026-11-16T00:09:01.559Z",
-  "updated": "2026-11-16T00:52:04.377Z",
+  "updated": "2026-11-16T00:52:05.853Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -316,6 +316,11 @@
     "crumb.ac3": {
       "status": "completed",
       "doneAt": "2026-11-16T00:52:04.377Z"
+    },
+    "new-conversation": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:52:05.853Z"
     }
   }
 }
