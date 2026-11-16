@@ -1,0 +1,401 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-16T01:32:50Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5371: Simple Home says '18 things need you' while the top bar says 'Needs you · 8': two needs-you rules",
+    "updated": "2026-11-16T01:41:43.617Z"
+  },
+  "plan": {
+    "id": "pan-5371",
+    "title": "Simple Home says '18 things need you' while the top bar says 'Needs you · 8': two needs-you rules",
+    "status": "running",
+    "uid": "deee0c91-9dfa-43ee-9ad4-5a40c945997e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-16T01:32:50Z",
+    "updated": "2026-11-16T01:41:43.617Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5371",
+        "label": "PAN-5371",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5371.md",
+        "label": "PRD",
+        "type": "document"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5413",
+        "label": "PAN-5413 (follow-up: Kanban strip)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "simple-mode",
+      "needs-you"
+    ],
+    "narratives": {
+      "Problem": "Simple Home's headline counts bucketSimpleHome(...).needsYou plus extra questions, which includes every plan waiting for Start work, every stuck agent and every changes-requested issue. The top bar counts useNeedsYouItems().length (pending input, issue attention needs-you, Flywheel rows, decisions). On :3011 they showed 18 vs 8. Simple Home also fails to list Flywheel rows, decisions and issue-less pending input that the top bar counts.",
+      "Proposal": "Option 1 from the issue (PAN-5284 D-8 rules pipeline states out of the Needs-you list). Simple Home's h1 and Needs-you section use useNeedsYouItems(): one card per shared item, chosen by a new pure helper lib/simple/needsYouCards.ts. The Simple reasons the selector does not count (start-work, stuck, problems) render in two new sections, Ready to start and Having trouble, outside the count, minus any issue already listed as a Needs-you card. One test renders NeedsYouIndicator and SimpleHomePage with the real selectors and proves the numbers and the card list agree. Docs and a changelog entry describe the change. Full detail, decision rules N-D1..N-D10 and before/after code: .pan/drafts/PAN-5371.md.",
+      "NonGoals": "- The Kanban NeedsYouStrip keeps its bucketSimpleHome rule and count (follow-up PAN-5413).\n- No change to buildNeedsYouItems/useNeedsYouItems semantics; the top bar, Advanced Home and project Home numbers do not change.\n- No change to bucketSimpleHome, deriveSimpleIssue, userFacingDisplay or SimpleIssuePage.\n- The two pre-existing SimpleIssuePage failures in simple-pages.test.tsx are not fixed here.\n- Runtime decision labels are not rewritten into simple-mode copy, except the Flywheel item title.\n- No server change and no new HTTP route.\n- A question the shared selector treats as resolved (answered or dismissed) and whose pane is not blocked no longer shows on Simple Home, matching the top bar; changing the resolution rule is a selector change."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Option 1: Simple Home uses useNeedsYouItems().length; plan-ready issues get their own section outside the count.",
+        "rationale": "PAN-5284 D-8 (.pan/drafts/pan-5284.md line 61) says work-not-started/ready and similar 'are pipeline states, not needs-you items'. Option 2 would contradict N-D8 and change the top bar, Advanced Home and project Home numbers PAN-5292 just aligned."
+      },
+      {
+        "summary": "Stuck and problems (changes-requested) also leave the count and render under a 'Having trouble' section.",
+        "rationale": "The shared selector does not count them either; N-D8 lists the canonical sources and they are not among them. A section keeps them visible with their existing actions."
+      },
+      {
+        "summary": "Simple 'question' derivations not in the shared list are not shown on Simple Home.",
+        "rationale": "Outside the shared list a question is answered, dismissed, or a kind-less phantom wait that PAN-1591 deliberately excludes from Needs you."
+      },
+      {
+        "summary": "Flywheel items show the title 'A decision is waiting' in simple mode.",
+        "rationale": "The selector titles them 'Flywheel', which is in simple mode's BANNED_WORDS list."
+      },
+      {
+        "summary": "The Kanban NeedsYouStrip is out of scope; filed as PAN-5413.",
+        "rationale": "The issue names only Simple Home and the top bar; the strip is a separate surface with its own card layout and actions."
+      }
+    ],
+    "items": [
+      {
+        "id": "simple-needs-you-split",
+        "title": "Add the pure Simple Needs-you card and secondary-section split",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T01:32:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5371",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "simple-home-shared-count",
+            "simple-home-count-agreement-test"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/simple/needsYouCards.ts",
+            "src/dashboard/frontend/src/lib/simple/needsYouCards.test.ts",
+            "src/dashboard/frontend/src/lib/simple/strings.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/simple/needsYouCards.test.ts src/lib/__tests__/simple-foundations.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "needsYouCards.test.ts passes its six named cases",
+            "simple-foundations.test.ts passes (no banned words in the new strings)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 (.pan/drafts/pan-5371.md on the feature branch; workspace copy .pan/drafts/PAN-5371.md). Add the seven SIMPLE_STRINGS.home keys exactly as written. Create lib/simple/needsYouCards.ts exporting coveredIssueIds, issueIdOfItem, simpleNeedsYouCards (decision rules N-D3 and N-D5) and simpleSecondarySections (N-D6); import only TYPES from ./derive and ../selectors/needsYou (a value import from ./derive breaks fr7-conversation-pending-input.test.tsx, which mocks ./derive with a factory). Write needsYouCards.test.ts with the six named cases, building derivations via the real deriveSimpleIssue. Add src/lib/simple/needsYouCards.test.ts to scripts/frontend-test-subset.txt on the line before src/lib/simple/uiMode.test.ts."
+        },
+        "items": [
+          {
+            "id": "simple-needs-you-split.ac1",
+            "title": "Given an issue item whose Simple derivation has display.state 'needs-you', simpleNeedsYouCards returns card = that derivation's needsYouReason (question for a pending AskUserQuestion agent, start-work for a derived 'planned' issue with no agents or panes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "simple-needs-you-split.ac2",
+            "title": "Given conversation:, decision:, flywheel: items and an issue: item with no derivation, simpleNeedsYouCards returns card 'item' for each; the flywheel card's title is 'A decision is waiting' and the decision card keeps item.title",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "simple-needs-you-split.ac3",
+            "title": "Given bucket entries of kind start-work, stuck, problems and question with no matching items, simpleSecondarySections returns the start-work derivation in readyToStart, stuck then problems in trouble, and the question entry in neither",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "simple-needs-you-split.ac4",
+            "title": "Given a start-work bucket entry whose identifier matches an item key issue:<ID> case-insensitively, simpleSecondarySections excludes it from both lists, and coveredIssueIds returns only the upper-case ids of issue: items",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "simple-needs-you-split.ac5",
+            "title": "simple-foundations.test.ts passes with the new strings and scripts/frontend-test-subset.txt lists src/lib/simple/needsYouCards.test.ts in sorted position",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "simple-home-shared-count",
+        "title": "Render Simple Home's count and Needs-you cards from the shared selector",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T01:32:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5371",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/simple/SimpleHomePage.tsx",
+            "src/dashboard/frontend/src/__tests__/fr7-conversation-pending-input.test.tsx",
+            "src/dashboard/frontend/src/components/simple/simple-pages.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/__tests__/fr7-conversation-pending-input.test.tsx src/lib/__tests__/simple-foundations.test.ts",
+            "cd src/dashboard/frontend && npx vitest run src/components/simple/simple-pages.test.tsx -t \"SimpleHomePage\"",
+            "npm run typecheck",
+            "grep -n extraQuestions src/dashboard/frontend/src/components/simple/SimpleHomePage.tsx"
+          ],
+          "expected_outputs": [
+            "fr7-conversation-pending-input.test.tsx passes, including 'SimpleHomePage: AC-1'",
+            "the SimpleHomePage describe in simple-pages.test.tsx passes, including its two new cases (two SimpleIssuePage failures predate this change and are filtered out)",
+            "simple-foundations.test.ts passes",
+            "typecheck completes without errors",
+            "the grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In SimpleHomePage.tsx: call useNeedsYouItems(); compute cards = simpleNeedsYouCards(needsItems, byIdentifier) and secondary = simpleSecondarySections(buckets.needsYou, needsItems); needsCount = needsItems.length; delete subjectByIssue, extraQuestions and usePendingInputSubjects. Render each card wrapped in data-testid='simple-needs-you-card' data-needs-you-key={item.key} via a local NeedsYouCardView (QuestionCard / ProblemsCard / new local NeedsYouItemCard with one Open button). Open targets per N-D4. Add 'Ready to start' (data-testid simple-ready-to-start) and 'Having trouble' (data-testid simple-having-trouble) sections after Needs you, only when non-empty, using the new SIMPLE_STRINGS keys. Subline per N-D7. Per N-D10, the Working now section and its 'being worked on' stat use buckets.working minus issues in coveredIssueIds(needsItems). Never write a quoted string containing a banned word (e.g. 'flywheel') in this file. In fr7-conversation-pending-input.test.tsx add vi.mock('../lib/selectors/needsYou', ...) and make the SimpleHomePage AC-1 case return one issue:PAN-1 pending-input item carrying the same subject; keep its assertions. In simple-pages.test.tsx (only the 'SimpleHomePage (C-SIMPLE)' describe), add the two cases from PRD WI-2 step 3 and assert card keys, never the headline number. Keep banned words out of comments in components/simple/*.tsx too."
+        },
+        "items": [
+          {
+            "id": "simple-home-shared-count.ac1",
+            "title": "Given useNeedsYouItems returns N items, SimpleHomePage renders the h1 '<N> things need you.' (or the singular form) and N elements with data-testid simple-needs-you-card, one per item key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "simple-home-shared-count.ac2",
+            "title": "Given a start-work issue not among the items, SimpleHomePage renders it inside data-testid simple-ready-to-start with a Start work button; given a stuck or changes-requested issue not among the items, it renders inside data-testid simple-having-trouble; given a working issue that is an item, it renders as a Needs-you card and not under Working now",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "simple-home-shared-count.ac3",
+            "title": "fr7-conversation-pending-input.test.tsx 'SimpleHomePage: AC-1' passes with useNeedsYouItems mocked to one issue:PAN-1 item and still shows 'SimpleHomePage conversation question'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "simple-home-shared-count.ac5",
+            "title": "Given a derived 'planned' PAN-1 seeded by simple-pages.test.tsx, SimpleHomePage renders it inside simple-ready-to-start with a Start work button and renders no simple-needs-you-card with data-needs-you-key issue:PAN-1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "simple-home-shared-count.ac4",
+            "title": "grep for extraQuestions in SimpleHomePage.tsx returns no match, and simple-foundations.test.ts passes (no banned word in any quoted string of components/simple)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "simple-home-count-agreement-test",
+        "title": "Prove the top bar and Simple Home show the same Needs-you count with real selectors",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T01:32:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5371",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/__tests__/countAgreement.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/App/__tests__/countAgreement.test.tsx"
+          ],
+          "expected_outputs": [
+            "both the PAN-5292 case and the new PAN-5371 case pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. Add describe('top bar and Simple Home counts agree (PAN-5371)') to countAgreement.test.tsx without changing the PAN-5292 case and without mocking any selector. Mock GetSetUpCard to null; set useUiMode to simple mode. Fixture: PAN-11 pending AskUserQuestion agent, PAN-12 derived working + attention needs-you, PAN-13 derived planned (no panes), PAN-14 agent status stuck, PAN-15 derived changes-requested, one issue-less conversation pending-input row 'helper', one Flywheel tick row with no issue id. Compute expected items with buildNeedsYouItems over the same fixture (never type N); assert expected keys include issue:PAN-11, issue:PAN-12, conversation:helper and a flywheel: key, and exclude PAN-13/14/15. Render NeedsYouIndicator + SimpleHomePage inside one QueryClientProvider and a DialogProvider (useSimpleActions calls useAlert) and assert the five checks listed in the PRD."
+        },
+        "items": [
+          {
+            "id": "simple-home-count-agreement-test.ac1",
+            "title": "Given the shared fixture, the test asserts the top bar renders 'Needs you · N' and the Simple Home h1 renders 'N things need you.' where N = buildNeedsYouItems(fixture).length, computed not typed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "simple-home-count-agreement-test.ac2",
+            "title": "Given the shared fixture, SimpleHomePage renders simple-needs-you-card elements whose data-needs-you-key set equals the expected item keys, which include issue:PAN-11, issue:PAN-12, conversation:helper and one flywheel: key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "simple-home-count-agreement-test.ac3",
+            "title": "The test asserts PAN-13 renders inside simple-ready-to-start, PAN-14 and PAN-15 render inside simple-having-trouble, none of the three has a simple-needs-you-card, and PAN-12's title appears exactly once on the page",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "simple-home-count-agreement-test.ac4",
+            "title": "The test asserts the Flywheel card shows 'A decision is waiting' and the simple-home-page root contains no text matching /flywheel/i; the existing PAN-5292 case still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the shared Simple Home count and its two new sections",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T01:32:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5371",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/mission-control.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "changelog.d/pan-5371.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'Having trouble' features/mission-control.mdx",
+            "grep -n 'needsYouCards.ts' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "both greps print a matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4 with the exact text given there: add the Simple-mode paragraph after the top-bar Needs-you paragraph in features/mission-control.mdx (~line 128); append the Simple Home sentence to item 4 of '## Top bar (PAN-5292)' in docs/DASHBOARD-ARCHITECTURE.md; create changelog.d/pan-5371.md with one '#### Fixed' bullet."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "features/mission-control.mdx contains a paragraph saying Simple mode's Home headline shows the same Needs-you number as the top bar, and that the 'Ready to start' and 'Having trouble' sections are outside that count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md top-bar item 4 contains SimpleHomePage.tsx, lib/simple/needsYouCards.ts, and the reasons start-work, stuck and problems as rendered outside the count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "changelog.d/pan-5371.md exists with one '#### Fixed' bullet linking #5371, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "simple-needs-you-split",
+        "to": "simple-home-shared-count",
+        "type": "blocks"
+      },
+      {
+        "from": "simple-home-shared-count",
+        "to": "simple-home-count-agreement-test",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-16-PAN-5371-simple-home-says-18-things-need-you-while-the-top-bar-says-needs-you-8-two-needs-you-rules.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

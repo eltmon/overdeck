@@ -41,6 +41,10 @@ vi.mock('../lib/simple/derive', () => ({
   deriveSimpleIssue: vi.fn(),
 }));
 
+vi.mock('../lib/selectors/needsYou', () => ({
+  useNeedsYouItems: vi.fn(() => []),
+}));
+
 // Mock DrawerAgentSession and related exports
 vi.mock('../components/drawer/DrawerAgentSession', () => ({
   DrawerAgentSession: ({ agentId }: any) => (
@@ -72,6 +76,7 @@ import * as decisions from '../lib/useDecisions';
 import * as simpleActions from '../lib/simple/useSimpleActions';
 import * as convoDock from '../lib/convoDock';
 import * as derive from '../lib/simple/derive';
+import * as needsYou from '../lib/selectors/needsYou';
 
 const mockIssue = {
   identifier: 'PAN-1',
@@ -358,8 +363,8 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
   });
 
   describe('SimpleHomePage: AC-1', () => {
-    it('AC-1: renders conversation-only pending subject via extraQuestions in SimpleHomePage', () => {
-      // Set up SimpleHomePage with a conversation-only pending subject via the extraQuestions path
+    it('AC-1: renders conversation-only pending subject via the shared Needs-you list in SimpleHomePage', () => {
+      // Set up SimpleHomePage with a conversation-only pending subject via the shared Needs-you list
       const convSimpleDerivation = {
         issue: mockIssue,
         primaryAgent: undefined,
@@ -369,19 +374,19 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
         reviewStuck: false,
       };
 
-      vi.mocked(decisions.usePendingInputSubjects).mockReturnValue([
-        {
-          agentId: 'conv-simple-001',
-          issueId: 'PAN-1',
-          since: new Date().toISOString(),
-          pendingAskUserQuestion: {
-            questions: [{ question: 'SimpleHomePage conversation question' }],
-          },
-        } as any,
-      ]);
+      const subject = {
+        agentId: 'conv-simple-001',
+        issueId: 'PAN-1',
+        since: new Date().toISOString(),
+        pendingAskUserQuestion: {
+          questions: [{ question: 'SimpleHomePage conversation question' }],
+        },
+      } as any;
+
+      vi.mocked(decisions.usePendingInputSubjects).mockReturnValue([subject]);
 
       // Complete bucket structure with all required arrays
-      // Conversation subjects route via extraQuestions, not needsYou
+      // Conversation subjects route through the shared Needs-you list, not bucketSimpleHome.
       vi.mocked(derive.bucketSimpleHome).mockReturnValue({
         needsYou: [],
         working: [],
@@ -390,6 +395,17 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
       } as any);
 
       vi.mocked(derive.deriveSimpleIssue).mockReturnValue(convSimpleDerivation as any);
+
+      vi.mocked(needsYou.useNeedsYouItems).mockReturnValue([
+        {
+          key: 'issue:PAN-1',
+          kind: 'pending-input',
+          title: 'PAN-1',
+          ask: 'SimpleHomePage conversation question',
+          open: vi.fn(),
+          subject,
+        } as any,
+      ]);
 
       // Wrap with QueryClientProvider because SimpleHomePage calls useQuery
       const queryClient = new QueryClient();
