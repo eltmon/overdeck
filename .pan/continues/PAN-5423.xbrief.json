@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5423",
   "created": "2026-11-16T05:56:13.176Z",
-  "updated": "2026-11-16T06:07:23.118Z",
+  "updated": "2026-11-16T06:07:28.683Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,6 +84,11 @@
     "wire-plan-action-toasts.ac3": {
       "status": "completed",
       "doneAt": "2026-11-16T06:07:23.118Z"
+    },
+    "changelog-entry": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5423",
+      "claimedAt": "2026-11-16T06:07:28.682Z"
     }
   }
 }
