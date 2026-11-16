@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5418",
   "created": "2026-11-16T04:03:53.810Z",
-  "updated": "2026-11-16T04:09:40.245Z",
+  "updated": "2026-11-16T04:09:47.006Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "own-patch-module.ac4": {
       "status": "completed",
       "doneAt": "2026-11-16T04:09:40.244Z"
+    },
+    "wire-diff-full": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5418",
+      "claimedAt": "2026-11-16T04:09:47.006Z"
     }
   }
 }
