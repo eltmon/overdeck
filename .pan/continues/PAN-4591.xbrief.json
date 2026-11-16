@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4591",
   "created": "2026-11-16T11:39:00.796Z",
-  "updated": "2026-11-16T12:01:23.704Z",
+  "updated": "2026-11-16T12:01:35.032Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,11 @@
     "mcp-resolver.ac5": {
       "status": "completed",
       "doneAt": "2026-11-16T12:01:23.703Z"
+    },
+    "inject-mcp": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4591",
+      "claimedAt": "2026-11-16T12:01:35.031Z"
     }
   }
 }
