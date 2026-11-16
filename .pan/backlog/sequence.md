@@ -1,11 +1,10 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T08:49:58.492641Z · model: claude-opus-5-5 · open: 887_
+_Last sequenced: 2026-11-16T09:19:54.653772Z · model: claude-opus-5-5 · open: 886_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-5424 | S | critical | ok |  |  | v0.87.0 desktop publish failed (515 MB tarball from onnxruntime); skip @huggingface/transformers in desktop externals, add size guard. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
@@ -895,10 +894,6 @@ _Last sequenced: 2026-11-16T08:49:58.492641Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
-### PAN-5424 (rank 1)
-
-New and already in the pipeline. The v0.87.0 release is half-shipped: core and contracts published, desktop stuck at 0.86.0 and no GitHub Release exists, so this blocks every release until it lands. The fix is one SKIP_PACKAGES entry plus a tarball size guard, so it takes the free rank-1 slot.
-
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
@@ -1215,6 +1210,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 
 New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
 
+### PAN-3100 (rank 88)
+
+New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1222,24 +1221,11 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T08:49:58.492641Z",
+  "generatedAt": "2026-11-16T09:19:54.653772Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 887,
+  "openCount": 886,
   "nodes": [
-    {
-      "issue": "PAN-5424",
-      "rank": 1,
-      "size": "S",
-      "importance": "critical",
-      "score": 92,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "v0.87.0 desktop publish failed (515 MB tarball from onnxruntime); skip @huggingface/transformers in desktop externals, add size guard.",
-      "rationale": "New and already in the pipeline. The v0.87.0 release is half-shipped: core and contracts published, desktop stuck at 0.86.0 and no GitHub Release exists, so this blocks every release until it lands. The fix is one SKIP_PACKAGES entry plus a tarball size guard, so it takes the free rank-1 slot.",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-5013",
       "rank": 3,
