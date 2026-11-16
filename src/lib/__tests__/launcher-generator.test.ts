@@ -337,7 +337,12 @@ describe('generateLauncherScript', () => {
       workingDir: worktree,
       changeDir: false,
       overdeckEnv: { agentId: 'agent-pan-3189', issueId: 'PAN-3189', sessionType: 'work' },
-      baseCommand: 'printenv PATH',
+      // PAN-4591: `pan skills launch-settings` now always reports the `semgrep` skill
+      // hidden (Semgrep is off by default on every machine), so this real, un-mocked
+      // launcher appends `--settings '...'` after baseCommand. Run through `sh -c`
+      // so that and any other appended flag land on ignored positional params,
+      // not as arguments to `printenv` itself.
+      baseCommand: "sh -c 'printenv PATH' --",
     }));
 
     const result = spawnSync('bash', [launcherPath], {
