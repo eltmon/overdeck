@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5343",
   "created": "2026-11-16T00:09:01.559Z",
-  "updated": "2026-11-16T00:46:00.171Z",
+  "updated": "2026-11-16T00:46:06.456Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -277,6 +277,11 @@
     "conv-deeplink.ac3": {
       "status": "completed",
       "doneAt": "2026-11-16T00:46:00.170Z"
+    },
+    "preset-bar": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:46:06.456Z"
     }
   }
 }
