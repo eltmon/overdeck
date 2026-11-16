@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5391",
   "created": "2026-11-16T02:26:12.740Z",
-  "updated": "2026-11-16T02:47:39.160Z",
+  "updated": "2026-11-16T02:47:46.825Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,11 @@
     "bar-amber-confirm.ac5": {
       "status": "completed",
       "doneAt": "2026-11-16T02:47:39.160Z"
+    },
+    "e2e-amber-step": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5391",
+      "claimedAt": "2026-11-16T02:47:46.825Z"
     }
   }
 }
