@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarClock, Loader2, Pause, Pencil, Play, Trash2, X } from 'lucide-react';
+import { CalendarClock, Loader2, Pause, Pencil, Play, Trash2 } from 'lucide-react';
 import { presetToCron, SCHEDULE_PRESET_DAYS, type SchedulePreset } from '@overdeck/contracts';
 import { MenuItemButton } from '../shared/ContextMenu';
+import { Modal } from '../shared/Modal';
+import formStyles from '../shared/ModalForm.module.css';
 import { formatLocalWhen } from '../CommandDeck/conversation-triage';
 import { useDashboardStore } from '../../lib/store';
 
@@ -141,11 +143,6 @@ export function ConversationScheduleDialog({ conversationName, onClose }: { conv
 
   useEffect(() => { promptRef.current?.focus(); }, []);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-  useEffect(() => {
     // PAN-4657 D14: refresh this dialog's own query when a sweep run (or any
     // list event) bumps the revision. The global ['conversations'] query is
     // ConversationList's job (it already invalidates on this same revision),
@@ -217,156 +214,140 @@ export function ConversationScheduleDialog({ conversationName, onClose }: { conv
   ));
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/32 backdrop-blur-sm" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Schedules"
-        className="mx-4 w-full max-w-lg rounded-2xl border border-border bg-popover text-popover-foreground shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center gap-2 border-b border-border px-5 py-3">
-          <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <h2 className="flex-1 text-sm font-medium">Schedules</h2>
-          <button type="button" className="rounded-[var(--radius-sm)] p-1 text-muted-foreground hover:bg-accent" onClick={onClose} aria-label="Close">
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        <div className="flex flex-col gap-3 px-5 py-4">
-          <form
-            className="flex flex-col gap-2"
-            onSubmit={(e) => { e.preventDefault(); void submit(); }}
-          >
-            <textarea
-              ref={promptRef}
-              className="min-h-16 w-full resize-y rounded-[var(--radius-sm)] border border-border bg-background px-2 py-1 text-[12px]"
-              value={form.prompt}
-              placeholder="Prompt to send on each occurrence"
-              aria-label="Schedule prompt"
-              onChange={(e) => setForm((f) => ({ ...f, prompt: e.target.value }))}
-            />
-            <div className="flex flex-wrap items-center gap-2">
+    <Modal title="Schedules" onClose={onClose}>
+      <div className={formStyles.form}>
+        <form
+          className="flex flex-col gap-2"
+          onSubmit={(e) => { e.preventDefault(); void submit(); }}
+        >
+          <textarea
+            ref={promptRef}
+            className={formStyles.textarea}
+            value={form.prompt}
+            placeholder="Prompt to send on each occurrence"
+            aria-label="Schedule prompt"
+            onChange={(e) => setForm((f) => ({ ...f, prompt: e.target.value }))}
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              className={formStyles.select}
+              value={form.repeatMode}
+              aria-label="Repeat"
+              onChange={(e) => setForm((f) => ({ ...f, repeatMode: e.target.value as RepeatMode }))}
+            >
+              {REPEAT_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+            </select>
+            {form.repeatMode === 'weekly' && (
               <select
-                className="rounded-[var(--radius-sm)] border border-border bg-background px-2 py-1 text-[12px]"
-                value={form.repeatMode}
-                aria-label="Repeat"
-                onChange={(e) => setForm((f) => ({ ...f, repeatMode: e.target.value as RepeatMode }))}
+                className={formStyles.select}
+                value={form.day}
+                aria-label="Day"
+                onChange={(e) => setForm((f) => ({ ...f, day: e.target.value }))}
               >
-                {REPEAT_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                {SCHEDULE_PRESET_DAYS.map((d) => <option key={d} value={d}>{d[0]!.toUpperCase() + d.slice(1)}</option>)}
               </select>
-              {form.repeatMode === 'weekly' && (
-                <select
-                  className="rounded-[var(--radius-sm)] border border-border bg-background px-2 py-1 text-[12px]"
-                  value={form.day}
-                  aria-label="Day"
-                  onChange={(e) => setForm((f) => ({ ...f, day: e.target.value }))}
-                >
-                  {SCHEDULE_PRESET_DAYS.map((d) => <option key={d} value={d}>{d[0]!.toUpperCase() + d.slice(1)}</option>)}
-                </select>
-              )}
-              {(form.repeatMode === 'daily' || form.repeatMode === 'weekdays' || form.repeatMode === 'weekly') && (
-                <input
-                  type="time"
-                  className="rounded-[var(--radius-sm)] border border-border bg-background px-2 py-1 text-[12px]"
-                  value={form.time}
-                  aria-label="Time"
-                  onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
-                />
-              )}
-              {form.repeatMode === 'cron' && (
-                <input
-                  className="min-w-0 flex-1 rounded-[var(--radius-sm)] border border-border bg-background px-2 py-1 font-mono text-[12px]"
-                  value={form.customCron}
-                  placeholder="* * * * *"
-                  aria-label="Cron expression"
-                  onChange={(e) => setForm((f) => ({ ...f, customCron: e.target.value }))}
-                />
-              )}
+            )}
+            {(form.repeatMode === 'daily' || form.repeatMode === 'weekdays' || form.repeatMode === 'weekly') && (
               <input
-                className="min-w-0 rounded-[var(--radius-sm)] border border-border bg-background px-2 py-1 text-[12px]"
-                value={form.timeZone}
-                placeholder="IANA time zone"
-                aria-label="Time zone"
-                onChange={(e) => setForm((f) => ({ ...f, timeZone: e.target.value }))}
+                type="time"
+                className={formStyles.input}
+                value={form.time}
+                aria-label="Time"
+                onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
               />
-            </div>
-            <div className="flex items-center gap-2">
+            )}
+            {form.repeatMode === 'cron' && (
+              <input
+                className={`${formStyles.input} ${formStyles.mono}`}
+                value={form.customCron}
+                placeholder="* * * * *"
+                aria-label="Cron expression"
+                onChange={(e) => setForm((f) => ({ ...f, customCron: e.target.value }))}
+              />
+            )}
+            <input
+              className={formStyles.input}
+              value={form.timeZone}
+              placeholder="IANA time zone"
+              aria-label="Time zone"
+              onChange={(e) => setForm((f) => ({ ...f, timeZone: e.target.value }))}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="submit"
+              className={formStyles.primaryButton}
+              disabled={busy || !form.prompt.trim()}
+            >
+              {editingId === null ? 'Create schedule' : 'Save changes'}
+            </button>
+            {editingId !== null && (
               <button
-                type="submit"
-                className="rounded-[var(--radius-sm)] border border-border px-3 py-1 text-[12px] hover:bg-accent disabled:opacity-50"
-                disabled={busy || !form.prompt.trim()}
+                type="button"
+                className={formStyles.button}
+                onClick={resetForm}
               >
-                {editingId === null ? 'Create schedule' : 'Save changes'}
+                Cancel edit
               </button>
-              {editingId !== null && (
-                <button
-                  type="button"
-                  className="rounded-[var(--radius-sm)] px-3 py-1 text-[12px] text-muted-foreground hover:bg-accent"
-                  onClick={resetForm}
-                >
-                  Cancel edit
-                </button>
-              )}
-            </div>
-          </form>
-          {error && <div role="alert" className="text-[12px] text-destructive-foreground">{error}</div>}
+            )}
+          </div>
+        </form>
+        {error && <div role="alert" className={formStyles.error}>{error}</div>}
 
-          {isLoading ? (
-            <div className="flex items-center gap-2 text-[12px] text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Loading…</div>
-          ) : schedules.length === 0 ? (
-            <div className="text-[12px] text-muted-foreground">No schedules yet.</div>
-          ) : (
-            <ul className="flex flex-col gap-1.5" aria-label="Schedules">
-              {schedules.map((schedule) => {
-                const next = schedule.enabled && schedule.nextRunAt ? `next ${formatLocalWhen(schedule.nextRunAt, new Date())}` : 'paused';
-                return (
-                  <li key={schedule.id} className="flex items-center gap-2 text-[12px]">
-                    <span className="min-w-0 flex-1 truncate" title={schedule.prompt}>{schedule.prompt}</span>
-                    <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{`${schedule.cron} · ${schedule.timeZone}`}</span>
-                    <span className="shrink-0 text-[11px] text-muted-foreground">{next}</span>
-                    {schedule.lastRunStatus && (
-                      <span className="shrink-0 text-[11px] text-muted-foreground" title={schedule.lastRunError ?? undefined}>
-                        {`last ${schedule.lastRunStatus}`}
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      className="shrink-0 rounded-[var(--radius-sm)] border border-border p-1 hover:bg-accent disabled:opacity-50"
-                      disabled={busy}
-                      onClick={() => { void togglePause(schedule); }}
-                      aria-label={schedule.enabled ? `Pause schedule ${schedule.id}` : `Resume schedule ${schedule.id}`}
-                      title={schedule.enabled ? 'Pause' : 'Resume'}
-                    >
-                      {schedule.enabled ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
-                    </button>
-                    <button
-                      type="button"
-                      className="shrink-0 rounded-[var(--radius-sm)] border border-border p-1 hover:bg-accent disabled:opacity-50"
-                      disabled={busy}
-                      onClick={() => startEdit(schedule)}
-                      aria-label={`Edit schedule ${schedule.id}`}
-                      title="Edit"
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </button>
-                    <button
-                      type="button"
-                      className="shrink-0 rounded-[var(--radius-sm)] border border-border p-1 hover:bg-accent disabled:opacity-50"
-                      disabled={busy}
-                      onClick={() => { void remove(schedule); }}
-                      aria-label={`Delete schedule ${schedule.id}`}
-                      title="Delete"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-[12px] text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Loading…</div>
+        ) : schedules.length === 0 ? (
+          <div className="text-[12px] text-muted-foreground">No schedules yet.</div>
+        ) : (
+          <ul className="flex flex-col gap-1.5" aria-label="Schedules">
+            {schedules.map((schedule) => {
+              const next = schedule.enabled && schedule.nextRunAt ? `next ${formatLocalWhen(schedule.nextRunAt, new Date())}` : 'paused';
+              return (
+                <li key={schedule.id} className="flex items-center gap-2 text-[12px]">
+                  <span className="min-w-0 flex-1 truncate" title={schedule.prompt}>{schedule.prompt}</span>
+                  <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{`${schedule.cron} · ${schedule.timeZone}`}</span>
+                  <span className="shrink-0 text-[11px] text-muted-foreground">{next}</span>
+                  {schedule.lastRunStatus && (
+                    <span className="shrink-0 text-[11px] text-muted-foreground" title={schedule.lastRunError ?? undefined}>
+                      {`last ${schedule.lastRunStatus}`}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    className="shrink-0 rounded-[var(--radius-sm)] border border-border p-1 hover:bg-accent disabled:opacity-50"
+                    disabled={busy}
+                    onClick={() => { void togglePause(schedule); }}
+                    aria-label={schedule.enabled ? `Pause schedule ${schedule.id}` : `Resume schedule ${schedule.id}`}
+                    title={schedule.enabled ? 'Pause' : 'Resume'}
+                  >
+                    {schedule.enabled ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+                  </button>
+                  <button
+                    type="button"
+                    className="shrink-0 rounded-[var(--radius-sm)] border border-border p-1 hover:bg-accent disabled:opacity-50"
+                    disabled={busy}
+                    onClick={() => startEdit(schedule)}
+                    aria-label={`Edit schedule ${schedule.id}`}
+                    title="Edit"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                  <button
+                    type="button"
+                    className="shrink-0 rounded-[var(--radius-sm)] border border-border p-1 hover:bg-accent disabled:opacity-50"
+                    disabled={busy}
+                    onClick={() => { void remove(schedule); }}
+                    aria-label={`Delete schedule ${schedule.id}`}
+                    title="Delete"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }
