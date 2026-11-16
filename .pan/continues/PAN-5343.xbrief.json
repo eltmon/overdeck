@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5343",
   "created": "2026-11-16T00:09:01.559Z",
-  "updated": "2026-11-16T00:23:31.438Z",
+  "updated": "2026-11-16T00:25:54.285Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,9 +120,26 @@
       "doneAt": "2026-11-16T00:23:26.042Z"
     },
     "switcher-door": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5343",
-      "claimedAt": "2026-11-16T00:23:31.438Z"
+      "claimedAt": "2026-11-16T00:23:31.438Z",
+      "doneAt": "2026-11-16T00:25:54.284Z"
+    },
+    "switcher-door.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:25:54.284Z"
+    },
+    "switcher-door.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:25:54.284Z"
+    },
+    "switcher-door.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:25:54.284Z"
+    },
+    "switcher-door.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:25:54.284Z"
     }
   }
 }
