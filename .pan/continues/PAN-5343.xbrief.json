@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5343",
   "created": "2026-11-16T00:09:01.559Z",
-  "updated": "2026-11-16T00:15:37.524Z",
+  "updated": "2026-11-16T00:17:59.246Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,9 +72,26 @@
       "doneAt": "2026-11-16T00:15:36.142Z"
     },
     "deck-layout-store": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5343",
-      "claimedAt": "2026-11-16T00:15:37.524Z"
+      "claimedAt": "2026-11-16T00:15:37.524Z",
+      "doneAt": "2026-11-16T00:17:59.246Z"
+    },
+    "deck-layout-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:17:59.246Z"
+    },
+    "deck-layout-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:17:59.246Z"
+    },
+    "deck-layout-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:17:59.246Z"
+    },
+    "deck-layout-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:17:59.246Z"
     }
   }
 }
