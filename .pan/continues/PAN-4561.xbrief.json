@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4561",
   "created": "2026-11-16T11:22:23.903Z",
-  "updated": "2026-11-16T12:11:50.120Z",
+  "updated": "2026-11-16T12:36:09.046Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -212,6 +212,11 @@
     "burn-down-issues.ac2": {
       "status": "completed",
       "doneAt": "2026-11-16T12:11:50.120Z"
+    },
+    "uat-screens": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4561",
+      "claimedAt": "2026-11-16T12:36:09.046Z"
     }
   }
 }
