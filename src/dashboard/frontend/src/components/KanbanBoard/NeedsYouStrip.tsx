@@ -1,18 +1,21 @@
 /**
  * PAN-2908 · C-BOARD — the "Needs you" strip.
  *
- * The only three states that need a human — pending questions, problems found
- * in review, stuck agents — surface above every column. Same derivation as
- * the simple-mode home (bucketSimpleHome), advanced-mode targets (opens the
- * issue drawer).
+ * PAN-5413: the strip's count is the shared Needs-you selector
+ * (useNeedsYouItems), so it matches the top bar. Simple reasons the selector
+ * does not count — plans ready to start, stuck agents, review problems —
+ * render as two labelled groups (Ready to start / Having trouble) in the
+ * same strip, outside the count.
  */
 import { useMemo, useState } from 'react';
 import { useDashboardStore } from '../../lib/store';
-import { usePendingInputSubjects } from '../../lib/useDecisions';
 import type { BackendPane, Issue } from '../../types';
 import type { AgentSnapshot } from '@overdeck/contracts';
 import { bucketSimpleHome, deriveSimpleIssue, type SimpleIssueDerivation, type NeedsYouKind } from '../../lib/simple/derive';
 import { useSimpleActions } from '../../lib/simple/useSimpleActions';
+import { useNeedsYouItems, type NeedsYouItem } from '../../lib/selectors/needsYou';
+import { simpleNeedsYouCards, simpleSecondarySections, type SimpleNeedsYouCard } from '../../lib/simple/needsYouCards';
+import { SIMPLE_STRINGS } from '../../lib/simple/strings';
 
 const KIND_META: Record<NeedsYouKind, { label: string; tone: string }> = {
   question: { label: 'Question', tone: 'border-warning/40' },
@@ -121,18 +124,48 @@ export function NeedsYouRow({
   );
 }
 
-type NeedsYouItem =
-  | { source: 'agent'; derivation: SimpleIssueDerivation; kind: NeedsYouKind; subjectId: string }
-  | { source: 'conversation'; derivation: SimpleIssueDerivation; kind: NeedsYouKind; conversationName: string; subjectId: string };
+function StripCardView({ card, onOpenIssue }: { card: SimpleNeedsYouCard; onOpenIssue: (id: string) => void }) {
+  if (card.card === 'item' || !card.derivation) {
+    return <NeedsYouItemRow item={card.item} onOpen={() => card.item.open()} />;
+  }
+  const subject = card.item.subject;
+  const isConversation = subject?.source === 'conversation';
+  return (
+    <NeedsYouRow
+      item={card.derivation}
+      kind={card.card}
+      question={subject ? card.item.ask : undefined}
+      onOpen={onOpenIssue}
+      isConversation={isConversation}
+      conversationName={isConversation ? subject!.agentId : undefined}
+    />
+  );
+}
+
+function NeedsYouItemRow({ item, onOpen }: { item: NeedsYouItem; onOpen: () => void }) {
+  return (
+    <div className="flex-none w-[340px] rounded-xl border bg-card p-3 shadow-sm border-warning/40" data-needs-you-item={item.key}>
+      <div className="text-xs font-medium">{item.title}</div>
+      <div className="mt-1 text-[11.5px] text-muted-foreground line-clamp-2">{item.ask}</div>
+      <div className="mt-2 flex items-center gap-2">
+        <button
+          onClick={onOpen}
+          className="ml-auto h-7 flex-none rounded-md border border-input px-2.5 text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+        >
+          Open
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export function NeedsYouStrip({ onOpenIssue }: { onOpenIssue: (id: string) => void }) {
   const issuesRaw = useDashboardStore((s) => s.issuesRaw);
   const agentsById = useDashboardStore((s) => s.agentsById);
   const derivedByIssueId = useDashboardStore((s) => s.derivedIssueStateByIssueId);
   const panesById = useDashboardStore((s) => s.backendPanesById);
-  const pendingSubjects = usePendingInputSubjects();
 
-  const { items, questions } = useMemo(() => {
+  const { byIdentifier, bucketNeeds } = useMemo(() => {
     const issues = (issuesRaw as Issue[]) ?? [];
     const allAgents = Object.values(agentsById ?? {}) as AgentSnapshot[];
     const agentsByIssue = new Map<string, AgentSnapshot[]>();
@@ -163,57 +196,60 @@ export function NeedsYouStrip({ onOpenIssue }: { onOpenIssue: (id: string) => vo
         panesOf(issue),
       ),
     );
-    const needs = bucketSimpleHome(derivations).needsYou;
-    const questionBySubject = new Map<string, string>();
-    const allItems: NeedsYouItem[] = [...needs.map((n) => ({ source: 'agent' as const, ...n, subjectId: n.derivation.pendingInputAgent?.id ?? '' }))];
+    return {
+      byIdentifier: new Map(derivations.map((d) => [d.issue.identifier.toLowerCase(), d])),
+      bucketNeeds: bucketSimpleHome(derivations).needsYou,
+    };
+  }, [issuesRaw, agentsById, derivedByIssueId, panesById]);
 
-    for (const s of pendingSubjects ?? []) {
-      const q = s.pendingAskUserQuestion?.questions?.[0]?.question;
-      if (q) questionBySubject.set(s.agentId, q);
+  const needsItems = useNeedsYouItems();
+  const cards = useMemo(() => simpleNeedsYouCards(needsItems, byIdentifier), [needsItems, byIdentifier]);
+  const secondary = useMemo(() => simpleSecondarySections(bucketNeeds, needsItems), [bucketNeeds, needsItems]);
+  const needsCount = needsItems.length;
 
-      // Detect conversation-only subjects with pending questions
-      if (s.pendingAskUserQuestion && s.issueId && !agentsByIssue.has(s.issueId.toLowerCase())) {
-        const issue = issues.find((i) => i.identifier.toLowerCase() === s.issueId?.toLowerCase());
-        if (issue) {
-          const syntheticDerivation = deriveSimpleIssue(issue, [], derivedByIssueId?.[issue.identifier], panesOf(issue));
-          allItems.push({
-            source: 'conversation',
-            derivation: syntheticDerivation,
-            kind: 'question',
-            conversationName: s.agentId,
-            subjectId: s.agentId,
-          });
-        }
-      }
-    }
-
-    return { items: allItems, questions: questionBySubject };
-  }, [issuesRaw, agentsById, derivedByIssueId, panesById, pendingSubjects]);
-
-  if (items.length === 0) return null;
+  if (needsCount === 0 && secondary.readyToStart.length === 0 && secondary.trouble.length === 0) return null;
 
   return (
     <div className="mb-3 flex items-stretch gap-2.5 overflow-x-auto border-b border-border bg-warning/5 px-4 py-3" data-component="needs-you-strip">
       <div className="flex flex-none flex-col justify-center pr-1">
         <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Needs you</span>
-        <span className="text-xl font-medium text-warning-foreground">{items.length}</span>
+        <span className="text-xl font-medium text-warning-foreground" data-testid="needs-you-strip-count">{needsCount}</span>
       </div>
-      {items.slice(0, 6).map((item) => {
-        const key = item.subjectId || `${item.derivation.issue.identifier}-${item.kind}`;
-        return (
-          <NeedsYouRow
-            key={key}
-            item={item.derivation}
-            kind={item.kind}
-            question={questions.get(item.subjectId)}
-            onOpen={onOpenIssue}
-            isConversation={item.source === 'conversation'}
-            conversationName={item.source === 'conversation' ? item.conversationName : undefined}
-          />
-        );
-      })}
-      {items.length > 6 && (
-        <div className="flex flex-none items-center px-2 text-xs text-muted-foreground">+{items.length - 6} more</div>
+      {cards.slice(0, 6).map((c) => (
+        <div key={c.item.key} data-testid="needs-you-strip-row" data-needs-you-key={c.item.key} className="flex flex-none">
+          <StripCardView card={c} onOpenIssue={onOpenIssue} />
+        </div>
+      ))}
+      {needsCount > 6 && (
+        <div className="flex flex-none items-center px-2 text-xs text-muted-foreground">+{needsCount - 6} more</div>
+      )}
+      {secondary.readyToStart.length > 0 && (
+        <div className="flex flex-none items-stretch gap-2.5 border-l border-border pl-2.5" data-testid="needs-you-strip-ready-to-start">
+          <div className="flex flex-none flex-col justify-center pr-1">
+            <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{SIMPLE_STRINGS.home.readyToStartTitle}</span>
+            <span className="text-xl font-medium text-muted-foreground">{secondary.readyToStart.length}</span>
+          </div>
+          {secondary.readyToStart.slice(0, 6).map((d) => (
+            <NeedsYouRow key={d.issue.identifier} item={d} kind="start-work" onOpen={onOpenIssue} />
+          ))}
+          {secondary.readyToStart.length > 6 && (
+            <div className="flex flex-none items-center px-2 text-xs text-muted-foreground">+{secondary.readyToStart.length - 6} more</div>
+          )}
+        </div>
+      )}
+      {secondary.trouble.length > 0 && (
+        <div className="flex flex-none items-stretch gap-2.5 border-l border-border pl-2.5" data-testid="needs-you-strip-having-trouble">
+          <div className="flex flex-none flex-col justify-center pr-1">
+            <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{SIMPLE_STRINGS.home.troubleTitle}</span>
+            <span className="text-xl font-medium text-muted-foreground">{secondary.trouble.length}</span>
+          </div>
+          {secondary.trouble.slice(0, 6).map((t) => (
+            <NeedsYouRow key={t.derivation.issue.identifier} item={t.derivation} kind={t.kind} onOpen={onOpenIssue} />
+          ))}
+          {secondary.trouble.length > 6 && (
+            <div className="flex flex-none items-center px-2 text-xs text-muted-foreground">+{secondary.trouble.length - 6} more</div>
+          )}
+        </div>
       )}
     </div>
   );
