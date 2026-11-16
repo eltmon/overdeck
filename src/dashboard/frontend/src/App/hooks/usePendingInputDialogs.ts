@@ -463,6 +463,8 @@ export function usePendingInputDialogs() {
       action: 'approve-manual' | 'reject-feedback';
       feedback?: string;
       toolUseId?: string;
+      /** The agent's issue, so the success toast can open it (PAN-5423). */
+      issueId?: string | null;
     }) => {
       const url = kind === 'agent'
         ? `/api/agents/${encodeURIComponent(id)}/plan-action`
@@ -484,10 +486,11 @@ export function usePendingInputDialogs() {
       return { toolUseId };
     },
     onSuccess: (_data, variables) => {
-      toast.success(
+      showDeliveredToast(
         variables.action === 'approve-manual'
           ? `Plan approved for ${variables.label?.trim() || variables.id}`
           : `Plan feedback sent to ${variables.label?.trim() || variables.id}`,
+        variables,
       );
     },
     onError: (error: Error, _variables, context) => {
@@ -505,6 +508,7 @@ export function usePendingInputDialogs() {
       label: subject.title?.trim() || subject.issueId || subject.id,
       action: 'approve-manual',
       toolUseId: subject.pendingProposedPlan?.toolUseId,
+      issueId: subject.issueId ?? null,
     });
   }, [currentPlanApprovalSubject, planActionMutation]);
 
@@ -518,6 +522,7 @@ export function usePendingInputDialogs() {
       action: 'reject-feedback',
       feedback,
       toolUseId: subject.pendingProposedPlan?.toolUseId,
+      issueId: subject.issueId ?? null,
     });
   }, [currentPlanApprovalSubject, planActionMutation]);
 
