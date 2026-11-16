@@ -1272,7 +1272,7 @@
 }
 
 .projectConvItem .conversationStopBtn {
-  left: 18px;
+  left: 10px;
   width: 14px;
   height: 14px;
 }
@@ -2521,7 +2521,7 @@
 
 .conversationStopBtn {
   position: absolute;
-  left: 12px;
+  left: 4px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
