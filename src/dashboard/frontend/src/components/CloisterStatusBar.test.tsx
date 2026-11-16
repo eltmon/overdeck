@@ -139,7 +139,7 @@ describe('CloisterStatusBar TTS health badge', () => {
 
     const modal = screen.getByRole('dialog', { name: 'Restart agents with current config' });
     expect(modal).toHaveAttribute('aria-modal', 'true');
-    expect(modal).toHaveClass('fixed', 'inset-0');
+    expect(document.querySelector('[data-component="modal-scrim"]')).toContainElement(modal);
   });
 });
 
