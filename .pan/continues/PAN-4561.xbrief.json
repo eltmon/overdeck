@@ -1,0 +1,239 @@
+{
+  "version": "1",
+  "issueId": "PAN-4561",
+  "created": "2026-11-16T11:22:23.903Z",
+  "updated": "2026-11-16T12:40:42.938Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "timings-before": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4561",
+      "claimedAt": "2026-11-16T11:22:23.903Z",
+      "doneAt": "2026-11-16T11:25:19.348Z"
+    },
+    "timings-before.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:25:19.348Z"
+    },
+    "timings-before.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:25:19.348Z"
+    },
+    "react19-deps": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4561",
+      "claimedAt": "2026-11-16T11:25:27.768Z",
+      "doneAt": "2026-11-16T11:40:06.656Z"
+    },
+    "react19-deps.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:40:06.656Z"
+    },
+    "react19-deps.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:40:06.656Z"
+    },
+    "react19-deps.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:40:06.656Z"
+    },
+    "react19-deps.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:40:06.656Z"
+    },
+    "visx-4": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4561",
+      "claimedAt": "2026-11-16T11:40:15.200Z",
+      "doneAt": "2026-11-16T11:41:43.738Z"
+    },
+    "visx-4.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:41:43.738Z"
+    },
+    "visx-4.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:41:43.738Z"
+    },
+    "compiler-on": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4561",
+      "claimedAt": "2026-11-16T11:41:48.491Z",
+      "doneAt": "2026-11-16T11:49:10.635Z"
+    },
+    "compiler-on.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:49:10.635Z"
+    },
+    "compiler-on.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:49:10.635Z"
+    },
+    "compiler-on.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:49:10.635Z"
+    },
+    "compiler-on.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:49:10.635Z"
+    },
+    "compile-coverage": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4561",
+      "claimedAt": "2026-11-16T11:49:25.231Z",
+      "doneAt": "2026-11-16T11:55:13.392Z"
+    },
+    "compile-coverage.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:55:13.392Z"
+    },
+    "compile-coverage.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:55:13.392Z"
+    },
+    "compile-coverage.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:55:13.392Z"
+    },
+    "compile-coverage.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:55:13.392Z"
+    },
+    "compile-coverage.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:55:13.392Z"
+    },
+    "manual-memo-ratchet": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4561",
+      "claimedAt": "2026-11-16T11:55:20.557Z",
+      "doneAt": "2026-11-16T11:57:48.816Z"
+    },
+    "manual-memo-ratchet.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:57:48.816Z"
+    },
+    "manual-memo-ratchet.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:57:48.816Z"
+    },
+    "manual-memo-ratchet.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:57:48.816Z"
+    },
+    "manual-memo-ratchet.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:57:48.816Z"
+    },
+    "compiler-lint-rules": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4561",
+      "claimedAt": "2026-11-16T11:57:53.190Z",
+      "doneAt": "2026-11-16T12:01:44.016Z"
+    },
+    "compiler-lint-rules.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:01:44.016Z"
+    },
+    "compiler-lint-rules.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:01:44.016Z"
+    },
+    "compiler-lint-rules.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:01:44.016Z"
+    },
+    "ratchet-audit": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4561",
+      "claimedAt": "2026-11-16T12:01:49.590Z",
+      "doneAt": "2026-11-16T12:03:46.348Z"
+    },
+    "ratchet-audit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:03:46.348Z"
+    },
+    "ratchet-audit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:03:46.348Z"
+    },
+    "ratchet-audit.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:03:46.348Z"
+    },
+    "timings-after": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4561",
+      "claimedAt": "2026-11-16T12:03:53.607Z",
+      "doneAt": "2026-11-16T12:10:20.885Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4561",
+      "claimedAt": "2026-11-16T12:04:00.700Z",
+      "doneAt": "2026-11-16T12:07:32.808Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:07:32.808Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:07:32.808Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:07:32.808Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:07:32.808Z"
+    },
+    "timings-after.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:10:20.885Z"
+    },
+    "timings-after.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:10:20.885Z"
+    },
+    "burn-down-issues": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:11:50.120Z"
+    },
+    "burn-down-issues.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:11:50.120Z"
+    },
+    "burn-down-issues.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:11:50.120Z"
+    },
+    "uat-screens": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4561",
+      "claimedAt": "2026-11-16T12:36:09.046Z",
+      "doneAt": "2026-11-16T12:40:13.412Z"
+    },
+    "uat-screens.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:40:13.412Z"
+    },
+    "uat-screens.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:40:13.412Z"
+    },
+    "uat-screens.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:40:13.412Z"
+    },
+    "compiler-on.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:40:42.938Z"
+    }
+  }
+}

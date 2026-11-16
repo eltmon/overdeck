@@ -1,3 +1,4 @@
+import { renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ConversationSessionFeedEntry, GauntletRunSessionFeedEntry, SessionFeedEntry } from '../types';
 import { filterSessionFeedEntriesForTab, mergeSessionFeedEntries, useMergedFeed } from '../useMergedFeed';
@@ -165,7 +166,7 @@ describe('useMergedFeed', () => {
     hookSources.observations = [entry('activity', 'activity-1', '2026-05-23T03:00:00.000Z')];
     hookSources.activityEntries = [entry('activity', 'activity-2', '2026-05-23T02:00:00.000Z')];
 
-    const result = useMergedFeed('activity', Date.parse('2026-05-23T04:00:00.000Z'));
+    const result = renderHook(() => useMergedFeed('activity', Date.parse('2026-05-23T04:00:00.000Z'))).result.current;
 
     expect(result.entries.map((item) => item.id)).toEqual(['activity-1', 'activity-2']);
     expect(result.allEntries.map((item) => item.id)).toEqual(['activity-1', 'activity-2', 'conversation-1']);

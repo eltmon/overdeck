@@ -17,6 +17,8 @@ src/App/topbar/AgentsMenu.test.tsx
 src/App/topbar/Breadcrumb.test.tsx
 src/__tests__/fr7-conversation-pending-input.test.tsx
 src/__tests__/overlay-tokens.test.ts
+src/__tests__/reactCompilerCoverage.test.ts
+src/__tests__/reactCompilerEnabled.test.tsx
 src/components/ActivityPanel.test.tsx
 src/components/Agents/directory/directory-tree.test.ts
 src/components/Agents/live/live-model.test.ts
@@ -48,6 +50,7 @@ src/components/CommandDeck/__tests__/pipeline-helpers.test.ts
 src/components/CommandDeck/__tests__/projectsData.isRealProjectKey.test.ts
 src/components/CommandDeck/__tests__/projectsData.origin.test.ts
 src/components/CommandDeck/__tests__/useConversationMutations.archive.test.tsx
+src/components/CommandDeck/__tests__/useConversationMutations.retitle.test.tsx
 src/components/CommandDeck/__tests__/useConversationMutations.stop.test.tsx
 src/components/CommandDeck/__tests__/useConversationMutations.triage.test.tsx
 src/components/CommandDeck/__tests__/useDefaultDeckSelection.test.ts

@@ -35,6 +35,11 @@
 - Dialogs opened from a menu use a zustand store plus a host mounted in
   `main.tsx` (`LinkPullRequestDialogHost`, `ContinueOnDeviceDialogHost`), so the dialog outlives
   the menu.
+- No new manual memo (`useMemo`, `useCallback`, `memo`): the React Compiler memoizes.
+  Three shrink-only ratchets guard it: `scripts/react-compiler-skip-baseline.txt`
+  (checked by `src/__tests__/reactCompilerCoverage.test.ts`), `scripts/manual-memo-baseline.txt`
+  (`npm run lint:manual-memo`) and `eslint-react-compiler-allowlist.json`. See
+  `docs/DASHBOARD-ARCHITECTURE.md` "React Compiler (PAN-4561)".
 - Every centered modal dialog renders through `components/shared/Modal.tsx`, fields styled by
   `components/shared/ModalForm.module.css` (PAN-4756); popovers, palettes, drawers and full-screen
   viewers do not.

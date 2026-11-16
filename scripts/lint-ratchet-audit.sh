@@ -3,7 +3,7 @@
 # lint-ratchet-audit.sh — require issue references for ratchet increases.
 # File-size exceptions carry their issue reference in each mandatory allowlist
 # row and are validated by lint-file-size.sh before this audit runs. Removing
-# ESLint allowlist entries and updating circular baseline paths to follow
+# ESLint or React Compiler allowlist entries and updating circular baseline paths to follow
 # source-file renames are always free. Raising any remaining ratchet must
 # happen in a commit whose message includes an issue reference matching
 # ([A-Z]+-[0-9]+|#[0-9]+).
@@ -25,14 +25,20 @@ CIRCULAR_BASELINE="scripts/circular-deps-baseline.txt"
 EFFECT_DIAG_BASELINE="scripts/effect-diagnostics-baseline.txt"
 EFFECT_FACADES_BASELINE="scripts/effect-facades-baseline.txt"
 HARNESS_BRANCHES_BASELINE="scripts/harness-branches-baseline.txt"
+REACT_COMPILER_SKIP_BASELINE="scripts/react-compiler-skip-baseline.txt"
+MANUAL_MEMO_BASELINE="scripts/manual-memo-baseline.txt"
 ESLINT_ALLOWLIST="eslint-any-allowlist.json"
+ESLINT_COMPILER_ALLOWLIST="eslint-react-compiler-allowlist.json"
 ISSUE_REF_RE='([A-Z]+-[0-9]+|#[0-9]+)'
 
 declare -A seen_commits
 
-eslint_allowlist_at() {
-  local rev="$1"
-  { git show "$rev:$ESLINT_ALLOWLIST" 2>/dev/null || true; } |
+# JSON allowlists are arrays of paths (eslint-any-allowlist.json,
+# eslint-react-compiler-allowlist.json). Removing an entry is free; adding one
+# is an increase.
+json_allowlist_at() {
+  local file="$1" rev="$2"
+  { git show "$rev:$file" 2>/dev/null || true; } |
     node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{if(!d.trim())return;JSON.parse(d).forEach(p=>console.log(p))})" |
     sort -u
 }
@@ -60,21 +66,30 @@ parent_effect_diag_baseline_at() {
   done | sort -u
 }
 
-parent_eslint_allowlist_at() {
+# Usage: json_allowlist_increases_for_commit <file> <label> <commit> <parents...>
+json_allowlist_increases_for_commit() {
+  local file="$1" label="$2" commit="$3"
+  shift 3
+  local parent has_parent_allowlist=false
   for parent in "$@"; do
-    eslint_allowlist_at "$parent"
-  done | sort -u
-}
+    if git cat-file -e "$parent:$file" 2>/dev/null; then
+      has_parent_allowlist=true
+      break
+    fi
+  done
+  # The first allowlist is an initialization, not a ratchet increase.
+  if [[ "$has_parent_allowlist" != true ]]; then
+    return 0
+  fi
 
-eslint_allowlist_increases_for_commit() {
-  local commit="$1"
-  shift
   local old_file new_file
   old_file=$(mktemp)
   new_file=$(mktemp)
-  parent_eslint_allowlist_at "$@" > "$old_file"
-  eslint_allowlist_at "$commit" > "$new_file"
-  comm -13 "$old_file" "$new_file" | sed 's/^/allowlist added: /'
+  for parent in "$@"; do
+    json_allowlist_at "$file" "$parent"
+  done | sort -u > "$old_file"
+  json_allowlist_at "$file" "$commit" > "$new_file"
+  comm -13 "$old_file" "$new_file" | sed "s|^|$label added: |"
   rm -f "$old_file" "$new_file"
 }
 
@@ -147,21 +162,23 @@ effect_facades_baseline_increases_for_commit() {
   rm -f "$old_file" "$new_file"
 }
 
-harness_branches_baseline_at() {
-  local rev="$1"
-  { git show "$rev:$HARNESS_BRANCHES_BASELINE" 2>/dev/null || true; } |
+count_path_baseline_at() {
+  local file="$1" rev="$2"
+  { git show "$rev:$file" 2>/dev/null || true; } |
     sed -E '/^[[:space:]]*(#|$)/d' | sort -u
 }
 
-# Rows are "<count> <path>" (PAN-4562). Compare by <path>: a lowered count is
-# free; a raised count or a new row is an increase. Across a merge commit's
-# parents the highest count per path is the old value.
-harness_branches_baseline_increases_for_commit() {
-  local commit="$1"
-  shift
+# Rows are "<count> <path>" (harness branches PAN-4562; React Compiler skips
+# and manual memo PAN-4561). Compare by <path>: a lowered count is free; a
+# raised count or a new row is an increase. Across a merge commit's parents
+# the highest count per path is the old value.
+# Usage: count_path_baseline_increases_for_commit <file> <label> <commit> <parents...>
+count_path_baseline_increases_for_commit() {
+  local file="$1" label="$2" commit="$3"
+  shift 3
   local parent has_parent_baseline=false
   for parent in "$@"; do
-    if git cat-file -e "$parent:$HARNESS_BRANCHES_BASELINE" 2>/dev/null; then
+    if git cat-file -e "$parent:$file" 2>/dev/null; then
       has_parent_baseline=true
       break
     fi
@@ -175,17 +192,17 @@ harness_branches_baseline_increases_for_commit() {
   old_file=$(mktemp)
   new_file=$(mktemp)
   for parent in "$@"; do
-    harness_branches_baseline_at "$parent"
+    count_path_baseline_at "$file" "$parent"
   done > "$old_file"
-  harness_branches_baseline_at "$commit" > "$new_file"
-  awk '
+  count_path_baseline_at "$file" "$commit" > "$new_file"
+  awk -v label="$label" '
     FILENAME == ARGV[1] {
       if (NF >= 2) { key = $2; if (!(key in old) || $1 + 0 > old[key] + 0) old[key] = $1 }
       next
     }
     NF >= 2 {
       key = $2
-      if (!(key in old) || $1 + 0 > old[key] + 0) print "harness branches baseline increased: " $0
+      if (!(key in old) || $1 + 0 > old[key] + 0) print label " increased: " $0
     }
   ' "$old_file" "$new_file"
   rm -f "$old_file" "$new_file"
@@ -279,11 +296,14 @@ audit_commit() {
 
   local increases
   increases=$(
-    eslint_allowlist_increases_for_commit "$commit" "${parents[@]}"
+    json_allowlist_increases_for_commit "$ESLINT_ALLOWLIST" "allowlist" "$commit" "${parents[@]}"
+    json_allowlist_increases_for_commit "$ESLINT_COMPILER_ALLOWLIST" "react-compiler allowlist" "$commit" "${parents[@]}"
     circular_baseline_increases_for_commit "$commit" "${parents[@]}"
     effect_diag_baseline_increases_for_commit "$commit" "${parents[@]}"
     effect_facades_baseline_increases_for_commit "$commit" "${parents[@]}"
-    harness_branches_baseline_increases_for_commit "$commit" "${parents[@]}"
+    count_path_baseline_increases_for_commit "$HARNESS_BRANCHES_BASELINE" "harness branches baseline" "$commit" "${parents[@]}"
+    count_path_baseline_increases_for_commit "$REACT_COMPILER_SKIP_BASELINE" "react-compiler skip baseline" "$commit" "${parents[@]}"
+    count_path_baseline_increases_for_commit "$MANUAL_MEMO_BASELINE" "manual-memo baseline" "$commit" "${parents[@]}"
   )
 
   if [[ -z "$increases" ]]; then
@@ -311,11 +331,11 @@ commits_for_file() {
   fi
 }
 
-for file in "$ESLINT_ALLOWLIST" "$CIRCULAR_BASELINE" "$EFFECT_DIAG_BASELINE" "$EFFECT_FACADES_BASELINE" "$HARNESS_BRANCHES_BASELINE"; do
+for file in "$ESLINT_ALLOWLIST" "$ESLINT_COMPILER_ALLOWLIST" "$CIRCULAR_BASELINE" "$EFFECT_DIAG_BASELINE" "$EFFECT_FACADES_BASELINE" "$HARNESS_BRANCHES_BASELINE" "$REACT_COMPILER_SKIP_BASELINE" "$MANUAL_MEMO_BASELINE"; do
   while IFS= read -r commit; do
     [[ -z "$commit" ]] && continue
     audit_commit "$commit"
   done < <(commits_for_file "$file")
 done
 
-echo "✓ ratchet audit passed (no unaudited ESLint/circular/Effect/harness-branch ratchet increases)"
+echo "✓ ratchet audit passed (no unaudited ESLint/compiler/memo/circular/Effect/harness-branch ratchet increases)"

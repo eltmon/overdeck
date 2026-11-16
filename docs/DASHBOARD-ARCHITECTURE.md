@@ -935,6 +935,8 @@ The dashboard store is a Zustand 4 store, so a `useDashboardStore(selector)` cal
 - **Aggregate chrome is the exception.** `AgentsMenu`, `StoppedAgentsBanner`, `SystemHealthPill`, `NeedsYouIndicator`, `LeftColumn` and `ConversationDock` show cross-issue totals, so they may re-render when any agent or issue entry changes.
 - **The 5 s health poll still re-renders `App`.** `App` reads `dataUpdatedAt` from the `backend-health` query, and several relative-time labels advance only because of that re-render. It stays until those labels move onto a shared clock (the PAN-4560 follow-up issue).
 
+The React Compiler now memoizes every component it can compile; see [React Compiler (PAN-4561)](#react-compiler-pan-4561) for the rules that make it skip one and for the no-manual-memo policy.
+
 **Render-count tests.** `src/dashboard/frontend/src/test-utils/renderCounter.tsx` provides `createRenderCounter()` (a `Probe` that counts React `Profiler` commits of a subtree, mounts excluded), `applyStoreEvents(events)` (applies domain events inside `act`), `resetDashboardStore()` and `seedDashboardStore(partial)`. The tests assert render counts, never that a `memo` exists, so they stay valid when the React Compiler ([PAN-4561](https://github.com/eltmon/overdeck/issues/4561)) replaces hand-written memoization. Each fixed path has one, and all run in CI through `npm run test:frontend-subset`,
 which runs the files listed in `scripts/frontend-test-subset.txt`:
 
@@ -958,6 +960,39 @@ cd src/dashboard/frontend && PROFILE_LABEL=baseline npx playwright test tests/pr
 ```
 
 The spec installs a bippy-based probe (`tests/profiling/render-probe.ts`) before React loads and runs four scenarios: a streaming conversation (40 synthetic deltas through the profile-only `window.__overdeckQueryClient`), a domain-event burst with no conversation open (20 batches applied through `window.useDashboardStore`, each carrying the store's current sequence so replay is unaffected), composer typing, and 65 s of idle tickers. S2 and S4 open the project home `/command-deck/<PROFILE_PROJECT>` (default `overdeck`), because a bare `/command-deck` auto-selects the first conversation. It is read-only: it never clicks a control that changes server state. Results go to `.tmp/pan-4560-profile/<label>.json` and `<label>.md`; each scenario table starts with the watched surfaces, then the top 15 components by updates.
+
+## React Compiler (PAN-4561)
+
+The dashboard frontend and the phone app (`apps/mobile`) run on React 19. The oxc React Compiler memoizes components and hooks at build time through `@vitejs/plugin-react`'s `react({ compiler })`; there is no Babel step. The options live in `src/dashboard/frontend/reactCompiler.ts` (`{ target: '19', panicThreshold: 'none' }`) and are shared by `vite.config.ts`, `vitest.config.ts`, `apps/mobile/vite.config.ts` and the coverage scan, so tests run the same compiled code the build ships. `src/__tests__/reactCompilerEnabled.test.tsx` proves the Vitest suite runs compiled code. `@vitejs/plugin-react` (6.1.2) and `oxc-transform-react` (0.152.0) are pinned exactly so a baseline made on one machine reproduces on CI.
+
+**Builds never fail on a skip.** With `panicThreshold: 'none'` the compiler leaves a component it cannot compile as it is and the build continues. A skipped component gets no memoization at all, so the coverage test below is the gate, not the build.
+
+**What makes the compiler skip a component, and the fix.** These are the Rules of React that the compiler checks:
+
+- **A ref read during render** (`ref.current` in the component body or in a value passed to JSX). Read refs only in effects and event handlers. A value the render needs belongs in state.
+- **A hook called conditionally or in a loop.** Call hooks unconditionally at the top of the component; split the component when a branch needs its own hooks.
+- **`try/finally`, or `throw` inside `try/catch`, in a component body or a closure the compiler analyzes.** Use `promise.finally()` instead (`post(path).finally(() => setBusy(false))`), or move the work into a module-level function that the component calls.
+- **An `eslint-disable` of a `react-hooks` rule** ("React rule suppression prevents optimization"). Fix the code the rule flagged instead.
+- **A `"use no memo"` (or `"use no forget"`) directive.** It opts the function out by hand; remove it and fix the underlying rule break.
+- **Impure reads during render** (`Date.now()`, `new Date()`, `Math.random()`). Take time from a clock hook such as `useNowTick` and pass it in. A `useMemo` that lists a dependency it never reads does not work under the compiler: the compiler infers dependencies from what the body reads, so read the value you depend on.
+
+When a fix needs more than one of these, move the logic into a module-level function, use `promise.finally()`, or split the component.
+
+**The three ratchets.** Each one only shrinks. Raising or adding a row is a hand edit in a commit whose message names an issue; `scripts/lint-ratchet-audit.sh` rejects it otherwise.
+
+| Ratchet | File | Fails when | Check | Update |
+| --- | --- | --- | --- | --- |
+| Compiler skips | `scripts/react-compiler-skip-baseline.txt` (`<count> <path>`; count = compiler diagnostics + opt-out directives) | a frontend source file has more skips than its row, or skips with no row; or a row is higher than the file's count | `src/__tests__/reactCompilerCoverage.test.ts` (frontend CI subset), or `npx tsx src/dashboard/frontend/scripts/reactCompilerCoverage.ts --check` | `npx tsx src/dashboard/frontend/scripts/reactCompilerCoverage.ts --update` |
+| Manual memo | `scripts/manual-memo-baseline.txt` (`<count> <path>`; `useMemo(`, `useCallback(`, `memo(` call sites) | a file has more call sites than its row, or any with no row | `npm run lint:manual-memo` (part of `npm run lint`) | `bash scripts/lint-manual-memo.sh --update` |
+| Compiler lint | `eslint-react-compiler-allowlist.json` (paths) | a file not on the list breaks an `eslint-plugin-react-hooks` compiler rule (`react-hooks/refs`, `purity`, `set-state-in-effect` and the rest, set in `.eslintrc.cjs`) | `npm run lint` (ESLint step) | remove the path once the file is clean |
+
+The ESLint rules use the plugin's Babel build of the compiler, which disagrees with oxc on some files, so the skip baseline (oxc, same version as the build) is the authority for "skipped" and the lint allowlist is kept separately. `react-hooks/exhaustive-deps` stays off: the compiler validates memo dependencies itself.
+
+**No manual memo.** New `useMemo`, `useCallback` and `memo` are rejected by `lint:manual-memo`. Existing ones go away only after their file has no row in the skip baseline: in a skipped file the compiler adds no memoization, so removing hand-written memo there would undo the render fixes above. Until a file leaves the skip baseline, the Render discipline rules about identity-stable props for memoized children still apply to it.
+
+**Renames and moved code.** A row follows a path, not a component. When a baselined file is renamed, or code moves out of it into a new file, hand-edit the rows in all three ratchet files to the new paths, in a commit whose message names an issue, because `lint-ratchet-audit.sh` treats a new path as an increase.
+
+**Regenerating after a main merge.** Before `pan done` on a branch that created these files, re-create them so rows from files main changed are counted: `npx tsx src/dashboard/frontend/scripts/reactCompilerCoverage.ts --init`; delete `scripts/manual-memo-baseline.txt` and run `bash scripts/lint-manual-memo.sh --update`; and regenerate `eslint-react-compiler-allowlist.json` from an ESLint JSON run without it. `--init` is for that case only; normal work uses `--update`.
 
 ## Diff compare and ignore-whitespace (PAN-4503)
 

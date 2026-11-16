@@ -338,3 +338,9 @@ Eye, the old stacked diamonds, or tan/copper colors. Canonical SVGs:
   `bg-foreground/` on list groups, list rows, metadata strips, or switch
   tracks — each hit is a finding; it should be `.list-group-bar`/`.list-row`/
   `.list-meta`/`.switch-track-on`/`.switch-track-locked` instead.
+- Reviewing frontend diffs: the React Compiler memoizes components, so a new
+  `useMemo(`, `useCallback(` or `memo(` is a finding. So is any new or raised
+  row in `scripts/react-compiler-skip-baseline.txt` or
+  `scripts/manual-memo-baseline.txt`, and any new path in
+  `eslint-react-compiler-allowlist.json`. See `docs/DASHBOARD-ARCHITECTURE.md`
+  "React Compiler".

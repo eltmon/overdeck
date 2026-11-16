@@ -112,8 +112,8 @@ export function RunSettingsPanel({ settings, onChange }: RunSettingsPanelProps) 
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const savedTimers = useRef<Record<FieldId, ReturnType<typeof setTimeout> | undefined>>({} as never);
   const confirmReasonInputRef = useRef<HTMLInputElement | null>(null);
-  const laneDebounceTimer = useRef<ReturnType<typeof setTimeout>>();
-  const briefDebounceTimer = useRef<ReturnType<typeof setTimeout>>();
+  const laneDebounceTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const briefDebounceTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const briefCommittedRef = useRef(settings.briefOverlay ?? '');
 
   useEffect(() => setConcurrency(settings.laneAConcurrency), [settings.laneAConcurrency]);
