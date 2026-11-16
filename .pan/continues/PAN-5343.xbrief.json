@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5343",
   "created": "2026-11-16T00:09:01.559Z",
-  "updated": "2026-11-16T00:13:35.998Z",
+  "updated": "2026-11-16T00:14:00.296Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,14 +32,31 @@
       "doneAt": "2026-11-16T00:11:20.381Z"
     },
     "homeless-panes": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5343",
-      "claimedAt": "2026-11-16T00:11:26.878Z"
+      "claimedAt": "2026-11-16T00:11:26.878Z",
+      "doneAt": "2026-11-16T00:14:00.296Z"
     },
     "preset-layout": {
       "status": "in_progress",
       "claimedBy": "agent-pan-5343",
       "claimedAt": "2026-11-16T00:13:35.998Z"
+    },
+    "homeless-panes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:14:00.296Z"
+    },
+    "homeless-panes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:14:00.296Z"
+    },
+    "homeless-panes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:14:00.296Z"
+    },
+    "homeless-panes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:14:00.296Z"
     }
   }
 }
