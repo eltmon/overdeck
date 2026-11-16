@@ -577,6 +577,12 @@ describe('KanbanBoard drawer wiring', () => {
       if (url === '/api/registered-projects') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve([]) } as Response);
       }
+      if (url === '/api/disk-alert') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ level: 'ok' }) } as Response);
+      }
+      if (url === '/api/conversations/pending-input' || url === '/api/agent-requests') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) } as Response);
+      }
       return Promise.resolve({
         ok: true,
         text: () => Promise.resolve('{}'),
@@ -657,6 +663,12 @@ describe('KanbanBoard j/k card navigation', () => {
     vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
       const url = input.toString();
       if (url === '/api/registered-projects') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) } as Response);
+      }
+      if (url === '/api/disk-alert') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ level: 'ok' }) } as Response);
+      }
+      if (url === '/api/conversations/pending-input' || url === '/api/agent-requests') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve([]) } as Response);
       }
       return Promise.resolve({

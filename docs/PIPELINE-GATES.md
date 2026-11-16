@@ -2027,10 +2027,10 @@ Command Deck's state badge renders "Work agent not started" (a `not-started`
 workStart), "Work start retrying" (a `retrying`, unheld one), or "Work start
 held" (a `retrying`, `held` one) in place of the ordinary state badge
 (`featureStateBadge.ts`), and groups `work-not-started` into Needs-you with a
-subline naming the recorded error. The Needs-you strip's "Start work" card
-(`NeedsYouStrip.tsx`) shows the same "Work agent not started" label and error
-text in place of the generic "Plan ready" card, with its existing Start work
-button (`POST /api/agents`) unchanged.
+subline naming the recorded error. The "Start work" card in the Needs-you
+strip's **Ready to start** group (`NeedsYouStrip.tsx`) shows the same "Work
+agent not started" label and error text in place of the generic "Plan ready"
+card, with its existing Start work button (`POST /api/agents`) unchanged.
 
 ### A PR opened outside a pipeline workspace (PAN-4605)
 

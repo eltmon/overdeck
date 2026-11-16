@@ -1419,8 +1419,8 @@ gave-up or stalled post-planning auto-start read from the workspace journal —
 see "Work agent not started" in `docs/PIPELINE-GATES.md`), never appears in
 this table: it is derived only when there is no live pane at all, so no row
 here can carry it. Command Deck's state badge (`featureStateBadge.ts`) and
-the Needs-you strip's "Start work" card (`NeedsYouStrip.tsx`) render it
-instead.
+the "Start work" card in the Needs-you strip's **Ready to start** group
+(`NeedsYouStrip.tsx`) render it instead.
 
 Needs you sorts oldest wait first. Live sorts by start time so rows never reshuffle under the
 pointer as agents write output; Waiting and Idle sort most recent activity first. A subagent
@@ -2100,7 +2100,11 @@ opens Home (`/`). After the brand, left to right, the bar holds:
    same selector for its headline and its Needs-you cards (`lib/simple/needsYouCards.ts`
    picks each card); the Simple reasons the selector does not count (`start-work`,
    `stuck`, `problems`) render in its **Ready to start** and **Having trouble**
-   sections, outside the count (PAN-5371).
+   sections, outside the count (PAN-5371). The Kanban board's Needs-you strip
+   (`components/KanbanBoard/NeedsYouStrip.tsx`) uses the same selector and the
+   same `needsYouCards.ts` helpers: its number is `useNeedsYouItems().length`,
+   and the displaced reasons render in its **Ready to start** and **Having
+   trouble** groups, outside the number (PAN-5413).
 5. **Exception chips**, each rendered only while its condition is true:
    **Auto-resume frozen** (`DeaconFrozenChip`, while Deacon is paused; click to
    resume), **N stopped** (`StoppedAgentsBanner variant="pill"`), **Low-cost

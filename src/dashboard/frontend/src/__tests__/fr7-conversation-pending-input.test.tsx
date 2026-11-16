@@ -8,6 +8,11 @@
  *
  * AC-1 tests verify conversation-only rendering when no agents exist.
  * AC-3 test verifies agent-backed entries are preserved and routed with isConversation: false.
+ *
+ * PAN-5413: NeedsYouStrip now reads the shared Needs-you list
+ * (useNeedsYouItems) instead of building its own; its cases drive
+ * needsYou.useNeedsYouItems directly with items whose `subject` carries
+ * `source`.
  */
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -97,6 +102,7 @@ const mockAgent = {
 describe('FR-7: Conversation-only pending input surfaces', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(needsYou.useNeedsYouItems).mockReturnValue([]);
     vi.mocked(convoDock.useConvoDock).mockReturnValue({
       items: [],
       expanded: true,
@@ -141,13 +147,22 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
 
   describe('NeedsYouStrip: AC-1', () => {
     it('AC-1: renders conversation-only question without agent in store', () => {
-      vi.mocked(decisions.usePendingInputSubjects).mockReturnValue([
+      const since = new Date().toISOString();
+      vi.mocked(needsYou.useNeedsYouItems).mockReturnValue([
         {
-          agentId: 'conv-001',
-          issueId: 'PAN-1',
-          since: new Date().toISOString(),
-          pendingAskUserQuestion: {
-            questions: [{ question: 'Ready to proceed?' }],
+          key: 'issue:PAN-1',
+          kind: 'pending-input',
+          title: 'PAN-1',
+          ask: 'Ready to proceed?',
+          open: vi.fn(),
+          subject: {
+            agentId: 'conv-001',
+            source: 'conversation',
+            issueId: 'PAN-1',
+            kinds: ['askUserQuestion'],
+            permissionRequestIds: [],
+            since,
+            pendingAskUserQuestion: { questions: [{ question: 'Ready to proceed?' }] },
           },
         } as any,
       ]);
@@ -158,30 +173,33 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
       expect(screen.getByText('PAN-1')).toBeInTheDocument();
     });
 
-    it('AC-1: handles multiple conversations on same issue', () => {
-      vi.mocked(decisions.usePendingInputSubjects).mockReturnValue([
+    it('AC-1: two conversations on one issue are one Needs-you row (K-D9)', () => {
+      const since = new Date().toISOString();
+      vi.mocked(needsYou.useNeedsYouItems).mockReturnValue([
         {
-          agentId: 'conv-a',
-          issueId: 'PAN-1',
-          since: new Date().toISOString(),
-          pendingAskUserQuestion: {
-            questions: [{ question: 'First conversation' }],
-          },
-        } as any,
-        {
-          agentId: 'conv-b',
-          issueId: 'PAN-1',
-          since: new Date().toISOString(),
-          pendingAskUserQuestion: {
-            questions: [{ question: 'Second conversation' }],
+          key: 'issue:PAN-1',
+          kind: 'pending-input',
+          title: 'PAN-1',
+          ask: 'First conversation',
+          open: vi.fn(),
+          subject: {
+            agentId: 'conv-a',
+            source: 'conversation',
+            issueId: 'PAN-1',
+            kinds: ['askUserQuestion'],
+            permissionRequestIds: [],
+            since,
+            pendingAskUserQuestion: { questions: [{ question: 'First conversation' }] },
           },
         } as any,
       ]);
 
       render(<NeedsYouStrip onOpenIssue={vi.fn()} />);
 
+      expect(screen.getAllByTestId('needs-you-strip-row')).toHaveLength(1);
       expect(screen.getByText('First conversation')).toBeInTheDocument();
-      expect(screen.getByText('Second conversation')).toBeInTheDocument();
+      expect(screen.queryByText('Second conversation')).not.toBeInTheDocument();
+      expect(screen.getByTestId('needs-you-strip-count')).toHaveTextContent('1');
     });
 
     it('AC-1: routes conversation answer with isConversation true', () => {
@@ -194,13 +212,22 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
         startWork: { mutate: vi.fn(), isPending: false },
       } as any);
 
-      vi.mocked(decisions.usePendingInputSubjects).mockReturnValue([
+      const since = new Date().toISOString();
+      vi.mocked(needsYou.useNeedsYouItems).mockReturnValue([
         {
-          agentId: 'conv-route-test',
-          issueId: 'PAN-1',
-          since: new Date().toISOString(),
-          pendingAskUserQuestion: {
-            questions: [{ question: 'Respond?' }],
+          key: 'issue:PAN-1',
+          kind: 'pending-input',
+          title: 'PAN-1',
+          ask: 'Respond?',
+          open: vi.fn(),
+          subject: {
+            agentId: 'conv-route-test',
+            source: 'conversation',
+            issueId: 'PAN-1',
+            kinds: ['askUserQuestion'],
+            permissionRequestIds: [],
+            since,
+            pendingAskUserQuestion: { questions: [{ question: 'Respond?' }] },
           },
         } as any,
       ]);
@@ -254,13 +281,22 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
 
       vi.mocked(derive.deriveSimpleIssue).mockReturnValue(mockAgentDerivation as any);
 
-      vi.mocked(decisions.usePendingInputSubjects).mockReturnValue([
+      const since = new Date().toISOString();
+      vi.mocked(needsYou.useNeedsYouItems).mockReturnValue([
         {
-          agentId: 'agent-test-1',
-          issueId: 'PAN-1',
-          since: new Date().toISOString(),
-          pendingAskUserQuestion: {
-            questions: [{ question: 'Agent needs input' }],
+          key: 'issue:PAN-1',
+          kind: 'pending-input',
+          title: 'PAN-1',
+          ask: 'Agent needs input',
+          open: vi.fn(),
+          subject: {
+            agentId: 'agent-test-1',
+            source: 'agent',
+            issueId: 'PAN-1',
+            kinds: ['askUserQuestion'],
+            permissionRequestIds: [],
+            since,
+            pendingAskUserQuestion: { questions: [{ question: 'Agent needs input' }] },
           },
         } as any,
       ]);
@@ -289,6 +325,122 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
           isConversation: false,
         })
       );
+    });
+
+    it("AC-1: routes the answer to the subject's agent, not the derivation's pendingInputAgent, when two agents wait on one issue (review PAN-5413)", () => {
+      const answerMutate = vi.fn();
+      vi.mocked(simpleActions.useSimpleActions).mockReturnValue({
+        tell: { mutate: vi.fn(), isPending: false },
+        recover: { mutate: vi.fn(), isPending: false },
+        unstick: { mutate: vi.fn(), isPending: false },
+        answer: { mutate: answerMutate, isPending: false },
+        startWork: { mutate: vi.fn(), isPending: false },
+      } as any);
+
+      // deriveSimpleIssue picked agent-work as pendingInputAgent, but the
+      // selector's item is the question asked by a different agent on the
+      // same issue, agent-worker.
+      const otherAgent = {
+        id: 'agent-work',
+        issueId: 'PAN-1',
+        status: 'running' as const,
+        name: 'other-agent',
+        pendingInputKinds: ['question'] as const,
+      } as any;
+      const mockAgentDerivation = {
+        issue: mockIssue,
+        primaryAgent: otherAgent,
+        pendingInputAgent: otherAgent,
+        display: { sentence: 'Agent question' },
+        agentStuck: false,
+        reviewStuck: false,
+      };
+
+      vi.mocked(derive.bucketSimpleHome).mockReturnValue({
+        needsYou: [
+          {
+            source: 'agent' as const,
+            derivation: mockAgentDerivation,
+            kind: 'question' as const,
+            subjectId: 'agent-work',
+          },
+        ],
+      } as any);
+
+      vi.mocked(derive.deriveSimpleIssue).mockReturnValue(mockAgentDerivation as any);
+
+      const since = new Date().toISOString();
+      vi.mocked(needsYou.useNeedsYouItems).mockReturnValue([
+        {
+          key: 'issue:PAN-1',
+          kind: 'pending-input',
+          title: 'PAN-1',
+          ask: 'Which schema?',
+          open: vi.fn(),
+          subject: {
+            agentId: 'agent-worker',
+            source: 'agent',
+            issueId: 'PAN-1',
+            kinds: ['askUserQuestion'],
+            permissionRequestIds: [],
+            since,
+            pendingAskUserQuestion: { questions: [{ question: 'Which schema?' }] },
+          },
+        } as any,
+      ]);
+
+      vi.mocked(store.useDashboardStore).mockImplementation((selector) => {
+        const state = {
+          issuesRaw: [mockIssue],
+          agentsById: { 'agent-work': otherAgent, 'agent-worker': mockAgent },
+          derivedIssueStateByIssueId: {},
+          backendPanesById: {},
+        };
+        return selector(state as any);
+      });
+
+      render(<NeedsYouStrip onOpenIssue={vi.fn()} />);
+
+      const input = screen.getByPlaceholderText('Type your answer…');
+      fireEvent.change(input, { target: { value: 'use v2' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Answer' }));
+
+      expect(answerMutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          agentId: 'agent-worker',
+          text: 'use v2',
+          isConversation: false,
+        })
+      );
+    });
+
+    it('AC-1: a conversation with no issue renders an Open row that calls item.open()', () => {
+      const since = new Date().toISOString();
+      const openSpy = vi.fn();
+      vi.mocked(needsYou.useNeedsYouItems).mockReturnValue([
+        {
+          key: 'conversation:helper',
+          kind: 'pending-input',
+          title: 'Helper conversation',
+          ask: 'Pick a port?',
+          open: openSpy,
+          subject: {
+            agentId: 'helper',
+            source: 'conversation',
+            kinds: ['askUserQuestion'],
+            permissionRequestIds: [],
+            since,
+          },
+        } as any,
+      ]);
+
+      render(<NeedsYouStrip onOpenIssue={vi.fn()} />);
+
+      expect(screen.getByText('Helper conversation')).toBeInTheDocument();
+      expect(screen.getByText('Pick a port?')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+      expect(openSpy).toHaveBeenCalledTimes(1);
+      expect(screen.queryByPlaceholderText('Type your answer…')).not.toBeInTheDocument();
     });
   });
 
