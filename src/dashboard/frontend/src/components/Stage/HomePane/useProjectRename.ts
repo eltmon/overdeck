@@ -18,7 +18,7 @@ export interface ProjectRenameControls {
   /** True while the rename request is in flight; disables the input. */
   pending: boolean
   /** Focus/select target for the draft input. */
-  inputRef: RefObject<HTMLInputElement>
+  inputRef: RefObject<HTMLInputElement | null>
   /** Enter edit mode with the current name pre-filled and selected. */
   begin: () => void
   /** Update the draft value. */

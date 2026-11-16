@@ -22,7 +22,7 @@ type SmartRow =
 interface SmartWorkspaceFieldProps {
   value: string;
   onChange: (text: string) => void;
-  inputRef?: RefObject<HTMLInputElement>;
+  inputRef?: RefObject<HTMLInputElement | null>;
   /** Registered issue prefixes, for recognizing `PAN-12`. */
   prefixes: string[];
   /** The selected project's prefix, which turns `#12` into `PAN-12`. */

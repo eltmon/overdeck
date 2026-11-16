@@ -184,7 +184,7 @@ function OverflowMenu({
   actions: Pick<UseIssueActionsResult, 'all' | 'primary' | 'phase'>;
   ignorePlacement?: boolean;
   onClose: () => void;
-  returnFocusRef?: RefObject<HTMLButtonElement>;
+  returnFocusRef?: RefObject<HTMLButtonElement | null>;
 }) {
   return (
     <>
@@ -280,7 +280,7 @@ function OverflowButton({
 }: {
   actions: Pick<UseIssueActionsResult, 'all' | 'primary' | 'phase'>;
   ignorePlacement?: boolean;
-  triggerRef?: RefObject<HTMLButtonElement>;
+  triggerRef?: RefObject<HTMLButtonElement | null>;
   openSignal?: number;
   count?: number;
   menuKey?: string;

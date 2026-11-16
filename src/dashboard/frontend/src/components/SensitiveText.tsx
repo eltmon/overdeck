@@ -9,7 +9,7 @@ interface SensitiveTextProps {
 
 export function SensitiveText({ value, className = '', revealDuration = 5000 }: SensitiveTextProps) {
   const [revealed, setRevealed] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const hide = useCallback(() => setRevealed(false), []);
 

@@ -40,7 +40,7 @@ interface DirectoryListProps {
   windowHours: DirectoryWindowHours;
   loading: boolean;
   error: boolean;
-  filterRef: RefObject<HTMLInputElement>;
+  filterRef: RefObject<HTMLInputElement | null>;
   onQueryChange: (query: string) => void;
   onFilterKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
   onSelect: (entryId: string) => void;

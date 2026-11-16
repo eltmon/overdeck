@@ -67,7 +67,7 @@ export interface SkillPacksSectionProps {
   /** Lowercased filter text from the panel; packs holding a match open, others hide. */
   search?: string;
   /** Lets the panel's summary line jump to this section. */
-  sectionRef?: RefObject<HTMLElement>;
+  sectionRef?: RefObject<HTMLElement | null>;
 }
 
 const ENDPOINT = '/api/skills/overrides';
