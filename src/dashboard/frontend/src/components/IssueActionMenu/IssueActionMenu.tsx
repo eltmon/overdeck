@@ -24,6 +24,7 @@ import {
   type NonIssueActionInvocation,
 } from './IssueActionGroupedBody';
 import { ActionDialogFrame } from './ActionDialogFrame';
+import formStyles from '../shared/ModalForm.module.css';
 import { IssueOpenInDialog } from './IssueOpenInDialog';
 import { RestartAgentDialog } from './RestartAgentDialog';
 import type { IssueActionView, UseIssueActionsResult } from './useIssueActions';
@@ -337,15 +338,15 @@ function NewOrderBookDialog({ actions, onClose }: { actions: UseIssueActionsResu
 
   return (
     <ActionDialogFrame label="New order book" onClose={onClose}>
-      <form className="space-y-3" onSubmit={(event) => { void onSubmit(event); }}>
-        <label className="block space-y-1 text-xs text-muted-foreground">
-          <span>Book name</span>
-          <input autoFocus value={name} onChange={(event) => setName(event.target.value)} className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary" />
+      <form className={formStyles.form} onSubmit={(event) => { void onSubmit(event); }}>
+        <label className={formStyles.field}>
+          <span className={formStyles.label}>Book name</span>
+          <input autoFocus value={name} onChange={(event) => setName(event.target.value)} className={formStyles.input} />
         </label>
-        <p className="text-[11px] text-muted-foreground">The issue will be added to Lane A. Arrange the book on the Order Book page.</p>
+        <p className={formStyles.hint}>The issue will be added to Lane A. Arrange the book on the Order Book page.</p>
         <div className="flex justify-end gap-2">
-          <button type="button" className="rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent" onClick={onClose}>Cancel</button>
-          <button type="submit" disabled={!name.trim() || submitting} className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50">{submitting ? 'Creating…' : 'Create & add'}</button>
+          <button type="button" className={formStyles.button} onClick={onClose}>Cancel</button>
+          <button type="submit" disabled={!name.trim() || submitting} className={formStyles.primaryButton}>{submitting ? 'Creating…' : 'Create & add'}</button>
         </div>
       </form>
     </ActionDialogFrame>
@@ -390,8 +391,8 @@ export function IssueActionDialogHost({ actions, onAfterClose }: { issueId?: str
           ariaLabel="Message to send to the agent"
           placeholder="Tell the agent what to do..."
           multiline
-          className="space-y-3"
-          inputClassName="min-h-[110px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary"
+          className={formStyles.form}
+          inputClassName={formStyles.textarea}
           actionsClassName="flex justify-end gap-2"
         />
       </ActionDialogFrame>
@@ -408,7 +409,9 @@ export function IssueActionDialogHost({ actions, onAfterClose }: { issueId?: str
 
   return (
     <ActionDialogFrame label={activeDialog.action.label} onClose={handleClose}>
-      <p className="text-xs text-muted-foreground">This action opens from the shared issue action surface.</p>
+      <div className={formStyles.content}>
+        <p className={formStyles.text}>This action opens from the shared issue action surface.</p>
+      </div>
     </ActionDialogFrame>
   );
 }
