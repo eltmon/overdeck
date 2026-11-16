@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5432",
   "created": "2026-11-16T09:27:35.793Z",
-  "updated": "2026-11-16T09:27:35.793Z",
+  "updated": "2026-11-16T09:28:48.244Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,26 @@
   "sessionHistory": [],
   "items": {
     "poll-rag-decision-entry": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5432",
-      "claimedAt": "2026-11-16T09:27:35.793Z"
+      "claimedAt": "2026-11-16T09:27:35.793Z",
+      "doneAt": "2026-11-16T09:28:48.244Z"
+    },
+    "poll-rag-decision-entry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T09:28:48.244Z"
+    },
+    "poll-rag-decision-entry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T09:28:48.244Z"
+    },
+    "poll-rag-decision-entry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T09:28:48.244Z"
+    },
+    "poll-rag-decision-entry.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T09:28:48.244Z"
     }
   }
 }
