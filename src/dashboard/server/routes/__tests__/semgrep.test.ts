@@ -150,6 +150,13 @@ describe('GET /api/projects/:projectKey/sast', () => {
       body: { value: 'blocking', effective: 'blocking', reason: 'verification.sast: blocking in projects.yaml', semgrepEnabled: true },
     });
   });
+
+  it('answers 422 when the global security block is invalid', async () => {
+    mockGetProject.mockReturnValue(Effect.succeed(PROJECT));
+    mockLoadConfigNoMigration.mockRejectedValue(new Error('config.yaml: security.semgrep.gate must be one of off, advisory, blocking'));
+    const res = await callProjectSast('GET');
+    expect(res).toEqual({ status: 422, body: { error: 'config.yaml: security.semgrep.gate must be one of off, advisory, blocking' } });
+  });
 });
 
 describe('POST /api/projects/:projectKey/sast', () => {
@@ -178,5 +185,18 @@ describe('POST /api/projects/:projectKey/sast', () => {
     const res = await callProjectSast('POST', { value: 'blocking' }, {});
     expect(res.status).toBe(401);
     expect(mockSetProjectSastOverride).not.toHaveBeenCalled();
+  });
+
+  it('rejects a literal null body with 400, not 500', async () => {
+    const res = await callProjectSast('POST', null);
+    expect(res).toEqual({ status: 400, body: { error: "value must be 'off', 'advisory', 'blocking', or null" } });
+    expect(mockSetProjectSastOverride).not.toHaveBeenCalled();
+  });
+
+  it('answers 422 when the global security block is invalid', async () => {
+    mockSetProjectSastOverride.mockResolvedValue(undefined);
+    mockLoadConfigNoMigration.mockRejectedValue(new Error('config.yaml: security.semgrep.gate must be one of off, advisory, blocking'));
+    const res = await callProjectSast('POST', { value: 'blocking' });
+    expect(res).toEqual({ status: 422, body: { error: 'config.yaml: security.semgrep.gate must be one of off, advisory, blocking' } });
   });
 });

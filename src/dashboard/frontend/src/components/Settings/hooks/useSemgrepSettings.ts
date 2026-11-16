@@ -58,7 +58,7 @@ export function useSemgrepSettings() {
     enabled: settings?.enabled === true,
     refetchOnWindowFocus: false,
   });
-  const installed = installStatus?.tools.find((t) => t.tool === 'semgrep')?.installed;
+  const installed = settings?.enabled ? installStatus?.tools.find((t) => t.tool === 'semgrep')?.installed : undefined;
 
   const [serverError, setServerError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -125,10 +125,9 @@ export function useSemgrepSettings() {
         setInstallMessage(body?.message ?? `Install request ended (HTTP ${res.status})`);
       } catch {
         setInstallMessage('The install request ended without an answer; checking the install state…');
-      } finally {
-        setInstalling(false);
-        void queryClient.invalidateQueries({ queryKey: ['semgrep-install-status'] });
       }
+      setInstalling(false);
+      void queryClient.invalidateQueries({ queryKey: ['semgrep-install-status'] });
     })();
   };
 

@@ -146,6 +146,30 @@ describe('SecuritySection (PAN-4594)', () => {
     expect(fetchMock).not.toHaveBeenCalledWith('/api/semgrep/settings', expect.objectContaining({ method: 'PUT' }));
   });
 
+  it('clears the stale installed state after Semgrep is turned off', async () => {
+    const { fetchMock } = installStrictFetchMock(({ method, url, init }) => {
+      if (method === 'GET' && url === '/api/semgrep/settings') return Response.json(BASE_VIEW);
+      if (method === 'GET' && url === '/api/prereqs/useSemgrep') {
+        return Response.json({ feature: 'useSemgrep', tools: [{ tool: 'semgrep', installed: true, installable: true }], ready: true, missing: [] });
+      }
+      if (method === 'PUT' && url === '/api/semgrep/settings') {
+        expect(JSON.parse(String(init?.body))).toEqual({ enabled: false });
+        return Response.json({ ...BASE_VIEW, enabled: false });
+      }
+      return undefined;
+    });
+
+    renderSection();
+    await waitFor(() => expect(screen.getByTestId('semgrep-install-status')).toHaveTextContent('1.180.0 installed'));
+
+    fireEvent.click(await screen.findByTestId('semgrep-enabled-toggle'));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/semgrep/settings', expect.objectContaining({ method: 'PUT' })));
+    await waitFor(() => expect(screen.getByTestId('semgrep-install-status')).toHaveTextContent('Turn Semgrep on to install it.'));
+    expect(screen.getByTestId('semgrep-install-status')).not.toHaveClass('text-success');
+    expect(screen.getByTestId('semgrep-install-button')).toBeInTheDocument();
+  });
+
   it('serializes saves and keeps the latest view', async () => {
     let resolveFirstPut: ((response: Response) => void) | undefined;
     let putCalls = 0;

@@ -13,7 +13,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { loadConfigNoMigration } from '../../../lib/config-yaml/load.js';
-import { SEMGREP_GATE_MODES, type SemgrepGateMode } from '../../../lib/config-yaml/semgrep.js';
+import { SEMGREP_GATE_MODES, type NormalizedSemgrepConfig, type SemgrepGateMode } from '../../../lib/config-yaml/semgrep.js';
 import { getProject } from '../../../lib/projects.js';
 import { projectSastView, setProjectSastOverride } from '../../../lib/semgrep/project-override.js';
 import { readSemgrepSettings, saveSemgrepSettings, SemgrepSettingsValidationError } from '../../../lib/semgrep/settings.js';
@@ -30,6 +30,21 @@ const readJsonBody = Effect.gen(function* () {
     return {};
   }
 });
+
+/** A plain object body, never null/array/primitive (readJsonBody parses a literal `null` body as `null`). */
+function readJsonObjectBody(raw: unknown): Record<string, unknown> {
+  return typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+}
+
+/** security.semgrep, or an error message when the stored config.yaml block is invalid. */
+async function loadSemgrepGateConfig(): Promise<{ config: NormalizedSemgrepConfig } | { error: string }> {
+  try {
+    const { config } = await loadConfigNoMigration();
+    return { config: config.security.semgrep };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
 
 const getSemgrepSettingsRoute = HttpRouter.add(
   'GET',
@@ -76,8 +91,9 @@ const getProjectSastRoute = HttpRouter.add(
     const key = params['projectKey'] ?? '';
     const project = yield* getProject(key);
     if (!project) return jsonResponse({ error: 'Project not found' }, { status: 404 });
-    const { config } = yield* Effect.promise(() => loadConfigNoMigration());
-    return jsonResponse(projectSastView(project, config.security.semgrep));
+    const semgrepConfig = yield* Effect.promise(() => loadSemgrepGateConfig());
+    if ('error' in semgrepConfig) return jsonResponse({ error: semgrepConfig.error }, { status: 422 });
+    return jsonResponse(projectSastView(project, semgrepConfig.config));
   })),
 );
 
@@ -94,7 +110,7 @@ const postProjectSastRoute = HttpRouter.add(
     const project = yield* getProject(key);
     if (!project) return jsonResponse({ error: 'Project not found' }, { status: 404 });
 
-    const body = (yield* readJsonBody) as { value?: unknown };
+    const body = readJsonObjectBody(yield* readJsonBody);
     const value = body.value;
     if (value !== null && !(SEMGREP_GATE_MODES as readonly unknown[]).includes(value)) {
       return jsonResponse({ error: "value must be 'off', 'advisory', 'blocking', or null" }, { status: 400 });
@@ -102,8 +118,9 @@ const postProjectSastRoute = HttpRouter.add(
 
     yield* Effect.promise(() => setProjectSastOverride(key, value as SemgrepGateMode | null));
     const updated = yield* getProject(key);
-    const { config } = yield* Effect.promise(() => loadConfigNoMigration());
-    return jsonResponse(projectSastView(updated!, config.security.semgrep));
+    const semgrepConfig = yield* Effect.promise(() => loadSemgrepGateConfig());
+    if ('error' in semgrepConfig) return jsonResponse({ error: semgrepConfig.error }, { status: 422 });
+    return jsonResponse(projectSastView(updated!, semgrepConfig.config));
   })),
 );
 

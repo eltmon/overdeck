@@ -37,6 +37,7 @@ let mergeTrainPostFails: boolean;
 /** PAN-4594: per-project Semgrep gate override state. */
 let sastValue: 'off' | 'advisory' | 'blocking' | null;
 let sastSemgrepEnabled: boolean;
+let sastGetFails: boolean;
 
 function renderDisclosure() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -64,6 +65,7 @@ describe('ProjectSettingsDisclosure', () => {
     mergeTrainPostFails = false;
     sastValue = null;
     sastSemgrepEnabled = true;
+    sastGetFails = false;
     const sastEffective = (): { effective: 'off' | 'advisory' | 'blocking'; reason: string } => {
       if (!sastSemgrepEnabled) return { effective: 'off', reason: 'security.semgrep.enabled is false' };
       if (sastValue) return { effective: sastValue, reason: `verification.sast: ${sastValue} in projects.yaml` };
@@ -71,6 +73,7 @@ describe('ProjectSettingsDisclosure', () => {
     };
     fetchControl = installStrictFetchMock(({ method, url, init }) => {
       if (method === 'GET' && url === '/api/projects/overdeck/sast') {
+        if (sastGetFails) return Response.json({ error: 'registry unavailable' }, { status: 503 });
         return Response.json({ value: sastValue, semgrepEnabled: sastSemgrepEnabled, ...sastEffective() });
       }
       if (method === 'POST' && url === '/api/projects/overdeck/sast') {
@@ -491,6 +494,16 @@ describe('ProjectSettingsDisclosure', () => {
 
     expect((await screen.findByTestId('sast-gate-effective')).textContent)
       .toBe('Semgrep is off for every project (Settings → Security)');
+  });
+
+  it('shows a distinct load error instead of a false off-everywhere message', async () => {
+    sastGetFails = true;
+    renderDisclosure();
+
+    expect((await screen.findByTestId('sast-gate-load-error')).textContent)
+      .toBe('Failed to load the Semgrep gate (HTTP 503)');
+    expect(screen.queryByTestId('sast-gate-effective')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Semgrep gate:/ })).not.toBeInTheDocument();
   });
 
   it('removes version_sync and returns to the explicit skip state', async () => {
