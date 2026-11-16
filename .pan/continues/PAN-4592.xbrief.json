@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4592",
   "created": "2026-11-16T16:14:58.639Z",
-  "updated": "2026-11-16T16:29:49.461Z",
+  "updated": "2026-11-16T16:42:57.290Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-16T16:42Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-16T16:42:57.290Z"
+    }
+  ],
   "items": {
     "semgrep-check-excerpt": {
       "status": "completed",
@@ -171,5 +177,14 @@
       "status": "completed",
       "doneAt": "2026-11-16T16:29:49.461Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-16T16:42:57Z",
+      "markdownBody": "# CodeRabbit findings for PAN-4592 (PR #5450)\n\nCodeRabbit posted 6 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4588612345 · src/lib/semgrep/ci-setup.ts:197 [Major]: Validate every effective push URL before pushing.\n  https://github.com/eltmon/overdeck/pull/5450#discussion_r4588612345\n- Thread 4588612354 · src/lib/semgrep/ci-setup.ts:203 [Minor]: Validate the remote host as well as the repository path.\n  https://github.com/eltmon/overdeck/pull/5450#discussion_r4588612354\n- Thread 4588612368 · src/lib/semgrep/ci-setup.ts:209 [Major]: Fetch the base into an explicit reference.\n  https://github.com/eltmon/overdeck/pull/5450#discussion_r4588612368\n- Thread 4588612377 · src/lib/semgrep/ci-setup.ts:219 [Minor]: Do not treat every failed read as an absent workflow.\n  https://github.com/eltmon/overdeck/pull/5450#discussion_r4588612377\n- Thread 4588612383 · src/lib/semgrep/ci-setup.ts:252 [Minor]: Create the worktree from the commit checked for the workflow.\n  https://github.com/eltmon/overdeck/pull/5450#discussion_r4588612383\n- Thread 4588612391 · src/lib/semgrep/ci-workflow.ts:133 [Minor]: Scanner failures on pull requests can fail blocking CI, and the status of a `git merge-base` failure is undefined in the tests.\n  https://github.com/eltmon/overdeck/pull/5450#discussion_r4588612391\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5450/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-4592 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5450 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    }
+  ]
 }
