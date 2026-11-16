@@ -4,6 +4,11 @@
 // `files` wins over `patch` when both are given. A patch that does not parse
 // shows its raw text with the reason. Files sort by path; each file block
 // carries `data-diff-file-path` so a caller can scroll to it.
+//
+// PAN-5418: the conversation All turns patch can hold mbox-style sections
+// (`From <sha> …` / `Subject: …`), one per commit. Each file from a section
+// gets a plain label row above its diff: `<short sha> <subject>`, or
+// `Uncommitted` for the all-zero sha. Files from a plain patch get no label.
 
 import { useMemo } from 'react'
 import { parsePatchFiles } from '@pierre/diffs'
@@ -120,8 +125,17 @@ const DIFF_PANEL_UNSAFE_CSS = `
 // ─── Patch parsing ────────────────────────────────────────────────────────────
 
 export type RenderablePatch =
-  | { kind: 'files'; files: FileDiffMetadata[] }
+  | { kind: 'files'; files: FileDiffMetadata[]; labels?: ReadonlyMap<FileDiffMetadata, string> }
   | { kind: 'raw'; text: string; reason: string }
+
+/** PAN-5418 FR-6: the label for a section preamble — `<short sha> <subject>`, `Uncommitted`, or undefined. */
+export function sectionLabel(patchMetadata: string | undefined): string | undefined {
+  const sha = patchMetadata?.match(/^From ([0-9a-f]{40}) /m)?.[1]
+  if (!sha) return undefined
+  if (/^0+$/.test(sha)) return 'Uncommitted'
+  const subject = patchMetadata?.match(/^Subject: (.*)$/m)?.[1] ?? ''
+  return `${sha.slice(0, 7)} ${subject}`.trim()
+}
 
 export function getRenderablePatch(
   patch: string | undefined,
@@ -138,7 +152,13 @@ export function getRenderablePatch(
     )
     const files = parsedPatches.flatMap((parsedPatch) => parsedPatch.files)
     if (files.length > 0) {
-      return { kind: 'files', files }
+      const labels = new Map<FileDiffMetadata, string>()
+      for (const parsedPatch of parsedPatches) {
+        const label = sectionLabel(parsedPatch.patchMetadata)
+        if (label === undefined) continue
+        for (const file of parsedPatch.files) labels.set(file, label)
+      }
+      return labels.size > 0 ? { kind: 'files', files, labels } : { kind: 'files', files }
     }
 
     return {
@@ -210,12 +230,18 @@ export function PatchFiles({ patch, files, cacheScope }: PatchFilesProps) {
           const filePath = resolveFileDiffPath(fileDiff)
           const fileKey = buildFileDiffRenderKey(fileDiff)
           const themedFileKey = `${fileKey}:${resolvedTheme}`
+          const label = renderablePatch.labels?.get(fileDiff)
           return (
             <div
               key={themedFileKey}
               data-diff-file-path={filePath}
               className="diff-render-file mb-2 rounded-md first:mt-2 last:mb-0"
             >
+              {label && (
+                <div data-testid="diff-section-label" className="px-2 pb-1 pt-1 font-mono text-[11px] text-muted-foreground">
+                  {label}
+                </div>
+              )}
               <FileDiff
                 fileDiff={fileDiff}
                 options={{

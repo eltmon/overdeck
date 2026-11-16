@@ -27,7 +27,7 @@ vi.mock('@pierre/diffs/react', () => ({
   FileDiff: ({ fileDiff }: { fileDiff: { name: string } }) => <div data-testid="file-diff">{fileDiff.name}</div>,
 }))
 
-import { PatchFiles } from '../PatchFiles'
+import { PatchFiles, sectionLabel } from '../PatchFiles'
 
 const TWO_FILES = `diff --git a/src/b.ts b/src/b.ts
 index 1111111..2222222 100644
@@ -43,6 +43,31 @@ index 3333333..4444444 100644
 @@ -1 +1 @@
 -old a
 +new a
+`
+
+const ZERO_SHA = '0'.repeat(40)
+
+/** PAN-5418: one file changed in a commit section and again in the uncommitted section. */
+const SECTIONED = `From ${'a'.repeat(40)} Mon Sep 17 00:00:00 2001
+Subject: first
+
+diff --git a/src/x.ts b/src/x.ts
+index 1111111..2222222 100644
+--- a/src/x.ts
++++ b/src/x.ts
+@@ -1 +1 @@
+-old x
++mid x
+From ${ZERO_SHA} Mon Sep 17 00:00:00 2001
+Subject: Uncommitted changes
+
+diff --git a/src/x.ts b/src/x.ts
+index 2222222..3333333 100644
+--- a/src/x.ts
++++ b/src/x.ts
+@@ -1 +1 @@
+-mid x
++new x
 `
 
 describe('PatchFiles', () => {
@@ -68,5 +93,31 @@ describe('PatchFiles', () => {
     const files = [{ name: 'only.ts', cacheKey: 'k1' }] as unknown as Parameters<typeof PatchFiles>[0]['files']
     const { container } = render(<PatchFiles patch={TWO_FILES} files={files} cacheScope="test" />)
     expect([...container.querySelectorAll<HTMLElement>('[data-diff-file-path]')].map((b) => b.dataset.diffFilePath)).toEqual(['only.ts'])
+  })
+
+  it('labels commit-section files with short sha and subject', () => {
+    render(<PatchFiles patch={SECTIONED} cacheScope="test" />)
+    expect(screen.getAllByTestId('file-diff')).toHaveLength(2)
+    expect(screen.getAllByTestId('diff-section-label').map((el) => el.textContent)).toEqual(['aaaaaaa first', 'Uncommitted'])
+  })
+
+  it('renders no label for a plain patch', () => {
+    render(<PatchFiles patch={TWO_FILES} cacheScope="test" />)
+    expect(screen.queryAllByTestId('diff-section-label')).toHaveLength(0)
+  })
+})
+
+describe('sectionLabel', () => {
+  it('returns undefined without a preamble', () => {
+    expect(sectionLabel(undefined)).toBeUndefined()
+  })
+
+  it('returns Uncommitted for the zero sha', () => {
+    expect(sectionLabel(`From ${ZERO_SHA} Mon Sep 17 00:00:00 2001\nSubject: Uncommitted changes\n`)).toBe('Uncommitted')
+  })
+
+  it('returns the short sha and subject for a commit preamble', () => {
+    const sha = '0123456789abcdef0123456789abcdef01234567'
+    expect(sectionLabel(`From ${sha} Mon Sep 17 00:00:00 2001\nSubject: fix the thing\n`)).toBe('0123456 fix the thing')
   })
 })
