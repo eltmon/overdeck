@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5423",
   "created": "2026-11-16T05:56:13.176Z",
-  "updated": "2026-11-16T05:56:13.177Z",
+  "updated": "2026-11-16T05:59:00.288Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,30 @@
   "sessionHistory": [],
   "items": {
     "delivered-toast-helper": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5423",
-      "claimedAt": "2026-11-16T05:56:13.176Z"
+      "claimedAt": "2026-11-16T05:56:13.176Z",
+      "doneAt": "2026-11-16T05:59:00.288Z"
+    },
+    "delivered-toast-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T05:59:00.288Z"
+    },
+    "delivered-toast-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T05:59:00.288Z"
+    },
+    "delivered-toast-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T05:59:00.288Z"
+    },
+    "delivered-toast-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T05:59:00.288Z"
+    },
+    "delivered-toast-helper.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T05:59:00.288Z"
     }
   }
 }
