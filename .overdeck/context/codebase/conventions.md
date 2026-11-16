@@ -35,6 +35,9 @@
 - Dialogs opened from a menu use a zustand store plus a host mounted in
   `main.tsx` (`LinkPullRequestDialogHost`, `ContinueOnDeviceDialogHost`), so the dialog outlives
   the menu.
+- Every centered modal dialog renders through `components/shared/Modal.tsx`, fields styled by
+  `components/shared/ModalForm.module.css` (PAN-4756); popovers, palettes, drawers and full-screen
+  viewers do not.
 
 ## Planning artifacts (xBRIEF v0.8, PAN-1124; relocated under `.pan/` by PAN-3917)
 - PRD drafts: `<planHome>/.pan/drafts/<issue>.md` (human-mutable narrative), committed on the feature branch.

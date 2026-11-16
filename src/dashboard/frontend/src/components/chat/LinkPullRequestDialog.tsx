@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { GitPullRequest, Loader2, RefreshCw, X } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 import type { ConversationPullRequests, PullRequestLink } from '@overdeck/contracts';
 import { PullRequestBadge } from '../primitives/PullRequestBadge';
+import { Modal } from '../shared/Modal';
+import formStyles from '../shared/ModalForm.module.css';
 
 /**
  * PAN-3822: the "Pull requests" dialog for one conversation. Lists every link
@@ -68,11 +70,6 @@ export function LinkPullRequestDialog({ conversationName, onClose }: { conversat
   });
 
   useEffect(() => { inputRef.current?.focus(); }, []);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
 
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true);
@@ -115,85 +112,74 @@ export function LinkPullRequestDialog({ conversationName, onClose }: { conversat
     && l.host === effective.host && l.repository === effective.repository && l.number === effective.number;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/32 backdrop-blur-sm" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Pull requests"
-        className="mx-4 w-full max-w-lg rounded-2xl border border-border bg-popover text-popover-foreground shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center gap-2 border-b border-border px-5 py-3">
-          <GitPullRequest className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <h2 className="flex-1 text-sm font-medium">Pull requests</h2>
+    <Modal
+      title="Pull requests"
+      onClose={onClose}
+      headerActions={(
+        <button
+          type="button"
+          className="-mt-1 grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
+          onClick={() => { void refresh(); }}
+          disabled={busy || links.length === 0}
+          aria-label="Refresh pull request status"
+          title="Refresh pull request status"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+        </button>
+      )}
+    >
+      <div className={formStyles.form}>
+        <form
+          className="flex gap-2"
+          onSubmit={(e) => { e.preventDefault(); void submit(); }}
+        >
+          <input
+            ref={inputRef}
+            className={`${formStyles.input} ${formStyles.mono} flex-1`}
+            value={draft}
+            placeholder="Pull request URL or #42"
+            aria-label="Pull request URL or #42"
+            onChange={(e) => setDraft(e.target.value)}
+          />
           <button
-            type="button"
-            className="rounded-[var(--radius-sm)] p-1 text-muted-foreground hover:bg-accent disabled:opacity-50"
-            onClick={() => { void refresh(); }}
-            disabled={busy || links.length === 0}
-            aria-label="Refresh pull request status"
-            title="Refresh pull request status"
+            type="submit"
+            className={formStyles.primaryButton}
+            disabled={busy || !draft.trim()}
           >
-            <RefreshCw className="h-3.5 w-3.5" />
+            Link
           </button>
-          <button type="button" className="rounded-[var(--radius-sm)] p-1 text-muted-foreground hover:bg-accent" onClick={onClose} aria-label="Close">
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        </form>
+        {error && <div role="alert" className={formStyles.error}>{error}</div>}
 
-        <div className="flex flex-col gap-3 px-5 py-4">
-          <form
-            className="flex gap-2"
-            onSubmit={(e) => { e.preventDefault(); void submit(); }}
-          >
-            <input
-              ref={inputRef}
-              className="min-w-0 flex-1 rounded-[var(--radius-sm)] border border-border bg-background px-2 py-1 text-[12px]"
-              value={draft}
-              placeholder="Pull request URL or #42"
-              aria-label="Pull request URL or #42"
-              onChange={(e) => setDraft(e.target.value)}
-            />
-            <button
-              type="submit"
-              className="rounded-[var(--radius-sm)] border border-border px-3 py-1 text-[12px] hover:bg-accent disabled:opacity-50"
-              disabled={busy || !draft.trim()}
-            >
-              Link
-            </button>
-          </form>
-          {error && <div role="alert" className="text-[12px] text-destructive-foreground">{error}</div>}
-
-          {isLoading ? (
-            <div className="flex items-center gap-2 text-[12px] text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Loading…</div>
-          ) : links.length === 0 ? (
-            <div className="text-[12px] text-muted-foreground">No pull requests linked yet.</div>
-          ) : (
-            <ul className="flex flex-col gap-1.5" aria-label="Linked pull requests">
-              {links.map((l) => (
-                <li key={`${l.host}/${l.repository}#${l.number}`} className="flex items-center gap-2 text-[12px]">
-                  <PullRequestBadge link={l} />
-                  <span className="min-w-0 flex-1 truncate" title={l.snapshot?.title ?? l.url}>
-                    {l.snapshot?.title || `${l.repository}#${l.number}`}
-                  </span>
-                  <span className="shrink-0 text-[11px] text-muted-foreground">
-                    {l.dismissedAt ? 'unlinked' : SOURCE_LABEL[l.source]}{isEffective(l) ? ' · shown' : ''}
-                  </span>
-                  <button
-                    type="button"
-                    className="shrink-0 rounded-[var(--radius-sm)] border border-border px-2 py-0.5 text-[11px] hover:bg-accent disabled:opacity-50"
-                    disabled={busy}
-                    onClick={() => { void (l.dismissedAt ? link(l.url) : unlink(l.url)); }}
-                    aria-label={`${l.dismissedAt ? 'Relink' : 'Unlink'} #${l.number}`}
-                  >
-                    {l.dismissedAt ? 'Relink' : 'Unlink'}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-[12px] text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Loading…</div>
+        ) : links.length === 0 ? (
+          <div className="text-[12px] text-muted-foreground">No pull requests linked yet.</div>
+        ) : (
+          <ul className="flex flex-col gap-1.5" aria-label="Linked pull requests">
+            {links.map((l) => (
+              <li key={`${l.host}/${l.repository}#${l.number}`} className="flex items-center gap-2 text-[12px]">
+                <PullRequestBadge link={l} />
+                <span className="min-w-0 flex-1 truncate" title={l.snapshot?.title ?? l.url}>
+                  {l.snapshot?.title || `${l.repository}#${l.number}`}
+                </span>
+                <span className="shrink-0 text-[11px] text-muted-foreground">
+                  {l.dismissedAt ? 'unlinked' : SOURCE_LABEL[l.source]}{isEffective(l) ? ' · shown' : ''}
+                </span>
+                <button
+                  type="button"
+                  className="shrink-0 rounded-[var(--radius-sm)] border border-border px-2 py-0.5 text-[11px] hover:bg-accent disabled:opacity-50"
+                  disabled={busy}
+                  onClick={() => { void (l.dismissedAt ? link(l.url) : unlink(l.url)); }}
+                  aria-label={`${l.dismissedAt ? 'Relink' : 'Unlink'} #${l.number}`}
+                >
+                  {l.dismissedAt ? 'Relink' : 'Unlink'}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }

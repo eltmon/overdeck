@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useId, useState } from 'react';
+import { Modal } from '../../shared/Modal';
 import { AddProjectStartStep } from './AddProjectStartStep.js';
 import { AddProjectFormStep } from './AddProjectFormStep.js';
 import { AddProjectFolderStep } from './AddProjectFolderStep.js';
@@ -76,24 +77,11 @@ export function AddProjectDialog({ variant, initialMode, initialUrl, initialPath
     return <div className="h-full w-full overflow-y-auto bg-background">{body}</div>;
   }
 
+  // Esc and the scrim close the modal only while no clone or batch runs.
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto pt-[8vh]">
-      <div className="absolute inset-0 bg-black/70" aria-hidden="true" />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape' && !busy) {
-            event.preventDefault();
-            onCancel();
-          }
-        }}
-        className="relative mx-4 mb-8 w-full max-w-[42rem] rounded border border-border bg-background shadow-2xl"
-      >
-        {body}
-      </div>
-    </div>
+    <Modal title="Add a project" headless labelledBy={titleId} dismissible={!busy} onClose={onCancel}>
+      {body}
+    </Modal>
   );
 }
 

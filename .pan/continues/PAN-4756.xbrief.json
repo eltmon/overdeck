@@ -1,0 +1,786 @@
+{
+  "version": "1",
+  "issueId": "PAN-4756",
+  "created": "2026-11-16T11:19:47.790Z",
+  "updated": "2026-11-16T12:39:21.014Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-16T12:39Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-16T12:39:21.013Z"
+    }
+  ],
+  "items": {
+    "modal-api": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:19:47.790Z",
+      "doneAt": "2026-11-16T11:23:02.676Z"
+    },
+    "modal-api.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:23:02.676Z"
+    },
+    "modal-api.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:23:02.676Z"
+    },
+    "modal-api.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:23:02.676Z"
+    },
+    "modal-api.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:23:02.676Z"
+    },
+    "modal-api.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:23:02.676Z"
+    },
+    "modal-form-styles": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:25:09.371Z",
+      "doneAt": "2026-11-16T11:25:51.179Z"
+    },
+    "modal-form-styles.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:25:51.179Z"
+    },
+    "modal-form-styles.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:25:51.179Z"
+    },
+    "delete-dead-dialogs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:30:25.712Z",
+      "doneAt": "2026-11-16T11:30:55.396Z"
+    },
+    "delete-dead-dialogs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:30:55.396Z"
+    },
+    "delete-dead-dialogs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:30:55.396Z"
+    },
+    "migrate-kanban-dialogs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:36:52.370Z",
+      "doneAt": "2026-11-16T11:37:16.329Z"
+    },
+    "migrate-kanban-dialogs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:37:16.329Z"
+    },
+    "migrate-kanban-dialogs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:37:16.329Z"
+    },
+    "migrate-bulk-dialogs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:37:18.148Z",
+      "doneAt": "2026-11-16T11:37:42.337Z"
+    },
+    "migrate-bulk-dialogs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:37:42.337Z"
+    },
+    "migrate-bulk-dialogs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:37:42.337Z"
+    },
+    "migrate-bulk-dialogs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:37:42.337Z"
+    },
+    "migrate-cost-breakdown-modal": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:37:43.715Z",
+      "doneAt": "2026-11-16T11:38:04.500Z"
+    },
+    "migrate-cost-breakdown-modal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:38:04.500Z"
+    },
+    "migrate-cost-breakdown-modal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:38:04.500Z"
+    },
+    "migrate-costs-page-issue-modal": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:38:05.748Z",
+      "doneAt": "2026-11-16T11:38:27.472Z"
+    },
+    "migrate-costs-page-issue-modal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:38:27.472Z"
+    },
+    "migrate-costs-page-issue-modal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:38:27.472Z"
+    },
+    "migrate-tasks-viewer-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:38:28.940Z",
+      "doneAt": "2026-11-16T11:38:53.725Z"
+    },
+    "migrate-tasks-viewer-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:38:53.725Z"
+    },
+    "migrate-tasks-viewer-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:38:53.725Z"
+    },
+    "migrate-prd-viewer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:38:55.593Z",
+      "doneAt": "2026-11-16T11:39:21.244Z"
+    },
+    "migrate-prd-viewer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:39:21.244Z"
+    },
+    "migrate-prd-viewer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:39:21.244Z"
+    },
+    "migrate-xbrief-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:39:22.616Z",
+      "doneAt": "2026-11-16T11:39:43.223Z"
+    },
+    "migrate-xbrief-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:39:43.223Z"
+    },
+    "migrate-xbrief-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:39:43.223Z"
+    },
+    "migrate-dialog-provider": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:40:59.756Z",
+      "doneAt": "2026-11-16T11:41:22.535Z"
+    },
+    "migrate-dialog-provider.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:41:22.535Z"
+    },
+    "migrate-dialog-provider.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:41:22.535Z"
+    },
+    "migrate-dialog-provider.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:41:22.535Z"
+    },
+    "migrate-dialog-provider.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:41:22.535Z"
+    },
+    "migrate-action-dialog-frame": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:41:23.952Z",
+      "doneAt": "2026-11-16T11:41:44.240Z"
+    },
+    "migrate-action-dialog-frame.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:41:44.240Z"
+    },
+    "migrate-action-dialog-frame.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:41:44.240Z"
+    },
+    "migrate-action-dialog-frame.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:41:44.240Z"
+    },
+    "migrate-action-dialog-frame.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:41:44.240Z"
+    },
+    "migrate-issue-open-in-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:41:45.529Z",
+      "doneAt": "2026-11-16T11:42:06.209Z"
+    },
+    "migrate-issue-open-in-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:42:06.209Z"
+    },
+    "migrate-issue-open-in-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:42:06.209Z"
+    },
+    "migrate-issue-open-in-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:42:06.209Z"
+    },
+    "migrate-confirmation-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:42:07.605Z",
+      "doneAt": "2026-11-16T11:42:30.521Z"
+    },
+    "migrate-confirmation-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:42:30.521Z"
+    },
+    "migrate-confirmation-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:42:30.521Z"
+    },
+    "migrate-confirmation-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:42:30.521Z"
+    },
+    "migrate-channel-permission-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:42:31.930Z",
+      "doneAt": "2026-11-16T11:42:54.348Z"
+    },
+    "migrate-channel-permission-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:42:54.348Z"
+    },
+    "migrate-channel-permission-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:42:54.348Z"
+    },
+    "migrate-channel-permission-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:42:54.348Z"
+    },
+    "migrate-terminal-permission-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:42:56.419Z",
+      "doneAt": "2026-11-16T11:43:17.696Z"
+    },
+    "migrate-terminal-permission-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:43:17.696Z"
+    },
+    "migrate-terminal-permission-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:43:17.696Z"
+    },
+    "migrate-terminal-permission-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:43:17.696Z"
+    },
+    "migrate-cloister-restart-config-modal": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:43:18.950Z",
+      "doneAt": "2026-11-16T11:43:40.537Z"
+    },
+    "migrate-cloister-restart-config-modal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:43:40.537Z"
+    },
+    "migrate-cloister-restart-config-modal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:43:40.537Z"
+    },
+    "migrate-cloister-restart-config-modal.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:43:40.537Z"
+    },
+    "migrate-ask-user-question-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:43:41.890Z",
+      "doneAt": "2026-11-16T11:44:03.140Z"
+    },
+    "migrate-ask-user-question-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:44:03.140Z"
+    },
+    "migrate-ask-user-question-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:44:03.140Z"
+    },
+    "migrate-ask-user-question-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:44:03.140Z"
+    },
+    "migrate-ask-user-question-dialog.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:44:03.140Z"
+    },
+    "migrate-plan-approval-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:44:04.652Z",
+      "doneAt": "2026-11-16T11:44:26.512Z"
+    },
+    "migrate-plan-approval-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:44:26.512Z"
+    },
+    "migrate-plan-approval-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:44:26.512Z"
+    },
+    "migrate-plan-approval-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:44:26.512Z"
+    },
+    "migrate-add-project-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:44:27.705Z",
+      "doneAt": "2026-11-16T11:44:52.544Z"
+    },
+    "migrate-add-project-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:44:52.544Z"
+    },
+    "migrate-add-project-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:44:52.544Z"
+    },
+    "migrate-resumable-session-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:44:54.683Z",
+      "doneAt": "2026-11-16T11:45:19.689Z"
+    },
+    "migrate-resumable-session-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:45:19.689Z"
+    },
+    "migrate-resumable-session-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:45:19.689Z"
+    },
+    "migrate-resumable-session-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:45:19.689Z"
+    },
+    "migrate-update-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:45:21.316Z",
+      "doneAt": "2026-11-16T11:45:44.014Z"
+    },
+    "migrate-update-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:45:44.014Z"
+    },
+    "migrate-update-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:45:44.014Z"
+    },
+    "migrate-update-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:45:44.014Z"
+    },
+    "migrate-teardown-modal": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:45:45.288Z",
+      "doneAt": "2026-11-16T11:46:08.393Z"
+    },
+    "migrate-teardown-modal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:46:08.393Z"
+    },
+    "migrate-teardown-modal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:46:08.393Z"
+    },
+    "migrate-teardown-modal.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:46:08.393Z"
+    },
+    "migrate-pair-device-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:46:09.845Z",
+      "doneAt": "2026-11-16T11:46:31.760Z"
+    },
+    "migrate-pair-device-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:46:31.760Z"
+    },
+    "migrate-pair-device-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:46:31.760Z"
+    },
+    "migrate-pair-device-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:46:31.760Z"
+    },
+    "migrate-set-up-phone-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:46:33.083Z",
+      "doneAt": "2026-11-16T11:46:54.891Z"
+    },
+    "migrate-set-up-phone-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:46:54.891Z"
+    },
+    "migrate-set-up-phone-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:46:54.891Z"
+    },
+    "migrate-set-up-phone-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:46:54.891Z"
+    },
+    "migrate-tailscale-setup-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:46:56.158Z",
+      "doneAt": "2026-11-16T11:47:18.352Z"
+    },
+    "migrate-tailscale-setup-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:47:18.352Z"
+    },
+    "migrate-tailscale-setup-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:47:18.352Z"
+    },
+    "migrate-tailscale-setup-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:47:18.352Z"
+    },
+    "migrate-create-access-token-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:47:19.469Z",
+      "doneAt": "2026-11-16T11:47:41.240Z"
+    },
+    "migrate-create-access-token-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:47:41.240Z"
+    },
+    "migrate-create-access-token-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:47:41.240Z"
+    },
+    "migrate-create-access-token-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:47:41.240Z"
+    },
+    "migrate-provider-models-modal": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:47:42.617Z",
+      "doneAt": "2026-11-16T11:48:05.543Z"
+    },
+    "migrate-provider-models-modal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:48:05.543Z"
+    },
+    "migrate-provider-models-modal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:48:05.543Z"
+    },
+    "migrate-provider-models-modal.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:48:05.543Z"
+    },
+    "migrate-vault-recovery-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:48:06.902Z",
+      "doneAt": "2026-11-16T11:48:30.163Z"
+    },
+    "migrate-vault-recovery-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:48:30.163Z"
+    },
+    "migrate-vault-recovery-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:48:30.163Z"
+    },
+    "migrate-vault-recovery-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:48:30.163Z"
+    },
+    "migrate-conversation-schedule-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:48:31.458Z",
+      "doneAt": "2026-11-16T11:48:50.811Z"
+    },
+    "migrate-conversation-schedule-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:48:50.811Z"
+    },
+    "migrate-conversation-schedule-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:48:50.811Z"
+    },
+    "migrate-conversation-schedule-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:48:50.811Z"
+    },
+    "migrate-link-pull-request-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:48:52.103Z",
+      "doneAt": "2026-11-16T11:49:12.011Z"
+    },
+    "migrate-link-pull-request-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:49:12.011Z"
+    },
+    "migrate-link-pull-request-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:49:12.011Z"
+    },
+    "migrate-link-pull-request-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:49:12.011Z"
+    },
+    "migrate-pull-here-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:49:13.345Z",
+      "doneAt": "2026-11-16T11:49:35.604Z"
+    },
+    "migrate-pull-here-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:49:35.604Z"
+    },
+    "migrate-pull-here-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:49:35.604Z"
+    },
+    "migrate-pull-here-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:49:35.604Z"
+    },
+    "migrate-vault-continue-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:49:37.041Z",
+      "doneAt": "2026-11-16T11:50:00.580Z"
+    },
+    "migrate-vault-continue-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:50:00.580Z"
+    },
+    "migrate-vault-continue-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:50:00.580Z"
+    },
+    "migrate-vault-continue-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:50:00.580Z"
+    },
+    "migrate-continue-on-device-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:50:02.388Z",
+      "doneAt": "2026-11-16T11:50:29.833Z"
+    },
+    "migrate-continue-on-device-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:50:29.833Z"
+    },
+    "migrate-continue-on-device-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:50:29.833Z"
+    },
+    "migrate-continue-on-device-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:50:29.833Z"
+    },
+    "migrate-fork-modal": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:50:37.762Z",
+      "doneAt": "2026-11-16T11:51:05.052Z"
+    },
+    "migrate-fork-modal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:51:05.052Z"
+    },
+    "migrate-fork-modal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:51:05.052Z"
+    },
+    "migrate-fork-modal.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:51:05.052Z"
+    },
+    "migrate-feature-metadata-modals": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:51:06.832Z",
+      "doneAt": "2026-11-16T11:51:32.567Z"
+    },
+    "migrate-feature-metadata-modals.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:51:32.567Z"
+    },
+    "migrate-feature-metadata-modals.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:51:32.567Z"
+    },
+    "migrate-feature-metadata-modals.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:51:32.567Z"
+    },
+    "migrate-settings-confirm-dialogs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:51:34.231Z",
+      "doneAt": "2026-11-16T11:51:57.734Z"
+    },
+    "migrate-settings-confirm-dialogs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:51:57.734Z"
+    },
+    "migrate-settings-confirm-dialogs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:51:57.734Z"
+    },
+    "migrate-settings-confirm-dialogs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:51:57.734Z"
+    },
+    "migrate-anywhere-trigger-dialogs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:51:59.237Z",
+      "doneAt": "2026-11-16T11:52:21.477Z"
+    },
+    "migrate-anywhere-trigger-dialogs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:52:21.477Z"
+    },
+    "migrate-anywhere-trigger-dialogs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:52:21.477Z"
+    },
+    "migrate-anywhere-trigger-dialogs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:52:21.477Z"
+    },
+    "migrate-anywhere-approval-remove-dialogs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:52:22.936Z",
+      "doneAt": "2026-11-16T11:52:44.667Z"
+    },
+    "migrate-anywhere-approval-remove-dialogs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:52:44.667Z"
+    },
+    "migrate-anywhere-approval-remove-dialogs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:52:44.667Z"
+    },
+    "migrate-anywhere-approval-remove-dialogs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:52:44.667Z"
+    },
+    "migrate-connect-bot-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:52:45.886Z",
+      "doneAt": "2026-11-16T11:53:07.982Z"
+    },
+    "migrate-connect-bot-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:53:07.982Z"
+    },
+    "migrate-connect-bot-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:53:07.982Z"
+    },
+    "migrate-connect-bot-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:53:07.982Z"
+    },
+    "migrate-mcp-url-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:53:09.346Z",
+      "doneAt": "2026-11-16T11:53:29.395Z"
+    },
+    "migrate-mcp-url-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:53:29.395Z"
+    },
+    "migrate-mcp-url-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:53:29.395Z"
+    },
+    "migrate-mcp-url-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:53:29.395Z"
+    },
+    "docs-modal-rule-and-audit": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:55:24.741Z",
+      "doneAt": "2026-11-16T11:55:45.486Z"
+    },
+    "docs-modal-rule-and-audit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:55:45.486Z"
+    },
+    "docs-modal-rule-and-audit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:55:45.486Z"
+    },
+    "docs-modal-rule-and-audit.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:55:45.486Z"
+    },
+    "docs-modal-rule-and-audit.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:55:45.486Z"
+    },
+    "uat-five-dialogs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:59:55.530Z",
+      "doneAt": "2026-11-16T12:00:16.905Z"
+    },
+    "uat-five-dialogs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:00:16.905Z"
+    },
+    "uat-five-dialogs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:00:16.905Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-16T12:39:21Z",
+      "markdownBody": "# CodeRabbit findings for PAN-4756 (PR #5441)\n\nCodeRabbit posted 1 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4585814071 · src/dashboard/frontend/src/components/shared/Modal.tsx:103 [Minor]: Keep initial focus in the topmost nested modal.\n  https://github.com/eltmon/overdeck/pull/5441#discussion_r4585814071\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5441/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-4756 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5441 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    }
+  ]
+}

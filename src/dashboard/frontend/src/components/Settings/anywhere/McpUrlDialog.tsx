@@ -9,9 +9,10 @@
  */
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { X } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { Modal } from '../../shared/Modal';
+import formStyles from '../../shared/ModalForm.module.css';
 import {
   ANYWHERE_ACCESS_TOKENS_QUERY_KEY,
   ANYWHERE_STATUS_QUERY_KEY,
@@ -53,21 +54,27 @@ async function copyText(text: string, label: string): Promise<void> {
 }
 
 export function CopyField({ label, value, multiline = false }: { label: string; value: string; multiline?: boolean }) {
-  const fieldClass = 'flex-1 min-w-0 bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground font-mono';
   return (
-    <div className="space-y-1">
-      <span className="text-xs text-muted-foreground">{label}</span>
+    <div className={formStyles.field}>
+      <span className={formStyles.label}>{label}</span>
       <div className="flex gap-2 items-start">
         {multiline ? (
-          <textarea readOnly aria-label={label} value={value} rows={8} className={`${fieldClass} resize-none`} />
+          <textarea
+            readOnly
+            aria-label={label}
+            value={value}
+            rows={8}
+            className={`${formStyles.textarea} ${formStyles.mono} flex-1 min-w-0`}
+            style={{ resize: 'none' }}
+          />
         ) : (
-          <input readOnly aria-label={label} value={value} onFocus={(e) => e.target.select()} className={fieldClass} />
+          <input readOnly aria-label={label} value={value} onFocus={(e) => e.target.select()} className={`${formStyles.input} ${formStyles.mono} flex-1 min-w-0`} />
         )}
         <button
           type="button"
           onClick={() => void copyText(value, label)}
           aria-label={`Copy ${label}`}
-          className="shrink-0 rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/50 transition-colors"
+          className={`${formStyles.button} shrink-0`}
         >
           Copy
         </button>
@@ -131,85 +138,68 @@ function McpUrlDialogBody({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
-      <div
-        className="bg-card border border-border rounded-lg shadow-2xl w-full max-w-lg mx-4"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="mcp-url-title"
-        data-component="mcp-url-dialog"
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <h3 id="mcp-url-title" className="text-base font-medium text-foreground">Copy MCP URL</h3>
-          <button type="button" onClick={onClose} aria-label="Close" className="text-muted-foreground hover:text-foreground transition-colors">
-            <X className="w-5 h-5" />
-          </button>
+    <Modal title="Copy MCP URL" onClose={onClose}>
+      {minted ? (
+        <div className={`${formStyles.content} space-y-3`} data-component="mcp-url-dialog">
+          <p className={formStyles.hint}>This token is shown once.</p>
+          <CopyField label="URL" value={minted.url} />
+          <CopyField label="Header" value={`Authorization: Bearer ${minted.token}`} />
+          <CopyField label="Client config" value={mcpClientConfig(minted.url, minted.token)} multiline />
+          <CopyField
+            label="Claude Code command"
+            value={`claude mcp add --transport http overdeck ${minted.url} --header "Authorization: Bearer ${minted.token}"`}
+          />
+          {error && <p className={formStyles.error}>{error}</p>}
         </div>
-
-        <div className="p-4 space-y-4 text-sm">
-          {minted ? (
-            <div className="space-y-3">
-              <p className="text-xs text-muted-foreground">This token is shown once.</p>
-              <CopyField label="URL" value={minted.url} />
-              <CopyField label="Header" value={`Authorization: Bearer ${minted.token}`} />
-              <CopyField label="Client config" value={mcpClientConfig(minted.url, minted.token)} multiline />
-              <CopyField
-                label="Claude Code command"
-                value={`claude mcp add --transport http overdeck ${minted.url} --header "Authorization: Bearer ${minted.token}"`}
-              />
-            </div>
+      ) : (
+        <div className={formStyles.form} data-component="mcp-url-dialog">
+          <div className={formStyles.field}>
+            <label htmlFor="mcp-url-name" className={formStyles.label}>Name</label>
+            <input
+              id="mcp-url-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={formStyles.input}
+            />
+          </div>
+          <div className={formStyles.field}>
+            <label htmlFor="mcp-url-address" className={formStyles.label}>Address</label>
+            <select
+              id="mcp-url-address"
+              value={address}
+              onChange={(e) => setChoice(e.target.value)}
+              className={`${formStyles.select} ${formStyles.mono}`}
+            >
+              {options.map((origin) => (
+                <option key={origin} value={origin}>{origin}</option>
+              ))}
+            </select>
+            {noReachable && (
+              <>
+                {noReachableMessage && <p className={formStyles.hint}>{noReachableMessage}</p>}
+                <p className={formStyles.hint}>Works only on this machine</p>
+              </>
+            )}
+          </div>
+          <label className={formStyles.choice}>
+            <input type="checkbox" checked={allowApprove} onChange={(e) => setAllowApprove(e.target.checked)} />
+            <span className={formStyles.choiceTitle}>Allow answering questions and approving permissions</span>
+          </label>
+          {forbidden ? (
+            <p className={formStyles.hint}>Only a browser on this machine can create MCP tokens.</p>
           ) : (
-            <>
-              <div className="space-y-1">
-                <label htmlFor="mcp-url-name" className="text-xs text-muted-foreground">Name</label>
-                <input
-                  id="mcp-url-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-                />
-              </div>
-              <div className="space-y-1">
-                <label htmlFor="mcp-url-address" className="text-xs text-muted-foreground">Address</label>
-                <select
-                  id="mcp-url-address"
-                  value={address}
-                  onChange={(e) => setChoice(e.target.value)}
-                  className="w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-                >
-                  {options.map((origin) => (
-                    <option key={origin} value={origin}>{origin}</option>
-                  ))}
-                </select>
-                {noReachable && (
-                  <>
-                    {noReachableMessage && <p className="text-xs text-muted-foreground">{noReachableMessage}</p>}
-                    <p className="text-xs text-muted-foreground">Works only on this machine</p>
-                  </>
-                )}
-              </div>
-              <label className="flex items-center gap-2 text-xs text-foreground">
-                <input type="checkbox" checked={allowApprove} onChange={(e) => setAllowApprove(e.target.checked)} />
-                Allow answering questions and approving permissions
-              </label>
-              {forbidden ? (
-                <p className="text-xs text-muted-foreground">Only a browser on this machine can create MCP tokens.</p>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => void handleCreate()}
-                  disabled={creating}
-                  className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-                >
-                  Create and copy URL
-                </button>
-              )}
-            </>
+            <button
+              type="button"
+              onClick={() => void handleCreate()}
+              disabled={creating}
+              className={`${formStyles.primaryButton} self-start`}
+            >
+              Create and copy URL
+            </button>
           )}
-          {error && <p className="text-xs text-destructive">{error}</p>}
+          {error && <p className={formStyles.error}>{error}</p>}
         </div>
-      </div>
-    </div>
+      )}
+    </Modal>
   );
 }

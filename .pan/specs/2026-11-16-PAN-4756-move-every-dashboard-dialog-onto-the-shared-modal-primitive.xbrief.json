@@ -1,0 +1,3505 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-16T12:00:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4756: Move every dashboard dialog onto the shared Modal primitive",
+    "updated": "2026-11-16T11:19:29.385Z"
+  },
+  "plan": {
+    "id": "pan-4756",
+    "title": "Move every dashboard dialog onto the shared Modal primitive",
+    "status": "running",
+    "uid": "5deacd6e-da74-4a4c-b265-394c001aac46",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-16T12:00:00Z",
+    "updated": "2026-11-16T11:19:29.385Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4756",
+        "label": "PAN-4756",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4756.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "modal",
+      "dialogs",
+      "style-guide"
+    ],
+    "metadata": {
+      "sizeJustification": "One repo-wide grep acceptance check over ~44 dialogs. All migrations depend on a single Modal API foundation item, are mechanically identical and file-disjoint (only fork-modal and feature-metadata-modals share command-deck.module.css, serialized by an edge), so they fan out in parallel under one plan; splitting into sibling issues would duplicate the foundation dependency and the final audit.",
+      "canonicalFilename": "2026-11-16-PAN-4756-move-every-dashboard-dialog-onto-the-shared-modal-primitive.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "About 44 dashboard dialogs draw bespoke backdrops and panels (bg-card/bg-popover, which under Broadsheet light are darker than the page, mostly without shadow), so they look sunken and inconsistent, and each re-implements or lacks Escape, scrim dismissal and focus handling.",
+      "Proposal": "Extend the PAN-4755 Modal primitive once (sizes, alertdialog, preserved accessible names, header actions, caller key handler, headless mode, warning tone, nested-modal isolation), add a shared ModalForm field stylesheet, then migrate each centered modal dialog onto Modal in parallel file-disjoint items, delete four unimported modal components, document the rule in STYLE-GUIDE.md and verify with an exact grep allowlist plus test-role UAT screenshots.",
+      "NonGoals": "- Changing any dialog's copy, fields, validation, endpoints or flow\n- Restyling dialog content other than form controls and footer buttons (markdown, tables, task lists, diffs, QR codes)\n- De-duplicating anywhereDialog.module.css, editDialog.module.css or the New conversation field rules into ModalForm.module.css\n- Migrating popovers, menus, tooltips, command palettes (CommandPalette, SearchModal, QuickOpen), side drawers (IssueDrawer, AgentDetailView, ContainerDetailPanel, LeftColumn drawer), MobileChrome phone sheet, ImageLightbox, XBriefFullscreen, IsolationMode, PlanDialog, EmergencyStopOverlay, the God View help overlay or recovery.tsx\n- Deleting AgentDetailView, ContainerDetailPanel or the BadgeBar/FeatureMetadata chain\n- A committed Playwright e2e spec\n- A z-index prop, stacking layers or an icon slot on Modal\n- Any migration item editing Modal.tsx or Modal.module.css (only modal-api does)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Set plan.metadata.sizeJustification instead of splitting into sibling issues.",
+        "rationale": "The issue's acceptance check is a single repo-wide grep and every migration depends on one Modal API change; the 38 migration items are mechanically identical, file-disjoint and run in parallel under one foundation, so sibling issues would only add coordination around a shared primitive."
+      },
+      {
+        "summary": "Extend Modal with size, alert, ariaLabel, closeLabel, headerActions, onKeyDown, headless/labelledBy, describedBy and tone in one foundation item (PRD D1).",
+        "rationale": "Each prop is required by a concrete dialog (DialogProvider alertdialog, preserved test names, Fork help button, decision dialog keys and header, Add project steps); concentrating them keeps migration items from editing the primitive in parallel."
+      },
+      {
+        "summary": "Preserve every dialog's current accessible name and close-button name (D4).",
+        "rationale": "The issue allows test changes only where names or structure changed; preserving names keeps unit tests and Playwright specs outside the CI list stable."
+      },
+      {
+        "summary": "Map Escape and scrim click to each dialog's existing dismiss action, guarded by its existing condition; ChannelPermissionDialog is non-dismissible (D5).",
+        "rationale": "The issue says every dialog gets Escape/scrim dismissal, and also says to keep behavior; mapping to the existing dismiss path satisfies both without inventing new outcomes such as an implicit Deny."
+      },
+      {
+        "summary": "Create components/shared/ModalForm.module.css as the shared field styles; leave anywhereDialog/editDialog modules as they are (D9).",
+        "rationale": "PAN-4755 left no shared field module, only per-area copies; a new shared file gives migrated dialogs one source without touching 20 already-migrated dialogs."
+      },
+      {
+        "summary": "Delete DeepWipeDialog, SwitchModelModal, ProviderEnvOverrideDialog and GodView/FocusView instead of migrating them (D10).",
+        "rationale": "Nothing imports them, so a migration cannot be verified, and leaving them fails the grep acceptance check."
+      },
+      {
+        "summary": "Keep command palettes, PlanDialog, side drawers, phone sheets and recovery.tsx out of scope (D11).",
+        "rationale": "The issue's scope rule covers only clearly centered modals; palettes are top-anchored without a header, PlanDialog is a draggable resizable window that minimizes on scrim click, drawers are side panels."
+      },
+      {
+        "summary": "Run the five-dialog screenshots as a work item (uat-five-dialogs) that commits ten PNGs, repeated by the test role in UAT; no committed e2e spec (D12).",
+        "rationale": "PAN-4755 closed its browser checks the same way (its uat-browser-checks item was completed by the work agent), and a pending UAT-only criterion on a migration item would block pan done."
+      },
+      {
+        "summary": "Run DialogProvider and ActionDialogFrame in parallel with the other migrations, at high priority, instead of strictly first (D16).",
+        "rationale": "The issue asks to migrate the shared frames first, but they share no files with other dialogs; priority keeps them first for a sequential executor without adding false blocking edges."
+      },
+      {
+        "summary": "Drop decorative header icons and keep a single Modal z-index (D7, D13).",
+        "rationale": "Modal's header design from PAN-4755 has no icon slot, and portal mount order already stacks a dialog opened from another dialog on top."
+      }
+    ],
+    "items": [
+      {
+        "id": "modal-api",
+        "title": "Extend the Modal primitive for every dialog shape (size, alert, names, header actions, headless, tone, nested isolation)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/shared/Modal.tsx",
+            "src/dashboard/frontend/src/components/shared/Modal.module.css",
+            "src/dashboard/frontend/src/components/shared/__tests__/Modal.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/HomeHeader.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/shared/__tests__/Modal.test.tsx src/components/Stage/HomePane/HomeHeader.test.tsx src/components/newConversation/__tests__/NewConversationDialog.test.tsx src/components/chat/sharing/__tests__/ShareDialog.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "Modal.test.tsx passes with the twelve new tests",
+            "HomeHeader.test.tsx and NewConversationDialog.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "migrate-dialog-provider",
+            "migrate-action-dialog-frame",
+            "migrate-issue-open-in-dialog",
+            "migrate-ask-user-question-dialog",
+            "migrate-plan-approval-dialog",
+            "migrate-terminal-permission-dialog",
+            "migrate-channel-permission-dialog",
+            "migrate-confirmation-dialog",
+            "migrate-kanban-dialogs",
+            "migrate-bulk-dialogs",
+            "migrate-cost-breakdown-modal",
+            "migrate-costs-page-issue-modal",
+            "migrate-tasks-viewer-dialog",
+            "migrate-prd-viewer",
+            "migrate-xbrief-dialog",
+            "migrate-resumable-session-dialog",
+            "migrate-update-dialog",
+            "migrate-cloister-restart-config-modal",
+            "migrate-fork-modal",
+            "migrate-feature-metadata-modals",
+            "migrate-settings-confirm-dialogs",
+            "migrate-anywhere-trigger-dialogs",
+            "migrate-anywhere-approval-remove-dialogs",
+            "migrate-connect-bot-dialog",
+            "migrate-mcp-url-dialog",
+            "migrate-pair-device-dialog",
+            "migrate-set-up-phone-dialog",
+            "migrate-tailscale-setup-dialog",
+            "migrate-create-access-token-dialog",
+            "migrate-provider-models-modal",
+            "migrate-vault-recovery-dialog",
+            "migrate-conversation-schedule-dialog",
+            "migrate-link-pull-request-dialog",
+            "migrate-pull-here-dialog",
+            "migrate-vault-continue-dialog",
+            "migrate-continue-on-device-dialog",
+            "migrate-add-project-dialog",
+            "migrate-teardown-modal"
+          ],
+          "parallelSafeReason": "Touches only the Modal primitive, its test and HomeHeader; no other item edits these files."
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Add ModalProps size ('narrow'|'default'|'wide'|'xl', replacing wide), alert, ariaLabel, closeLabel, headerActions, onKeyDown, headless + labelledBy, describedBy, tone ('default'|'warning'). Behavior: capture the opener with useState at first render; keep focus if it is already inside the panel; ignore keydown whose target is outside the panel DOM; run props.onKeyDown first and skip own handling when defaultPrevented; handled Escape calls stopPropagation; the scrim onClick calls stopPropagation. CSS: .sizeNarrow/.sizeDefault/.sizeWide/.sizeXl max widths 440/600/760/1000 (no class named default), .warning border color-mix(var(--warning) 40%), .headerActions, .headlessBody (flex column, padding 0, no border-top, still the scroll container); remove max-width from .panel. HomeHeader.tsx: wide -> size=\"wide\". Add the twelve Modal.test.tsx tests named in the PRD."
+        },
+        "items": [
+          {
+            "id": "modal-api.ac1",
+            "title": "Given <Modal alert>, when rendered, then getByRole('alertdialog') matches; given ariaLabel='Old name', then getByRole('dialog', { name: 'Old name' }) matches while the heading shows the title.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "modal-api.ac2",
+            "title": "Given an outer Modal containing an inner Modal, when Escape is pressed in the inner panel, then the inner onClose runs once and the outer onClose runs zero times.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "modal-api.ac3",
+            "title": "Given <div onClick={spy}><Modal>…<button>Inside</button></Modal></div>, when Inside is clicked, then spy is not called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "modal-api.ac4",
+            "title": "Given headless with labelledBy='x' and a child <h1 id='x'>Step heading</h1>, when rendered, then no Close button renders and the dialog is named 'Step heading'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "modal-api.ac5",
+            "title": "Given the existing Modal.test.tsx, HomeHeader.test.tsx and the 15 existing Modal callers, when the tests and npm run typecheck:frontend run, then all pass and Modal.tsx no longer declares 'wide?: boolean'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "modal-form-styles",
+        "title": "Add the shared ModalForm field and button stylesheet",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/shared/ModalForm.module.css"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nE 'var\\(--(surface-overlay-field|border-overlay)\\)' src/dashboard/frontend/src/components/shared/ModalForm.module.css || true",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "the no-fallback grep prints nothing",
+            "typecheck:frontend exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create components/shared/ModalForm.module.css: copy anywhereDialog.module.css verbatim, add .textarea (min-height 88px, padding 8px 10px, resize vertical, same box as .input) and .destructiveButton from editDialog.module.css, include .textarea and .destructiveButton in the focus-visible and disabled selector lists, add .content { padding: 16px 0 14px; } for non-form bodies, and add the PAN-4756 header comment. Every overlay-token read keeps its fallback."
+        },
+        "items": [
+          {
+            "id": "modal-form-styles.ac1",
+            "title": "Given ModalForm.module.css, when `grep -nE '^\\.(form|content|field|label|hint|input|select|textarea|error|button|primaryButton|destructiveButton)\\b'` runs, then each of the twelve class names has a rule.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "modal-form-styles.ac2",
+            "title": "Given the file, when `grep -nE 'var\\(--(surface-overlay-field|border-overlay)\\)'` runs (a token read without fallback), then it prints nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-dialog-provider",
+        "title": "Render DialogProvider confirm and alert through Modal",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/DialogProvider.tsx",
+            "src/dashboard/frontend/src/components/DialogProvider.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/DialogProvider.test.tsx src/components/SystemHealthPill.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/DialogProvider.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Replace DialogShell with <Modal alert size=\"narrow\">; delete DialogShell, useDialogDepth and the module-level dialogDepth counter. Confirm: title=options.title, onClose=onCancel, footer = Cancel (formStyles.button) + Confirm (formStyles.primaryButton, or formStyles.destructiveButton when variant is destructive). Alert: title = options.title or Error/Success/Notice as today, onClose=onClose, footer = OK (primaryButton). Message <p> keeps its id and gets className `${formStyles.text} whitespace-pre-line select-text cursor-text`; the required-text input uses formStyles.field/label/input. Keep both focus effects. In DialogProvider.test.tsx change the two fireEvent.keyDown(window, Escape) calls to fire on screen.getByRole('alertdialog'). Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-dialog-provider.ac1",
+            "title": "Given a confirm() call, when the dialog opens, then screen.getByRole('alertdialog') renders inside a [data-component=\"modal\"] element and DialogProvider.tsx no longer contains 'fixed inset-0'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-dialog-provider.ac2",
+            "title": "Given an open confirm dialog, when Escape is pressed on the alertdialog, then the confirm promise resolves false (DialogProvider.test.tsx passes).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-dialog-provider.ac3",
+            "title": "Given a destructive confirm, when it opens, then the Cancel button has focus, and SystemHealthPill.test.tsx still passes (it keys on [role=\"alertdialog\"]).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-dialog-provider.ac4",
+            "title": "Given components/DialogProvider.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-action-dialog-frame",
+        "title": "Render ActionDialogFrame through Modal and restyle the issue-action dialog fields",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/IssueActionMenu/ActionDialogFrame.tsx",
+            "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx",
+            "src/dashboard/frontend/src/components/IssueActionMenu/RestartAgentDialog.tsx",
+            "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx",
+            "src/dashboard/frontend/src/components/IssueActionMenu/RestartAgentDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/IssueActionMenu/IssueActionMenu.test.tsx src/components/IssueActionMenu/RestartAgentDialog.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/IssueActionMenu/ActionDialogFrame.tsx src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx src/dashboard/frontend/src/components/IssueActionMenu/RestartAgentDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. ActionDialogFrame returns <Modal title={label} size=\"narrow\" onClose={onClose}>{children}</Modal> (keep its JSDoc and lint:circular note). In IssueActionMenu.tsx (New order book dialog, grep label=\"New order book\", and the action dialogs near lines 382/410) and RestartAgentDialog.tsx replace Tailwind input/button classes with ModalForm classes; buttons stay in the body. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-action-dialog-frame.ac1",
+            "title": "Given an issue action that opens a dialog, when it renders, then the dialog named by the action label renders inside [data-component=\"modal\"] and ActionDialogFrame.tsx no longer contains 'fixed inset-0'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-action-dialog-frame.ac2",
+            "title": "Given the New order book dialog, when it renders, then its name input carries the ModalForm input class (toHaveClass(formStyles.input)).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-action-dialog-frame.ac3",
+            "title": "Given the restart dialog, when Escape is pressed inside it, then onClose runs and IssueActionMenu.test.tsx and RestartAgentDialog.test.tsx pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-action-dialog-frame.ac4",
+            "title": "Given components/IssueActionMenu/ActionDialogFrame.tsx, components/IssueActionMenu/IssueActionMenu.tsx, components/IssueActionMenu/RestartAgentDialog.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-issue-open-in-dialog",
+        "title": "Render IssueOpenInDialog through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/IssueActionMenu/IssueOpenInDialog.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/IssueActionMenu/IssueOpenInDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. <Modal title=\"Open workspace\" size=\"narrow\" onClose={onClose}>; delete the window Escape listener (grep `if (event.key === 'Escape') onClose()`). Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-issue-open-in-dialog.ac1",
+            "title": "Given the Open workspace dialog, when it renders, then IssueOpenInDialog.tsx imports Modal and no longer contains 'fixed inset-0' or a window keydown listener.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-issue-open-in-dialog.ac2",
+            "title": "Given the dialog renders, when queried, then getByRole('dialog', { name: 'Open workspace' }) matches.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-issue-open-in-dialog.ac3",
+            "title": "Given components/IssueActionMenu/IssueOpenInDialog.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-ask-user-question-dialog",
+        "title": "Render AskUserQuestionDialog through a headless warning-tone Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/AskUserQuestionDialog.tsx",
+            "src/dashboard/frontend/src/components/__tests__/AskUserQuestionDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/__tests__/AskUserQuestionDialog.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/AskUserQuestionDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ],
+          "parallelSafeReason": "Its files are disjoint from every other item; it depends only on modal-api and modal-form-styles."
+        },
+        "narrative": {
+          "Action": "PRD WI-6. <Modal headless labelledBy={titleId} describedBy={`${questionIdBase}-0`} tone=\"warning\" title={displayName} dismissible={!isSubmitting} onClose={onDismiss} onKeyDown={...} footer={Send}>. Keep the header row (icon, h2 id={titleId}, subtitle, Minimize button with aria-label and title) as the first body child, padding 18px 20px 14px, bottom border var(--border-overlay, var(--border)). handlePanelKeyDown moves to the onKeyDown prop minus its Escape branch and trapTab; keep stopPropagation, Ctrl/Cmd+Enter and 1-4. Keep the initial-focus effect, delete the focus-restore part. The question area drops max-h-[60vh] overflow-y-auto. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-ask-user-question-dialog.ac1",
+            "title": "Given a pending question, when the dialog opens, then getByRole('dialog', { name: <displayName> }) has aria-describedby equal to the first question's id and sits inside [data-component=\"modal\"].",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-ask-user-question-dialog.ac2",
+            "title": "Given the open dialog, when Escape is pressed while not submitting, then onDismiss runs once; when a key is pressed inside the dialog, then a document keydown listener receives nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-ask-user-question-dialog.ac3",
+            "title": "Given the dialog, when it renders, then the Minimize button (aria-label Minimize) is present and AskUserQuestionDialog.test.tsx passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-ask-user-question-dialog.ac4",
+            "title": "Given components/AskUserQuestionDialog.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-plan-approval-dialog",
+        "title": "Render PlanApprovalDialog through a headless Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/PlanApprovalDialog.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/PlanApprovalDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Same headless pattern as WI-6 (labelledBy = its h2 id, add useId if missing), size=\"wide\", default tone, dismissible={!isSubmitting}, onClose={onDismiss}; Approve and Request-changes buttons go to footer. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-plan-approval-dialog.ac1",
+            "title": "Given a pending plan, when the dialog opens, then PlanApprovalDialog.tsx imports Modal, contains no 'fixed inset-0', and the dialog is named by its header h2.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-plan-approval-dialog.ac2",
+            "title": "Given the open dialog, when Escape is pressed while not submitting, then onDismiss runs; the Minimize button keeps aria-label Minimize.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-plan-approval-dialog.ac3",
+            "title": "Given components/PlanApprovalDialog.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-terminal-permission-dialog",
+        "title": "Render TerminalPermissionDialog through a warning-tone Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/TerminalPermissionDialog.tsx",
+            "src/dashboard/frontend/src/components/__tests__/TerminalPermissionDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/__tests__/TerminalPermissionDialog.test.tsx src/App/hooks/usePendingInputDialogs.permission-notify.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/TerminalPermissionDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. <Modal title=\"Permission needed\" tone=\"warning\" dismissible={!busy} onClose={onDismiss} footer={buttons}>. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-terminal-permission-dialog.ac1",
+            "title": "Given a terminal permission request, when the dialog opens, then getByRole('dialog', { name: 'Permission needed' }) renders inside [data-component=\"modal\"] with the warning class.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-terminal-permission-dialog.ac2",
+            "title": "Given busy is true, when Escape is pressed, then onDismiss is not called; TerminalPermissionDialog.test.tsx passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-terminal-permission-dialog.ac3",
+            "title": "Given components/TerminalPermissionDialog.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-channel-permission-dialog",
+        "title": "Render ChannelPermissionDialog through a non-dismissible Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/ChannelPermissionDialog.tsx",
+            "src/dashboard/frontend/src/components/ChannelPermissionDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/ChannelPermissionDialog.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/ChannelPermissionDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 and D5. <Modal title=\"Tool Permission Required\" dismissible={false} onClose={onDeny} footer={Deny + Allow}>. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-channel-permission-dialog.ac1",
+            "title": "Given a channel permission request, when Escape is pressed or the scrim is clicked, then neither onDeny nor onAllow is called and the dialog stays open.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-channel-permission-dialog.ac2",
+            "title": "Given the dialog, when Allow is clicked, then onAllow runs once; ChannelPermissionDialog.tsx contains no 'fixed inset-0' and its test passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-channel-permission-dialog.ac3",
+            "title": "Given components/ChannelPermissionDialog.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-confirmation-dialog",
+        "title": "Render ConfirmationDialog through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/ConfirmationDialog.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/ConfirmationDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. <Modal title=\"Confirmation Required\" size=\"narrow\" onClose={onClose} footer={buttons}>. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-confirmation-dialog.ac1",
+            "title": "Given a pending confirmation, when it renders, then ConfirmationDialog.tsx imports Modal and contains no 'fixed inset-0'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-confirmation-dialog.ac2",
+            "title": "Given the dialog, when queried, then getByRole('dialog', { name: 'Confirmation Required' }) matches and Escape calls onClose.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-confirmation-dialog.ac3",
+            "title": "Given components/ConfirmationDialog.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-kanban-dialogs",
+        "title": "Render the three Kanban board dialogs through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/KanbanBoard/dialogs/AgentWarningDialog.tsx",
+            "src/dashboard/frontend/src/components/KanbanBoard/dialogs/SyncPromptDialog.tsx",
+            "src/dashboard/frontend/src/components/KanbanBoard/dialogs/TasksDialog.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/KanbanBoard.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/KanbanBoard/dialogs/AgentWarningDialog.tsx src/dashboard/frontend/src/components/KanbanBoard/dialogs/SyncPromptDialog.tsx src/dashboard/frontend/src/components/KanbanBoard/dialogs/TasksDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. AgentWarningDialog and SyncPromptDialog: size narrow, title = their h3 text; KanbanBoard TasksDialog: title `Tasks: ${issue.identifier}`, default size. onClose={onClose}. dialogs/index.ts unchanged. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-kanban-dialogs.ac1",
+            "title": "Given each of the three files, when grepped, then none contains 'fixed inset-0' and each imports Modal.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-kanban-dialogs.ac2",
+            "title": "Given the Kanban board, when KanbanBoard.test.tsx runs, then it passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-bulk-dialogs",
+        "title": "Render the bulk agent warning and bulk close-out dialogs through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/BulkAgentWarningDialog.tsx",
+            "src/dashboard/frontend/src/components/BulkCloseOutProgress.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/KanbanBoard.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/BulkAgentWarningDialog.tsx src/dashboard/frontend/src/components/BulkCloseOutProgress.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. BulkAgentWarningDialog: narrow, onClose. BulkCloseOutProgress: default size, onClose, dismissible={isComplete}. Title = each h3 text. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-bulk-dialogs.ac1",
+            "title": "Given a running bulk close-out, when Escape is pressed, then the dialog stays open; when complete, Escape calls onClose.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-bulk-dialogs.ac2",
+            "title": "Given both files, when grepped, then neither contains 'fixed inset-0' and both import Modal.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-bulk-dialogs.ac3",
+            "title": "Given components/BulkAgentWarningDialog.tsx, components/BulkCloseOutProgress.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-cost-breakdown-modal",
+        "title": "Render CostBreakdownModal through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CostBreakdownModal.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/CostBreakdownModal.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13. <Modal title={`Cost Breakdown: ${displayIssueId}`} onClose={onClose}>. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-cost-breakdown-modal.ac1",
+            "title": "Given an issue cost breakdown, when it opens, then getByRole('dialog', { name: 'Cost Breakdown: <id>' }) renders inside [data-component=\"modal\"].",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-cost-breakdown-modal.ac2",
+            "title": "Given CostBreakdownModal.tsx, when grepped, then it contains no 'fixed inset-0'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-costs-page-issue-modal",
+        "title": "Render the Costs page issue-detail modal through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CostsPage.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/CostsPage.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14. Only the issue-detail modal around line 216 (grep `bg-black/60 flex items-center justify-center z-50 p-4`): <Modal title={displayIssueId} onClose={onClose}>. The page is unchanged. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-costs-page-issue-modal.ac1",
+            "title": "Given the Costs page, when an issue row opens its detail, then the detail renders inside [data-component=\"modal\"] named by the issue id.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-costs-page-issue-modal.ac2",
+            "title": "Given CostsPage.tsx, when grepped, then it contains no 'fixed inset-0'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-tasks-viewer-dialog",
+        "title": "Render the Tasks viewer dialog through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/TasksDialog.tsx",
+            "src/dashboard/frontend/src/components/TasksDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/TasksDialog.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/TasksDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15 (before/after in the PRD recipe). <Modal title={`Tasks: ${issueId}`} closeLabel=\"Close tasks viewer\" onClose={onClose}><TasksPanel/></Modal>. The scrim-close test selects [data-component=\"modal-scrim\"] and fires mouseDown then click. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-tasks-viewer-dialog.ac1",
+            "title": "Given the Tasks viewer, when it opens, then getByRole('dialog', { name: 'Tasks: PAN-3231' }) and the button named 'Close tasks viewer' render, and TasksDialog.test.tsx passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-tasks-viewer-dialog.ac2",
+            "title": "Given TasksDialog.tsx, when grepped, then it contains no 'fixed inset-0'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-prd-viewer",
+        "title": "Render PrdViewer through an xl Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/PrdViewer.tsx",
+            "src/dashboard/frontend/src/components/PrdViewer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/PrdViewer.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/PrdViewer.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-16. <Modal title={`PRD: ${issueId}`} description={data?.path} size=\"xl\" closeLabel=\"Close PRD viewer\" onClose={onClose}>; delete the dialogRef focus effect and the window Escape listener. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-prd-viewer.ac1",
+            "title": "Given a PRD, when the viewer opens, then the dialog renders inside [data-component=\"modal\"] with the xl size class and the button 'Close PRD viewer'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-prd-viewer.ac2",
+            "title": "Given PrdViewer.tsx, when grepped, then it contains no 'fixed inset-0' and no window keydown listener; PrdViewer.test.tsx passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-xbrief-dialog",
+        "title": "Render XBriefDialog through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/xbrief/XBriefDialog.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/xbrief/XBriefDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-17. <Modal title={`xBRIEF Plan: ${issueId}`} size=\"wide\" onClose={onClose}>. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-xbrief-dialog.ac1",
+            "title": "Given XBriefDialog.tsx, when grepped, then it imports Modal and contains no 'fixed inset-0'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-xbrief-dialog.ac2",
+            "title": "Given the dialog renders, when queried, then getByRole('dialog', { name: 'xBRIEF Plan: <id>' }) matches.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-resumable-session-dialog",
+        "title": "Render ResumableSessionDialog through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/ResumableSessionDialog.tsx",
+            "src/dashboard/frontend/src/components/__tests__/ResumableSessionDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/__tests__/ResumableSessionDialog.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/ResumableSessionDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-18. <Modal title={content.title(request)} size=\"narrow\" onClose={closeRecovery}>; keep data-testid=\"resumable-session-dialog\" and data-kind on an inner wrapper div. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-resumable-session-dialog.ac1",
+            "title": "Given a 409 resumable-session response, when the dialog opens, then [data-testid=\"resumable-session-dialog\"] renders inside [data-component=\"modal\"].",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-resumable-session-dialog.ac2",
+            "title": "Given ResumableSessionDialog.tsx, when grepped, then it contains no 'fixed inset-0'; ResumableSessionDialog.test.tsx passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-resumable-session-dialog.ac3",
+            "title": "Given components/ResumableSessionDialog.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-update-dialog",
+        "title": "Render UpdateDialog through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/UpdateDialog.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/UpdateDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-19. <Modal title=\"Overdeck update\" closeLabel=\"Close updater\" onClose={onClose} footer={Not now + install}>; delete the Escape listener and overlayRef. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-update-dialog.ac1",
+            "title": "Given the updater opens, when queried, then the dialog named 'Overdeck update' and the button 'Close updater' render inside [data-component=\"modal\"].",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-update-dialog.ac2",
+            "title": "Given UpdateDialog.tsx, when grepped, then it contains no 'fixed inset-0' and no window keydown listener.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-update-dialog.ac3",
+            "title": "Given components/UpdateDialog.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-cloister-restart-config-modal",
+        "title": "Render Cloister's restart-config modal through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CloisterStatusBar.tsx",
+            "src/dashboard/frontend/src/components/CloisterStatusBar.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/CloisterStatusBar.test.tsx src/components/SystemHealthPill.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/CloisterStatusBar.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-20. Only the modal at grep `showRestartConfigModal && createPortal(`: drop its createPortal wrapper and render <Modal title=\"Restart Agents with Current Config\" ariaLabel=\"Restart agents with current config\" size=\"narrow\" onClose={() => setShowRestartConfigModal(false)}>. The restart popover is unchanged. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-cloister-restart-config-modal.ac1",
+            "title": "Given the restart-config modal opens, when queried, then getByRole('dialog', { name: 'Restart agents with current config' }) renders inside [data-component=\"modal\"].",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-cloister-restart-config-modal.ac2",
+            "title": "Given CloisterStatusBar.tsx, when grepped, then it contains no 'fixed inset-0'; CloisterStatusBar.test.tsx and SystemHealthPill.test.tsx pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-cloister-restart-config-modal.ac3",
+            "title": "Given components/CloisterStatusBar.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-fork-modal",
+        "title": "Render ForkModal and its help modal through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ForkModal.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/ForkModal.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-21. <Modal title=\"Continue in a new conversation\" headerActions={Help button aria-label=\"Help\"} onKeyDown={handleDialogKeyDown minus Escape} onClose={onClose}>. ForkHelpModal becomes a nested <Modal title=\"Continue Options\" size=\"narrow\"> with 'Got it' in footer; delete its window keydown capture listener. Delete .forkOverlay, .forkDialog, .forkHelpOverlay, .forkHelpDialog and any .forkHeader*/.forkTitle/.forkClose/.forkFooter rule that grep shows has no remaining user. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-fork-modal.ac1",
+            "title": "Given the fork modal with its help open, when Escape is pressed in the help dialog, then only the help dialog closes and the fork dialog stays open.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-fork-modal.ac2",
+            "title": "Given command-deck.module.css, when `grep -nE '^\\.(forkOverlay|forkDialog|forkHelpOverlay|forkHelpDialog)\\b'` runs, then it prints nothing; ForkModal.test.tsx passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-fork-modal.ac3",
+            "title": "Given components/CommandDeck/ForkModal.tsx, components/CommandDeck/styles/command-deck.module.css, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-feature-metadata-modals",
+        "title": "Render MarkdownModal and TranscriptUpload through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/FeatureMetadata/MarkdownModal.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/FeatureMetadata/TranscriptUpload.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/CommandDeck/CommandDeck.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/CommandDeck/FeatureMetadata/MarkdownModal.tsx src/dashboard/frontend/src/components/CommandDeck/FeatureMetadata/TranscriptUpload.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-22 and D10. MarkdownModal: <Modal title={title} size=\"wide\" onClose={onClose}>, delete its window Escape listener. TranscriptUpload: narrow, title = its heading text, fields restyled with ModalForm. Delete .modalOverlay and .modalContent, and any other .modal* rule only if grep finds no other user (AgentOutputPanel.tsx uses some .modal* names). Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-feature-metadata-modals.ac1",
+            "title": "Given command-deck.module.css, when `grep -nE '^\\.(modalOverlay|modalContent)\\b'` runs, then it prints nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-feature-metadata-modals.ac2",
+            "title": "Given MarkdownModal.tsx and TranscriptUpload.tsx, when grepped for 'styles.modalOverlay', then neither matches and both import Modal; npm run typecheck:frontend exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-feature-metadata-modals.ac3",
+            "title": "Given components/CommandDeck/FeatureMetadata/MarkdownModal.tsx, components/CommandDeck/FeatureMetadata/TranscriptUpload.tsx, components/CommandDeck/styles/command-deck.module.css, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-settings-confirm-dialogs",
+        "title": "Render PresetDiffDialog and ReindexConfirmDialog through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/PresetDiffDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/ReindexConfirmDialog.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/Settings/PresetDiffDialog.tsx src/dashboard/frontend/src/components/Settings/ReindexConfirmDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-23. PresetDiffDialog: title `${plan.label} v${plan.version}`, default size, onClose={onCancel}, dismissible={!busy}. ReindexConfirmDialog: title={title}, narrow, onClose={onCancel}, dismissible={!busy}. Buttons to footer with ModalForm classes. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-settings-confirm-dialogs.ac1",
+            "title": "Given busy is true, when Escape is pressed in either dialog, then onCancel is not called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-settings-confirm-dialogs.ac2",
+            "title": "Given both files, when grepped, then neither contains 'fixed inset-0' and both import Modal.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-settings-confirm-dialogs.ac3",
+            "title": "Given components/Settings/PresetDiffDialog.tsx, components/Settings/ReindexConfirmDialog.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-anywhere-trigger-dialogs",
+        "title": "Render the Add trigger and signing-secret dialogs through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/AddTriggerDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/AddTriggerDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/Settings/anywhere/__tests__/AddTriggerDialog.test.tsx src/components/Settings/anywhere/__tests__/TriggersPanel.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/Settings/anywhere/AddTriggerDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-24. The file's internal frame (line 48) becomes a Modal (narrow, onClose); remove its closeOnBackdrop parameter and update both call sites in the file. Fields use ModalForm classes. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-anywhere-trigger-dialogs.ac1",
+            "title": "Given the Add trigger dialog, when it opens, then it renders inside [data-component=\"modal\"] and AddTriggerDialog.tsx contains no 'fixed inset-0' or 'closeOnBackdrop'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-anywhere-trigger-dialogs.ac2",
+            "title": "Given AddTriggerDialog.test.tsx and TriggersPanel.test.tsx, when run, then both pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-anywhere-trigger-dialogs.ac3",
+            "title": "Given components/Settings/anywhere/AddTriggerDialog.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-anywhere-approval-remove-dialogs",
+        "title": "Render ApprovalDialog and RemoveSshMachineDialog through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/ApprovalDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/RemoveSshMachineDialog.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/Settings/anywhere/__tests__/MachinesPanel.test.tsx src/components/Settings/anywhere/__tests__/DirectoryPanel.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/Settings/anywhere/ApprovalDialog.tsx src/dashboard/frontend/src/components/Settings/anywhere/RemoveSshMachineDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-25. ApprovalDialog: narrow, title = its h3 text, onClose. RemoveSshMachineDialog: narrow, title `Remove ${link.label}?`, onClose={onCancel}. Buttons to footer. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-anywhere-approval-remove-dialogs.ac1",
+            "title": "Given both files, when grepped, then neither contains 'fixed inset-0' and both import Modal.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-anywhere-approval-remove-dialogs.ac2",
+            "title": "Given the remove dialog for link 'box', when it renders, then getByRole('dialog', { name: 'Remove box?' }) matches; MachinesPanel.test.tsx passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-anywhere-approval-remove-dialogs.ac3",
+            "title": "Given components/Settings/anywhere/ApprovalDialog.tsx, components/Settings/anywhere/RemoveSshMachineDialog.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-connect-bot-dialog",
+        "title": "Render ConnectBotDialog through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/ConnectBotDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/ConnectBotDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/Settings/anywhere/__tests__/ConnectBotDialog.test.tsx src/components/Settings/anywhere/__tests__/PublicMcpSharedCache.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/Settings/anywhere/ConnectBotDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-26. <Modal title=\"Connect a bot\" onClose={onClose}>; snippet blocks keep their classes. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-connect-bot-dialog.ac1",
+            "title": "Given the Connect a bot dialog, when it opens, then getByRole('dialog', { name: 'Connect a bot' }) renders inside [data-component=\"modal\"].",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-connect-bot-dialog.ac2",
+            "title": "Given ConnectBotDialog.tsx, when grepped, then it contains no 'fixed inset-0'; its two test files pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-connect-bot-dialog.ac3",
+            "title": "Given components/Settings/anywhere/ConnectBotDialog.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-mcp-url-dialog",
+        "title": "Render McpUrlDialog through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/McpUrlDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/McpUrlDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/Settings/anywhere/__tests__/McpUrlDialog.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/Settings/anywhere/McpUrlDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-27. <Modal title=\"Copy MCP URL\" onClose={onClose}>; CopyField uses formStyles.input / formStyles.textarea plus formStyles.mono. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-mcp-url-dialog.ac1",
+            "title": "Given the Copy MCP URL dialog, when it opens, then it renders inside [data-component=\"modal\"] and the URL field has the ModalForm input class.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-mcp-url-dialog.ac2",
+            "title": "Given McpUrlDialog.tsx, when grepped, then it contains no 'fixed inset-0'; McpUrlDialog.test.tsx passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-mcp-url-dialog.ac3",
+            "title": "Given components/Settings/anywhere/McpUrlDialog.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-pair-device-dialog",
+        "title": "Render PairDeviceDialog through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/PairDeviceDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/PairDeviceDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/Settings/anywhere/__tests__/PairDeviceDialog.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/Settings/anywhere/PairDeviceDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-28. <Modal title=\"Pair a device\" size=\"narrow\" onClose={onClose}>; QR block keeps its classes. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-pair-device-dialog.ac1",
+            "title": "Given the Pair a device dialog, when it opens, then it renders inside [data-component=\"modal\"] named 'Pair a device'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-pair-device-dialog.ac2",
+            "title": "Given PairDeviceDialog.tsx, when grepped, then it contains no 'fixed inset-0'; PairDeviceDialog.test.tsx passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-pair-device-dialog.ac3",
+            "title": "Given components/Settings/anywhere/PairDeviceDialog.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-set-up-phone-dialog",
+        "title": "Render SetUpPhoneDialog through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/SetUpPhoneDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/SetUpPhoneDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/Settings/anywhere/__tests__/SetUpPhoneDialog.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/Settings/anywhere/SetUpPhoneDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-29. <Modal title=\"Set up a phone\" size=\"narrow\" onClose={onClose}>; step sections keep their h4 headings. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-set-up-phone-dialog.ac1",
+            "title": "Given the Set up a phone dialog, when it opens, then it renders inside [data-component=\"modal\"] named 'Set up a phone'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-set-up-phone-dialog.ac2",
+            "title": "Given SetUpPhoneDialog.tsx, when grepped, then it contains no 'fixed inset-0'; SetUpPhoneDialog.test.tsx passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-set-up-phone-dialog.ac3",
+            "title": "Given components/Settings/anywhere/SetUpPhoneDialog.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-tailscale-setup-dialog",
+        "title": "Render TailscaleSetupDialog through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/TailscaleSetupDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/TailscaleSetupDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/Settings/anywhere/__tests__/TailscaleSetupDialog.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/Settings/anywhere/TailscaleSetupDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-30. <Modal title=\"Set up Tailscale\" onClose={onClose}>. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-tailscale-setup-dialog.ac1",
+            "title": "Given the Set up Tailscale dialog, when it opens, then it renders inside [data-component=\"modal\"] named 'Set up Tailscale'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-tailscale-setup-dialog.ac2",
+            "title": "Given TailscaleSetupDialog.tsx, when grepped, then it contains no 'fixed inset-0'; TailscaleSetupDialog.test.tsx passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-tailscale-setup-dialog.ac3",
+            "title": "Given components/Settings/anywhere/TailscaleSetupDialog.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-create-access-token-dialog",
+        "title": "Render CreateAccessTokenDialog through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/CreateAccessTokenDialog.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/Settings/sections/CreateAccessTokenDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-31. <Modal title=\"Create access token\" size=\"narrow\" onClose={handleClose}>; delete the backdrop onKeyDown. Fields use ModalForm classes. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-create-access-token-dialog.ac1",
+            "title": "Given the Create access token dialog, when Escape is pressed, then handleClose runs once.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-create-access-token-dialog.ac2",
+            "title": "Given CreateAccessTokenDialog.tsx, when grepped, then it contains no 'fixed inset-0'; AccessTokensSection.test.tsx passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-create-access-token-dialog.ac3",
+            "title": "Given components/Settings/sections/CreateAccessTokenDialog.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-provider-models-modal",
+        "title": "Render the provider models modal through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/ProviderManagementSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/ProviderManagementSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/Settings/sections/__tests__/ProviderManagementSection.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/Settings/sections/ProviderManagementSection.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-32. The models modal at grep `modelsModalProvider && (`: <Modal title={`${providerName} Models`} onClose={() => setModelsModalProvider(null)}>; the provider logo in the header is dropped (D7). Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-provider-models-modal.ac1",
+            "title": "Given a provider's models list opened, when it renders, then the '<Provider> Models' dialog renders inside [data-component=\"modal\"].",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-provider-models-modal.ac2",
+            "title": "Given ProviderManagementSection.tsx, when grepped, then it contains no 'fixed inset-0'; ProviderManagementSection.test.tsx passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-provider-models-modal.ac3",
+            "title": "Given components/Settings/sections/ProviderManagementSection.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-vault-recovery-dialog",
+        "title": "Render the vault recovery-phrase dialog through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/SessionVaultSetupForm.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/SessionVaultSetupForm.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/Settings/sections/__tests__/SessionVaultSetupForm.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/Settings/sections/SessionVaultSetupForm.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-33. RecoveryDialog only: <Modal title=\"Write down your recovery phrase\" size=\"narrow\" dismissible={acknowledged} onClose={onDone}>; delete closeIfAcknowledged. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-vault-recovery-dialog.ac1",
+            "title": "Given the recovery dialog before acknowledgement, when Escape is pressed, then onDone is not called; after acknowledgement, Escape calls onDone.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-vault-recovery-dialog.ac2",
+            "title": "Given SessionVaultSetupForm.tsx, when grepped, then it contains no 'fixed inset-0'; SessionVaultSetupForm.test.tsx passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-vault-recovery-dialog.ac3",
+            "title": "Given components/Settings/sections/SessionVaultSetupForm.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-conversation-schedule-dialog",
+        "title": "Render ConversationScheduleDialog through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ConversationScheduleDialog.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationScheduleDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/chat/__tests__/ConversationScheduleDialog.test.tsx src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/chat/ConversationScheduleDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-34. <Modal title=\"Schedules\" onClose={onClose}>; delete the window Escape listener (line 144). Fields use ModalForm classes. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-conversation-schedule-dialog.ac1",
+            "title": "Given the Schedules dialog, when it opens, then getByRole('dialog', { name: 'Schedules' }) renders inside [data-component=\"modal\"] and the Schedule prompt field has the ModalForm textarea or input class.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-conversation-schedule-dialog.ac2",
+            "title": "Given ConversationScheduleDialog.tsx, when grepped, then it contains no 'fixed inset-0'; its two test files pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-conversation-schedule-dialog.ac3",
+            "title": "Given components/chat/ConversationScheduleDialog.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-link-pull-request-dialog",
+        "title": "Render LinkPullRequestDialog through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/LinkPullRequestDialog.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/LinkPullRequestDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/chat/__tests__/LinkPullRequestDialog.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/chat/LinkPullRequestDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-35. <Modal title=\"Pull requests\" headerActions={Refresh button aria-label=\"Refresh pull request status\"} onClose={onClose}>; delete the window Escape listener. The URL input uses ModalForm classes. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-link-pull-request-dialog.ac1",
+            "title": "Given the Pull requests dialog, when it opens, then the dialog named 'Pull requests' and the 'Refresh pull request status' button render inside [data-component=\"modal\"].",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-link-pull-request-dialog.ac2",
+            "title": "Given LinkPullRequestDialog.tsx, when grepped, then it contains no 'fixed inset-0'; LinkPullRequestDialog.test.tsx passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-link-pull-request-dialog.ac3",
+            "title": "Given components/chat/LinkPullRequestDialog.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-pull-here-dialog",
+        "title": "Render PullHereDialog through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/PullHereDialog.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/PullHereDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/chat/__tests__/PullHereDialog.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/chat/PullHereDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-36. <Modal title={status ? `Pulling “${target.title}” here` : `Pull “${target.title}” here?`} ariaLabel={status ? 'Pulling here' : 'Pull here'} dismissible={closable} onClose={onClose}>. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-pull-here-dialog.ac1",
+            "title": "Given the Pull here dialog, when it opens, then getByRole('dialog', { name: 'Pull here' }) still matches while the visible heading shows the target title.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-pull-here-dialog.ac2",
+            "title": "Given a pull in progress (closable false), when Escape is pressed, then onClose is not called; PullHereDialog.test.tsx passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-pull-here-dialog.ac3",
+            "title": "Given components/chat/PullHereDialog.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-vault-continue-dialog",
+        "title": "Render VaultContinueDialog through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/VaultContinueDialog.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/VaultContinueDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/chat/__tests__/VaultContinueDialog.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/chat/VaultContinueDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-37. <Modal title={preview ? `Continue “${preview.title}”` : 'Continue here'} ariaLabel=\"Continue here\" dismissible={!busy} onClose={onClose}>; keep data-testid=\"vault-continue-dialog\" on an inner wrapper; delete the window Escape listener (line 78). Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-vault-continue-dialog.ac1",
+            "title": "Given the Continue here dialog, when it opens, then getByRole('dialog', { name: 'Continue here' }) and [data-testid=\"vault-continue-dialog\"] render inside [data-component=\"modal\"].",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-vault-continue-dialog.ac2",
+            "title": "Given busy is true, when Escape is pressed, then onClose is not called; VaultContinueDialog.test.tsx passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-vault-continue-dialog.ac3",
+            "title": "Given components/chat/VaultContinueDialog.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-continue-on-device-dialog",
+        "title": "Render ContinueOnDeviceDialog through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/continueOnDevice/ContinueOnDeviceDialog.tsx",
+            "src/dashboard/frontend/src/components/chat/continueOnDevice/__tests__/ContinueOnDeviceDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/chat/continueOnDevice/__tests__/ContinueOnDeviceDialog.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/chat/continueOnDevice/ContinueOnDeviceDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-38. <Modal title=\"Continue on another device\" size=\"narrow\" onClose={onClose}>; tabs stay in the body. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-continue-on-device-dialog.ac1",
+            "title": "Given the Continue on another device dialog, when it opens, then it renders inside [data-component=\"modal\"] named 'Continue on another device'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-continue-on-device-dialog.ac2",
+            "title": "Given ContinueOnDeviceDialog.tsx, when grepped, then it contains no 'fixed inset-0'; ContinueOnDeviceDialog.test.tsx passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-continue-on-device-dialog.ac3",
+            "title": "Given components/chat/continueOnDevice/ContinueOnDeviceDialog.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-add-project-dialog",
+        "title": "Render the Add project dialog through a headless Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/project/new/AddProjectDialog.tsx",
+            "src/dashboard/frontend/src/components/project/new/__tests__/AddProjectDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "npm --prefix src/dashboard/frontend run test -- src/components/project/new/__tests__/AddProjectDialog.test.tsx",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/project/new/AddProjectDialog.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the listed test files pass",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-39 (before/after in the PRD). Modal branch becomes <Modal title=\"Add a project\" headless labelledBy={titleId} dismissible={!busy} onClose={onCancel}>{body}</Modal>. The page variant and the step components are unchanged. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-add-project-dialog.ac1",
+            "title": "Given the Add project dialog, when it opens, then getByRole('dialog', { name: 'Add a project' }) renders inside [data-component=\"modal\"] and 'Open a folder' receives focus.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-add-project-dialog.ac2",
+            "title": "Given a clone in progress, when Escape is pressed, then the dialog stays open; AddProjectDialog.test.tsx passes unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-teardown-modal",
+        "title": "Render TeardownModal through Modal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/resources/TeardownModal.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend",
+            "grep -nE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' src/dashboard/frontend/src/components/resources/TeardownModal.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend exits 0",
+            "the bespoke-frame grep prints nothing for the migrated files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-40. <Modal title={`Tear down ${issueId}`} ariaLabel=\"Tear down stack\" size=\"narrow\" onClose={onClose}>; the autoFocus input may stay. Follow the PRD 'Migration recipe' steps 1-7: import Modal and ModalForm styles, delete the bespoke backdrop/panel/header/footer and Escape-only listeners, put actions in footer, keep copy, ids, aria attributes and data-testids, restyle form controls with ModalForm classes, preserve accessible names via ariaLabel/closeLabel, fix only structural test queries."
+        },
+        "items": [
+          {
+            "id": "migrate-teardown-modal.ac1",
+            "title": "Given the teardown dialog, when it opens, then getByRole('dialog', { name: 'Tear down stack' }) renders inside [data-component=\"modal\"] and the autoFocus input keeps focus.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-teardown-modal.ac2",
+            "title": "Given TeardownModal.tsx, when grepped, then it contains no 'fixed inset-0' or 'aria-modal'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-teardown-modal.ac3",
+            "title": "Given components/resources/TeardownModal.tsx, when grepped, then each file that renders a form control or footer button imports shared/ModalForm.module.css and every input, select, textarea and footer button in the dialog has a formStyles.* className (FR-6).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delete-dead-dialogs",
+        "title": "Delete the four unimported centered-modal components",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "refactor",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/DeepWipeDialog.tsx",
+            "src/dashboard/frontend/src/components/SwitchModelModal.tsx",
+            "src/dashboard/frontend/src/components/ProviderEnvOverrideDialog.tsx",
+            "src/dashboard/frontend/src/components/GodView/FocusView.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -rln -E 'DeepWipeDialog|SwitchModelModal|ProviderEnvOverrideDialog|FocusView' src tests --include=*.ts --include=*.tsx || true",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "the importer grep prints nothing",
+            "typecheck:frontend exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-41 and D10. First run `grep -rln -E \"DeepWipeDialog|SwitchModelModal|ProviderEnvOverrideDialog|FocusView\" src tests --include=*.ts --include=*.tsx` from the repo root; it must list only the four files. Then delete them with git rm. If any other file is listed, keep that component and migrate it with the PRD recipe instead."
+        },
+        "items": [
+          {
+            "id": "delete-dead-dialogs.ac1",
+            "title": "Given the four paths, when `ls` runs on them, then each reports No such file or directory.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-dead-dialogs.ac2",
+            "title": "Given the repo after deletion, when npm run typecheck:frontend runs, then it exits 0 and the importer grep prints nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-modal-rule-and-audit",
+        "title": "Document the every-modal-uses-Modal rule and run the final grep audit",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "design/style-guide/STYLE-GUIDE.md",
+            ".overdeck/context/codebase/conventions.md",
+            "changelog.d/pan-4756.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend/src && grep -rlE 'fixed inset-0|aria-modal|role=\"(alert)?dialog\"' --include=*.tsx . | grep -vE '\\.test\\.tsx$|/__tests__/' | sed 's#^\\./##' | sort",
+            "grep -nE '^\\.(forkOverlay|forkDialog|forkHelpOverlay|forkHelpDialog|modalOverlay|modalContent)\\b' src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css || true",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "FR-9 grep prints exactly the 23 allowlisted paths",
+            "FR-10 grep prints nothing",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-42. STYLE-GUIDE.md section 5, after the Overlay tokens (PAN-4755) Ledger paragraph (grep `menus and popovers keep using them.`): add '#### Every modal dialog uses Modal (PAN-4756)' with the rule, ModalForm.module.css, the four sizes, alert/tone/headless usage and the list of overlays that are not modal dialogs. conventions.md ## Frontend: add the one bullet from the PRD; keep the single last-verified line unchanged. Create changelog.d/pan-4756.md with the #### Improved bullet from the PRD. Then run the FR-9 and FR-10 grep commands and compare with the PRD FR-9 allowlist; if a path outside the allowlist remains, it belongs to an unfinished migration item: report it via pan tell rather than adding it to the allowlist."
+        },
+        "items": [
+          {
+            "id": "docs-modal-rule-and-audit.ac1",
+            "title": "Given STYLE-GUIDE.md, when `grep -n 'Every modal dialog uses Modal (PAN-4756)'` runs, then it prints one line, and that section names components/shared/Modal.tsx and components/shared/ModalForm.module.css.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-modal-rule-and-audit.ac2",
+            "title": "Given the finished branch, when the FR-9 grep command runs, then it prints exactly the 23 allowlisted paths from the PRD FR-9 table and no other path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-modal-rule-and-audit.ac3",
+            "title": "Given command-deck.module.css, when the FR-10 grep runs, then it prints nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-modal-rule-and-audit.ac4",
+            "title": "Given changelog.d/pan-4756.md, when npm run lint:docs runs, then it exits 0 and the file contains an '#### Improved' heading with a bullet linking #4756.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-five-dialogs",
+        "title": "Check five migrated dialogs in a real browser in Broadsheet light and dark and commit the screenshots",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4756",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "design/style-guide/screenshots/pan-4756/*.png"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "ls design/style-guide/screenshots/pan-4756/*.png | wc -l"
+          ],
+          "expected_outputs": [
+            "prints 10"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-43 and D12. In an isolated Playwright browser profile against the workspace's running dashboard (never another agent's session), Broadsheet theme, open Add project, Fork (Create summary fork), Update (open-updater), Tasks (project-tree Tasks icon) and Pull requests (conversation menu) in light and then dark. For each, read the computed background-color of [data-component=\"modal\"] and of body and the panel's computed box-shadow, then save design/style-guide/screenshots/pan-4756/<add-project|fork|update|tasks|link-pull-request>-<light|dark>.png and commit them."
+        },
+        "items": [
+          {
+            "id": "uat-five-dialogs.ac1",
+            "title": "Given Broadsheet light and then dark in an isolated Playwright profile, when each of the five dialogs opens, then its [data-component=\"modal\"] renders a computed background-color different from body's and a box-shadow other than none.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-five-dialogs.ac2",
+            "title": "Given the item's commit, when `ls design/style-guide/screenshots/pan-4756/*.png | wc -l` runs, then it prints 10.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "migrate-tasks-viewer-dialog",
+        "to": "uat-five-dialogs",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-update-dialog",
+        "to": "uat-five-dialogs",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-fork-modal",
+        "to": "uat-five-dialogs",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-link-pull-request-dialog",
+        "to": "uat-five-dialogs",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-add-project-dialog",
+        "to": "uat-five-dialogs",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-dialog-provider",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-dialog-provider",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-action-dialog-frame",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-action-dialog-frame",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-issue-open-in-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-issue-open-in-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-ask-user-question-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-ask-user-question-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-plan-approval-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-plan-approval-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-terminal-permission-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-terminal-permission-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-channel-permission-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-channel-permission-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-confirmation-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-confirmation-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-kanban-dialogs",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-kanban-dialogs",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-bulk-dialogs",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-bulk-dialogs",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-cost-breakdown-modal",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-cost-breakdown-modal",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-costs-page-issue-modal",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-costs-page-issue-modal",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-tasks-viewer-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-tasks-viewer-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-prd-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-prd-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-xbrief-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-xbrief-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-resumable-session-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-resumable-session-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-update-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-update-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-cloister-restart-config-modal",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-cloister-restart-config-modal",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-fork-modal",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-fork-modal",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-feature-metadata-modals",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-feature-metadata-modals",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-settings-confirm-dialogs",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-settings-confirm-dialogs",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-anywhere-trigger-dialogs",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-anywhere-trigger-dialogs",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-anywhere-approval-remove-dialogs",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-anywhere-approval-remove-dialogs",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-connect-bot-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-connect-bot-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-mcp-url-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-mcp-url-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-pair-device-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-pair-device-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-set-up-phone-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-set-up-phone-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-tailscale-setup-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-tailscale-setup-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-create-access-token-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-create-access-token-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-provider-models-modal",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-provider-models-modal",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-vault-recovery-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-vault-recovery-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-conversation-schedule-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-conversation-schedule-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-link-pull-request-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-link-pull-request-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-pull-here-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-pull-here-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-vault-continue-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-vault-continue-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-continue-on-device-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-continue-on-device-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-add-project-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-add-project-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-api",
+        "to": "migrate-teardown-modal",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-form-styles",
+        "to": "migrate-teardown-modal",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-fork-modal",
+        "to": "migrate-feature-metadata-modals",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-dialog-provider",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-action-dialog-frame",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-issue-open-in-dialog",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-ask-user-question-dialog",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-plan-approval-dialog",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-terminal-permission-dialog",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-channel-permission-dialog",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-confirmation-dialog",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-kanban-dialogs",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-bulk-dialogs",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-cost-breakdown-modal",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-costs-page-issue-modal",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-tasks-viewer-dialog",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-prd-viewer",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-xbrief-dialog",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-resumable-session-dialog",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-update-dialog",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-cloister-restart-config-modal",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-fork-modal",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-feature-metadata-modals",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-settings-confirm-dialogs",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-anywhere-trigger-dialogs",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-anywhere-approval-remove-dialogs",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-connect-bot-dialog",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-mcp-url-dialog",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-pair-device-dialog",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-set-up-phone-dialog",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-tailscale-setup-dialog",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-create-access-token-dialog",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-provider-models-modal",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-vault-recovery-dialog",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-conversation-schedule-dialog",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-link-pull-request-dialog",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-pull-here-dialog",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-vault-continue-dialog",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-continue-on-device-dialog",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-add-project-dialog",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-teardown-modal",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "delete-dead-dialogs",
+        "to": "docs-modal-rule-and-audit",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

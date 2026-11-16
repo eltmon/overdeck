@@ -1,8 +1,10 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, X } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { dashboardMutationJsonHeaders, ensureDashboardSession } from '../../lib/wsTransport';
 import { useAddProjectDialog } from '../project/new/addProjectDialogStore';
+import { Modal } from '../shared/Modal';
+import formStyles from '../shared/ModalForm.module.css';
 
 /**
  * PAN-4437: "Continue here" for a Session Vault browse copy. Reads the
@@ -56,8 +58,6 @@ async function fetchPreview(vaultId: string): Promise<ContinuePreview> {
   return data as ContinuePreview;
 }
 
-const BUTTON = 'rounded-[var(--radius-sm)] border border-border px-3 py-1 text-[12px] hover:bg-accent disabled:opacity-50';
-
 export function VaultContinueDialog({ vaultId, onClose, onContinued }: {
   vaultId: string;
   onClose: () => void;
@@ -72,13 +72,6 @@ export function VaultContinueDialog({ vaultId, onClose, onContinued }: {
   const [error, setError] = useState<string | null>(null);
   const [driftOverride, setDriftOverride] = useState<string[] | null>(null);
   const addProjectOpen = useAddProjectDialog((state) => state.open);
-
-  useEffect(() => {
-    if (addProjectOpen) return undefined;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [addProjectOpen, busy, onClose]);
 
   const submit = async (onDrift?: 'continue' | 'note') => {
     if (!preview) return;
@@ -116,26 +109,26 @@ export function VaultContinueDialog({ vaultId, onClose, onContinued }: {
   const id8 = vaultId.slice(0, 8);
   const drift = driftOverride ?? preview?.drift ?? [];
   let body: ReactNode = null;
-  let actions: ReactNode = <button type="button" className={BUTTON} onClick={onClose}>Close</button>;
+  let actions: ReactNode = <button type="button" className={formStyles.button} onClick={onClose}>Close</button>;
 
   if (isLoading) {
-    body = <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Loading…</div>;
+    body = <div className={formStyles.status}><Loader2 className="h-3 w-3 animate-spin" /> Loading…</div>;
   } else if (loadError || !preview) {
-    body = <div role="alert">{loadError instanceof Error ? loadError.message : 'Could not load the saved conversation.'}</div>;
+    body = <div role="alert" className={formStyles.error}>{loadError instanceof Error ? loadError.message : 'Could not load the saved conversation.'}</div>;
   } else if (!preview.resumable) {
-    body = <p>{`${preview.harness} has no native resume. Run: pan vault resume ${id8}`}</p>;
+    body = <p className={formStyles.text}>{`${preview.harness} has no native resume. Run: pan vault resume ${id8}`}</p>;
   } else if (preview.noTargetReason === 'clone-offered' && preview.clone) {
     const slug = preview.clone.slug ?? preview.clone.url;
     const cloneUrl = preview.clone.url;
-    body = <p>{`No registered project matches ${slug}.`}</p>;
+    body = <p className={formStyles.text}>{`No registered project matches ${slug}.`}</p>;
     actions = (
       <>
-        <button type="button" className={BUTTON} onClick={() => openClone(cloneUrl)}>{`Clone and register ${slug}`}</button>
-        <button type="button" className={BUTTON} onClick={onClose}>Cancel</button>
+        <button type="button" className={formStyles.primaryButton} onClick={() => openClone(cloneUrl)}>{`Clone and register ${slug}`}</button>
+        <button type="button" className={formStyles.button} onClick={onClose}>Cancel</button>
       </>
     );
   } else if (!preview.target) {
-    body = <p>{`The saved working directory ${preview.savedCwd || '(none)'} does not exist here and the record has no git origin. Run: pan vault resume ${id8} --cwd <dir>`}</p>;
+    body = <p className={formStyles.text}>{`The saved working directory ${preview.savedCwd || '(none)'} does not exist here and the record has no git origin. Run: pan vault resume ${id8} --cwd <dir>`}</p>;
   } else {
     const { target, wip } = preview;
     let codeLine: string | null = null;
@@ -152,21 +145,21 @@ export function VaultContinueDialog({ vaultId, onClose, onContinued }: {
     }
     body = (
       <>
-        <p>Continue in <code>{target.cwd}</code></p>
-        {codeLine && <p>{codeLine}</p>}
-        {drift.length > 0 && <p>{`The working directory differs from where this conversation was saved: ${drift.join(', ')}.`}</p>}
+        <p className={formStyles.text}>Continue in <code className={formStyles.mono}>{target.cwd}</code></p>
+        {codeLine && <p className={formStyles.text}>{codeLine}</p>}
+        {drift.length > 0 && <p className={formStyles.text}>{`The working directory differs from where this conversation was saved: ${drift.join(', ')}.`}</p>}
       </>
     );
     actions = drift.length > 0 ? (
       <>
-        <button type="button" className={BUTTON} disabled={busy} onClick={() => { void submit('continue'); }}>Continue</button>
-        <button type="button" className={BUTTON} disabled={busy} onClick={() => { void submit('note'); }}>Continue with a note</button>
-        <button type="button" className={BUTTON} disabled={busy} onClick={onClose}>Cancel</button>
+        <button type="button" className={formStyles.primaryButton} disabled={busy} onClick={() => { void submit('continue'); }}>Continue</button>
+        <button type="button" className={formStyles.button} disabled={busy} onClick={() => { void submit('note'); }}>Continue with a note</button>
+        <button type="button" className={formStyles.button} disabled={busy} onClick={onClose}>Cancel</button>
       </>
     ) : (
       <>
-        <button type="button" className={BUTTON} disabled={busy} onClick={() => { void submit(); }}>Continue here</button>
-        <button type="button" className={BUTTON} disabled={busy} onClick={onClose}>Cancel</button>
+        <button type="button" className={formStyles.primaryButton} disabled={busy} onClick={() => { void submit(); }}>Continue here</button>
+        <button type="button" className={formStyles.button} disabled={busy} onClick={onClose}>Cancel</button>
       </>
     );
   }
@@ -174,31 +167,22 @@ export function VaultContinueDialog({ vaultId, onClose, onContinued }: {
   if (addProjectOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/32 backdrop-blur-sm" onClick={() => { if (!busy) onClose(); }}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Continue here"
-        data-testid="vault-continue-dialog"
-        className="mx-4 w-full max-w-lg rounded-2xl border border-border bg-popover text-popover-foreground shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center gap-2 border-b border-border px-5 py-3">
-          <h2 className="min-w-0 flex-1 truncate text-sm font-medium">{preview ? `Continue “${preview.title}”` : 'Continue here'}</h2>
-          <button type="button" className="rounded-[var(--radius-sm)] p-1 text-muted-foreground hover:bg-accent" onClick={onClose} aria-label="Close" disabled={busy}>
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-        <div className="flex flex-col gap-2 px-5 py-4 text-[12px]">
-          {preview && <p className="text-muted-foreground">{`Saved on ${preview.ownerLabel}.`}</p>}
-          {body}
-          {error && <div role="alert" className="text-destructive-foreground">{error}</div>}
-          <div className="mt-2 flex flex-wrap justify-end gap-2">
-            {busy && <Loader2 className="h-3.5 w-3.5 animate-spin self-center text-muted-foreground" />}
-            {actions}
-          </div>
+    <Modal
+      title={preview ? `Continue “${preview.title}”` : 'Continue here'}
+      ariaLabel="Continue here"
+      onClose={onClose}
+      dismissible={!busy}
+    >
+      {/* The actions stay inside the test id wrapper: pan-4437-continue-here.spec.ts scopes its button queries to it. */}
+      <div className={`${formStyles.content} flex flex-col gap-2`} data-testid="vault-continue-dialog">
+        {preview && <p className={formStyles.hint}>{`Saved on ${preview.ownerLabel}.`}</p>}
+        {body}
+        {error && <div role="alert" className={formStyles.error}>{error}</div>}
+        <div className="mt-2 flex flex-wrap justify-end gap-2">
+          {busy && <Loader2 className="h-3.5 w-3.5 animate-spin self-center text-muted-foreground" />}
+          {actions}
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

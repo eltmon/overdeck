@@ -298,9 +298,10 @@ export function SystemHealthPill({ compact = false, children }: { compact?: bool
     const onPointerDown = (event: PointerEvent) => {
       if (document.querySelector('[role="alertdialog"]')) return;
       // A portaled dialog (the Cloister restart popover and config modal) lives
-      // outside the wrapper; a click inside it must not close the popover (E-D6).
+      // outside the wrapper; a click inside it, or on a Modal's scrim, must not
+      // close the popover (E-D6, PAN-4756).
       const target = event.target as Element | null;
-      if (target?.closest?.('[role="dialog"], [role="alertdialog"]') && !wrapperRef.current?.contains(target)) return;
+      if (target?.closest?.('[role="dialog"], [role="alertdialog"], [data-component="modal-scrim"]') && !wrapperRef.current?.contains(target)) return;
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
         closePopover();
       }

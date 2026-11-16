@@ -11,7 +11,10 @@
  */
 import { useEffect, useState } from 'react';
 import { create } from 'zustand';
-import { ArrowDownToLine, Check, Circle, Loader2, Square, X } from 'lucide-react';
+import { ArrowDownToLine, Check, Circle, Loader2, Square } from 'lucide-react';
+
+import { Modal } from '../shared/Modal';
+import formStyles from '../shared/ModalForm.module.css';
 
 import { getPull, PULL_POLL_MS, PULL_STEPS, startPull, type PullStatus, type PullStep } from './pullApi';
 
@@ -107,80 +110,70 @@ export function PullHereDialog({ target, onClose }: { target: PullTarget; onClos
   const current = status ? PULL_STEPS.indexOf(status.step) : -1;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/32 backdrop-blur-sm" onClick={closable ? onClose : undefined}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={status ? 'Pulling here' : 'Pull here'}
-        className="mx-4 w-full max-w-lg rounded-2xl border border-border bg-popover text-popover-foreground shadow-lg"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-center gap-2 border-b border-border px-5 py-3">
-          <ArrowDownToLine className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <h2 className="flex-1 text-sm font-medium">{status ? `Pulling “${target.title}” here` : `Pull “${target.title}” here?`}</h2>
-          {closable && (
-            <button type="button" aria-label="Close" className="rounded-[var(--radius-sm)] p-1 text-muted-foreground hover:bg-accent" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-        <div className="space-y-3 px-5 py-4 text-[13px]">
-          {status ? (
+    <Modal
+      title={status ? `Pulling “${target.title}” here` : `Pull “${target.title}” here?`}
+      ariaLabel={status ? 'Pulling here' : 'Pull here'}
+      onClose={onClose}
+      dismissible={closable}
+      footer={status ? undefined : (
+        <>
+          <button type="button" className={formStyles.button} onClick={onClose}>Cancel</button>
+          {target.isWorking ? (
             <>
-              <ol className="space-y-2" data-testid="pull-steps">
-                {PULL_STEPS.map((step, index) => {
-                  const done = status.state === 'done' || index < current;
-                  const live = !done && !failed && index === current;
-                  return (
-                    <li key={step} className={`flex items-center gap-2 ${done || live ? 'text-foreground' : 'text-muted-foreground'}`} data-step={step} data-live={live || undefined}>
-                      {done ? <Check size={13} /> : live ? <Loader2 size={13} className="animate-spin" /> : <Circle size={13} />}
-                      {stepLabel(step, owner)}
-                    </li>
-                  );
-                })}
-              </ol>
-              {failed ? (
-                <p role="alert" className="text-destructive">
-                  {status.error ?? 'The pull failed'}. The conversation is still running on <span className="font-mono">{owner}</span>.
-                </p>
-              ) : lost ? (
-                <p role="alert" className="text-destructive">
-                  Lost track of the pull: {error}. It may still finish; the conversation list shows where it runs.
-                </p>
-              ) : (
-                <p className="text-muted-foreground">If adoption fails, {owner} takes the conversation back and nothing is lost.</p>
-              )}
+              <button type="button" className={formStyles.button} onClick={() => void start('stop')}>
+                <Square size={12} />Stop it now
+              </button>
+              <button type="button" className={formStyles.primaryButton} onClick={() => void start('wait')}>
+                Wait for this turn
+              </button>
             </>
           ) : (
-            <>
-              <p>This machine becomes the owner. <span className="font-mono">{owner}</span> stops running the conversation and shows it as “Continued on this machine”, read-only.</p>
-              <p>Uncommitted and unpushed changes come with it.</p>
-              {target.isWorking && (
-                <p><span className="font-mono">{owner}</span> is running a turn right now. Wait for it to finish, or stop it now and pull what is there.</p>
-              )}
-              <p className="text-muted-foreground">A conversation runs on one machine at a time.</p>
-              {error && <p role="alert" className="text-destructive">{error}</p>}
-              <div className="flex justify-end gap-2 pt-1">
-                <button type="button" className="rounded-[var(--radius-sm)] border border-border px-3 py-1 hover:bg-accent" onClick={onClose}>Cancel</button>
-                {target.isWorking ? (
-                  <>
-                    <button type="button" className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-border px-3 py-1 hover:bg-accent" onClick={() => void start('stop')}>
-                      <Square size={12} />Stop it now
-                    </button>
-                    <button type="button" className="rounded-[var(--radius-sm)] bg-primary px-3 py-1 text-primary-foreground hover:bg-primary/90" onClick={() => void start('wait')}>
-                      Wait for this turn
-                    </button>
-                  </>
-                ) : (
-                  <button type="button" className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-primary px-3 py-1 text-primary-foreground hover:bg-primary/90" onClick={() => void start('wait')}>
-                    <ArrowDownToLine size={12} />Pull here
-                  </button>
-                )}
-              </div>
-            </>
+            <button type="button" className={formStyles.primaryButton} onClick={() => void start('wait')}>
+              <ArrowDownToLine size={12} />Pull here
+            </button>
           )}
-        </div>
+        </>
+      )}
+    >
+      <div className={`${formStyles.content} space-y-3 text-[13px]`}>
+        {status ? (
+          <>
+            <ol className="space-y-2" data-testid="pull-steps">
+              {PULL_STEPS.map((step, index) => {
+                const done = status.state === 'done' || index < current;
+                const live = !done && !failed && index === current;
+                return (
+                  <li key={step} className={`flex items-center gap-2 ${done || live ? 'text-foreground' : 'text-muted-foreground'}`} data-step={step} data-live={live || undefined}>
+                    {done ? <Check size={13} /> : live ? <Loader2 size={13} className="animate-spin" /> : <Circle size={13} />}
+                    {stepLabel(step, owner)}
+                  </li>
+                );
+              })}
+            </ol>
+            {failed ? (
+              <p role="alert" className={formStyles.error}>
+                {status.error ?? 'The pull failed'}. The conversation is still running on <span className="font-mono">{owner}</span>.
+              </p>
+            ) : lost ? (
+              <p role="alert" className={formStyles.error}>
+                Lost track of the pull: {error}. It may still finish; the conversation list shows where it runs.
+              </p>
+            ) : (
+              <p className={formStyles.hint}>If adoption fails, {owner} takes the conversation back and nothing is lost.</p>
+            )}
+          </>
+        ) : (
+          <>
+            <p className={formStyles.text}>This machine becomes the owner. <span className="font-mono">{owner}</span> stops running the conversation and shows it as “Continued on this machine”, read-only.</p>
+            <p className={formStyles.text}>Uncommitted and unpushed changes come with it.</p>
+            {target.isWorking && (
+              <p className={formStyles.text}><span className="font-mono">{owner}</span> is running a turn right now. Wait for it to finish, or stop it now and pull what is there.</p>
+            )}
+            <p className={formStyles.hint}>A conversation runs on one machine at a time.</p>
+            {error && <p role="alert" className={formStyles.error}>{error}</p>}
+          </>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }

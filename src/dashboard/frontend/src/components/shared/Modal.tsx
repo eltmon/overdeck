@@ -5,10 +5,12 @@
  * dismissal (D6) so every dialog built on it gets the same accessible
  * behavior without re-implementing it.
  */
-import { useEffect, useId, useRef, type FormEvent, type KeyboardEvent, type MouseEvent, type ReactNode, type ReactPortal } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent, type ReactNode, type ReactPortal } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import styles from './Modal.module.css';
+
+export type ModalSize = 'narrow' | 'default' | 'wide' | 'xl';
 
 export interface ModalProps {
   title: string;
@@ -21,13 +23,35 @@ export interface ModalProps {
   /** Non-scrolling region above the footer, e.g. an error alert. */
   pinned?: ReactNode;
   footer?: ReactNode;
-  /** Widens the panel for tabular content (760px instead of 600px). */
-  wide?: boolean;
+  /** Panel max width: narrow 440px, default 600px, wide 760px, xl 1000px (PAN-4756 D2). */
+  size?: ModalSize;
+  /** Renders role="alertdialog" (DialogProvider confirm/alert). */
+  alert?: boolean;
+  /** Accessible name when it must differ from the visible title (kept from a pre-Modal dialog). */
+  ariaLabel?: string;
+  /** Accessible name of the header close button (default "Close"). */
+  closeLabel?: string;
+  /** Extra header buttons, rendered before the close button. */
+  headerActions?: ReactNode;
+  /** Runs first for every key pressed inside the panel; call preventDefault() to skip Modal's own Escape/Tab handling. */
+  onKeyDown?: (event: KeyboardEvent<HTMLElement>) => void;
+  /** No header row: the caller renders its own heading and passes its id in labelledBy. */
+  headless?: boolean;
+  /** id of the caller's heading that names the dialog (used with `headless`). */
+  labelledBy?: string;
+  /** aria-describedby target when the description is the caller's own element (AskUserQuestion's first question). Overrides `description`'s id. */
+  describedBy?: string;
+  /** "warning" draws the needs-you border (PAN-4754 FR-14). */
+  tone?: 'default' | 'warning';
   children: ReactNode;
 }
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+// Render order of every Modal. A nested Modal renders after its parent, so a
+// higher number is a higher layer even when both mount in the same commit.
+let modalLayerSeq = 0;
 
 function focusableElements(container: HTMLElement): HTMLElement[] {
   return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
@@ -35,7 +59,33 @@ function focusableElements(container: HTMLElement): HTMLElement[] {
   );
 }
 
-export function Modal({ title, description, onClose, dismissible = true, onSubmit, pinned, footer, wide = false, children }: ModalProps): ReactPortal {
+const SIZE_CLASS: Record<ModalSize, string | undefined> = {
+  narrow: styles.sizeNarrow,
+  default: styles.sizeDefault,
+  wide: styles.sizeWide,
+  xl: styles.sizeXl,
+};
+
+export function Modal({
+  title,
+  description,
+  onClose,
+  dismissible = true,
+  onSubmit,
+  pinned,
+  footer,
+  size = 'default',
+  alert = false,
+  ariaLabel,
+  closeLabel,
+  headerActions,
+  onKeyDown: onCallerKeyDown,
+  headless = false,
+  labelledBy,
+  describedBy,
+  tone = 'default',
+  children,
+}: ModalProps): ReactPortal {
   const titleId = useId();
   const descriptionId = useId();
   // Cast keeps the element polymorphic (form when a submit handler is given,
@@ -43,20 +93,52 @@ export function Modal({ title, description, onClose, dismissible = true, onSubmi
   const Panel = onSubmit ? 'form' : ('div' as unknown as 'form');
   const panelRef = useRef<HTMLFormElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
+  const scrimRef = useRef<HTMLDivElement | null>(null);
   const scrimPressedRef = useRef(false);
+  // Captured at first render, before a child's autoFocus or this component's
+  // effect moves focus into the panel (PAN-4756 FR-1).
+  const [opener] = useState(() => (document.activeElement instanceof HTMLElement ? document.activeElement : null));
+  const [layer] = useState(() => ++modalLayerSeq);
 
   useEffect(() => {
-    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const restore = () => {
+      if (opener && document.contains(opener)) opener.focus();
+    };
+    // A child already placed focus (autoFocus): keep it.
+    if (panelRef.current?.contains(document.activeElement)) return restore;
+    // A nested Modal mounted in the same commit ran its effect first and holds
+    // focus in a higher layer: keep it there.
+    const focusedPanel = document.activeElement?.closest<HTMLElement>('[data-component="modal"]');
+    if (focusedPanel && Number(focusedPanel.dataset.modalLayer) > layer) return restore;
     const body = bodyRef.current;
     const target = (body && focusableElements(body)[0]) ?? panelRef.current;
     target?.focus();
-    return () => {
-      if (previouslyFocused && document.contains(previouslyFocused)) previouslyFocused.focus();
-    };
+    return restore;
+  }, [opener, layer]);
+
+  // A dialog that swaps its body (a form replaced by its result) removes the
+  // focused control, and focus falls to <body>, outside the panel: Escape and
+  // the Tab trap then stop working. Pull focus back to the panel. Observe the
+  // scrim, not the panel: dropping onSubmit turns the panel from a form into a
+  // div, which React mounts as a new element.
+  useEffect(() => {
+    const scrim = scrimRef.current;
+    if (!scrim) return;
+    const observer = new MutationObserver(() => {
+      if (document.activeElement === null || document.activeElement === document.body) panelRef.current?.focus();
+    });
+    observer.observe(scrim, { childList: true, subtree: true });
+    return () => observer.disconnect();
   }, []);
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    // React bubbles a nested portal's key events through the React tree; only
+    // react to keys pressed inside this panel's DOM.
+    if (!(event.target instanceof Node) || !panelRef.current?.contains(event.target)) return;
+    onCallerKeyDown?.(event);
+    if (event.defaultPrevented) return;
     if (event.key === 'Escape') {
+      event.stopPropagation();
       if (!dismissible) return;
       event.preventDefault();
       onClose();
@@ -87,34 +169,45 @@ export function Modal({ title, description, onClose, dismissible = true, onSubmi
   const onScrimClick = (event: MouseEvent<HTMLDivElement>) => {
     const pressedOnScrim = scrimPressedRef.current;
     scrimPressedRef.current = false;
+    // The modal portals to document.body, but React still bubbles its clicks
+    // to the caller's ancestors (a kanban card, a tree row); stop them here.
+    event.stopPropagation();
     if (!dismissible) return;
     if (pressedOnScrim && event.target === event.currentTarget) onClose();
   };
 
+  const panelClassName = [styles.panel, SIZE_CLASS[size], tone === 'warning' && styles.warning].filter(Boolean).join(' ');
+  const bodyClassName = headless ? `${styles.body} ${styles.headlessBody}` : styles.body;
+
   return createPortal(
-    <div className={styles.scrim} data-component="modal-scrim" onMouseDown={onScrimMouseDown} onClick={onScrimClick}>
+    <div ref={scrimRef} className={styles.scrim} data-component="modal-scrim" onMouseDown={onScrimMouseDown} onClick={onScrimClick}>
       <Panel
         ref={panelRef}
-        role="dialog"
+        role={alert ? 'alertdialog' : 'dialog'}
         aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={description ? descriptionId : undefined}
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabel ? undefined : (labelledBy ?? titleId)}
+        aria-describedby={describedBy ?? (description && !headless ? descriptionId : undefined)}
         tabIndex={-1}
-        className={wide ? `${styles.panel} ${styles.wide}` : styles.panel}
+        className={panelClassName}
         data-component="modal"
+        data-modal-layer={layer}
         onKeyDown={onKeyDown}
         onSubmit={onSubmit}
       >
-        <div className={styles.header}>
-          <div className={styles.titles}>
-            <h2 id={titleId} className={styles.title}>{title}</h2>
-            {description && <p id={descriptionId} className={styles.description}>{description}</p>}
+        {!headless && (
+          <div className={styles.header}>
+            <div className={styles.titles}>
+              <h2 id={titleId} className={styles.title}>{title}</h2>
+              {description && <p id={descriptionId} className={styles.description}>{description}</p>}
+            </div>
+            {headerActions && <div className={styles.headerActions}>{headerActions}</div>}
+            <button type="button" className={styles.close} aria-label={closeLabel ?? 'Close'} onClick={onClose} disabled={!dismissible}>
+              <X size={16} />
+            </button>
           </div>
-          <button type="button" className={styles.close} aria-label="Close" onClick={onClose} disabled={!dismissible}>
-            <X size={16} />
-          </button>
-        </div>
-        <div ref={bodyRef} className={styles.body}>{children}</div>
+        )}
+        <div ref={bodyRef} className={bodyClassName}>{children}</div>
         {pinned && <div className={styles.pinned}>{pinned}</div>}
         {footer && <div className={styles.footer}>{footer}</div>}
       </Panel>

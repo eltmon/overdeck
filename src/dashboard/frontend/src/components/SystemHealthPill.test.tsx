@@ -287,6 +287,16 @@ describe('SystemHealthPill', () => {
     expect(screen.queryByRole('dialog', { name: 'System health' })).not.toBeInTheDocument();
   });
 
+  it('stays open for a pointer-down on a Modal scrim, which carries no dialog role (PAN-4756)', () => {
+    setSnapshot('healthy');
+    render(<div data-component="modal-scrim" data-testid="modal-scrim"><div role="dialog" aria-label="Restart config" /></div>);
+    renderPill();
+
+    fireEvent.click(screen.getByTestId('system-health-pill'));
+    fireEvent.pointerDown(screen.getByTestId('modal-scrim'));
+    expect(screen.getByRole('dialog', { name: 'System health' })).toBeInTheDocument();
+  });
+
   it('closes when the shutdown dialog opens so it never covers it (PAN-5342)', () => {
     setSnapshot('healthy');
     renderPill();

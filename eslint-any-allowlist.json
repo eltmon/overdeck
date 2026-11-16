@@ -52,7 +52,6 @@
   "src/core/state-mapping.ts",
   "src/dashboard/frontend/src/components/AgentDetailView.tsx",
   "src/dashboard/frontend/src/components/CommandDeck/FeatureMetadata/TranscriptUpload.tsx",
-  "src/dashboard/frontend/src/components/DeepWipeDialog.tsx",
   "src/dashboard/frontend/src/components/HealthHistoryChart.tsx",
   "src/dashboard/frontend/src/components/HealthHistoryTimeline.tsx",
   "src/dashboard/frontend/src/components/PlanDialog.tsx",

@@ -13,10 +13,12 @@
  * POST /api/agents/:id/plan-action (agents) or
  * POST /api/conversations/:name/plan-action (conversations).
  */
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { ClipboardCheck, Loader2, Minus, Check, MessageSquare } from 'lucide-react'
 import { capture } from '../lib/telemetry'
 import { ChatMarkdown } from './chat/ChatMarkdown'
+import { Modal } from './shared/Modal'
+import formStyles from './shared/ModalForm.module.css'
 
 export interface PlanApprovalSubject {
   id: string
@@ -51,6 +53,7 @@ export function PlanApprovalDialog({
   const [showFeedback, setShowFeedback] = useState(false)
   const [feedback, setFeedback] = useState('')
   const pending = subject?.pendingProposedPlan
+  const titleId = useId()
 
   if (!isOpen || !subject || !pending) return null
 
@@ -67,81 +70,23 @@ export function PlanApprovalDialog({
   }
 
   return (
-    // Clicking the backdrop minimizes (not approves) — the plan stays
+    // Esc and a scrim click minimize (not approve) — the plan stays
     // recoverable via the "Needs you" list so navigation is never trapped.
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-      onClick={(e) => { if (e.target === e.currentTarget && !isSubmitting) onDismiss() }}
-    >
-      <div className="w-full max-w-3xl overflow-hidden rounded-xl border border-primary/30 bg-card shadow-2xl">
-        <div className="flex items-center gap-3 border-b border-border px-5 py-4">
-          <div className="rounded-full bg-primary/15 p-2">
-            <ClipboardCheck className="h-5 w-5 text-primary" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-lg font-semibold text-foreground">{displayName}</h2>
-            <p className="text-sm text-muted-foreground">
-              {subject.kindLabel ?? 'Agent'} finished planning and is waiting for your approval to start work.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onDismiss}
-            disabled={isSubmitting}
-            title="Minimize — keeps the plan in the activity feed's “Needs you” list"
-            aria-label="Minimize"
-            className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Minus className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="space-y-4 px-5 py-4 max-h-[65vh] overflow-y-auto">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{subject.kindLabel ?? 'Subject'}</p>
-              <p className="font-mono text-sm text-foreground">{subject.id}</p>
-              {subject.title ? (
-                <p className="mt-1 text-sm font-medium text-foreground">{subject.title}</p>
-              ) : null}
-            </div>
-            <div>
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Issue</p>
-              <p className="font-mono text-sm text-foreground">{subject.issueId ?? 'Unknown'}</p>
-            </div>
-          </div>
-
-          <div className="rounded-md border border-border bg-background/40 px-4 py-3 text-sm">
-            <ChatMarkdown text={pending.plan} cwd={undefined} />
-          </div>
-
-          {showFeedback && (
-            <div className="space-y-1">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                What should change?
-              </p>
-              <textarea
-                value={feedback}
-                onChange={(e) => setFeedback(e.target.value)}
-                disabled={isSubmitting}
-                rows={3}
-                placeholder="Describe what to change — sent to the session as plan feedback."
-                className="w-full rounded-md border border-border bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleRequestChanges()
-                }}
-              />
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center justify-end gap-3 border-t border-border bg-card/40 px-5 py-4">
+    <Modal
+      title={displayName}
+      headless
+      labelledBy={titleId}
+      size="wide"
+      onClose={onDismiss}
+      dismissible={!isSubmitting}
+      footer={
+        <>
           <button
             type="button"
             onClick={onDismiss}
             disabled={isSubmitting}
             title="Keeps the plan in the activity feed's “Needs you” list — click it there to reopen"
-            className="rounded-md border border-border bg-popover px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-card disabled:cursor-not-allowed disabled:opacity-60"
+            className={formStyles.button}
           >
             Minimize
           </button>
@@ -150,7 +95,7 @@ export function PlanApprovalDialog({
               type="button"
               onClick={handleRequestChanges}
               disabled={isSubmitting || !feedback.trim()}
-              className="inline-flex items-center gap-2 rounded-md border border-border bg-popover px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-card disabled:cursor-not-allowed disabled:opacity-60"
+              className={formStyles.button}
             >
               {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
               Send Feedback
@@ -160,7 +105,7 @@ export function PlanApprovalDialog({
               type="button"
               onClick={() => setShowFeedback(true)}
               disabled={isSubmitting}
-              className="inline-flex items-center gap-2 rounded-md border border-border bg-popover px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-card disabled:cursor-not-allowed disabled:opacity-60"
+              className={formStyles.button}
             >
               <MessageSquare className="h-4 w-4" />
               Request Changes
@@ -175,13 +120,74 @@ export function PlanApprovalDialog({
               onApprove()
             }}
             disabled={isSubmitting}
-            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+            className={formStyles.primaryButton}
           >
             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
             Approve Plan
           </button>
+        </>
+      }
+    >
+      <div className="flex shrink-0 items-center gap-3 border-b border-[color:var(--border-overlay,var(--border))] px-5 pb-[14px] pt-[18px]">
+        <div className="rounded-full bg-primary/15 p-2">
+          <ClipboardCheck className="h-5 w-5 text-primary" />
         </div>
+        <div className="min-w-0 flex-1">
+          <h2 id={titleId} className="truncate text-lg font-semibold text-foreground">{displayName}</h2>
+          <p className="text-sm text-muted-foreground">
+            {subject.kindLabel ?? 'Agent'} finished planning and is waiting for your approval to start work.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onDismiss}
+          disabled={isSubmitting}
+          title="Minimize — keeps the plan in the activity feed's “Needs you” list"
+          aria-label="Minimize"
+          className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Minus className="h-4 w-4" />
+        </button>
       </div>
-    </div>
+
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{subject.kindLabel ?? 'Subject'}</p>
+            <p className="font-mono text-sm text-foreground">{subject.id}</p>
+            {subject.title ? (
+              <p className="mt-1 text-sm font-medium text-foreground">{subject.title}</p>
+            ) : null}
+          </div>
+          <div>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Issue</p>
+            <p className="font-mono text-sm text-foreground">{subject.issueId ?? 'Unknown'}</p>
+          </div>
+        </div>
+
+        <div className="rounded-md border border-border bg-background/40 px-4 py-3 text-sm">
+          <ChatMarkdown text={pending.plan} cwd={undefined} />
+        </div>
+
+        {showFeedback && (
+          <div className={formStyles.field}>
+            <p className={formStyles.label}>
+              What should change?
+            </p>
+            <textarea
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+              disabled={isSubmitting}
+              rows={3}
+              placeholder="Describe what to change — sent to the session as plan feedback."
+              className={formStyles.textarea}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleRequestChanges()
+              }}
+            />
+          </div>
+        )}
+      </div>
+    </Modal>
   )
 }

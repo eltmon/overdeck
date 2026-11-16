@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { X } from 'lucide-react';
 import { dashboardMutationJsonHeaders, ensureDashboardSession } from '../../../lib/wsTransport';
+import { Modal } from '../../shared/Modal';
+import formStyles from '../../shared/ModalForm.module.css';
 import { ACCESS_TOKEN_SCOPE_OPTIONS } from './accessTokenScopes';
 import {
   ACCESS_TOKENS_FORBIDDEN_EXPLANATION,
@@ -74,112 +75,86 @@ export function CreateAccessTokenDialog({ open, onClose, onCreated }: CreateAcce
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-      onClick={handleClose}
-      onKeyDown={(e) => { if (e.key === 'Escape') handleClose(); }}
-    >
-      <div
-        className="bg-card border border-border rounded-lg shadow-2xl w-full max-w-md mx-4"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <h3 className="text-base font-semibold text-foreground">Create access token</h3>
+    <Modal
+      title="Create access token"
+      size="narrow"
+      onClose={handleClose}
+      footer={created ? undefined : (
+        <>
+          <button type="button" onClick={handleClose} className={formStyles.button}>
+            Cancel
+          </button>
           <button
             type="button"
-            onClick={handleClose}
-            className="text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => mutation.mutate()}
+            disabled={!canCreate || mutation.isPending}
+            className={formStyles.primaryButton}
           >
-            <X className="w-5 h-5" />
+            Create
           </button>
-        </div>
-
-        <div className="p-4 space-y-3 text-sm">
-          {created ? (
-            <div className="space-y-3">
-              <p className="text-foreground">Copy this token now. It is not shown again.</p>
-              <input
-                type="text"
-                readOnly
-                data-testid="access-token-plaintext"
-                value={created.token}
-                className="w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground font-mono"
-                onFocus={(e) => e.target.select()}
-              />
-              <button
-                type="button"
-                onClick={handleCopy}
-                className="px-3 py-1.5 text-sm rounded-md border border-border text-foreground hover:bg-muted/30 transition-colors"
-              >
+        </>
+      )}
+    >
+      <div className={formStyles.form}>
+        {created ? (
+          <div className={formStyles.field}>
+            <p className={formStyles.text}>Copy this token now. It is not shown again.</p>
+            <input
+              type="text"
+              readOnly
+              data-testid="access-token-plaintext"
+              value={created.token}
+              className={`${formStyles.input} ${formStyles.mono}`}
+              onFocus={(e) => e.target.select()}
+            />
+            <div>
+              <button type="button" onClick={handleCopy} className={formStyles.button}>
                 {copied ? 'Copied' : 'Copy'}
               </button>
             </div>
-          ) : (
-            <>
-              <label className="block">
-                <span className="text-xs text-muted-foreground">Name</span>
-                <input
-                  type="text"
-                  maxLength={200}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="mt-1 w-full bg-background border border-border rounded-md px-2 py-1.5 text-sm text-foreground"
-                />
-              </label>
-              <div className="space-y-2">
-                <span className="text-xs text-muted-foreground">Scopes</span>
-                {ACCESS_TOKEN_SCOPE_OPTIONS.map((option) => (
-                  <label key={option.id} className="flex items-start gap-2 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={scopes.includes(option.id)}
-                      onChange={() => toggleScope(option.id)}
-                      aria-label={option.id}
-                      className="mt-0.5"
-                    />
-                    <span>
-                      <span className="text-foreground font-mono">{option.id}</span>
-                      <span className="text-muted-foreground"> — {option.description}</span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-              {forbidden && (
-                <p role="alert" data-testid="access-tokens-forbidden" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                  {forbidden.message} {ACCESS_TOKENS_FORBIDDEN_EXPLANATION}
-                </p>
-              )}
-              {otherError && (
-                <p data-testid="access-tokens-error" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                  {otherError.message}
-                </p>
-              )}
-            </>
-          )}
-        </div>
-
-        {!created && (
-          <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="px-3 py-1.5 text-sm rounded-md border border-border text-foreground hover:bg-muted/30 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() => mutation.mutate()}
-              disabled={!canCreate || mutation.isPending}
-              className="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              Create
-            </button>
           </div>
+        ) : (
+          <>
+            <label className={formStyles.field}>
+              <span className={formStyles.label}>Name</span>
+              <input
+                type="text"
+                maxLength={200}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className={formStyles.input}
+              />
+            </label>
+            <div className={formStyles.field}>
+              <span className={formStyles.label}>Scopes</span>
+              {ACCESS_TOKEN_SCOPE_OPTIONS.map((option) => (
+                <label key={option.id} className={formStyles.choice}>
+                  <input
+                    type="checkbox"
+                    checked={scopes.includes(option.id)}
+                    onChange={() => toggleScope(option.id)}
+                    aria-label={option.id}
+                  />
+                  <span className="min-w-0 text-xs">
+                    <span className="text-foreground font-mono">{option.id}</span>
+                    <span className="text-muted-foreground"> — {option.description}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            {forbidden && (
+              <p role="alert" data-testid="access-tokens-forbidden" className={formStyles.error}>
+                {forbidden.message} {ACCESS_TOKENS_FORBIDDEN_EXPLANATION}
+              </p>
+            )}
+            {otherError && (
+              <p data-testid="access-tokens-error" className={formStyles.error}>
+                {otherError.message}
+              </p>
+            )}
+          </>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }

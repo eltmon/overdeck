@@ -16,8 +16,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import qrcode from 'qrcode-generator';
-import { X } from 'lucide-react';
 
+import { Modal } from '../../shared/Modal';
+import formStyles from '../../shared/ModalForm.module.css';
 import { ViewToggle } from '../../shared/ViewToggle';
 import { openSettingsSection } from '../../../lib/settingsSection';
 import { SetUpPhoneAppPanel } from './SetUpPhoneAppPanel';
@@ -176,9 +177,9 @@ function BrowserPhoneSetup({ onClose }: { onClose: () => void }) {
   const pairUrl = pairing ? `${pairing.origin}/m#pair=${pairing.credential}` : '';
 
   return (
-    <div className="p-4 space-y-5 text-sm">
+    <div className="space-y-5 text-sm">
       <Step n={1} title="Install Tailscale">
-        <p className="text-xs text-muted-foreground">
+        <p className={formStyles.hint}>
           Install Tailscale on your phone and sign in with the same account as this machine.
         </p>
         <QrImage value={TAILSCALE_DOWNLOAD_URL} alt="Tailscale download QR code" />
@@ -194,12 +195,12 @@ function BrowserPhoneSetup({ onClose }: { onClose: () => void }) {
               setPairing(null);
               setForbidden(false);
             }}
-            className="w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+            className={formStyles.select}
           >
             {phoneOrigins.map((origin) => <option key={origin} value={origin}>{origin}</option>)}
           </select>
         ) : (
-          <p className="text-xs text-muted-foreground">
+          <p className={formStyles.hint}>
             No https:// address yet. Run <code>tailscale serve</code> for the dashboard port, then add its address, such as https://desk.tailnet.ts.net.
           </p>
         )}
@@ -213,26 +214,26 @@ function BrowserPhoneSetup({ onClose }: { onClose: () => void }) {
               setTyped(e.target.value);
               setAddError(null);
             }}
-            className="flex-1 min-w-0 bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground font-mono focus:ring-1 focus:ring-primary"
+            className={`${formStyles.input} ${formStyles.mono} flex-1`}
           />
           <button
             type="button"
             onClick={() => void handleAdd()}
             disabled={adding || typed.trim() === ''}
-            className="shrink-0 rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
+            className={`${formStyles.button} shrink-0`}
           >
             Add
           </button>
         </div>
-        {addError && <p className="text-xs text-destructive">{addError}</p>}
+        {addError && <p className={formStyles.error}>{addError}</p>}
       </Step>
 
       <Step n={3} title="Require a token to sign in">
         {tokenMint.data === true ? (
-          <p className="text-xs text-muted-foreground">On. A phone signs in only with its pairing code.</p>
+          <p className={formStyles.hint}>On. A phone signs in only with its pairing code.</p>
         ) : (
           <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">
+            <p className={formStyles.hint}>
               {tokenMint.isError
                 ? 'Could not read this setting.'
                 : tokenMint.isLoading
@@ -246,14 +247,14 @@ function BrowserPhoneSetup({ onClose }: { onClose: () => void }) {
                   openSettingsSection('access-tokens');
                   onClose();
                 }}
-                className="rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/50 transition-colors"
+                className={formStyles.button}
               >
                 Open the setting
               </button>
               <button
                 type="button"
                 onClick={() => void tokenMint.refetch()}
-                className="rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/50 transition-colors"
+                className={formStyles.button}
               >
                 Check again
               </button>
@@ -281,7 +282,7 @@ function BrowserPhoneSetup({ onClose }: { onClose: () => void }) {
           </div>
 
           {forbidden ? (
-            <p className="text-xs text-muted-foreground">Pairing links can be created only from a browser on this machine.</p>
+            <p className={formStyles.hint}>Pairing links can be created only from a browser on this machine.</p>
           ) : pairing && !expired ? (
             <div className="space-y-3">
               <input
@@ -289,42 +290,42 @@ function BrowserPhoneSetup({ onClose }: { onClose: () => void }) {
                 aria-label="Pairing link"
                 value={pairUrl}
                 onFocus={(e) => e.target.select()}
-                className="w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground font-mono"
+                className={`${formStyles.input} ${formStyles.mono}`}
               />
               {platform === 'iphone' ? (
                 <>
-                  <p className="text-xs text-foreground">1. Open in Safari, then Share → Add to Home Screen</p>
+                  <p className={formStyles.text}>1. Open in Safari, then Share → Add to Home Screen</p>
                   <QrImage value={appUrl} alt="Phone app QR code" />
-                  <p className="text-xs text-foreground">2. In the installed app, tap Scan pairing code</p>
+                  <p className={formStyles.text}>2. In the installed app, tap Scan pairing code</p>
                   <QrImage value={pairUrl} alt="Pairing QR code" />
                 </>
               ) : (
                 <QrImage value={pairUrl} alt="Pairing QR code" />
               )}
-              <p className="text-xs text-muted-foreground">{pairingExpiresInText(pairing.expiresAt)}</p>
+              <p className={formStyles.hint}>{pairingExpiresInText(pairing.expiresAt)}</p>
               <button
                 type="button"
                 onClick={() => void handleCreate()}
                 disabled={creating}
-                className="rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
+                className={formStyles.button}
               >
                 Create another code
               </button>
             </div>
           ) : (
             <div className="space-y-2">
-              {expired && <p className="text-xs text-muted-foreground">This code expired.</p>}
+              {expired && <p className={formStyles.hint}>This code expired.</p>}
               <button
                 type="button"
                 onClick={() => void handleCreate()}
                 disabled={!selected || creating}
-                className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                className={formStyles.primaryButton}
               >
                 {expired ? 'Create another code' : 'Create pairing link'}
               </button>
             </div>
           )}
-          {linkError && <p className="text-xs text-destructive">{linkError}</p>}
+          {linkError && <p className={formStyles.error}>{linkError}</p>}
         </Step>
       )}
     </div>
@@ -335,39 +336,23 @@ function SetUpPhoneDialogBody({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<'app' | 'browser'>('app');
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
-      <div
-        className="bg-card border border-border rounded-lg shadow-2xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="set-up-phone-title"
-        data-component="set-up-phone-dialog"
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <h3 id="set-up-phone-title" className="text-base font-medium text-foreground">Set up a phone</h3>
-          <button type="button" onClick={onClose} aria-label="Close" className="text-muted-foreground hover:text-foreground transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="px-4 pt-3">
-          <ViewToggle
-            ariaLabel="Phone setup"
-            options={[{ id: 'app', label: 'Overdeck app' }, { id: 'browser', label: 'Browser on the phone' }]}
-            value={tab}
-            onChange={setTab}
-          />
-        </div>
+    <Modal title="Set up a phone" size="narrow" onClose={onClose}>
+      <div className={`${formStyles.content} space-y-5`} data-component="set-up-phone-dialog">
+        <ViewToggle
+          ariaLabel="Phone setup"
+          options={[{ id: 'app', label: 'Overdeck app' }, { id: 'browser', label: 'Browser on the phone' }]}
+          value={tab}
+          onChange={setTab}
+        />
 
         {tab === 'app' ? (
-          <div className="p-4 space-y-5 text-sm">
+          <div className="space-y-5 text-sm">
             <SetUpPhoneAppPanel />
           </div>
         ) : (
           <BrowserPhoneSetup onClose={onClose} />
         )}
       </div>
-    </div>
+    </Modal>
   );
 }

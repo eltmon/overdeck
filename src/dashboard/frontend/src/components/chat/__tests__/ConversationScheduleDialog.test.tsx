@@ -217,8 +217,8 @@ describe('ConversationScheduleDialog (PAN-4657)', () => {
   it('closes on Escape', async () => {
     renderHostWith({ schedules: [] });
     act(() => openScheduleDialog('conv-a'));
-    await screen.findByRole('dialog', { name: 'Schedules' });
-    fireEvent.keyDown(window, { key: 'Escape' });
+    const dialog = await screen.findByRole('dialog', { name: 'Schedules' });
+    fireEvent.keyDown(dialog, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Schedules' })).not.toBeInTheDocument());
   });
 });
