@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5343",
   "created": "2026-11-16T00:09:01.559Z",
-  "updated": "2026-11-16T00:15:36.143Z",
+  "updated": "2026-11-16T00:15:37.524Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,11 @@
     "preset-layout.ac3": {
       "status": "completed",
       "doneAt": "2026-11-16T00:15:36.142Z"
+    },
+    "deck-layout-store": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:15:37.524Z"
     }
   }
 }
