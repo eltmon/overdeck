@@ -4,17 +4,17 @@
     "created": "2026-11-16T03:17:44Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5414: Left column rows: invisible hover buttons truncate titles and meta, Stop × overlaps the Settle box, empty All-deck crumb",
-    "updated": "2026-11-16T03:22:18.369Z"
+    "updated": "2026-11-16T03:23:19.551Z"
   },
   "plan": {
     "id": "pan-5414",
     "title": "Left column rows: invisible hover buttons truncate titles and meta, Stop × overlaps the Settle box, empty All-deck crumb",
-    "status": "proposed",
+    "status": "running",
     "uid": "71fc967b-1904-46b8-aafd-8cdf399bc954",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-16T03:17:44Z",
-    "updated": "2026-11-16T03:22:18.369Z",
+    "updated": "2026-11-16T03:23:19.551Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5414",
@@ -426,5 +426,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
