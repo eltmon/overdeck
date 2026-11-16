@@ -3020,10 +3020,13 @@ explorer watch batch of the edit root.
 **PR status refetch.** Each status read calls `gh`. The status query never
 polls, except for the editor bar: it refetches every 15 s
 (`PR_STATUS_REFETCH_MS`) while `shouldPollPr(pr)` is true, which is an open,
-non-draft PR that cannot merge yet whose `mergeable` or `mergeStateStatus` is
-`UNKNOWN` or whose `mergeStateStatus` is `BLOCKED`. A draft, conflicting
-(`DIRTY`) or out-of-date (`BEHIND`) PR cannot change by itself, so it is read
-again only on **Refresh**.
+non-draft PR that either cannot merge yet and has `mergeable` or
+`mergeStateStatus` `UNKNOWN` or `mergeStateStatus` `BLOCKED`, or can merge but
+has `checksPassing: false` (`UNSTABLE`: a non-required check is pending or
+failing; PAN-5391). A draft, conflicting (`DIRTY`) or out-of-date (`BEHIND`)
+PR cannot change by itself, so it is read again only on **Refresh**. The
+merge verdict's `checksPassing` is true only for `CLEAN` and `HAS_HOOKS`; the
+editor bar shows an `UNSTABLE` PR in amber and confirms before merging it.
 
 **Commits run the repository's hooks.** The commit is made as the operator's
 global git identity, never with `--no-verify`; a refused commit or push returns
