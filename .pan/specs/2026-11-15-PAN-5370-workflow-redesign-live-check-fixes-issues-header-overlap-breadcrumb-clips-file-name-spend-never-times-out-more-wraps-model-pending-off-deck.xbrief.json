@@ -1,0 +1,636 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-15T20:46:52Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5370: Workflow redesign live-check fixes: Issues header overlap, breadcrumb clips file name, Spend never times out, More wraps, model pending off-deck",
+    "updated": "2026-11-15T20:57:25.015Z"
+  },
+  "plan": {
+    "id": "pan-5370",
+    "title": "Workflow redesign live-check fixes: Issues header overlap, breadcrumb clips file name, Spend never times out, More wraps, model pending off-deck",
+    "status": "running",
+    "uid": "3da9b6b4-61f2-49be-870c-24add4e941e5",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-15T20:46:52Z",
+    "updated": "2026-11-15T20:57:25.015Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5370",
+        "label": "PAN-5370",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "layout",
+      "workflow-redesign",
+      "pan-5284"
+    ],
+    "narratives": {
+      "Problem": "The epic owner's live check of the workflow redesign (C #5290, G #5294) at 1920 x 1000 found five defects: the left column Issues header squeezes its toggle to 0 px so the CI chip draws over the ISSUES eyebrow and the filter wraps; the code pane breadcrumb clips the file name instead of the leading folders; the Spend this week fact waits forever when /api/costs/summary hangs; the Home action row needs 1070 px in a 1048 px row so More wraps; and off the deck the New conversation button says model pending because nothing fetches the settings' default model.",
+      "Proposal": "Five leaf fixes, each with its own test: scope a shrinkable chip container into the frame header (identity chip ellipsizes, eyebrow/count/filter never shrink); split the breadcrumb into a truncating leading group and a non-shrinking file segment; route the spend read through fetchWithTimeout with a 20 s timeout and add a spendError prop so the fact shows — / unavailable like Landed; tighten the action row's gap and padding; call ensureDefaultConversationModel once at module load in newConversationDefaults.ts with the existing re-derive rule plus a non-empty guard. Then document the behavior and verify the three layout fixes live with Playwright at 1920 x 1000. Full detail, before/after code and test recipes: .pan/drafts/PAN-5370.md.",
+      "NonGoals": "- No timeout or error change to useProjectChanges or the Landed fact\n- No measured middle-collapse (overdeck › … › frame ›) breadcrumb; end ellipsis on the leading group only\n- No change to the Command Deck tree variant of ProjectNode or to the shared .projectCiChip/.projectDeployChip/.projectIdentityChip rules\n- No guarantee the action row fits at 1920 px with longer editor labels (e.g. VS Code Insiders) or on macOS; wrapping stays allowed outside the stated configuration\n- No server, contract, route or cost-summary performance change (the slow route is PAN-5369)\n- No new Playwright spec added to test:playwright; live verification is a one-off probe plus the test role's UAT\n- No vi.resetModules + dynamic-import render tests"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Issues header: the identity chip truncates with an ellipsis; CI and deploy chips keep their width; overflow is clipped by a frame-only chip container",
+        "rationale": "The live probe showed the 189 px identity chip is what does not fit at 264 px; scoping the override to .frameHeaderChips > .projectIdentityChip leaves the tree variant and HomeMetaLine untouched."
+      },
+      {
+        "summary": "Breadcrumb: pure-CSS end ellipsis on the leading group instead of a measured middle collapse",
+        "rationale": "The issue gives overdeck › … › frame › as an example only; end ellipsis meets 'leading segments truncate first' with no layout code that happy-dom cannot test."
+      },
+      {
+        "summary": "Spend timeout uses the existing fetchWithTimeout (PAN-1705) with an exported SPEND_TIMEOUT_MS = 20_000; error wins over stale data",
+        "rationale": "Reuses the dashboard's one timeout helper; mirrors the Landed fact, whose isError check already wins over data."
+      },
+      {
+        "summary": "Action row: gap-2 -> gap-1.5 and px-3 -> px-2.5, with an inner-gap fallback gated on a live measurement",
+        "rationale": "The probe measured 1070 px needed vs 1048 px available; the two changes save about 40 px, and the issue lists tightening gaps or padding as the first option."
+      },
+      {
+        "summary": "Default model: keep the issue's module-load fix and add a non-empty guard to the re-derive",
+        "rationale": "The issue prescribes the module-load call, and it is the only placement that covers every store reader (useCreateConversation is used from ProjectHome too). The guard is a no-op in production but stops a failed import-time fetch in unit tests from resetting a model set in beforeEach."
+      },
+      {
+        "summary": "Screenshots go to the gitignored .tmp/pan-5370/ and measurements into the PR description; the test role captures its own UAT screenshots",
+        "rationale": "No committed-evidence convention exists for dashboard screenshots; project memory places UX artifacts in .tmp/, and roles/test.md owns UAT screenshots."
+      }
+    ],
+    "items": [
+      {
+        "id": "issues-header-fit",
+        "title": "Keep the Issues eyebrow, count and filter whole in the left column header",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T20:46:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5370",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
+            "src/dashboard/frontend/src/components/frame/IssuesFilterMenu.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+            "src/dashboard/frontend/src/components/frame/__tests__/IssuesSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/frame/__tests__/IssuesSection.test.tsx",
+            "grep -c frameHeaderChips src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "IssuesSection.test.tsx passes including the PAN-5370 test",
+            "grep prints 2",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-5370.md). In ProjectNode.tsx frame branch only: toggle button className min-w-0 -> shrink-0; wrap ProjectCiChip, ProjectDeployChip, ProjectIdentityChip in <span className={styles.frameHeaderChips} data-testid=\"issues-header-chips\">; headerActions wrapper gets shrink-0. IssuesFilterMenu trigger gets whitespace-nowrap. Append .frameHeaderChips and .frameHeaderChips > .projectIdentityChip rules (exact CSS in the PRD) after the .projectDeployChip block in command-deck.module.css. Do not edit the tree branch or the shared chip rules. Add the PAN-5370 test to IssuesSection.test.tsx as specified."
+        },
+        "items": [
+          {
+            "id": "issues-header-fit.ac1",
+            "title": "Given the frame header renders, when IssuesSection.test.tsx runs, then the issues-section-toggle button renders with class shrink-0 and without min-w-0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issues-header-fit.ac2",
+            "title": "Given the three chips render, then the issues-header-chips container renders them and does not render issues-section-toggle or issues-filter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issues-header-fit.ac3",
+            "title": "Given the filter menu renders, then issues-filter renders with class whitespace-nowrap and its actions wrapper (parentElement.parentElement) renders with class shrink-0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issues-header-fit.ac4",
+            "title": "grep -c frameHeaderChips on command-deck.module.css returns 2 and the diff preserves the tree-variant branch of ProjectNode.tsx and the .projectCiChip/.projectIdentityChip/.projectDeployChip rules unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "breadcrumb-file-name",
+        "title": "Keep the code pane breadcrumb's file name whole while leading segments truncate",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T20:46:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5370",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/code/CodePaneHeader.tsx",
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/CodePaneHeader.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/explorer/code/__tests__/CodePaneHeader.test.tsx src/components/explorer/code/__tests__/CodePane.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "CodePaneHeader.test.tsx and CodePane.test.tsx pass",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 / D-2. Split the breadcrumb into a leading group span (min-w-0 truncate, data-testid code-pane-breadcrumb-lead: root label and every segment but the last, separators with px-1 only BETWEEN them), a final separator span (shrink-0 px-1, data-testid code-pane-breadcrumb-sep, the › before the file name) and a file segment span (max-w-full shrink-0 truncate text-foreground, data-testid code-pane-breadcrumb-file). Outer span: flex min-w-0 items-center overflow-hidden text-xs text-muted-foreground, title={path}. No whitespace text nodes: textContent stays e.g. overdeck›docs›a.md. Add the PAN-5370 test."
+        },
+        "items": [
+          {
+            "id": "breadcrumb-file-name.ac1",
+            "title": "Given path src/dashboard/frontend/src/components/frame/LeftColumn.tsx, then code-pane-breadcrumb-file renders exactly LeftColumn.tsx with classes shrink-0, truncate and text-foreground",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "breadcrumb-file-name.ac2",
+            "title": "Given the same path, then code-pane-breadcrumb-lead renders with classes min-w-0 and truncate and text overdeck›src›dashboard›frontend›src›components›frame, without LeftColumn.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "breadcrumb-file-name.ac3",
+            "title": "Given the same path, then code-pane-breadcrumb-sep renders › with class shrink-0 outside the leading group; given path a.md the lead renders overdeck and the file segment renders a.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "breadcrumb-file-name.ac4",
+            "title": "The breadcrumb's title attribute returns the full path and the existing textContent assertions in CodePaneHeader.test.tsx and CodePane.test.tsx pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spend-timeout",
+        "title": "Give the Spend request a 20 s client timeout",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T20:46:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5370",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/HomePane/useHomeData.ts",
+            "src/dashboard/frontend/src/components/Stage/HomePane/__tests__/useHomeData.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/HomePane/__tests__/useHomeData.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "useHomeData.test.tsx passes with the three new tests",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Export SPEND_TIMEOUT_MS = 20_000 from useHomeData.ts; useProjectSpend's queryFn takes ({ signal }) and calls fetchWithTimeout(url, { signal, timeoutMs: SPEND_TIMEOUT_MS }) from lib/apiFetch. Leave useProjectChanges unchanged. In the test file, add the passthrough vi.mock of lib/apiFetch from the PRD and the three tests (timeoutMs recorded, TimeoutError -> isError, HTTP 503 -> isError). Never wait real time. NFR-2: the timeout path is proved by the mocked TimeoutError rejection, never by a real or fake-timer 20 s wait."
+        },
+        "items": [
+          {
+            "id": "spend-timeout.ac1",
+            "title": "Given useProjectSpend('PAN') loads, then fetchWithTimeout is called with timeoutMs 20000 and an AbortSignal signal, and SPEND_TIMEOUT_MS returns 20000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spend-timeout.ac2",
+            "title": "Given the cost summary fetch rejects with DOMException TimeoutError, then the hook returns isError true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spend-timeout.ac3",
+            "title": "Given the cost summary answers HTTP 503, then the hook returns isError true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spend-error-fact",
+        "title": "Show — / unavailable in the Spend fact when the spend read fails",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T20:46:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5370",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/HomePane/HomeFacts.tsx",
+            "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/HomeFacts.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/HomePane/HomeFacts.test.tsx src/components/Stage/ProjectHome.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "HomeFacts.test.tsx and ProjectHome.test.tsx pass",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add required prop spendError: boolean to HomeFactsProps; Spend value/sub/valueClass use the precedence no prefix -> error -> data -> loading (exact JSX in the PRD). ProjectHome passes spendError={spend.isError}. Add spendError={false} to renderFacts defaults and the PAN-5370 test."
+        },
+        "items": [
+          {
+            "id": "spend-error-fact.ac1",
+            "title": "Given spend null and spendError true, then the Spend fact renders value — and sub unavailable and the value lacks text-signal-cost-foreground",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spend-error-fact.ac2",
+            "title": "Given stale spend data {week 412, today 43} and spendError true, then the Spend fact renders — and unavailable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spend-error-fact.ac3",
+            "title": "Given spendUnavailable true and spendError true, then the sub renders needs an issue prefix; given spend null and no error, the value renders …",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spend-error-fact.ac4",
+            "title": "ProjectHome.tsx passes spendError={spend.isError} to HomeFacts and ProjectHome.test.tsx passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "home-actions-one-line",
+        "title": "Tighten the Home action row so More stays on the first line at 1920 px",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T20:46:52Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5370",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/HomePane/HomeActions.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/HomeActions.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/HomePane/HomeActions.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "HomeActions.test.tsx passes with the spacing test",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ],
+          "acJustification": "Two class-level ACs; the layout outcome is proved by live-layout-verification.ac1, which depends on this item."
+        },
+        "narrative": {
+          "Action": "PRD WI-5 / D-4. ACT_LAYOUT px-3 -> px-2.5; toolbar gap-2 -> gap-1.5; keep flex-wrap. Add the spacing test. The one-line layout itself is proved by live-layout-verification, which also owns the D-4 fallback edit."
+        },
+        "items": [
+          {
+            "id": "home-actions-one-line.ac1",
+            "title": "Given HomeActions renders, then the Project actions toolbar renders with classes flex-wrap and gap-1.5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-actions-one-line.ac2",
+            "title": "Given HomeActions renders, then the Terminal button renders with class px-2.5 and not px-3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "default-model-on-load",
+        "title": "Resolve the default conversation model at module load in newConversationDefaults",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T20:46:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5370",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/frame/deck/newConversationDefaults.ts",
+            "src/dashboard/frontend/src/components/frame/deck/__tests__/newConversationDefaults.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/frame/deck/__tests__/newConversationDefaults.test.tsx src/components/frame/__tests__/NewConversationButton.test.tsx src/components/frame/deck/__tests__/useCreateConversation.test.tsx src/components/frame/__tests__/LeftColumn.test.tsx src/components/Stage/ProjectHome.test.tsx src/components/CommandDeck/CommandDeck.test.tsx src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx src/App/AppChrome.test.tsx src/App.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "all nine test files pass with no unexpected-request or unhandled-rejection errors",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 / D-5. Append the module-load ensureDefaultConversationModel().then(rederive) block (with the `restored &&` non-empty guard) after onKnownModelsSync in newConversationDefaults.ts. Create the new test file with the vi.hoisted fetch stub recipe from the PRD (no resetModules). Add it to scripts/frontend-test-subset.txt between deckNavigation.test.tsx and useCreateConversation.test.tsx. Checkpoint: run the eight closure test files; on failure apply the PRD's vi.mock fallback to that file."
+        },
+        "items": [
+          {
+            "id": "default-model-on-load.ac1",
+            "title": "Given /api/settings answers default_conversation_model claude-opus-5-5 and no stored pick, when newConversationDefaults loads, then the store's model becomes claude-opus-5-5 without any picker mounting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "default-model-on-load.ac2",
+            "title": "Given that store state, NewConversationButton's new-conversation-summary renders Opus 5.5 and does not render model pending",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "default-model-on-load.ac3",
+            "title": "The module-load block in newConversationDefaults.ts applies the re-derived model only when it is non-empty and differs from the store's current model (restored && restored !== current), read from the diff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "default-model-on-load.ac4",
+            "title": "scripts/frontend-test-subset.txt contains src/components/frame/deck/__tests__/newConversationDefaults.test.tsx in sorted position and the eight existing importer test files pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-changelog",
+        "title": "Document the five fixes in DASHBOARD-ARCHITECTURE.md and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T20:46:52Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5370",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "changelog.d/pan-5370.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c SPEND_TIMEOUT_MS docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep prints at least 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Add the five PAN-5370 sentences to docs/DASHBOARD-ARCHITECTURE.md at the five anchors named in the PRD (left column item 5 Issues, item 3 New conversation, the newConversationDefaults.ts table row, the Spend data-source bullet, the code pane header paragraph). Create changelog.d/pan-5370.md with the #### Fixed entry from the PRD."
+        },
+        "items": [
+          {
+            "id": "docs-and-changelog.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md's Spend data-source bullet states the read gives up after 20 s (SPEND_TIMEOUT_MS) and shows — / unavailable on error or timeout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md's Issues item contains the sentence that the chips give way first with the identity chip ending in an ellipsis, and its New conversation item contains the sentence that the default model is requested once at load",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac3",
+            "title": "The code pane header paragraph contains the sentence that the file name never truncates before the leading folders and that the full path shows as the tooltip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac4",
+            "title": "changelog.d/pan-5370.md exists with one #### Fixed bullet linking #5370 and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-layout-verification",
+        "title": "Measure the Issues header, breadcrumb and action row live at 1920 x 1000",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-15T20:46:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5370",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".tmp/pan-5370/probe.mjs",
+            "src/dashboard/frontend/src/components/Stage/HomePane/HomeActions.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vite --port 3010 --strictPort (background; port 3010 is a trusted origin)",
+            "node .tmp/pan-5370/probe.mjs"
+          ],
+          "expected_outputs": [
+            "probe prints one distinct toolbar top, unclipped toggle/filter, unclipped LeftColumn.tsx file segment with a non-zero-width separator before it",
+            "home-actions.png, issues-header.png, breadcrumb.png exist in .tmp/pan-5370/",
+            "an Item: live-layout-verification commit carrying the measurements is pushed"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 (follow its six steps exactly; the recipe was run end to end in planning). Serve the branch frontend with `npx vite --port 3010 --strictPort` from src/dashboard/frontend (3010 is on the server's trusted-origin list; other ports leave the WebSocket refused), open http://localhost:3010/command-deck/overdeck in a fresh isolated Playwright context at 1920 x 1000 dark, measure the toolbar tops/headroom and the frame header, then open a conversation (first conversation-meta-line), press Control+Shift+E and walk the virtualized file tree with the PRD's clickTree helper to src/dashboard/frontend/src/components/frame/LeftColumn.tsx and measure the breadcrumb. If the toolbar wraps or headroom < 16 px, apply D-4's fallback in HomeActions.tsx (ACT_LAYOUT inner gap-2 -> gap-1.5) with trailer `Item: live-layout-verification` and re-measure. Save PNGs and measurements in .tmp/pan-5370/, paste measurements into the PR description, stop Vite, and record the item with `git commit --allow-empty` (measurements in the body, trailer `Item: live-layout-verification`), then push. If port 3010 is busy, do not stop the other process: note it in the PR and still make the empty commit."
+        },
+        "items": [
+          {
+            "id": "live-layout-verification.ac1",
+            "title": "Given the Home of project overdeck at 1920 x 1000 with the dock closed, then every Project actions toolbar child returns one distinct top value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-layout-verification.ac2",
+            "title": "Given the left column at its default width, then issues-section-toggle's width returns at least its scrollWidth and issues-filter renders on one line (height <= 24 px) inside the header's right edge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-layout-verification.ac3",
+            "title": "Given LeftColumn.tsx open in a code pane beside a conversation, then code-pane-breadcrumb-file renders LeftColumn.tsx with scrollWidth <= clientWidth + 1 and code-pane-breadcrumb-sep renders with non-zero width",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-layout-verification.ac4",
+            "title": "The three screenshots are saved under .tmp/pan-5370/ and a pushed commit with trailer Item: live-layout-verification records the measurements",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "issues-header-fit",
+        "to": "live-layout-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "breadcrumb-file-name",
+        "to": "live-layout-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "home-actions-one-line",
+        "to": "live-layout-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "default-model-on-load",
+        "to": "docs-and-changelog",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-15-PAN-5370-workflow-redesign-live-check-fixes-issues-header-overlap-breadcrumb-clips-file-name-spend-never-times-out-more-wraps-model-pending-off-deck.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

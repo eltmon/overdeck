@@ -184,6 +184,7 @@ export function ProjectHome({
             changes={changes}
             spend={spend.data ?? null}
             spendUnavailable={!prefix}
+            spendError={spend.isError}
             onAgents={() => navigate('/agents', 'agents')}
             onNeedsYou={() => needsYouRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
             onInReview={() => inReviewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}

@@ -2,10 +2,12 @@
  * PAN-5294 G-D13 — the two server reads behind the project Home. One changes
  * query (7 days of first-parent commits on the default branch) feeds the
  * Landed fact, the metadata line's branch and Recent changes; the spend
- * query feeds the Spend fact. Neither polls faster than 60 s (NFR-1).
+ * query feeds the Spend fact. Neither polls faster than 60 s (NFR-1). The
+ * spend read gives up after 20 s (PAN-5370).
  */
 import { useQuery } from '@tanstack/react-query'
 import type { ProjectChanges } from '@overdeck/contracts'
+import { fetchWithTimeout } from '../../../lib/apiFetch'
 
 interface CostSummary {
   today?: { totalCost?: number }
@@ -34,11 +36,14 @@ export function useProjectChanges(projectKey?: string) {
   })
 }
 
+/** PAN-5370: the Spend fact gives up after this long and shows "unavailable". */
+export const SPEND_TIMEOUT_MS = 20_000
+
 export function useProjectSpend(prefix?: string | null) {
   return useQuery({
     queryKey: ['project-recent-spend', prefix],
-    queryFn: async (): Promise<CostSummary> => {
-      const res = await fetch(`/api/costs/summary?project=${encodeURIComponent(prefix!)}`)
+    queryFn: async ({ signal }): Promise<CostSummary> => {
+      const res = await fetchWithTimeout(`/api/costs/summary?project=${encodeURIComponent(prefix!)}`, { signal, timeoutMs: SPEND_TIMEOUT_MS })
       if (!res.ok) throw new Error('Failed to fetch project spend')
       return res.json()
     },

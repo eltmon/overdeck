@@ -36,6 +36,35 @@ describe('CodePaneHeader', () => {
     expect(screen.getByText('docs').className).not.toContain('text-foreground')
   })
 
+  it('keeps the file name whole and lets the leading segments truncate (PAN-5370)', () => {
+    renderHeader({ rootLabel: 'overdeck', path: 'src/dashboard/frontend/src/components/frame/LeftColumn.tsx' })
+    const file = screen.getByTestId('code-pane-breadcrumb-file')
+    expect(file.textContent).toBe('LeftColumn.tsx')
+    expect(file.className).toContain('shrink-0')
+    expect(file.className).toContain('truncate')
+    expect(file.className).toContain('text-foreground')
+
+    const lead = screen.getByTestId('code-pane-breadcrumb-lead')
+    expect(lead.className).toContain('min-w-0')
+    expect(lead.className).toContain('truncate')
+    expect(lead.textContent).toBe('overdeck›src›dashboard›frontend›src›components›frame')
+    expect(lead.textContent).not.toContain('LeftColumn.tsx')
+
+    const sep = screen.getByTestId('code-pane-breadcrumb-sep')
+    expect(sep.textContent).toBe('›')
+    expect(sep.className).toContain('shrink-0')
+    expect(within(lead).queryByTestId('code-pane-breadcrumb-sep')).not.toBeInTheDocument()
+
+    expect(screen.getByTestId('code-pane-breadcrumb').getAttribute('title')).toBe('src/dashboard/frontend/src/components/frame/LeftColumn.tsx')
+  })
+
+  it('keeps a single-segment file name whole (PAN-5370)', () => {
+    renderHeader({ rootLabel: 'overdeck', path: 'a.md' })
+    expect(screen.getByTestId('code-pane-breadcrumb-lead').textContent).toBe('overdeck')
+    expect(screen.getByTestId('code-pane-breadcrumb-sep').textContent).toBe('›')
+    expect(screen.getByTestId('code-pane-breadcrumb-file').textContent).toBe('a.md')
+  })
+
   it('shows Edit / Preview tabs for a markdown file', () => {
     const props = renderHeader()
     expect(screen.getByRole('tab', { name: 'Edit' }).getAttribute('aria-selected')).toBe('true')
