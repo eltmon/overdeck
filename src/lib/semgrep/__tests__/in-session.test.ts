@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   SEMGREP_MCP_DISABLED_TOOLS_ENV,
   isSemgrepMcpRole,
+  mergeClaudeHookMaps,
+  resolveSemgrepLaunchSettings,
   resolveSemgrepMcpServer,
   semgrepInSessionEnv,
   type SemgrepInSessionDeps,
@@ -144,5 +146,116 @@ describe('resolveSemgrepMcpServer (PAN-4591 WI-2)', () => {
       SEMGREP_MCP_DISABLE_TRACING: 'true',
       ...SEMGREP_MCP_DISABLED_TOOLS_ENV,
     });
+  });
+});
+
+describe('resolveSemgrepLaunchSettings (PAN-4591 WI-5)', () => {
+  const EDIT_HOOK_CFG = { enabled: true, edit_hook: true };
+
+  it('returns a PostToolUse hook for an eligible claude-code launch', async () => {
+    const settings = await resolveSemgrepLaunchSettings(
+      { harness: 'claude-code' },
+      { loadSemgrepConfig: async () => EDIT_HOOK_CFG, home: '/h', platform: 'linux' },
+    );
+    expect(settings.hideSkill).toBe(false);
+    expect(settings.claudeHooks).not.toBeNull();
+    const hooks = settings.claudeHooks!.PostToolUse as Array<{ matcher: string; hooks: Array<{ command: string; timeout: number }> }>;
+    expect(hooks[0]!.matcher).toBe('Edit|Write|MultiEdit');
+    expect(hooks[0]!.hooks[0]!.command).toContain('semgrep-edit-hook');
+    expect(hooks[0]!.hooks[0]!.timeout).toBe(40);
+  });
+
+  it('hides the skill and adds no hook when disabled', async () => {
+    const settings = await resolveSemgrepLaunchSettings({ harness: 'claude-code' }, { loadSemgrepConfig: async () => undefined });
+    expect(settings).toEqual({ hideSkill: true, claudeHooks: null });
+  });
+
+  it('returns claudeHooks null for codex', async () => {
+    const settings = await resolveSemgrepLaunchSettings({ harness: 'codex' }, { loadSemgrepConfig: async () => EDIT_HOOK_CFG });
+    expect(settings.claudeHooks).toBeNull();
+  });
+
+  it('returns claudeHooks null for a conversation launch', async () => {
+    const settings = await resolveSemgrepLaunchSettings(
+      { harness: 'claude-code', conversation: 'conv-1' },
+      { loadSemgrepConfig: async () => EDIT_HOOK_CFG },
+    );
+    expect(settings.claudeHooks).toBeNull();
+  });
+
+  it('returns claudeHooks null when edit_hook is false', async () => {
+    const settings = await resolveSemgrepLaunchSettings(
+      { harness: 'claude-code' },
+      { loadSemgrepConfig: async () => ({ enabled: true, edit_hook: false }) },
+    );
+    expect(settings.claudeHooks).toBeNull();
+  });
+
+  it('returns claudeHooks null when enabled is false', async () => {
+    const settings = await resolveSemgrepLaunchSettings(
+      { harness: 'claude-code' },
+      { loadSemgrepConfig: async () => ({ enabled: false, edit_hook: true }) },
+    );
+    expect(settings.claudeHooks).toBeNull();
+  });
+
+  it('returns claudeHooks null on win32', async () => {
+    const settings = await resolveSemgrepLaunchSettings(
+      { harness: 'claude-code' },
+      { loadSemgrepConfig: async () => EDIT_HOOK_CFG, platform: 'win32' },
+    );
+    expect(settings.claudeHooks).toBeNull();
+  });
+
+  it('returns claudeHooks null with OVERDECK_DOCKER_WORKSPACE=1', async () => {
+    const previous = process.env.OVERDECK_DOCKER_WORKSPACE;
+    process.env.OVERDECK_DOCKER_WORKSPACE = '1';
+    try {
+      const settings = await resolveSemgrepLaunchSettings({ harness: 'claude-code' }, { loadSemgrepConfig: async () => EDIT_HOOK_CFG });
+      expect(settings.claudeHooks).toBeNull();
+    } finally {
+      if (previous === undefined) delete process.env.OVERDECK_DOCKER_WORKSPACE;
+      else process.env.OVERDECK_DOCKER_WORKSPACE = previous;
+    }
+  });
+
+  it('returns claudeHooks null with PAN_DOCKER=1', async () => {
+    const previous = process.env.PAN_DOCKER;
+    process.env.PAN_DOCKER = '1';
+    try {
+      const settings = await resolveSemgrepLaunchSettings({ harness: 'claude-code' }, { loadSemgrepConfig: async () => EDIT_HOOK_CFG });
+      expect(settings.claudeHooks).toBeNull();
+    } finally {
+      if (previous === undefined) delete process.env.PAN_DOCKER;
+      else process.env.PAN_DOCKER = previous;
+    }
+  });
+
+  it('returns { hideSkill: true, claudeHooks: null } with one warning when config loading throws', async () => {
+    const warnings: string[] = [];
+    const settings = await resolveSemgrepLaunchSettings(
+      { harness: 'claude-code' },
+      { loadSemgrepConfig: async () => { throw new Error('boom'); }, warn: (line) => warnings.push(line) },
+    );
+    expect(settings).toEqual({ hideSkill: true, claudeHooks: null });
+    expect(warnings).toHaveLength(1);
+  });
+});
+
+describe('mergeClaudeHookMaps (PAN-4591 WI-5)', () => {
+  it('returns a unchanged when b is null', () => {
+    const a = { PostToolUse: [{ id: 1 }] };
+    expect(mergeClaudeHookMaps(a, null)).toBe(a);
+  });
+
+  it('returns b when a is undefined', () => {
+    const b = { PostToolUse: [{ id: 2 }] };
+    expect(mergeClaudeHookMaps(undefined, b)).toBe(b);
+  });
+
+  it('concatenates event arrays with a first', () => {
+    const a = { PostToolUse: [{ id: 'sageox' }] };
+    const b = { PostToolUse: [{ id: 'semgrep' }] };
+    expect(mergeClaudeHookMaps(a, b)).toEqual({ PostToolUse: [{ id: 'sageox' }, { id: 'semgrep' }] });
   });
 });

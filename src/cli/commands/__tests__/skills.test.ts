@@ -63,6 +63,7 @@ const mocks = vi.hoisted(() => {
     listSageoxUploads: vi.fn(),
     setSageoxUpload: vi.fn(),
     readSageoxLinkState: vi.fn(),
+    resolveSemgrepLaunchSettings: vi.fn(),
   };
 });
 
@@ -88,6 +89,11 @@ vi.mock('../../../lib/sageox/config.js', () => ({
 }));
 
 vi.mock('../../../lib/sageox/binding.js', () => ({ readSageoxLinkState: mocks.readSageoxLinkState }));
+
+vi.mock('../../../lib/semgrep/in-session.js', () => ({
+  resolveSemgrepLaunchSettings: mocks.resolveSemgrepLaunchSettings,
+  mergeClaudeHookMaps: (a: unknown, b: unknown) => (b ? { ...(a as object), ...(b as object) } : a),
+}));
 
 vi.mock('../../../lib/skill-packs/sources.js', () => ({
   PackSourceError: mocks.PackSourceError,
@@ -171,6 +177,7 @@ beforeEach(() => {
   mocks.applyDeftForLaunch.mockResolvedValue({ hideSkills: [], deny: [], provenance: '', warnings: [] });
   mocks.launchMountsDeft.mockResolvedValue(false);
   mocks.resolveSageoxLaunch.mockResolvedValue({ active: false, warnings: [] });
+  mocks.resolveSemgrepLaunchSettings.mockResolvedValue({ hideSkill: true, claudeHooks: null });
 });
 
 afterEach(() => {
