@@ -93,11 +93,6 @@ async function drive(done: () => boolean): Promise<void> {
   while (!done() && nativeNow() < deadline) await turn()
 }
 
-/** PAN-5459 transition only: work item 7 deletes this once no fixed drive remains. */
-async function driveTurns(turns: number): Promise<void> {
-  for (let index = 0; index < turns; index++) await turn()
-}
-
 async function driveUntil(done: () => boolean): Promise<void> {
   await drive(done)
   expect(done(), `condition not met within ${DRIVE_BUDGET_MS} ms of real time`).toBe(true)
