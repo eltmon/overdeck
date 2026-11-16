@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5343",
   "created": "2026-11-16T00:09:01.559Z",
-  "updated": "2026-11-16T00:23:26.042Z",
+  "updated": "2026-11-16T00:23:31.438Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,11 @@
     "deck-openers.ac5": {
       "status": "completed",
       "doneAt": "2026-11-16T00:23:26.042Z"
+    },
+    "switcher-door": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:23:31.438Z"
     }
   }
 }
