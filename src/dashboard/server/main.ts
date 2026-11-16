@@ -219,6 +219,7 @@ try {
 await bootConversationEnvironmentOrWarn();
 
 if (!isPeerDashboardProcess()) (await import('./services/backend-restart-recovery.js')).startBackendRestartRecovery(); // PAN-5091: before the read model starts the inventory
+if (!isPeerDashboardProcess()) await (await import('./services/shutdown/boot.js')).startShutdownServices(); // PAN-5342
 // Bind the HTTP socket before starting any background service or the Deacon.
 // A bind failure is retried by server.ts and then terminates this process through
 // Effect's Node runtime; no headless orchestrator is allowed to survive it.
