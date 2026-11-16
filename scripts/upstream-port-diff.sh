@@ -11,6 +11,9 @@
 #                            path since its recorded commit (no filter = both);
 #                            --patch also prints the diff
 #
+# A .css port carries its header as /* ... */ (PAN-5188); a .py port carries
+# it as # ... (PAN-5452), since neither comment form uses //.
+#
 # Environment: UPSTREAM_PORTS_FILE (default scripts/upstream-ports.json),
 # UPSTREAM_PORTS_ROOT (default the repo root; `local` paths resolve against it),
 # ORCA_REPO (default ~/Projects/orca), T3CODE_REPO (default ~/Projects/t3code),
@@ -98,6 +101,11 @@ check() {
     if [[ "$local_path" == *.css ]]; then
       header="/* ${header#// } */"
       origin_line="/* upstream: $path @ $commit */"
+    fi
+    # Python has no // comments: a .py port carries the same two lines as # ... (PAN-5452).
+    if [[ "$local_path" == *.py ]]; then
+      header="# ${header#// }"
+      origin_line="# upstream: $path @ $commit"
     fi
     head10="$(head -n 10 "$file")"
     if ! grep -qxF -- "$header" <<<"$head10"; then

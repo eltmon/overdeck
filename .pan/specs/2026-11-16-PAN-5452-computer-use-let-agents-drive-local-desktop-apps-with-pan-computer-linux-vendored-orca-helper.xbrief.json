@@ -4,17 +4,17 @@
     "created": "2026-11-16T18:26:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5452: Computer use: let agents drive local desktop apps with `pan computer` (Linux, vendored Orca helper)",
-    "updated": "2026-11-16T18:33:01.242Z"
+    "updated": "2026-11-16T18:34:17.624Z"
   },
   "plan": {
     "id": "pan-5452",
     "title": "Computer use: let agents drive local desktop apps with `pan computer` (Linux, vendored Orca helper)",
-    "status": "proposed",
+    "status": "running",
     "uid": "3d23ff06-3e85-4a47-b078-851a2c7a3908",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-16T18:26:00Z",
-    "updated": "2026-11-16T18:33:01.242Z",
+    "updated": "2026-11-16T18:34:17.624Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5452",
@@ -1629,5 +1629,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }

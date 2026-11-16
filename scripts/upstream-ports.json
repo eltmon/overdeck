@@ -502,5 +502,11 @@
     "upstream": "orca",
     "path": "src/renderer/src/components/right-sidebar/file-explorer/mutations/file-explorer-drag-edge-scroll.ts",
     "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-linux/runtime.py",
+    "upstream": "orca",
+    "path": "native/computer-use-linux/runtime.py",
+    "commit": "c6b9ac9549b"
   }
 ]
