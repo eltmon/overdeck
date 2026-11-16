@@ -1,10 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T18:00:16.172274Z · model: claude-opus-5-5 · open: 893_
+_Last sequenced: 2026-11-16T18:30:34.320516Z · model: claude-opus-5-5 · open: 894_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
+| 1 | PAN-5452 | L | medium | ok |  |  | In pipeline (planning, live workspace): opt-in `pan computer` verb + skill to drive Linux desktop apps via vendored Orca AT-SPI helper. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
@@ -901,6 +902,10 @@ _Last sequenced: 2026-11-16T18:00:16.172274Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
+### PAN-5452 (rank 1)
+
+New issue that entered the pipeline before this pass: it has a PRD at .pan/drafts/pan-5452.md and a live workspace, so it is pinned at the vacant rank 1 instead of being ranked against the backlog. On its own merits it is a self-contained, opt-in feature (medium importance), not substrate work.
+
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
@@ -1217,10 +1222,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
 
 Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
 
-### PAN-3106 (rank 87)
-
-New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1228,11 +1229,24 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T18:00:16.172274Z",
+  "generatedAt": "2026-11-16T18:30:34.320516Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 893,
+  "openCount": 894,
   "nodes": [
+    {
+      "issue": "PAN-5452",
+      "rank": 1,
+      "size": "L",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline (planning, live workspace): opt-in `pan computer` verb + skill to drive Linux desktop apps via vendored Orca AT-SPI helper.",
+      "rationale": "New issue that entered the pipeline before this pass: it has a PRD at .pan/drafts/pan-5452.md and a live workspace, so it is pinned at the vacant rank 1 instead of being ranked against the backlog. On its own merits it is a self-contained, opt-in feature (medium importance), not substrate work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
     {
       "issue": "PAN-5013",
       "rank": 3,
