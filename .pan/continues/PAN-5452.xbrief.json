@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5452",
   "created": "2026-11-16T18:34:39.411Z",
-  "updated": "2026-11-16T19:53:20.252Z",
+  "updated": "2026-11-16T19:53:31.117Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -314,6 +314,11 @@
     "wait-command.ac5": {
       "status": "completed",
       "doneAt": "2026-11-16T19:53:20.251Z"
+    },
+    "doctor-row": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T19:53:31.117Z"
     }
   }
 }
