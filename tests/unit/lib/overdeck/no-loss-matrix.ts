@@ -681,6 +681,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/projects/:projectKey/rename',               kind: 'http', disposition: 'WRITE',       door: 'Project registry rename write door (renameProject)' },
   { surface: 'GET /api/projects/:projectKey/merge-train',           kind: 'http', disposition: 'READ',        door: 'ConfigResolver.getProject (merge_train override + effective state, PAN-1696)' },
   { surface: 'POST /api/projects/:projectKey/merge-train',          kind: 'http', disposition: 'WRITE',       door: 'Project config writer sets the per-project merge-train override (setProjectMergeTrain, PAN-1696)' },
+  { surface: 'GET /api/projects/:projectKey/sast',                  kind: 'http', disposition: 'READ',        door: 'ConfigResolver.getProject (verification.sast override + effective sast mode, PAN-4594)' },
+  { surface: 'POST /api/projects/:projectKey/sast',                 kind: 'http', disposition: 'WRITE',       door: 'Project config writer sets verification.sast (setProjectSastOverride, PAN-4594)' },
   { surface: 'GET /api/projects/:projectKey/version-sync',          kind: 'http', disposition: 'AGGREGATE',   door: 'Project config resolver plus durable per-issue ship records for the latest project outcome' },
   { surface: 'PUT /api/projects/:projectKey/version-sync',          kind: 'http', disposition: 'WRITE',       door: 'Lossless project version_sync write door (setProjectVersionSync)' },
 

@@ -4,15 +4,30 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-const { mockReadSemgrepSettings, mockSaveSemgrepSettings } = vi.hoisted(() => ({
+const { mockReadSemgrepSettings, mockSaveSemgrepSettings, mockGetProject, mockSetProjectSastOverride, mockLoadConfigNoMigration } = vi.hoisted(() => ({
   mockReadSemgrepSettings: vi.fn(),
   mockSaveSemgrepSettings: vi.fn(),
+  mockGetProject: vi.fn(),
+  mockSetProjectSastOverride: vi.fn(),
+  mockLoadConfigNoMigration: vi.fn(),
 }));
 
 vi.mock('../../../../lib/semgrep/settings.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../lib/semgrep/settings.js')>()),
   readSemgrepSettings: mockReadSemgrepSettings,
   saveSemgrepSettings: mockSaveSemgrepSettings,
+}));
+vi.mock('../../../../lib/projects.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/projects.js')>()),
+  getProject: mockGetProject,
+}));
+vi.mock('../../../../lib/semgrep/project-override.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/semgrep/project-override.js')>()),
+  setProjectSastOverride: mockSetProjectSastOverride,
+}));
+vi.mock('../../../../lib/config-yaml/load.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/config-yaml/load.js')>()),
+  loadConfigNoMigration: mockLoadConfigNoMigration,
 }));
 
 import { semgrepRouteLayer } from '../semgrep.js';
@@ -24,10 +39,15 @@ import { getOverdeckHome } from '../../../../lib/paths.js';
 
 const AUTHED = { [INTERNAL_TOKEN_HEADER]: 'test-token' };
 
-async function callRoute(method: string, body?: unknown, headers: Record<string, string> = AUTHED) {
+async function callRoute(
+  method: string,
+  body?: unknown,
+  headers: Record<string, string> = AUTHED,
+  path = '/api/semgrep/settings',
+) {
   const init: RequestInit = { method, headers: { 'Content-Type': 'application/json', ...headers } };
   if (body !== undefined) init.body = JSON.stringify(body);
-  const request = HttpServerRequest.fromWeb(new Request('http://localhost/api/semgrep/settings', init));
+  const request = HttpServerRequest.fromWeb(new Request(`http://localhost${path}`, init));
   const response = await Effect.runPromise(
     Effect.scoped(
       Effect.flatMap(HttpRouter.toHttpEffect(semgrepRouteLayer), (app) =>
@@ -104,5 +124,59 @@ describe('PUT /api/semgrep/settings', () => {
     const res = await callRoute('PUT', { enabled: true });
     expect(res).toEqual({ status: 200, body: VIEW });
     expect(mockSaveSemgrepSettings).toHaveBeenCalledWith({ enabled: true });
+  });
+});
+
+const PROJECT = { name: 'overdeck', path: '/repo' };
+const SEMGREP_CONFIG = { enabled: true, mcp: false, edit_hook: false, gate: 'advisory' as const, severity: 'ERROR' as const, configs: ['p/default'], timeout_seconds: 300 };
+
+async function callProjectSast(method: string, body?: unknown, headers?: Record<string, string>) {
+  return callRoute(method, body, headers, '/api/projects/overdeck/sast');
+}
+
+describe('GET /api/projects/:projectKey/sast', () => {
+  it('404s an unknown project', async () => {
+    mockGetProject.mockReturnValue(Effect.succeed(null));
+    const res = await callProjectSast('GET');
+    expect(res).toEqual({ status: 404, body: { error: 'Project not found' } });
+  });
+
+  it('returns value, effective and reason', async () => {
+    mockGetProject.mockReturnValue(Effect.succeed({ ...PROJECT, verification: { sast: 'blocking' as const } }));
+    mockLoadConfigNoMigration.mockResolvedValue({ config: { security: { semgrep: SEMGREP_CONFIG } } });
+    const res = await callProjectSast('GET');
+    expect(res).toEqual({
+      status: 200,
+      body: { value: 'blocking', effective: 'blocking', reason: 'verification.sast: blocking in projects.yaml', semgrepEnabled: true },
+    });
+  });
+});
+
+describe('POST /api/projects/:projectKey/sast', () => {
+  beforeEach(() => {
+    mockGetProject.mockReturnValue(Effect.succeed(PROJECT));
+    mockLoadConfigNoMigration.mockResolvedValue({ config: { security: { semgrep: SEMGREP_CONFIG } } });
+  });
+
+  it('rejects an invalid value with 400', async () => {
+    const res = await callProjectSast('POST', { value: 'strict' });
+    expect(res).toEqual({ status: 400, body: { error: "value must be 'off', 'advisory', 'blocking', or null" } });
+    expect(mockSetProjectSastOverride).not.toHaveBeenCalled();
+  });
+
+  it('calls the setter with null and returns the view', async () => {
+    mockSetProjectSastOverride.mockResolvedValue(undefined);
+    const res = await callProjectSast('POST', { value: null });
+    expect(mockSetProjectSastOverride).toHaveBeenCalledWith('overdeck', null);
+    expect(res).toEqual({
+      status: 200,
+      body: { value: null, effective: 'advisory', reason: 'security.semgrep.gate: advisory', semgrepEnabled: true },
+    });
+  });
+
+  it('is refused without credentials', async () => {
+    const res = await callProjectSast('POST', { value: 'blocking' }, {});
+    expect(res.status).toBe(401);
+    expect(mockSetProjectSastOverride).not.toHaveBeenCalled();
   });
 });
