@@ -103,3 +103,28 @@ describe('Stage Layout bar (PAN-5343 H-D7)', () => {
     expect(screen.queryByTestId('layout-preset-bar')).not.toBeInTheDocument()
   })
 })
+
+describe('Stage make-only button (PAN-5343 H-D19)', () => {
+  it('collapses a 2-leaf layout to the chosen pane and keeps the other tab', () => {
+    localStorage.setItem('pan-panes:overdeck', JSON.stringify([
+      { paneId: 'home', paneType: 'home', label: 'Home', createdAt: 1, isPermanent: true },
+      agent('a'),
+      agent('b'),
+    ]))
+    localStorage.setItem('pan-active-pane:overdeck', 'a')
+    localStorage.setItem('pan-layout:overdeck', JSON.stringify(presetLayout(['a', 'b'], 2)))
+    renderStage('overdeck')
+    const buttons = screen.getAllByRole('button', { name: 'Make this the only pane' })
+    expect(buttons).toHaveLength(2)
+    fireEvent.click(buttons[1]!)
+    expect(localStorage.getItem('pan-layout:overdeck')).toBeNull()
+    expect(usePanesStore.getState().activePaneByWorkspace.overdeck).toBe('b')
+    expect(screen.queryByRole('button', { name: 'Make this the only pane' })).not.toBeInTheDocument()
+    // Both agent tabs stay in the strip; the second (pane b) is the selected one.
+    const agentTabs = screen.getAllByRole('tab').filter((t) => t.getAttribute('data-tab-type') === 'agent')
+    expect(agentTabs).toHaveLength(2)
+    expect(agentTabs[1]).toHaveAttribute('aria-selected', 'true')
+    expect(agentTabs[0]).toHaveAttribute('aria-selected', 'false')
+  })
+})
+

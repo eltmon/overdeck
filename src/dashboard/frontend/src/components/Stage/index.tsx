@@ -655,6 +655,15 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
     [layout, activeId, deckKey, setActivePane, setLayout],
   )
 
+  // PAN-5343 H-D19: the split header's ⤢ — show only this pane; the others stay as tabs.
+  const makeOnlyPane = useCallback(
+    (paneId: string) => {
+      setLayout(null)
+      setActivePane(deckKey, paneId)
+    },
+    [deckKey, setActivePane, setLayout],
+  )
+
   const onRatioChange = useCallback(
     (path: SplitPath, ratio: number) => {
       setLayout(layout ? updateRatio(layout, path, ratio) : null)
@@ -762,6 +771,7 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
                 onCloseLeaf={closeLeaf}
                 onRatioChange={onRatioChange}
                 onDropTab={onDropTab}
+                onMakeOnly={makeOnlyPane}
               />
             )}
           </div>

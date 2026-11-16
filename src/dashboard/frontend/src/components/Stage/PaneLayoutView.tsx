@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react'
-import { X } from 'lucide-react'
+import { Maximize2, X } from 'lucide-react'
 import type { WorkspacePane } from '../../lib/panesStore'
 import type { PaneLayout, SplitPath } from '../../lib/paneLayout'
 import styles from './stage.module.css'
@@ -24,6 +24,8 @@ export interface PaneLayoutViewProps {
   onCloseLeaf: (paneId: string) => void
   onRatioChange: (path: SplitPath, ratio: number) => void
   onDropTab: (targetPaneId: string, draggedPaneId: string, zone: DropZone) => void
+  /** PAN-5343 H-D19: the split header's ⤢ button — show only this pane; the others stay as tabs. */
+  onMakeOnly?: (paneId: string) => void
 }
 
 /** Pick the drop zone from the pointer position within a region. */
@@ -62,7 +64,7 @@ function zoneStyle(zone: DropZone): React.CSSProperties {
  * is being dragged, each leaf shows edge drop zones for split-by-drag.
  */
 export function PaneLayoutView(props: PaneLayoutViewProps) {
-  const { node, path, panesById, renderPaneContent, focusedPaneId, showHeaders, draggingPaneId, onFocus, onCloseLeaf, onRatioChange, onDropTab } = props
+  const { node, path, panesById, renderPaneContent, focusedPaneId, showHeaders, draggingPaneId, onFocus, onCloseLeaf, onRatioChange, onDropTab, onMakeOnly } = props
   const containerRef = useRef<HTMLDivElement>(null)
   const [hoverZone, setHoverZone] = useState<DropZone | null>(null)
 
@@ -106,6 +108,17 @@ export function PaneLayoutView(props: PaneLayoutViewProps) {
         {showHeaders && (
           <div className={`${styles.splitHeader} ${focused ? styles.splitHeaderFocused : ''}`}>
             <span className={styles.splitHeaderLabel}>{pane?.label ?? 'Pane'}</span>
+            {onMakeOnly && (
+              <button
+                type="button"
+                className={styles.splitHeaderClose}
+                onClick={(e) => { e.stopPropagation(); onMakeOnly(paneId) }}
+                title="Make this the only pane"
+                aria-label="Make this the only pane"
+              >
+                <Maximize2 size={13} />
+              </button>
+            )}
             <button
               type="button"
               className={styles.splitHeaderClose}
