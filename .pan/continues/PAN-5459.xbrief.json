@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5459",
   "created": "2026-11-16T23:02:28.883Z",
-  "updated": "2026-11-16T23:11:52.363Z",
+  "updated": "2026-11-16T23:12:42.529Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,9 +90,22 @@
       "doneAt": "2026-11-16T23:11:42.565Z"
     },
     "legacy-grace-wait": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5459",
-      "claimedAt": "2026-11-16T23:11:52.363Z"
+      "claimedAt": "2026-11-16T23:11:52.363Z",
+      "doneAt": "2026-11-16T23:12:42.528Z"
+    },
+    "legacy-grace-wait.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:12:42.528Z"
+    },
+    "legacy-grace-wait.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:12:42.528Z"
+    },
+    "legacy-grace-wait.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T23:12:42.528Z"
     }
   }
 }
