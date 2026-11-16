@@ -310,6 +310,100 @@ function VersionShipSettings({ projectKey }: { projectKey: string }) {
   );
 }
 
+interface ProjectSastView {
+  value: 'off' | 'advisory' | 'blocking' | null;
+  effective: 'off' | 'advisory' | 'blocking';
+  reason: string;
+  semgrepEnabled: boolean;
+}
+
+/**
+ * PAN-4594: per-project Semgrep gate override (verification.sast). Writes
+ * through POST /api/projects/:projectKey/sast; never turns Semgrep on itself.
+ */
+function SastGateSetting({ projectKey }: { projectKey: string }) {
+  const queryClient = useQueryClient();
+  const queryKey = ['project-sast', projectKey] as const;
+  const { data } = useQuery({
+    queryKey,
+    queryFn: async (): Promise<ProjectSastView> => {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/sast`);
+      if (!res.ok) return { value: null, effective: 'off', reason: 'Failed to load the Semgrep gate', semgrepEnabled: false };
+      return res.json();
+    },
+    enabled: !!projectKey,
+  });
+  const [error, setError] = useState<string | null>(null);
+  const mutation = useMutation({
+    mutationFn: async (value: 'off' | 'advisory' | 'blocking' | null): Promise<ProjectSastView> => {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/sast`, {
+        method: 'POST',
+        headers: await dashboardMutationJsonHeaders(),
+        body: JSON.stringify({ value }),
+      });
+      const payload = await res.json().catch(() => ({})) as Partial<ProjectSastView> & { error?: string };
+      if (!res.ok) throw new Error(payload.error ?? `HTTP ${res.status}`);
+      return payload as ProjectSastView;
+    },
+    onSuccess: (view) => {
+      queryClient.setQueryData(queryKey, view);
+      setError(null);
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : String(err)),
+  });
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-border pt-3">
+      <span className="text-[13px] text-foreground">Semgrep gate</span>
+      <div style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+        {[
+          { v: 'off' as const, label: 'Off' },
+          { v: 'advisory' as const, label: 'Advisory' },
+          { v: 'blocking' as const, label: 'Blocking' },
+          { v: null, label: 'Global default' },
+        ].map((o, i) => {
+          const active = (data?.value ?? null) === o.v;
+          return (
+            <button
+              key={String(o.v)}
+              type="button"
+              aria-label={`Semgrep gate: ${o.label}`}
+              aria-pressed={active}
+              disabled={mutation.isPending}
+              onClick={() => mutation.mutate(o.v)}
+              style={{
+                appearance: 'none',
+                border: 0,
+                borderLeft: i === 0 ? 0 : '1px solid var(--border)',
+                padding: '6px 12px',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                background: active ? 'color-mix(in srgb, var(--primary) 16%, transparent)' : 'transparent',
+                color: active ? 'var(--primary)' : 'var(--muted-foreground)',
+              }}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+      {data && (
+        <span className="text-[11px] text-muted-foreground" data-testid="sast-gate-effective">
+          {data.semgrepEnabled === false
+            ? 'Semgrep is off for every project (Settings → Security)'
+            : `Effective: ${data.effective} (${data.reason})`}
+        </span>
+      )}
+      {error && (
+        <span className="text-[11px] text-destructive" data-testid="sast-gate-error">
+          Failed to save the Semgrep gate: {error}
+        </span>
+      )}
+    </div>
+  );
+}
+
 /** PAN-1693/1695: per-project settings in the cockpit — currently the auto-merge default. */
 export function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
   const queryClient = useQueryClient();
@@ -448,6 +542,7 @@ export function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
         </span>
       )}
       </div>
+      <SastGateSetting projectKey={projectKey} />
       <VersionShipSettings projectKey={projectKey} />
       <MergeTrainSummary projectKey={projectKey} />
       <ProjectSkillsSection projectKey={projectKey} />
