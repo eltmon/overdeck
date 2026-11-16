@@ -1,13 +1,13 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T07:14:17.670671Z · model: claude-opus-5-5 · open: 886_
+_Last sequenced: 2026-11-16T08:34:14.452776Z · model: claude-opus-5-5 · open: 886_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-5424 | S | critical | ok |  |  | v0.87.0 desktop publish failed (515 MB tarball from onnxruntime); skip @huggingface/transformers in desktop externals, add size guard. |
-| 2 | PAN-5427 | S | medium | ok |  |  | Markdown preview shows YAML front matter as a body paragraph on most docs pages; render it as a key/value list above the content. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
+| 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
@@ -898,13 +898,13 @@ _Last sequenced: 2026-11-16T07:14:17.670671Z · model: claude-opus-5-5 · open: 
 
 New and already in the pipeline. The v0.87.0 release is half-shipped: core and contracts published, desktop stuck at 0.86.0 and no GitHub Release exists, so this blocks every release until it lands. The fix is one SKIP_PACKAGES entry plus a tarball size guard, so it takes the free rank-1 slot.
 
-### PAN-5427 (rank 2)
-
-New and already in the pipeline (live workspace feature-pan-5427), so it is pinned in rank 2, the slot freed when PAN-5423 merged. It is a small, well-specified frontend fix in MarkdownTab with named tests and a concrete acceptance check; its parent epic PAN-5284 is closed, so it carries no contains edge.
-
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
+
+### PAN-5430 (rank 4)
+
+New issue, sibling of the just-merged front-matter fix PAN-5427, and already queued in the active workflow-redesign order book, so it takes free rank 4 behind critical PAN-5013. It is a small, well-specified MarkdownTab change with named tests, a sanitising allow-list and a concrete acceptance check on the README preview; its parent epic PAN-5284 is closed, so it carries no contains edge.
 
 ### PAN-5385 (rank 8)
 
@@ -1221,7 +1221,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T07:14:17.670671Z",
+  "generatedAt": "2026-11-16T08:34:14.452776Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 886,
@@ -1240,19 +1240,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "auto"
     },
     {
-      "issue": "PAN-5427",
-      "rank": 2,
-      "size": "S",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Markdown preview shows YAML front matter as a body paragraph on most docs pages; render it as a key/value list above the content.",
-      "rationale": "New and already in the pipeline (live workspace feature-pan-5427), so it is pinned in rank 2, the slot freed when PAN-5423 merged. It is a small, well-specified frontend fix in MarkdownTab with named tests and a concrete acceptance check; its parent epic PAN-5284 is closed, so it carries no contains edge.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-5013",
       "rank": 3,
       "size": "S",
@@ -1262,6 +1249,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "dependsOn": [],
       "why": "Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned.",
       "rationale": "Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5430",
+      "rank": 4,
+      "size": "S",
+      "importance": "medium",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews.",
+      "rationale": "New issue, sibling of the just-merged front-matter fix PAN-5427, and already queued in the active workflow-redesign order book, so it takes free rank 4 behind critical PAN-5013. It is a small, well-specified MarkdownTab change with named tests, a sanitising allow-list and a concrete acceptance check on the README preview; its parent epic PAN-5284 is closed, so it carries no contains edge.",
       "gate": "auto",
       "planning": "auto"
     },
