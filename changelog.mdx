@@ -10,6 +10,17 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: do not edit this page for an unreleased change. Each PR adds its bullets to changelog.d/<issue>.md (format: changelog.d/README.md), and pan release stable folds them into a dated <Update> block here. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so in its entry and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.88.0" description="2026-11-16">
+  #### New
+
+  - **Semgrep sast verification gate:** with `security.semgrep.enabled: true`, every verification run ends with a `sast` check that scans the lines a branch added. It is advisory by default: findings go into the verification artifact and the security review lane, and the run still passes. Set `security.semgrep.gate: blocking` (or `verification.sast: blocking` for one project in `projects.yaml`) to fail verification on a finding. A missing Semgrep binary, a scanner error, or a timeout marks the check skipped with the reason and never blocks a merge. New `nosemgrep` comments, `.semgrepignore` edits and rule-file changes are listed for the security reviewer. ([#4590](https://github.com/eltmon/overdeck/issues/4590))
+  - **Semgrep in CI:** `pan semgrep ci-setup <project>` opens a pull request that adds a pinned, diff-aware Semgrep GitHub Actions workflow. In blocking mode a pull request that adds a finding fails the check and the work agent gets the findings; in advisory mode the check only warns. ([#4592](https://github.com/eltmon/overdeck/issues/4592))
+  - **Semgrep controls in the dashboard:** Settings → Security turns Semgrep on, sets the gate mode, severity, rule configs, scan timeout, MCP server and edit hook, and installs the pinned Semgrep CLI with one button. Each control writes only its own `security.semgrep` key in `~/.overdeck/config.yaml`. Project settings gains a Semgrep gate control that sets `verification.sast` for one project. ([#4594](https://github.com/eltmon/overdeck/issues/4594))
+  - **Computer use:** agents can read and operate local desktop apps on Linux with `pan computer` (accessibility tree, clicks, typing, keys, screenshots). It is off until you set `computer_use.enabled: true` in `~/.overdeck/config.yaml`, and only one agent drives the desktop at a time. ([#5452](https://github.com/eltmon/overdeck/issues/5452))
+
+  [Compare v0.87.2...v0.88.0](https://github.com/eltmon/overdeck/compare/v0.87.2...v0.88.0)
+</Update>
+
 <Update label="v0.87.2" description="2026-11-16">
   #### New
 
