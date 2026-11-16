@@ -83,7 +83,7 @@ test('pairs a device from Settings → Anywhere, lists it, and revokes it', asyn
     expect(cookies.some((c) => c.name === 'overdeck_session')).toBe(false);
 
     await expect(dialog.getByText(/^Paired: /)).toBeVisible({ timeout: 10_000 });
-    await dialog.getByRole('button', { name: 'Close' }).click();
+    await page.getByRole('dialog', { name: 'Pair a device' }).getByRole('button', { name: 'Close' }).click();
     await expect(dialog).toHaveCount(0);
 
     const panel = page.locator(PANEL);
@@ -122,7 +122,7 @@ test('adds a trusted address from the pair dialog without a restart', async ({ b
 
     await expect(dialog.getByLabel('Address the other device opens')).toHaveValue('https://desk.example.test', { timeout: 10_000 });
     await expect(dialog.getByRole('button', { name: 'Create pairing link' })).toBeEnabled();
-    await dialog.getByRole('button', { name: 'Close' }).click();
+    await page.getByRole('dialog', { name: 'Pair a device' }).getByRole('button', { name: 'Close' }).click();
 
     await expect(card.getByText('https://desk.example.test')).toBeVisible({ timeout: 10_000 });
     const status = await page.request.get(`${dashboard.baseUrl}/api/anywhere/status`);
