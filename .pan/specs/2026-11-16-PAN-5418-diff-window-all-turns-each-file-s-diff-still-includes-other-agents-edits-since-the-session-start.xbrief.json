@@ -4,17 +4,17 @@
     "created": "2026-11-16T03:59:33Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5418: Diff window All turns: each file's diff still includes other agents' edits since the session start",
-    "updated": "2026-11-16T04:02:43.138Z"
+    "updated": "2026-11-16T04:03:46.239Z"
   },
   "plan": {
     "id": "pan-5418",
     "title": "Diff window All turns: each file's diff still includes other agents' edits since the session start",
-    "status": "proposed",
+    "status": "running",
     "uid": "28c152bf-dcd1-4aef-a1e7-5df5bae79944",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-16T03:59:33Z",
-    "updated": "2026-11-16T04:02:43.138Z",
+    "updated": "2026-11-16T04:03:46.239Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5418",
@@ -338,5 +338,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
