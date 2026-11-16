@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5418",
   "created": "2026-11-16T04:03:53.810Z",
-  "updated": "2026-11-16T04:12:12.835Z",
+  "updated": "2026-11-16T04:13:49.197Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,9 +38,10 @@
       "doneAt": "2026-11-16T04:12:12.835Z"
     },
     "section-labels": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5418",
-      "claimedAt": "2026-11-16T04:11:48.598Z"
+      "claimedAt": "2026-11-16T04:11:48.598Z",
+      "doneAt": "2026-11-16T04:13:49.197Z"
     },
     "wire-diff-full.ac1": {
       "status": "completed",
@@ -53,6 +54,18 @@
     "wire-diff-full.ac3": {
       "status": "completed",
       "doneAt": "2026-11-16T04:12:12.835Z"
+    },
+    "section-labels.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T04:13:49.197Z"
+    },
+    "section-labels.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T04:13:49.197Z"
+    },
+    "section-labels.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T04:13:49.197Z"
     }
   }
 }
