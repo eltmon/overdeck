@@ -4,17 +4,17 @@
     "created": "2026-11-15T20:46:52Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5370: Workflow redesign live-check fixes: Issues header overlap, breadcrumb clips file name, Spend never times out, More wraps, model pending off-deck",
-    "updated": "2026-11-15T20:56:07.955Z"
+    "updated": "2026-11-15T20:57:25.015Z"
   },
   "plan": {
     "id": "pan-5370",
     "title": "Workflow redesign live-check fixes: Issues header overlap, breadcrumb clips file name, Spend never times out, More wraps, model pending off-deck",
-    "status": "proposed",
+    "status": "running",
     "uid": "3da9b6b4-61f2-49be-870c-24add4e941e5",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T20:46:52Z",
-    "updated": "2026-11-15T20:56:07.955Z",
+    "updated": "2026-11-15T20:57:25.015Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5370",
@@ -632,5 +632,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
