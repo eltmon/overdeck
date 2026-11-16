@@ -4,17 +4,17 @@
     "created": "2026-11-16T16:05:16Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4592: Opt-in Semgrep GitHub Actions workflow via pan semgrep ci-setup, with failure relay",
-    "updated": "2026-11-16T16:13:31.516Z"
+    "updated": "2026-11-16T16:14:43.213Z"
   },
   "plan": {
     "id": "pan-4592",
     "title": "Opt-in Semgrep GitHub Actions workflow via pan semgrep ci-setup, with failure relay",
-    "status": "proposed",
+    "status": "running",
     "uid": "848e9331-a6d2-4598-a3f6-f621c3e6db09",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-16T16:05:16Z",
-    "updated": "2026-11-16T16:13:31.516Z",
+    "updated": "2026-11-16T16:14:43.213Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4592",
@@ -644,5 +644,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
