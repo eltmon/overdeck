@@ -9,7 +9,8 @@ import {
   FALLBACK_DEFAULT_CONVERSATION_MODEL,
 } from '../chat/defaultConversationModel';
 import styles from './styles/command-deck.module.css';
-import pickerStyles from '../shared/ModelPicker/ModelPicker.module.css';
+import { Modal } from '../shared/Modal';
+import formStyles from '../shared/ModalForm.module.css';
 import { ModelHarnessPicker, ModelSelect, useAvailableModels } from '../shared/ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
 import type { Conversation } from './ConversationList';
@@ -77,47 +78,26 @@ const INTENT_LABEL: Record<ForkIntent, string> = {
 };
 
 function ForkHelpModal({ onClose }: { onClose: () => void }) {
-  const overlayRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKey, true);
-    return () => window.removeEventListener('keydown', handleKey, true);
-  }, [onClose]);
-
   return (
-    <div
-      ref={overlayRef}
-      className={styles.forkHelpOverlay}
-      onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
+    <Modal
+      title="Continue Options"
+      size="narrow"
+      onClose={onClose}
+      // Keys pressed in this nested dialog must not reach the conversation
+      // list/row handlers underneath (they react to Space/'f').
+      onKeyDown={(e) => e.stopPropagation()}
+      footer={
+        <button type="button" className={formStyles.primaryButton} onClick={onClose}>
+          Got it
+        </button>
+      }
     >
-      <div className={styles.forkHelpDialog} role="dialog" aria-labelledby="fork-help-title">
-        <div className={styles.forkHeader}>
-          <div className={styles.forkHeaderLeft}>
-            <HelpCircle size={16} className={styles.forkHeaderIcon} />
-            <h3 id="fork-help-title" className={styles.forkTitle}>Continue Options</h3>
-          </div>
-          <button className={styles.forkClose} onClick={onClose} aria-label="Close">
-            <X size={14} />
-          </button>
-        </div>
-        <div className={styles.forkHelpBody}>
-          <div className={styles.markdownContent}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{FORK_HELP_CONTENT}</ReactMarkdown>
-          </div>
-        </div>
-        <div className={styles.forkFooter}>
-          <button className={styles.forkConfirmBtn} onClick={onClose}>
-            Got it
-          </button>
+      <div className={formStyles.content}>
+        <div className={styles.markdownContent}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{FORK_HELP_CONTENT}</ReactMarkdown>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -226,8 +206,6 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
     }
   }, [intent, convTitle, freshStart]);
 
-  const overlayRef = useRef<HTMLDivElement>(null);
-
   const forkMode: ForkModeOption =
     intent === 'plain' ? 'plain' : intent === 'handoff' ? 'handoff' : fastSummary ? 'fast-summary' : 'summary';
   const apiForkMode: ApiForkMode = intent === 'plain' ? 'plain' : intent === 'handoff' ? 'handoff' : 'summary';
@@ -249,15 +227,11 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
   const title = conversation.title ?? conversation.name;
   const truncatedTitle = title.length > 50 ? title.slice(0, 47) + '...' : title;
 
-  // Scope keyboard handling to the dialog: Escape closes, and every other key
-  // is stopped from bubbling to the conversation-list/row handlers underneath
-  // (which react to Space/'f'), so typing in any field can never disturb them.
+  // Scope keyboard handling to the dialog: every key is stopped from bubbling
+  // to the conversation-list/row handlers underneath (which react to
+  // Space/'f'), so typing in any field can never disturb them. Modal still
+  // handles Escape and Tab after this runs.
   const handleDialogKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      onClose();
-      return;
-    }
     e.stopPropagation();
   };
 
@@ -270,325 +244,23 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
   ];
 
   return (
-    <div
-      ref={overlayRef}
-      className={styles.forkOverlay}
-      onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
-    >
-      <div className={styles.forkDialog} role="dialog" aria-labelledby="fork-title" onKeyDown={handleDialogKeyDown}>
-        <div className={styles.forkHeader}>
-          <div className={styles.forkHeaderLeft}>
-            <GitBranchPlus size={16} className={styles.forkHeaderIcon} />
-            <h3 id="fork-title" className={styles.forkTitle}>Continue in a new conversation</h3>
-          </div>
-          <div className={styles.forkHeaderRight}>
-            <button className={styles.forkClose} onClick={() => setShowHelp(true)} aria-label="Help">
-              <HelpCircle size={14} />
-            </button>
-            <button className={styles.forkClose} onClick={onClose} aria-label="Close">
-              <X size={14} />
-            </button>
-          </div>
-        </div>
-
-        {showHelp && <ForkHelpModal onClose={() => setShowHelp(false)} />}
-
-        <div className={styles.forkBody}>
-          <p className={styles.forkDesc}>
-            From <strong title={title}>{truncatedTitle}</strong>.
-          </p>
-
-          <div className={styles.forkFields}>
-            {/* Intent — the one decision most users make. */}
-            <fieldset className={styles.forkModeGroup}>
-              <legend>Start the new agent from</legend>
-              {intentOptions.map((opt) => (
-                <label key={opt.value} className={styles.forkCheckboxRow}>
-                  <input
-                    type="radio"
-                    name="fork-intent"
-                    value={opt.value}
-                    checked={intent === opt.value}
-                    onChange={() => setIntent(opt.value)}
-                  />
-                  <span>
-                    {opt.label}
-                    {opt.value === 'summary' && (
-                      <span style={{ marginLeft: 6, color: 'var(--muted-foreground)' }}>· recommended</span>
-                    )}
-                    <span className={pickerStyles.fieldHint} style={{ display: 'block' }}>{opt.hint}</span>
-                  </span>
-                </label>
-              ))}
-            </fieldset>
-
-            {/* Name. */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label htmlFor="fork-title-input" style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>
-                New name
-              </label>
-              <input
-                id="fork-title-input"
-                type="text"
-                value={forkTitle}
-                onChange={(e) => { nameDirtyRef.current = true; setForkTitle(e.target.value); }}
-                className={styles.forkTitleInput}
-                placeholder={isHandoffFork && freshStart ? 'Named from the first message' : undefined}
-                autoFocus
-              />
-            </div>
-
-            {/* Project association — independent of the successor cwd. */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label htmlFor="fork-project-select" style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>
-                Project
-              </label>
-              <select
-                id="fork-project-select"
-                value={projectKey}
-                onChange={(event) => setProjectKey(event.target.value)}
-              >
-                <option value="">Same as source ({sourceProjectLabel})</option>
-                {registeredProjects.map((project) => (
-                  <option key={project.key} value={project.key}>{project.name ?? project.key}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Launch model — always relevant. */}
-            {isPlainFork ? (
-              <>
-                <ModelSelect
-                  value={launchModel}
-                  onChange={setLaunchModel}
-                  groups={groups}
-                  label="Launch model"
-                />
-                <span className={pickerStyles.fieldHint}>
-                  Exact copy always launches under Claude Code — Pi cannot consume the
-                  copied Claude session history.
-                </span>
-              </>
-            ) : (
-              <>
-                <ModelHarnessPicker
-                  model={launchModel}
-                  onModelChange={setLaunchModel}
-                  groups={groups}
-                  modelLabel="Launch model"
-                />
-                <span className={pickerStyles.fieldHint}>
-                  The model and harness the new conversation will use.
-                </span>
-              </>
-            )}
-
-            {/* Handoff focus — the primary steering input, so keep it visible. */}
-            {isHandoffFork && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-                <label htmlFor="handoff-focus-input" style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>
-                  {freshStart ? 'First message (optional)' : 'Focus (optional)'}
-                </label>
-                <textarea
-                  id="handoff-focus-input"
-                  value={handoffFocus}
-                  onChange={(e) => setHandoffFocus(e.target.value)}
-                  className={styles.forkTitleInput}
-                  rows={3}
-                  placeholder="What should the next conversation focus on?"
-                />
-                <span className={pickerStyles.fieldHint}>
-                  {freshStart
-                    ? "Sent verbatim as the new conversation's first message. Nothing from this conversation is carried over."
-                    : handoffAuthor === 'external'
-                      ? 'Steers what the authoring session emphasizes in the handoff document.'
-                      : 'Sent to the source agent as guidance for the handoff document.'}
-                </span>
-              </div>
-            )}
-
-            {/* PAN-4499 D13: skills/packs/hold parsed from the composer text. */}
-            {isHandoffFork && (handoffSkills.length > 0 || handoffPacks.length > 0) && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
-                {handoffSkills.map((skill) => (
-                  <span key={`skill-${skill}`} className={styles.forkCheckboxRow} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
-                    Skill: {skill}
-                    <button type="button" aria-label={`Remove skill ${skill}`} onClick={() => setHandoffSkills((prev) => prev.filter((s) => s !== skill))}>
-                      <X size={10} />
-                    </button>
-                  </span>
-                ))}
-                {handoffPacks.map((pack) => (
-                  <span key={`pack-${pack}`} className={styles.forkCheckboxRow} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
-                    Pack: {pack}
-                    <button type="button" aria-label={`Remove pack ${pack}`} onClick={() => setHandoffPacks((prev) => prev.filter((p) => p !== pack))}>
-                      <X size={10} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-            {isHandoffFork && (
-              <>
-                <label className={styles.forkCheckboxRow}>
-                  <input
-                    type="checkbox"
-                    checked={handoffHold}
-                    onChange={(e) => setHandoffHold(e.target.checked)}
-                  />
-                  <span>Hold — start it myself</span>
-                </label>
-                <label className={styles.forkCheckboxRow}>
-                  <input
-                    type="checkbox"
-                    checked={freshStart}
-                    onChange={(e) => setFreshStart(e.target.checked)}
-                  />
-                  <span>Fresh start — no summary, no parent link</span>
-                </label>
-              </>
-            )}
-
-            {/* Inline warnings — safety, not advanced. */}
-            {showModelSwitchWarning && (
-              <div className={styles.forkWarning}>
-                <strong>Warning:</strong> Exact copy with a different model may fail
-                if the raw history contains provider-specific blocks (e.g., signed thinking
-                blocks). Use a summary or handoff for cross-model continues.
-              </div>
-            )}
-            {handoffUnavailable && (
-              <div className={styles.forkWarning}>
-                Source-authored handoff requires a running source conversation. Switch
-                to an external author in Advanced options, or use Fresh summary / Exact copy.
-              </div>
-            )}
-
-            {/* Advanced options — everything power users still need, tucked away. */}
-            <details style={{ borderTop: '1px solid var(--border)', marginTop: '4px', paddingTop: '8px' }}>
-              <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: 500, color: 'var(--muted-foreground)', userSelect: 'none' }}>
-                Advanced options
-              </summary>
-              <div className={styles.forkFields} style={{ marginTop: '8px' }}>
-                {isSummaryFork && (
-                  <>
-                    <div className={styles.forkCheckboxRow}>
-                      <input
-                        type="checkbox"
-                        id="fast-summary"
-                        checked={fastSummary}
-                        onChange={(e) => setFastSummary(e.target.checked)}
-                      />
-                      <label htmlFor="fast-summary">Fast summary (no LLM, heuristic only)</label>
-                    </div>
-                    <span className={pickerStyles.fieldHint}>
-                      Skips the summary model and uses local transcript metadata only — instant and free, but rough.
-                    </span>
-
-                    {!fastSummary && (
-                      <>
-                        <ModelHarnessPicker
-                          model={summaryModel}
-                          onModelChange={setSummaryModel}
-                          groups={groups}
-                          modelLabel="Summary model"
-                        />
-                        <span className={pickerStyles.fieldHint}>
-                          Generates a concise summary of the conversation history.
-                        </span>
-
-                        <div className={styles.forkCheckboxRow}>
-                          <input
-                            type="checkbox"
-                            id="include-thinking"
-                            checked={includeThinkingInSummary}
-                            onChange={(e) => setIncludeThinkingInSummary(e.target.checked)}
-                          />
-                          <label htmlFor="include-thinking">Include thinking in summary</label>
-                        </div>
-                        <span className={pickerStyles.fieldHint}>
-                          When enabled, thinking content is included as labeled text in the summary.
-                        </span>
-                      </>
-                    )}
-                  </>
-                )}
-
-                {isHandoffFork && !freshStart && (
-                  <>
-                    <fieldset className={styles.forkModeGroup}>
-                      <legend>Authored by</legend>
-                      <label className={styles.forkCheckboxRow}>
-                        <input
-                          type="radio"
-                          name="handoff-author"
-                          value="external"
-                          checked={handoffAuthor === 'external'}
-                          onChange={() => setHandoffAuthor('external')}
-                        />
-                        <span>External session (clean — pick the authoring model below)</span>
-                      </label>
-                      <label className={styles.forkCheckboxRow}>
-                        <input
-                          type="radio"
-                          name="handoff-author"
-                          value="source"
-                          checked={handoffAuthor === 'source'}
-                          onChange={() => setHandoffAuthor('source')}
-                          disabled={!sourceSupportsSourceAuthoring}
-                        />
-                        <span>
-                          Source agent (uses source's model — pollutes the source conversation)
-                          {!sourceSupportsSourceAuthoring && (
-                            <span style={{ marginLeft: 6, fontStyle: 'italic', color: 'var(--muted-foreground)' }}>
-                              — not supported for {conversation.harness} sources
-                            </span>
-                          )}
-                        </span>
-                      </label>
-                    </fieldset>
-
-                    {handoffAuthor === 'external' && (
-                      <>
-                        <ModelHarnessPicker
-                          model={summaryModel}
-                          onModelChange={setSummaryModel}
-                          groups={groups}
-                          modelLabel="Authoring model"
-                        />
-                        <span className={pickerStyles.fieldHint}>
-                          The model and harness that read the source transcript and emit the
-                          handoff document. Cheaper models work fine; use a larger model for
-                          nuanced or long conversations.
-                        </span>
-                      </>
-                    )}
-                    {handoffAuthor === 'source' && (
-                      <span className={pickerStyles.fieldHint}>
-                        Source-authored handoff asks the live source agent to write the seed
-                        document, using whatever model the source is currently running.
-                      </span>
-                    )}
-                  </>
-                )}
-
-                {isPlainFork && (
-                  <span className={pickerStyles.fieldHint}>
-                    Exact copy has no extra options — it carries over the raw history from the
-                    last compaction point and resumes under Claude Code.
-                  </span>
-                )}
-              </div>
-            </details>
-          </div>
-        </div>
-
-        <div className={styles.forkFooter}>
-          <button className={styles.forkCancelBtn} onClick={onClose}>
+    <Modal
+      title="Continue in a new conversation"
+      onClose={onClose}
+      onKeyDown={handleDialogKeyDown}
+      headerActions={
+        <button type="button" className={styles.forkClose} aria-label="Help" onClick={() => setShowHelp(true)}>
+          <HelpCircle size={14} />
+        </button>
+      }
+      footer={
+        <>
+          <button type="button" className={formStyles.button} onClick={onClose}>
             Cancel
           </button>
           <button
-            className={styles.forkConfirmBtn}
+            type="button"
+            className={formStyles.primaryButton}
             disabled={confirmDisabled}
             title={
               handoffUnavailable
@@ -634,8 +306,305 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
             <GitBranchPlus size={13} />
             {isPending ? 'Continuing…' : 'Continue'}
           </button>
+        </>
+      }
+    >
+      {showHelp && <ForkHelpModal onClose={() => setShowHelp(false)} />}
+
+      <div className={formStyles.form}>
+        <p className={formStyles.hint}>
+          From <strong title={title}>{truncatedTitle}</strong>.
+        </p>
+
+        {/* Intent — the one decision most users make. */}
+        <fieldset className={formStyles.fieldset}>
+          <legend className={`${formStyles.label} mb-2.5`}>Start the new agent from</legend>
+          {intentOptions.map((opt) => (
+            <label key={opt.value} className={formStyles.choice}>
+              <input
+                type="radio"
+                name="fork-intent"
+                value={opt.value}
+                checked={intent === opt.value}
+                onChange={() => setIntent(opt.value)}
+              />
+              <span className="min-w-0">
+                <span className={formStyles.choiceTitle}>
+                  {opt.label}
+                  {opt.value === 'summary' && (
+                    <span style={{ marginLeft: 6, color: 'var(--muted-foreground)' }}>· recommended</span>
+                  )}
+                </span>
+                <span className={formStyles.choiceHint}>{opt.hint}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+
+        {/* Name. */}
+        <div className={formStyles.field}>
+          <label htmlFor="fork-title-input" className={formStyles.label}>
+            New name
+          </label>
+          <input
+            id="fork-title-input"
+            type="text"
+            value={forkTitle}
+            onChange={(e) => { nameDirtyRef.current = true; setForkTitle(e.target.value); }}
+            className={formStyles.input}
+            placeholder={isHandoffFork && freshStart ? 'Named from the first message' : undefined}
+            autoFocus
+          />
         </div>
+
+        {/* Project association — independent of the successor cwd. */}
+        <div className={formStyles.field}>
+          <label htmlFor="fork-project-select" className={formStyles.label}>
+            Project
+          </label>
+          <select
+            id="fork-project-select"
+            value={projectKey}
+            onChange={(event) => setProjectKey(event.target.value)}
+            className={formStyles.select}
+          >
+            <option value="">Same as source ({sourceProjectLabel})</option>
+            {registeredProjects.map((project) => (
+              <option key={project.key} value={project.key}>{project.name ?? project.key}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Launch model — always relevant. */}
+        {isPlainFork ? (
+          <div className={formStyles.field}>
+            <ModelSelect
+              value={launchModel}
+              onChange={setLaunchModel}
+              groups={groups}
+              label="Launch model"
+            />
+            <p className={formStyles.hint}>
+              Exact copy always launches under Claude Code — Pi cannot consume the
+              copied Claude session history.
+            </p>
+          </div>
+        ) : (
+          <div className={formStyles.field}>
+            <ModelHarnessPicker
+              model={launchModel}
+              onModelChange={setLaunchModel}
+              groups={groups}
+              modelLabel="Launch model"
+            />
+            <p className={formStyles.hint}>
+              The model and harness the new conversation will use.
+            </p>
+          </div>
+        )}
+
+        {/* Handoff focus — the primary steering input, so keep it visible. */}
+        {isHandoffFork && (
+          <div className={formStyles.field}>
+            <label htmlFor="handoff-focus-input" className={formStyles.label}>
+              {freshStart ? 'First message (optional)' : 'Focus (optional)'}
+            </label>
+            <textarea
+              id="handoff-focus-input"
+              value={handoffFocus}
+              onChange={(e) => setHandoffFocus(e.target.value)}
+              className={formStyles.textarea}
+              rows={3}
+              placeholder="What should the next conversation focus on?"
+            />
+            <p className={formStyles.hint}>
+              {freshStart
+                ? "Sent verbatim as the new conversation's first message. Nothing from this conversation is carried over."
+                : handoffAuthor === 'external'
+                  ? 'Steers what the authoring session emphasizes in the handoff document.'
+                  : 'Sent to the source agent as guidance for the handoff document.'}
+            </p>
+          </div>
+        )}
+
+        {/* PAN-4499 D13: skills/packs/hold parsed from the composer text. */}
+        {isHandoffFork && (handoffSkills.length > 0 || handoffPacks.length > 0) && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+            {handoffSkills.map((skill) => (
+              <span key={`skill-${skill}`} className={formStyles.hint} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                Skill: {skill}
+                <button type="button" aria-label={`Remove skill ${skill}`} onClick={() => setHandoffSkills((prev) => prev.filter((s) => s !== skill))}>
+                  <X size={10} />
+                </button>
+              </span>
+            ))}
+            {handoffPacks.map((pack) => (
+              <span key={`pack-${pack}`} className={formStyles.hint} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                Pack: {pack}
+                <button type="button" aria-label={`Remove pack ${pack}`} onClick={() => setHandoffPacks((prev) => prev.filter((p) => p !== pack))}>
+                  <X size={10} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        {isHandoffFork && (
+          <div className={formStyles.fieldset}>
+            <label className={formStyles.choice}>
+              <input
+                type="checkbox"
+                checked={handoffHold}
+                onChange={(e) => setHandoffHold(e.target.checked)}
+              />
+              <span className={formStyles.choiceTitle}>Hold — start it myself</span>
+            </label>
+            <label className={formStyles.choice}>
+              <input
+                type="checkbox"
+                checked={freshStart}
+                onChange={(e) => setFreshStart(e.target.checked)}
+              />
+              <span className={formStyles.choiceTitle}>Fresh start — no summary, no parent link</span>
+            </label>
+          </div>
+        )}
+
+        {/* Inline warnings — safety, not advanced. */}
+        {showModelSwitchWarning && (
+          <div className={styles.forkWarning}>
+            <strong>Warning:</strong> Exact copy with a different model may fail
+            if the raw history contains provider-specific blocks (e.g., signed thinking
+            blocks). Use a summary or handoff for cross-model continues.
+          </div>
+        )}
+        {handoffUnavailable && (
+          <div className={styles.forkWarning}>
+            Source-authored handoff requires a running source conversation. Switch
+            to an external author in Advanced options, or use Fresh summary / Exact copy.
+          </div>
+        )}
+
+        {/* Advanced options — everything power users still need, tucked away. */}
+        <details className={formStyles.details}>
+          <summary>Advanced options</summary>
+          <div className="flex flex-col gap-4">
+            {isSummaryFork && (
+              <>
+                <div className={formStyles.field}>
+                  <div className={formStyles.choice}>
+                    <input
+                      type="checkbox"
+                      id="fast-summary"
+                      checked={fastSummary}
+                      onChange={(e) => setFastSummary(e.target.checked)}
+                    />
+                    <label htmlFor="fast-summary" className={formStyles.choiceTitle}>Fast summary (no LLM, heuristic only)</label>
+                  </div>
+                  <p className={formStyles.hint}>
+                    Skips the summary model and uses local transcript metadata only — instant and free, but rough.
+                  </p>
+                </div>
+
+                {!fastSummary && (
+                  <>
+                    <div className={formStyles.field}>
+                      <ModelHarnessPicker
+                        model={summaryModel}
+                        onModelChange={setSummaryModel}
+                        groups={groups}
+                        modelLabel="Summary model"
+                      />
+                      <p className={formStyles.hint}>
+                        Generates a concise summary of the conversation history.
+                      </p>
+                    </div>
+
+                    <div className={formStyles.field}>
+                      <div className={formStyles.choice}>
+                        <input
+                          type="checkbox"
+                          id="include-thinking"
+                          checked={includeThinkingInSummary}
+                          onChange={(e) => setIncludeThinkingInSummary(e.target.checked)}
+                        />
+                        <label htmlFor="include-thinking" className={formStyles.choiceTitle}>Include thinking in summary</label>
+                      </div>
+                      <p className={formStyles.hint}>
+                        When enabled, thinking content is included as labeled text in the summary.
+                      </p>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
+            {isHandoffFork && !freshStart && (
+              <>
+                <fieldset className={formStyles.fieldset}>
+                  <legend className={`${formStyles.label} mb-2.5`}>Authored by</legend>
+                  <label className={formStyles.choice}>
+                    <input
+                      type="radio"
+                      name="handoff-author"
+                      value="external"
+                      checked={handoffAuthor === 'external'}
+                      onChange={() => setHandoffAuthor('external')}
+                    />
+                    <span className={formStyles.choiceTitle}>External session (clean — pick the authoring model below)</span>
+                  </label>
+                  <label className={formStyles.choice}>
+                    <input
+                      type="radio"
+                      name="handoff-author"
+                      value="source"
+                      checked={handoffAuthor === 'source'}
+                      onChange={() => setHandoffAuthor('source')}
+                      disabled={!sourceSupportsSourceAuthoring}
+                    />
+                    <span className="min-w-0">
+                      <span className={formStyles.choiceTitle}>Source agent (uses source's model — pollutes the source conversation)</span>
+                      {!sourceSupportsSourceAuthoring && (
+                        <span className={formStyles.choiceHint} style={{ fontStyle: 'italic' }}>
+                          — not supported for {conversation.harness} sources
+                        </span>
+                      )}
+                    </span>
+                  </label>
+                </fieldset>
+
+                {handoffAuthor === 'external' && (
+                  <div className={formStyles.field}>
+                    <ModelHarnessPicker
+                      model={summaryModel}
+                      onModelChange={setSummaryModel}
+                      groups={groups}
+                      modelLabel="Authoring model"
+                    />
+                    <p className={formStyles.hint}>
+                      The model and harness that read the source transcript and emit the
+                      handoff document. Cheaper models work fine; use a larger model for
+                      nuanced or long conversations.
+                    </p>
+                  </div>
+                )}
+                {handoffAuthor === 'source' && (
+                  <p className={formStyles.hint}>
+                    Source-authored handoff asks the live source agent to write the seed
+                    document, using whatever model the source is currently running.
+                  </p>
+                )}
+              </>
+            )}
+
+            {isPlainFork && (
+              <p className={formStyles.hint}>
+                Exact copy has no extra options — it carries over the raw history from the
+                last compaction point and resumes under Claude Code.
+              </p>
+            )}
+          </div>
+        </details>
       </div>
-    </div>
+    </Modal>
   );
 }
