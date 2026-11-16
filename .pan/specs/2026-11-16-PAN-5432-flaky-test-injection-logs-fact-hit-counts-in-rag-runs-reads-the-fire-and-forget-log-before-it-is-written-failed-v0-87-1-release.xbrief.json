@@ -1,0 +1,137 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-16T09:23:49Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5432: Flaky test: injection 'logs fact hit counts in rag-runs' reads the fire-and-forget log before it is written (failed v0.87.1 release)",
+    "updated": "2026-11-16T09:27:16.108Z"
+  },
+  "plan": {
+    "id": "pan-5432",
+    "title": "Flaky test: injection 'logs fact hit counts in rag-runs' reads the fire-and-forget log before it is written (failed v0.87.1 release)",
+    "status": "running",
+    "uid": "c0290683-ad23-4a8a-ae3d-6fd7b7d7c0db",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-16T09:23:49Z",
+    "updated": "2026-11-16T09:27:16.108Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5432",
+        "label": "PAN-5432",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "test",
+      "flaky",
+      "memory",
+      "release-blocker"
+    ],
+    "metadata": {
+      "docsJustification": "Test-only change: one Vitest test in tests/lib/memory/injection.test.ts switches a single file read to a vi.waitFor poll. No behavior, CLI, route, config, or documented surface changes, so no doc file is touched; the inline comment in the test explains the poll.",
+      "canonicalFilename": "2026-11-16-PAN-5432-flaky-test-injection-logs-fact-hit-counts-in-rag-runs-reads-the-fire-and-forget-log-before-it-is-written-failed-v0-87-1-release.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The v0.87.1 release pack job failed on tests/lib/memory/injection.test.ts > 'logs fact hit counts and allocations in rag-runs' with 'expected [] to have a length of 1'. writeDecision in src/lib/memory/injection.ts (line 535) appends the rag-decision entry fire-and-forget (void appendFile), and the test reads the rag-runs log once immediately after injectPromptTimeMemory resolves, so on a loaded runner the entry has not landed yet.",
+      "Proposal": "Test-only fix per the PRD (.pan/drafts/PAN-5432.md WI-1): replace the single readRagEntries() read at line 954 with a vi.waitFor poll (timeout 2000 ms, interval 20 ms) that filters rag-decision entries and asserts toHaveLength(1), treating read/parse errors as not-yet via .catch(() => []). Keep the three field assertions. Production code stays fire-and-forget. readRagEntries has exactly one caller; tests using injectWithLog capture the decision synchronously and query-expansion logging is awaited, so no other test needs the change.",
+      "NonGoals": "- Making the production rag-runs append in writeDecision awaited, or any change under src/\n- Re-running or re-cutting the v0.87.1 release\n- Tests that call injectPromptTimeMemory without logDecision and do not read the log (e.g. line 513 'escapes retrieved memory text')\n- Changing the readRagEntries helper or tests/lib/memory/query-expansion.test.ts\n- Adding real sleeps, fake timers, skipIf or .only to the test\n- Adding a changelog.d entry (not user-facing)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix in the test only with vi.waitFor; keep the production append fire-and-forget.",
+        "rationale": "The issue body prescribes this test-only fix, and awaiting the log write would add latency to every prompt-time injection, which the design deliberately avoids."
+      },
+      {
+        "summary": "Scope is the single test at line 954; no other test changes.",
+        "rationale": "grep shows readRagEntries has one caller; injectWithLog tests capture the decision via a synchronous logDecision callback, and query-expansion rag-runs writes are awaited end to end (logQueryExpansion awaited at query-expansion.ts lines 92, 131, 228)."
+      },
+      {
+        "summary": "No docs or changelog change; recorded via plan.metadata.docsJustification.",
+        "rationale": "The change touches one test file and no documented or user-facing surface."
+      },
+      {
+        "summary": "Single plan item, no edges.",
+        "rationale": "The fix is one indivisible edit to one test; splitting would create items with no independent value."
+      }
+    ],
+    "items": [
+      {
+        "id": "poll-rag-decision-entry",
+        "title": "Poll for the rag-decision entry with vi.waitFor in the 'logs fact hit counts and allocations in rag-runs' test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T09:23:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5432",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/lib/memory/injection.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/memory/injection.test.ts",
+            "npm run lint",
+            "git diff origin/main --stat -- src/"
+          ],
+          "expected_outputs": [
+            "vitest reports tests/lib/memory/injection.test.ts passing with 0 failures, including 'logs fact hit counts and allocations in rag-runs'",
+            "npm run lint exits 0",
+            "git diff origin/main --stat -- src/ prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In tests/lib/memory/injection.test.ts, inside it('logs fact hit counts and allocations in rag-runs') (lines 936-960), replace `const entries = await readRagEntries(); const decisionEntries = entries.filter(...); expect(decisionEntries).toHaveLength(1);` with: a one-line comment `// writeDecision appends to rag-runs fire-and-forget, so poll until the entry lands.` followed by `const decisionEntries = await vi.waitFor(async () => { const found = (await readRagEntries().catch(() => [])).filter((entry: { type: string }) => entry.type === 'rag-decision'); expect(found).toHaveLength(1); return found; }, { timeout: 2000, interval: 20 });`. Keep the following three assertions (hitCounts.facts >= 1, budgets.facts === 1500, allocationBytes.facts > 0) unchanged. Do not modify readRagEntries, any other test, or any file under src/. Do not add setTimeout/sleep/vi.useFakeTimers. vi is already imported. See .pan/drafts/PAN-5432.md WI-1 for the exact before/after snippet."
+        },
+        "items": [
+          {
+            "id": "poll-rag-decision-entry.ac1",
+            "title": "Given the edited test file, when `npx vitest run tests/lib/memory/injection.test.ts` runs, then it exits 0 and the test 'logs fact hit counts and allocations in rag-runs' passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poll-rag-decision-entry.ac2",
+            "title": "The test's only readRagEntries() call sits inside a vi.waitFor callback that is passed { timeout: 2000, interval: 20 }, catches read errors with .catch(() => []), and asserts toHaveLength(1) on the rag-decision entries it returns.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poll-rag-decision-entry.ac3",
+            "title": "Given the polled rag-decision entry, when the test runs, then it still asserts and preserves the checks hitCounts.facts >= 1, budgets.facts === 1500 and allocationBytes.facts > 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poll-rag-decision-entry.ac4",
+            "title": "`git diff origin/main -- src/` produces no output, and the diff adds no setTimeout, sleep or vi.useFakeTimers call to tests/lib/memory/injection.test.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "active"
+}
