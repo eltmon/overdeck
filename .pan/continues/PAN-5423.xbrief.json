@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5423",
   "created": "2026-11-16T05:56:13.176Z",
-  "updated": "2026-11-16T05:59:30.727Z",
+  "updated": "2026-11-16T06:03:52.099Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -36,9 +36,22 @@
       "doneAt": "2026-11-16T05:59:00.288Z"
     },
     "wire-auq-answer-toast": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5423",
-      "claimedAt": "2026-11-16T05:59:30.727Z"
+      "claimedAt": "2026-11-16T05:59:30.727Z",
+      "doneAt": "2026-11-16T06:03:52.098Z"
+    },
+    "wire-auq-answer-toast.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T06:03:52.098Z"
+    },
+    "wire-auq-answer-toast.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T06:03:52.098Z"
+    },
+    "wire-auq-answer-toast.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T06:03:52.098Z"
     }
   }
 }
