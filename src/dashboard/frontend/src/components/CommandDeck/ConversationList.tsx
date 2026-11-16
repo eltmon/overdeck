@@ -261,6 +261,10 @@ interface ConversationListProps {
   groupByProject?: (conv: Conversation) => ConversationProjectRef;
   /** PAN-5343 H-D18: conversation name → 1-based split leaf, while the deck is split. */
   paneSlots?: ReadonlyMap<string, number>;
+  /** PAN-5343 H-D5: Ctrl/Cmd+Click, the Beside control and the Open beside menu item. When absent, Ctrl/Cmd+Click toggles the multi-selection. */
+  onOpenBeside?: (name: string) => void;
+  /** PAN-5343 H-D5: the Open in its project menu item. */
+  onOpenInProject?: (name: string) => void;
 }
 
 /** The sections the 'active' scope shows. */
@@ -359,6 +363,8 @@ interface ConversationListItemProps {
   markName?: string;
   /** PAN-5343 H-D18: the split leaf showing this row's conversation. */
   paneSlot?: number;
+  onOpenBeside?: (name: string) => void;
+  onOpenInProject?: (name: string) => void;
 }
 
 /** The non-zero group counts, in the order the PRD fixes (WI-10 step 3). */
@@ -387,6 +393,8 @@ function ConversationListItemImpl({
   markProjectKey,
   markName,
   paneSlot,
+  onOpenBeside,
+  onOpenInProject,
 }: ConversationListItemProps) {
   return (
     <motion.div
@@ -409,6 +417,8 @@ function ConversationListItemImpl({
         markProjectKey={markProjectKey}
         markName={markName}
         paneSlot={paneSlot}
+        onOpenBeside={onOpenBeside}
+        onOpenInProject={onOpenInProject}
       />
       {node.descendants.length > 0 && (
         <button
@@ -466,12 +476,14 @@ function itemPropsEqual(a: ConversationListItemProps, b: ConversationListItemPro
     && Object.is(a.onToggleGroup, b.onToggleGroup)
     && Object.is(a.mutations, b.mutations)
     && Object.is(a.registeredProjects, b.registeredProjects)
+    && Object.is(a.onOpenBeside, b.onOpenBeside)
+    && Object.is(a.onOpenInProject, b.onOpenInProject)
   );
 }
 
 const ConversationListItem = memo(ConversationListItemImpl, itemPropsEqual);
 
-export function ConversationList({ selectedConversation, onSelectConversation, excludeIds, includeIds, scope = 'all', groupByProject, paneSlots }: ConversationListProps) {
+export function ConversationList({ selectedConversation, onSelectConversation, excludeIds, includeIds, scope = 'all', groupByProject, paneSlots, onOpenBeside, onOpenInProject }: ConversationListProps) {
   const shownSections = scope === 'active' ? ACTIVE_SECTION_ORDER : SECTION_ORDER;
   const [sort, setSort] = useState<SortOption>(loadSort);
   const [tab, setTab] = useState<ListTab>(loadTab);
@@ -631,6 +643,11 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
         return;
       }
     }
+    // PAN-5343 H-D5: with an opener, Ctrl/Cmd+Click opens beside and selects nothing.
+    if (onOpenBeside && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+      onOpenBeside(name);
+      return;
+    }
     if (e.metaKey || e.ctrlKey || e.shiftKey) {
       setSelected((previous) => {
         const next = new Set(previous);
@@ -644,7 +661,7 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
     setSelected(new Set());
     anchorRef.current = null;
     onSelectConversation(name);
-  }, [onSelectConversation]);
+  }, [onSelectConversation, onOpenBeside]);
 
   const clearSelection = useCallback(() => {
     setSelected(new Set());
@@ -728,6 +745,8 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
         markProjectKey={mark?.key}
         markName={mark?.label}
         paneSlot={paneSlots?.get(node.conv.name)}
+        onOpenBeside={onOpenBeside}
+        onOpenInProject={onOpenInProject}
       />
     );
   };

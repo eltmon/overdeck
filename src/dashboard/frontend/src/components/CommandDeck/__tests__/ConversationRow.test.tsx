@@ -680,3 +680,36 @@ describe('ConversationRow pane badge (PAN-5343 H-D18)', () => {
     expect(screen.queryByTestId('conversation-pane-slot')).not.toBeInTheDocument();
   });
 });
+
+describe('ConversationRow open-beside controls (PAN-5343 H-D5)', () => {
+  it('the Beside control calls onOpenBeside and not onSelect', () => {
+    const onOpenBeside = vi.fn();
+    const onSelect = vi.fn();
+    renderRow({}, { onOpenBeside, onSelect });
+    fireEvent.click(screen.getByRole('button', { name: 'Open beside' }));
+    expect(onOpenBeside).toHaveBeenCalledWith(conversation.name);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('has no Beside control or menu items without the openers', () => {
+    renderRow({});
+    expect(screen.queryByRole('button', { name: 'Open beside' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    expect(screen.queryByText('Open beside')).not.toBeInTheDocument();
+    expect(screen.queryByText('Open in its project')).not.toBeInTheDocument();
+  });
+
+  it('the row menu shows Open beside and Open in its project', () => {
+    const onOpenBeside = vi.fn();
+    const onOpenInProject = vi.fn();
+    renderRow({}, { onOpenBeside, onOpenInProject });
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    const menu = screen.getByRole('menu', { name: 'Actions for Test conversation' });
+    fireEvent.click(within(menu).getByText('Open in its project'));
+    expect(onOpenInProject).toHaveBeenCalledWith(conversation.name);
+
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    fireEvent.click(within(screen.getByRole('menu', { name: 'Actions for Test conversation' })).getByText('Open beside'));
+    expect(onOpenBeside).toHaveBeenCalledWith(conversation.name);
+  });
+});

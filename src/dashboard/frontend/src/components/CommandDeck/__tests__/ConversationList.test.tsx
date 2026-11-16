@@ -854,13 +854,13 @@ describe('Multi-select and bulk bar (PAN-4639 WI-10)', () => {
     };
   }
 
-  function renderThree() {
+  function renderThree(onOpenBeside?: (name: string) => void) {
     const client = makeClient();
     client.setQueryData(['conversations'], [selectConv(1, 'a'), selectConv(2, 'b'), selectConv(3, 'c')]);
     render(
       <DialogProvider>
         <QueryClientProvider client={client}>
-          <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+          <ConversationList selectedConversation={null} onSelectConversation={() => {}} onOpenBeside={onOpenBeside} />
         </QueryClientProvider>
       </DialogProvider>,
     );
@@ -880,6 +880,35 @@ describe('Multi-select and bulk bar (PAN-4639 WI-10)', () => {
     expect(screen.getByTitle('a')).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByTitle('b')).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByTitle('c')).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('PAN-5343 H-D5: with onOpenBeside, Ctrl-click and Meta-click open beside and select nothing', () => {
+    const onOpenBeside = vi.fn();
+    renderThree(onOpenBeside);
+    fireEvent.click(screen.getByTitle('a'), { ctrlKey: true });
+    fireEvent.click(screen.getByTitle('b'), { metaKey: true });
+    expect(onOpenBeside).toHaveBeenNthCalledWith(1, 'a');
+    expect(onOpenBeside).toHaveBeenNthCalledWith(2, 'b');
+    expect(screen.queryByText(/selected$/)).not.toBeInTheDocument();
+    expect(screen.getByTitle('a')).not.toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTitle('b')).not.toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('PAN-5343 H-D5: with onOpenBeside, Shift-click still multi-selects', () => {
+    const onOpenBeside = vi.fn();
+    renderThree(onOpenBeside);
+    fireEvent.click(screen.getByTitle('a'), { shiftKey: true });
+    fireEvent.click(screen.getByTitle('b'), { shiftKey: true });
+    expect(onOpenBeside).not.toHaveBeenCalled();
+    expect(screen.getByText('2 selected')).toBeInTheDocument();
+    expect(screen.getByRole('toolbar', { name: 'Selected conversations' })).toBeInTheDocument();
+  });
+
+  it('PAN-5343 H-D5: without onOpenBeside, Ctrl-click still toggles the selection', () => {
+    renderThree();
+    fireEvent.click(screen.getByTitle('a'), { ctrlKey: true });
+    expect(screen.getByText('1 selected')).toBeInTheDocument();
+    expect(screen.getByTitle('a')).toHaveAttribute('aria-selected', 'true');
   });
 
   it('bulk-select.ac2: clicking the bulk bar Settle sends one request with three updates and closes the bar', async () => {
