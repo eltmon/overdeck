@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:19:47.790Z",
+  "updated": "2026-11-16T11:23:02.677Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,30 @@
   "sessionHistory": [],
   "items": {
     "modal-api": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4756",
-      "claimedAt": "2026-11-16T11:19:47.790Z"
+      "claimedAt": "2026-11-16T11:19:47.790Z",
+      "doneAt": "2026-11-16T11:23:02.676Z"
+    },
+    "modal-api.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:23:02.676Z"
+    },
+    "modal-api.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:23:02.676Z"
+    },
+    "modal-api.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:23:02.676Z"
+    },
+    "modal-api.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:23:02.676Z"
+    },
+    "modal-api.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:23:02.676Z"
     }
   }
 }
