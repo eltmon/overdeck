@@ -153,7 +153,7 @@ describe('ServerConfig', () => {
 
       expect(serverPort).toBeDefined();
       expect(serverPort).not.toBe('3011');
-      expect(proxyTarget).toBe(`http://server:${serverPort}`);
+      expect(proxyTarget).toBe(`http://api-test-feature_folder:${serverPort}`);
       expect(compose.services?.server?.labels ?? []).toContain(
         `traefik.http.services.pan-api-test-feature_folder.loadbalancer.server.port=${serverPort}`,
       );
