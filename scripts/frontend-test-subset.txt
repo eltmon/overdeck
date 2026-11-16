@@ -505,6 +505,7 @@ src/lib/__tests__/linkedConversation.test.ts
 src/lib/__tests__/markdownDocLinks.test.ts
 src/lib/__tests__/monaco-setup.test.ts
 src/lib/__tests__/nativeQuietReads.test.tsx
+src/lib/__tests__/paneLayout.preset.test.ts
 src/lib/__tests__/panesStore.code.test.ts
 src/lib/__tests__/panesStore.explorer.test.ts
 src/lib/__tests__/panesStore.homeless.test.ts
