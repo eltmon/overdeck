@@ -508,5 +508,11 @@
     "upstream": "orca",
     "path": "native/computer-use-linux/runtime.py",
     "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "src/lib/computer-use/blocked-key-combos.ts",
+    "upstream": "orca",
+    "path": "src/main/computer/action-contracts/computer-blocked-key-combos.ts",
+    "commit": "c6b9ac9549b"
   }
 ]
