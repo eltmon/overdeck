@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:38:55.593Z",
+  "updated": "2026-11-16T11:39:21.244Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,9 +138,18 @@
       "doneAt": "2026-11-16T11:38:53.725Z"
     },
     "migrate-prd-viewer": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4756",
-      "claimedAt": "2026-11-16T11:38:55.593Z"
+      "claimedAt": "2026-11-16T11:38:55.593Z",
+      "doneAt": "2026-11-16T11:39:21.244Z"
+    },
+    "migrate-prd-viewer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:39:21.244Z"
+    },
+    "migrate-prd-viewer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:39:21.244Z"
     }
   }
 }
