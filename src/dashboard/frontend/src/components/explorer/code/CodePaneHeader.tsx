@@ -41,16 +41,26 @@ export function CodePaneHeader(props: CodePaneHeaderProps) {
   const { path, rootLabel, view, onView, wordWrap, onToggleWrap, changes, onToggleChanges, preview, onKeepOpen, onReveal } = props
   const markdown = props.previewable ?? isMarkdownPath(path)
   const segments = path.split('/').filter(Boolean)
+  const fileName = segments.length > 0 ? segments[segments.length - 1] : undefined
+  const leading = segments.slice(0, -1)
   return (
     <div className={`${styles.subTabs} items-center`} data-testid="code-pane-header">
-      <span className="flex min-w-0 items-center gap-1 truncate text-xs text-muted-foreground" title={path} data-testid="code-pane-breadcrumb">
-        <span>{rootLabel}</span>
-        {segments.map((segment, i) => (
-          <Fragment key={i}>
-            <span aria-hidden>›</span>
-            <span className={i === segments.length - 1 ? 'text-foreground' : undefined}>{segment}</span>
-          </Fragment>
-        ))}
+      <span className="flex min-w-0 items-center overflow-hidden text-xs text-muted-foreground" title={path} data-testid="code-pane-breadcrumb">
+        <span className="min-w-0 truncate" data-testid="code-pane-breadcrumb-lead">
+          <span>{rootLabel}</span>
+          {leading.map((segment, i) => (
+            <Fragment key={i}>
+              <span aria-hidden className="px-1">›</span>
+              <span>{segment}</span>
+            </Fragment>
+          ))}
+        </span>
+        {fileName !== undefined && (
+          <>
+            <span aria-hidden className="shrink-0 px-1" data-testid="code-pane-breadcrumb-sep">›</span>
+            <span className="max-w-full shrink-0 truncate text-foreground" data-testid="code-pane-breadcrumb-file">{fileName}</span>
+          </>
+        )}
       </span>
       {onToggleChanges ? (
         <div role="tablist" aria-label="Mode" className="flex">

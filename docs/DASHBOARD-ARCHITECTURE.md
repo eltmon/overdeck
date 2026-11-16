@@ -2224,7 +2224,9 @@ Top to bottom:
    name, the harness when it is not Claude Code, and the effort word — the
    same inputs quick create sends. The caret menu holds the model, harness and
    effort pickers, the Retrospective button and **New conversation with
-   options…**.
+   options…**. `newConversationDefaults.ts` asks for the settings' default
+   conversation model once at load, so the line names the real default on
+   routes without a model picker; a stored manual pick still wins (PAN-5370).
 4. **Conversations** (`ConversationsSection.tsx`). An **Active / All N** switch
    over `ConversationList`, persisted in `overdeck.ui.leftColumnConversationScope`
    (default Active). Active shows Needs you and Inbox; All adds Snoozed and
@@ -2233,7 +2235,10 @@ Top to bottom:
    `ProjectMembershipBoundary`: the eyebrow "Issues", the issue count, the CI,
    deploy and identity chips, and the filter menu (`IssuesFilterMenu.tsx`: All,
    Alive or Failed sessions, plus a **Planned** checkbox). Its collapse state
-   persists in `overdeck.ui.leftColumnIssuesCollapsed`.
+   persists in `overdeck.ui.leftColumnIssuesCollapsed`. The eyebrow, count and
+   filter never shrink; the CI, deploy and identity chips sit in a container
+   that gives way first — the identity chip ends in an ellipsis and anything
+   still too wide is clipped (PAN-5370).
 6. **Workspaces** (`WorkspacesSection.tsx`). The selected project's workspaces,
    an **Archived (N)** expander and a `+` for a new workspace. The row helpers
    live in `workspaceRows.ts`. The section renders nothing when the project has
@@ -2274,7 +2279,7 @@ still sees it.
 | `useIssueCosts.ts` | The `['costs-by-issue']` query (15 s) mapped to `issueCosts` and `issueCostDetails`, keyed as given and lowercased. |
 | `useProjectScope.ts` | `useProjectScope(deckKey, conversations?)`: the `conversations` list it scoped (the `['conversations']` query unless the caller passes one), `projectConvs`, `projectConvIdSet`, `projectIssueIds`, the project data and registry entry, `resolveConversationProjectName`, and the `membership` flags (`pending`, `registryError`, `unknown`). |
 | `useIssueSessionActions.ts` | `useIssueSessionActions(deckKey)`: one memoized object of the issue and session handlers (select, terminal, transcript, stop, pause, resume, unpause, restart, deep wipe, state dir, orphan cleanup, Plan dialog). Also the `useDeckDialogs` store that holds the open Plan dialog's issue. |
-| `newConversationDefaults.ts` | The `useNewConversationDefaults` store: `model`, `harness` and `effort` for quick create, loaded from storage and re-derived when the model catalog syncs. |
+| `newConversationDefaults.ts` | The `useNewConversationDefaults` store: `model`, `harness` and `effort` for quick create, loaded from storage and re-derived when the model catalog syncs, and re-derived once the settings' default conversation model loads. |
 | `useCreateConversation.ts` | `useCreateConversation(deckKey, onCreated?)` returns `{ create, createForAgent }`: POST `/api/conversations` with the stored defaults, select it, open its pane and call `openInDeck`. |
 | `useOpenConversation.ts` | `useOpenConversation(deckKey, options?)` returns `(name) => void`: select the conversation, open its pane in its project (the No-project bucket when unscoped) and call `openInDeck`. `null` clears the selection. |
 | `DeckDataHost.tsx` | Renders `null`. Calls `useSessionTreeSubscription(useDeckProjects().projects)` and nothing else. |
@@ -2516,7 +2521,7 @@ The permanent `Home` tab of a project deck (`paneType: 'home'`), mounted by `Com
 - `useAgentsWorking({ projectKey })` (`lib/selectors/agentsWorking.ts`) — the Agents working fact, the same count as the project switcher.
 - `useNeedsYouItems({ projectKey })` (`lib/selectors/needsYou.ts`) — the Needs you fact and panel, and the `needs you` row tag (an issue is tagged when the list has key `issue:<ID>`).
 - `GET /api/projects/:key/changes?since=7d` (query key `['project-changes', key, '7d']`, 60 s poll) — the Landed fact, the metadata line's branch and Recent changes.
-- `GET /api/costs/summary?project=<prefix>` (query key `['project-recent-spend', prefix]`, 60 s poll) — the Spend fact. The prefix is the registered issue prefix, else the single prefix of the loaded issues.
+- `GET /api/costs/summary?project=<prefix>` (query key `['project-recent-spend', prefix]`, 60 s poll) — the Spend fact. The prefix is the registered issue prefix, else the single prefix of the loaded issues. The read gives up after 20 s (`SPEND_TIMEOUT_MS`); on an error or timeout the fact shows `—` / `unavailable`, as Landed does.
 - `GET /api/projects/:key/release-status` (query key `['projectReleaseStatus', key]`, shared with `ProjectReleasePanel`) — the release word.
 - The project CI record, `selectProjectCi(key)` + `deriveProjectCi` — the CI word.
 
@@ -2861,7 +2866,9 @@ pane is marked **deleted**; saving recreates it.
 The header holds the path, Edit / Preview for markdown files (`MarkdownTab`
 renders the live draft), **Wrap** (on by default, also `Alt+Z`), **Changes**
 (a Monaco diff of `HEAD` against the draft, editable on the right, keeping the
-cursor) and **Keep open**.
+cursor) and **Keep open**. The path is a breadcrumb whose file name never
+truncates before the leading folders do; the full path is the breadcrumb's
+tooltip (PAN-5370).
 
 ### Write services and the trash (PAN-5187)
 

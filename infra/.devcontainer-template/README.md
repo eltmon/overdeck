@@ -61,6 +61,18 @@ each one uses one of Docker's ~31 bridge subnets (PAN-4663). Stacks rendered
 before the fix keep their empty `_default` network until their next rebuild or
 teardown removes it.
 
+Compose registers each service's name (`server`, `frontend`, `dev`) as a DNS
+name on every network that service joins, including the shared `overdeck`
+network — so the bare name `server` resolves to every running stack's server,
+not just this one. The frontend therefore proxies to
+`http://api-{{FEATURE_FOLDER}}:3013`, an alias the `server` service declares
+on `devnet` only (PAN-5330). Any new service-to-service URL added to this
+template must use a `devnet`-scoped alias, never a bare service name. A
+running stack picks up this kind of change only when `.devcontainer/` is
+re-rendered — `pan workspace rebuild <issue>`, a new workspace, or a new UAT
+stack. `./dev rebuild`, `./dev up`, `docker compose up -d` and
+`docker restart` reuse the already-rendered file and keep the old target.
+
 ## Usage
 
 ### Via Convenience Script
