@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T14:13:01.724397Z · model: claude-opus-5-5 · open: 893_
+_Last sequenced: 2026-11-16T14:47:16.675651Z · model: claude-opus-5-5 · open: 891_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -220,12 +220,11 @@ _Last sequenced: 2026-11-16T14:13:01.724397Z · model: claude-opus-5-5 · open: 
 | 223 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
 | 224 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
 | 225 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
-| 226 | PAN-4561 | L | medium | ok |  |  | React 18.3 + ~700 hand memo hooks; upgrade to React 19, enable the compiler, ratchet out manual memo. #4560 profiling has landed. |
+| 226 | PAN-5435 | M | medium | ok |  |  | React Compiler burn-down for app shell, pages, hooks, lib: 67 skips, 100 memo sites. Do first; hooks feed all groups. Unblocked. |
 | 227 | PAN-4242 | M | high | ok |  |  | pan handoff --cwd skips the folder-trust pre-trust pan start does; successor sits at the trust prompt for hours while shown live |
 | 228 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 229 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
 | 230 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
-| 231 | PAN-5435 | M | medium | ok |  | PAN-4561 | React Compiler burn-down for app shell, pages, hooks, lib: 67 skips, 100 memo sites. Do first; hooks feed all groups. |
 | 232 | PAN-5116 | S | high | ok |  |  | restart-all closes the pane but the launcher ignores SIGHUP, so the old ACP host and agent child keep running; stop runtime first. |
 | 233 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 234 | PAN-4909 | S | high | ok |  |  | Mac set up with connect: Safari on localhost:3011 gets HTTP 401 from the loopback session mint, so the Mac's own dashboard won't load. |
@@ -391,8 +390,8 @@ _Last sequenced: 2026-11-16T14:13:01.724397Z · model: claude-opus-5-5 · open: 
 | 395 | PAN-3164 | XS | medium | ok |  |  | probeUatStack reports readiness from container count, so the UI offers 'Open UAT frontend' while the API is still resolving Maven deps. |
 | 396 | PAN-3121 | S | medium | ok |  |  | The failed-send outbox never reconciles against the transcript, so a delivered message keeps a Retry twin that would double-send. |
 | 397 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
-| 398 | PAN-5436 | L | medium | ok |  | PAN-4561 | React Compiler burn-down for components/chat: 44 skips in 30 files, then drop 163 manual memo sites. Needs PAN-4561 merged. |
-| 399 | PAN-5438 | L | medium | ok |  | PAN-4561 | React Compiler burn-down for Command Deck, Stage, frame, dock: 56 skips, 237 memo sites. Needs PAN-4561 merged. |
+| 398 | PAN-5436 | L | medium | ok |  |  | React Compiler burn-down for components/chat: 44 skips in 30 files, then drop 163 manual memo sites. PAN-4561 has merged. |
+| 399 | PAN-5438 | L | medium | ok |  |  | React Compiler burn-down for Command Deck, Stage, frame, dock: 56 skips, 237 memo sites. PAN-4561 has merged. |
 | 400 | PAN-5366 | M | medium | ok |  |  | Conversation page cannot show whether per-turn memory injection reaches it; add a state route and a status-line part. |
 | 401 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
 | 402 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
@@ -421,14 +420,14 @@ _Last sequenced: 2026-11-16T14:13:01.724397Z · model: claude-opus-5-5 · open: 
 | 425 | PAN-5386 | XS | medium | ok |  |  | CodeRabbit follow-up for PAN-5361 (PR #5373): 1 Major finding, baseline burst can hide an idle regression in bare-host smoke |
 | 426 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
 | 427 | PAN-5227 | S | medium | ok |  |  | Closed-issue reaper re-checks every issue's state every 60 s, spending ~25% of the GitHub App REST bucket while idle. |
-| 428 | PAN-5439 | L | medium | ok |  | PAN-4561 | React Compiler burn-down for explorer, God View, conversations, workspace, project: 40 skips, 132 memo sites. |
+| 428 | PAN-5439 | L | medium | ok |  |  | React Compiler burn-down for explorer, God View, conversations, workspace, project: 40 skips, 132 memo sites. |
 | 429 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
 | 430 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
 | 431 | PAN-1627 | M | medium | ok |  |  | Substrate: Claude Code's native .claude/** settings-edit protection wedges in-scope work agents (un-overridable by PreToolUse auto-appr… |
 | 432 | PAN-1624 | S | medium | ok |  |  | pan handoff --author external: authored doc is socket_write-ten but never submitted |
 | 433 | PAN-3901 | S | medium | ok |  |  | test-skip gate has no audited exemption for opt-in live suites (skipIf on env/binary); allowlist row with justification |
 | 434 | PAN-3852 | S | medium | ok |  |  | Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping |
-| 435 | PAN-5437 | M | medium | ok |  | PAN-4561 | React Compiler burn-down for components/Settings: 60 skips in 31 files, 27 memo sites. Needs PAN-4561 merged. |
+| 435 | PAN-5437 | M | medium | ok |  |  | React Compiler burn-down for components/Settings: 60 skips in 31 files, 27 memo sites. PAN-4561 has merged. |
 | 436 | PAN-3862 | L | medium | needs-refinement |  |  | /agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model |
 | 437 | PAN-1572 | M | medium | needs-refinement |  |  | Settings permission-mode can desync from the resolved mode; body cites the removed DSP flag and a renamed symbol — rewrite first |
 | 438 | PAN-4627 | S | medium | ok |  |  | Homebrew Claude Code installs get a copy-only upgrade banner; make the brew plan runnable and auto-upgrade outdated runnable installs. |
@@ -443,7 +442,7 @@ _Last sequenced: 2026-11-16T14:13:01.724397Z · model: claude-opus-5-5 · open: 
 | 447 | PAN-5180 | M | medium | ok |  |  | Tab-open REST burst (~45 requests) delays every client 1.0-1.4 s; uncached prerequisite and status probes. |
 | 448 | PAN-5264 | M | medium | ok |  |  | Attribute the app-rest GitHub caller (1,422 untraced App REST calls/hour), then cut the largest path. |
 | 449 | PAN-5340 | S | medium | ok |  |  | A Preview link to another Markdown file should open it in Preview, not Edit. Follows PAN-5337. |
-| 450 | PAN-5440 | L | medium | ok |  | PAN-4561 | React Compiler burn-down for all remaining components: 78 skips in 42 files, 288 memo sites. Largest group; do last. |
+| 450 | PAN-5440 | L | medium | ok |  |  | React Compiler burn-down for all remaining components: 78 skips in 42 files, 288 memo sites. Largest group; do last. |
 | 451 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
 | 452 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
 | 453 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
@@ -882,7 +881,7 @@ _Last sequenced: 2026-11-16T14:13:01.724397Z · model: claude-opus-5-5 · open: 
 | 886 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
 | 887 | PAN-4555 | XS | low | ok |  |  | Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then. |
 | 888 | PAN-4590 | L | medium | ok |  |  | Semgrep sast verification gate + review-context findings; first buildable Semgrep child (epic PAN-4585 closed), needs config. |
-| 889 | PAN-4591 | L | medium | ok |  |  | Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; epic PAN-4585 closed, now buildable. |
+| 889 | PAN-5434 | M | low | ok |  |  | Codex apply_patch post-edit Semgrep scan; needs a hooks.json composer shared with SageOx. PAN-4591 merged; live Codex probe first. |
 | 890 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
 | 891 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
 | 892 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
@@ -893,7 +892,6 @@ _Last sequenced: 2026-11-16T14:13:01.724397Z · model: claude-opus-5-5 · open: 
 | 897 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
 | 898 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
 | 899 | PAN-5207 | L | low | needs-refinement |  | PAN-5202 | Parked by the operator: Flux meeting bots for Zoom, Teams, Meet, Slack as a paid integration. Do not start. |
-| 900 | PAN-5434 | M | low | ok |  | PAN-4591 | Codex apply_patch post-edit Semgrep scan; needs a hooks.json composer shared with SageOx. Blocked by PAN-4591; live Codex probe first. |
 | 901 | PAN-5181 | XS | low | ok |  |  | Fix shipped in PR #5179 (merged 2026-11-13); the body says it closes on merge. Verify and close. |
 | 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
 | 903 | PAN-5444 | XS | low | ok |  |  | Two Minor CodeRabbit findings left on merged PR #5443: semgrep repo rules resolve from event cwd; hook tests not isolated from Docker. |
@@ -1228,10 +1226,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T14:13:01.724397Z",
+  "generatedAt": "2026-11-16T14:47:16.675651Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 893,
+  "openCount": 891,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -3987,15 +3985,15 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4561",
+      "issue": "PAN-5435",
       "rank": 226,
-      "size": "L",
+      "size": "M",
       "importance": "medium",
       "score": 52,
       "condition": "ok",
       "dependsOn": [],
-      "why": "React 18.3 + ~700 hand memo hooks; upgrade to React 19, enable the compiler, ratchet out manual memo. #4560 profiling has landed.",
-      "rationale": "PAN-4560 profiling merged, so the before numbers this upgrade wanted now exist; rank held at 220 because the broad React upgrade still carries third-party risk and PAN-4572 should land first.",
+      "why": "React Compiler burn-down for app shell, pages, hooks, lib: 67 skips, 100 memo sites. Do first; hooks feed all groups. Unblocked.",
+      "rationale": "PAN-4561 (React 19 + compiler) merged on 2026-11-16, so this first burn-down group is now buildable and moves into the parent's freed slot at 226.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4048,21 +4046,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "Kimi ACP cancel is sent with id:\"\" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked.",
       "rationale": "Source-verified cause: effect-acp serializes every notification with an empty id, so session/cancel never reaches Kimi, the provider keeps generating and spending, and 318 late chunks render after turn_completed. Its prerequisite PAN-4563 (replay fixture and pinned host-replay test) merged in #4576, so the dependency is cleared; the rank stays at 224 because it already sat in the high tier with peers of equal score and nothing else about the issue changed.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5435",
-      "rank": 231,
-      "size": "M",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4561"
-      ],
-      "why": "React Compiler burn-down for app shell, pages, hooks, lib: 67 skips, 100 memo sites. Do first; hooks feed all groups.",
-      "rationale": "New child of PAN-4561 (in pipeline): it can start only after the React 19 upgrade and compiler land, so it sits in a free slot below the parent at medium importance.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6108,11 +6091,9 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "importance": "medium",
       "score": 48,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4561"
-      ],
-      "why": "React Compiler burn-down for components/chat: 44 skips in 30 files, then drop 163 manual memo sites. Needs PAN-4561 merged.",
-      "rationale": "New child of PAN-4561 (in pipeline): it can start only after the React 19 upgrade and compiler land, so it sits in a free slot below the parent at medium importance.",
+      "dependsOn": [],
+      "why": "React Compiler burn-down for components/chat: 44 skips in 30 files, then drop 163 manual memo sites. PAN-4561 has merged.",
+      "rationale": "PAN-4561 merged on 2026-11-16, so the blocking dependency is gone; rank unchanged because PAN-5435 (shared hooks) should land first.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6123,11 +6104,9 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "importance": "medium",
       "score": 48,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4561"
-      ],
-      "why": "React Compiler burn-down for Command Deck, Stage, frame, dock: 56 skips, 237 memo sites. Needs PAN-4561 merged.",
-      "rationale": "New child of PAN-4561 (in pipeline): it can start only after the React 19 upgrade and compiler land, so it sits in a free slot below the parent at medium importance.",
+      "dependsOn": [],
+      "why": "React Compiler burn-down for Command Deck, Stage, frame, dock: 56 skips, 237 memo sites. PAN-4561 has merged.",
+      "rationale": "PAN-4561 merged on 2026-11-16, so the blocking dependency is gone; rank unchanged because PAN-5435 (shared hooks) should land first.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6482,11 +6461,9 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "importance": "medium",
       "score": 46,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4561"
-      ],
+      "dependsOn": [],
       "why": "React Compiler burn-down for explorer, God View, conversations, workspace, project: 40 skips, 132 memo sites.",
-      "rationale": "New child of PAN-4561 (in pipeline): it can start only after the React 19 upgrade and compiler land, so it sits in a free slot below the parent at medium importance.",
+      "rationale": "PAN-4561 merged on 2026-11-16, so the blocking dependency is gone; rank unchanged because PAN-5435 (shared hooks) should land first.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6571,11 +6548,9 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "importance": "medium",
       "score": 44,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4561"
-      ],
-      "why": "React Compiler burn-down for components/Settings: 60 skips in 31 files, 27 memo sites. Needs PAN-4561 merged.",
-      "rationale": "New child of PAN-4561 (in pipeline): it can start only after the React 19 upgrade and compiler land, so it sits in a free slot below the parent at medium importance.",
+      "dependsOn": [],
+      "why": "React Compiler burn-down for components/Settings: 60 skips in 31 files, 27 memo sites. PAN-4561 has merged.",
+      "rationale": "PAN-4561 merged on 2026-11-16, so the blocking dependency is gone; rank unchanged because PAN-5435 (shared hooks) should land first.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6758,11 +6733,9 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "importance": "medium",
       "score": 44,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4561"
-      ],
+      "dependsOn": [],
       "why": "React Compiler burn-down for all remaining components: 78 skips in 42 files, 288 memo sites. Largest group; do last.",
-      "rationale": "New comment adds components/shared/Modal.tsx to this group's skip baseline after PAN-4561 merged main; scope grows by one file, rank unchanged.",
+      "rationale": "PAN-4561 merged on 2026-11-16 (adding Modal.tsx to this group's baseline); unblocked but stays last of the burn-down groups by design.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12140,15 +12113,15 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4591",
+      "issue": "PAN-5434",
       "rank": 889,
-      "size": "L",
-      "importance": "medium",
-      "score": 45,
+      "size": "M",
+      "importance": "low",
+      "score": 32,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; epic PAN-4585 closed, now buildable.",
-      "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
+      "why": "Codex apply_patch post-edit Semgrep scan; needs a hooks.json composer shared with SageOx. PAN-4591 merged; live Codex probe first.",
+      "rationale": "PAN-4591 (Semgrep in-session) merged on 2026-11-16, so this deferred slice is unblocked and takes the parent's freed slot at 889.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12284,21 +12257,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
         "PAN-5202"
       ],
       "why": "Parked by the operator: Flux meeting bots for Zoom, Teams, Meet, Slack as a paid integration. Do not start.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5434",
-      "rank": 900,
-      "size": "M",
-      "importance": "low",
-      "score": 32,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4591"
-      ],
-      "why": "Codex apply_patch post-edit Semgrep scan; needs a hooks.json composer shared with SageOx. Blocked by PAN-4591; live Codex probe first.",
-      "rationale": "New issue filed as a deferred slice of PAN-4591; it is blocked by that issue and ranks just after the Semgrep cluster.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13265,55 +13223,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 0.5
     },
     {
-      "from": "PAN-4561",
-      "to": "PAN-5435",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4561",
-      "to": "PAN-5436",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4561",
-      "to": "PAN-5437",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4561",
-      "to": "PAN-5438",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4561",
-      "to": "PAN-5439",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4561",
-      "to": "PAN-5440",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4572",
-      "to": "PAN-4561",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-4586",
       "to": "PAN-3952",
       "type": "informs",
@@ -13337,13 +13246,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
     {
       "from": "PAN-4590",
       "to": "PAN-4594",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4591",
-      "to": "PAN-5434",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
