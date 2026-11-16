@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
-import { AlertTriangle, Info, CheckCircle, XCircle, X } from 'lucide-react';
+
+import { Modal } from './shared/Modal';
+import formStyles from './shared/ModalForm.module.css';
 
 // --- Types ---
 
@@ -43,69 +45,6 @@ export function useAlert() {
   return ctx.alert;
 }
 
-// --- Nested dialog depth tracking ---
-
-let dialogDepth = 0;
-
-function useDialogDepth() {
-  const [depth, setDepth] = useState(0);
-
-  useEffect(() => {
-    dialogDepth += 1;
-    setDepth(dialogDepth);
-    return () => {
-      dialogDepth -= 1;
-    };
-  }, []);
-
-  return depth;
-}
-
-// --- Dialog Shell ---
-
-function DialogShell({
-  children,
-  onDismiss,
-}: {
-  children: React.ReactNode;
-  onDismiss: () => void;
-}) {
-  const depth = useDialogDepth();
-  const [entered, setEntered] = useState(false);
-
-  useEffect(() => {
-    requestAnimationFrame(() => setEntered(true));
-  }, []);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onDismiss();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onDismiss]);
-
-  return (
-    <div
-      className="fixed inset-0 bg-black/32 backdrop-blur-sm flex items-center justify-center z-[100]"
-      onClick={onDismiss}
-      style={{ '--nested-dialogs': depth } as React.CSSProperties}
-    >
-      <div
-        className={`bg-popover text-popover-foreground rounded-2xl border border-border shadow-lg w-full max-w-md mx-4 transition-all duration-200 ease-in-out ${
-          entered ? 'scale-100 opacity-100' : 'scale-[0.98] opacity-0'
-        }`}
-        style={{ transform: `scale(${entered ? `calc(1 - 0.1 * ${depth})` : '0.98'})` }}
-        onClick={(e) => e.stopPropagation()}
-        role="alertdialog"
-        aria-modal="true"
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
-
 // --- Dialog Components ---
 
 function ConfirmDialogContent({
@@ -133,25 +72,38 @@ function ConfirmDialogContent({
   }, [isDestructive]);
 
   return (
-    <DialogShell onDismiss={onCancel}>
-      {/* Header */}
-      <div className="flex items-center gap-2 px-6 py-4 border-b border-border">
-        {isDestructive ? (
-          <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
-        ) : (
-          <Info className="w-5 h-5 text-info shrink-0" />
-        )}
-        <h3 id="dialog-title" className="text-lg font-semibold text-foreground">{options.title}</h3>
-      </div>
-
-      {/* Body */}
-      <div className="px-6 py-5 space-y-3">
-        <p id="dialog-message" className="text-sm text-foreground whitespace-pre-line select-text cursor-text">{options.message}</p>
+    <Modal
+      title={options.title}
+      size="narrow"
+      alert
+      describedBy="dialog-message"
+      onClose={onCancel}
+      footer={
+        <>
+          <button ref={cancelRef} type="button" onClick={onCancel} className={formStyles.button}>
+            {options.cancelLabel || 'Cancel'}
+          </button>
+          <button
+            ref={confirmRef}
+            type="button"
+            onClick={onConfirm}
+            disabled={!confirmationMatches}
+            className={isDestructive ? formStyles.destructiveButton : formStyles.primaryButton}
+          >
+            {options.confirmLabel || 'Confirm'}
+          </button>
+        </>
+      }
+    >
+      <div className={formStyles.form}>
+        <p id="dialog-message" className={`${formStyles.text} whitespace-pre-line select-text cursor-text`}>{options.message}</p>
         {requiresText ? (
-          <label className="block text-xs text-muted-foreground">
-            Type <span className="font-mono text-foreground">{options.requiredText}</span> to confirm
+          <label className={formStyles.field}>
+            <span className={formStyles.label}>
+              Type <span className={formStyles.mono}>{options.requiredText}</span> to confirm
+            </span>
             <input
-              className="mt-1 w-full rounded border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              className={formStyles.input}
               value={confirmationText}
               onChange={(event) => setConfirmationText(event.target.value)}
               aria-label="Confirmation text"
@@ -160,30 +112,7 @@ function ConfirmDialogContent({
           </label>
         ) : null}
       </div>
-
-      {/* Footer */}
-      <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-border">
-        <button
-          ref={cancelRef}
-          onClick={onCancel}
-          className="px-4 py-2 rounded-lg text-sm bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
-        >
-          {options.cancelLabel || 'Cancel'}
-        </button>
-        <button
-          ref={confirmRef}
-          onClick={onConfirm}
-          disabled={!confirmationMatches}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-            isDestructive
-              ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
-              : 'bg-primary text-primary-foreground hover:bg-primary/90'
-          }`}
-        >
-          {options.confirmLabel || 'Confirm'}
-        </button>
-      </div>
-    </DialogShell>
+    </Modal>
   );
 }
 
@@ -200,45 +129,25 @@ function AlertDialogContent({
     closeRef.current?.focus();
   }, []);
 
-  const iconMap = {
-    info: <Info className="w-5 h-5 text-info shrink-0" />,
-    error: <XCircle className="w-5 h-5 text-destructive shrink-0" />,
-    success: <CheckCircle className="w-5 h-5 text-success shrink-0" />,
-  };
-
   const variant = options.variant || 'info';
 
   return (
-    <DialogShell onDismiss={onClose}>
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-        <div className="flex items-center gap-2">
-          {iconMap[variant]}
-          <h3 id="alert-title" className="text-lg font-semibold text-foreground">
-            {options.title || (variant === 'error' ? 'Error' : variant === 'success' ? 'Success' : 'Notice')}
-          </h3>
-        </div>
-        <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-
-      {/* Body */}
-      <div className="px-6 py-5">
-        <p id="alert-message" className="text-sm text-foreground whitespace-pre-line select-text cursor-text">{options.message}</p>
-      </div>
-
-      {/* Footer */}
-      <div className="flex items-center justify-end px-6 py-4 border-t border-border">
-        <button
-          ref={closeRef}
-          onClick={onClose}
-          className="px-4 py-2 rounded-lg text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-medium"
-        >
+    <Modal
+      title={options.title || (variant === 'error' ? 'Error' : variant === 'success' ? 'Success' : 'Notice')}
+      size="narrow"
+      alert
+      describedBy="alert-message"
+      onClose={onClose}
+      footer={
+        <button ref={closeRef} type="button" onClick={onClose} className={formStyles.primaryButton}>
           OK
         </button>
+      }
+    >
+      <div className={formStyles.content}>
+        <p id="alert-message" className={`${formStyles.text} whitespace-pre-line select-text cursor-text`}>{options.message}</p>
       </div>
-    </DialogShell>
+    </Modal>
   );
 }
 

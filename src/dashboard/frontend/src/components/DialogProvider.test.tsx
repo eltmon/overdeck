@@ -94,7 +94,7 @@ describe('DialogProvider', () => {
       );
 
       fireEvent.click(screen.getByText('Open Confirm'));
-      fireEvent.keyDown(window, { key: 'Escape' });
+      fireEvent.keyDown(screen.getByRole('alertdialog'), { key: 'Escape' });
 
       await waitFor(() => expect(onResult).toHaveBeenCalledWith(false));
     });
@@ -222,7 +222,7 @@ describe('DialogProvider', () => {
       );
 
       fireEvent.click(screen.getByText('Open Alert'));
-      fireEvent.keyDown(window, { key: 'Escape' });
+      fireEvent.keyDown(screen.getByRole('alertdialog'), { key: 'Escape' });
 
       await waitFor(() => expect(onResult).toHaveBeenCalled());
     });
