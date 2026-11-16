@@ -24,7 +24,11 @@ vi.mock('../../DialogProvider', () => ({
 }));
 
 const openConversation = vi.fn();
-vi.mock('../deck/useOpenConversation', () => ({ useOpenConversation: () => openConversation }));
+const openConversationBeside = vi.fn();
+vi.mock('../deck/useOpenConversation', () => ({
+  useOpenConversation: () => openConversation,
+  useOpenConversationBeside: () => openConversationBeside,
+}));
 
 const conv = (id: number, name: string, extra: Record<string, unknown> = {}) => ({
   id,
@@ -71,6 +75,7 @@ function renderSection(selectedProject = 'alpha', commandDeckProjects: Array<{ n
 beforeEach(() => {
   localStorage.clear();
   openConversation.mockClear();
+  openConversationBeside.mockClear();
   calls = [];
   resetDeckLayoutStore();
   usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} });
@@ -142,6 +147,13 @@ describe('ConversationsSection deck switch (PAN-5343 H-D2)', () => {
     renderSection('__all-projects__');
     fireEvent.click(screen.getByTestId('conversation-deck-scope-project'));
     expect(calls.at(-1)).toEqual({ method: 'selectProject', projectName: '__no-project__', opts: undefined });
+  });
+
+  it('Ctrl+Click opens beside instead of selecting (PAN-5343 H-D5)', () => {
+    renderSection('__all-projects__');
+    fireEvent.click(screen.getByTitle('elsewhere'), { ctrlKey: true });
+    expect(openConversationBeside).toHaveBeenCalledWith('elsewhere');
+    expect(openConversation).not.toHaveBeenCalled();
   });
 
   it('lists every project in the All projects deck, with the full count', () => {

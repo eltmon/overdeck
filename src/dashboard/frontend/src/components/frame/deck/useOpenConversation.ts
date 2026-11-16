@@ -9,12 +9,18 @@
  * so a conversation-reference link can open an archived or otherwise
  * unlisted conversation: when the name isn't in the live list, the passed
  * object stands in for it so its own `projectKey`/`cwd` still resolve.
+ *
+ * PAN-5343 H-D5/H-D6: in the All projects deck a plain open shows the
+ * conversation in the focused leaf of that deck (`showConversation`) and
+ * never switches projects. `useOpenConversationBeside` opens it beside the
+ * panes on screen, in the All deck or in the conversation's own project deck.
  */
 
 import { useCallback } from 'react';
 import type { Conversation } from '../../CommandDeck/ConversationList';
 import { openConversationTab } from '../../CommandDeck/openConversationTab';
-import { NO_PROJECT_KEY } from '../../CommandDeck/projectsData';
+import { ALL_PROJECTS_KEY, NO_PROJECT_KEY } from '../../CommandDeck/projectsData';
+import { openConversationBeside, showConversation } from '../../Stage/openConversationInDeck';
 import { useCommandDeckSelection } from '../../../lib/commandDeckSelection';
 import { conversationRouteKey } from '../../../lib/linkedConversation';
 import { useDeckNavigation } from './deckNavigation';
@@ -36,6 +42,14 @@ export function useOpenConversation(
     if (!name) return;
     selection.setSelectedFeature(null);
     const conv = conversations.find((c) => c.name === name) ?? (typeof target === 'object' && target ? target : undefined);
+    if (deckKey === ALL_PROJECTS_KEY) {
+      showConversation(ALL_PROJECTS_KEY, name, conv?.title ?? 'Agent');
+      if (conv) {
+        onOpened?.(name);
+        openInDeck({ projectKey: ALL_PROJECTS_KEY, conversationRouteKey: conversationRouteKey(conv) });
+      }
+      return;
+    }
     // Unscoped conversations live in the No-project bucket.
     const projectName = resolveConversationProjectName(conv) ?? NO_PROJECT_KEY;
     openConversationTab(projectName, name, conv?.title ?? 'Agent');
@@ -53,4 +67,25 @@ export function useOpenConversation(
       selectProject(projectName, { updateUrl: false });
     }
   }, [conversations, resolveConversationProjectName, openInDeck, selectProject, onOpened, deckKey]);
+}
+
+/**
+ * PAN-5343 H-D5: open a conversation beside the panes on screen — in the All
+ * projects deck when it is selected, else in the conversation's own project
+ * deck (which, in a project deck, is the selected deck).
+ */
+export function useOpenConversationBeside(deckKey: string | null): (name: string) => void {
+  const { openInDeck } = useDeckNavigation();
+  const { conversations, resolveConversationProjectName } = useProjectScope(deckKey);
+
+  return useCallback((name: string) => {
+    const selection = useCommandDeckSelection.getState();
+    selection.setSelectedConversation(name);
+    if (selection.selectedFeature) selection.selectSession(selection.selectedFeature, null);
+    selection.setSelectedFeature(null);
+    const conv = conversations.find((c) => c.name === name);
+    const deck = deckKey === ALL_PROJECTS_KEY ? ALL_PROJECTS_KEY : resolveConversationProjectName(conv) ?? NO_PROJECT_KEY;
+    openConversationBeside(deck, name, conv?.title ?? 'Agent');
+    if (conv) openInDeck({ projectKey: deck, conversationRouteKey: conversationRouteKey(conv) });
+  }, [conversations, resolveConversationProjectName, openInDeck, deckKey]);
 }

@@ -24,7 +24,7 @@ import { selectDeckLayout, useDeckLayoutStore } from '../../lib/deckLayoutStore'
 import { collectLeafIds, leafCount, type PaneLayout } from '../../lib/paneLayout';
 import { selectPanesForWorkspace, usePanesStore, type WorkspacePane } from '../../lib/panesStore';
 import { useDeckNavigation } from './deck/deckNavigation';
-import { useOpenConversation } from './deck/useOpenConversation';
+import { useOpenConversation, useOpenConversationBeside } from './deck/useOpenConversation';
 import { useProjectScope } from './deck/useProjectScope';
 
 export const CONVERSATION_SCOPE_STORAGE_KEY = 'overdeck.ui.leftColumnConversationScope';
@@ -83,6 +83,9 @@ export function ConversationsSection({ selectedProject }: { selectedProject: str
   const { conversations, projectConvs, projectConvIdSet } = useProjectScope(selectedProject);
   const selectedConversation = useCommandDeckSelection((s) => s.selectedConversation);
   const openConversation = useOpenConversation(selectedProject);
+  // PAN-5343 H-D5: Ctrl/Cmd+Click and Beside open beside; Open in its project switches decks.
+  const openConversationBesideInDeck = useOpenConversationBeside(selectedProject);
+  const openConversationInProject = useOpenConversation(null);
   const { selectProject } = useDeckNavigation();
   // The switcher's project list, read from its cache (no polling of its own).
   const { data: projects = [] } = useQuery({ queryKey: ['command-deck-projects'], queryFn: fetchProjects, staleTime: Infinity });
@@ -135,6 +138,8 @@ export function ConversationsSection({ selectedProject }: { selectedProject: str
         includeIds={allProjects ? undefined : projectConvIdSet}
         groupByProject={allProjects ? groupByProject : undefined}
         paneSlots={paneSlots}
+        onOpenBeside={openConversationBesideInDeck}
+        onOpenInProject={openConversationInProject}
         scope={scope}
       />
     </section>
