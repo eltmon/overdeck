@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { mapConversationsToFeedEntries, useConversationFeed, type ConversationFeedRow } from '../useConversationFeed';
 import type { ConversationSessionFeedEntry, SessionFeedEntry } from '../types';
@@ -192,7 +193,7 @@ describe('useConversationFeed', () => {
       error: null,
     } as ReturnType<typeof useQuery>);
 
-    expect(useConversationFeed()).toEqual({
+    expect(renderHook(() => useConversationFeed()).result.current).toEqual({
       entries: [expect.objectContaining({
         kind: 'conversation',
         id: 'conversation:conv-a',

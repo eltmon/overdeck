@@ -650,7 +650,7 @@ export function useConfluenceOrbs(
 
     const next: ConfluenceOrb[] = [];
     const liveIds = new Set<string>();
-    const now = Date.now();
+    const now = nowTick;
     for (const [id, issueAgents] of agentsByIssue) {
       const issue = issuesById.get(id.toUpperCase());
       if (issue === undefined && !TRACKER_ISSUE_ID.test(id)) continue;
@@ -835,7 +835,7 @@ export function useConfluenceMeta(
   });
 
   return useMemo(() => {
-    const now = new Date();
+    const now = new Date(nowTick);
     const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     // The census counts agents the terminal backend hosts, not agent rows:
     // a stored `running` with no pane behind it is not an agent (PAN-3540).
@@ -851,7 +851,7 @@ export function useConfluenceMeta(
       conversation.sessionAlive !== false &&
       conversation.status !== 'ended',
     ).length ?? null;
-    const costEvents = hookStream.costEvents.filter((event) => event.ts >= Date.now() - EVENT_WINDOW_MS);
+    const costEvents = hookStream.costEvents.filter((event) => event.ts >= nowTick - EVENT_WINDOW_MS);
 
     return {
       mergesToday: recentActivity.filter((entry) => isMergeActivityToday(entry, midnight)).length,
