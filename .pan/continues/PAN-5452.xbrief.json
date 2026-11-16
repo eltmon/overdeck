@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5452",
   "created": "2026-11-16T18:34:39.411Z",
-  "updated": "2026-11-16T19:02:41.994Z",
+  "updated": "2026-11-16T19:09:32.796Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,9 +102,30 @@
       "doneAt": "2026-11-16T19:02:36.466Z"
     },
     "desktop-lease": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5452",
-      "claimedAt": "2026-11-16T19:02:41.994Z"
+      "claimedAt": "2026-11-16T19:02:41.994Z",
+      "doneAt": "2026-11-16T19:09:32.795Z"
+    },
+    "desktop-lease.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:09:32.795Z"
+    },
+    "desktop-lease.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:09:32.795Z"
+    },
+    "desktop-lease.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:09:32.795Z"
+    },
+    "desktop-lease.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:09:32.795Z"
+    },
+    "desktop-lease.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T19:09:32.795Z"
     }
   }
 }
