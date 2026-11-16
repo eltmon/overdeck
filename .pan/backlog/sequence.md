@@ -1,12 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T06:43:58.952047Z · model: claude-opus-5-5 · open: 888_
+_Last sequenced: 2026-11-16T07:14:17.670671Z · model: claude-opus-5-5 · open: 886_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-5424 | S | critical | ok |  |  | v0.87.0 desktop publish failed (515 MB tarball from onnxruntime); skip @huggingface/transformers in desktop externals, add size guard. |
-| 2 | PAN-5423 | S | medium | ok |  |  | Make the 'Answer delivered to ...' toast clickable so it opens the conversation or issue that received the answer. |
+| 2 | PAN-5427 | S | medium | ok |  |  | Markdown preview shows YAML front matter as a body paragraph on most docs pages; render it as a key/value list above the content. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
@@ -215,7 +215,6 @@ _Last sequenced: 2026-11-16T06:43:58.952047Z · model: claude-opus-5-5 · open: 
 | 216 | PAN-3196 | S | high | ok |  |  | Root-owned container residue makes close-out die on EACCES after passing every DoD row; same family as PAN-3570. |
 | 217 | PAN-3186 | XS | high | ok |  |  | One configured non-git member (auricle/infra) blanks pipeline membership for the whole project the resolver claims it can answer. |
 | 218 | PAN-3185 | XS | high | ok |  |  | Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail. |
-| 219 | PAN-5413 | S | medium | ok |  |  | Kanban Needs-you strip counts with the old Simple Home rule; switch it to the shared top-bar selector (epic D-8). |
 | 220 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time with no production-reach check, so members read shipped while prod serves the old build. |
 | 221 | PAN-3130 | S | high | ok |  |  | Identifier-joined write paths have no containment assertion, so a crafted issue or agent id could redirect a canonical write. |
 | 222 | PAN-3047 | XS | high | ok |  |  | Strike-branch teardown uses --is-ancestor, which cannot see a squash merge, so all 96 strike/* branches survive as residue. |
@@ -441,7 +440,6 @@ _Last sequenced: 2026-11-16T06:43:58.952047Z · model: claude-opus-5-5 · open: 
 | 447 | PAN-5180 | M | medium | ok |  |  | Tab-open REST burst (~45 requests) delays every client 1.0-1.4 s; uncached prerequisite and status probes. |
 | 448 | PAN-5264 | M | medium | ok |  |  | Attribute the app-rest GitHub caller (1,422 untraced App REST calls/hour), then cut the largest path. |
 | 449 | PAN-5340 | S | medium | ok |  |  | A Preview link to another Markdown file should open it in Preview, not Edit. Follows PAN-5337. |
-| 450 | PAN-5341 | S | medium | ok |  |  | Dock Changes diff view reuses the Markdown Preview that shipped in PAN-5338; matters once D2 moves diffs to the dock. |
 | 451 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
 | 452 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
 | 453 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
@@ -900,9 +898,9 @@ _Last sequenced: 2026-11-16T06:43:58.952047Z · model: claude-opus-5-5 · open: 
 
 New and already in the pipeline. The v0.87.0 release is half-shipped: core and contracts published, desktop stuck at 0.86.0 and no GitHub Release exists, so this blocks every release until it lands. The fix is one SKIP_PACKAGES entry plus a tarball size guard, so it takes the free rank-1 slot.
 
-### PAN-5423 (rank 2)
+### PAN-5427 (rank 2)
 
-Merged (PR closed the issue) and now verifying on main, so it is out of the pipeline; kept at rank 2 unchanged since nothing is left to pick up and it drops off when the tracker closes it.
+New and already in the pipeline (live workspace feature-pan-5427), so it is pinned in rank 2, the slot freed when PAN-5423 merged. It is a small, well-specified frontend fix in MarkdownTab with named tests and a concrete acceptance check; its parent epic PAN-5284 is closed, so it carries no contains edge.
 
 ### PAN-5013 (rank 3)
 
@@ -1223,10 +1221,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T06:43:58.952047Z",
+  "generatedAt": "2026-11-16T07:14:17.670671Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 888,
+  "openCount": 886,
   "nodes": [
     {
       "issue": "PAN-5424",
@@ -1242,15 +1240,15 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "auto"
     },
     {
-      "issue": "PAN-5423",
+      "issue": "PAN-5427",
       "rank": 2,
       "size": "S",
       "importance": "medium",
-      "score": 55,
+      "score": 60,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Make the 'Answer delivered to ...' toast clickable so it opens the conversation or issue that received the answer.",
-      "rationale": "Merged (PR closed the issue) and now verifying on main, so it is out of the pipeline; kept at rank 2 unchanged since nothing is left to pick up and it drops off when the tracker closes it.",
+      "why": "Markdown preview shows YAML front matter as a body paragraph on most docs pages; render it as a key/value list above the content.",
+      "rationale": "New and already in the pipeline (live workspace feature-pan-5427), so it is pinned in rank 2, the slot freed when PAN-5423 merged. It is a small, well-specified frontend fix in MarkdownTab with named tests and a concrete acceptance check; its parent epic PAN-5284 is closed, so it carries no contains edge.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3917,19 +3915,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "dependsOn": [],
       "why": "Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail.",
       "rationale": "Rank held at 212: the rescope comment confirms the TOCTOU gap is still in spawn.ts even though the named racer was cut; the remaining spawner (retryDeferredHandoffs) makes it rarer, so score drops slightly. Moved one slot to 218 because rank 219 is pinned to in-pipeline PAN-5371.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5413",
-      "rank": 219,
-      "size": "S",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Kanban Needs-you strip counts with the old Simple Home rule; switch it to the shared top-bar selector (epic D-8).",
-      "rationale": "Its prerequisite PAN-5371 merged (#5415), so the shared needs-you selector exists and this fix is unblocked; it takes the rank-219 slot PAN-5371 vacated.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6707,19 +6692,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "dependsOn": [],
       "why": "A Preview link to another Markdown file should open it in Preview, not Edit. Follows PAN-5337.",
       "rationale": "Rank kept; its only dependency PAN-5337 closed, so the dependsOn entry is removed and it is now unblocked.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5341",
-      "rank": 450,
-      "size": "S",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Dock Changes diff view reuses the Markdown Preview that shipped in PAN-5338; matters once D2 moves diffs to the dock.",
-      "rationale": "Its dependency PAN-5338 merged, so it is no longer blocked; rank held because its value still waits on D2 moving diffs to the dock.",
       "gate": "auto",
       "planning": "auto"
     },
