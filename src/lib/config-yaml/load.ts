@@ -78,11 +78,12 @@ export function stripProjectTtsEndpoint(config: YamlConfig | null): YamlConfig |
  * can commit a .pan.yaml to the branch it is on, so the project layer never sets them.
  * PAN-4947 D-2: the same holds for `mcp.public` (public MCP through Tailscale Funnel).
  * PAN-5108 D13: and for `harnesses` (harness CLI auto-update is machine-wide).
+ * PAN-5452: and for computer_use (desktop control is the operator's call).
  */
 export function stripProjectSecurity(config: YamlConfig | null): YamlConfig | null {
   if (!config) return config;
   // PAN-5108: harness CLI auto-update is machine-wide; a project file never sets it.
-  const { security: _security, harnesses: _harnesses, ...rest } = config;
+  const { security: _security, harnesses: _harnesses, computer_use: _computerUse, ...rest } = config;
   // PAN-4947 D-2: public MCP (Tailscale Funnel) is operator-only too.
   if (rest.mcp?.public === undefined) return rest;
   const { public: _public, ...mcp } = rest.mcp;

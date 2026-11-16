@@ -575,6 +575,7 @@ export interface YamlConfig {
   ollama?: YamlOllamaConfig;
   jev?: import('./jev.js').YamlJevConfig;
   security?: import('./semgrep.js').YamlSecurityConfig;
+  computer_use?: import('./computer-use.js').YamlComputerUseConfig;
 
   /** Conversation-specific configuration */
   conversations?: ConversationsConfig;
@@ -822,6 +823,7 @@ export interface NormalizedConfig {
   ollama: NormalizedOllamaConfig;
   jev: import('./jev.js').NormalizedJevConfig;
   security: import('./semgrep.js').NormalizedSecurityConfig;
+  computerUse: import('./computer-use.js').NormalizedComputerUseConfig;
 
   /** Enabled providers */
   enabledProviders: Set<ModelProvider>;

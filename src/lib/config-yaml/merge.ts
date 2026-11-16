@@ -15,6 +15,7 @@ import { normalizeJevConfig } from './jev.js';
 import { defaultPushConfig, mergePushConfig } from './push-config.js';
 import { defaultMcpConfig, mergeMcpConfig } from './mcp-config.js';
 import { normalizeSecurityConfig } from './semgrep.js';
+import { normalizeComputerUseConfig } from './computer-use.js';
 import { normalizeGovernorReserves } from './governor-reserves.js';
 import { cloneRoles, DEFAULT_ROLES, DEFAULT_WORKHORSES, mergeRoleConfig, validateRoleModelRefs } from './roles.js';
 import {
@@ -174,6 +175,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     ollama: { ...DEFAULT_CONFIG.ollama },
     jev: { ...DEFAULT_CONFIG.jev },
     security: { semgrep: { ...DEFAULT_CONFIG.security.semgrep } },
+    computerUse: { ...DEFAULT_CONFIG.computerUse },
     harnesses: { ...DEFAULT_CONFIG.harnesses },
     enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
     providerHarnesses: { ...DEFAULT_CONFIG.providerHarnesses },
@@ -492,6 +494,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     // Optional Jev judgment client (PAN-4369): folds like ollama, throws on bad values.
     result.jev = normalizeJevConfig(config.jev, result.jev);
     result.security = normalizeSecurityConfig(config.security, result.security); // PAN-4585
+    result.computerUse = normalizeComputerUseConfig(config.computer_use, result.computerUse); // PAN-5452
 
     // Merge conversation configuration
     if (config.conversations?.compaction_model) {
