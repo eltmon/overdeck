@@ -71,7 +71,7 @@ export function HomeHeader({ title, subtitle, rename, projectKey, meta }: HomeHe
       </div>
       {meta}
       {projectKey && settingsOpen && (
-        <Modal title="Project settings" wide onClose={() => setSettingsOpen(false)}>
+        <Modal title="Project settings" size="wide" onClose={() => setSettingsOpen(false)}>
           <ProjectSettingsSection projectKey={projectKey} />
         </Modal>
       )}

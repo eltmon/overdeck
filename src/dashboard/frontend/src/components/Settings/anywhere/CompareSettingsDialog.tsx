@@ -35,7 +35,7 @@ export function CompareSettingsDialog({ machine, label, onClose }: { machine: st
     <Modal
       title={`Compare settings with ${label}`}
       onClose={onClose}
-      wide
+      size="wide"
       footer={<button type="button" onClick={onClose} className={styles.button}>Close</button>}
     >
       <div className={styles.form}>
