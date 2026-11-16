@@ -4,17 +4,17 @@
     "created": "2026-11-15T23:55:23Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5343: Workflow redesign H: All projects deck — list active conversations across projects, show 1–4 side by side",
-    "updated": "2026-11-16T00:07:29.471Z"
+    "updated": "2026-11-16T00:08:42.878Z"
   },
   "plan": {
     "id": "pan-5343",
     "title": "Workflow redesign H: All projects deck — list active conversations across projects, show 1–4 side by side",
-    "status": "proposed",
+    "status": "running",
     "uid": "c4269c34-2826-4c65-bb2d-4b2f6f8b9ef8",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-15T23:55:23Z",
-    "updated": "2026-11-16T00:07:29.471Z",
+    "updated": "2026-11-16T00:08:42.878Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5343",
@@ -1761,5 +1761,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
