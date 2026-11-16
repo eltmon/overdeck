@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5423",
   "created": "2026-11-16T05:56:13.176Z",
-  "updated": "2026-11-16T06:05:35.705Z",
+  "updated": "2026-11-16T06:07:23.118Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,9 +68,22 @@
       "doneAt": "2026-11-16T06:05:17.882Z"
     },
     "wire-plan-action-toasts": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5423",
-      "claimedAt": "2026-11-16T06:05:35.705Z"
+      "claimedAt": "2026-11-16T06:05:35.705Z",
+      "doneAt": "2026-11-16T06:07:23.118Z"
+    },
+    "wire-plan-action-toasts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T06:07:23.118Z"
+    },
+    "wire-plan-action-toasts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T06:07:23.118Z"
+    },
+    "wire-plan-action-toasts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T06:07:23.118Z"
     }
   }
 }
