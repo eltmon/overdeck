@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4591",
   "created": "2026-11-16T11:39:00.796Z",
-  "updated": "2026-11-16T12:26:03.763Z",
+  "updated": "2026-11-16T12:26:11.755Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -136,6 +136,11 @@
     "claude-launch-hook.ac4": {
       "status": "completed",
       "doneAt": "2026-11-16T12:26:03.762Z"
+    },
+    "hide-skill-when-off": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4591",
+      "claimedAt": "2026-11-16T12:26:11.755Z"
     }
   }
 }
