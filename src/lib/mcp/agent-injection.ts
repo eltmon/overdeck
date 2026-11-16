@@ -22,7 +22,7 @@ import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { getDashboardLoopbackApiUrl } from '../config.js';
 import { getOverdeckHome } from '../paths.js';
 import { panCliInvocation } from '../pan-cli-invocation.js';
-import { getAgentDir } from '../agents/agent-state-read.js';
+import { getAgentDir, getAgentState } from '../agents/agent-state-read.js';
 import { normalizeAgentId } from '../agents/identity.js';
 import { FLYWHEEL_CONVERSATION_SESSION } from '../flywheel/constants.js';
 import { ensureAgentMcpToken, type AgentTokenRole } from './agent-token.js';
@@ -31,6 +31,7 @@ import { resolveProjectMcpServers, type ProjectMcpServer } from '../projects/pro
 import { atlassianNeedsInteractiveAuth } from '../skill-packs/atlassian.js';
 import type { PackMcpServer } from '../skill-packs/adapters.js';
 import { CLAUDE_OVERDECK_MCP_CONFIG_FILE, OVERDECK_MCP_SERVER_NAME } from './overdeck-mcp-args.js';
+import { resolveSemgrepMcpServer, SEMGREP_MCP_SERVER_NAME, type SemgrepMcpServer } from '../semgrep/in-session.js';
 
 export { harnessGetsOverdeckMcp, overdeckMcpEnabledFor } from './overdeck-mcp-gate.js';
 
@@ -86,6 +87,20 @@ export interface OverdeckMcpLaunchOwner {
   issueId?: string;
   /** PAN-5165: the conversation tmux session whose skill layer selects packs. */
   skillConversation?: string;
+  /** PAN-4591: the review convoy lane (`security`, …); resume paths fall back to state `reviewSubRole`. */
+  subRole?: string;
+}
+
+/** PAN-4591: the `semgrep` server for this launch, or null. Never throws (NFR-8). */
+async function launchSemgrepServer(owner: OverdeckMcpLaunchOwner): Promise<SemgrepMcpServer | null> {
+  try {
+    const subRole = owner.subRole
+      ?? (owner.agentKind === 'agent' && owner.role === 'review' ? getAgentState(normalizeAgentId(owner.agentId))?.reviewSubRole : undefined);
+    return await resolveSemgrepMcpServer({ agentId: owner.agentId, agentKind: owner.agentKind, role: owner.role, subRole });
+  } catch (error) {
+    console.warn(`[agent-injection] semgrep MCP skipped for ${owner.agentId}: ${(error as Error).message}`);
+    return null;
+  }
 }
 
 /** The launching role's own MCP server names; a project server with one of these names is dropped (D-4). */
@@ -99,9 +114,9 @@ async function roleServerNames(role: AgentTokenRole): Promise<string[]> {
   }
 }
 
-/** The launch project's resolved servers, with `overdeck` and the role's server names reserved. */
-async function launchProjectServers(owner: OverdeckMcpLaunchOwner) {
-  const reservedNames = [OVERDECK_MCP_SERVER_NAME, ...(await roleServerNames(owner.role))];
+/** The launch project's resolved servers, with `overdeck`, the role's server names and `extraReserved` reserved. */
+async function launchProjectServers(owner: OverdeckMcpLaunchOwner, extraReserved: readonly string[] = []) {
+  const reservedNames = [OVERDECK_MCP_SERVER_NAME, ...(await roleServerNames(owner.role)), ...extraReserved];
   return resolveProjectMcpServers({ issueId: owner.issueId, cwd: owner.cwd, reservedNames });
 }
 
@@ -139,12 +154,13 @@ const OVERDECK_MCP_JSON_LAUNCH_KINDS: ReadonlySet<string> = new Set(['claude-cod
  */
 export async function prepareClaudeOverdeckMcp(
   owner: OverdeckMcpLaunchOwner,
-): Promise<{ overdeckMcpConfig?: string; overdeckMcpServerNames?: string[]; mcpStrict?: boolean }> {
+): Promise<{ overdeckMcpConfig?: string; overdeckMcpServerNames?: string[]; mcpStrict?: boolean; overdeckMcpForceAllow?: string[] }> {
   const behavior = getHarnessBehavior(owner.harness);
   if (!OVERDECK_MCP_JSON_LAUNCH_KINDS.has(behavior.launchCommandKind)) {
     if (!behavior.usesCodexHome) await warnUnprovisionedProjectServers(owner);
     return {};
   }
+  const semgrep = await launchSemgrepServer(owner);
   const servers: Record<string, unknown> = {};
   let dir: string | undefined;
   try {
@@ -158,14 +174,20 @@ export async function prepareClaudeOverdeckMcp(
   }
   let project: { servers: Record<string, ProjectMcpServer>; strict: boolean } = { servers: {}, strict: false };
   try {
-    project = await launchProjectServers(owner);
+    project = await launchProjectServers(owner, semgrep ? [SEMGREP_MCP_SERVER_NAME] : []);
   } catch (error) {
     console.warn(`[agent-injection] project MCP skipped for ${owner.agentId}: ${(error as Error).message}`);
   }
   Object.assign(servers, project.servers);
+  if (semgrep) servers[SEMGREP_MCP_SERVER_NAME] = semgrep;
   let pack: Record<string, PackMcpServer> = {};
   try {
-    pack = await launchPackServers(owner, [OVERDECK_MCP_SERVER_NAME, ...(await roleServerNames(owner.role)), ...Object.keys(project.servers)]);
+    pack = await launchPackServers(owner, [
+      OVERDECK_MCP_SERVER_NAME,
+      ...(await roleServerNames(owner.role)),
+      ...Object.keys(project.servers),
+      ...(semgrep ? [SEMGREP_MCP_SERVER_NAME] : []),
+    ]);
   } catch (error) {
     console.warn(`[agent-injection] pack MCP skipped for ${owner.agentId}: ${(error as Error).message}`);
   }
@@ -177,8 +199,9 @@ export async function prepareClaudeOverdeckMcp(
     return {
       overdeckMcpConfig: await writeLaunchMcpConfig(dir, servers),
       // An overdeck-only file keeps the pre-PAN-5061 result; the launcher defaults to mcp__overdeck (NFR-1).
-      ...(Object.keys(project.servers).length + Object.keys(pack).length > 0 ? { overdeckMcpServerNames: Object.keys(servers) } : {}),
+      ...(Object.keys(project.servers).length + Object.keys(pack).length + (semgrep ? 1 : 0) > 0 ? { overdeckMcpServerNames: Object.keys(servers) } : {}),
       ...(project.strict ? { mcpStrict: true } : {}),
+      ...(semgrep ? { overdeckMcpForceAllow: [SEMGREP_MCP_SERVER_NAME] } : {}),
     };
   } catch (error) {
     console.warn(`[agent-injection] overdeck MCP skipped for ${owner.agentId}: ${(error as Error).message}`);
@@ -205,7 +228,8 @@ async function warnUnprovisionedProjectServers(owner: OverdeckMcpLaunchOwner): P
   } catch {
     // Best effort: pack names are a bonus, never required for the warning.
   }
-  const allNames = [...names, ...packNames];
+  const semgrepNames = (await launchSemgrepServer(owner)) ? [SEMGREP_MCP_SERVER_NAME] : [];
+  const allNames = [...names, ...packNames, ...semgrepNames];
   if (allNames.length === 0) return;
   console.warn(`[project-mcp] ${projectKey}: harness ${owner.harness} does not provision MCP; servers unavailable: ${allNames.join(', ')}`);
 }
@@ -223,6 +247,7 @@ export type CodexOverdeckMcpServer = ProjectMcpServer & { defaultToolsApprovalMo
  */
 export async function prepareCodexOverdeckMcp(owner: OverdeckMcpLaunchOwner): Promise<Record<string, CodexOverdeckMcpServer>> {
   if (!getHarnessBehavior(owner.harness).usesCodexHome) return {};
+  const semgrep = await launchSemgrepServer(owner);
   const servers: Record<string, CodexOverdeckMcpServer> = {};
   try {
     const minted = await mintOverdeckTokenFile(owner);
@@ -232,7 +257,7 @@ export async function prepareCodexOverdeckMcp(owner: OverdeckMcpLaunchOwner): Pr
   }
   let projectServerNames: string[] = [];
   try {
-    const projectServers = (await launchProjectServers(owner)).servers;
+    const projectServers = (await launchProjectServers(owner, semgrep ? [SEMGREP_MCP_SERVER_NAME] : [])).servers;
     projectServerNames = Object.keys(projectServers);
     for (const [name, server] of Object.entries(projectServers)) {
       servers[name] = { ...server, defaultToolsApprovalMode: 'approve' };
@@ -240,8 +265,14 @@ export async function prepareCodexOverdeckMcp(owner: OverdeckMcpLaunchOwner): Pr
   } catch (error) {
     console.warn(`[agent-injection] project MCP skipped for ${owner.agentId}: ${(error as Error).message}`);
   }
+  if (semgrep) servers[SEMGREP_MCP_SERVER_NAME] = { ...semgrep, defaultToolsApprovalMode: 'approve' };
   try {
-    const takenNames = [OVERDECK_MCP_SERVER_NAME, ...(await roleServerNames(owner.role)), ...projectServerNames];
+    const takenNames = [
+      OVERDECK_MCP_SERVER_NAME,
+      ...(await roleServerNames(owner.role)),
+      ...projectServerNames,
+      ...(semgrep ? [SEMGREP_MCP_SERVER_NAME] : []),
+    ];
     for (const [name, server] of Object.entries(await launchPackServers(owner, takenNames))) {
       // D-7b: Codex agents cannot reuse the operator's Claude Code /mcp sign-in, so a header-less atlassian server is unusable.
       if (atlassianNeedsInteractiveAuth(server)) {

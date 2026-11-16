@@ -256,6 +256,8 @@ export interface LauncherConfig extends CodexNativeEndpointOption {
 
   /** PAN-4932/PAN-5061: `<dir>/overdeck-mcp.json` → `--mcp-config=`; without an allow-list, `--allowedTools=` names its servers (`overdeckMcpServerNames`, default `mcp__overdeck`); `mcpStrict` (the project's `mcp_strict`) adds `--strict-mcp-config`. */
   overdeckMcpConfig?: string; overdeckMcpServerNames?: string[]; mcpStrict?: boolean;
+  /** PAN-4591: names (e.g. `semgrep`) force-allowed with their own `--allowedTools=` even when `baseCommand` already carries a role allow-list. */
+  overdeckMcpForceAllow?: string[];
 
   /** Wrap Claude Code in the PTY supervisor: `node <supervisorScriptPath> claude ...`. Defaults to false. */
   useSupervisor?: boolean;
@@ -551,7 +553,7 @@ function buildCommand(config: LauncherConfig): string[] {
     if (config.baseCommand) {
       let cmd = config.baseCommand;
       cmd += buildChannelsArgs(config);
-      cmd += overdeckMcpArgs(config.overdeckMcpConfig, cmd, { serverNames: config.overdeckMcpServerNames, strict: config.mcpStrict });
+      cmd += overdeckMcpArgs(config.overdeckMcpConfig, cmd, { serverNames: config.overdeckMcpServerNames, strict: config.mcpStrict, forceAllow: config.overdeckMcpForceAllow });
       for (const file of systemPromptFiles(config)) {
         cmd += ` --append-system-prompt-file ${shellQuote(file)}`;
       }
@@ -684,7 +686,7 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
 
   // Append channels bridge args (no-op when channelsBridgeMcpConfig unset)
   cmd += buildChannelsArgs(config);
-  cmd += overdeckMcpArgs(config.overdeckMcpConfig, cmd, { serverNames: config.overdeckMcpServerNames, strict: config.mcpStrict });
+  cmd += overdeckMcpArgs(config.overdeckMcpConfig, cmd, { serverNames: config.overdeckMcpServerNames, strict: config.mcpStrict, forceAllow: config.overdeckMcpForceAllow });
 
   // Append session args
   if (config.resumeSessionId) {
