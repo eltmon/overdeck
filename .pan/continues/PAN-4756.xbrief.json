@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:39:22.616Z",
+  "updated": "2026-11-16T11:39:43.223Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -152,9 +152,18 @@
       "doneAt": "2026-11-16T11:39:21.244Z"
     },
     "migrate-xbrief-dialog": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4756",
-      "claimedAt": "2026-11-16T11:39:22.616Z"
+      "claimedAt": "2026-11-16T11:39:22.616Z",
+      "doneAt": "2026-11-16T11:39:43.223Z"
+    },
+    "migrate-xbrief-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:39:43.223Z"
+    },
+    "migrate-xbrief-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:39:43.223Z"
     }
   }
 }
