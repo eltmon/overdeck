@@ -232,6 +232,7 @@ for (const theme of ['light', 'dark'] as const) {
     let prBody: Record<string, unknown> = {
       url: 'https://github.com/eltmon/workflow-fixture/pull/42', number: 42, state: 'OPEN', isDraft: false,
       mergeable: 'MERGEABLE', mergeStateStatus: 'BLOCKED', headSha: 'abc', canMerge: false, reason: 'Required checks or reviews are not met',
+      checksPassing: false,
     };
     await page.route(`**/api/explorer/edit-workspaces/${workspaceId}`, async (route) => {
       const real = await route.fetch();
@@ -253,7 +254,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(merge).toHaveAttribute('title', 'Required checks or reviews are not met');
     await shot(page, 'pr-open', theme);
 
-    prBody = { ...prBody, mergeStateStatus: 'CLEAN', canMerge: true, reason: null };
+    prBody = { ...prBody, mergeStateStatus: 'CLEAN', canMerge: true, reason: null, checksPassing: true };
     await bar(page).getByRole('button', { name: 'Refresh' }).click();
     await expect(barText(page)).toHaveText('PR #42 · no conflicts. Merging squashes it into main.');
     await expect(merge).toBeEnabled();

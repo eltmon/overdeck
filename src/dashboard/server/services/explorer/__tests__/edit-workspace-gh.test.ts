@@ -28,8 +28,12 @@ function open(mergeStateStatus: string, overrides: Partial<PrMergeState> = {}): 
 }
 
 describe('mergeVerdict', () => {
-  it.each(['CLEAN', 'UNSTABLE', 'HAS_HOOKS'])('allows a merge when mergeable is MERGEABLE and status is %s', (status) => {
-    expect(mergeVerdict(open(status))).toEqual({ canMerge: true, reason: null });
+  it.each<[string, boolean]>([
+    ['CLEAN', true],
+    ['HAS_HOOKS', true],
+    ['UNSTABLE', false],
+  ])('allows a merge when mergeable is MERGEABLE and status is %s, with checksPassing %s', (status, checksPassing) => {
+    expect(mergeVerdict(open(status))).toEqual({ canMerge: true, reason: null, checksPassing });
   });
 
   it.each<[string, PrMergeState, string]>([
@@ -45,7 +49,7 @@ describe('mergeVerdict', () => {
     ['UNKNOWN mergeable', open('CLEAN', { mergeable: 'UNKNOWN' }), 'GitHub is still checking whether this PR can merge'],
     ['unlisted FOO', open('FOO'), 'GitHub reports FOO'],
   ])('refuses %s with the D-F7 reason', (_label, state, reason) => {
-    expect(mergeVerdict(state)).toEqual({ canMerge: false, reason });
+    expect(mergeVerdict(state)).toEqual({ canMerge: false, reason, checksPassing: false });
   });
 });
 
@@ -82,6 +86,7 @@ describe('readPrWithVerdict', () => {
       headSha: 'deadbeef',
       canMerge: true,
       reason: null,
+      checksPassing: true,
     });
   });
 
@@ -91,6 +96,12 @@ describe('readPrWithVerdict', () => {
     const pr = await readPrWithVerdict(gh, 'o/r', 'scratch/edit-1', '/w', sleep);
     expect(sleep).not.toHaveBeenCalled();
     expect(pr?.reason).toBe('Required checks or reviews are not met');
+  });
+
+  it('returns canMerge true and checksPassing false for a MERGEABLE/UNSTABLE PR', async () => {
+    const { gh } = fakeGh([listed, view('MERGEABLE', 'UNSTABLE')]);
+    const pr = await readPrWithVerdict(gh, 'o/r', 'scratch/edit-1', '/w', async () => {});
+    expect(pr).toMatchObject({ canMerge: true, checksPassing: false });
   });
 
   it('skips gh pr view for a merged PR', async () => {

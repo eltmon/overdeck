@@ -8,7 +8,9 @@
  * choose the HTTP code.
  *
  * `mergeVerdict` is the D-F7 table: whether the explorer may offer one-click
- * Merge, and the reason in words when it may not.
+ * Merge, and the reason in words when it may not. `checksPassing` is false
+ * for UNSTABLE, so the explorer can ask before merging a PR whose checks
+ * have not passed (PAN-5391).
  */
 import type { EditWorkspacePr } from '@overdeck/contracts';
 import { runGh } from '../../../../lib/github-quota/run-gh.js';
@@ -44,6 +46,8 @@ export interface PrMergeState {
 export interface MergeVerdict {
   canMerge: boolean;
   reason: string | null;
+  /** PAN-5391: false for UNSTABLE, which GitHub still lets merge. */
+  checksPassing: boolean;
 }
 
 function parsePrState(value: unknown): PrState {
@@ -136,12 +140,14 @@ export async function createGitHubIssue(gh: GhRunner, input: CreateGitHubIssueIn
 }
 
 const MERGEABLE_STATUSES = new Set(['CLEAN', 'UNSTABLE', 'HAS_HOOKS']);
+/** UNSTABLE is mergeable but some check is pending or failing (PAN-5391). */
+const CHECKS_PASSING_STATUSES = new Set(['CLEAN', 'HAS_HOOKS']);
 
 /** The D-F7 merge verdict table. */
 export function mergeVerdict(pr: Pick<PrMergeState, 'state' | 'isDraft' | 'mergeable' | 'mergeStateStatus'>): MergeVerdict {
   const { state, isDraft, mergeable, mergeStateStatus } = pr;
   if (state === 'OPEN' && !isDraft && mergeable === 'MERGEABLE' && MERGEABLE_STATUSES.has(mergeStateStatus)) {
-    return { canMerge: true, reason: null };
+    return { canMerge: true, reason: null, checksPassing: CHECKS_PASSING_STATUSES.has(mergeStateStatus) };
   }
   let reason: string;
   if (state === 'MERGED') reason = 'Already merged';
@@ -152,7 +158,7 @@ export function mergeVerdict(pr: Pick<PrMergeState, 'state' | 'isDraft' | 'merge
   else if (mergeStateStatus === 'BEHIND') reason = 'The branch is out of date with the base branch';
   else if (mergeable === 'UNKNOWN' || mergeStateStatus === 'UNKNOWN') reason = 'GitHub is still checking whether this PR can merge';
   else reason = `GitHub reports ${mergeStateStatus}`;
-  return { canMerge: false, reason };
+  return { canMerge: false, reason, checksPassing: false };
 }
 
 function isUnknown(state: PrMergeState): boolean {

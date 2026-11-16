@@ -137,7 +137,7 @@ const ROOT = 'workspace:w1'
 function pr(over: Partial<EditWorkspacePr> = {}): EditWorkspacePr {
   return {
     url: 'https://github.com/o/r/pull/7', number: 7, state: 'OPEN', isDraft: false, mergeable: 'MERGEABLE',
-    mergeStateStatus: 'CLEAN', headSha: 'abc', canMerge: true, reason: null, ...over,
+    mergeStateStatus: 'CLEAN', headSha: 'abc', canMerge: true, reason: null, checksPassing: true, ...over,
   }
 }
 

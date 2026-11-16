@@ -55,7 +55,7 @@ describe('getEditWorkspaceStatus', () => {
 
   it('reports an open CLEAN PR as mergeable', async () => {
     const status = await getEditWorkspaceStatus('w1', deps({ github_repo: 'o/r' }, openCleanGh));
-    expect(status.pr).toMatchObject({ number: 3, state: 'OPEN', canMerge: true, reason: null, headSha: 'abc' });
+    expect(status.pr).toMatchObject({ number: 3, state: 'OPEN', canMerge: true, reason: null, checksPassing: true, headSha: 'abc' });
     expect(status.prSupport.available).toBe(true);
   });
 
