@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4591",
   "created": "2026-11-16T11:39:00.796Z",
-  "updated": "2026-11-16T12:10:35.096Z",
+  "updated": "2026-11-16T12:10:42.610Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,11 @@
     "inject-mcp.ac6": {
       "status": "completed",
       "doneAt": "2026-11-16T12:10:35.095Z"
+    },
+    "edit-hook-script": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4591",
+      "claimedAt": "2026-11-16T12:10:42.610Z"
     }
   }
 }
