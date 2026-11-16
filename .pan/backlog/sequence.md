@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T01:10:05.897766Z · model: claude-opus-5-5 · open: 894_
+_Last sequenced: 2026-11-16T01:54:11.809907Z · model: claude-opus-5-5 · open: 892_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -19,7 +19,6 @@ _Last sequenced: 2026-11-16T01:10:05.897766Z · model: claude-opus-5-5 · open: 
 | 19 | PAN-5381 | S | high | ok |  |  | Dashboard main thread: findProjectByPath runs realpathSync on every project root per call (10.8% of profile); cache roots once. |
 | 20 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 21 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
-| 21 | PAN-5347 | S | medium | ok |  |  | In pipeline: composer / menu lists no skills; add them from /api/skills/overrides under a labeled Skills group |
 | 22 | PAN-4671 | M | high | ok |  |  | CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff. |
 | 23 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
 | 24 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
@@ -215,8 +214,7 @@ _Last sequenced: 2026-11-16T01:10:05.897766Z · model: claude-opus-5-5 · open: 
 | 215 | PAN-4364 | S | medium | ok |  |  | GPT-6 catalog: gpt-6-sol misclassed frontier and OpenAI tierModels still remap to GPT-5.6; prerequisites have closed |
 | 216 | PAN-3196 | S | high | ok |  |  | Root-owned container residue makes close-out die on EACCES after passing every DoD row; same family as PAN-3570. |
 | 217 | PAN-3186 | XS | high | ok |  |  | One configured non-git member (auricle/infra) blanks pipeline membership for the whole project the resolver claims it can answer. |
-| 218 | PAN-5370 | S | medium | ok |  |  | Workflow-redesign live-check fixes: Issues header overlap, breadcrumb clips file name, Spend fact never times out, More wraps. |
-| 219 | PAN-3185 | XS | high | ok |  |  | Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail. |
+| 218 | PAN-3185 | XS | high | ok |  |  | Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail. |
 | 219 | PAN-5371 | S | medium | ok |  |  | Simple Home headline (18) and top bar Needs-you (8) count different things; pick one rule so both agree (epic D-8). |
 | 220 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time with no production-reach check, so members read shipped while prod serves the old build. |
 | 221 | PAN-3130 | S | high | ok |  |  | Identifier-joined write paths have no containment assertion, so a crafted issue or agent id could redirect a canonical write. |
@@ -396,6 +394,7 @@ _Last sequenced: 2026-11-16T01:10:05.897766Z · model: claude-opus-5-5 · open: 
 | 395 | PAN-3164 | XS | medium | ok |  |  | probeUatStack reports readiness from container count, so the UI offers 'Open UAT frontend' while the API is still resolving Maven deps. |
 | 396 | PAN-3121 | S | medium | ok |  |  | The failed-send outbox never reconciles against the transcript, so a delivered message keeps a Retry twin that would double-send. |
 | 397 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
+| 398 | PAN-5413 | S | medium | ok |  | PAN-5371 | Kanban Needs-you strip counts with the old Simple Home rule; switch it to the shared top-bar selector (epic D-8). |
 | 400 | PAN-5366 | M | medium | ok |  |  | Conversation page cannot show whether per-turn memory injection reaches it; add a state route and a status-line part. |
 | 401 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
 | 402 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
@@ -897,7 +896,6 @@ _Last sequenced: 2026-11-16T01:10:05.897766Z · model: claude-opus-5-5 · open: 
 | 899 | PAN-5207 | L | low | needs-refinement |  | PAN-5202 | Parked by the operator: Flux meeting bots for Zoom, Teams, Meet, Slack as a paid integration. Do not start. |
 | 901 | PAN-5181 | XS | low | ok |  |  | Fix shipped in PR #5179 (merged 2026-11-13); the body says it closes on merge. Verify and close. |
 | 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
-| 903 | PAN-5235 | XS | low | ok |  |  | Fix already applied: terminal-dialog toast now navigates to the agent's terminal tab. Verify and close. |
 | 904 | PAN-5405 | S | medium | ok |  | PAN-5295 | CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus. |
 
 ## Rationale detail
@@ -957,10 +955,6 @@ Follow-up to PAN-4543, which fixed the summary route. The Pipeline view polls th
 ### PAN-4551 (rank 21)
 
 Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. PAN-4527, PAN-4531 and PAN-4540 closed on 2026-10-24, so it now waits only on PAN-4534 (in pipeline); rank holds at 14.
-
-### PAN-5347 (rank 21)
-
-New in-pipeline discoverability fix: skills never reach the composer slash menu, so operators cannot find skill-only workflows. Pinned in the free rank-21 slot beside the other in-pipeline work; it reuses the existing skills route and category grouping.
 
 ### PAN-4671 (rank 22)
 
@@ -1222,6 +1216,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 
 New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
 
+### PAN-3100 (rank 88)
+
+New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1229,10 +1227,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T01:10:05.897766Z",
+  "generatedAt": "2026-11-16T01:54:11.809907Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 894,
+  "openCount": 892,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -1413,19 +1411,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "dependsOn": [],
       "why": "Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised",
       "rationale": "Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. PAN-4527, PAN-4531 and PAN-4540 closed on 2026-10-24, so it now waits only on PAN-4534 (in pipeline); rank holds at 14.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5347",
-      "rank": 21,
-      "size": "S",
-      "importance": "medium",
-      "score": 64,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: composer / menu lists no skills; add them from /api/skills/overrides under a labeled Skills group",
-      "rationale": "New in-pipeline discoverability fix: skills never reach the composer slash menu, so operators cannot find skill-only workflows. Pinned in the free rank-21 slot beside the other in-pipeline work; it reuses the existing skills route and category grouping.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3927,28 +3912,15 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "auto"
     },
     {
-      "issue": "PAN-5370",
-      "rank": 218,
-      "size": "S",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Workflow-redesign live-check fixes: Issues header overlap, breadcrumb clips file name, Spend fact never times out, More wraps.",
-      "rationale": "New child of epic PAN-5284 with four concrete UI defects and testable acceptance; placed just ahead of the epic node with its sibling children.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3185",
-      "rank": 219,
+      "rank": 218,
       "size": "XS",
       "importance": "high",
       "score": 70,
       "condition": "ok",
       "dependsOn": [],
       "why": "Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail.",
-      "rationale": "Rank held at 212: the rescope comment confirms the TOCTOU gap is still in spawn.ts even though the named racer was cut; the remaining spawner (retryDeferredHandoffs) makes it rarer, so score drops slightly.",
+      "rationale": "Rank held at 212: the rescope comment confirms the TOCTOU gap is still in spawn.ts even though the named racer was cut; the remaining spawner (retryDeferredHandoffs) makes it rarer, so score drops slightly. Moved one slot to 218 because rank 219 is pinned to in-pipeline PAN-5371.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6163,6 +6135,21 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "condition": "ok",
       "dependsOn": [],
       "why": "Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5413",
+      "rank": 398,
+      "size": "S",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5371"
+      ],
+      "why": "Kanban Needs-you strip counts with the old Simple Home rule; switch it to the shared top-bar selector (epic D-8).",
+      "rationale": "New child of epic PAN-5284 split out of PAN-5371 to keep that fix small; it reuses the needs-you split PAN-5371 lands, so it follows that work in the free rank-398 slot.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12328,18 +12315,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "auto"
     },
     {
-      "issue": "PAN-5235",
-      "rank": 903,
-      "size": "XS",
-      "importance": "low",
-      "score": 8,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fix already applied: terminal-dialog toast now navigates to the agent's terminal tab. Verify and close.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-5405",
       "rank": 904,
       "size": "S",
@@ -13471,13 +13446,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "from": "PAN-5284",
-      "to": "PAN-5370",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5284",
       "to": "PAN-5371",
       "type": "contains",
       "source": "github-ref",
@@ -13489,6 +13457,20 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-5284",
+      "to": "PAN-5413",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5371",
+      "to": "PAN-5413",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
     },
     {
       "from": "PAN-750",
