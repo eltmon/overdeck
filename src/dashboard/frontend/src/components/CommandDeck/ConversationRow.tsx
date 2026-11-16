@@ -98,6 +98,8 @@ interface ConversationRowProps {
   /** PAN-5343 H-D3: the row's project mark in the All projects list (NO_PROJECT_KEY renders muted). */
   markProjectKey?: string;
   markName?: string;
+  /** PAN-5343 H-D18: the 1-based split leaf showing this conversation, when the deck is split. */
+  paneSlot?: number;
 }
 
 /** D28: WOWED and PASS use the done token; every other verdict is neutral (routine work, not an alarm). */
@@ -166,6 +168,7 @@ export function ConversationRow({
   criticOf = null,
   markProjectKey,
   markName,
+  paneSlot,
 }: ConversationRowProps) {
   const [copiedId, setCopiedId] = useState(false);
   const [editingName, setEditingName] = useState(false);
@@ -662,6 +665,16 @@ export function ConversationRow({
               </>
             )}
           </span>
+        </span>
+      )}
+
+      {paneSlot !== undefined && (
+        <span
+          className="shrink-0 rounded border border-border px-1 font-mono text-[10px] leading-4 text-muted-foreground"
+          title={`Shown in pane ${paneSlot}`}
+          data-testid="conversation-pane-slot"
+        >
+          {paneSlot}
         </span>
       )}
 

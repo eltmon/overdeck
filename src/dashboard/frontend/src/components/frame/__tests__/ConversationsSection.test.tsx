@@ -2,12 +2,15 @@
  * PAN-5293 WI-11: the left column's Conversations section.
  */
 import type { ReactNode } from 'react';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CONVERSATION_SCOPE_STORAGE_KEY, ConversationsSection } from '../ConversationsSection';
 import { useCommandDeckSelection } from '../../../lib/commandDeckSelection';
 import { TestDeckNavigationProvider, type DeckNavigationCall } from '../deck/deckNavigation';
+import { resetDeckLayoutStore, useDeckLayoutStore } from '../../../lib/deckLayoutStore';
+import { presetLayout } from '../../../lib/paneLayout';
+import { usePanesStore } from '../../../lib/panesStore';
 
 vi.mock('../../Settings/anywhere/machinesApi', () => ({
   MACHINES_QUERY_KEY: ['anywhere-machines'],
@@ -69,6 +72,8 @@ beforeEach(() => {
   localStorage.clear();
   openConversation.mockClear();
   calls = [];
+  resetDeckLayoutStore();
+  usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} });
   useCommandDeckSelection.setState({ selectedConversation: null, selectedFeature: null });
   vi.stubGlobal('fetch', vi.fn(async () => Response.json([])));
 });
@@ -144,5 +149,42 @@ describe('ConversationsSection deck switch (PAN-5343 H-D2)', () => {
     expect(screen.getByTitle('elsewhere')).toBeInTheDocument();
     expect(screen.getByTitle('inbox-a')).toBeInTheDocument();
     expect(screen.getByTestId('conversation-scope-all')).toHaveTextContent('All 5');
+  });
+});
+
+describe('ConversationsSection pane badges (PAN-5343 H-D18)', () => {
+  const agentPane = (paneId: string, conversationId: string) => ({ paneId, paneType: 'agent' as const, label: conversationId, createdAt: 1, conversationId });
+
+  function seedDeck(layout: ReturnType<typeof presetLayout> | null) {
+    usePanesStore.setState({
+      panesByWorkspace: { alpha: [agentPane('p1', 'needs-you'), agentPane('p2', 'inbox-a')] },
+      activePaneByWorkspace: { alpha: 'p1' },
+    });
+    useDeckLayoutStore.setState({ layoutByDeck: { alpha: layout }, focusHistoryByDeck: {} });
+  }
+
+  const badgeIn = (title: string) => screen.getByTitle(title).querySelector('[data-testid="conversation-pane-slot"]');
+
+  it('numbers the rows shown in a 2-leaf layout and leaves other rows unbadged', () => {
+    seedDeck(presetLayout(['p1', 'p2'], 2));
+    renderSection();
+    expect(badgeIn('inbox-a')).toHaveTextContent('2');
+    expect(badgeIn('needs-you')).toHaveTextContent('1');
+    fireEvent.click(screen.getByTestId('conversation-scope-all'));
+    expect(screen.getAllByTestId('conversation-pane-slot')).toHaveLength(2);
+  });
+
+  it('shows no badge with a null layout', () => {
+    seedDeck(null);
+    renderSection();
+    expect(screen.queryByTestId('conversation-pane-slot')).not.toBeInTheDocument();
+  });
+
+  it('drops the badge when the layout goes back to null', () => {
+    seedDeck(presetLayout(['p1', 'p2'], 2));
+    renderSection();
+    expect(badgeIn('inbox-a')).toHaveTextContent('2');
+    act(() => { useDeckLayoutStore.getState().setLayout('alpha', null); });
+    expect(screen.queryByTestId('conversation-pane-slot')).not.toBeInTheDocument();
   });
 });

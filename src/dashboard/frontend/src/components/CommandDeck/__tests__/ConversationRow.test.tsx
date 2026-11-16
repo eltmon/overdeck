@@ -666,3 +666,17 @@ describe('ConversationRow schedule menu item (PAN-4657 menu-wiring)', () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe('ConversationRow pane badge (PAN-5343 H-D18)', () => {
+  it('shows the split leaf number with its title', () => {
+    renderRow({}, { paneSlot: 2 });
+    const badge = screen.getByTestId('conversation-pane-slot');
+    expect(badge).toHaveTextContent('2');
+    expect(badge).toHaveAttribute('title', 'Shown in pane 2');
+  });
+
+  it('shows no badge without a pane slot', () => {
+    renderRow({});
+    expect(screen.queryByTestId('conversation-pane-slot')).not.toBeInTheDocument();
+  });
+});

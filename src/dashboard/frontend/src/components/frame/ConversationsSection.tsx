@@ -10,7 +10,7 @@
  * project's conversations.
  */
 
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ConversationList, type Conversation } from '../CommandDeck/ConversationList';
 import type { ConversationProjectRef } from '../CommandDeck/conversationProjectGroups';
@@ -20,6 +20,9 @@ import {
 import { fetchRegisteredProjects, type RegisteredProject } from '../CommandDeck/UnknownProjectState';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { readLastProjectKey } from '../../lib/lastProject';
+import { selectDeckLayout, useDeckLayoutStore } from '../../lib/deckLayoutStore';
+import { collectLeafIds, leafCount, type PaneLayout } from '../../lib/paneLayout';
+import { selectPanesForWorkspace, usePanesStore, type WorkspacePane } from '../../lib/panesStore';
 import { useDeckNavigation } from './deck/deckNavigation';
 import { useOpenConversation } from './deck/useOpenConversation';
 import { useProjectScope } from './deck/useProjectScope';
@@ -38,6 +41,24 @@ function readScope(): ConversationScope {
 
 const EMPTY_REGISTERED: RegisteredProject[] = [];
 const NO_PROJECT_REF: ConversationProjectRef = { key: NO_PROJECT_KEY, label: NO_PROJECT_LABEL };
+
+/**
+ * PAN-5343 H-D18: conversation name → its 1-based split leaf, only while the
+ * deck shows two or more leaves. Agent panes only.
+ */
+export function paneSlotsFor(
+  layout: PaneLayout | null,
+  panes: readonly WorkspacePane[],
+): ReadonlyMap<string, number> | undefined {
+  if (!layout || leafCount(layout) < 2) return undefined;
+  const byId = new Map(panes.map((pane) => [pane.paneId, pane]));
+  const slots = new Map<string, number>();
+  collectLeafIds(layout).forEach((paneId, index) => {
+    const pane = byId.get(paneId);
+    if (pane?.paneType === 'agent' && pane.conversationId) slots.set(pane.conversationId, index + 1);
+  });
+  return slots.size > 0 ? slots : undefined;
+}
 
 function SegmentButton({ pressed, onClick, children, testId }: { pressed: boolean; onClick: () => void; children: ReactNode; testId: string }) {
   return (
@@ -66,6 +87,10 @@ export function ConversationsSection({ selectedProject }: { selectedProject: str
   // The switcher's project list, read from its cache (no polling of its own).
   const { data: projects = [] } = useQuery({ queryKey: ['command-deck-projects'], queryFn: fetchProjects, staleTime: Infinity });
   const allProjects = selectedProject === ALL_PROJECTS_KEY;
+  // The deck's in-memory layout and panes; the list never hydrates storage itself.
+  const deckLayout = useDeckLayoutStore(selectDeckLayout(selectedProject ?? ''));
+  const deckPanes = usePanesStore(selectPanesForWorkspace(selectedProject ?? ''));
+  const paneSlots = useMemo(() => paneSlotsFor(deckLayout, deckPanes), [deckLayout, deckPanes]);
   // PAN-5343 H-D3: group the All projects list by registered project (same
   // key as the switcher, so the marks match its colors).
   const { data: registeredProjects = EMPTY_REGISTERED } = useQuery({
@@ -109,6 +134,7 @@ export function ConversationsSection({ selectedProject }: { selectedProject: str
         onSelectConversation={openConversation}
         includeIds={allProjects ? undefined : projectConvIdSet}
         groupByProject={allProjects ? groupByProject : undefined}
+        paneSlots={paneSlots}
         scope={scope}
       />
     </section>
