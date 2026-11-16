@@ -83,6 +83,16 @@ describe('McpUrlDialog (PAN-4649)', () => {
     expect(screen.getByText('This token is shown once.')).toBeInTheDocument();
   });
 
+  it('keeps focus inside the dialog once the result replaces the form (PAN-4756)', async () => {
+    mockServer(200);
+    const { user } = await renderAndSetup();
+
+    await user.click(screen.getByRole('button', { name: 'Create and copy URL' }));
+    await screen.findByLabelText('URL');
+
+    expect(document.querySelector('[data-component="modal"]')!.contains(document.activeElement)).toBe(true);
+  });
+
   it('adds approve only when the box is ticked', async () => {
     mockServer(200);
     const { user } = await renderAndSetup();
