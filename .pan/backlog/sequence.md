@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T00:35:35.072764Z · model: claude-opus-5-5 · open: 895_
+_Last sequenced: 2026-11-16T01:10:05.897766Z · model: claude-opus-5-5 · open: 894_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -81,7 +81,6 @@ _Last sequenced: 2026-11-16T00:35:35.072764Z · model: claude-opus-5-5 · open: 
 | 80 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
 | 81 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent pane, so a single hungry agent inflates the unit and oomd kills the whole fleet — twice now. |
 | 82 | PAN-3278 | S | critical | needs-refinement |  |  | A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts. |
-| 83 | PAN-5330 | S | high | ok |  |  | Workspace devcontainers share the 'server' DNS alias on the overdeck network, so a frontend can proxy to another workspace. |
 | 84 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
 | 85 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
 | 86 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
@@ -1207,10 +1206,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
 
 Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.
 
-### PAN-5330 (rank 83)
-
-New substrate bug placed in a freed high-tier slot. With several workspace stacks up, browser checks hit the wrong backend and flake, which corrupts verification.
-
 ### PAN-3234 (rank 84)
 
 Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
@@ -1223,6 +1218,10 @@ New this pass. The deployment gate's queue message is unusually good — it name
 
 Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
 
+### PAN-3106 (rank 87)
+
+New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1230,10 +1229,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T00:35:35.072764Z",
+  "generatedAt": "2026-11-16T01:10:05.897766Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 895,
+  "openCount": 894,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -2222,19 +2221,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "dependsOn": [],
       "why": "A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts.",
       "rationale": "Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5330",
-      "rank": 83,
-      "size": "S",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Workspace devcontainers share the 'server' DNS alias on the overdeck network, so a frontend can proxy to another workspace.",
-      "rationale": "New substrate bug placed in a freed high-tier slot. With several workspace stacks up, browser checks hit the wrong backend and flake, which corrupts verification.",
       "gate": "auto",
       "planning": "auto"
     },
