@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4294",
   "created": "2026-11-16T20:10:42.311Z",
-  "updated": "2026-11-16T20:47:50.935Z",
+  "updated": "2026-11-16T20:48:49.588Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -200,9 +200,18 @@
       "doneAt": "2026-11-16T20:47:46.202Z"
     },
     "miniflare-webhook-e2e": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4294",
-      "claimedAt": "2026-11-16T20:47:50.935Z"
+      "claimedAt": "2026-11-16T20:47:50.935Z",
+      "doneAt": "2026-11-16T20:48:49.588Z"
+    },
+    "miniflare-webhook-e2e.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:48:49.588Z"
+    },
+    "miniflare-webhook-e2e.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:48:49.588Z"
     }
   }
 }
