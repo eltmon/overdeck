@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4594",
   "created": "2026-11-16T16:04:35.511Z",
-  "updated": "2026-11-16T17:19:28.217Z",
+  "updated": "2026-11-16T17:30:06.872Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-16T17:30Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-16T17:30:06.872Z"
+    }
+  ],
   "items": {
     "semgrep-settings-door": {
       "status": "completed",
@@ -185,5 +191,14 @@
       "status": "completed",
       "doneAt": "2026-11-16T17:19:28.217Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-16T17:30:06Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4594\n\nPull request: https://github.com/eltmon/overdeck/pull/5451 (head `741072af`)\n\nSource: check_run:test-shard (3/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (3/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/133477200507/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/43917976104/job/133477200507  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/contracts/telemetry-client-route.test.ts\u001b[2m > \u001b[22mclientRouteOf\u001b[2m > \u001b[22mhas every non-DELETE NO_LOSS_MATRIX /api/ surface in client_route_area\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/contracts/telemetry-client-route.test.ts\u001b[2m > \u001b[22mclientRouteOf\u001b[2m > \u001b[22mhas every non-DELETE NO_LOSS_MATRIX /api/ surface in client_route_area\n\u001b[31m\u001b[1mAssertionError\u001b[22m: GET /api/semgrep/settings first segment \"semgrep\" missing from client_route_area: expected [ 'access-tokens', 'account', …(119) ] to include 'semgrep'\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m tests/unit/contracts/telemetry-client-route.test.ts:\u001b[2m50:99\u001b[22m\u001b[39m\n    \u001b[90m 48|\u001b[39m       \u001b[35mconst\u001b[39m segment \u001b[33m=\u001b[39m pathPart\u001b[33m.\u001b[39m\u001b[34mslice\u001b[39m(\u001b[32m'/api/'\u001b[39m\u001b[33m.\u001b[39mlength)\u001b[33m.\u001b[39m\u001b[34msplit\u001b[39m(\u001b[32m'/'\u001b[39m)[\u001b[34m0\u001b[39m]\u001b[33m;\u001b[39m\n    \u001b[90m 49|\u001b[39m       \u001b[35mif\u001b[39m (\u001b[33m!\u001b[39msegment) \u001b[35mcontinue\u001b[39m\u001b[33m;\u001b[39m\n    \u001b[90m 50|\u001b[39m       expect(areas, `${entry.surface} first segment \"${segment}\" missi…\n    \u001b[90m   |\u001b[39m                                                                                                   \u001b[31m^\u001b[39m\n    \u001b[90m 51|\u001b[39m     }\n    \u001b[90m 52|\u001b[39m   })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m687 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m1 skipped\u001b[39m\u001b[90m (689)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
 }
