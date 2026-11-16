@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T08:34:14.452776Z · model: claude-opus-5-5 · open: 886_
+_Last sequenced: 2026-11-16T08:49:58.492641Z · model: claude-opus-5-5 · open: 887_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -737,6 +737,7 @@ _Last sequenced: 2026-11-16T08:34:14.452776Z · model: claude-opus-5-5 · open: 
 | 745 | PAN-3823 | XS | low | needs-refinement |  |  | Image-only report titled "pan sync issue"; needs the command, output text, and expected behavior |
 | 746 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
 | 747 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
+| 748 | PAN-5431 | XS | low | ok |  |  | CodeRabbit minor follow-up on PR #5429 (PAN-5424): RELEASING.md direct vs transitive deps wording; native path in a test assertion. |
 | 749 | PAN-962 | M | low | needs-refinement |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
 | 750 | PAN-961 | M | low | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
 | 751 | PAN-5365 | S | low | needs-refinement |  |  | MCP memory_add gains a source param now that PAN-5360 shipped; the supersedes-on-agent-surface decision is still open. |
@@ -1221,10 +1222,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T08:34:14.452776Z",
+  "generatedAt": "2026-11-16T08:49:58.492641Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 886,
+  "openCount": 887,
   "nodes": [
     {
       "issue": "PAN-5424",
@@ -10335,6 +10336,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "why": "Evaluate context-mode MCP server as session continuity + search layer",
       "gate": "auto",
       "planning": "interactive"
+    },
+    {
+      "issue": "PAN-5431",
+      "rank": 748,
+      "size": "XS",
+      "importance": "low",
+      "score": 36,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CodeRabbit minor follow-up on PR #5429 (PAN-5424): RELEASING.md direct vs transitive deps wording; native path in a test assertion.",
+      "rationale": "New CodeRabbit follow-up with two Minor findings (one doc wording, one test path); placed in a free low-tier slot beside comparable minor follow-ups.",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-962",
