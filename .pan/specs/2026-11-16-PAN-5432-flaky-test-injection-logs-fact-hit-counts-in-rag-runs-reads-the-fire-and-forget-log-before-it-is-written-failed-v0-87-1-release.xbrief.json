@@ -4,17 +4,17 @@
     "created": "2026-11-16T09:23:49Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5432: Flaky test: injection 'logs fact hit counts in rag-runs' reads the fire-and-forget log before it is written (failed v0.87.1 release)",
-    "updated": "2026-11-16T09:26:19.960Z"
+    "updated": "2026-11-16T09:27:16.108Z"
   },
   "plan": {
     "id": "pan-5432",
     "title": "Flaky test: injection 'logs fact hit counts in rag-runs' reads the fire-and-forget log before it is written (failed v0.87.1 release)",
-    "status": "proposed",
+    "status": "running",
     "uid": "c0290683-ad23-4a8a-ae3d-6fd7b7d7c0db",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-16T09:23:49Z",
-    "updated": "2026-11-16T09:26:19.960Z",
+    "updated": "2026-11-16T09:27:16.108Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5432",
@@ -133,5 +133,5 @@
     ],
     "edges": []
   },
-  "status": "proposed"
+  "status": "active"
 }
