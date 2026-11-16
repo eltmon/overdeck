@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4594",
   "created": "2026-11-16T16:04:35.511Z",
-  "updated": "2026-11-16T16:32:46.817Z",
+  "updated": "2026-11-16T16:37:05.271Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,9 +44,10 @@
       "doneAt": "2026-11-16T16:32:39.852Z"
     },
     "project-sast-override-door": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4594",
-      "claimedAt": "2026-11-16T16:32:46.817Z"
+      "claimedAt": "2026-11-16T16:32:46.817Z",
+      "doneAt": "2026-11-16T16:37:05.271Z"
     }
   }
 }
