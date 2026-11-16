@@ -54,12 +54,22 @@ function createRepo(name: string, relativePath: string, content: string): string
   return repo;
 }
 
+/** PAN-5418: the real HEAD sha, so an attributed commit fixture resolves (D4 skips unresolvable shas). */
+function headSha(repo: string): string {
+  return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf-8' }).trim();
+}
+
 /** PAN-5408: a minimal ConversationChanges fixture for getConversationDiffFull's conversationChanges dep. */
-function changesFor(repoRoot: string, uncommittedPaths: string[], committedPaths: string[] = []): ConversationChanges {
+function changesFor(
+  repoRoot: string,
+  uncommittedPaths: string[],
+  committedPaths: string[] = [],
+  sha: string = 'f'.repeat(40),
+): ConversationChanges {
   const commits = committedPaths.length > 0
     ? [{
-        sha: 'f'.repeat(40),
-        shortSha: 'fffffff',
+        sha,
+        shortSha: sha.slice(0, 7),
         subject: 's',
         authoredAt: new Date().toISOString(),
         pushed: false,
@@ -289,7 +299,7 @@ describe('getConversationDiffFull (PAN-5408: attributed files only)', () => {
     const deps = {
       resolveSessionFile: async () => sessionFile,
       getCachedMessages: async () => ({ messages: [], fileEditsByAssistantId: new Map() }),
-      conversationChanges: async () => changesFor(repo, [], ['c.txt']),
+      conversationChanges: async () => changesFor(repo, [], ['c.txt'], headSha(repo)),
     };
 
     const resultFull = await getConversationDiffFull('full-files', undefined, deps);
@@ -318,7 +328,7 @@ describe('getConversationDiffFull (PAN-5408: attributed files only)', () => {
     const deps = {
       resolveSessionFile: async () => sessionFile,
       getCachedMessages: async () => ({ messages: [], fileEditsByAssistantId: new Map() }),
-      conversationChanges: async () => changesFor(repo, ['a.txt'], ['c.txt']),
+      conversationChanges: async () => changesFor(repo, ['a.txt'], ['c.txt'], headSha(repo)),
     };
 
     const resultFiltered = await getConversationDiffFull('full-files-filter', 'a.txt', deps);
