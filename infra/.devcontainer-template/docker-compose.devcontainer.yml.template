@@ -118,7 +118,11 @@ services:
       - CI=true
       - CONTAINER_MODE=true
       - VITE_API_URL=https://api-{{FEATURE_FOLDER}}.overdeck.localhost
-      - VITE_PROXY_TARGET=http://server:3013
+      # PAN-5330: never the bare service name. Compose registers `server` on the
+      # shared `overdeck` network for every workspace stack, so `server` resolves
+      # to several stacks' backends. `api-{{FEATURE_FOLDER}}` is a devnet-only
+      # alias of this stack's server (see the server service's networks).
+      - VITE_PROXY_TARGET=http://api-{{FEATURE_FOLDER}}:3013
     networks:
       - devnet
       - overdeck
@@ -186,8 +190,12 @@ services:
       - LINEAR_API_KEY=${LINEAR_API_KEY}
       - GITHUB_TOKEN=${GITHUB_TOKEN}
     networks:
-      - devnet
-      - overdeck
+      devnet:
+        # PAN-5330: the frontend's proxy target. Declared on devnet only, so no
+        # other stack can resolve it and it never joins the shared network.
+        aliases:
+          - api-{{FEATURE_FOLDER}}
+      overdeck: {}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.pan-api-{{FEATURE_FOLDER}}.rule=Host(`api-{{FEATURE_FOLDER}}.overdeck.localhost`)"

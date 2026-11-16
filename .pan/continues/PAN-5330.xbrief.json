@@ -1,0 +1,75 @@
+{
+  "version": "1",
+  "issueId": "PAN-5330",
+  "created": "2026-11-16T00:27:07.373Z",
+  "updated": "2026-11-16T00:31:49.321Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "template-devnet-alias": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5330",
+      "claimedAt": "2026-11-16T00:27:07.373Z",
+      "doneAt": "2026-11-16T00:29:02.121Z"
+    },
+    "template-devnet-alias.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:29:02.121Z"
+    },
+    "template-devnet-alias.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:29:02.121Z"
+    },
+    "template-devnet-alias.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:29:02.121Z"
+    },
+    "template-devnet-alias.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:29:02.121Z"
+    },
+    "proxy-target-uniqueness-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5330",
+      "claimedAt": "2026-11-16T00:29:10.188Z",
+      "doneAt": "2026-11-16T00:30:50.185Z"
+    },
+    "proxy-target-uniqueness-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:30:50.185Z"
+    },
+    "proxy-target-uniqueness-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:30:50.185Z"
+    },
+    "proxy-target-uniqueness-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:30:50.185Z"
+    },
+    "proxy-target-uniqueness-test.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:30:50.185Z"
+    },
+    "docs-devnet-alias": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5330",
+      "claimedAt": "2026-11-16T00:30:55.995Z",
+      "doneAt": "2026-11-16T00:31:49.321Z"
+    },
+    "docs-devnet-alias.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:31:49.321Z"
+    },
+    "docs-devnet-alias.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:31:49.321Z"
+    },
+    "docs-devnet-alias.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T00:31:49.321Z"
+    }
+  }
+}

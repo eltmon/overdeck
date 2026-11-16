@@ -1,0 +1,293 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-16T00:18:33Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5330: Workspace devcontainers share the DNS name 'server' on the external overdeck network, so a frontend can proxy to another workspace's backend",
+    "updated": "2026-11-16T00:26:53.462Z"
+  },
+  "plan": {
+    "id": "pan-5330",
+    "title": "Workspace devcontainers share the DNS name 'server' on the external overdeck network, so a frontend can proxy to another workspace's backend",
+    "status": "running",
+    "uid": "bc72e8fd-1ac4-442e-a504-576613269dec",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-16T00:18:33Z",
+    "updated": "2026-11-16T00:26:53.462Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5330",
+        "label": "PAN-5330",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5330.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "devcontainer",
+      "docker",
+      "workspace-stack",
+      "networking",
+      "bugfix"
+    ],
+    "narratives": {
+      "Problem": "Every workspace stack's server joins the shared external `overdeck` Docker network, and Compose registers the service name `server` there for every stack. The template points the frontend's Vite proxy at `http://server:3013`, so in a frontend container `server` resolves to every running stack's server (observed live 2026-11-16: the PAN-5370 frontend resolved `server` to its own 192.168.48.11 and PAN-5343's 192.168.48.5, never its own devnet IP). About half the proxied requests reach another workspace's backend.",
+      "Proposal": "In infra/.devcontainer-template/docker-compose.devcontainer.yml.template, give the `server` service a devnet-only alias `api-{{FEATURE_FOLDER}}` (map-form networks, `overdeck: {}` unchanged) and set the frontend's `VITE_PROXY_TARGET=http://api-{{FEATURE_FOLDER}}:3013`. The name is unique per stack and lives only on the stack's private network, so no other stack can answer it (proved with a throwaway two-project probe). Update the existing config.test.ts expectation, add a renderer-driven test over two feature stacks and one UAT stack, and document the rule in the template README and the codebase map.",
+      "NonGoals": "- No change to src/dashboard/frontend/vite.config.ts or its container fallback `http://server:3011`.\n- No change to src/lib/workspace/devcontainer-renderer.ts, ensure-devcontainer.ts, or any placeholder.\n- No service joins or leaves a network; frontend and server keep both devnet and overdeck.\n- No Traefik label, router, or middleware changes.\n- No service-key rename (server, frontend, dev stay).\n- No change to other projects' compose templates or to sync-sources/templates/docker/*.\n- No live-stack acceptance check: this branch's stack renders from the primary checkout's template until merge.\n- No changelog.d entry: the template is Overdeck's own repo template and does not reach users."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix with a devnet-scoped unique alias `api-{{FEATURE_FOLDER}}` on the server and point VITE_PROXY_TARGET at it.",
+        "rationale": "Combines both options the issue lists: the name is unique per stack and frontend-to-server traffic stays on the private devnet. A throwaway probe proved the alias resolves to exactly the own server and is invisible to other stacks."
+      },
+      {
+        "summary": "Do not pursue the issue's option 2 as worded (only a unique alias on overdeck).",
+        "rationale": "Compose always registers the service key as a DNS name on every joined network; the probe showed `server` on the shared network without any configuration. Removing it would need a service rename, which is out of scope."
+      },
+      {
+        "summary": "Name the alias `api-{{FEATURE_FOLDER}}` rather than `server-{{FEATURE_FOLDER}}` or the container name.",
+        "rationale": "It equals the first label of the existing Traefik API host, which must already fit the 63-character DNS label limit, so it adds no new length limit. Container names depend on the compose project name, which callers override with -p."
+      },
+      {
+        "summary": "No renderer code change; the issue's 'update the generator' is met by the template edit plus a test that drives createWorkspacePlaceholders and processTemplates.",
+        "rationale": "{{FEATURE_FOLDER}} already exists and the UAT path already overrides it, so no new placeholder is needed (Karpathy: minimum change)."
+      },
+      {
+        "summary": "Leave vite.config.ts's container fallback unchanged.",
+        "rationale": "It runs only when VITE_PROXY_TARGET is unset, every rendered stack sets it, and a fallback cannot know the workspace's folder name."
+      },
+      {
+        "summary": "No changelog.d entry.",
+        "rationale": "infra/.devcontainer-template is the Overdeck repository's own workspace template; Overdeck users' projects never render it."
+      }
+    ],
+    "items": [
+      {
+        "id": "template-devnet-alias",
+        "title": "Point the frontend proxy at a devnet-only per-stack server alias",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T00:18:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5330",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "infra/.devcontainer-template/docker-compose.devcontainer.yml.template",
+            "tests/unit/dashboard/config.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/config.test.ts tests/unit/lib/workspace/devcontainer-init-command.test.ts tests/unit/lib/workspace/rebuild-stack.test.ts tests/unit/lib/workspace/stack-health-compose-name.test.ts",
+            "! grep -q 'http://server:' infra/.devcontainer-template/docker-compose.devcontainer.yml.template",
+            "sed -e 's#{{PROJECT_PATH}}#/home/test/Projects/overdeck#g; s#{{PROJECTS_DIR}}#/home/test/Projects#g; s/{{[A-Z_]*}}/feature-probe/g' infra/.devcontainer-template/docker-compose.devcontainer.yml.template | docker compose -f - config -q"
+          ],
+          "expected_outputs": [
+            "all four vitest files pass",
+            "the negated grep exits 0 (no bare http://server: target remains)",
+            "docker compose config -q exits 0 (unset LINEAR_API_KEY/GITHUB_TOKEN warnings are fine)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In infra/.devcontainer-template/docker-compose.devcontainer.yml.template: (1) in the frontend service, replace `- VITE_PROXY_TARGET=http://server:3013` with `- VITE_PROXY_TARGET=http://api-{{FEATURE_FOLDER}}:3013` and add the PAN-5330 comment from the PRD above it; (2) in the server service, replace the list-form `networks: [- devnet, - overdeck]` block (right after `- GITHUB_TOKEN=${GITHUB_TOKEN}`) with map form: `devnet:` carrying `aliases: [api-{{FEATURE_FOLDER}}]` plus the PAN-5330 comment, and `overdeck: {}`. Do not touch any other service's networks or any label. In tests/unit/dashboard/config.test.ts (test 'accepts the workspace devcontainer server env in peer mode'), change `expect(proxyTarget).toBe(`http://server:${serverPort}`)` to `expect(proxyTarget).toBe(`http://api-test-feature_folder:${serverPort}`)` — that test renders {{FEATURE_FOLDER}} as `test-feature_folder`. Then run the compose-config checkpoint exactly as in verify_commands (absolute values for PROJECT_PATH and PROJECTS_DIR are required; with relative ones Compose reports an undefined named volume). If Docker is unavailable, say so in the commit body.",
+          "Verification": "Rendered compose sets the frontend proxy to http://api-<FEATURE_FOLDER>:3013, server declares that alias under devnet only, Traefik labels unchanged."
+        },
+        "items": [
+          {
+            "id": "template-devnet-alias.ac1",
+            "title": "Given the edited template, `! grep -q 'http://server:' <template>` exits 0, and `grep -n 'VITE_PROXY_TARGET=http://api-{{FEATURE_FOLDER}}:3013'` returns exactly one line in the frontend service",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "template-devnet-alias.ac2",
+            "title": "Given the template parsed as YAML, the server service's networks map declares `aliases: [api-{{FEATURE_FOLDER}}]` under devnet and no aliases under overdeck, and `git diff origin/main -- <template>` shows no changed `traefik.` label line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "template-devnet-alias.ac3",
+            "title": "When `npx vitest run` runs on tests/unit/dashboard/config.test.ts, devcontainer-init-command.test.ts, rebuild-stack.test.ts and stack-health-compose-name.test.ts, it exits 0 and config.test.ts asserts the proxy target `http://api-test-feature_folder:<PORT>`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "template-devnet-alias.ac4",
+            "title": "When the template is rendered with PROJECT_PATH=/home/test/Projects/overdeck, PROJECTS_DIR=/home/test/Projects and every other token set to `feature-probe`, then piped to `docker compose -f - config -q`, the command exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "proxy-target-uniqueness-test",
+        "title": "Add a renderer-driven test that two stacks never share a proxy target",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T00:18:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5330",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/workspace/devcontainer-proxy-target.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspace/devcontainer-proxy-target.test.ts",
+            "bash scripts/lint-source-introspection.sh"
+          ],
+          "expected_outputs": [
+            "devcontainer-proxy-target.test.ts passes",
+            "lint-source-introspection exits 0 with no new baseline entry"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create tests/unit/lib/workspace/devcontainer-proxy-target.test.ts using the `render()` helper in the PRD: build a ProjectConfig `{ name: 'overdeck', path: process.cwd(), workspace: { docker: { compose_template: 'infra/.devcontainer-template' } } } as ProjectConfig`, call createWorkspacePlaceholders + processTemplates (mapping only docker-compose.devcontainer.yml.template -> docker-compose.devcontainer.yml) into a mkdtemp dir, parse with `yaml`. Do NOT call renderDevcontainer (it creates ~/.cache dirs). Remove temp dirs in afterEach. Render three stacks: render('pan-9001'), render('pan-9002'), render('alpha-bravo-1115', { FEATURE_FOLDER: 'uat-alpha-bravo-1115' }). For every stack S and every other stack T assert the six PRD assertions: (1) host of S's VITE_PROXY_TARGET is in S.server.networks.devnet.aliases; (2) host !== 'server' and is not in S.server's names on overdeck (service key + overdeck aliases); (3) host is not in T.server's names on overdeck or devnet; (4) URL port equals server PORT env; (5) host matches /^[a-z0-9-]{1,63}$/ and equals the first label of the server's `traefik.http.routers.pan-api-*.rule` Host(`...`); (6) declared networks of server and frontend (list or map form) sorted equal ['devnet','overdeck']. Also assert the three hosts are pairwise distinct. No skipIf/.only; do not read any .ts file.",
+          "Verification": "Test passes on the WI-1 template; on the old template its host would be `server`, which assertions 1 and 2 reject."
+        },
+        "items": [
+          {
+            "id": "proxy-target-uniqueness-test.ac1",
+            "title": "When `npx vitest run tests/unit/lib/workspace/devcontainer-proxy-target.test.ts` runs, it exits 0 and reports tests covering two feature stacks and one UAT stack (FEATURE_FOLDER `uat-alpha-bravo-1115`)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "proxy-target-uniqueness-test.ac2",
+            "title": "Given a rendered stack whose proxy host is `server`, the test's assertion 2 rejects it (the file contains an explicit `not.toBe('server')` or equivalent check on the proxy host)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "proxy-target-uniqueness-test.ac3",
+            "title": "The test file produces each compose file through processTemplates and the substitution builder exported from src/lib/workspace/devcontainer-renderer.ts (named in the item narrative), and never calls renderDevcontainer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "proxy-target-uniqueness-test.ac4",
+            "title": "When `bash scripts/lint-source-introspection.sh` runs, it exits 0 and scripts/source-introspection-baseline.txt has no new entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-devnet-alias",
+        "title": "Document the devnet-only proxy alias in the template README and codebase map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T00:18:33Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5330",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "infra/.devcontainer-template/README.md",
+            ".overdeck/context/codebase/concerns.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'api-{{FEATURE_FOLDER}}' infra/.devcontainer-template/README.md",
+            "grep -n 'PAN-5330' .overdeck/context/codebase/concerns.md",
+            "grep -c 'last-verified' .overdeck/context/codebase/concerns.md",
+            "grep -n 'pan workspace rebuild' infra/.devcontainer-template/README.md"
+          ],
+          "expected_outputs": [
+            "README grep returns at least one line in the Networks section",
+            "concerns.md grep returns the new bullet",
+            "last-verified count is 1",
+            "README grep returns the re-render instruction"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. (1) infra/.devcontainer-template/README.md, section `### Networks` (after the paragraph starting `The stack creates one network`): add a paragraph saying Compose registers each service name (server, frontend, dev) on every joined network including the shared `overdeck` network, so the bare name `server` resolves to every running stack's server; the frontend therefore proxies to `http://api-{{FEATURE_FOLDER}}:3013`, an alias the server declares on devnet only (PAN-5330); any new service-to-service URL in the template must use a devnet-scoped alias, never a bare service name; a running stack picks the change up only when `.devcontainer/` is re-rendered — `pan workspace rebuild <issue>`, a new workspace, or a new UAT stack — while `./dev rebuild`, `./dev up`, `docker compose up -d` and `docker restart` reuse the old rendered file and keep `http://server:3013`. (2) .overdeck/context/codebase/concerns.md: add a bullet `**Bare service names collide on the shared overdeck network** (PAN-5330) — ...` directly after the `**Docker's bridge pool caps live workspace stacks** (PAN-4663)` bullet, at most 4 lines, same facts. Keep the single `<!-- last-verified: -->` line unchanged. No changelog.d entry.",
+          "Verification": "README and concerns.md state the alias rule and the recreate requirement."
+        },
+        "items": [
+          {
+            "id": "docs-devnet-alias.ac1",
+            "title": "Given the edited README, when `grep -n 'api-{{FEATURE_FOLDER}}' infra/.devcontainer-template/README.md` runs, it returns lines in the `### Networks` section that say the alias exists on devnet only and that a bare service name must never be used as a service-to-service target",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-devnet-alias.ac2",
+            "title": "The README names `pan workspace rebuild <issue>` as the command that applies the change to a running stack, and states that `./dev rebuild`, `docker compose up -d` and `docker restart` keep the old `http://server:3013` target",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-devnet-alias.ac3",
+            "title": "concerns.md contains a PAN-5330 bullet directly after the PAN-4663 bridge-pool bullet, and `grep -c 'last-verified' .overdeck/context/codebase/concerns.md` prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "template-devnet-alias",
+        "to": "proxy-target-uniqueness-test",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-16-PAN-5330-workspace-devcontainers-share-the-dns-name-server-on-the-external-overdeck-network-so-a-frontend-can-proxy-to-another-workspace-s-backend.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}
