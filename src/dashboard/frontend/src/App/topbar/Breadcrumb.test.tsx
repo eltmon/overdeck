@@ -56,6 +56,14 @@ describe('Breadcrumb (PAN-5292 WI-E8)', () => {
     expect(screen.getByTestId('topbar-crumb')).toHaveTextContent(/^All projects$/);
   });
 
+  it('reads just "All projects" with no separator when the All deck has no active pane (PAN-5414)', () => {
+    resetDeckLayoutStore();
+    renderCrumb(<Breadcrumb activeTab="command-deck" selectedProjectKey="__all-projects__" />);
+    const crumb = screen.getByTestId('topbar-crumb');
+    expect(crumb.textContent).toMatch(/^All projects$/);
+    expect(crumb.textContent).not.toContain('/');
+  });
+
   it('reads "All projects / <pane>" in the All projects deck (PAN-5343 H-D4)', () => {
     resetDeckLayoutStore();
     usePanesStore.getState().addPane('__all-projects__', { paneType: 'agent', label: 'Fix the build', conversationId: 'c1' });

@@ -1,0 +1,119 @@
+{
+  "version": "1",
+  "issueId": "PAN-5414",
+  "created": "2026-11-16T03:24:08.774Z",
+  "updated": "2026-11-16T04:14:21.803Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "crumb-empty-all-deck": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5414",
+      "claimedAt": "2026-11-16T03:24:08.774Z",
+      "doneAt": "2026-11-16T03:28:34.743Z"
+    },
+    "crumb-empty-all-deck.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T03:28:34.743Z"
+    },
+    "crumb-empty-all-deck.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T03:28:34.743Z"
+    },
+    "crumb-empty-all-deck.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T03:28:34.743Z"
+    },
+    "crumb-empty-all-deck.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T03:28:34.743Z"
+    },
+    "row-actions-group": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5414",
+      "claimedAt": "2026-11-16T03:28:42.601Z",
+      "doneAt": "2026-11-16T03:40:35.422Z"
+    },
+    "row-actions-group.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T03:40:35.422Z"
+    },
+    "row-actions-group.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T03:40:35.422Z"
+    },
+    "row-actions-group.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T03:40:35.422Z"
+    },
+    "row-actions-group.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T03:40:35.422Z"
+    },
+    "row-actions-group.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T03:40:35.422Z"
+    },
+    "row-right-padding": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5414",
+      "claimedAt": "2026-11-16T03:40:46.045Z",
+      "doneAt": "2026-11-16T03:52:15.437Z"
+    },
+    "row-right-padding.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T03:52:15.437Z"
+    },
+    "row-right-padding.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T03:52:15.437Z"
+    },
+    "row-right-padding.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T03:52:15.437Z"
+    },
+    "row-right-padding.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T03:52:15.437Z"
+    },
+    "stop-x-position": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5414",
+      "claimedAt": "2026-11-16T03:52:25.687Z",
+      "doneAt": "2026-11-16T04:02:38.822Z"
+    },
+    "stop-x-position.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T04:02:38.822Z"
+    },
+    "stop-x-position.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T04:02:38.822Z"
+    },
+    "stop-x-position.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T04:02:38.822Z"
+    },
+    "docs-and-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5414",
+      "claimedAt": "2026-11-16T04:02:54.568Z",
+      "doneAt": "2026-11-16T04:14:21.803Z"
+    },
+    "docs-and-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T04:14:21.803Z"
+    },
+    "docs-and-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T04:14:21.803Z"
+    },
+    "docs-and-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T04:14:21.803Z"
+    }
+  }
+}

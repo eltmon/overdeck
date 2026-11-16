@@ -2063,7 +2063,10 @@ opens Home (`/`). After the brand, left to right, the bar holds:
    project's `name` from `useRootLabel('project:<key>')`, never the key, and the
    pane label is `selectActivePane(key)?.label ?? 'Home'`. With no project it
    reads "All projects"; on the No-project deck it reads "No project / <pane>".
-   Every other route shows `TAB_TITLES[activeTab]` alone.
+   In the All projects deck it reads "All projects / <pane label>", "All
+   projects / N conversations side by side" with two or more leaves, and just
+   "All projects" with no active pane. Every other route shows
+   `TAB_TITLES[activeTab]` alone.
 2. **Search box.** It opens the command palette (scope `all`), the same as
    `Ctrl K` / `⌘K`; `/` still opens the search modal. Its text is
    `PALETTE_SEARCH_PLACEHOLDER` and its keycap is `paletteKeycap()`, both in
@@ -2422,6 +2425,12 @@ the left column can call it from any route.
 old multi-select toggle. New per-row props (`markProjectKey`, `markName`,
 `paneSlot`, `onOpenBeside`, `onOpenInProject`, `dragDeckKey`) are primitives
 or stable callbacks compared in `itemPropsEqual`.
+
+Beside and ⋮ sit in the `.conversationActions` group (zero width at rest,
+open on row hover/focus-within, held open by `conversationActionsOpen` while
+the menu is open); the flat row's right padding is 8px at rest and 30px on
+hover, focus-within, favorited (`conversationItemFavorited`) and menu-open
+(`conversationItemMenuOpen`).
 
 ### Drag a row onto a pane
 

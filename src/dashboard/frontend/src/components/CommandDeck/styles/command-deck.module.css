@@ -1272,7 +1272,7 @@
 }
 
 .projectConvItem .conversationStopBtn {
-  left: 18px;
+  left: 10px;
   width: 14px;
   height: 14px;
 }
@@ -2358,7 +2358,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 30px 4px 24px;
+  padding: 4px 8px 4px 24px;
   position: relative;
   cursor: pointer;
   transition: background 0.1s;
@@ -2372,6 +2372,16 @@
 
 .conversationItem:hover {
   background: var(--accent);
+}
+
+/* PAN-5414: reserve the star's 30px slot only while it can show (hover,
+   focus, favorited, or the overflow menu open) so the row's own padding
+   doesn't permanently truncate the title/meta at rest. */
+.conversationItem:hover,
+.conversationItem:focus-within,
+.conversationItemFavorited,
+.conversationItemMenuOpen {
+  padding-right: 30px;
 }
 
 /* Hover-only action group — collapses to 0 width when row is not hovered,
@@ -2401,6 +2411,19 @@
   overflow: visible;
   opacity: 1;
   margin-left: 0;
+}
+
+/* PAN-5414: held open while the overflow menu is open. The portaled menu's
+   overlay captures row hover/focus, so the group's own opacity must be
+   lifted independently of :hover/:focus-within. */
+.conversationActionsOpen {
+  max-width: 120px;
+  opacity: 1;
+  margin-left: 0;
+}
+
+.conversationActionsOpen .conversationKebabBtn {
+  opacity: 1;
 }
 
 .conversationItemSelected {
@@ -2485,6 +2508,12 @@
   color: var(--foreground);
 }
 
+/* PAN-5414: conversationActions clips overflow, which would otherwise crop
+   the default outside focus ring. */
+.conversationActions .conversationKebabBtn:focus-visible {
+  outline-offset: -2px;
+}
+
 .projectConvItem .conversationKebabBtn {
   width: 16px;
   height: 16px;
@@ -2492,7 +2521,7 @@
 
 .conversationStopBtn {
   position: absolute;
-  left: 12px;
+  left: 4px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;

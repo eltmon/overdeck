@@ -1,0 +1,430 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-16T03:17:44Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5414: Left column rows: invisible hover buttons truncate titles and meta, Stop × overlaps the Settle box, empty All-deck crumb",
+    "updated": "2026-11-16T03:23:19.551Z"
+  },
+  "plan": {
+    "id": "pan-5414",
+    "title": "Left column rows: invisible hover buttons truncate titles and meta, Stop × overlaps the Settle box, empty All-deck crumb",
+    "status": "running",
+    "uid": "71fc967b-1904-46b8-aafd-8cdf399bc954",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-16T03:17:44Z",
+    "updated": "2026-11-16T03:23:19.551Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5414",
+        "label": "PAN-5414",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5284",
+        "label": "Parent epic #5284",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "command-deck",
+      "css",
+      "polish"
+    ],
+    "narratives": {
+      "Problem": "In the Command Deck left column, flat conversation rows reserve ~78 px for invisible controls at rest (30 px right padding for the hidden star plus the in-flow, opacity-0 Beside and kebab buttons), so titles and meta lines truncate early. The hover Stop button (left 12px, 16px wide) overlaps the Settle checkbox that starts at x=24; the nested variant's Stop button overlaps its status indicator. An empty All projects deck's crumb reads 'All projects / Conversation' because AllProjectsCrumb falls back to a literal 'Conversation'.",
+      "Proposal": "Wrap Beside and kebab in the existing collapsing .conversationActions group, held open (with visible buttons) by a new .conversationActionsOpen class while the portaled menu is open. Drop the flat row's right padding to 8 px at rest and restore 30 px on hover, focus-within, favorited (.conversationItemFavorited) and menu-open (.conversationItemMenuOpen). Move .conversationStopBtn to left 4px and the nested one to left 10px. Render only 'All projects' in an empty All deck crumb. Update mission-control.mdx, DASHBOARD-ARCHITECTURE.md and add changelog.d/pan-5414.md. Verify geometry in an isolated Playwright browser.",
+      "NonGoals": "- No change to nested rows' 22px right padding or single-line layout\n- No hover padding transition or animation\n- No removal of margin-left: auto from .conversationKebabBtn\n- No deletion of the unused .conversationItemConfirming rule or other dead CSS\n- No change to which decks pass onOpenBeside; project decks keep the Beside button\n- No change to the star's position, size or favorite behavior\n- No change to LinkedConversationRow, the project tree, or the crumb for project decks, the No-project deck or other routes\n- No pixel-width assertions in happy-dom tests and no tests that read CSS or TSX source\n- No skipIf or .only in tests; no allowlist raise for ConversationRow.tsx"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Reuse the existing .conversationActions class for the Beside+kebab group",
+        "rationale": "The issue names it; it already has collapse/open transitions and .projectConvItem overrides."
+      },
+      {
+        "summary": "Add .conversationActionsOpen .conversationKebabBtn { opacity: 1 } besides the group-open rule",
+        "rationale": "The portaled MenuSurface takes focus and MenuOverlay takes hover, so without it the open group would contain invisible buttons."
+      },
+      {
+        "summary": "Keep 30px right padding while the menu is open via a conversationItemMenuOpen row class",
+        "rationale": "Otherwise the group jumps 22px right under the already-positioned menu when the overlay removes row hover."
+      },
+      {
+        "summary": "Nested Stop button moves to left 10px; nested right padding stays 22px",
+        "rationale": "Nested rows have no Settle checkbox but the button at 18-32 overlaps the status indicator at 28; 10+14=24 clears it. The issue scopes the padding fix to flat rows."
+      },
+      {
+        "summary": "Empty All deck crumb keeps font-medium text-foreground styling and hides when paneLabel is falsy",
+        "rationale": "It names a selected deck, like other deck crumbs; an empty label is as meaningless as a missing one."
+      },
+      {
+        "summary": "Keep margin-left: auto on .conversationKebabBtn",
+        "rationale": "Inside the content-sized group it resolves to 0 and does not break alignment; the issue says remove it only if it does."
+      }
+    ],
+    "items": [
+      {
+        "id": "crumb-empty-all-deck",
+        "title": "Empty All projects deck crumb reads just 'All projects'",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T03:17:44Z",
+        "metadata": {
+          "issueLabel": "pan-5414",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/App/topbar/Breadcrumb.tsx",
+            "src/dashboard/frontend/src/App/topbar/Breadcrumb.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/App/topbar/Breadcrumb.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "Breadcrumb.test.tsx passes including the new empty All deck test",
+            "typecheck completes without errors"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In AllProjectsCrumb (Breadcrumb.tsx ~line 40) replace the `paneLabel ?? 'Conversation'` fallback with `paneLabel || null`, and render the '/' separator span and the detail span only when detail is truthy; keep the first span's classes (shrink-0 font-medium text-foreground). Update the file header comment to say an empty All projects deck reads just 'All projects' (PAN-5414). Add the test from PRD WI-1 to Breadcrumb.test.tsx inside the existing describe, calling resetDeckLayoutStore() first."
+        },
+        "items": [
+          {
+            "id": "crumb-empty-all-deck.ac1",
+            "title": "Given the All projects deck is selected with no panes and no split layout, when Breadcrumb renders, then the topbar-crumb text matches /^All projects$/ and contains no '/'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crumb-empty-all-deck.ac2",
+            "title": "Given an All deck with one active pane labelled 'Fix the build', the crumb still renders 'All projects/Fix the build' (existing test passes unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crumb-empty-all-deck.ac3",
+            "title": "Given an All deck layout with 3 leaves, the crumb still renders 'All projects/3 conversations side by side' (existing test passes unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crumb-empty-all-deck.ac4",
+            "title": "When the All projects deck is selected with no panes in the running dashboard, the topbar-crumb renders exactly 'All projects' (browser UAT by the test role on the workspace stack, isolated Playwright profile, 1920x1000, 264px column)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "row-actions-group",
+        "title": "Wrap Beside and kebab buttons in the collapsing conversationActions group, held open while the menu is open",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T03:17:44Z",
+        "metadata": {
+          "issueLabel": "pan-5414",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "FR-9"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "ConversationRow.test.tsx passes including the new 'hover action group (PAN-5414)' tests",
+            "typecheck and lint complete without errors"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In ConversationRow.tsx (~lines 699-733) wrap the Beside span (still guarded by onOpenBeside) and the kebab span in one `{!editingName && (<span className={`${styles.conversationActions} ${menuOpen ? styles.conversationActionsOpen : ''}`} data-testid=\"conversation-actions\">...</span>)}`, keeping every attribute and handler of both buttons unchanged; the star stays outside. In command-deck.module.css, directly after the `.conversationItemConfirming .conversationActions` rule, add `.conversationActionsOpen { max-width: 120px; opacity: 1; margin-left: 0; }` and `.conversationActionsOpen .conversationKebabBtn { opacity: 1; }` (the portaled menu's overlay takes row hover and focus, so the buttons' own opacity must be lifted too). Add the four tests listed in PRD WI-2 to ConversationRow.test.tsx using the existing renderRow helper and real styles import. Also add `.conversationActions .conversationKebabBtn:focus-visible { outline-offset: -2px; }` so the group's overflow: hidden does not clip the default outside focus ring."
+        },
+        "items": [
+          {
+            "id": "row-actions-group.ac1",
+            "title": "Given a flat row rendered with onOpenBeside, the 'Open beside' button and the 'More actions for Test conversation' button share one parent element that has the styles.conversationActions class",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-actions-group.ac2",
+            "title": "Given a flat row rendered without onOpenBeside, the kebab button's parent has styles.conversationActions and no 'Open beside' button renders; a nested row (variant='nested') also renders its kebab inside styles.conversationActions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-actions-group.ac3",
+            "title": "Given the row's kebab is clicked, the conversationActions group gains the styles.conversationActionsOpen class; before the click it does not have it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-actions-group.ac4",
+            "title": "command-deck.module.css contains .conversationActionsOpen (max-width 120px, opacity 1, margin-left 0), .conversationActionsOpen .conversationKebabBtn (opacity 1) and .conversationActions .conversationKebabBtn:focus-visible (outline-offset -2px)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-actions-group.ac5",
+            "title": "When a flat row is hovered, the Beside (when present), kebab and star buttons render with computed opacity 1 and non-zero width, and tabbing to the kebab shows an unclipped focus ring (browser UAT by the test role on the workspace stack, isolated Playwright profile, 1920x1000, 264px column)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "row-right-padding",
+        "title": "Flat row right padding defaults to 8px at rest and 30px when the star can show",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T03:17:44Z",
+        "metadata": {
+          "issueLabel": "pan-5414",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "ConversationRow.test.tsx passes including the favorited/menu-open class tests",
+            "typecheck and lint complete without errors"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In command-deck.module.css change `.conversationItem` padding from `4px 30px 4px 24px` to `4px 8px 4px 24px`, and directly after the `.conversationItem:hover` rule add one rule `.conversationItem:hover, .conversationItem:focus-within, .conversationItemFavorited, .conversationItemMenuOpen { padding-right: 30px; }`. In ConversationRow.tsx itemClass (~lines 343-345), flat branch only, add `conv.isFavorited ? styles.conversationItemFavorited : ''` and `menuOpen ? styles.conversationItemMenuOpen : ''`; leave the nested branch unchanged. Add the three tests from PRD WI-3."
+        },
+        "items": [
+          {
+            "id": "row-right-padding.ac1",
+            "title": "Given a flat row with isFavorited true, the row button renders with the styles.conversationItemFavorited class; with isFavorited false it renders without it; a nested row with isFavorited true renders without it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-right-padding.ac2",
+            "title": "Given a flat row whose kebab was clicked, the row button renders with the styles.conversationItemMenuOpen class",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-right-padding.ac3",
+            "title": "command-deck.module.css .conversationItem padding is '4px 8px 4px 24px' and one rule applies padding-right 30px to :hover, :focus-within, .conversationItemFavorited and .conversationItemMenuOpen",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-right-padding.ac4",
+            "title": "Given a flat row at rest (mouse elsewhere, focus blurred) with no pane badge, the gap between the conversationMain block's right edge and the row's right edge measures 8 +/- 1 px; with a pane badge the main block ends 6 +/- 1 px before the badge (browser UAT by the test role on the workspace stack, isolated Playwright profile, 1920x1000, 264px column)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stop-x-position",
+        "title": "Move the hover Stop button clear of the Settle checkbox and nested status indicator",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T03:17:44Z",
+        "metadata": {
+          "issueLabel": "pan-5414",
+          "inspectionDepth": "fast",
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ],
+          "verify_commands": [
+            "npm run lint",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lint and typecheck complete without errors; geometry is proven by the test role's browser UAT"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In command-deck.module.css set `.conversationStopBtn { left: 4px; }` (was 12px; spans x=4-20, Settle checkbox starts at x=24) and `.projectConvItem .conversationStopBtn { left: 10px; }` (was 18px; 14px wide so spans x=10-24, nested status indicator starts at x=28). Change nothing else in those rules. No unit test (geometry is proven by the test role's browser UAT): happy-dom has no layout and tests must not read CSS source."
+        },
+        "items": [
+          {
+            "id": "stop-x-position.ac1",
+            "title": "command-deck.module.css .conversationStopBtn rule contains left: 4px, and the .projectConvItem .conversationStopBtn rule contains left: 10px and preserves width: 14px",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stop-x-position.ac2",
+            "title": "When a flat row with a live session is hovered, the Stop button's right edge is <= the Settle checkbox's left edge (browser UAT by the test role on the workspace stack, isolated Playwright profile, 1920x1000, 264px column)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stop-x-position.ac3",
+            "title": "When a nested row with a live session is hovered, the Stop button's right edge is <= the status indicator's left edge (browser UAT by the test role on the workspace stack, isolated Playwright profile, 1920x1000, 264px column)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-changelog",
+        "title": "Document the empty All deck crumb and the row hover action layout, add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T03:17:44Z",
+        "metadata": {
+          "issueLabel": "pan-5414",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "features/mission-control.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "changelog.d/pan-5414.md"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ],
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0 with changelog.d/pan-5414.md present"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In features/mission-control.mdx (~line 44, the sentence ending 'the top bar reads \"All projects / \"...') add that with no conversation open the top bar reads just \"All projects\", and add one sentence that the row's Beside and kebab buttons and the star appear when you point at the row and take no room otherwise. In docs/DASHBOARD-ARCHITECTURE.md extend item 1 Crumb (~line 2056) with the All deck crumb forms including the bare 'All projects', and below the per-row props paragraph of the All projects deck section (~line 2416) add the paragraph from PRD WI-5 naming conversationActions, conversationActionsOpen, conversationItemFavorited and conversationItemMenuOpen and the 8px/30px padding rule. Create changelog.d/pan-5414.md with exactly the text given in PRD WI-5 (one #### Fixed section)."
+        },
+        "items": [
+          {
+            "id": "docs-and-changelog.ac1",
+            "title": "features/mission-control.mdx contains a sentence saying an empty All projects deck's top bar reads just \"All projects\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains the three All deck crumb forms in the Crumb item, and its All projects deck section contains conversationActions, conversationActionsOpen, conversationItemFavorited and conversationItemMenuOpen with the 8px at rest / 30px on hover, focus-within, favorited and menu-open padding rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-changelog.ac3",
+            "title": "changelog.d/pan-5414.md exists with exactly one '#### Fixed' heading and a bullet linking issue #5414, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "row-actions-group",
+        "to": "row-right-padding",
+        "type": "blocks"
+      },
+      {
+        "from": "row-right-padding",
+        "to": "stop-x-position",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-16-PAN-5414-left-column-rows-invisible-hover-buttons-truncate-titles-and-meta-stop-overlaps-the-settle-box-empty-all-deck-crumb.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

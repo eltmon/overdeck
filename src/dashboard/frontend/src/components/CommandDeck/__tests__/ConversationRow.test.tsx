@@ -714,6 +714,64 @@ describe('ConversationRow open-beside controls (PAN-5343 H-D5)', () => {
   });
 });
 
+describe('ConversationRow hover action group (PAN-5414)', () => {
+  it('groups the Beside and kebab buttons under one conversationActions parent', () => {
+    renderRow({}, { onOpenBeside: vi.fn() });
+    const group = screen.getByTestId('conversation-actions');
+    expect(group).toHaveClass(styles.conversationActions);
+    expect(within(group).getByRole('button', { name: 'Open beside' })).toBeInTheDocument();
+    expect(within(group).getByLabelText('More actions for Test conversation')).toBeInTheDocument();
+  });
+
+  it('groups only the kebab under conversationActions when there is no Beside opener', () => {
+    renderRow({});
+    const group = screen.getByTestId('conversation-actions');
+    expect(group).toHaveClass(styles.conversationActions);
+    expect(within(group).queryByRole('button', { name: 'Open beside' })).not.toBeInTheDocument();
+    expect(within(group).getByLabelText('More actions for Test conversation')).toBeInTheDocument();
+  });
+
+  it('groups the kebab under conversationActions on a nested row too', () => {
+    renderRow({}, { variant: 'nested' });
+    const group = screen.getByTestId('conversation-actions');
+    expect(group).toHaveClass(styles.conversationActions);
+    expect(within(group).getByLabelText('More actions for Test conversation')).toBeInTheDocument();
+  });
+
+  it('holds the group open with conversationActionsOpen while the menu is open', () => {
+    renderRow({});
+    const group = screen.getByTestId('conversation-actions');
+    expect(group).not.toHaveClass(styles.conversationActionsOpen);
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    expect(group).toHaveClass(styles.conversationActionsOpen);
+  });
+});
+
+describe('ConversationRow right-padding reservation (PAN-5414)', () => {
+  it('adds conversationItemFavorited on a flat favorited row, not on an unfavorited one', () => {
+    renderRow({ isFavorited: true });
+    expect(screen.getByTitle(conversation.name)).toHaveClass(styles.conversationItemFavorited);
+  });
+
+  it('omits conversationItemFavorited on a flat unfavorited row', () => {
+    renderRow({ isFavorited: false });
+    expect(screen.getByTitle(conversation.name)).not.toHaveClass(styles.conversationItemFavorited);
+  });
+
+  it('never adds conversationItemFavorited on a nested favorited row', () => {
+    renderRow({ isFavorited: true }, { variant: 'nested' });
+    expect(screen.getByTitle(conversation.name)).not.toHaveClass(styles.conversationItemFavorited);
+  });
+
+  it('adds conversationItemMenuOpen to a flat row once its kebab menu is opened', () => {
+    renderRow({});
+    const row = screen.getByTitle(conversation.name);
+    expect(row).not.toHaveClass(styles.conversationItemMenuOpen);
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    expect(row).toHaveClass(styles.conversationItemMenuOpen);
+  });
+});
+
 describe('ConversationRow drag onto a pane (PAN-5343 H-D8)', () => {
   it('is draggable with a deck key and records the drag', async () => {
     const { useConversationDragStore, CONVERSATION_DRAG_TYPE } = await import('../../Stage/conversationDragStore');
