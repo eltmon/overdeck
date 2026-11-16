@@ -657,6 +657,12 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   `infra/.devcontainer-template/` sets `network_mode: none`. The renderer reads the
   template from the primary checkout (`devcontainer-renderer.ts`), so a branch's
   template edit reaches workspace stacks only after merge.
+- **Bare service names collide on the shared overdeck network** (PAN-5330) —
+  Compose registers a service's name on every network it joins, including the
+  shared `overdeck` network, so the bare name `server` resolves to every
+  running stack's server, not just this one's. The template gives `server` a
+  `devnet`-scoped alias (`api-{{FEATURE_FOLDER}}`) for the frontend to proxy
+  to instead.
 - **The dashboard snapshot is the `current` cycle, not every issue** (PAN-4717) —
   the read model feeds `issuesRaw` from `IssueDataService.getIssues()` with
   default options, and `computeIssues` drops canonical `backlog` and `canceled`
