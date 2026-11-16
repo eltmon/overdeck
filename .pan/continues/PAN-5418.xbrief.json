@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5418",
   "created": "2026-11-16T04:03:53.810Z",
-  "updated": "2026-11-16T04:03:53.810Z",
+  "updated": "2026-11-16T04:09:40.245Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,26 @@
   "sessionHistory": [],
   "items": {
     "own-patch-module": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5418",
-      "claimedAt": "2026-11-16T04:03:53.810Z"
+      "claimedAt": "2026-11-16T04:03:53.810Z",
+      "doneAt": "2026-11-16T04:09:40.244Z"
+    },
+    "own-patch-module.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T04:09:40.244Z"
+    },
+    "own-patch-module.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T04:09:40.244Z"
+    },
+    "own-patch-module.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T04:09:40.244Z"
+    },
+    "own-patch-module.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T04:09:40.244Z"
     }
   }
 }
