@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5452",
   "created": "2026-11-16T18:34:39.411Z",
-  "updated": "2026-11-16T19:42:40.197Z",
+  "updated": "2026-11-16T19:42:49.369Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -262,6 +262,11 @@
     "run-preamble.ac5": {
       "status": "completed",
       "doneAt": "2026-11-16T19:42:40.197Z"
+    },
+    "command-builders": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5452",
+      "claimedAt": "2026-11-16T19:42:49.369Z"
     }
   }
 }
