@@ -773,6 +773,10 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'PUT /api/jev/settings',                                kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via jev settings path-scoped write (PAN-4508)' },
   { surface: 'GET /api/jev/usage',                                   kind: 'http', disposition: 'READ',        door: 'jev usage log summary, read-only (PAN-4508)' },
 
+  // ── semgrep.ts ────────────────────────────────────────────────────────────
+  { surface: 'GET /api/semgrep/settings',                            kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG via semgrep settings door (PAN-4594)' },
+  { surface: 'PUT /api/semgrep/settings',                            kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via semgrep settings path-scoped write (PAN-4594)' },
+
   // ── color-themes.ts (PAN-4644) ───────────────────────────────────────────
   { surface: 'GET /api/color-themes',                                kind: 'http', disposition: 'READ',        door: 'color theme store + selection resolve (PAN-4644)' },
   { surface: 'PUT /api/color-themes/selection',                      kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via color theme selection path-scoped write (PAN-4644)' },
