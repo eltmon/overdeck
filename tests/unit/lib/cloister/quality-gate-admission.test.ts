@@ -840,6 +840,12 @@ describe('head-of-line fairness (PAN-5285)', () => {
     return typeof since === 'number' ? since : undefined
   }
 
+  /** The wait-reason kind a waiter ticket for `gateName` recorded, or undefined. */
+  function waitKind(rootDir: string, gateName: string): string | undefined {
+    const wait = waiterTicket(rootDir, gateName)?.wait as { reason?: { kind?: unknown } } | undefined
+    return typeof wait?.reason?.kind === 'string' ? wait.reason.kind : undefined
+  }
+
   /**
    * Attach a rejection handler now. CI retries a failed test once, and a failed
    * attempt that never reached its own handler would leave this acquire polling a
@@ -940,8 +946,9 @@ describe('head-of-line fairness (PAN-5285)', () => {
     const available = () => 12.5 * GiB
     // Two slots, so the head only ever waits on memory, never on the slot the second gate holds.
     const headPromise = pending(acquireQualityGateAdmission(big, fairDeps(rootDir, () => clock, available, { maxWaitMs: 10_000, slots: 2 })))
+    // The head records its memory block at t=1, so at t=5000 it is past the 1 s bound.
+    await driveUntil(() => blockedSince(rootDir, 'vitest') === 1)
     clock = 5_000
-    await driveTurns(10)
 
     const second = await driveUntilResolved(acquireQualityGateAdmission(small, fairDeps(rootDir, () => clock, available, { slots: 2 })))
     expect(second.admittedAlone).toBe(false)
@@ -959,7 +966,8 @@ describe('head-of-line fairness (PAN-5285)', () => {
     const held = { isProcessAlive: otherAlive, staleMs: 600_000 }
     const headPromise = acquireQualityGateAdmission(big, fairDeps(rootDir, () => clock, () => 16 * GiB, held))
     const headSettled = settledFlag(headPromise)
-    await driveTurns(5)
+    // Queued at t=1 and waiting on the held slot, not on memory.
+    await driveUntil(() => waitKind(rootDir, 'vitest') === 'slots')
     // Long past the bound in queue age, but it has waited on the slot, not on memory.
     clock = 10_000
     unlinkSync(join(rootDir, 'owner.json'))
