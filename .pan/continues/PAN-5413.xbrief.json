@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5413",
+  "created": "2026-11-16T05:09:02.463Z",
+  "updated": "2026-11-16T05:09:02.464Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "strip-shared-count": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5413",
+      "claimedAt": "2026-11-16T05:09:02.463Z"
+    }
+  }
+}
