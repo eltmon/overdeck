@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5391",
   "created": "2026-11-16T02:26:12.740Z",
-  "updated": "2026-11-16T02:32:39.599Z",
+  "updated": "2026-11-16T02:42:40.532Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,9 +32,22 @@
       "doneAt": "2026-11-16T02:32:30.816Z"
     },
     "poll-unstable": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5391",
-      "claimedAt": "2026-11-16T02:32:39.599Z"
+      "claimedAt": "2026-11-16T02:32:39.599Z",
+      "doneAt": "2026-11-16T02:42:40.532Z"
+    },
+    "poll-unstable.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:42:40.532Z"
+    },
+    "poll-unstable.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:42:40.532Z"
+    },
+    "poll-unstable.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:42:40.532Z"
     }
   }
 }
