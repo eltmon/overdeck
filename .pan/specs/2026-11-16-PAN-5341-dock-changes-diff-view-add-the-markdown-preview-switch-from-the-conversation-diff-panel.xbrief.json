@@ -4,17 +4,17 @@
     "created": "2026-11-16T05:06:43Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5341: Dock Changes diff view: add the Markdown Preview switch from the conversation diff panel",
-    "updated": "2026-11-16T05:08:12.832Z"
+    "updated": "2026-11-16T05:09:30.931Z"
   },
   "plan": {
     "id": "pan-5341",
     "title": "Dock Changes diff view: add the Markdown Preview switch from the conversation diff panel",
-    "status": "proposed",
+    "status": "running",
     "uid": "6a1d7f53-6f78-40f9-8b8f-8141edd464ca",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-16T05:06:43Z",
-    "updated": "2026-11-16T05:08:12.832Z",
+    "updated": "2026-11-16T05:09:30.931Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5341",
@@ -380,5 +380,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
