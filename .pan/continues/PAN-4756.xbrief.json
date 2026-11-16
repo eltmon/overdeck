@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:46:09.845Z",
+  "updated": "2026-11-16T11:46:31.761Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -408,9 +408,22 @@
       "doneAt": "2026-11-16T11:46:08.393Z"
     },
     "migrate-pair-device-dialog": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4756",
-      "claimedAt": "2026-11-16T11:46:09.845Z"
+      "claimedAt": "2026-11-16T11:46:09.845Z",
+      "doneAt": "2026-11-16T11:46:31.760Z"
+    },
+    "migrate-pair-device-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:46:31.760Z"
+    },
+    "migrate-pair-device-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:46:31.760Z"
+    },
+    "migrate-pair-device-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:46:31.760Z"
     }
   }
 }
