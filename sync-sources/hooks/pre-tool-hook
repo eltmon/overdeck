@@ -5,8 +5,8 @@
 # to the dashboard. No runtime.json writes — AgentStateService's
 # SubscriptionRef is the source of truth now.
 #
-# Never blocks Claude Code: strict timeout, silent failure, pending-events
-# buffering via pan-hook-lib.
+# Blocks only while `pan shutdown` drains (PAN-5342); otherwise strict timeout, silent failure,
+# pending-events buffering via pan-hook-lib.
 
 set +e
 
@@ -15,6 +15,13 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/pan-hook-lib.sh" 2>/dev/null || exit 0
 
 pan_resolve_agent_id || exit 0
+
+# PAN-5342: while `pan shutdown` drains, deny every new tool call so the
+# session ends its turn at a tool boundary. The call already running is unaffected.
+if [ -f "${OVERDECK_HOME:-$HOME/.overdeck}/shutdown.json" ]; then
+  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Overdeck is shutting down (pan shutdown). Do not start any tool. End your turn now with one line saying where you stopped. The operator resumes this session after the restart."}}'
+  exit 0
+fi
 
 TOOL_INFO=$(cat 2>/dev/null || echo '{}')
 TOOL_NAME="unknown"
