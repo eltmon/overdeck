@@ -42,6 +42,16 @@ describe('runHelper (PAN-5452)', () => {
     expect(deps.rm).toHaveBeenCalledWith('/x/computer-use/ops/fixed-uuid.json', { force: true });
   });
 
+  it('still removes the op file when writeFile creates it and then fails partway (e.g. ENOSPC)', async () => {
+    const writeFile = vi.fn().mockRejectedValue(Object.assign(new Error('no space left on device'), { code: 'ENOSPC' }));
+    const execFile = vi.fn();
+    const deps = makeDeps({ writeFile, execFile });
+
+    await expect(runHelper({ tool: 'list_apps' }, {}, deps)).rejects.toThrow('no space left on device');
+    expect(execFile).not.toHaveBeenCalled();
+    expect(deps.rm).toHaveBeenCalledWith('/x/computer-use/ops/fixed-uuid.json', { force: true });
+  });
+
   it('removes the op file after a timeout', async () => {
     const execFile = vi.fn().mockRejectedValue(Object.assign(new Error('killed'), { killed: true }));
     const deps = makeDeps({ execFile });

@@ -7,6 +7,7 @@
  */
 import { assertKeyComboAllowed as assertKeyComboAllowedReal } from './blocked-key-combos.js';
 import { ComputerUseError } from './errors.js';
+import type { HelperResponse } from './helper.js';
 import { holderKey as holderKeyReal } from './lease.js';
 import { type OperationKind, runComputerOperation as runComputerOperationReal, type RunComputerOperationResult } from './run.js';
 import { type ElementRecord, elementRecord as elementRecordReal } from './snapshot-store.js';
@@ -113,7 +114,7 @@ function applyTreeFilter(result: RunComputerOperationResult, options: GetAppStat
   const isSubtreeRead = options.elementIndex !== undefined;
   if (treeLines === snapshot.treeLines && !isSubtreeRead) return result;
 
-  const response: Record<string, unknown> = {
+  const response: HelperResponse = {
     ...result.response,
     snapshot: treeLines === snapshot.treeLines ? snapshot : { ...snapshot, treeLines },
   };

@@ -77,11 +77,13 @@ export async function runHelper(
   const dir = resolveOpsDir();
   await mkdirFn(dir, { recursive: true, mode: 0o700 });
   const opFile = join(dir, `${uuid()}.json`);
-  await writeFileFn(opFile, JSON.stringify(operation), { mode: 0o600 });
 
   let stdout: string;
   let stderr: string;
   try {
+    // Inside the try/finally: a write that creates the file and then fails
+    // partway (e.g. ENOSPC) must still be cleaned up below.
+    await writeFileFn(opFile, JSON.stringify(operation), { mode: 0o600 });
     try {
       const result = await exec(systemPython, ['-I', resolveHelperPath(), opFile], {
         env,
