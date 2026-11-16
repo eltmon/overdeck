@@ -170,7 +170,7 @@ export async function skillsLaunchSettingsCommand(options: LaunchSettingsOptions
       ? await applyDeftFailOpen(join(dirname(link), 'deft.env'), async envFile =>
         launch.applyDeftForLaunch(ctx, envFile, await launch.launchMountsDeft(ctx)))
       : launch.EMPTY_DEFT_LAUNCH;
-    const json = launch.claudeSkillSettingsJson(mergeSkillNames(disabled, deft.hideSkills), {
+    const json = launch.claudeSkillSettingsJson(mergeSkillNames(disabled, deft.hideSkills, semgrep.hideSkill ? ['semgrep'] : []), {
       ...sageox.settings,
       hooks: mergeClaudeHookMaps(sageox.settings?.hooks, semgrep.claudeHooks),
       deny: deft.deny,
@@ -189,7 +189,7 @@ export async function skillsLaunchSettingsCommand(options: LaunchSettingsOptions
   const codexHome = options.codexHome as string;
   const deft = await applyDeftFailOpen(join(codexHome, 'overdeck-deft.env'), async envFile =>
     launch.applyDeftForLaunch(ctx, envFile, await launch.launchMountsDeft(ctx)));
-  await launch.writeCodexSkillOverrides(codexHome, mergeSkillNames(disabled, deft.hideSkills));
+  await launch.writeCodexSkillOverrides(codexHome, mergeSkillNames(disabled, deft.hideSkills, semgrep.hideSkill ? ['semgrep'] : []));
   await applyPacksFailOpen(() => launch.applyCodexPacks(ctx, codexHome, exclude), async () => {
     const { writeCodexPackBlock } = await import('../../lib/skill-packs/mount.js');
     await writeCodexPackBlock(codexHome, null);
@@ -204,8 +204,8 @@ export async function skillsLaunchSettingsCommand(options: LaunchSettingsOptions
   }
 }
 
-function mergeSkillNames(disabled: readonly string[], hidden: readonly string[]): string[] {
-  return [...new Set([...disabled, ...hidden])];
+function mergeSkillNames(disabled: readonly string[], hidden: readonly string[], extraHidden: readonly string[] = []): string[] {
+  return [...new Set([...disabled, ...hidden, ...extraHidden])];
 }
 
 /** NFR-2: a Deft error removes the env file and leaves the launch as it would be without Deft. */

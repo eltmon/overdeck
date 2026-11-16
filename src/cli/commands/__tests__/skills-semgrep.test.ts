@@ -98,3 +98,30 @@ describe('pan skills launch-settings — semgrep + SageOx hook merge (PAN-4591 W
     expect(settings.hooks.PostToolUse[1]!.hooks[0]!.command).toContain('semgrep-edit-hook');
   });
 });
+
+describe('pan skills launch-settings — hide the semgrep skill when off (PAN-4591 WI-6)', () => {
+  it('Claude: skillOverrides contains semgrep:off when hideSkill is true', async () => {
+    mocks.loadConfigNoMigration.mockResolvedValue({ config: { security: { semgrep: { enabled: false, mcp: false, edit_hook: false } } } });
+    await run('launch-settings', '--harness', 'claude-code', '--cwd', '/w');
+    const settings = JSON.parse(stdout.join('')) as { skillOverrides: Record<string, string> };
+    expect(settings.skillOverrides.semgrep).toBe('off');
+  });
+
+  it('Codex: writeCodexSkillOverrides is called with a list containing semgrep when hideSkill is true', async () => {
+    mocks.loadConfigNoMigration.mockResolvedValue({ config: { security: { semgrep: { enabled: false, mcp: false, edit_hook: false } } } });
+    await run('launch-settings', '--harness', 'codex', '--cwd', '/w', '--codex-home', '/ch');
+    expect(mocks.writeCodexSkillOverrides).toHaveBeenCalledWith('/ch', expect.arrayContaining(['semgrep']));
+  });
+
+  it('Claude: no semgrep key when hideSkill is false', async () => {
+    await run('launch-settings', '--harness', 'claude-code', '--cwd', '/w');
+    const printed = stdout.join('');
+    if (printed) expect((JSON.parse(printed) as { skillOverrides?: Record<string, string> }).skillOverrides?.semgrep).toBeUndefined();
+  });
+
+  it('Codex: no semgrep in the list when hideSkill is false', async () => {
+    await run('launch-settings', '--harness', 'codex', '--cwd', '/w', '--codex-home', '/ch');
+    const call = mocks.writeCodexSkillOverrides.mock.calls[0] as [string, string[]];
+    expect(call[1]).not.toContain('semgrep');
+  });
+});

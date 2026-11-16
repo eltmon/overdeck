@@ -177,7 +177,7 @@ beforeEach(() => {
   mocks.applyDeftForLaunch.mockResolvedValue({ hideSkills: [], deny: [], provenance: '', warnings: [] });
   mocks.launchMountsDeft.mockResolvedValue(false);
   mocks.resolveSageoxLaunch.mockResolvedValue({ active: false, warnings: [] });
-  mocks.resolveSemgrepLaunchSettings.mockResolvedValue({ hideSkill: true, claudeHooks: null });
+  mocks.resolveSemgrepLaunchSettings.mockResolvedValue({ hideSkill: false, claudeHooks: null });
 });
 
 afterEach(() => {
