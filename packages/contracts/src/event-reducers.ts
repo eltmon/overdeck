@@ -22,6 +22,7 @@ import type {
   RestartGateSnapshot,
   ProjectDeploySnapshot,
   ScanProgressSnapshot,
+  ShutdownSnapshot,
   TurnDiffSummary,
 } from './types'
 import { defaultRuntimeSnapshot, mergeSnapshotRuntimeById } from './agent-runtime-merge'
@@ -130,6 +131,8 @@ export interface ReadModelState {
   githubQuota: GitHubQuotaSnapshot | null
   /** PAN-3751 — in-flight deploys keyed by project key; derived, never stored. */
   deployByProjectKey: Record<string, ProjectDeploySnapshot>
+  /** PAN-5342 — the safe-shutdown drain; derived, never stored; null when none runs. */
+  shutdown: ShutdownSnapshot | null
   /** sessionId (from agent snapshot or runtime claudeSessionId) → agentId index */
   agentIdBySessionId: Record<string, string>
 }
@@ -179,6 +182,7 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   restartGate: null,
   githubQuota: null,
   deployByProjectKey: {},
+  shutdown: null,
   agentIdBySessionId: {},
   dashboardLifecycle: {
     active: false,
@@ -333,6 +337,8 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     restartGate: snapshot.restartGate ?? state.restartGate,
     githubQuota: snapshot.githubQuota ?? state.githubQuota,
     deployByProjectKey: snapshot.deployByProjectKey ?? state.deployByProjectKey,
+    // PAN-5342: never fall back to the old state; a fresh boot has no drain.
+    shutdown: snapshot.shutdown ?? null,
     agentIdBySessionId,
   }
 }
@@ -442,6 +448,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
               ...prevRuntime,
               activity: 'stopped' as const,
               currentTool: undefined,
+              toolStartedAt: undefined,
               currentToolDescription: undefined,
               thinking: undefined,
               waiting: undefined,
@@ -585,6 +592,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
               ...prevRuntime,
               activity: 'stopped' as const,
               currentTool: undefined,
+              toolStartedAt: undefined,
               currentToolDescription: undefined,
               thinking: undefined,
               waiting: undefined,
@@ -780,6 +788,9 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         sequence: Math.max(state.sequence, event.sequence),
         deployByProjectKey: event.payload.deploys,
       }
+
+    case 'system.shutdown_changed':
+      return { ...state, sequence: Math.max(state.sequence, event.sequence), shutdown: event.payload.shutdown }
 
     case 'resources.updated':
       return {
@@ -1052,7 +1063,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       return { ...state, sequence: Math.max(state.sequence, event.sequence) }
 
     case 'agent.activity_changed': {
-      const { agentId, activity, currentTool, toolDescription } = event.payload
+      const { agentId, activity, currentTool, toolDescription, hookName } = event.payload
       const prev = state.agentRuntimeById[agentId]
         ?? defaultRuntimeSnapshot(agentId, event.timestamp, event.sequence)
       const next: AgentRuntimeSnapshot = {
@@ -1060,6 +1071,11 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         activity,
         currentTool: activity === 'working' ? currentTool : undefined,
         currentToolDescription: activity === 'working' ? toolDescription : undefined,
+        // PAN-5342: the age of the tool in flight, for the shutdown banner.
+        toolStartedAt: activity !== 'working' ? undefined
+          : hookName === 'PreToolUse' ? event.timestamp
+          : hookName === 'PostToolUse' ? undefined
+          : prev.toolStartedAt,
         // Clear thinking/waiting on transitions away from those activities.
         thinking: activity === 'thinking' ? prev.thinking : undefined,
         waiting: activity === 'waiting' ? prev.waiting : undefined,
@@ -1082,6 +1098,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         ...prev,
         activity: 'thinking',
         currentTool: undefined,
+        toolStartedAt: undefined,
         currentToolDescription: undefined,
         thinking: { since: event.timestamp, lastToolAt },
         waiting: undefined,
@@ -1123,6 +1140,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         ...prev,
         activity: 'waiting',
         currentTool: undefined,
+        toolStartedAt: undefined,
         currentToolDescription: undefined,
         thinking: undefined,
         waiting: {

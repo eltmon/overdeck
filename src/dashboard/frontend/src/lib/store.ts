@@ -19,6 +19,7 @@ import type {
   MemoryStatus,
   ProjectCiSnapshot,
   ProjectDeploySnapshot,
+  ShutdownSnapshot,
   ResetMarker,
   ResourceStats,
   RestartGateSnapshot,
@@ -691,6 +692,9 @@ export const selectProjectCi = (projectKey: string) =>
 /** PAN-3751 — the project's in-flight deploy, pushed by `project.deploy_changed`. */
 export const selectProjectDeploy = (projectKey: string) =>
   (s: DashboardState): ProjectDeploySnapshot | undefined => s.deployByProjectKey[projectKey]
+
+/** PAN-5342 — the safe-shutdown drain, pushed by `system.shutdown_changed`; null when none runs. */
+export const selectShutdown = (s: DashboardState): ShutdownSnapshot | null => s.shutdown
 
 /**
  * PAN-3729 — the voluntary-restart approval gate, delivered by the snapshot on

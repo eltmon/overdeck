@@ -405,6 +405,7 @@ export const ReadModelServiceLive = Layer.effect(
         githubQuota: state.githubQuota ?? undefined,
         // PAN-3751: in-flight deploys, derived server-side from runtime files.
         deployByProjectKey: state.deployByProjectKey,
+        shutdown: state.shutdown,
         timestamp: new Date().toISOString(),
       };
     }

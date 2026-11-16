@@ -29,6 +29,7 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
 }));
 
 import {
+  isAtTurnBoundary,
   getAgentEffectiveLastActivityMs,
   idleAgeMs,
   isAlive,
@@ -526,5 +527,27 @@ describe('getAgentEffectiveLastActivityMs', () => {
 
     expect(getAgentEffectiveLastActivityMs('agent-x')).toBe(NOW - 60_000);
     expect(isIdle('agent-x', 5 * 60_000, NOW)).toBe(false);
+  });
+});
+
+describe('isAtTurnBoundary (PAN-5342 D-4)', () => {
+  const lastActivity = '2026-11-15T20:00:00.000Z';
+  const labelMs = Date.parse(lastActivity);
+
+  it('is false for working, thinking and a null snapshot', () => {
+    expect(isAtTurnBoundary({ activity: 'working', lastActivity }, null)).toBe(false);
+    expect(isAtTurnBoundary({ activity: 'thinking', lastActivity }, null)).toBe(false);
+    expect(isAtTurnBoundary(null, null)).toBe(false);
+  });
+
+  it('is true for idle, waiting and stopped with no heartbeat or one within the slack', () => {
+    for (const activity of ['idle', 'waiting', 'stopped'] as const) {
+      expect(isAtTurnBoundary({ activity, lastActivity }, null)).toBe(true);
+      expect(isAtTurnBoundary({ activity, lastActivity }, labelMs + 5000)).toBe(true);
+    }
+  });
+
+  it('is false for a stale idle label once the transcript moved more than 5 s later', () => {
+    expect(isAtTurnBoundary({ activity: 'idle', lastActivity }, labelMs + 6000)).toBe(false);
   });
 });
