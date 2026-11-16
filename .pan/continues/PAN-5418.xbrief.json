@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5418",
   "created": "2026-11-16T04:03:53.810Z",
-  "updated": "2026-11-16T04:13:49.197Z",
+  "updated": "2026-11-16T04:13:50.378Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,11 @@
     "section-labels.ac3": {
       "status": "completed",
       "doneAt": "2026-11-16T04:13:49.197Z"
+    },
+    "docs-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5418",
+      "claimedAt": "2026-11-16T04:13:50.377Z"
     }
   }
 }
