@@ -613,6 +613,16 @@ The Modal primitive (`components/shared/Modal.tsx`) reads a dedicated four-token
 
 Ledger restates its existing look by reference (`--surface-overlay: var(--popover)`, `--surface-overlay-field: var(--background)`, `--border-overlay: var(--border)`); it does not get new values. `--popover` and `--card` are unaffected — menus and popovers keep using them.
 
+#### Every modal dialog uses Modal (PAN-4756)
+
+Every centered modal dialog renders through `components/shared/Modal.tsx`. No component draws its own backdrop or panel. The primitive owns the scrim, the raised `--surface-overlay` panel with `--shadow-overlay`, Escape and scrim dismissal, focus entry, the Tab trap and focus restore, and the phone bottom sheet.
+
+- **Fields:** form controls inside a modal (labels, inputs, selects, textareas, help text, footer buttons) use `components/shared/ModalForm.module.css`. Content such as markdown, tables, task lists, diffs and QR codes keeps its own classes.
+- **Sizes:** `size="narrow"` 440px, `"default"` 600px, `"wide"` 760px, `"xl"` 1000px. At 600px and below every size is a full-width bottom sheet.
+- **Roles and tone:** `alert` gives `role="alertdialog"` (confirm and alert prompts). `tone="warning"` is for needs-you dialogs only: the decision dialog and the terminal permission dialog.
+- **Headless:** `headless` is only for dialogs that own their heading: Add project, the decision dialog and plan approval.
+- **Not modal dialogs** (they keep their own surfaces): popovers, menus, tooltips, command palettes, side drawers, phone sheets, lightboxes, full-screen viewers, the God View help overlay, the Plan window and the emergency-stop overlay.
+
 ### When to Use Shadows
 
 Shadows are reserved for **floating elements only** — elements that overlap other content:
