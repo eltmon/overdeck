@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5424",
+  "created": "2026-11-16T06:26:53.865Z",
+  "updated": "2026-11-16T06:26:53.865Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "skip-transformers": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5424",
+      "claimedAt": "2026-11-16T06:26:53.865Z"
+    }
+  }
+}
