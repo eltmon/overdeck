@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:43:18.950Z",
+  "updated": "2026-11-16T11:43:40.538Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -282,9 +282,22 @@
       "doneAt": "2026-11-16T11:43:17.696Z"
     },
     "migrate-cloister-restart-config-modal": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4756",
-      "claimedAt": "2026-11-16T11:43:18.950Z"
+      "claimedAt": "2026-11-16T11:43:18.950Z",
+      "doneAt": "2026-11-16T11:43:40.537Z"
+    },
+    "migrate-cloister-restart-config-modal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:43:40.537Z"
+    },
+    "migrate-cloister-restart-config-modal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:43:40.537Z"
+    },
+    "migrate-cloister-restart-config-modal.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:43:40.537Z"
     }
   }
 }
