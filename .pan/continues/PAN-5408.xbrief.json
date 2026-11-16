@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5408",
   "created": "2026-11-16T02:46:02.692Z",
-  "updated": "2026-11-16T03:01:41.939Z",
+  "updated": "2026-11-16T03:08:54.828Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,22 @@
       "doneAt": "2026-11-16T03:01:36.687Z"
     },
     "panebar-escape-closes-menus": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5408",
-      "claimedAt": "2026-11-16T03:01:41.939Z"
+      "claimedAt": "2026-11-16T03:01:41.939Z",
+      "doneAt": "2026-11-16T03:08:54.828Z"
+    },
+    "panebar-escape-closes-menus.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T03:08:54.828Z"
+    },
+    "panebar-escape-closes-menus.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T03:08:54.828Z"
+    },
+    "panebar-escape-closes-menus.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T03:08:54.828Z"
     }
   }
 }
