@@ -3,6 +3,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { usePanesStore } from '../../lib/panesStore';
+import { resetDeckLayoutStore, useDeckLayoutStore } from '../../lib/deckLayoutStore';
+import { presetLayout } from '../../lib/paneLayout';
 import { Breadcrumb } from './Breadcrumb';
 
 const PROJECTS = [{ key: 'panopticon-cli', name: 'overdeck', path: '/p/overdeck' }];
@@ -52,6 +54,23 @@ describe('Breadcrumb (PAN-5292 WI-E8)', () => {
   it('reads "All projects" on the Command Deck with no project selected', () => {
     renderCrumb(<Breadcrumb activeTab="command-deck" selectedProjectKey={null} />);
     expect(screen.getByTestId('topbar-crumb')).toHaveTextContent(/^All projects$/);
+  });
+
+  it('reads "All projects / <pane>" in the All projects deck (PAN-5343 H-D4)', () => {
+    resetDeckLayoutStore();
+    usePanesStore.getState().addPane('__all-projects__', { paneType: 'agent', label: 'Fix the build', conversationId: 'c1' });
+    renderCrumb(<Breadcrumb activeTab="command-deck" selectedProjectKey="__all-projects__" />);
+    expect(screen.getByTestId('topbar-crumb')).toHaveTextContent(/^All projects\/Fix the build$/);
+  });
+
+  it('reads "All projects / N conversations side by side" for a split All deck (PAN-5343 H-D4)', () => {
+    resetDeckLayoutStore();
+    usePanesStore.getState().addPane('__all-projects__', { paneType: 'agent', label: 'Fix the build', conversationId: 'c1' });
+    useDeckLayoutStore.getState().setLayout('__all-projects__', presetLayout(['a', 'b', 'c'], 3));
+    renderCrumb(<Breadcrumb activeTab="command-deck" selectedProjectKey="__all-projects__" />);
+    expect(screen.getByTestId('topbar-crumb')).toHaveTextContent(/^All projects\/3 conversations side by side$/);
+    resetDeckLayoutStore();
+    localStorage.clear();
   });
 
   it('shows only the page title on other routes', () => {
