@@ -427,6 +427,15 @@ describe('account page billing states (PAN-4294 WI-6)', () => {
     expect(billingPart(body)).toContain(escapeHtml('Anywhere, founding price, $60 a year (founding price)'));
   });
 
+  it('cancelled but still paid: the end date and no relay button', async () => {
+    const { client, env } = await billed();
+    await seedSubscription(env, { subscriptionId: 'sub_1', userId: 'u-tess', status: 'canceled', paidThrough: PAID_THROUGH });
+    const billing = billingPart(await (await client.get()).text());
+    expect(billing).toContain('Cancelled. Ends on 2027-01-02.');
+    expect(billing).not.toContain('/account/billing/relay');
+    expect(billing).toContain(escapeHtml(MANAGE_BILLING_BUTTON));
+  });
+
   it('past due: the failed-payment warning while access lasts', async () => {
     const { client, env } = await billed();
     await seedSubscription(env, { subscriptionId: 'sub_1', userId: 'u-tess', status: 'past_due', paidThrough: NOW - DAY });

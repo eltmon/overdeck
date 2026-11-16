@@ -31,6 +31,11 @@ export function paidThroughText(paidThrough: number): string {
   return `Paid through ${formatDate(paidThrough)}`;
 }
 
+/** A subscription cancelled in the portal keeps access to the end of the paid period (D-6). */
+export function endsOnText(paidThrough: number): string {
+  return `Cancelled. Ends on ${formatDate(paidThrough)}.`;
+}
+
 export function foundingPlacesText(placesLeft: number): string {
   return `${placesLeft} founding places left`;
 }
@@ -122,11 +127,16 @@ export function billingSection(input: BillingSectionInput): string {
     const product = PRODUCTS[billing.paid.productKey];
     lines.push(p(`${product.label}, ${product.priceText}`));
     if (billing.pastDue) lines.push(p(PAST_DUE_MESSAGE, 'warn'));
-    lines.push(
-      product.relay
-        ? buttonForm('/account/billing/relay', csrf, REMOVE_RELAY_BUTTON, { action: 'remove' })
-        : buttonForm('/account/billing/relay', csrf, ADD_RELAY_BUTTON, { action: 'add' }),
-    );
+    if (billing.paid.status === 'canceled') {
+      // The relay cannot change on a cancelled subscription (the action answers 409), so no relay button.
+      lines.push(p(endsOnText(billing.paid.paidThrough), 'warn'));
+    } else {
+      lines.push(
+        product.relay
+          ? buttonForm('/account/billing/relay', csrf, REMOVE_RELAY_BUTTON, { action: 'remove' })
+          : buttonForm('/account/billing/relay', csrf, ADD_RELAY_BUTTON, { action: 'add' }),
+      );
+    }
     lines.push(buttonForm('/account/billing/portal', csrf, MANAGE_BILLING_BUTTON));
     return lines.join('\n');
   }
