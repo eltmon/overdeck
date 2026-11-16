@@ -71,7 +71,7 @@ export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, on
   const tabsBtnRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const barRef = useRef<HTMLDivElement>(null)
-  const menuOpen = menu !== null
+  const menuKind = menu?.kind ?? null
   const shortcuts = useShortcutList()
   const keycapOf = (id: string | undefined): { text: string; aria: string } | null => {
     if (!id) return null
@@ -113,11 +113,11 @@ export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, on
     setMenu({ kind, top: r.bottom + 2, left: kind === 'add' ? r.left : Math.max(8, r.right - 240) })
   }
   const toggleMenu = (kind: 'add' | 'tabs') => (menu?.kind === kind ? setMenu(null) : openMenu(kind))
-  // Close on outside click, scroll, or resize — the menu is portaled to <body>
-  // so it escapes the PaneBar's overflow clip; reposition isn't tracked, so we
+  // Close on outside click, scroll, resize, or Escape — the menu is portaled to
+  // <body> so it escapes the PaneBar's overflow clip; reposition isn't tracked, so we
   // just dismiss on layout changes.
   useEffect(() => {
-    if (!menuOpen) return
+    if (!menuKind) return
     const onDoc = (e: MouseEvent) => {
       const t = e.target as Node
       if (addBtnRef.current?.contains(t) || tabsBtnRef.current?.contains(t) || menuRef.current?.contains(t)) return
@@ -125,15 +125,24 @@ export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, on
     }
     const dismiss = () => setMenu(null)
     const onScroll = (e: Event) => { if (!menuRef.current?.contains(e.target as Node)) setMenu(null) }
+    // Escape closes the menu and returns focus to its trigger, as the ⋯ and Send menus do (PAN-5408).
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      e.preventDefault()
+      setMenu(null)
+      ;(menuKind === 'add' ? addBtnRef : tabsBtnRef).current?.focus()
+    }
     document.addEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
     window.addEventListener('resize', dismiss)
     window.addEventListener('scroll', onScroll, true)
     return () => {
       document.removeEventListener('mousedown', onDoc)
+      document.removeEventListener('keydown', onKey)
       window.removeEventListener('resize', dismiss)
       window.removeEventListener('scroll', onScroll, true)
     }
-  }, [menuOpen])
+  }, [menuKind])
 
   return (
     <div className={styles.panebarWrap}>

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
+import { Terminal } from 'lucide-react'
 import { PaneBar } from './PaneBar'
 import type { WorkspacePane } from '../../lib/panesStore'
 
@@ -234,6 +235,42 @@ describe('PaneBar', () => {
     const docsTab = screen.getAllByRole('tab')[2]
     fireEvent.dragEnd(docsTab, { dataTransfer: { dropEffect: 'none' } })
     expect(onTabDetach).not.toHaveBeenCalled()
+  })
+
+  it('Escape closes the N tabs list and focuses its trigger (PAN-5408)', () => {
+    render(<PaneBar panes={makePanes()} activePaneId="h" onSelect={() => {}} onClose={() => {}} onAdd={() => {}} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '3 tabs, list all tabs' }))
+    expect(screen.getByRole('menu', { name: 'All tabs' })).toBeTruthy()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(screen.queryByRole('menu', { name: 'All tabs' })).toBeNull()
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '3 tabs, list all tabs' }))
+  })
+
+  it('Escape closes the + menu and focuses its trigger (PAN-5408)', () => {
+    const onActionSelect = vi.fn()
+    render(
+      <PaneBar
+        panes={makePanes()}
+        activePaneId="h"
+        onSelect={() => {}}
+        onClose={() => {}}
+        onAdd={() => {}}
+        newActions={[{ key: 'terminal', label: 'Terminal', icon: Terminal, onSelect: onActionSelect }]}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open new tab' }))
+    const action = screen.getByRole('menuitem', { name: 'Terminal' })
+    expect(action).toBeTruthy()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(screen.queryByRole('menuitem', { name: 'Terminal' })).toBeNull()
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Open new tab' }))
+    expect(onActionSelect).not.toHaveBeenCalled()
   })
 })
 
