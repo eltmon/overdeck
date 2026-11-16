@@ -81,6 +81,16 @@ describe('HomeActions (PAN-5294 G-D4)', () => {
     expect(screen.getByRole('button', { name: 'New conversation' })).toHaveTextContent('N')
   })
 
+  it('uses the tightened spacing that keeps the row on one line at 1920 px (PAN-5370)', () => {
+    renderActions()
+    const toolbar = screen.getByRole('toolbar', { name: 'Project actions' })
+    expect(toolbar).toHaveClass('flex-wrap')
+    expect(toolbar).toHaveClass('gap-1.5')
+    const terminal = screen.getByRole('button', { name: /^Terminal/ })
+    expect(terminal.className).toContain('px-2.5')
+    expect(terminal.className).not.toContain('px-3')
+  })
+
   it('lists Claude Code, Codex and New conversation with options… under the caret', () => {
     const h = renderActions()
 

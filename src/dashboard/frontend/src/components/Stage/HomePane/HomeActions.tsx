@@ -42,7 +42,7 @@ const AGENTS = [
 
 // Layout and color are separate: cn() does not merge Tailwind classes, so a
 // primary button must not also carry the neutral colors.
-const ACT_LAYOUT = 'inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-[13px] disabled:cursor-not-allowed disabled:opacity-60'
+const ACT_LAYOUT = 'inline-flex h-9 items-center gap-2 rounded-lg border px-2.5 text-[13px] disabled:cursor-not-allowed disabled:opacity-60'
 const ACT = `${ACT_LAYOUT} border-border bg-card text-foreground hover:bg-accent`
 const ACT_PRIMARY = `${ACT_LAYOUT} border-primary bg-primary text-primary-foreground`
 const KEYCAP = 'keycap ml-1 rounded-md px-1.5 font-mono text-xs text-muted-foreground'
@@ -90,7 +90,7 @@ export function HomeActions({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label="Project actions">
+      <div className="flex flex-wrap items-center gap-1.5" role="toolbar" aria-label="Project actions">
         <div className="relative inline-flex">
           <button
             type="button"
