@@ -53,7 +53,7 @@ export interface RenderInput {
   screenshot?: SavedScreenshot | null;
   apps?: readonly { name: string; pid: number | null }[];
   windows?: readonly { index: number; title: string | null; isMinimized?: boolean }[];
-  capabilities?: Record<string, unknown>;
+  capabilities?: unknown;
   matches?: readonly string[];
 }
 
