@@ -14,7 +14,7 @@
   + `@lydell/node-pty` for tmux terminal streaming (`/ws/terminal`); Herdr
   terminals stream through `herdr terminal session observe|control` NDJSON
   (`src/lib/terminal-backends/herdr-stream.ts`, base64 bytes decoded as UTF-8). SQLite for event store / deacon state.
-- **Frontend:** React 18, Zustand (shared reducers from `@overdeck/contracts`),
+- **Frontend:** React 19 compiled by the oxc React Compiler (`reactCompiler.ts`), Zustand (shared reducers from `@overdeck/contracts`),
   TanStack Query for settings mutations, CSS modules (`command-deck.module.css`,
   `stage.module.css`) + Tailwind-style utility classes in Settings, lucide-react
   icons (being replaced by brand SVGs for providers/harnesses).

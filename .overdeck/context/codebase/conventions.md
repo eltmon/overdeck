@@ -35,6 +35,11 @@
 - Dialogs opened from a menu use a zustand store plus a host mounted in
   `main.tsx` (`LinkPullRequestDialogHost`, `ContinueOnDeviceDialogHost`), so the dialog outlives
   the menu.
+- No new manual memo (`useMemo`, `useCallback`, `memo`): the React Compiler memoizes.
+  Three shrink-only ratchets guard it: `scripts/react-compiler-skip-baseline.txt`
+  (checked by `src/__tests__/reactCompilerCoverage.test.ts`), `scripts/manual-memo-baseline.txt`
+  (`npm run lint:manual-memo`) and `eslint-react-compiler-allowlist.json`. See
+  `docs/DASHBOARD-ARCHITECTURE.md` "React Compiler (PAN-4561)".
 
 ## Planning artifacts (xBRIEF v0.8, PAN-1124; relocated under `.pan/` by PAN-3917)
 - PRD drafts: `<planHome>/.pan/drafts/<issue>.md` (human-mutable narrative), committed on the feature branch.
