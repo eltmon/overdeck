@@ -1,0 +1,13 @@
+plan-digest: fb4a89d1a3c3b455226edbdd92d1e09c4c046846c93985d486c08bf26a8f3704
+
+## blocks-the-design: Install endpoint remains unguarded
+
+The PRD's D13 directs the UI to call `POST /api/prereqs/install` while leaving its route unchanged. `src/dashboard/server/routes/prereqs.ts:92-115` parses the request body and calls `installTool` without an authorization, content-type, Origin, or CSRF check. `src/dashboard/server/remote-request-gate.ts:145-158` lets a trusted loopback caller through without a credential, and `src/dashboard/server/routes/dashboard-auth.ts:481-488` classifies loopback requests without forwarding headers as trusted. Since the body parser accepts JSON regardless of content type (`prereqs.ts:24-31`), a cross-origin browser request that reaches loopback can trigger an operator-level installation. The new UI sending mutation headers does not protect the endpoint. Smallest fix: add `rejectUnsafeDashboardMutationRequest` before parsing the install request, cover an unauthenticated or wrong-content-type request in a route test, and update any legitimate caller that lacks mutation headers. A repository-wide `rg '/api/prereqs/install'` found no existing frontend caller.
+
+## blocks-the-design: Concurrent saves can show stale settings
+
+WI-3 says each `save(patch)` sends a PUT and calls `queryClient.setQueryData(['semgrep-settings'], body)` with the full returned view. WI-1 serializes disk writes with `runSettingsWriteSerialized` (`src/lib/settings-api.ts:908-917`), but it does not order HTTP response delivery. If two controls save quickly, a delayed response from the first request can arrive last and replace the cache with a view that predates the second write. The UI then displays values different from `config.yaml` until another read. The existing Jev hook avoids overlapping writes with a pending queue and `inFlightRef` (`src/dashboard/frontend/src/components/Settings/hooks/useJevSettings.ts:36-71`). Smallest fix: serialize Security-section mutations in the hook, or use request sequencing and refetch after the last in-flight mutation; add a test that resolves two save responses out of order.
+
+## sharpens-framing: Project view reason has no UI contract
+
+FR-4 says the Project settings control shows the effective mode **and its reason**. WI-4 returns `reason` from `resolveSastGateMode` (`src/lib/cloister/sast-gate.ts:82-95`), but WI-6 renders only the off-everywhere message or `Global default: <effective>` and renders nothing extra for an explicit override. No WI-6 test checks the reason. Smallest fix: specify where the reason appears for all four choices and test it, or narrow FR-4 explicitly if the reason is meant only for the API.

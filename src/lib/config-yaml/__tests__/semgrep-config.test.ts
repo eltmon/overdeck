@@ -89,6 +89,9 @@ describe('config-yaml security.semgrep block (PAN-4585)', () => {
     [{ severity: 'HIGH' }, /security\.semgrep\.severity must be one of INFO, WARNING, ERROR/],
     [{ configs: [] }, /security\.semgrep\.configs must be a non-empty list/],
     [{ configs: ['--dangerous'] }, /security\.semgrep\.configs must be a non-empty list/],
+    // PAN-4594: a leading-space entry must not pass the dash check on the raw value and then
+    // trim into a leading dash the CLI would read as a flag.
+    [{ configs: [' -bad'] }, /security\.semgrep\.configs must be a non-empty list/],
     [{ configs: 'p/default' }, /security\.semgrep\.configs must be a non-empty list/],
     [{ timeout_seconds: 0 }, /security\.semgrep\.timeout_seconds must be a positive whole number/],
     [{ timeout_seconds: '60' }, /security\.semgrep\.timeout_seconds must be a positive whole number/],

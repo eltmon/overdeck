@@ -20,6 +20,7 @@ import {
   type PrereqFeature,
   type PrereqTool,
 } from "../../../lib/prereqs/registry.js";
+import { rejectUnsafeDashboardMutationRequest } from "./dashboard-auth.js";
 
 const readJsonBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
@@ -94,6 +95,9 @@ const installToolRoute = HttpRouter.add(
   "/api/prereqs/install",
   httpHandler(
     Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const authError = rejectUnsafeDashboardMutationRequest(request);
+      if (authError) return authError;
       const body = (yield* readJsonBody) as { tool?: string };
       const tool = body.tool;
 

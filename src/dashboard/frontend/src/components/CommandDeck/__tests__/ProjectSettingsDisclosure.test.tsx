@@ -34,6 +34,10 @@ let versionSyncLoadFails: boolean;
 let mergeTrainAggregateEnabled: boolean;
 /** PAN-5363: makes the merge-train POST answer 500 without writing. */
 let mergeTrainPostFails: boolean;
+/** PAN-4594: per-project Semgrep gate override state. */
+let sastValue: 'off' | 'advisory' | 'blocking' | null;
+let sastSemgrepEnabled: boolean;
+let sastGetFails: boolean;
 
 function renderDisclosure() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -59,7 +63,23 @@ describe('ProjectSettingsDisclosure', () => {
     versionSyncLoadFails = false;
     mergeTrainAggregateEnabled = true;
     mergeTrainPostFails = false;
+    sastValue = null;
+    sastSemgrepEnabled = true;
+    sastGetFails = false;
+    const sastEffective = (): { effective: 'off' | 'advisory' | 'blocking'; reason: string } => {
+      if (!sastSemgrepEnabled) return { effective: 'off', reason: 'security.semgrep.enabled is false' };
+      if (sastValue) return { effective: sastValue, reason: `verification.sast: ${sastValue} in projects.yaml` };
+      return { effective: 'advisory', reason: 'security.semgrep.gate: advisory' };
+    };
     fetchControl = installStrictFetchMock(({ method, url, init }) => {
+      if (method === 'GET' && url === '/api/projects/overdeck/sast') {
+        if (sastGetFails) return Response.json({ error: 'registry unavailable' }, { status: 503 });
+        return Response.json({ value: sastValue, semgrepEnabled: sastSemgrepEnabled, ...sastEffective() });
+      }
+      if (method === 'POST' && url === '/api/projects/overdeck/sast') {
+        sastValue = (JSON.parse(String(init?.body)) as { value: 'off' | 'advisory' | 'blocking' | null }).value;
+        return Response.json({ value: sastValue, semgrepEnabled: sastSemgrepEnabled, ...sastEffective() });
+      }
       if (method === 'GET' && url === '/api/projects/overdeck/auto-merge-default') {
         return Response.json({ value: autoMergeValue });
       }
@@ -435,6 +455,61 @@ describe('ProjectSettingsDisclosure', () => {
     expect(await screen.findByText('Partial propagation — these paths do not report 48.8.0:')).toBeInTheDocument();
     expect(screen.getByText('apps/desktop/package.json')).toBeInTheDocument();
     expect(screen.getByText('packages/contracts/package.json')).toBeInTheDocument();
+  });
+
+  it('shows the global default and posts an override', async () => {
+    renderDisclosure();
+
+    expect((await screen.findByTestId('sast-gate-effective')).textContent)
+      .toBe('Effective: advisory (security.semgrep.gate: advisory)');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Semgrep gate: Blocking' }));
+
+    await waitFor(() => expect(fetchControl.fetchMock).toHaveBeenCalledWith(
+      '/api/projects/overdeck/sast',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ value: 'blocking' }) }),
+    ));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Semgrep gate: Blocking' }))
+      .toHaveAttribute('aria-pressed', 'true'));
+    expect(screen.getByTestId('sast-gate-effective').textContent)
+      .toBe('Effective: blocking (verification.sast: blocking in projects.yaml)');
+  });
+
+  it('Global default posts null', async () => {
+    sastValue = 'off';
+    renderDisclosure();
+    await screen.findByRole('button', { name: 'Semgrep gate: Off' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Semgrep gate: Global default' }));
+
+    await waitFor(() => expect(fetchControl.fetchMock).toHaveBeenCalledWith(
+      '/api/projects/overdeck/sast',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ value: null }) }),
+    ));
+  });
+
+  it('says when Semgrep is off everywhere', async () => {
+    sastSemgrepEnabled = false;
+    renderDisclosure();
+
+    expect((await screen.findByTestId('sast-gate-effective')).textContent)
+      .toBe('Semgrep is off for every project (Settings → Security)');
+  });
+
+  it('shows a distinct load error instead of a false off-everywhere message, with a retry', async () => {
+    sastGetFails = true;
+    renderDisclosure();
+
+    expect((await screen.findByTestId('sast-gate-load-error')).textContent)
+      .toBe('Failed to load the Semgrep gate (HTTP 503)');
+    expect(screen.queryByTestId('sast-gate-effective')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Semgrep gate:/ })).not.toBeInTheDocument();
+
+    sastGetFails = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    await waitFor(() => expect(screen.getByTestId('sast-gate-effective')).toBeInTheDocument());
+    expect(screen.queryByTestId('sast-gate-load-error')).not.toBeInTheDocument();
   });
 
   it('removes version_sync and returns to the explicit skip state', async () => {

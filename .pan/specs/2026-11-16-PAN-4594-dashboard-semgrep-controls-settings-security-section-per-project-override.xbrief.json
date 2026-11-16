@@ -1,0 +1,666 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-16T15:50:12Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4594: Dashboard Semgrep controls: Settings security section, per-project override, findings in issue view",
+    "updated": "2026-11-16T16:04:15.219Z"
+  },
+  "plan": {
+    "id": "pan-4594",
+    "title": "Dashboard Semgrep controls: Settings security section, per-project override",
+    "status": "running",
+    "uid": "757dc1ba-80ae-4c19-b02c-ae198fa68379",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-16T15:50:12Z",
+    "updated": "2026-11-16T16:04:15.219Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4594",
+        "label": "PAN-4594",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5449",
+        "label": "PAN-5449 (sibling: sast visibility)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4585",
+        "label": "PAN-4585 (parent)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "semgrep",
+      "security",
+      "dashboard",
+      "settings",
+      "config"
+    ],
+    "narratives": {
+      "Problem": "Semgrep support (PAN-4585, #4590, #4591) is configured only by hand-editing security.semgrep in ~/.overdeck/config.yaml and verification.sast in ~/.overdeck/projects.yaml, and the managed install runs only from pan sync/pan install. The dashboard's whole-document settings save is lossy, so it cannot be used to write this block.",
+      "Proposal": "Add a path-scoped read/write door for security.semgrep (src/lib/semgrep/settings.ts, validated by the existing normalizeSecurityConfig), a per-project verification.sast setter (src/lib/semgrep/project-override.ts), one route file with GET/PUT /api/semgrep/settings and GET/POST /api/projects/:projectKey/sast, a Settings → Security section with an install button that calls the existing POST /api/prereqs/install, a Semgrep gate control in Project settings, and the docs/changelog. The visibility half (sast skipped state, findings list) is split to PAN-5449. POST /api/prereqs/install gains rejectUnsafeDashboardMutationRequest (plan critique).",
+      "NonGoals": "- The sast skipped state in VerificationGatesPanel.tsx and the findings list in the issue view (moved to PAN-5449)\n- Any change to GET /api/prereqs or GET /api/prereqs/:feature\n- Any change to saveSettingsApi / writeYamlConfigPreservingComments or to src/lib/settings-api.ts\n- Any edit to src/lib/projects.ts\n- Letting a repo .pan.yaml set any security key\n- Semgrep Platform/token fields (#4593) and CI setup (#4592)\n- Polling GET /api/prereqs/useSemgrep, or an install progress bar\n- Showing the per-project Semgrep mode in the collapsed Project settings summary\n- Raising any file-size allowlist row"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split the visibility half (sast skipped state, findings list in the issue view) into sibling issue PAN-5449",
+        "rationale": "The full scope was about 29 files and 8 subsystems, over the 25-file/6-subsystem plan lint; controls and visibility share no source file, so a sizeJustification would not be honest. Precedent: PAN-4585 filed its children the same way."
+      },
+      {
+        "summary": "The Security section edits every security.semgrep key, including mcp, edit_hook and timeout_seconds",
+        "rationale": "Those keys shipped after the issue was written and live in the same block; leaving them out would force a hand edit of the block the section owns."
+      },
+      {
+        "summary": "API uses YAML snake_case keys and PUT accepts a partial patch",
+        "rationale": "1:1 key-to-path mapping avoids translation bugs, and per-control partial saves cannot overwrite a key another control changed."
+      },
+      {
+        "summary": "Validate with normalizeSecurityConfig on the merged candidate and refuse to write on error",
+        "rationale": "A bad value in security.semgrep makes every loadConfigSync caller throw, so the door must never write one; reusing the loader's validator keeps one set of rules."
+      },
+      {
+        "summary": "Put the per-project setter in a new module, not src/lib/projects.ts",
+        "rationale": "projects.ts is 1212 lines against its 1217 allowlist cap and agents may not raise caps."
+      },
+      {
+        "summary": "Add the mutation guard to POST /api/prereqs/install (plan critique)",
+        "rationale": "The route accepted unauthenticated loopback JSON and started installs; no caller besides the route exists, so the guard breaks nothing."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-16-PAN-4594-dashboard-semgrep-controls-settings-security-section-per-project-override.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "semgrep-settings-door",
+        "title": "Add the path-scoped security.semgrep read/write door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T15:50:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4594",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/semgrep/settings.ts",
+            "src/lib/semgrep/__tests__/settings.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/semgrep/__tests__/settings.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "settings.test.ts passes with all seven named cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "semgrep-settings-route",
+            "security-settings-section"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 exactly: new src/lib/semgrep/settings.ts exporting SEMGREP_SETTINGS_KEYS, SemgrepSettingsView (normalized config + pinnedVersion = SEMGREP_VERSION), SemgrepSettingsValidationError, readSemgrepSettings(deps?) and saveSemgrepSettings(input, deps?). Save validates the merged candidate with normalizeSecurityConfig (never re-implemented rules), rejects non-object bodies, unknown keys and empty patches, runs inside runSettingsWriteSerialized, replaces a non-map security/security.semgrep node with an empty map (D7), writes only the patched keys with doc.setIn (configs via doc.createNode of the trimmed list), writes with writeFileAtomic(path, text, 0o600), then clearConfigCache(). Tests use a mkdtemp config path via deps.configPath, never the real ~/.overdeck/config.yaml. PROBE: if the parsed document has YAML syntax errors (doc.errors non-empty), both read and save throw SemgrepSettingsValidationError and nothing is written."
+        },
+        "items": [
+          {
+            "id": "semgrep-settings-door.ac1",
+            "title": "Given a config.yaml with a '# keep me' comment, a jev: block and security.semgrep.mcp: true, when saveSemgrepSettings({ gate: 'blocking' }) runs, then the file still contains the comment, the jev block text and mcp: true, and now contains gate: blocking",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "semgrep-settings-door.ac2",
+            "title": "Given saveSemgrepSettings({ gate: 'strict' }), ({ foo: 1 }), ({ configs: [] }), or any save against a config.yaml with a YAML syntax error, when it runs, then it rejects with SemgrepSettingsValidationError and the file bytes are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "semgrep-settings-door.ac3",
+            "title": "Given a config.yaml whose security key is null, when saveSemgrepSettings({ enabled: true }) runs, then readSemgrepSettings returns enabled: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "semgrep-settings-door.ac4",
+            "title": "Given no security block, when readSemgrepSettings runs, then it returns the PAN-4590 defaults (advisory, ERROR, [p/default], 300) plus pinnedVersion '1.180.0'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "semgrep-settings-route",
+        "title": "Expose GET/PUT /api/semgrep/settings",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T15:50:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4594",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/semgrep.ts",
+            "src/dashboard/server/routes/__tests__/semgrep.test.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/semgrep.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "semgrep.test.ts settings cases pass",
+            "no-loss-matrix.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2: new route file src/dashboard/server/routes/semgrep.ts modeled on routes/jev.ts, exporting semgrepRouteLayer = Layer.mergeAll(GET, PUT). GET returns readSemgrepSettings() or 422 { error } on SemgrepSettingsValidationError. PUT calls rejectUnsafeDashboardMutationRequest first, then saveSemgrepSettings(body); validation error -> 400 { error }. Register semgrepRouteLayer in server.ts next to jevRouteLayer (import near line 116, layer list near line 424). Add two no-loss-matrix rows after the jev block. Route tests mirror routes/__tests__/projects-merge-train.test.ts auth setup and mock lib/semgrep/settings.js. Unauthenticated mutation -> 401 from rejectUnauthorizedDashboardRequest. No route-scopes.ts row (PRD D17): scoped credentials, including per-agent MCP tokens, need admin."
+        },
+        "items": [
+          {
+            "id": "semgrep-settings-route.ac1",
+            "title": "Given an authenticated PUT /api/semgrep/settings whose save throws SemgrepSettingsValidationError, when the route runs, then it returns 400 with { error } carrying the message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "semgrep-settings-route.ac2",
+            "title": "Given a PUT /api/semgrep/settings with no credential header, when the route runs, then it returns 401 and saveSemgrepSettings is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "semgrep-settings-route.ac3",
+            "title": "Given GET /api/semgrep/settings while the block is invalid, when the route runs, then it returns 422 with { error }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "semgrep-settings-route.ac4",
+            "title": "Given the no-loss matrix test, when it runs, then it passes with rows for GET and PUT /api/semgrep/settings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "security-settings-section",
+        "title": "Add the Settings → Security section with the Semgrep install button",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T15:50:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4594",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/hooks/useSemgrepSettings.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/SecuritySection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/SecuritySection.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/settingsPageConstants.ts",
+            "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/Settings/sections/__tests__/SecuritySection.test.tsx src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx src/components/Settings/anywhere/__tests__/DevicesPanel.test.tsx src/components/Settings/sections/__tests__/GitHubIdentitiesSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SecuritySection.test.tsx passes with all seven named cases",
+            "AccessTokensSection, DevicesPanel and GitHubIdentitiesSection tests still pass (nav order)",
+            "typecheck (including typecheck:frontend) completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3 to the contract in the PRD (the hook declares its own SemgrepSettingsView types; API keys are YAML snake_case). useSemgrepSettings: query ['semgrep-settings'] GET /api/semgrep/settings; install-state query ['semgrep-install-status'] GET /api/prereqs/useSemgrep only while enabled, refetchOnWindowFocus false, no refetchInterval; save(patch) is serialized like useJevSettings' drain (pendingRef merged patch + inFlightRef; one PUT in flight, later patches merged and sent after it) and PUTs with dashboardMutationJsonHeaders; install() POSTs { tool: 'semgrep' } to /api/prereqs/install and re-reads the install state once (also after a rejected fetch, with the D12 message). SecuritySection renders <section id='security'> with the eight rows and data-testids from the WI-3 table, the description text, disabled rows while off, the install status texts, the load-error box and the role=alert error. Nav item { id: 'security', label: 'Security', icon: ShieldAlert } goes directly after 'permissions'; <SecuritySection /> renders directly after <PermissionsSection .../> in SettingsPage.tsx. Add the test path to scripts/frontend-test-subset.txt in sorted position. Implementation checkpoint (D12): confirm no dashboard server request timeout under 600 s applies to POST /api/prereqs/install; if one exists, keep the UI as specified and note it in the PR description."
+        },
+        "items": [
+          {
+            "id": "security-settings-section.ac1",
+            "title": "Given GET /api/semgrep/settings returns gate 'blocking' and configs ['p/default','rules/x.yml'], when the Security section renders, then semgrep-gate-select shows blocking and semgrep-configs-input holds both lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "security-settings-section.ac2",
+            "title": "Given enabled is false, when the section renders, then semgrep-install-button is disabled and no request is sent to /api/prereqs/useSemgrep",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "security-settings-section.ac3",
+            "title": "Given enabled is true and installed is false, when the operator clicks semgrep-install-button, then one POST /api/prereqs/install with body {\"tool\":\"semgrep\"} is sent, the returned message renders in semgrep-install-message, and the install state is re-read once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "security-settings-section.ac4",
+            "title": "Given the first PUT's response is held and the operator then changes severity and gate, when the first response resolves, then a second PUT with only the later change is sent and the gate select finally shows the second response's value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "security-settings-section.ac5",
+            "title": "Given SETTINGS_NAV_ITEMS, when it is read, then the item with id 'security' directly follows 'permissions' and scripts/frontend-test-subset.txt lists SecuritySection.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "project-sast-override-door",
+        "title": "Add the per-project verification.sast setter and view module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T15:50:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4594",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/semgrep/project-override.ts",
+            "src/lib/semgrep/__tests__/project-override.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/semgrep/__tests__/project-override.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "project-override.test.ts passes with all six named cases",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4: new src/lib/semgrep/project-override.ts with applyProjectSastOverride(config, key, value) (pure ProjectsConfigMutation), setProjectSastOverride(key, value) via the exported updateProjectsConfigAsync, and projectSastView(project, semgrep) via resolveSastGateMode(semgrep, project.verification?.sast, () => {}). null deletes only verification.sast and drops an emptied verification block; unknown project throws 'Unknown project: <key>'; changed is false when the value is already stored. Do not edit src/lib/projects.ts (1212 lines, allowlist cap 1217)."
+        },
+        "items": [
+          {
+            "id": "project-sast-override-door.ac1",
+            "title": "Given a project with verification { tests: 'ci' }, when applyProjectSastOverride sets 'blocking', then verification becomes { tests: 'ci', sast: 'blocking' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-sast-override-door.ac2",
+            "title": "Given verification { tests: 'ci', sast: 'off' } or { sast: 'off' }, when applyProjectSastOverride sets null, then the result is { tests: 'ci' } or no verification key respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-sast-override-door.ac3",
+            "title": "Given security.semgrep.enabled false, when projectSastView runs, then it returns effective 'off', semgrepEnabled false and reason 'security.semgrep.enabled is false'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-sast-override-door.ac4",
+            "title": "Given the finished branch, when git diff origin/main -- src/lib/projects.ts runs, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "project-sast-override-route",
+        "title": "Expose GET/POST /api/projects/:projectKey/sast",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T15:50:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4594",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/semgrep.ts",
+            "src/dashboard/server/routes/__tests__/semgrep.test.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/semgrep.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "semgrep.test.ts project-sast cases pass",
+            "no-loss-matrix.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5: add GET and POST /api/projects/:projectKey/sast to routes/semgrep.ts and to semgrepRouteLayer. GET: const project = yield* getProject(key) (Effect variant, never getProjectSync — projects.ts header forbids new sync callers in server code) or 404 { error: 'Project not found' }, then projectSastView(project, (yield* Effect.promise(() => loadConfigNoMigration())).config.security.semgrep). POST: rejectUnsafeDashboardMutationRequest first, 404, value must be 'off'|'advisory'|'blocking'|null else 400 { error: \"value must be 'off', 'advisory', 'blocking', or null\" }, await setProjectSastOverride, re-read the project with yield* getProject(key), return the view. Add two no-loss-matrix rows next to the merge-train rows. Tests mock lib/projects.js getProject (returning Effect.succeed), lib/semgrep/project-override.js setProjectSastOverride and config-yaml/load.js loadConfigNoMigration."
+        },
+        "items": [
+          {
+            "id": "project-sast-override-route.ac1",
+            "title": "Given POST /api/projects/overdeck/sast with { value: 'strict' }, when the route runs, then it returns 400 and setProjectSastOverride is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-sast-override-route.ac2",
+            "title": "Given an authenticated POST with { value: null }, when the route runs, then setProjectSastOverride is called with ('overdeck', null) and the response carries value, effective, reason and semgrepEnabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-sast-override-route.ac3",
+            "title": "Given GET /api/projects/nope/sast for an unknown project, when the route runs, then it returns 404",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-sast-override-route.ac4",
+            "title": "Given a POST with no credential header, when the route runs, then it returns 401 and the setter is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-sast-override-route.ac5",
+            "title": "Given the finished routes/semgrep.ts, when it is searched for getProjectSync or loadConfigSync, then it contains neither",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "project-sast-override-ui",
+        "title": "Add the Semgrep gate control to Project settings",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T15:50:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4594",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectSettingsDisclosure.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectSettingsDisclosure.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/ProjectSettingsDisclosure.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ProjectSettingsDisclosure.test.tsx passes, existing cases plus the three new ones",
+            "typecheck (including typecheck:frontend) completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6: add SastGateSetting({ projectKey }) in ProjectSettingsDisclosure.tsx, rendered inside ProjectSettingsSection directly after the Merge train row and before <VersionShipSettings projectKey={projectKey} />. Query ['project-sast', projectKey] GET /api/projects/<key>/sast; POST { value } with dashboardMutationJsonHeaders; four segmented buttons styled like the Merge train row with aria-labels 'Semgrep gate: Off|Advisory|Blocking|Global default' and aria-pressed; effective text in data-testid sast-gate-effective for every choice ('Semgrep is off for every project (Settings → Security)' when semgrepEnabled is false, else 'Effective: <effective> (<reason>)' using the server's reason); inline error in data-testid sast-gate-error. Add strict-fetch handlers for GET/POST /api/projects/overdeck/sast so existing tests keep passing, then the three new cases from the PRD."
+        },
+        "items": [
+          {
+            "id": "project-sast-override-ui.ac1",
+            "title": "Given GET returns value null, effective 'advisory' and reason 'security.semgrep.gate: advisory', when Project settings renders, then sast-gate-effective reads 'Effective: advisory (security.semgrep.gate: advisory)' and 'Semgrep gate: Global default' has aria-pressed true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-sast-override-ui.ac2",
+            "title": "Given the operator clicks 'Semgrep gate: Blocking' and the POST answers effective 'blocking' with reason 'verification.sast: blocking in projects.yaml', when the response arrives, then the POST body was {\"value\":\"blocking\"} and sast-gate-effective reads 'Effective: blocking (verification.sast: blocking in projects.yaml)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-sast-override-ui.ac3",
+            "title": "Given value 'off', when the operator clicks 'Semgrep gate: Global default', then the POST body is {\"value\":null}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-sast-override-ui.ac4",
+            "title": "Given semgrepEnabled false, when Project settings renders, then sast-gate-effective reads 'Semgrep is off for every project (Settings → Security)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "semgrep-dashboard-docs",
+        "title": "Document the Semgrep dashboard controls and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T15:50:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4594",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/semgrep.mdx",
+            "changelog.d/pan-4594.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-7: in configuration/semgrep.mdx add the 'Settings → Security' sentence after the Turn it on YAML block, a '## Dashboard' section before '## Harness support' (the eight Security rows, the install button behavior, when changes take effect per D16, and the per-project Semgrep gate control that writes verification.sast and cannot turn Semgrep on), the 'or use the Semgrep gate control' clause in the per-project paragraph, and replace 'dashboard controls (#4594)' in the intro's planned list with a note that findings in the dashboard (#5449) are planned. Create changelog.d/pan-4594.md with the exact #### New bullet from the PRD."
+        },
+        "items": [
+          {
+            "id": "semgrep-dashboard-docs.ac1",
+            "title": "Given configuration/semgrep.mdx, when it is read, then a '## Dashboard' section names 'Settings → Security', the install button, and the 'Semgrep gate' control that writes verification.sast",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "semgrep-dashboard-docs.ac2",
+            "title": "Given configuration/semgrep.mdx, when its intro is read, then it no longer lists dashboard controls (#4594) as planned and names #5449 for dashboard findings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "semgrep-dashboard-docs.ac3",
+            "title": "Given changelog.d/pan-4594.md, when npm run lint:docs runs, then it exits 0 with a single #### New bullet linking #4594",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "prereqs-install-guard",
+        "title": "Guard POST /api/prereqs/install with the dashboard mutation check",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T16:20:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4594",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/prereqs.ts",
+            "src/dashboard/server/routes/__tests__/prereqs-install.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/prereqs-install.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "prereqs-install.test.ts passes with the three named cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-8: in src/dashboard/server/routes/prereqs.ts installToolRoute, read HttpServerRequest.HttpServerRequest and return rejectUnsafeDashboardMutationRequest(request) before parsing the body (import from ./dashboard-auth.js, double quotes). Leave GET /api/prereqs and GET /api/prereqs/:feature unchanged. New route test prereqs-install.test.ts copies the auth setup from projects-merge-train.test.ts and mocks installTool from lib/prereqs/registry.js via importOriginal."
+        },
+        "items": [
+          {
+            "id": "prereqs-install-guard.ac1",
+            "title": "Given POST /api/prereqs/install with no credential header, when the route runs, then it returns 401 and installTool is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prereqs-install-guard.ac2",
+            "title": "Given an internal-token POST with Content-Type text/plain, when the route runs, then it returns 400 and installTool is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prereqs-install-guard.ac3",
+            "title": "Given an internal-token POST with JSON {\"tool\":\"semgrep\"}, when the route runs, then installTool is called with 'semgrep' and the route returns 200 for a successful result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "semgrep-settings-door",
+        "to": "semgrep-settings-route",
+        "type": "blocks"
+      },
+      {
+        "from": "semgrep-settings-route",
+        "to": "project-sast-override-route",
+        "type": "blocks"
+      },
+      {
+        "from": "project-sast-override-door",
+        "to": "project-sast-override-route",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -91,11 +91,17 @@ export function normalizeSecurityConfig(
   if (semgrep.severity !== undefined) merged.severity = readEnum('severity', semgrep.severity, SEMGREP_SEVERITIES);
   if (semgrep.configs !== undefined) {
     const configs: unknown = semgrep.configs;
-    if (!Array.isArray(configs) || configs.length === 0
-      || !configs.every((entry) => typeof entry === 'string' && entry.trim() !== '' && !entry.startsWith('-'))) {
+    if (!Array.isArray(configs) || configs.length === 0 || !configs.every((entry) => typeof entry === 'string')) {
       throw new Error('config.yaml: security.semgrep.configs must be a non-empty list of rule ids or paths');
     }
-    merged.configs = configs.map((entry: string) => entry.trim());
+    // Validate the trimmed form, not the raw one: a leading-space entry like ' -bad' passes a
+    // pre-trim startsWith('-') check but becomes '-bad' after trimming, which the CLI would
+    // read as a flag and which a later load of this same file would then reject (PAN-4594).
+    const trimmed = configs.map((entry) => entry.trim());
+    if (!trimmed.every((entry) => entry !== '' && !entry.startsWith('-'))) {
+      throw new Error('config.yaml: security.semgrep.configs must be a non-empty list of rule ids or paths');
+    }
+    merged.configs = trimmed;
   }
   if (semgrep.timeout_seconds !== undefined) {
     const timeout: unknown = semgrep.timeout_seconds;
