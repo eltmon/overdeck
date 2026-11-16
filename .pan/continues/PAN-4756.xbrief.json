@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:36:37.905Z",
+  "updated": "2026-11-16T11:36:52.370Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,7 +66,7 @@
     "migrate-kanban-dialogs": {
       "status": "in_progress",
       "claimedBy": "agent-pan-4756",
-      "claimedAt": "2026-11-16T11:36:37.905Z"
+      "claimedAt": "2026-11-16T11:36:52.370Z"
     }
   }
 }
