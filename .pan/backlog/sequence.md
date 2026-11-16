@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T14:47:16.675651Z · model: claude-opus-5-5 · open: 891_
+_Last sequenced: 2026-11-16T15:48:16.624592Z · model: claude-opus-5-5 · open: 895_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -16,6 +16,7 @@ _Last sequenced: 2026-11-16T14:47:16.675651Z · model: claude-opus-5-5 · open: 
 | 15 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
 | 16 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 17 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
+| 18 | PAN-5447 | M | high | ok |  |  | Palette search stalls 15s+: sync 5 GB sqlite-vec scan on the event loop; aborted searches keep running and stall /api/version |
 | 19 | PAN-5381 | S | high | ok |  |  | Dashboard main thread: findProjectByPath runs realpathSync on every project root per call (10.8% of profile); cache roots once. |
 | 20 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 21 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
@@ -204,6 +205,7 @@ _Last sequenced: 2026-11-16T14:47:16.675651Z · model: claude-opus-5-5 · open: 
 | 205 | PAN-3050 | XS | high | ok |  |  | Idle-stack reaper's regex only matches overdeck-feature-*-server|frontend, so MYN stacks run for hours after their agents are gone. |
 | 206 | PAN-4365 | S | medium | ok |  |  | Stale defaults: workhorses.expensive is Opus 4.8 and the flywheel role is a literal that ignores the slot; evals now unblocked |
 | 207 | PAN-2980 | XS | high | ok |  |  | The pre-push file-size guard reads the shared working tree, so another session's uncommitted edits block an unrelated, guard-clean push. |
+| 208 | PAN-5448 | S | medium | ok |  |  | Left column gains a Files item that toggles the Files dock; Ctrl+Shift+E has no always-visible button. Operator-raised, spec complete |
 | 209 | PAN-3769 | S | high | needs-refinement |  |  | Red main 707089c5→e4b280b3 blocked deploys ~14h: missing no-loss lock entry + stale OpenRouter expectation. Verify still reproducing. |
 | 210 | PAN-3760 | S | high | ok |  |  | permissionMode 'auto' undocumented as non-bypass, launcher can emit invalid --permission-mode, invalid values drop silently. |
 | 211 | PAN-3629 | M | high | ok |  |  | No sanctioned door to re-scope a live agent; the operator must violate pan tell doctrine or let the rejected design land. |
@@ -277,6 +279,7 @@ _Last sequenced: 2026-11-16T14:47:16.675651Z · model: claude-opus-5-5 · open: 
 | 281 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
 | 282 | PAN-4811 | M | medium | ok |  |  | Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; PAN-4743 landed the Fly target door, so this is now unblocked. |
 | 283 | PAN-5079 | S | high | ok |  |  | pan task claim/cancel/done write any id, so a typo leaves a stray row in the committed continue file an agent can't remove. |
+| 284 | PAN-5446 | S | medium | ok |  |  | 7 CodeRabbit findings on merged PAN-4590 sast gate; 2 Major: dirty scans not bound to tree, incomplete scans reported as scanned |
 | 285 | PAN-4778 | S | medium | ok |  |  | Workspace-image CI never published: wrong Fly app, fly not on PATH, no FLY_API_TOKEN (operator). Fly VMs run a June image. |
 | 286 | PAN-4817 | S | medium | ok |  | PAN-4778 | Fly app's cached image predates pan serve --no-open, so every new Fly VM crashes and rolls back; blocks live Fly verification. |
 | 287 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
@@ -892,6 +895,7 @@ _Last sequenced: 2026-11-16T14:47:16.675651Z · model: claude-opus-5-5 · open: 
 | 897 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
 | 898 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
 | 899 | PAN-5207 | L | low | needs-refinement |  | PAN-5202 | Parked by the operator: Flux meeting bots for Zoom, Teams, Meet, Slack as a paid integration. Do not start. |
+| 900 | PAN-5449 | M | low | ok |  | PAN-4590 | Semgrep visibility half split from PAN-4594: neutral skipped state in Test/Lint panel plus findings list in issue view |
 | 901 | PAN-5181 | XS | low | ok |  |  | Fix shipped in PR #5179 (merged 2026-11-13); the body says it closes on merge. Verify and close. |
 | 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
 | 903 | PAN-5444 | XS | low | ok |  |  | Two Minor CodeRabbit findings left on merged PR #5443: semgrep repo rules resolve from event cwd; hook tests not isolated from Docker. |
@@ -942,6 +946,10 @@ Operator decision 2026-10-04 after the Flywheel closed 19 deployed issues by han
 ### PAN-4511 (rank 17)
 
 pan spawn is the foreman's pane-only item worker, so parallel waves cannot run any item through it on either backend. The test suite never asserts argv, so it stayed green. Small fix with a clear expected behavior.
+
+### PAN-5447 (rank 18)
+
+New issue. Like PAN-4544 and PAN-5381, it blocks the dashboard event loop: each search runs a 1.1 s synchronous vector scan, superseded keystroke searches are never aborted, and stacked scans froze unrelated routes for 4.8 s. The root cause is measured and the fix direction is concrete, so it ranks with the other event-loop blockers.
 
 ### PAN-5381 (rank 19)
 
@@ -1215,10 +1223,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 
 New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
 
-### PAN-3100 (rank 88)
-
-New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1226,10 +1230,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T14:47:16.675651Z",
+  "generatedAt": "2026-11-16T15:48:16.624592Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 891,
+  "openCount": 895,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -1371,6 +1375,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch",
       "rationale": "pan spawn is the foreman's pane-only item worker, so parallel waves cannot run any item through it on either backend. The test suite never asserts argv, so it stayed green. Small fix with a clear expected behavior.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5447",
+      "rank": 18,
+      "size": "M",
+      "importance": "high",
+      "score": 77,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Palette search stalls 15s+: sync 5 GB sqlite-vec scan on the event loop; aborted searches keep running and stall /api/version",
+      "rationale": "New issue. Like PAN-4544 and PAN-5381, it blocks the dashboard event loop: each search runs a 1.1 s synchronous vector scan, superseded keystroke searches are never aborted, and stacked scans froze unrelated routes for 4.8 s. The root cause is measured and the fix direction is concrete, so it ranks with the other event-loop blockers.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3790,6 +3807,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
+      "issue": "PAN-5448",
+      "rank": 208,
+      "size": "S",
+      "importance": "medium",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Left column gains a Files item that toggles the Files dock; Ctrl+Shift+E has no always-visible button. Operator-raised, spec complete",
+      "rationale": "New operator-raised discoverability fix (epic PAN-5284). The body names files, test cases, docs and acceptance, so it is ready to build; it ranks in the medium UI tier because UI discoverability is a stated operator priority.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3769",
       "rank": 209,
       "size": "S",
@@ -4693,6 +4723,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "pan task claim/cancel/done write any id, so a typo leaves a stray row in the committed continue file an agent can't remove.",
       "rationale": "Pipeline-integrity bug: the continue file gates pan done, and the role prompt forbids hand edits, so a typo can wedge completion. The fix copies show's existing check into the write verbs.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5446",
+      "rank": 284,
+      "size": "S",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "7 CodeRabbit findings on merged PAN-4590 sast gate; 2 Major: dirty scans not bound to tree, incomplete scans reported as scanned",
+      "rationale": "New follow-up to the merged PAN-4590 Semgrep gate. Two findings are correctness issues in an advisory-by-default gate, so it ranks medium, ahead of the low-importance Semgrep UI children.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12261,6 +12304,21 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
+      "issue": "PAN-5449",
+      "rank": 900,
+      "size": "M",
+      "importance": "low",
+      "score": 36,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4590"
+      ],
+      "why": "Semgrep visibility half split from PAN-4594: neutral skipped state in Test/Lint panel plus findings list in issue view",
+      "rationale": "New issue split from PAN-4594 at planning time; ranked beside it with the same low importance as the other Semgrep dashboard work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-5181",
       "rank": 901,
       "size": "XS",
@@ -13251,6 +13309,20 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 1
     },
     {
+      "from": "PAN-4590",
+      "to": "PAN-5446",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4590",
+      "to": "PAN-5449",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
       "from": "PAN-465",
       "to": "PAN-3011",
       "type": "unblocks",
@@ -13445,6 +13517,20 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-5446",
+      "to": "PAN-5449",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-5449",
+      "to": "PAN-4594",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-750",
