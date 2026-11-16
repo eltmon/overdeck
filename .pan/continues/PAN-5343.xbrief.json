@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5343",
   "created": "2026-11-16T00:09:01.559Z",
-  "updated": "2026-11-16T00:17:59.246Z",
+  "updated": "2026-11-16T00:18:05.065Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,11 @@
     "deck-layout-store.ac4": {
       "status": "completed",
       "doneAt": "2026-11-16T00:17:59.246Z"
+    },
+    "deck-openers": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:18:05.065Z"
     }
   }
 }
