@@ -21,8 +21,9 @@
 - **Desktop app:** `apps/desktop` — Electron 40 (exact pin; ABI 143), main and
   preload bundled to CJS by tsdown, packaged by electron-builder
   (`dist:linux|mac|win`; Linux AppImage x64, mac arm64 dmg, win NSIS).
-  `prepare-server-resources.mjs` stages the embedded server and rebuilds
-  node-pty for Electron's ABI; macOS notarization runs in the `afterSign`
+  `prepare-server-resources.mjs` stages the embedded server, installs the
+  externals it finds by scanning the chunk graph, and load-checks node-pty's
+  Node-API prebuild under Electron (no ABI rebuild); macOS notarization runs in the `afterSign`
   hook `scripts/notarize.cjs` with `mac.notarize: false`. See `docs/BUILD.md`.
 - **Phone app:** `apps/mobile` — Capacitor 8 (iOS SPM project, Android
   Gradle 8.14 / JDK 21), a Vite build of the frontend's `/m` screens. See
