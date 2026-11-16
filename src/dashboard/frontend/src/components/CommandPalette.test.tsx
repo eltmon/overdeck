@@ -740,6 +740,41 @@ describe('CommandPalette new-workspace action (PAN-3330 FR-6b)', () => {
   });
 });
 
+describe('CommandPalette shutdown and emergency-stop actions (PAN-5342)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    useDashboardStore.setState({ issuesRaw: [], agentsById: {} } as Parameters<typeof useDashboardStore.setState>[0]);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it.each(['reboot', 'shutdown', 'shut down', 'power off', 'quit'])('finds "Shut down Overdeck" for the query "%s"', (query) => {
+    renderCommandPalette();
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: query } });
+    expect(getOptionByValue('shutdown')).toHaveTextContent('Shut down Overdeck');
+  });
+
+  it('opens the shutdown dialog through its window event, calling no API', () => {
+    const opened = vi.fn();
+    window.addEventListener('pan:shutdown-open', opened);
+    renderCommandPalette();
+    selectPaletteResult(getOptionByValue('shutdown'));
+    expect(opened).toHaveBeenCalledTimes(1);
+    window.removeEventListener('pan:shutdown-open', opened);
+  });
+
+  it('opens the emergency-stop confirm instead of calling a route (D-16)', () => {
+    const opened = vi.fn();
+    window.addEventListener('pan:emergency-stop-open', opened);
+    renderCommandPalette();
+    selectPaletteResult(getOptionByValue('emergency-stop'));
+    expect(opened).toHaveBeenCalledTimes(1);
+    window.removeEventListener('pan:emergency-stop-open', opened);
+  });
+});
+
 describe('CommandPalette new-conversation-with-options action (PAN-4486)', () => {
   beforeEach(() => {
     vi.useFakeTimers();

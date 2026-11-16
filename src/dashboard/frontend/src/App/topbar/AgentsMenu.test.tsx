@@ -177,7 +177,7 @@ describe('AgentsMenu', () => {
     setWorking([agentRow('agent-pan-1', 'PAN-1')]);
     renderMenu();
     fireEvent.click(screen.getByTestId('agents-menu-trigger'));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Stop all agents…' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Stop all agents…/ }));
     expect(mocks.triggerEmergencyStop).toHaveBeenCalledTimes(1);
   });
 
@@ -185,11 +185,37 @@ describe('AgentsMenu', () => {
     setWorking([]);
     renderMenu();
     fireEvent.click(screen.getByTestId('agents-menu-trigger'));
-    const stop = screen.getByRole('menuitem', { name: 'Stop all agents…' });
+    const stop = screen.getByRole('menuitem', { name: /^Stop all agents…/ });
     expect(stop).toBeDisabled();
     expect(stop).toHaveAttribute('title', 'No agents are working');
     fireEvent.click(stop);
     expect(mocks.triggerEmergencyStop).not.toHaveBeenCalled();
+  });
+
+  it('gives both stop items a sub-line saying what they do (PAN-5342 FR-8)', () => {
+    setWorking([agentRow('agent-pan-1', 'PAN-1')]);
+    renderMenu();
+    fireEvent.click(screen.getByTestId('agents-menu-trigger'));
+    expect(screen.getByRole('menuitem', { name: /^Stop all agents…/ })).toHaveTextContent(
+      'Kills every agent now. Work in progress is cut off.',
+    );
+    expect(screen.getByRole('menuitem', { name: /^Shut down Overdeck…/ })).toHaveTextContent(
+      'Lets each agent finish its current step, then stops everything. Safe to reboot after.',
+    );
+  });
+
+  it('keeps "Shut down Overdeck…" enabled with no agents and opens the shutdown dialog through its event', () => {
+    const opened = vi.fn();
+    window.addEventListener('pan:shutdown-open', opened);
+    setWorking([]);
+    renderMenu();
+    fireEvent.click(screen.getByTestId('agents-menu-trigger'));
+    const shutdown = screen.getByRole('menuitem', { name: /^Shut down Overdeck…/ });
+    expect(shutdown).toBeEnabled();
+    fireEvent.click(shutdown);
+    expect(opened).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('agents-menu')).toBeNull();
+    window.removeEventListener('pan:shutdown-open', opened);
   });
 
   it('closes on Escape and on a pointer-down outside', () => {

@@ -2,9 +2,12 @@
 //
 // "N agents working ▾" opens a list of every working session from
 // useAgentsWorking() — the one count every surface shares (PAN-5287 D-9) — plus
-// "Open the Agents page" and "Stop all agents…". It replaces the green
-// RunningAgentsPill and the bar's red Stop-all button: running is blue, and the
-// stop lives one click deeper so it is never pressed by accident.
+// "Open the Agents page", "Stop all agents…" and "Shut down Overdeck…"
+// (PAN-5342 FR-8), each stop item with a sub-line saying what it does. It
+// replaces the green RunningAgentsPill and the bar's red Stop-all button:
+// running is blue, and the stops live one click deeper so they are never
+// pressed by accident. Shut down is never disabled: it also stops idle
+// sessions and the services.
 //
 // This is aggregate chrome (docs/DASHBOARD-ARCHITECTURE.md "Render discipline
 // (PAN-4560)"): it subscribes to whole slices because it shows a cross-issue
@@ -22,6 +25,7 @@ import { navigateToIssue, relativeTime } from '../../components/AgentPillPopover
 import { fetchConversations, type Conversation } from '../../components/CommandDeck/ConversationList';
 import { fetchRegisteredProjects } from '../../components/CommandDeck/UnknownProjectState';
 import { triggerEmergencyStop } from '../../components/EmergencyStopOverlay';
+import { triggerShutdownDialog } from '../../components/ShutdownDialog';
 import { MenuItemButton, MenuSeparator, MenuSurface } from '../../components/shared/ContextMenu';
 import type { Agent, Issue } from '../../types';
 
@@ -202,7 +206,23 @@ export function AgentsMenu() {
               triggerEmergencyStop();
             }}
           >
-            Stop all agents…
+            <span className="min-w-0 flex-1">
+              <span className="block">Stop all agents…</span>
+              <span className="block text-[11.5px] text-muted-foreground">Kills every agent now. Work in progress is cut off.</span>
+            </span>
+          </MenuItemButton>
+          <MenuItemButton
+            onClick={() => {
+              setOpen(false);
+              triggerShutdownDialog();
+            }}
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block">Shut down Overdeck…</span>
+              <span className="block text-[11.5px] text-muted-foreground">
+                Lets each agent finish its current step, then stops everything. Safe to reboot after.
+              </span>
+            </span>
           </MenuItemButton>
         </MenuSurface>
       )}

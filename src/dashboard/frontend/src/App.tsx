@@ -5,6 +5,7 @@ import { capture } from './lib/telemetry';
 import { fetchWithTimeout } from './lib/apiFetch';
 import { dashboardMutationJsonHeaders } from './lib/wsTransport';
 import { EmergencyStopOverlay } from './components/EmergencyStopOverlay';
+import { ShutdownDialog } from './components/ShutdownDialog';
 import { EventRouter } from './components/EventRouter';
 import { sharedRouteCode } from './components/chat/sharing/joinApi';
 import { SharedConversationRoute } from './components/chat/sharing/SharedConversationView';
@@ -922,6 +923,7 @@ export default function App() {
 
       {/* Emergency STOP hotkey (Cmd/Ctrl+Shift+.) — kills all agents, freezes auto-resume */}
       <EmergencyStopOverlay />
+      <ShutdownDialog />
       {shortcutsSheetOpen && <ShortcutsSheet onClose={() => setShortcutsSheetOpen(false)} />}
 
       {/* Toast Notifications */}

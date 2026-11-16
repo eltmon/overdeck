@@ -36,7 +36,10 @@ import {
   MessagesSquare,
   MessageSquarePlus,
   Clock,
+  Power,
 } from 'lucide-react';
+import { triggerEmergencyStop } from './EmergencyStopOverlay';
+import { triggerShutdownDialog } from './ShutdownDialog';
 import { openNewConversationDialog } from './newConversation/newConversationDialogStore';
 import { useFleetSearchActions } from './palette-fleet-hits';
 import { useFileProviderActions } from './palette/fileProvider';
@@ -494,7 +497,18 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
       group: 'Orchestration',
       keywords: ['kill', 'abort', 'stop all', 'halt'],
       destructive: true,
-      onSelect: () => void callApi('/api/agents/emergency-stop'),
+      // Opens the existing confirm (PAN-5342 D-16); there is no /api/agents/emergency-stop route.
+      onSelect: () => triggerEmergencyStop(),
+    },
+    {
+      id: 'shutdown',
+      label: 'Shut down Overdeck',
+      description: 'Let agents finish their current step, then stop everything',
+      icon: Power,
+      group: 'Orchestration',
+      keywords: ['shutdown', 'shut down', 'reboot', 'power off', 'quit'],
+      destructive: true,
+      onSelect: () => triggerShutdownDialog(),
     },
     {
       id: 'restart-conversations',
