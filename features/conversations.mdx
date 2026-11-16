@@ -1017,6 +1017,13 @@ main** and the per-turn chips, the window has a **Compare…** view for any two
 points in the conversation's repository. It works in a local-only repository
 too: no remote and no pull request are needed.
 
+**All turns** lists the files this conversation changed — its own commits and
+the uncommitted files its edits touched, the same list as the Changes tab's
+**This conversation** — and nothing other agents changed in the same
+checkout; **vs main** and **Compare…** show the wider comparisons. A file
+changed only through a shell command without a commit made by this
+conversation is not listed under All turns.
+
 1. Click **Compare…**.
 2. Pick a **base** and a **head**. Each box suggests branches, tags and recent
    commits, and accepts any ref you type, such as a SHA or `HEAD~2`.

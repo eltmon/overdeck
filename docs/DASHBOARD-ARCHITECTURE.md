@@ -471,8 +471,13 @@ door that does not exist; a real record read door would be a separate change.
     (`<base>...HEAD`, committed changes only) against the project's configured default
     branch (`workspace.repos[].default_branch`, then `workspace.default_branch`, then
     `main`; `pr_target` is not used), resolving the local branch before `origin/<branch>`;
-    a missing branch yields `baseRef: null` and an empty file list. `/diffs/full` returns
-    `files` and honors `?file=`. The conversation diff routes live in
+    a missing branch yields `baseRef: null` and an empty file list. For the cwd
+    repository, `/diffs/full` returns only the conversation's attributed files (the
+    `GET /api/conversations/:name/changes?scope=conversation` set), diffed from the
+    commit before the earlier of the conversation start and its earliest attributed
+    commit; untracked attributed files render as new-file patches; other repositories
+    are still scoped from the transcript's edit records (PAN-5408). It returns `files`
+    and honors `?file=`. The conversation diff routes live in
     `routes/conversation-diffs.ts`.
 - Global issue updates use `issues.delta`: complete changed rows at their original
   array positions plus the resulting length. Initial/reconnect snapshots retain all
@@ -2464,8 +2469,9 @@ recent commits. Children B, D1, D2, F and G of the workflow redesign
   else is 400, an unknown project 404. It has no route-scopes row, so it
   stays `admin`.
 
-Per-file diffs reuse `GET /api/diffs/compare` and
-`GET /api/conversations/:name/diffs/full`; there is no third diff renderer.
+The Changes tab's per-file diffs use `GET /api/diffs/compare`, `GET
+/api/agents/:id/diffs/vs-main` and the explorer's `readFile` (`DockDiffView.tsx`); the
+diff window's All turns uses `GET /api/conversations/:name/diffs/full` (PAN-5408).
 
 ### Commits
 
