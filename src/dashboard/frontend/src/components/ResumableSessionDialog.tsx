@@ -6,13 +6,15 @@
  */
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Play, RotateCcw, ShieldCheck, Square, X } from 'lucide-react';
+import { Loader2, Play, RotateCcw, ShieldCheck, Square } from 'lucide-react';
 import { toast } from 'sonner';
 import { useResumeRecovery, recoveryFromBody, type RecoveryRequest } from '../lib/resumeRecovery';
 import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { toastResumeOutcome } from '../lib/resumeOutcome';
 import { useAlert } from './DialogProvider';
+import { Modal } from './shared/Modal';
+import formStyles from './shared/ModalForm.module.css';
 
 async function postJson(url: string, body?: unknown): Promise<Record<string, unknown> | null> {
   const res = await fetch(url, {
@@ -145,32 +147,14 @@ export function ResumableSessionDialog() {
   };
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40" onClick={closeRecovery}>
-      <div
-        role="dialog"
-        aria-label={content.title(request)}
-        data-testid="resumable-session-dialog"
-        data-kind={kind}
-        className="w-full max-w-md rounded-lg border border-border bg-popover p-4 text-sm text-popover-foreground shadow-xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h3 className="font-medium"><span className="font-mono">{agentId}</span>{content.title(request).slice(agentId.length)}</h3>
-          <button type="button" aria-label="Close" className="text-muted-foreground hover:text-foreground" onClick={closeRecovery}>
-            <X size={16} />
-          </button>
-        </div>
-        <p className="text-xs leading-5 text-muted-foreground">{content.body}</p>
-        <div className="mt-4 flex items-center gap-2">
-          <button
-            type="button"
-            data-testid="recovery-primary"
-            onClick={primary}
-            disabled={!!pending}
-            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity disabled:opacity-50"
-          >
-            {pending === 'primary' ? <Loader2 size={13} className="animate-spin" /> : kind === 'resumable' ? <Play size={13} /> : kind === 'live-session' ? <Square size={13} /> : <ShieldCheck size={13} />}
-            {kind === 'live-session' && !request.retry ? 'Stop agent' : content.primary}
+    <Modal
+      title={content.title(request)}
+      size="narrow"
+      onClose={closeRecovery}
+      footer={
+        <>
+          <button type="button" onClick={closeRecovery} className={formStyles.button}>
+            Cancel
           </button>
           {kind === 'resumable' && (
             <button
@@ -178,7 +162,7 @@ export function ResumableSessionDialog() {
               data-testid="recovery-start-fresh"
               onClick={startFresh}
               disabled={!!pending}
-              className="inline-flex items-center gap-1.5 rounded-md border border-input px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+              className={formStyles.button}
             >
               {pending === 'fresh' ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
               Start fresh
@@ -186,22 +170,29 @@ export function ResumableSessionDialog() {
           )}
           <button
             type="button"
-            onClick={closeRecovery}
-            className="ml-auto rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+            data-testid="recovery-primary"
+            onClick={primary}
+            disabled={!!pending}
+            className={formStyles.primaryButton}
           >
-            Cancel
+            {pending === 'primary' ? <Loader2 size={13} className="animate-spin" /> : kind === 'resumable' ? <Play size={13} /> : kind === 'live-session' ? <Square size={13} /> : <ShieldCheck size={13} />}
+            {kind === 'live-session' && !request.retry ? 'Stop agent' : content.primary}
           </button>
-        </div>
+        </>
+      }
+    >
+      <div data-testid="resumable-session-dialog" data-kind={kind} className={`${formStyles.content} space-y-3`}>
+        <p className={formStyles.text}>{content.body}</p>
         {pending && (
           // A start can take minutes when the workspace docker stack has to
           // come up first. Never trap the operator: closing only dismisses the
           // dialog — the start keeps running server-side and the tree updates
           // via SSE when the agent lands.
-          <p data-testid="recovery-pending-hint" className="mt-3 text-[11px] leading-4 text-muted-foreground">
+          <p data-testid="recovery-pending-hint" className={formStyles.hint}>
             Starting can take a few minutes when the workspace docker stack needs to come up. Closing this won&apos;t stop it.
           </p>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }
