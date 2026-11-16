@@ -44,7 +44,6 @@
 1 src/dashboard/frontend/src/components/CommandDeck/usePriorityConversation.ts
 17 src/dashboard/frontend/src/components/CommandPalette.tsx
 1 src/dashboard/frontend/src/components/DeaconActivityView.tsx
-1 src/dashboard/frontend/src/components/DeepWipeDialog.tsx
 6 src/dashboard/frontend/src/components/DialogProvider.tsx
 5 src/dashboard/frontend/src/components/DiffPanel.tsx
 2 src/dashboard/frontend/src/components/DiffPanelShell.tsx
@@ -65,7 +64,6 @@
 1 src/dashboard/frontend/src/components/PanOpenInPicker.tsx
 5 src/dashboard/frontend/src/components/Pipeline/PipelineView.tsx
 1 src/dashboard/frontend/src/components/PlanDialog.tsx
-1 src/dashboard/frontend/src/components/ProviderEnvOverrideDialog.tsx
 1 src/dashboard/frontend/src/components/SensitiveText.tsx
 2 src/dashboard/frontend/src/components/Settings/DesktopSettingsSection.tsx
 3 src/dashboard/frontend/src/components/Settings/OpenRouterModelBrowser.tsx

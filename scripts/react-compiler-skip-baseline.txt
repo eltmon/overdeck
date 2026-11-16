@@ -147,6 +147,7 @@
 5 src/dashboard/frontend/src/components/resources/MachineRoom.tsx
 1 src/dashboard/frontend/src/components/resources/ReclaimAdvisor.tsx
 2 src/dashboard/frontend/src/components/resources/TeardownModal.tsx
+1 src/dashboard/frontend/src/components/shared/Modal.tsx
 1 src/dashboard/frontend/src/components/simple/SimpleIssuePage.tsx
 4 src/dashboard/frontend/src/components/skills/SkillOverridesPanel.tsx
 3 src/dashboard/frontend/src/components/skills/SkillPacksSection.tsx
