@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:55:45.486Z",
+  "updated": "2026-11-16T11:59:55.530Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -752,6 +752,11 @@
     "docs-modal-rule-and-audit.ac4": {
       "status": "completed",
       "doneAt": "2026-11-16T11:55:45.486Z"
+    },
+    "uat-five-dialogs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4756",
+      "claimedAt": "2026-11-16T11:59:55.530Z"
     }
   }
 }
