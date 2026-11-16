@@ -2,10 +2,11 @@
   "compilerOptions": {
     "composite": true,
     "skipLibCheck": true,
+    "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
     "strict": true
   },
-  "include": ["vite.config.ts", "reactCompiler.ts"]
+  "include": ["vite.config.ts", "reactCompiler.ts", "scripts/reactCompilerCoverage.ts"]
 }
