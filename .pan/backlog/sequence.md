@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T06:22:11.832231Z · model: claude-opus-5-5 · open: 888_
+_Last sequenced: 2026-11-16T06:43:58.952047Z · model: claude-opus-5-5 · open: 888_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -902,7 +902,7 @@ New and already in the pipeline. The v0.87.0 release is half-shipped: core and c
 
 ### PAN-5423 (rank 2)
 
-New and already in review, so it is pinned in the free rank-2 slot rather than ranked against the backlog; it is a small, well-specified UI discoverability fix.
+Merged (PR closed the issue) and now verifying on main, so it is out of the pipeline; kept at rank 2 unchanged since nothing is left to pick up and it drops off when the tracker closes it.
 
 ### PAN-5013 (rank 3)
 
@@ -1223,7 +1223,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T06:22:11.832231Z",
+  "generatedAt": "2026-11-16T06:43:58.952047Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 888,
@@ -1250,7 +1250,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "condition": "ok",
       "dependsOn": [],
       "why": "Make the 'Answer delivered to ...' toast clickable so it opens the conversation or issue that received the answer.",
-      "rationale": "New and already in review, so it is pinned in the free rank-2 slot rather than ranked against the backlog; it is a small, well-specified UI discoverability fix.",
+      "rationale": "Merged (PR closed the issue) and now verifying on main, so it is out of the pipeline; kept at rank 2 unchanged since nothing is left to pick up and it drops off when the tracker closes it.",
       "gate": "auto",
       "planning": "auto"
     },
