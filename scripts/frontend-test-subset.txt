@@ -82,6 +82,7 @@ src/components/__tests__/StoppedAgentsBanner.test.tsx
 src/components/dock/__tests__/activeDock.test.ts
 src/components/dock/__tests__/changes-model.test.ts
 src/components/dock/__tests__/ConversationChangesList.test.tsx
+src/components/dock/__tests__/dockDiffPreview.test.ts
 src/components/dock/__tests__/DockDiffView.test.tsx
 src/components/dock/__tests__/dockScope.test.ts
 src/components/dock/__tests__/LiveTab.test.tsx
