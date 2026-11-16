@@ -325,11 +325,12 @@ describe('quality gate admission', () => {
     it('counts a held slot above a lowered slot count against capacity', async () => {
       const rootDir = home()
       writeFileSync(join(rootDir, 'slot-1.json'), ownerJson(process.pid, 10_000))
-      const admission = acquireQualityGateAdmission(request, { ...deps(rootDir), now: () => 10_000 })
+      const onWaiting = vi.fn()
+      const admission = acquireQualityGateAdmission(request, { ...deps(rootDir), now: () => 10_000, onWaiting })
       let resolved = false
       void admission.then(() => { resolved = true })
 
-      await driveTurns(20)
+      await driveUntil(() => onWaiting.mock.calls.some(([reason]) => reason.kind === 'slots'))
       expect(resolved).toBe(false)
 
       unlinkSync(join(rootDir, 'slot-1.json'))
@@ -410,11 +411,12 @@ describe('quality gate admission', () => {
       configMocks.loadGlobalConfigNoMigration.mockRejectedValue(new Error('broken config.yaml'))
       const first = await driveUntilResolved(acquireQualityGateAdmission(request, configDeps(rootDir, 1)))
       const second = await driveUntilResolved(acquireQualityGateAdmission(request, configDeps(rootDir, 2)))
-      const thirdPromise = acquireQualityGateAdmission(request, configDeps(rootDir, 3))
+      const onThirdWaiting = vi.fn()
+      const thirdPromise = acquireQualityGateAdmission(request, { ...configDeps(rootDir, 3), onWaiting: onThirdWaiting })
       let thirdSettled = false
       thirdPromise.finally(() => { thirdSettled = true }).catch(() => undefined)
 
-      await driveTurns(20)
+      await driveUntil(() => onThirdWaiting.mock.calls.some(([reason]) => reason.kind === 'slots'))
       expect([first.slots, second.slots]).toEqual([2, 2])
       expect(thirdSettled).toBe(false)
 
@@ -429,11 +431,12 @@ describe('quality gate admission', () => {
       const rootDir = home()
       configuredSlots(3)
       const first = await driveUntilResolved(acquireQualityGateAdmission(request, { ...deps(rootDir), now: () => 1 }))
-      const secondPromise = acquireQualityGateAdmission(request, { ...deps(rootDir), now: () => 2 })
+      const onWaiting = vi.fn()
+      const secondPromise = acquireQualityGateAdmission(request, { ...deps(rootDir), now: () => 2, onWaiting })
       let secondResolved = false
       void secondPromise.then(() => { secondResolved = true })
 
-      await driveTurns(20)
+      await driveUntil(() => onWaiting.mock.calls.some(([reason]) => reason.kind === 'slots'))
       expect(secondResolved).toBe(false)
       expect(configMocks.loadGlobalConfigNoMigration).not.toHaveBeenCalled()
 
