@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:44:54.683Z",
+  "updated": "2026-11-16T11:45:19.690Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -354,9 +354,22 @@
       "doneAt": "2026-11-16T11:44:52.544Z"
     },
     "migrate-resumable-session-dialog": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4756",
-      "claimedAt": "2026-11-16T11:44:54.683Z"
+      "claimedAt": "2026-11-16T11:44:54.683Z",
+      "doneAt": "2026-11-16T11:45:19.689Z"
+    },
+    "migrate-resumable-session-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:45:19.689Z"
+    },
+    "migrate-resumable-session-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:45:19.689Z"
+    },
+    "migrate-resumable-session-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:45:19.689Z"
     }
   }
 }
