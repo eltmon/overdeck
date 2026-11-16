@@ -443,6 +443,17 @@ prints (it prints it again when the agent is already running), or open the
 agent in the dashboard. See "Reaching an agent from a shell" in
 `docs/TERMINAL-BACKENDS.md`.
 
+### Launches refused: Overdeck is shutting down
+
+Starts, resumes and conversation messages fail with "Overdeck is shutting down (pan shutdown)" while a drain runs, because `~/.overdeck/shutdown.json` exists. Cancel the drain, or start Overdeck again after the restart:
+
+```bash
+pan shutdown --cancel   # cancel the running drain
+pan up                  # after a reboot: the dashboard consumes a leftover record at boot
+```
+
+See [Safe shutdown](/features/safe-shutdown).
+
 ### Agent keeps failing
 
 Check the handoff count in state.json. If it's high, the task may be too complex:

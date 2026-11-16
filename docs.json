@@ -108,6 +108,7 @@
               "features/conversations",
               "features/specialists",
               "features/cloister",
+              "features/safe-shutdown",
               "features/skills",
               "features/skill-packs",
               "features/workspaces",

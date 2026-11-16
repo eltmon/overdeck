@@ -285,8 +285,14 @@ pan up
 # Start server + open in system browser (no Electron)
 npx overdeck serve
 
-# Stop dashboard
+# Stop dashboard (agents keep running)
 pan down
+
+# Drain every agent at a tool boundary, stop everything, report "Safe to reboot."
+pan shutdown
+
+# The same, then reboot the machine (Linux)
+pan shutdown --reboot
 
 # Restart dashboard
 pan restart
