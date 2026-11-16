@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5343",
   "created": "2026-11-16T00:09:01.559Z",
-  "updated": "2026-11-16T00:11:20.381Z",
+  "updated": "2026-11-16T00:11:26.879Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "deck-key.ac4": {
       "status": "completed",
       "doneAt": "2026-11-16T00:11:20.381Z"
+    },
+    "homeless-panes": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5343",
+      "claimedAt": "2026-11-16T00:11:26.878Z"
     }
   }
 }
