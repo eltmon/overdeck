@@ -5,6 +5,7 @@
 // reads "No project / <pane label>". Every other route shows its page title.
 // PAN-5343 H-D4: the All projects deck reads "All projects / <pane label>",
 // or "All projects / N conversations side by side" while N ≥ 2 panes show.
+// With no pane active, PAN-5414 reads just "All projects" with no separator.
 // The project name comes from the registered project (`overdeck`), never its
 // key (`panopticon-cli`).
 
@@ -37,12 +38,16 @@ function AllProjectsCrumb() {
   const layout = useDeckLayoutStore(selectDeckLayout(ALL_PROJECTS_KEY));
   const paneLabel = usePanesStore(selectActivePane(ALL_PROJECTS_KEY))?.label;
   const shown = layout ? leafCount(layout) : 0;
-  const detail = shown >= 2 ? `${shown} conversations side by side` : paneLabel ?? 'Conversation';
+  const detail = shown >= 2 ? `${shown} conversations side by side` : paneLabel || null;
   return (
     <div className={CRUMB_CLASS} data-testid="topbar-crumb">
       <span className="shrink-0 font-medium text-foreground">{ALL_PROJECTS_LABEL}</span>
-      <span className="shrink-0 text-muted-foreground" aria-hidden="true">/</span>
-      <span className="min-w-0 truncate text-muted-foreground">{detail}</span>
+      {detail && (
+        <>
+          <span className="shrink-0 text-muted-foreground" aria-hidden="true">/</span>
+          <span className="min-w-0 truncate text-muted-foreground">{detail}</span>
+        </>
+      )}
     </div>
   );
 }
