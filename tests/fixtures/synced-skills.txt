@@ -105,6 +105,7 @@ react-best-practices
 refactor
 refactor-radar
 release
+semgrep
 send-feedback-to-agent
 session-health
 spec-readiness

@@ -3,13 +3,17 @@ export interface YamlSecurityConfig {
   semgrep?: YamlSemgrepConfig;
 }
 
-/** Raw `security.semgrep:` block. Phase 1 reads only `enabled`; later keys are ignored. */
+/** Raw `security.semgrep:` block. Unknown keys beyond these are ignored. */
 export interface YamlSemgrepConfig {
   enabled?: boolean;
+  mcp?: boolean;
+  edit_hook?: boolean;
 }
 
 export interface NormalizedSemgrepConfig {
   enabled: boolean;
+  mcp: boolean;
+  edit_hook: boolean;
 }
 
 export interface NormalizedSecurityConfig {
@@ -17,8 +21,10 @@ export interface NormalizedSecurityConfig {
 }
 
 export const DEFAULT_NORMALIZED_SECURITY: NormalizedSecurityConfig = {
-  semgrep: { enabled: false },
+  semgrep: { enabled: false, mcp: false, edit_hook: false },
 };
+
+const BOOLEAN_KEYS = ['enabled', 'mcp', 'edit_hook'] as const;
 
 /**
  * Fold one config layer's `security:` block onto the value merged so far. Off by
@@ -39,11 +45,13 @@ export function normalizeSecurityConfig(
     throw new Error('config.yaml: security.semgrep must be a mapping');
   }
   const merged: NormalizedSemgrepConfig = { ...current.semgrep };
-  if (semgrep.enabled !== undefined) {
-    if (typeof semgrep.enabled !== 'boolean') {
-      throw new Error(`config.yaml: security.semgrep.enabled must be true or false (got: ${String(semgrep.enabled)})`);
+  for (const key of BOOLEAN_KEYS) {
+    const value = semgrep[key];
+    if (value === undefined) continue;
+    if (typeof value !== 'boolean') {
+      throw new Error(`config.yaml: security.semgrep.${key} must be true or false (got: ${String(value)})`);
     }
-    merged.enabled = semgrep.enabled;
+    merged[key] = value;
   }
   return { ...current, semgrep: merged };
 }

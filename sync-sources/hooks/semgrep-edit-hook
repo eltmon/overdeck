@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# PAN-4591: post-edit Semgrep scan. Never fails the edit: any startup error exits 0 silently.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)" || exit 0
+[ -f "$SCRIPT_DIR/semgrep-edit-hook.js" ] || exit 0
+node "$SCRIPT_DIR/semgrep-edit-hook.js" 2>/dev/null || true
+exit 0

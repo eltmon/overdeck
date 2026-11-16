@@ -1,0 +1,727 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-16T11:18:10Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4591: Semgrep in-session for agents: semgrep mcp server, post-edit scan hook, and semgrep skill",
+    "updated": "2026-11-16T11:37:49.741Z"
+  },
+  "plan": {
+    "id": "pan-4591",
+    "title": "Semgrep in-session for agents: semgrep mcp server, post-edit scan hook, and semgrep skill",
+    "status": "running",
+    "uid": "f591a766-8a23-4069-b545-06ded46c6551",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-16T11:18:10Z",
+    "updated": "2026-11-16T11:37:49.741Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4591",
+        "label": "PAN-4591",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4585",
+        "label": "PAN-4585 (parent, phase 1)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5434",
+        "label": "PAN-5434 (sibling: Codex edit hook)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4591.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "semgrep",
+      "security",
+      "mcp",
+      "hooks",
+      "skills",
+      "sast"
+    ],
+    "metadata": {
+      "sizeJustification": "23 files. The subsystem lint counts 7 because three single top-level doc files (configuration/semgrep.mdx, configuration/harnesses.mdx, changelog.d/pan-4591.md) each count as their own subsystem under the two-path-segment rule; code spans src/lib, src/cli and sync-sources only. The only independently risky slice (the Codex apply_patch hook) is already split into PAN-5434.",
+      "canonicalFilename": "2026-11-16-PAN-4591-semgrep-in-session-for-agents-semgrep-mcp-server-post-edit-scan-hook-and-semgrep-skill.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Phase 1 (PAN-4585) installs a managed Semgrep CLI but agents never see Semgrep while they work: no MCP tools, no feedback after an edit, and no guidance on triage or suppressions.",
+      "Proposal": "Add security.semgrep.mcp and security.semgrep.edit_hook (default false). Inject a stdio `semgrep` MCP server (managed launcher, quiet env, tracing off, Overdeck-owned settings/log files, token scrubbed, three login/metrics-dependent tools disabled) into the launch MCP file and Codex server map for work agents and the review security lane, which reaches Claude Code, Codex and the ACP host. Inject a PostToolUse Edit|Write|MultiEdit hook per launch through the `pan skills launch-settings` JSON for Claude Code agent launches; the hook script (sync-sources/hooks/semgrep-edit-hook) scans only the edited file in work sessions and returns findings as additionalContext. Ship a `semgrep` skill hidden at launch while Semgrep is off, and document the harness matrix.",
+      "NonGoals": "- No entry in OVERDECK_HOOK_REGISTRATIONS and no write to ~/.claude/settings.json for Semgrep.\n- No Codex edit hook and no change to src/lib/sageox/codex-hooks.ts (PAN-5434).\n- No MCP server or hook for plan, test, ship, flywheel, worker or conversation launches, nor for the correctness, performance or requirements review lanes or the review synthesis parent.\n- No edit hook for ACP, pi, ohmypi, kimi-code, muse or prime-agent harnesses; no MCP for pi/ohmypi/kimi-code native/muse/prime-agent (warning only).\n- No Semgrep for remote (Fly) launches or Docker workspaces.\n- No sast verification gate, review-context findings, configs/severity keys (PAN-4590), CI workflow (PAN-4592), Platform token or semgrep_findings/supply-chain tools (PAN-4593), or dashboard controls (PAN-4594).\n- No use of `semgrep mcp -k <hook>` modes.\n- No `--config auto` anywhere and no metrics or tracing enabled.\n- No change to the project-mcp reserve warning wording.\n- No raise of any scripts/file-size-allowlist.txt row; src/lib/agents/spawn.ts gains no lines."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Inject the Claude edit hook per launch through the `pan skills launch-settings` --settings JSON instead of adding it to OVERDECK_HOOK_REGISTRATIONS as the issue text says.",
+        "rationale": "OVERDECK_HOOK_REGISTRATIONS writes a permanent ~/.claude/settings.json entry that fires in every Claude session on the machine and registers into a harness while Semgrep is off, contradicting PAN-4585 FR-1. SageOx (PAN-4852) already injects per-launch hooks this way, and planning probe 7 confirmed a --settings PostToolUse hook's additionalContext reaches the model on Claude Code 2.1.325. The issue's intent (toggle-gated, managed sessions only, scan only the edited file) is preserved."
+      },
+      {
+        "summary": "Write Overdeck's own hook script instead of using `semgrep mcp -k post-tool-cli-scan`.",
+        "rationale": "Planning probe: that mode exits 2 with 'No SEMGREP_APP_TOKEN found, please login' and starts Datadog tracing; it supports only claude/cursor/windsurf agents."
+      },
+      {
+        "summary": "security.semgrep.mcp and security.semgrep.edit_hook default to false.",
+        "rationale": "Each costs about 100 MB per agent or about 2 s per edit (measured); phase-1 adopters who enabled only the install must not see new behavior on upgrade."
+      },
+      {
+        "summary": "Split the Codex apply_patch edit hook into sibling issue PAN-5434; Codex still gets the MCP server here.",
+        "rationale": "codex-hooks.ts owns hooks.json wholesale with index-keyed trust hashes, so a second source needs a composer, and Codex 0.169.0's PostToolUse behavior for apply_patch is unverified and needs a live probe with a logged-in Codex."
+      },
+      {
+        "summary": "Disable semgrep_scan, semgrep_findings and semgrep_scan_supply_chain in the MCP server.",
+        "rationale": "Probe: semgrep_scan always errors with metrics off ('Cannot run scan with auto config when metrics are off'); the other two need a Semgrep Platform login (PAN-4593 scope)."
+      },
+      {
+        "summary": "Hook rules are p/default plus repo-local .semgrep.yml / .semgrep/ in the session cwd.",
+        "rationale": "No configs key exists until PAN-4590; p/default is the registry pack the parent PRD probed, and repo-local rules let the skill's custom-rule workflow take effect."
+      },
+      {
+        "summary": "Conversations get neither the MCP server nor the hook; the hook scans only sessions whose state.json role is work.",
+        "rationale": "The issue targets work agents (MCP also for the review security lane); conversations are the operator's interactive sessions and resume/recovery launch paths do not export OVERDECK_SESSION_TYPE, so state.json role is the reliable signal."
+      },
+      {
+        "summary": "Treat the issue's 'ACP harnesses get no MCP today' as stale: ACP receives the server through the shared launch MCP file.",
+        "rationale": "PAN-4934 made src/lib/acp/host.ts read the launch --mcp-config file and pass stdio servers to session/new; no ACP-specific wiring is needed. The ACP edit-hook gap is documented."
+      }
+    ],
+    "items": [
+      {
+        "id": "config-keys",
+        "title": "Add security.semgrep.mcp and security.semgrep.edit_hook config keys",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T11:18:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4591",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/semgrep.ts",
+            "src/lib/config-yaml/__tests__/semgrep-config.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/config-yaml/__tests__/semgrep-config.test.ts src/lib/config-yaml/__tests__/semgrep-project-layer.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both config test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Extend YamlSemgrepConfig/NormalizedSemgrepConfig with mcp and edit_hook booleans, default false in DEFAULT_NORMALIZED_SECURITY, and validate all three keys in normalizeSecurityConfig with the existing error format. Update the unknown-keys test expectation and add default, enable and bad-value tests."
+        },
+        "items": [
+          {
+            "id": "config-keys.ac1",
+            "title": "Given no config, mergeConfigs(null).config.security.semgrep returns { enabled: false, mcp: false, edit_hook: false }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-keys.ac2",
+            "title": "Given a global layer with mcp: true and edit_hook: true, the merged config returns both as true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-keys.ac3",
+            "title": "Given mcp: 'yes' or edit_hook: 1, config load throws 'security.semgrep.<key> must be true or false'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-resolver",
+        "title": "Create the semgrep MCP server resolver with role, toggle, platform and launcher-ownership gates",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T11:18:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4591",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "inject-mcp",
+            "edit-hook-script",
+            "claude-launch-hook"
+          ],
+          "files_scope": [
+            "src/lib/semgrep/in-session.ts",
+            "src/lib/semgrep/install.ts",
+            "src/lib/semgrep/__tests__/in-session.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/semgrep/__tests__/in-session.test.ts src/lib/semgrep/__tests__/install.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "in-session.test.ts and install.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-15",
+            "NFR-2",
+            "NFR-3",
+            "NFR-10",
+            "NFR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Export inspectSemgrepLauncher and managedSemgrepTarget from install.ts. Create src/lib/semgrep/in-session.ts with SEMGREP_MCP_SERVER_NAME, semgrepInSessionEnv, SEMGREP_MCP_DISABLED_TOOLS_ENV, isSemgrepMcpRole and resolveSemgrepMcpServer exactly as the PRD specifies: enabled && mcp, eligible role (work, or review + security), no Docker env, not win32, managed launcher; server command /usr/bin/env -u SEMGREP_APP_TOKEN -u SEMGREP_RULES <launcher> mcp with quiet env, Overdeck-owned settings/log files, SEMGREP_MCP_DISABLE_TRACING=true and the three tool-disable vars. Config read tolerates a missing security block."
+        },
+        "items": [
+          {
+            "id": "mcp-resolver.ac1",
+            "title": "Given enabled and mcp true and a managed launcher, resolveSemgrepMcpServer returns the stdio server for role work and for role review with subRole security, with command /usr/bin/env and args starting '-u SEMGREP_APP_TOKEN -u SEMGREP_RULES'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-resolver.ac2",
+            "title": "The resolver returns null for the correctness, performance and requirements lanes, for roles plan/test/ship/worker, and for conversation owners",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-resolver.ac3",
+            "title": "The resolver returns null when enabled or mcp is false, when the config has no security block, with OVERDECK_DOCKER_WORKSPACE=1 or PAN_DOCKER=1, and on win32",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-resolver.ac4",
+            "title": "Given an absent or foreign launcher, the resolver returns null and emits one warning containing 'run pan sync'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-resolver.ac5",
+            "title": "The returned server env contains SEMGREP_SEND_METRICS=off, SEMGREP_ENABLE_VERSION_CHECK=0, SEMGREP_MCP_DISABLE_TRACING=true, SEMGREP_SCAN_DISABLED=true, SEMGREP_FINDINGS_DISABLED=true, SEMGREP_SCAN_SUPPLY_CHAIN_DISABLED=true and settings/log paths under <home>/tools/semgrep/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "inject-mcp",
+        "title": "Inject the semgrep server into the launch MCP file and Codex server map with sub-role plumbing",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T11:18:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4591",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/agent-injection.ts",
+            "src/lib/agents/spawn.ts",
+            "src/lib/mcp/__tests__/semgrep-injection.test.ts",
+            "src/lib/mcp/overdeck-mcp-args.ts",
+            "src/lib/launcher-generator.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/mcp/__tests__/semgrep-injection.test.ts tests/unit/lib/mcp/agent-injection.test.ts tests/unit/lib/launcher-generator-overdeck-mcp.test.ts",
+            "npm run typecheck",
+            "wc -l src/lib/agents/spawn.ts"
+          ],
+          "expected_outputs": [
+            "all three injection/launcher test files pass",
+            "typecheck completes without errors",
+            "spawn.ts line count prints 1088"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-14",
+            "NFR-8"
+          ],
+          "acJustification": "Six criteria: file injection, state sub-role fallback, Codex map and reservation, fail-open and unprovisioned warning, unchanged existing tests with the spawn.ts size limit, and the relaunch allow-list are separate behaviors review must check."
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Add subRole to OverdeckMcpLaunchOwner; add launchSemgrepServer (owner subRole, else state reviewSubRole for review agents via agent-state-read.js; never throws). In prepareClaudeOverdeckMcp and prepareCodexOverdeckMcp reserve 'semgrep' against project and pack servers when active, add the server (Codex with defaultToolsApprovalMode 'approve'), and count it in the overdeckMcpServerNames condition. Name it in the unprovisioned-harness warning. In spawn.ts add subRole: options.subRole inside the two existing object literals without adding lines. Convoy lanes spawn through spawnRun(..., { subRole }) in src/lib/cloister/review-convoy.ts and resume through resumeAgent (state reviewSubRole already set), so both paths reach the sub-role. Add a narrow force-allow: prepareClaudeOverdeckMcp returns overdeckMcpForceAllow ['semgrep'], LauncherConfig carries it, and overdeckMcpArgs appends --allowedTools=mcp__semgrep when the command already has a role allow-list (resumed/recovered review lanes), leaving PAN-5061's no-allow-list rule for project servers unchanged."
+        },
+        "items": [
+          {
+            "id": "inject-mcp.ac1",
+            "title": "Given a review security-lane owner and a resolver returning a server, prepareClaudeOverdeckMcp writes overdeck-mcp.json containing mcpServers.semgrep and returns overdeckMcpServerNames containing 'semgrep', so overdeckMcpArgs emits mcp__semgrep",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inject-mcp.ac2",
+            "title": "Given a review owner without subRole whose state.json reviewSubRole is 'security', the resolver receives subRole 'security'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inject-mcp.ac3",
+            "title": "prepareCodexOverdeckMcp returns a semgrep entry with defaultToolsApprovalMode 'approve', and a project server named semgrep is reserved only while the managed server is active",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inject-mcp.ac4",
+            "title": "Given a throwing resolver, injection resolves without a semgrep key and emits one warning; given harness pi with an eligible launch, the unprovisioned warning names semgrep",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inject-mcp.ac5",
+            "title": "tests/unit/lib/mcp/agent-injection.test.ts passes unchanged and wc -l src/lib/agents/spawn.ts prints 1088",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inject-mcp.ac6",
+            "title": "Given the resumed review-lane base command from roleSystemPromptInjection(roleAgentDefinitionPath('review')) and overdeckMcpForceAllow ['semgrep'], the generated launcher script contains both the role --allowedTools list and --allowedTools=mcp__semgrep, while a project-only server list with an existing allow-list still emits no extra --allowedTools",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "edit-hook-script",
+        "title": "Create the semgrep-edit-hook script that scans only the edited file in work sessions",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T11:18:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4591",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/hooks/semgrep-edit-hook.ts",
+            "sync-sources/hooks/semgrep-edit-hook*",
+            "sync-sources/hooks/semgrep-edit-hook.js",
+            "sync-sources/hooks/tsdown.config.ts",
+            "src/lib/claude-hooks-registration.ts",
+            "src/lib/semgrep/__tests__/edit-hook.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/semgrep/__tests__/edit-hook.test.ts",
+            "npm run typecheck:hooks",
+            "npm run build:scripts",
+            "git grep -n semgrep-edit-hook src/lib/claude-hooks-registration.ts"
+          ],
+          "expected_outputs": [
+            "edit-hook.test.ts passes",
+            "typecheck:hooks completes without errors",
+            "build:scripts emits sync-sources/hooks/semgrep-edit-hook.js",
+            "grep shows the name only inside HOOK_SCRIPT_NAMES"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-2",
+            "NFR-8",
+            "NFR-9",
+            "NFR-10",
+            "FR-15"
+          ],
+          "acJustification": "Seven criteria: output shape, eligibility skips, launcher ownership, fail-open and truncation, env scrubbing, registration placement, and Docker plus shell-level fail-open are independent contracts review must check separately."
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add a standalone node:* only TypeScript hook exporting runSemgrepEditHook and semgrepScanEnv with injected deps, plus a bash shim and the built .js (npm run build:scripts; restore the two other bundles if they change). Gates in order: Edit/Write/MultiEdit tool, OVERDECK_AGENT_ID with state.json role 'work', regular file at most 1 MiB not under node_modules/.git/dist and not a skip-listed extension, the managed launcher is managed (lstat says symlink and readlink equals <home>/tools/semgrep/bin/semgrep; a regular file or foreign symlink is never executed). Scan with --json --quiet --metrics=off --config p/default (+ repo .semgrep.yml/.semgrep/) and a 30 s timeout under the scrubbed quiet env; return additionalContext JSON with at most 10 findings or ''. Add both names to HOOK_SCRIPT_NAMES only. The shim fails open (no set -e/exec; exits 0 silently on a missing dir, bundle or node, or a crash) and the script skips Docker sessions (OVERDECK_DOCKER_WORKSPACE/PAN_DOCKER)."
+        },
+        "items": [
+          {
+            "id": "edit-hook-script.ac1",
+            "title": "Given a Write payload in a work session and a fake execFile returning two results, runSemgrepEditHook returns JSON with hookEventName 'PostToolUse' and additionalContext listing both rule ids, their lines and a nosemgrep instruction",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "edit-hook-script.ac2",
+            "title": "Given a non-work role, no OVERDECK_AGENT_ID, a Bash tool, a .md file, a node_modules path, a 2 MiB file, or a missing binary, the hook returns '' and execFile is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "edit-hook-script.ac6",
+            "title": "Given <home>/bin/semgrep is a regular file or a symlink to any other target, the hook returns '' and execFile is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "edit-hook-script.ac3",
+            "title": "Given execFile rejects with a timeout, the hook returns '' (fail open); given 12 results it lists 10 and appends '…and 2 more'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "edit-hook-script.ac4",
+            "title": "semgrepScanEnv removes SEMGREP_APP_TOKEN and SEMGREP_RULES, preserves PATH, and its four Semgrep keys equal semgrepInSessionEnv for the same home",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "edit-hook-script.ac5",
+            "title": "HOOK_SCRIPT_NAMES contains semgrep-edit-hook and semgrep-edit-hook.js, OVERDECK_HOOK_REGISTRATIONS does not reference it, and sync-sources/hooks/semgrep-edit-hook.js is committed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "edit-hook-script.ac7",
+            "title": "Given OVERDECK_DOCKER_WORKSPACE=1 or PAN_DOCKER=1 the hook returns '' without calling execFile, and running a copy of the shim with no bundle or with a bundle that exits 3 exits 0 with empty stdout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "claude-launch-hook",
+        "title": "Inject the PostToolUse semgrep hook per launch through the Claude launch settings JSON",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T11:18:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4591",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/semgrep/in-session.ts",
+            "src/lib/semgrep/__tests__/in-session.test.ts",
+            "src/cli/commands/skills.ts",
+            "src/cli/commands/__tests__/skills.test.ts",
+            "src/cli/commands/__tests__/skills-semgrep.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/skills.test.ts src/cli/commands/__tests__/skills-semgrep.test.ts src/lib/semgrep/__tests__/in-session.test.ts",
+            "npm run typecheck",
+            "wc -l src/cli/commands/__tests__/skills.test.ts"
+          ],
+          "expected_outputs": [
+            "all three test files pass",
+            "typecheck completes without errors",
+            "skills.test.ts line count is below 1000"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Add resolveSemgrepLaunchSettings (hideSkill = !enabled; claudeHooks only for claude-code, enabled && edit_hook, non-conversation, non-win32; command guarded by `if [ -x <home>/bin/semgrep-edit-hook ]`, timeout 40; never throws) and mergeClaudeHookMaps to in-session.ts. In skillsLaunchSettingsCommand dynamically import it and merge claudeHooks with SageOx hooks into the Claude settings JSON. Mock it in skills.test.ts (at most 6 lines) so existing outputs stay identical; put new tests in skills-semgrep.test.ts."
+        },
+        "items": [
+          {
+            "id": "claude-launch-hook.ac1",
+            "title": "Given edit_hook on and a non-conversation Claude launch, launch-settings stdout JSON contains hooks.PostToolUse with matcher 'Edit|Write|MultiEdit' and a command containing semgrep-edit-hook",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-launch-hook.ac2",
+            "title": "Given SageOx active with its own PostToolUse entry, the emitted hooks.PostToolUse array has two entries with SageOx's first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-launch-hook.ac3",
+            "title": "resolveSemgrepLaunchSettings returns claudeHooks null for codex, for a conversation, for edit_hook false, for enabled false and on win32, with OVERDECK_DOCKER_WORKSPACE=1 or PAN_DOCKER=1, and returns { hideSkill: true, claudeHooks: null } with one warning when config loading throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-launch-hook.ac4",
+            "title": "skills.test.ts passes with its existing launch-settings expectations byte-identical, and wc -l on it prints a count below 1000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hide-skill-when-off",
+        "title": "Hide the semgrep skill at Claude and Codex launch while Semgrep is off",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T11:18:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4591",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/skills.ts",
+            "src/cli/commands/__tests__/skills-semgrep.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/skills-semgrep.test.ts src/cli/commands/__tests__/skills.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both skills test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Append 'semgrep' to the hidden skill names in both launch-settings branches when resolveSemgrepLaunchSettings returns hideSkill true, and test both harnesses both ways."
+        },
+        "items": [
+          {
+            "id": "hide-skill-when-off.ac1",
+            "title": "Given hideSkill true, Claude launch-settings stdout skillOverrides contains \"semgrep\":\"off\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hide-skill-when-off.ac2",
+            "title": "Given hideSkill true, the Codex branch calls writeCodexSkillOverrides with a list containing 'semgrep'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hide-skill-when-off.ac3",
+            "title": "Given hideSkill false, neither the Claude JSON nor the Codex list contains 'semgrep'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "semgrep-skill",
+        "title": "Write the semgrep skill for triage, justified nosemgrep, custom rules and MCP tools",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T11:18:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4591",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/semgrep/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint (including scripts/lint-skills.sh) completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Create sync-sources/skills/semgrep/SKILL.md with frontmatter name: semgrep, the given description and triggers, and the seven body sections in order: is Semgrep on, running the CLI by absolute path with the scrubbed quiet env (never --config auto), triage, justified line-level `nosemgrep: <rule-id> -- <reason>`, custom rules in .semgrep.yml/.semgrep/ tested with `semgrep --test` using ruleid/ok annotations, the four MCP tools and why semgrep_scan is absent, and handling 'Semgrep found' hook messages."
+        },
+        "items": [
+          {
+            "id": "semgrep-skill.ac1",
+            "title": "sync-sources/skills/semgrep/SKILL.md exists with frontmatter name 'semgrep' and renders the seven sections in the PRD order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "semgrep-skill.ac2",
+            "title": "The skill's CLI snippet invokes ${OVERDECK_HOME:-$HOME/.overdeck}/bin/semgrep through env -u SEMGREP_APP_TOKEN -u SEMGREP_RULES with SEMGREP_SEND_METRICS=off, and the text rejects --config auto and bare nosemgrep",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "semgrep-skill.ac3",
+            "title": "npm run lint exits 0 with the new skill present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document in-session Semgrep, the harness matrix and the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T11:18:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4591",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/semgrep.mdx",
+            "configuration/harnesses.mdx",
+            "changelog.d/pan-4591.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "NFR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. In configuration/semgrep.mdx update 'What it is' and 'Turn it on' (mcp, edit_hook, defaults, new sessions only), add '## In-session tools' (MCP server, post-edit hook, skill, costs) and '## Harness support' with the five PRD rows, and add the two egress rows plus the tracing-off and ~/.overdeck/tools/semgrep state notes. Add '## Semgrep in sessions' to configuration/harnesses.mdx before '## Installing pi'. Add changelog.d/pan-4591.md with the PRD's New bullet."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "configuration/semgrep.mdx renders '## In-session tools' and '## Harness support' showing Claude Code MCP yes/hook yes, Codex MCP yes/hook no (#5434), ACP host MCP yes/hook no, and pi/oh-my-pi/Kimi Code native/Muse/Prime Agent MCP no/hook no",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "configuration/semgrep.mdx contains text stating mcp and edit_hook default to false, require enabled: true and reach new sessions only, and its egress table contains the MCP rule-schema fetch and the post-edit registry download as sending no code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "configuration/harnesses.mdx renders a '## Semgrep in sessions' section linking to /configuration/semgrep#harness-support, and changelog.d/pan-4591.md exists with one '#### New' bullet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "config-keys",
+        "to": "mcp-resolver",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-resolver",
+        "to": "inject-mcp",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-resolver",
+        "to": "edit-hook-script",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-resolver",
+        "to": "claude-launch-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "claude-launch-hook",
+        "to": "hide-skill-when-off",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -905,4 +905,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   encode, `JSON.stringify` and `TextEncoder` warm (about 90–95 ms on the first connect after a
   server start) for 1,450 issues and 1,662 agents (5.5 MB, 61% of it issue `description`). Server
   congestion during the burst is PAN-5180.
+- **Semgrep's built-in agent integration needs a login** (PAN-4591 planning probe, Semgrep 1.180.0) —
+  `semgrep mcp -k post-tool-cli-scan` exits 2 with "No SEMGREP_APP_TOKEN found" and starts Datadog
+  tracing unless `SEMGREP_MCP_DISABLE_TRACING=true`. With `SEMGREP_SEND_METRICS=off` the MCP
+  `semgrep_scan` tool always fails ("Cannot run scan with auto config when metrics are off");
+  `semgrep_scan_with_custom_rule` works. The server sends `roots/list` requests, so a client that ignores
+  them hangs every tool call. Semgrep writes `~/.semgrep/` unless `SEMGREP_SETTINGS_FILE`/`SEMGREP_LOG_FILE`
+  point elsewhere, and reads a login token from that settings file.
 <!-- last-verified: 2026-11-04 -->

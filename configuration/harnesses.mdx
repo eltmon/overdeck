@@ -946,6 +946,21 @@ Stop your Prime Agent agents and conversations, run
 `npm uninstall -g prime-agent`, then run `pan doctor` and confirm it lists no
 orphaned Prime Agent daemons.
 
+## Semgrep in sessions
+
+With `security.semgrep` turned on, agents can get a `semgrep` MCP server and a post-edit scan
+hook mid-session, not just the managed CLI install:
+
+| Harness | MCP server | Edit hook |
+| --- | --- | --- |
+| Claude Code | Yes | Yes |
+| Codex | Yes | No (#5434) |
+| ACP host (Kimi over ACP, OpenCode, Grok Build) | Yes | No |
+| pi, oh-my-pi, Kimi Code native, Muse, Prime Agent | No (one launch warning) | No |
+
+See [Semgrep: harness support](/configuration/semgrep#harness-support) for what each column
+means and how to turn it on.
+
 ## Installing pi
 
 pi is **not** auto-installed. `pan install` lists it among the optional tools
