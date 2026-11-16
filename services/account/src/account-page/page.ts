@@ -4,9 +4,14 @@
  * Server-rendered, no JavaScript; every value passes through escapeHtml(). The plan comes from D1
  * (entitlementFor of the grant row, expired or not, and the subscription rows), never from the Directory DO. Machines and relay use
  * come from the Directory DO; when it cannot answer, both sections say so and no Remove form is shown.
+ * When billing is configured, the Billing section and the paid-plan lines come from billing/page-sections.ts
+ * (PAN-4294 WI-6); otherwise the page keeps BILLING_MESSAGE.
  */
 import { formatDate, formatDateTime } from '../admin/screen.ts';
-import { billingStateFor, loadSubscriptions } from '../billing/access.ts';
+import { billingStateFor, loadSubscriptions, type BillingState } from '../billing/access.ts';
+import { parseBillingConfig } from '../billing/catalog.ts';
+import { foundingAvailability } from '../billing/founding.ts';
+import { billingSection, paidPlanLines, planLabel, RELAY_NOT_IN_PLAN_MESSAGE } from '../billing/page-sections.ts';
 import { readDirectoryView, type DirectoryMachine, type DirectoryView } from '../directory-view.ts';
 import { entitlementFor, FREE_PLAN_MAX_MACHINES, type Entitlement } from '../entitlement.ts';
 import type { Handler, RequestContext } from '../env.ts';
@@ -26,6 +31,8 @@ export const DELETE_STATEMENT =
 export interface PageNotice {
   error?: string;
   status?: number;
+  /** GET /account?checkout=done: Creem sent the user back after paying (PAN-4294 WI-6). */
+  checkoutDone?: boolean;
 }
 
 /** Same rounding as the dashboard's relayTrafficText (AnywhereStatusCard.tsx): decimal GB, one decimal for used. */
@@ -47,17 +54,20 @@ function accessText(grant: GrantRow | null, now: number): string {
   return `Access: Expires on ${formatDate(grant.expires_at)}`;
 }
 
-function planSection(entitlement: Entitlement, grant: GrantRow | null, now: number): string {
+function planSection(entitlement: Entitlement, grant: GrantRow | null, now: number, billing: BillingState, billingConfigured: boolean): string {
+  const inviteOnly = billingConfigured ? '' : `\n<p class="muted">${escapeHtml(INVITE_ONLY_PAID_MESSAGE)}</p>`;
   return `<h2>Plan</h2>
-<p>${entitlement.plan === 'free' ? 'Free account' : 'Tester'}</p>
-<p>${escapeHtml(accessText(grant, now))}</p>
-<p class="muted">${escapeHtml(INVITE_ONLY_PAID_MESSAGE)}</p>`;
+<p>${escapeHtml(planLabel(entitlement))}</p>${paidPlanLines(billing)}
+<p>${escapeHtml(accessText(grant, now))}</p>${inviteOnly}`;
 }
 
 function relaySection(entitlement: Entitlement, view: DirectoryView | null, now: number): string {
   const extra = `<p class="muted">Extra traffic: ${escapeHtml(INVITE_ONLY_PAID_MESSAGE)}</p>`;
   if (view === null) return `<h2>Relay</h2>\n<p>${escapeHtml(DIRECTORY_UNAVAILABLE_MESSAGE)}</p>`;
-  if (entitlement.plan === 'free') return `<h2>Relay</h2>\n<p>${escapeHtml(RELAY_NOT_INCLUDED_MESSAGE)}</p>\n${extra}`;
+  if (!entitlement.relay) {
+    const message = entitlement.plan === 'anywhere' ? RELAY_NOT_IN_PLAN_MESSAGE : RELAY_NOT_INCLUDED_MESSAGE;
+    return `<h2>Relay</h2>\n<p>${escapeHtml(message)}</p>\n${extra}`;
+  }
   const reset = relayResetDate(now);
   const stopped = view.relay.stopped ? `\n<p class="warn">${escapeHtml(`Relay allowance used; it resets on ${reset}.`)}</p>` : '';
   return `<h2>Relay</h2>
@@ -113,14 +123,20 @@ export async function renderAccountPage(rc: RequestContext, session: UserSession
   const grant = await getGrant(rc, session.githubId);
   const billing = billingStateFor(await loadSubscriptions(rc, session.userId), now);
   const entitlement = entitlementFor(grant, billing, isOwner(rc, session.githubId));
+  const cfg = parseBillingConfig(rc.env);
+  const founding = cfg !== null && billing.paid === null ? await foundingAvailability(rc, cfg) : null;
   const view = await readDirectoryView(rc.env, session.userId);
   const error = notice.error ? `<p class="warn">${escapeHtml(notice.error)}</p>\n` : '';
+  const billingHtml =
+    cfg === null
+      ? `<h2>Billing</h2>\n<p>${escapeHtml(BILLING_MESSAGE)}</p>`
+      : billingSection({ entitlement, billing, founding, csrf: session.csrfToken, checkoutDone: notice.checkoutDone === true, now });
   const body = [
     identitySection(session),
-    error + planSection(entitlement, grant, now),
+    error + planSection(entitlement, grant, now, billing, cfg !== null),
     relaySection(entitlement, view, now),
     machinesSection(entitlement, view, session.csrfToken),
-    `<h2>Billing</h2>\n<p>${escapeHtml(BILLING_MESSAGE)}</p>`,
+    billingHtml,
     deleteSection(session.csrfToken),
   ].join('\n');
   return html(layout(ACCOUNT_TITLE, body), notice.status ?? 200);
@@ -130,5 +146,5 @@ export async function renderAccountPage(rc: RequestContext, session: UserSession
 export const page: Handler = async (req, rc) => {
   const user = await requireUserSession(req, rc);
   if (!user.ok) return user.response;
-  return renderAccountPage(rc, user.session);
+  return renderAccountPage(rc, user.session, { checkoutDone: new URL(req.url).searchParams.get('checkout') === 'done' });
 };
