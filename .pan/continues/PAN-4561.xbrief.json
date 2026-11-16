@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4561",
   "created": "2026-11-16T11:22:23.903Z",
-  "updated": "2026-11-16T11:49:10.635Z",
+  "updated": "2026-11-16T11:49:25.231Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,11 @@
     "compiler-on.ac4": {
       "status": "completed",
       "doneAt": "2026-11-16T11:49:10.635Z"
+    },
+    "compile-coverage": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4561",
+      "claimedAt": "2026-11-16T11:49:25.231Z"
     }
   }
 }
