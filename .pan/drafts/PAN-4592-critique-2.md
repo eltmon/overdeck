@@ -1,0 +1,9 @@
+plan-digest: 56e5ca7cd8639fba9a3e8abc10733ab0913ef604b7d60ce8d6992583500a4a05
+
+## blocks-the-design: Origin check does not verify the push destination
+
+The PRD requires `origin` to be the configured GitHub repository (D14, lines 185–186; WI-4, lines 482–484), but WI-4 accepts any URL ending in the repository slug. Re-running that rule for `github_repo: eltmon/overdeck` accepts both `git@evil.example:eltmon/overdeck.git` and `https://gitlab.com/eltmon/overdeck.git`. It also checks `git remote get-url origin`, while `git push origin` can use a different `remote.origin.pushurl`: `git -c remote.origin.pushurl=git@evil.example:eltmon/overdeck.git remote get-url origin` prints the GitHub URL, but the same command with `--push` prints the other host. The repository already has `repoFromRemoteUrl` in `packages/contracts/src/pull-request-ref.ts`, lines 70–84, for parsing a remote's host and repository, though its broad `host.includes('github')` rule needs an exact-host check here. As written, the command can push the generated commit outside the intended GitHub repository and then try to create a PR in the configured one. Validate the actual push URL (or URLs) and require the expected GitHub host and repository before any fetch or push.
+
+## blocks-the-design: An unrelated open PR counts as setup success
+
+FR-1 requires a PR into the selected base branch (PRD lines 61–64). WI-4 step 10 (lines 488–490) runs `gh pr list --head overdeck/semgrep-ci --state open --json url --limit 1` and returns success for the first URL without checking its base. A prior PR from that branch into another base branch would make `ci-setup` return success without adding a PR to the selected base. The local `gh pr list --help` confirms `--base` is a supported filter. Add `--base <base>` to the lookup, and verify that any returned PR belongs to the configured origin repository before treating it as success; otherwise leave the existing branch refusal in step 11 in force.

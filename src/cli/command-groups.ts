@@ -219,6 +219,11 @@ export const COMMAND_GROUPS = {
     load: () => import('./commands/integrate.js'),
     register: (mod, program) => mod.registerIntegrateCommands(program),
   }),
+  semgrep: group({
+    names: ['semgrep'],
+    load: () => import('./commands/semgrep.js'),
+    register: (mod, program) => mod.registerSemgrepCommands(program),
+  }),
 };
 
 export type CommandGroupKey = keyof typeof COMMAND_GROUPS;

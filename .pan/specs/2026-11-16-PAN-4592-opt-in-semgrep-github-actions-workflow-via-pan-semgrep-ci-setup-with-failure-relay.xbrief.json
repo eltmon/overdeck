@@ -1,0 +1,648 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-16T16:05:16Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4592: Opt-in Semgrep GitHub Actions workflow via pan semgrep ci-setup, with failure relay",
+    "updated": "2026-11-16T16:14:43.213Z"
+  },
+  "plan": {
+    "id": "pan-4592",
+    "title": "Opt-in Semgrep GitHub Actions workflow via pan semgrep ci-setup, with failure relay",
+    "status": "running",
+    "uid": "848e9331-a6d2-4598-a3f6-f621c3e6db09",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-16T16:05:16Z",
+    "updated": "2026-11-16T16:14:43.213Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4592",
+        "label": "PAN-4592",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4585",
+        "label": "PAN-4585 (parent)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "semgrep",
+      "sast",
+      "ci",
+      "github-actions",
+      "cli"
+    ],
+    "metadata": {
+      "sizeJustification": "20 files, but the finalize lint counts each top-level doc and manifest path (configuration/, cli/, docs/, changelog.d/, scripts/, packages/contracts/, sync-sources/skills/) as its own group, giving 10. The code is two areas, src/lib/semgrep (two new modules) and the CI relay (two files), plus the standard CLI registration set for a new verb. Splitting would separate a CLI verb from the skill, manifest and docs that lint:skills, lint:slash-commands and agent-text-cli-verbs require to ship with it.",
+      "canonicalFilename": "2026-11-16-PAN-4592-opt-in-semgrep-github-actions-workflow-via-pan-semgrep-ci-setup-with-failure-relay.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Overdeck's Semgrep support (PAN-4585, PAN-4590, PAN-4591) scans only on the local machine. A user cannot add a Semgrep GitHub Actions check to a project from Overdeck, and a red Semgrep CI job reaches the work agent only as a generic CI failure whose log excerpt is built for Vitest output.",
+      "Proposal": "Add 'pan semgrep ci-setup <project>' (plus the pan-semgrep skill), which renders a pinned, diff-aware Semgrep workflow carrying the project's gate mode in OVERDECK_SEMGREP_GATE and opens a PR from branch overdeck/semgrep-ci through a detached throwaway worktree, never touching the base branch. In blocking mode a PR that adds a finding fails the semgrep job; in advisory mode the job always concludes green and only warns, so no merge-verdict reader needs changing. Add isSemgrepCheckName, a Semgrep findings excerpt, and Semgrep fix/suppression guidance to the CI failure relay. Full detail: .pan/drafts/PAN-4592.md.",
+      "NonGoals": "- No change to ADVISORY_CHECK_NAMES, src/lib/advisory-checks.ts, or any merge-verdict reader (pr-facts.ts, github-app.ts, webhook-handlers.ts, derived-issue-state.ts, ready-set.ts, auto-merge-scheduler.ts, strike-review.ts)\n- CI does not follow later security.semgrep.gate or verification.sast changes; the operator edits OVERDECK_SEMGREP_GATE\n- No dashboard button, HTTP route or no-loss matrix row (#4594 owns dashboard Semgrep UI)\n- No Semgrep Platform tier, semgrep ci, or SEMGREP_APP_TOKEN (#4593)\n- No GitHub branch-protection change; ci-setup never marks semgrep required on GitHub\n- No update or removal of an existing .github/workflows/semgrep.yml\n- No GitLab CI support and no polyrepo sub-repositories\n- No change to the local sast gate or its config keys\n- No push to the base branch and no local branch created in the user's primary checkout"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Advisory vs required is rendered into the workflow (OVERDECK_SEMGREP_GATE) instead of adding 'semgrep' to ADVISORY_CHECK_NAMES",
+        "rationale": "ADVISORY_CHECK_NAMES is process-wide and the merge verdicts that matter ignore it: pr-facts summarizeStatusCheckRollup counts every row, and toChecksState feeds ready-set, the auto-merge scheduler and strike review; a per-project list would need every reader changed (two of them at the 1000-line ceiling). A green job is advisory to every reader by construction."
+      },
+      {
+        "summary": "Gate mapping: blocking stays blocking; advisory and off render as advisory; resolved once at ci-setup time",
+        "rationale": "An off gate must never fail CI; the operator edits one env line to change it later, and the local sast gate keeps following the config live."
+      },
+      {
+        "summary": "Advisory runs are not relayed to the work agent",
+        "rationale": "The job concludes green, matching the local sast gate where advisory findings are not rework."
+      },
+      {
+        "summary": "Pull requests are scanned diff-aware (--baseline-commit at the merge base); pushes are scanned only with --sarif-upload and never fail",
+        "rationale": "Whole-tree PR scans would fail every PR in blocking mode on repos with existing findings; a red main empties Overdeck's merge gate. Verified in semgrep/semgrep:1.180.0 against a scratch repo."
+      },
+      {
+        "summary": "Use --sarif-output=semgrep.sarif and keep the text report on stdout",
+        "rationale": "Verified in the container; the relay excerpt needs the human-readable report."
+      },
+      {
+        "summary": "SARIF upload to GitHub code scanning is opt-in via --sarif-upload",
+        "rationale": "Upload needs security-events: write and, on private repos, GitHub Advanced Security; least privilege by default."
+      },
+      {
+        "summary": "The generated commit and push use --no-verify from a detached throwaway worktree under OVERDECK_HOME/tmp, with OVERDECK_PAN_GIT_OP=1",
+        "rationale": "A fresh worktree has no installed dependencies, so repository hooks cannot run; precedents exist in uat-generation-deps.ts and planning-promotion.ts; OVERDECK_PAN_GIT_OP lets an agent run the command past its git guard; no local branch is created."
+      },
+      {
+        "summary": "ci-setup requires security.semgrep.enabled true, a GitHub single-repo project whose origin is github_repo, and never overwrites an existing workflow",
+        "rationale": "Parent FR-1 (one block turns the feature on); polyrepo, forks as origin, GitLab and workflow updates are outside the issue's scope."
+      },
+      {
+        "summary": "CLI and skill only; no dashboard button or HTTP route",
+        "rationale": "The issue scopes 'pan semgrep ci-setup <project> (plus skill wrapper)'; dashboard Semgrep UI belongs to #4594."
+      },
+      {
+        "summary": "The workflow pins semgrep/semgrep:<SEMGREP_VERSION> (1.180.0), actions/checkout@v4 and github/codeql-action/upload-sarif@v3",
+        "rationale": "Same engine as the local gate (parent NFR-5); tag verified on Docker Hub; checkout@v4 is what this repo's workflows use."
+      },
+      {
+        "summary": "CI carries security.semgrep.severity as --severity flags, scans Dependabot PRs, and makes the SARIF upload step non-fatal",
+        "rationale": "Plan critique round 1: keeps blocking CI at the local gate's threshold (verified in the container), avoids a silently unscanned PR class, and keeps advisory and push runs green when an upload fails."
+      }
+    ],
+    "items": [
+      {
+        "id": "semgrep-check-excerpt",
+        "title": "Add the Semgrep check matcher and findings-log excerpt to the check-run reader",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T16:05:16Z",
+        "metadata": {
+          "issueLabel": "pan-4592",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/cloister/ci-check-run-failures.ts",
+            "src/lib/cloister/__tests__/ci-check-run-failures.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/ci-check-run-failures.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ci-check-run-failures.test.ts passes including the Semgrep cases",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 in src/lib/cloister/ci-check-run-failures.ts: export isSemgrepCheckName (trimmed name matches /^semgrep(?![a-z0-9])/i) and extractSemgrepFindingsExcerpt(log, maxChars) beside extractTestFailureExcerpt (strip Actions timestamps the same way; start at the first /\\d+ Code Findings?/ line; end at the first later /^\\s*Ran \\d+ rules? on \\d+ files?/ line inclusive; over maxChars keep the head plus '\\n…\\n<Ran line>'; no start line gives the trimmed tail). In collectCheckRunFailures use the Semgrep extractor when isSemgrepCheckName(run.name). Add one header-comment sentence. Extend src/lib/cloister/__tests__/ci-check-run-failures.test.ts with the PRD cases and the D5 sample log."
+        },
+        "items": [
+          {
+            "id": "semgrep-check-excerpt.ac1",
+            "title": "isSemgrepCheckName returns true for 'semgrep', 'Semgrep OSS', 'semgrep / scan', 'semgrep (pr)' and ' SEMGREP ', and false for 'semgrepx', 'run-semgrep', 'test', '' and null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "semgrep-check-excerpt.ac2",
+            "title": "Given the PRD D5 sample log with Actions timestamps, extractSemgrepFindingsExcerpt returns text that starts with the '1 Code Finding' line and ends with 'Ran 1 rule on 1 file: 1 finding.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "semgrep-check-excerpt.ac3",
+            "title": "Given a findings block over 5000 characters, the excerpt is at most 2000 characters and still ends with the 'Ran' line; given a log with no 'Code Finding' line it returns the trimmed tail",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "semgrep-check-excerpt.ac4",
+            "title": "Given a failing GitHub Actions check run named 'semgrep' and the sample log, collectCheckRunFailures returns an excerpt equal to extractSemgrepFindingsExcerpt(log)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "relay-semgrep-guidance",
+        "title": "Add Semgrep fix and suppression instructions to CI failure feedback",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T16:05:16Z",
+        "metadata": {
+          "issueLabel": "pan-4592",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/cloister/ci-failure-feedback.ts",
+            "tests/unit/lib/cloister/ci-failure-feedback.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/ci-failure-feedback.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ci-failure-feedback.test.ts passes including the Semgrep cases",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2 in src/lib/cloister/ci-failure-feedback.ts: import isSemgrepCheckName from ./ci-check-run-failures.js, add the SEMGREP_FAILURE_GUIDANCE constant with the exact PRD text, append it in buildFeedbackBody after the excerpt of every failure whose name isSemgrepCheckName accepts, and add the PAN-4592 header bullet. The test-gate logic is unchanged. Extend tests/unit/lib/cloister/ci-failure-feedback.test.ts."
+        },
+        "items": [
+          {
+            "id": "relay-semgrep-guidance.ac1",
+            "title": "Given failing check runs 'semgrep' and 'lint', the written feedback body's '### semgrep' section contains 'nosemgrep: <rule-id> -- <reason>' and the '### lint' section does not contain 'nosemgrep'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-semgrep-guidance.ac2",
+            "title": "Given a failing check named 'Semgrep OSS', its feedback section contains the Semgrep guidance text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-semgrep-guidance.ac3",
+            "title": "Given a red CI test job in a verification.tests: ci project, relayCiFailureFeedback still returns testGateFailed true and its feedback body contains no Semgrep guidance",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-workflow-render",
+        "title": "Render the Semgrep GitHub Actions workflow with the gate mode and strict input validation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T16:05:16Z",
+        "metadata": {
+          "issueLabel": "pan-4592",
+          "inspectionDepth": "deep",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "ci-setup-core"
+          ],
+          "files_scope": [
+            "src/lib/semgrep/ci-workflow.ts",
+            "src/lib/semgrep/__tests__/ci-workflow.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npx vitest run src/lib/semgrep/__tests__/ci-workflow.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ci-workflow.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "acJustification": "Six criteria: the workflow text is the security-sensitive core of the feature, and each criterion pins one independently reviewable property (exact text, parsed structure, gate line, SARIF variant, severity mapping, validation)."
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3: new pure module src/lib/semgrep/ci-workflow.ts exporting SEMGREP_WORKFLOW_PATH, SemgrepCiGate (options include severity), validateCiConfigs, validateBaseBranch, ciGateForMode and renderSemgrepWorkflow, producing exactly the PRD WI-3 YAML (pinned semgrep/semgrep:<SEMGREP_VERSION>, pull_request trigger, no job-level if: (Dependabot PRs are scanned), contents: read, --severity flags from security.semgrep.severity per D17, job env OVERDECK_SEMGREP_GATE/SEMGREP_ENABLE_VERSION_CHECK/SEMGREP_SEND_METRICS/BASE_REF, fetch-depth 0, the D5-verified scan script). With sarifUpload: a push trigger on the base branch (JSON.stringify), security-events: write and actions: read, and the upload-sarif@v3 step with continue-on-error: true. Only the configs and the base branch are interpolated, after validation. Add src/lib/semgrep/__tests__/ci-workflow.test.ts."
+        },
+        "items": [
+          {
+            "id": "ci-workflow-render.ac1",
+            "title": "Given configs ['p/default', '.semgrep/'], base 'main', gate 'advisory', severity 'ERROR', no upload and version 1.180.0, renderSemgrepWorkflow returns text equal to the PRD WI-3 example",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-workflow-render.ac2",
+            "title": "Given the example options, the rendered YAML parses with container image 'semgrep/semgrep:1.180.0', permissions exactly { contents: 'read' }, only a pull_request trigger, no 'if' key on jobs.semgrep, and a run script that contains '--metrics off', '--error', '--sarif-output=semgrep.sarif', '--baseline-commit' and '--severity ERROR' and no '${{'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-workflow-render.ac3",
+            "title": "Given gate 'blocking', the rendered text differs from the advisory text only in the line 'OVERDECK_SEMGREP_GATE: blocking'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-workflow-render.ac4",
+            "title": "Given sarifUpload true, the rendered YAML has on.push.branches ['main'], permissions including 'security-events: write', and an upload step using 'github/codeql-action/upload-sarif@v3' with continue-on-error true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-workflow-render.ac6",
+            "title": "Given severity 'WARNING', both scan lines contain '--severity WARNING --severity ERROR'; given severity 'INFO', no line contains '--severity'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-workflow-render.ac5",
+            "title": "validateCiConfigs rejects 'auto', '/abs/rules.yml', '--config', 'p/default;rm -rf x', '../rules' and an empty list and accepts 'p/default', 'r/python.lang.security', '.semgrep/' and 'rules/custom.yml'; validateBaseBranch rejects 'main;x' and '$(x)' and accepts 'release/1.2'; ciGateForMode maps off and advisory to 'advisory'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-setup-core",
+        "title": "Open the Semgrep workflow pull request from a detached throwaway worktree",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T16:05:16Z",
+        "metadata": {
+          "issueLabel": "pan-4592",
+          "inspectionDepth": "fast",
+          "difficulty": "complex",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/semgrep/ci-setup.ts",
+            "src/lib/semgrep/__tests__/ci-setup.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npx vitest run src/lib/semgrep/__tests__/ci-setup.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ci-setup.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-6",
+            "NFR-1"
+          ],
+          "parallelSafeReason": "It touches only two new files (src/lib/semgrep/ci-setup.ts and its test) that no other item edits; it depends on ci-workflow-render only through the DAG edge."
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4: new src/lib/semgrep/ci-setup.ts exporting SEMGREP_SETUP_BRANCH ('overdeck/semgrep-ci') and runSemgrepCiSetup(opts, deps), following PRD steps 1-14 exactly: refusals (Semgrep off, unknown project, no github_repo, polyrepo, invalid configs or base, origin URL not naming github_repo, existing workflow file, leftover remote branch), gate from resolveSastGateMode via ciGateForMode, severity from security.semgrep.severity, the open-PR short-circuit, --dry-run running no git or gh command, a detached worktree under <OVERDECK_HOME>/tmp/semgrep-ci-setup, commit and push with --no-verify to HEAD:refs/heads/overdeck/semgrep-ci, the D10 workflow-scope message, gh pr create, and worktree removal in finally. The default run is promisified execFile with timeouts and env OVERDECK_PAN_GIT_OP=1. Add src/lib/semgrep/__tests__/ci-setup.test.ts."
+        },
+        "items": [
+          {
+            "id": "ci-setup-core.ac1",
+            "title": "Given each FR-5 refusal condition (including origin 'git@github.com:someone/fork.git' for github_repo 'eltmon/overdeck'), runSemgrepCiSetup returns ok false with the PRD message and the fake run records no 'push' and no 'pr create' call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-setup-core.ac2",
+            "title": "Given dryRun true, runSemgrepCiSetup returns ok true with dryRun true, the fake run records zero calls, and the logged text contains 'image: semgrep/semgrep:1.180.0' and 'OVERDECK_SEMGREP_GATE: advisory' (or 'blocking' when the project sets verification.sast: blocking)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-setup-core.ac3",
+            "title": "Given a successful run, the recorded push argv is exactly ['push', '--no-verify', 'origin', 'HEAD:refs/heads/overdeck/semgrep-ci'], no recorded argv contains 'refs/heads/<base>', and prUrl equals the URL the fake gh pr create printed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-setup-core.ac4",
+            "title": "Given a push that fails with stderr 'refusing to allow an OAuth App to create or update workflow', runSemgrepCiSetup returns ok false with a message containing 'gh auth refresh -s workflow' and the fake run still records 'worktree remove'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-setup-core.ac5",
+            "title": "Given gh pr list returns an open PR URL, runSemgrepCiSetup returns ok true with existing true and records no 'worktree add'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-semgrep-command",
+        "title": "Register the pan semgrep ci-setup CLI command",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T16:05:16Z",
+        "metadata": {
+          "issueLabel": "pan-4592",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/semgrep.ts",
+            "src/cli/command-groups.ts",
+            "src/cli/index.ts",
+            "scripts/slash-commands-curation.json",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "tests/unit/cli/semgrep-command.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/semgrep-command.test.ts",
+            "npm run build:cli",
+            "node dist/cli/index.js semgrep ci-setup --help",
+            "npm run lint:slash-commands",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "semgrep-command.test.ts passes",
+            "--help output lists --sarif-upload and --dry-run",
+            "composer-command manifest matches the CLI registry",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5: new src/cli/commands/semgrep.ts with registerSemgrepCommands (group 'semgrep', subcommand 'ci-setup <project>' with --sarif-upload and --dry-run; the action lazily imports runSemgrepCiSetup, prints 'Pull request: <url>', and on ok false prints the message to stderr and calls exitCli(1)); add the semgrep group to src/cli/command-groups.ts; add 'await groups.register(\\'semgrep\\');' after the integrate registration in src/cli/index.ts; add \"semgrep\": \"Core\" to scripts/slash-commands-curation.json; run npm run build:cli && npm run generate:slash-commands and commit the regenerated packages/contracts/src/composer-commands.generated.ts. Add tests/unit/cli/semgrep-command.test.ts (template tests/unit/cli/integrate-command.test.ts)."
+        },
+        "items": [
+          {
+            "id": "cli-semgrep-command.ac1",
+            "title": "node dist/cli/index.js semgrep ci-setup --help prints a usage line naming '<project>' and lists --sarif-upload and --dry-run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-semgrep-command.ac2",
+            "title": "Given 'semgrep ci-setup myapp --dry-run --sarif-upload', the command calls runSemgrepCiSetup with { projectKey: 'myapp', dryRun: true, sarifUpload: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-semgrep-command.ac3",
+            "title": "Given runSemgrepCiSetup returns ok false, the command writes the message to stderr and exits with code 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-semgrep-command.ac4",
+            "title": "npm run lint:slash-commands exits 0, and the regenerated manifest contains an entry with path ['semgrep', 'ci-setup']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-semgrep-skill",
+        "title": "Add the pan-semgrep wrapper skill and list the verb in the umbrella pan skill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T16:05:16Z",
+        "metadata": {
+          "issueLabel": "pan-4592",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "sync-sources/skills/pan-semgrep/SKILL.md",
+            "sync-sources/skills/pan/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run build:cli",
+            "npm run lint:skills",
+            "npx vitest run src/lib/__tests__/agent-text-cli-verbs.test.ts"
+          ],
+          "expected_outputs": [
+            "lint:skills passes",
+            "agent-text-cli-verbs.test.ts passes"
+          ],
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6: new sync-sources/skills/pan-semgrep/SKILL.md in CLI-wrapper shape (template sync-sources/skills/pan-kill/SKILL.md, rules docs/SKILLS-CONVENTION.md) with the PRD frontmatter and sections, naming only --sarif-upload and --dry-run; add the line '  pan semgrep ci-setup <p>    Semgrep GitHub Actions workflow PR' after the pan integrate file-manager line in the SYSTEM / DAEMON block of sync-sources/skills/pan/SKILL.md."
+        },
+        "items": [
+          {
+            "id": "pan-semgrep-skill.ac1",
+            "title": "Given npm run build:cli has run, sync-sources/skills/pan-semgrep/SKILL.md exists and contains frontmatter name 'pan-semgrep' and a description starting with 'pan semgrep ci-setup <project>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-semgrep-skill.ac2",
+            "title": "The skill states that the command needs security.semgrep.enabled true, supports GitHub single-repo projects only, explains the OVERDECK_SEMGREP_GATE line, and shows the 'gh auth refresh -s workflow' fix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-semgrep-skill.ac3",
+            "title": "sync-sources/skills/pan/SKILL.md lists 'pan semgrep ci-setup' in its SYSTEM / DAEMON block, and npm run lint:skills exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-semgrep-ci",
+        "title": "Document the Semgrep CI workflow and its failure relay",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T16:05:16Z",
+        "metadata": {
+          "issueLabel": "pan-4592",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "configuration/semgrep.mdx",
+            "docs/PIPELINE-GATES.md",
+            "cli/core-commands.mdx",
+            "changelog.d/pan-4592.md"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run lint:docs",
+            "npx vitest run src/lib/__tests__/agent-text-cli-verbs.test.ts"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "agent-text-cli-verbs.test.ts passes"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-7: update configuration/semgrep.mdx (drop 'CI (#4592), ' from the planned list and add the ci-setup sentence; add a '## CI workflow' section after '## Verification gate' with the command, flags, refusals, what the workflow runs, the gate table, the OVERDECK_SEMGREP_GATE line, the static-mode note, the shared severity threshold and Dependabot scanning, the blocking-mode scanner-error note, --sarif-upload and code scanning's own check, D8 and D10; add the Data egress row), docs/PIPELINE-GATES.md (the 'Semgrep checks (PAN-4592)' bullet and the 'CI check (PAN-4592)' paragraph), cli/core-commands.mdx (a '## pan semgrep ci-setup' section after '## pan doctor'), and add changelog.d/pan-4592.md with the PRD's '#### New' entry."
+        },
+        "items": [
+          {
+            "id": "docs-semgrep-ci.ac1",
+            "title": "configuration/semgrep.mdx contains a '## CI workflow' section that shows 'pan semgrep ci-setup', a table mapping blocking to a failing check and advisory/off to warnings only, and the OVERDECK_SEMGREP_GATE line; it no longer lists 'CI (#4592)' as planned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-semgrep-ci.ac2",
+            "title": "configuration/semgrep.mdx's Data egress table contains a row for the CI workflow (GitHub Actions)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-semgrep-ci.ac3",
+            "title": "docs/PIPELINE-GATES.md contains 'Semgrep checks (PAN-4592)' in the CI failure feedback list and a 'CI check (PAN-4592)' paragraph stating that ADVISORY_CHECK_NAMES is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-semgrep-ci.ac4",
+            "title": "cli/core-commands.mdx contains a '## pan semgrep ci-setup' heading after '## pan doctor', and changelog.d/pan-4592.md contains a '#### New' heading with one bullet linking issue #4592",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-semgrep-ci.ac5",
+            "title": "npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "semgrep-check-excerpt",
+        "to": "relay-semgrep-guidance",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-workflow-render",
+        "to": "ci-setup-core",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-setup-core",
+        "to": "cli-semgrep-command",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-semgrep-command",
+        "to": "pan-semgrep-skill",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-semgrep-command",
+        "to": "docs-semgrep-ci",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

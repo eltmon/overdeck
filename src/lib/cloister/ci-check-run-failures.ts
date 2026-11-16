@@ -8,6 +8,7 @@
  * failing shard is visible at once. For each failing GitHub Actions job the
  * job log is fetched (retried with bounded backoff while GitHub has not
  * published it yet) and the Vitest failure section is extracted from it.
+ * A Semgrep check (PAN-4592) gets its findings block instead.
  * See docs/PIPELINE-GATES.md, "CI failure feedback".
  */
 import { execFile } from 'node:child_process';
@@ -95,16 +96,39 @@ export function withoutAggregateChecks<T extends { name: string; log?: string }>
  * tail, where a failing step's error is.
  */
 export function extractTestFailureExcerpt(log: string, maxChars = EXCERPT_MAX_CHARS): string {
+  return extractLogSection(log, /(^|\s)FAIL\s/, /Test Files\s.*\bfailed\b/, maxChars);
+}
+
+/**
+ * From the first line matching `start` through the first later line matching
+ * `end` (inclusive), at most `maxChars` with the `end` line kept. No `start`
+ * line gives the log's tail.
+ */
+function extractLogSection(log: string, start: RegExp, end: RegExp, maxChars: number): string {
   // Actions prefixes every line with an ISO timestamp.
   const lines = log.split(/\r?\n/).map((line) => line.replace(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z ?/, ''));
-  const first = lines.findIndex((line) => /(^|\s)FAIL\s/.test(line));
+  const first = lines.findIndex((line) => start.test(line));
   if (first < 0) return lines.join('\n').trim().slice(-maxChars).trim();
-  const summary = lines.findIndex((line, index) => index > first && /Test Files\s.*\bfailed\b/.test(line));
+  const summary = lines.findIndex((line, index) => index > first && end.test(line));
   const section = lines.slice(first, summary >= 0 ? summary + 1 : undefined).join('\n').trim();
   if (section.length <= maxChars) return section;
   const summaryLine = summary >= 0 ? lines[summary]!.trim() : '';
   const head = section.slice(0, maxChars - summaryLine.length - 6).trimEnd();
   return summaryLine ? `${head}\n…\n${summaryLine}` : head;
+}
+
+/** PAN-4592: `semgrep`, `Semgrep OSS`, `semgrep / scan`, `semgrep (pr)`; not `semgrepx` or `run-semgrep`. */
+export function isSemgrepCheckName(name: string | null | undefined): boolean {
+  return typeof name === 'string' && /^semgrep(?![a-z0-9])/i.test(name.trim());
+}
+
+/**
+ * PAN-4592: the part of a Semgrep job log that names the findings: from the
+ * `N Code Finding(s)` box line through the `Ran N rule(s) on M file(s)` line,
+ * at most ~2000 characters with the `Ran` line kept. A log with neither gives its tail.
+ */
+export function extractSemgrepFindingsExcerpt(log: string, maxChars = EXCERPT_MAX_CHARS): string {
+  return extractLogSection(log, /\d+ Code Findings?/, /^\s*Ran \d+ rules? on \d+ files?/, maxChars);
 }
 
 /** A job's log, retried while GitHub has not published it; '' when it never appears. */
@@ -144,7 +168,7 @@ export async function collectCheckRunFailures(owner: string, repo: string, headS
       name: run.name,
       ...(isActionsJob ? { jobId: run.id } : {}),
       ...(run.details_url || run.html_url ? { url: (run.details_url || run.html_url)! } : {}),
-      excerpt: log ? extractTestFailureExcerpt(log) : '',
+      excerpt: log ? (isSemgrepCheckName(run.name) ? extractSemgrepFindingsExcerpt(log) : extractTestFailureExcerpt(log)) : '',
       ...(log ? { log } : {}),
     });
   }

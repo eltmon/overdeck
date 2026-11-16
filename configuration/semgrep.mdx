@@ -13,9 +13,10 @@ analysis (SAST) scanner. It is **off by default**.
 Turning the feature on makes Overdeck install a pinned Semgrep binary and report its health in
 `pan doctor`. It also adds in-session tools (#4591): a `semgrep` MCP server, a post-edit scan
 hook, and a `semgrep` skill. The verification gate runs a `sast` scan of each branch, and its
-findings go to the security review lane (#4590). A Codex edit hook (#5434), CI (#4592), a
-Platform/Guardian tier (#4593), and dashboard controls (#4594) are planned but not part of this
-release.
+findings go to the security review lane (#4590). `pan semgrep ci-setup` opens a pull request
+that adds a Semgrep GitHub Actions workflow (see [CI workflow](#ci-workflow) below). A Codex edit
+hook (#5434), a Platform/Guardian tier (#4593), and dashboard controls (#4594) are planned but
+not part of this release.
 
 ## Turn it on
 
@@ -139,6 +140,74 @@ works, for example `quality_gates.semgrep: { command: "semgrep scan --config p/d
 Do not name it `sast`, which is the built-in check's name.
 That gate blocks on any finding in the whole tree, and it is not diff-scoped.
 
+## CI workflow
+
+`pan semgrep ci-setup <project>` opens a pull request that adds `.github/workflows/semgrep.yml`
+to the project's GitHub repository. Overdeck never rewrites the file; delete it to stop CI scans.
+
+```bash
+pan semgrep ci-setup myapp --dry-run       # print the target and the workflow; change nothing
+pan semgrep ci-setup myapp                 # open the pull request
+pan semgrep ci-setup myapp --sarif-upload  # also upload results to GitHub code scanning
+```
+
+The command commits in a throwaway worktree under `~/.overdeck/tmp/semgrep-ci-setup/`, pushes
+the branch `overdeck/semgrep-ci`, and opens the pull request into the base branch
+(`workspace.pr_target`, then `workspace.default_branch`, then `origin/HEAD`, then `main`). It
+never pushes to the base branch and never touches the project's checkout. If a pull request from
+`overdeck/semgrep-ci` is already open, it prints that URL and changes nothing.
+
+It refuses, with exit code 1 and a one-line reason, when:
+
+- `security.semgrep.enabled` is false;
+- the project is unknown, has no `github_repo`, or is polyrepo (`workspace.repos` is set);
+- `origin` is not the project's `github_repo` (a fork, for example);
+- a `configs` entry is `auto`, an absolute path, contains a `..` segment, or has a character
+  outside `A-Z a-z 0-9 . _ / @ : + -`;
+- the base branch name has a character outside `A-Z a-z 0-9 . _ / -`;
+- the base branch already has `.github/workflows/semgrep.yml`;
+- the branch `overdeck/semgrep-ci` exists on `origin` with no open pull request.
+
+### What the workflow runs
+
+One job, named `semgrep`, so GitHub names its check `semgrep`. It runs `semgrep scan` in the
+pinned `semgrep/semgrep:1.180.0` image with one `--config` per `configs` entry, `--metrics off`
+and `--sarif-output=semgrep.sarif`, with `contents: read` permission and no Semgrep account or
+token. A pull request is scanned diff-aware (`--baseline-commit` at the merge base), so only
+findings on code the pull request adds are reported. CI uses the same `severity` threshold as the
+local gate (`ERROR` scans with `--severity ERROR`, `WARNING` adds `--severity WARNING`, `INFO`
+passes no flag). Dependabot pull requests are scanned too.
+
+The job's `OVERDECK_SEMGREP_GATE` line holds the gate mode, read once from the project's
+`verification.sast` or from `security.semgrep.gate`:
+
+```yaml
+    env:
+      OVERDECK_SEMGREP_GATE: advisory
+```
+
+| Gate mode | The `semgrep` check |
+| --- | --- |
+| `blocking` | A pull request that adds a finding fails the `semgrep` check; the work agent gets the findings with fix and suppression instructions |
+| `advisory` or `off` | The check never fails; findings appear as warnings in the job log |
+
+The workflow does not follow later config changes. To change the gate, edit the
+`OVERDECK_SEMGREP_GATE` line to `blocking` or `advisory`. In blocking mode a scanner error (for
+example an unreachable registry) also fails the pull request check, unlike the local `sast` gate,
+which skips on a scanner error.
+
+`--sarif-upload` adds a trigger on pushes to the base branch, an `upload-sarif` step, and the
+`security-events: write` and `actions: read` permissions. A push run scans the whole tree and
+never fails the job, and a failed upload never fails it either. GitHub code scanning may then add
+its own check, governed by the repository's code-scanning settings, not by
+`OVERDECK_SEMGREP_GATE`.
+
+The generated commit and push skip repository hooks (`--no-verify`): the throwaway worktree has
+no installed dependencies, and the pull request's CI and review gate the one generated file.
+Pushing a file under `.github/workflows/` needs a credential with the `workflow` scope. When
+GitHub refuses the push for that reason, run `gh auth refresh -s workflow` (HTTPS remotes) or
+push over SSH, then run the command again.
+
 ## Harness support
 
 | Harness | MCP server | Edit hook |
@@ -157,6 +226,7 @@ That gate blocks on any finding in the whole tree, and it is not diff-scoped.
 | MCP `semgrep_rule_schema` | `semgrep.dev` | No |
 | Post-edit scan | `semgrep.dev` (registry download of `p/default`) | No |
 | Verification `sast` scan | `semgrep.dev` (registry download of each registry id in `configs`) | No |
+| CI workflow (GitHub Actions) | semgrep.dev (registry download) from GitHub's runner; GitHub code scanning with --sarif-upload | Code stays on GitHub's runner; with --sarif-upload, findings go to GitHub code scanning |
 | Version check / metrics | Disabled (`SEMGREP_ENABLE_VERSION_CHECK=0`, `SEMGREP_SEND_METRICS=off`) | n/a |
 | Semgrep Platform / Guardian | Not available in this release | — |
 
