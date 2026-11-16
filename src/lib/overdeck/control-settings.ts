@@ -1,6 +1,7 @@
 import { Context, Effect, Layer, Schema } from 'effect';
 
 import { getOverdeckDatabase } from './infra.js';
+import { isShutdownDrainingSync } from '../shutdown/drain-record.js';
 import { IssueId } from './issues.js';
 import type { ProjectConfig as RawProjectConfig } from '../projects.js';
 import { getProjectSync, loadProjectsConfigSync } from '../projects.js';
@@ -124,7 +125,6 @@ const FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY = 'flywheel.auto_pickup_backlog';
 const FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY = 'flywheel.require_uat_before_merge';
 export const FLYWHEEL_MERGE_TRAIN_ENABLED_KEY = 'flywheel.merge_train_enabled';
 const MERGE_TRAIN_ENABLED_KEY = 'merge_train.enabled';
-export const DASHBOARD_LAST_CLEAN_SHUTDOWN_AT_KEY = 'dashboard.last_clean_shutdown_at';
 
 /** Read a raw app_settings value synchronously. Returns null if not set. */
 export function getSetting(key: string): string | null {
@@ -143,14 +143,11 @@ export function setSetting(key: string, value: string): void {
   ).run(key, value, now);
 }
 
-export function setLastCleanShutdownAt(iso: string): void {
-  setSetting(DASHBOARD_LAST_CLEAN_SHUTDOWN_AT_KEY, iso);
-}
-
 /** Synchronous check of the global Deacon pause flag; a failed read logs and reports not paused. */
 export function isDeaconGloballyPaused(): boolean {
   try {
-    return getSetting(DEACON_GLOBAL_PAUSE_KEY) === 'true';
+    // PAN-5342: a shutdown drain freezes every patrol and stores nothing here.
+    return isShutdownDrainingSync() || getSetting(DEACON_GLOBAL_PAUSE_KEY) === 'true';
   } catch (err) {
     console.warn('[control-settings] Failed to read deacon pause flag:', err);
     return false;

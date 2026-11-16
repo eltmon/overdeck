@@ -1,17 +1,12 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { Effect } from 'effect';
 
 import { closeOverdeckDatabase } from '../../../../src/lib/overdeck/infra.js';
-import { ConfigResolver, ConfigResolverLive, setLastCleanShutdownAt, DASHBOARD_LAST_CLEAN_SHUTDOWN_AT_KEY, getSetting } from '../../../../src/lib/overdeck/control-settings.js';
+import { ConfigResolver, ConfigResolverLive, isDeaconGloballyPaused, setDeaconGloballyPaused } from '../../../../src/lib/overdeck/control-settings.js';
 import type { IssueId } from '../../../../src/lib/overdeck/issues.js';
-
-// Moved here from src/lib/overdeck/control-settings.ts, which no production code called (PAN-3958 CH-8).
-function getLastCleanShutdownAt(): string | null {
-  return getSetting(DASHBOARD_LAST_CLEAN_SHUTDOWN_AT_KEY);
-}
 
 // ── Test helpers ─────────────────────────────────────────────────────────────
 
@@ -25,17 +20,18 @@ function makeIssueId(s: string) {
 // ── AC2: SettingsWriter persists to app_settings, no Records ─────────────────
 
 
-describe('clean shutdown marker', () => {
-  it('round-trips the marker through the synchronous settings door', () => {
+describe('isDeaconGloballyPaused (PAN-5342)', () => {
+  it('reports paused while the shutdown record exists, even with the flag false', () => {
     const previousHome = process.env.OVERDECK_HOME;
-    const testHome = mkdtempSync(join(tmpdir(), 'pan-3184-control-settings-'));
-    const marker = '2026-07-27T05:00:00.000Z';
+    const testHome = mkdtempSync(join(tmpdir(), 'pan-5342-control-settings-'));
     closeOverdeckDatabase();
     process.env.OVERDECK_HOME = testHome;
 
     try {
-      setLastCleanShutdownAt(marker);
-      expect(getLastCleanShutdownAt()).toBe(marker);
+      setDeaconGloballyPaused(false);
+      expect(isDeaconGloballyPaused()).toBe(false);
+      writeFileSync(join(testHome, 'shutdown.json'), '{}');
+      expect(isDeaconGloballyPaused()).toBe(true);
     } finally {
       closeOverdeckDatabase();
       if (previousHome === undefined) delete process.env.OVERDECK_HOME;

@@ -1,5 +1,6 @@
 import { isNoResumeValueEnabled } from '../boot-no-resume.js';
 import { isPeerDashboardProcess } from '../boot-gates.js';
+import { isShutdownDrainingSync } from '../shutdown/drain-record.js';
 import { spawnSequencerAgent } from './sequencer-agent.js';
 
 /**
@@ -16,6 +17,10 @@ function autonomousSpawnSuppressed(mode: 'incremental' | 'review'): boolean {
   // still respects it.
   if (isPeerDashboardProcess()) {
     console.warn(`[backlog-auto-trigger] suppressed ${mode} sequencer pass: peer dashboard spawns nothing`);
+    return true;
+  }
+  if (isShutdownDrainingSync()) {
+    console.warn(`[backlog-auto-trigger] suppressed ${mode} sequencer pass: shutdown in progress`);
     return true;
   }
   if (!isNoResumeValueEnabled(process.env.OVERDECK_NO_RESUME)) return false;
