@@ -224,6 +224,11 @@ export const COMMAND_GROUPS = {
     load: () => import('./commands/semgrep.js'),
     register: (mod, program) => mod.registerSemgrepCommands(program),
   }),
+  computer: group({
+    names: ['computer'],
+    load: () => import('./commands/computer.js'),
+    register: (mod, program) => mod.registerComputerCommands(program),
+  }),
 };
 
 export type CommandGroupKey = keyof typeof COMMAND_GROUPS;

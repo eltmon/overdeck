@@ -277,6 +277,8 @@ program
 await groups.register('integrate');
 // pan semgrep ci-setup — Semgrep GitHub Actions workflow (PAN-4592)
 await groups.register('semgrep');
+// pan computer — desktop computer use (PAN-5452)
+await groups.register('computer');
 
 await groups.register('review');
 

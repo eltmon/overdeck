@@ -69,6 +69,7 @@ SYSTEM / DAEMON
   pan doctor                  System health check
   pan integrate file-manager  Right-click "Open in Overdeck"
   pan semgrep ci-setup <p>    Semgrep GitHub Actions workflow PR
+  pan computer <sub>          Read and operate local desktop apps (opt-in)
 
 ADMIN (PLUMBING)
   pan admin cloister <cmd>    Lifecycle watchdog
