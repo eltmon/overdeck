@@ -16,6 +16,7 @@
     "doctor": "Core",
     "install": "Core",
     "integrate": "Core",
+    "semgrep": "Core",
     "skills": "Core",
     "test": "Core",
     "dev": "Core",

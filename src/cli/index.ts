@@ -275,6 +275,8 @@ program
 
 // pan integrate file-manager — right-click "Open in Overdeck" (PAN-5349)
 await groups.register('integrate');
+// pan semgrep ci-setup — Semgrep GitHub Actions workflow (PAN-4592)
+await groups.register('semgrep');
 
 await groups.register('review');
 
