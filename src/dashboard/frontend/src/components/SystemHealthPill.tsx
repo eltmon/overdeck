@@ -34,6 +34,7 @@ import {
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { useDashboardStore } from '../lib/store';
 import { useConfirm } from './DialogProvider';
+import { SHUTDOWN_OPEN_EVENT } from './ShutdownDialog';
 
 const POPOVER_ID = 'system-health-popover';
 const POPOVER_TITLE_ID = 'system-health-popover-title';
@@ -277,6 +278,15 @@ export function SystemHealthPill({ compact = false, children }: { compact?: bool
     setOpen(false);
     if (restoreFocus) requestAnimationFrame(() => triggerRef.current?.focus());
   }, []);
+
+  // PAN-5342: the shutdown dialog opens from System controls; close the popover
+  // (z-[200]) so it does not sit on top of the dialog's scrim.
+  useEffect(() => {
+    if (!open) return;
+    const onShutdownOpen = () => closePopover(false);
+    window.addEventListener(SHUTDOWN_OPEN_EVENT, onShutdownOpen);
+    return () => window.removeEventListener(SHUTDOWN_OPEN_EVENT, onShutdownOpen);
+  }, [open, closePopover]);
 
   const openAttentionIssue = useCallback((issueId: string) => {
     useDashboardStore.getState().openIssue(issueId);

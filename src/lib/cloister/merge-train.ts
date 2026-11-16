@@ -12,6 +12,7 @@
  * agent-spawn machinery.
  */
 import { isMergeTrainEnabledForProject } from '../overdeck/merge-sync.js';
+import { isShutdownDrainingSync } from '../shutdown/drain-record.js';
 import { getProjectSync, resolveProjectFromIssueSync, type ProjectConfig } from '../projects.js';
 import { reconcileStaleSiblings, type ReconcileDeps, type SiblingOutcome } from './merge-train-reconciler.js';
 
@@ -31,6 +32,7 @@ export async function runMergeTrainReconcile(
   mergedIssueId: string,
   opts: RunMergeTrainOptions = {},
 ): Promise<SiblingOutcome[]> {
+  if (isShutdownDrainingSync()) return []; // PAN-5342: no train work while draining
   const enabledCheck = opts.enabled ?? (() => {
     const resolved = resolveProjectFromIssueSync(mergedIssueId);
     // Fail closed: if project resolution fails, return false (don't mutate git).

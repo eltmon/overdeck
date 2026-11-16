@@ -112,6 +112,14 @@ describe('auto-merge executor', () => {
     }
   });
 
+  it('does nothing while a shutdown drains (PAN-5342)', async () => {
+    const listEntries = vi.fn(() => [pendingEntry()]);
+
+    await tickAutoMergeExecutor({ now: () => NOW, isDraining: () => true, listEntries });
+
+    expect(listEntries).not.toHaveBeenCalled();
+  });
+
   it('skips future-scheduled pending entries', async () => {
     const transition = vi.fn();
     const mergeIssue = vi.fn();

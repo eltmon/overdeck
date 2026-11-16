@@ -1,7 +1,7 @@
 /**
  * Command definitions for the dashboard lifecycle verbs: `pan up`,
- * `pan reload` and `pan restart` (plus `pan restart approve`, `hold` and
- * `release`).
+ * `pan reload`, `pan restart` (plus `pan restart approve`, `hold` and
+ * `release`) and `pan shutdown`.
  *
  * None of these verbs takes a positional argument. Commander 12 accepts
  * excess arguments by default, so `pan restart status` used to fall through
@@ -9,7 +9,7 @@
  * unknown positionals before its action runs.
  */
 
-import type { Command } from 'commander';
+import { Option, type Command } from 'commander';
 import { lazyAction } from '../lazy-action.js';
 
 /** Defines `pan up` without its action; the caller attaches the action. */
@@ -28,7 +28,7 @@ export function defineUpCommand(program: Command): Command {
     .option('--seed-from-legacy', 'Seed a fresh local database from the legacy database (copy conversations + reconstruct in-flight agents/issues). Default is an empty local database.');
 }
 
-/** Registers `pan reload`, `pan restart` and its `approve`, `hold` and `release` subcommands. */
+/** Registers `pan reload`, `pan restart` and its `approve`, `hold` and `release` subcommands, and `pan shutdown`. */
 export function registerReloadAndRestartCommands(program: Command): void {
   program
     .command('reload')
@@ -94,4 +94,24 @@ export function registerReloadAndRestartCommands(program: Command): void {
     .action(async () => {
       await (await import('./restart-hold.js')).restartReleaseCommand();
     });
+
+  registerShutdownCommand(program);
+}
+
+/**
+ * Registers `pan shutdown` (PAN-5342). `--finish` is the detached final stage
+ * the drain starts once every session has stopped; it is hidden from help.
+ */
+export function registerShutdownCommand(program: Command): void {
+  program.command('shutdown')
+    .description('Drain Overdeck safely: let each agent finish its current tool call, stop everything, then report safe to reboot')
+    .allowExcessArguments(false)
+    .option('--deadline <seconds>', 'Seconds before stragglers are listed (default 120, 10–3600)')
+    .option('--reboot', 'Reboot the machine when the drain completes (Linux)')
+    .option('--force', 'At the deadline, stop stragglers mid-tool (on a running drain: stop them now)')
+    .option('--cancel', 'Cancel a running drain; stopped sessions are offered for resume')
+    .option('--status', 'Print the current drain and exit')
+    .option('--no-wait', 'Start the drain and exit without following it')
+    .addOption(new Option('--finish').hideHelp())
+    .action(lazyAction(() => import('./shutdown.js'), 'shutdownCommand'));
 }

@@ -12,6 +12,7 @@ import {
 } from '../../../lib/overdeck/merge-sync.js';
 import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
 import { isPeerDashboardProcess } from '../../../lib/boot-gates.js';
+import { isShutdownDrainingSync } from '../../../lib/shutdown/drain-record.js';
 import { evaluateIssueMergeGate } from '../../../lib/cloister/merge-gate.js';
 import { deftAutoMergeHold } from '../../../lib/deft/policy.js';
 import type { MergeReadiness, PrFacts } from '../../../lib/cloister/pr-facts.js';
@@ -62,6 +63,8 @@ interface MergeResult {
 
 export interface AutoMergeExecutorDeps {
   now?: () => Date;
+  /** PAN-5342: true while `pan shutdown` drains; the tick then does nothing. */
+  isDraining?: () => boolean;
   listEntries?: () => PendingAutoMerge[];
   /** A strike row passes `preferBranch: strike/<id>` (PAN-4753 WI-6). */
   isEligible?: (issueId: string, options?: { preferBranch?: string }) => Promise<AutoMergeEligibility>;
@@ -181,6 +184,7 @@ function defaultAnnounceFailure(issueId: string, reason: string): void {
 }
 
 export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): Promise<void> {
+  if ((deps.isDraining ?? isShutdownDrainingSync)()) return; // PAN-5342
   const now = deps.now ?? (() => new Date());
   const nowDate = now();
   const entries = deps.listEntries

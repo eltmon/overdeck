@@ -441,7 +441,9 @@ describe('useDecisions disk alert integration (PAN-5093)', () => {
 describe('backendRestartDecisions (PAN-5091)', () => {
   const offer = (overrides: Partial<BackendRestartRecoverySnapshot> = {}): BackendRestartRecoverySnapshot => ({
     lostAt: '2026-11-06T09:13:00.000Z',
+    cause: 'backend-restart',
     conversations: [{ name: 'a', title: 'Fernkite deploy' }, { name: 'b', title: null }],
+    agents: [],
     run: null,
     ...overrides,
   });
@@ -464,7 +466,16 @@ describe('backendRestartDecisions (PAN-5091)', () => {
     });
     expect(backendRestartDecisions(offer({ conversations: [{ name: 'a', title: null }] }))[0]!.label)
       .toBe('1 conversation stopped when the terminal backend restarted');
-    expect(describePendingInput(['backendRestart'])).toBe('Stopped by a terminal-backend restart');
+    expect(describePendingInput(['backendRestart'])).toBe('Stopped by a restart or shutdown');
+  });
+
+  it('after a shutdown counts conversations and agents as the sessions shutdown stopped (PAN-5342)', () => {
+    const agents = [{ id: 'agent-pan-7', issueId: 'PAN-7', label: 'PAN-7 work agent' }];
+    expect(backendRestartDecisions(offer({ cause: 'shutdown', agents }))[0]!.label).toBe('Resume the 3 sessions shutdown stopped');
+    expect(backendRestartDecisions(offer({ cause: 'shutdown', conversations: [], agents }))[0]!.label).toBe('Resume the 1 session shutdown stopped');
+    const run = { state: 'running' as const, startedAt: '2026-11-06T09:20:00.000Z', finishedAt: null, current: 'agent-pan-7', waitingForPressure: false, results: [] };
+    expect(backendRestartDecisions(offer({ cause: 'shutdown', lostAt: null, conversations: [], run }))[0]!.label)
+      .toBe('Resuming the sessions shutdown stopped');
   });
 
   it('stays while Resume all runs, even after the last conversation left the offer', () => {

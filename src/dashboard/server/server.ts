@@ -153,6 +153,7 @@ import { githubQuotaRouteLayer } from './routes/github-quota.js';
 import { githubIdentitiesRouteLayer } from './routes/github-identities.js';
 import { diskAlertRouteLayer } from './routes/disk-alert.js';
 import { backendRestartRecoveryRouteLayer } from './routes/backend-restart-recovery.js';
+import { shutdownRouteLayer } from './routes/shutdown.js';
 import { harnessAutoUpdateRouteLayer } from './routes/harness-auto-update.js';
 import { telemetryClientConfigRouteLayer } from './routes/telemetry-client-config.js';
 import { ttsRouteLayer } from './routes/tts.js';
@@ -460,6 +461,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   githubIdentitiesRouteLayer,
   diskAlertRouteLayer,
   backendRestartRecoveryRouteLayer,
+  shutdownRouteLayer,
   harnessAutoUpdateRouteLayer,
   telemetryClientConfigRouteLayer,
   ttsRouteLayer,

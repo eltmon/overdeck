@@ -1,0 +1,83 @@
+---
+title: Safe shutdown
+description: Drain every agent at a tool boundary before a reboot
+---
+
+# Safe shutdown
+
+`pan shutdown` stops Overdeck without cutting any agent off in the middle of a tool call. Each session finishes the call it is running, ends its turn, and is stopped. Then Overdeck waits for its own server work, checks that nothing is still writing, stops its services, and tells you it is safe to reboot.
+
+A plain reboot gives every session 5 seconds to exit and then kills it, wherever it is. `pan down` stops the dashboard and its services but leaves every agent running. Use `pan shutdown` when you want to reboot the machine or stop everything cleanly.
+
+```bash
+pan shutdown            # drain, stop everything, report "Safe to reboot."
+pan shutdown --reboot   # the same, then reboot the machine (Linux)
+pan shutdown --status   # print the running drain
+pan shutdown --cancel   # cancel a running drain
+```
+
+## What happens, phase by phase
+
+1. **Admissions close.** Overdeck writes the shutdown record, `~/.overdeck/shutdown.json`. While it exists, every new launch is refused: agent and conversation starts, resumes and messages to conversations, Deacon patrols, auto-merges, the merge train, the backlog sequencer and `pan reload`. Each refusal names `pan shutdown`.
+2. **Draining.** The next tool call of every managed Claude Code session is denied with an instruction to end its turn. The call already running is not affected. Overdeck stops each session as soon as it sees it at a turn boundary: the session is idle, waiting for a person, or stopped, and its transcript has not moved since. Sessions that are thinking or running a tool keep running.
+3. **Waiting for writers.** After every session is stopped, Overdeck waits for its own server work: an auto-merge in progress, post-merge work, and running verification workers.
+4. **Verifying.** Overdeck checks for leftover panes, `index.lock` files and half-done rebases or merges in your project worktrees. It reports what it finds as warnings and never blocks on them.
+5. **Complete.** A detached final stage stops the supervisor, the dashboard, Traefik, CLIProxy and smee (the same steps as `pan down`). With `--reboot` it then runs `systemctl reboot`.
+
+Overdeck leaves the Herdr server, the `tmux -L overdeck` server and workspace Docker containers to the operating system. Once every session pane is closed they hold no Overdeck work, and Docker stops its containers at system shutdown.
+
+## The deadline and force
+
+The deadline is 120 seconds by default. Set it with `--deadline <seconds>`, from 10 to 3600.
+
+Past the deadline, the drain does not kill anything. It marks itself overdue and lists the sessions still running, with the tool each one is running and its description. You can then wait, cancel, or force:
+
+- `pan shutdown --force` at the start: at the deadline, stop the remaining sessions mid-tool and stop waiting for server work.
+- `pan shutdown --force` on a running drain, or **Force all** in the banner: stop the remaining sessions now.
+- **Force stop** on one banner row: stop that one session now.
+
+Force never kills Overdeck's own server work. The drain only stops waiting for it, and the dashboard's exit ends it. The next boot requeues an interrupted auto-merge and re-adopts verification workers.
+
+## The banner
+
+While a drain runs, every dashboard page shows a banner with the phase, the time left, each pending session with its tool and how long that tool has run, the pending server work, and a collapsed count of the sessions already stopped. It has **Force stop** per row, **Force all** and **Cancel shutdown**. When the drain completes, the banner reads "Overdeck is shut down. It is safe to reboot." (or "Rebooting…"). The reconnect banner stays hidden after that, because the dashboard is down on purpose.
+
+## Where to start it
+
+- **Agents menu** in the top bar: **Shut down Overdeck…**, under **Stop all agents…**. Stop all agents kills every agent now; Shut down Overdeck lets each one finish its current step.
+- **Health popover**, under System controls.
+- **Command palette**: search for shutdown, shut down, reboot, power off or quit.
+- **CLI**: `pan shutdown`.
+
+The dashboard asks for confirmation first. The dialog lists what will stop, shows the deadline, and has a **Reboot when done** checkbox. There is no hotkey.
+
+If an agent or conversation runs `pan shutdown` itself, the command starts the drain and returns at once, so its own tool call can end.
+
+`pan shutdown` needs the dashboard. If the dashboard is not running, start it with `pan up` first.
+
+## After the restart
+
+Nothing resumes by itself. When the dashboard starts again, **Needs you** shows "Resume the N sessions shutdown stopped". It lists every agent the drain stopped and every conversation that was working when the drain began. **Resume all** starts them one at a time and waits while memory or CPU pressure is high. Idle conversations are not listed; they resume when you open them.
+
+A cancelled drain makes the same offer. If the dashboard restarts in the middle of a drain, the drain ends as a cancel.
+
+## The reboot guard (Linux)
+
+While at least one session is mid-turn, the dashboard holds a logind block inhibitor with the text:
+
+```text
+Overdeck has N agents running. Use Shut down Overdeck first.
+```
+
+N counts sessions that are working, not idle ones, so an ordinary reboot with only idle sessions is never blocked. The GNOME restart dialog and `systemctl reboot` show this text and refuse. The drain releases the guard when it completes. The guard is best effort: if polkit refuses the lock, Overdeck logs that the guard is disabled and carries on. To reboot anyway, run `systemctl reboot -i`.
+
+## Updating the hook
+
+The tool-call deny lives in the pre-tool hook. Run `pan sync` after upgrading so the new hook reaches `~/.overdeck/bin`.
+
+## Limits
+
+- Background shells (`run_in_background`) and background subagents survive the end of a turn and stop with the pane.
+- Sessions of harnesses without the hook are stopped at their next idle point, like Claude Code sessions, but their tool calls are not denied.
+- Remote Fly agents and other linked machines are not drained.
+- Power loss and crash reboots are out of scope.

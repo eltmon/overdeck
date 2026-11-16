@@ -159,6 +159,35 @@ export function listAdoptableVerificationWorkers(logPrefix: string): WorkerState
   return adoptable;
 }
 
+/**
+ * PAN-5342 (WI-5): verification workers still running with no result — the
+ * server-side writers a shutdown drain waits for. Same directory walk as
+ * {@link listAdoptableVerificationWorkers}, any launching door.
+ */
+export function listActiveVerificationWorkers(): WorkerState[] {
+  const root = join(getOverdeckHome(), 'verification-workers');
+  let entries: string[];
+  try {
+    entries = readdirSync(root);
+  } catch {
+    return [];
+  }
+  const active: WorkerState[] = [];
+  for (const entry of entries) {
+    let issueId: unknown;
+    try {
+      issueId = (JSON.parse(readFileSync(join(root, entry, 'state.json'), 'utf8')) as { issueId?: unknown }).issueId;
+    } catch {
+      continue;
+    }
+    if (typeof issueId !== 'string' || safeIssueId(issueId) !== entry) continue;
+    if (!isVerificationWorkerActive(issueId)) continue;
+    const state = readVerificationWorkerState(issueId);
+    if (state) active.push(state);
+  }
+  return active;
+}
+
 function writeJsonAtomic(path: string, value: unknown): void {
   const temp = `${path}.${process.pid}.tmp`;
   writeFileSync(temp, `${JSON.stringify(value, null, 2)}\n`);

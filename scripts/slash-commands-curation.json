@@ -9,6 +9,7 @@
     "down": "Core",
     "restart": "Core",
     "reload": "Core",
+    "shutdown": "Core",
     "status": "Core",
     "init": "Core",
     "sync": "Core",

@@ -52,6 +52,10 @@ const KNOWN_CALL_SITES = new Set([
   'dashboard/server/routes/workspaces.ts|await messageAgent(agentId, message);',
   'dashboard/server/routes/workspaces/merge-strike.ts|assertDelivered(agentId, await messageAgent(agentId, rebaseMsg));',
   'dashboard/server/services/agent-spawner.ts|await messageAgent(agentId, msg);',
+  // PAN-5342: Resume all on the shutdown offer resumes each agent the drain
+  // stopped; a refused or failed resume stays listed as failed in the offer.
+  'dashboard/server/services/backend-restart-recovery.ts|resumeAgent: async (agentId, message, opts) => (await import(\'../../../lib/agents/resume.js\')).resumeAgent(agentId, message, opts),',
+  'dashboard/server/services/backend-restart-recovery.ts|const result = await deps.resumeAgent(agentId, undefined, { resumeCause: \'operator\' });',
   // PAN-3965: the generic CI-failure message reads the delivery outcome; a CI
   // test-gate failure goes through the verification door (verification-escalation).
   'lib/cloister/ci-failure-feedback.ts|const outcome = await messageAgent(agentId, message, \'internal\', {});',

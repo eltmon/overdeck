@@ -2069,9 +2069,13 @@ opens Home (`/`). After the brand, left to right, the bar holds:
 3. **Agents menu** (`App/topbar/AgentsMenu.tsx`): "N agents working ▾", counted
    by `useAgentsWorking()` (`lib/selectors/agentsWorking.ts`). The dot is
    `bg-state-live` (blue) when N > 0. The menu lists every working session
-   (title, project · role · model, age), then **Open the Agents page** and
-   **Stop all agents…**, which opens the emergency-stop confirm
-   (`triggerEmergencyStop`) and is disabled at 0.
+   (title, project · role · model, age), then **Open the Agents page**,
+   **Stop all agents…** (sub-line "Kills every agent now. Work in progress is
+   cut off."), which opens the emergency-stop confirm (`triggerEmergencyStop`)
+   and is disabled at 0, and **Shut down Overdeck…** (sub-line "Lets each
+   agent finish its current step, then stops everything. Safe to reboot
+   after."), which opens `ShutdownDialog` (`triggerShutdownDialog`) and is never
+   disabled (PAN-5342).
 4. **Needs you · N** (`components/flywheel/NeedsYouIndicator.tsx`), counted by
    `useNeedsYouItems()` (`lib/selectors/needsYou.ts`). It is always visible and
    amber only when N > 0. The menu groups items by project (items without one
@@ -2108,6 +2112,42 @@ Settings), and a pointer-down outside the dot's wrapper. A pointer-down is
 ignored while any `[role="alertdialog"]` is mounted, and when its target is
 inside a `[role="dialog"]` or `[role="alertdialog"]` outside the wrapper, which
 covers Cloister's portaled restart popover and its restart-config modal.
+
+## Safe shutdown (PAN-5342)
+
+`pan shutdown` drains every session at a tool boundary, then stops the services.
+User docs: `features/safe-shutdown.mdx`. PRD: `.pan/drafts/pan-5342.md`.
+
+- **The shutdown record** (`src/lib/shutdown/drain-record.ts`) is
+  `<OVERDECK_HOME>/shutdown.json`, the only stored shutdown state. While it
+  exists, `launchAgentPane`, `pan spawn`, the conversation create, resume and
+  message doors (409 `shutdown-draining`, `src/lib/shutdown/refusal.ts`),
+  `isDeaconGloballyPaused()`, the auto-merge tick, the merge-train reconcile,
+  the backlog sequencer and `pan reload` all refuse. The pre-tool hook denies
+  every new tool call of a managed Claude Code session.
+- **The drain service** (`src/dashboard/server/services/shutdown/`) runs in the
+  dashboard, because the runtime mirror lives there. `drain-service.ts` owns the
+  phases (`draining`, `waiting-for-writers`, `verifying`, `complete`) and stops
+  a session on the first tick that sees it at a turn boundary
+  (`isAtTurnBoundary` in `src/lib/agents/liveness.ts`). `writers.ts` lists
+  in-flight auto-merges, post-merge runs and verification workers; `verify.ts`
+  reports leftover panes, `index.lock` files and half-done rebases;
+  `end.ts` is the one end path (cancel and boot) that deletes the record and
+  seeds the resume offer; `boot.ts` consumes a leftover record at boot and
+  starts the reboot guard (`reboot-guard.ts`, a `systemd-inhibit` block lock
+  held while a session is mid-turn).
+- **The snapshot** is derived each tick and emitted with
+  `getEventStore().emitOnly({ type: 'system.shutdown_changed', … })`, like
+  `project.deploy_changed`: never stored, never replayed. The frontend reads it
+  with `selectShutdown`, and `ShutdownBanner` renders it above the system
+  notices row.
+- **The final stage** (`final-stage.ts`) is a detached `systemd-run --user`
+  unit (a detached spawn elsewhere) running `pan shutdown --finish`. It stops
+  the supervisor before the dashboard, reuses the `pan down` body
+  (`src/cli/commands/down.ts`), and reboots with `--reboot`.
+- **No close code (D-12).** The frontend keeps the last snapshot. In phase
+  `complete` the banner shows the safe-to-reboot screen and `AppChrome` hides
+  `DegradedModeBanner`, so the reconnect loop never shows.
 
 ## Left column (PAN-5293)
 

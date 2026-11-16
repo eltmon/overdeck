@@ -287,6 +287,16 @@ describe('SystemHealthPill', () => {
     expect(screen.queryByRole('dialog', { name: 'System health' })).not.toBeInTheDocument();
   });
 
+  it('closes when the shutdown dialog opens so it never covers it (PAN-5342)', () => {
+    setSnapshot('healthy');
+    renderPill();
+
+    fireEvent.click(screen.getByTestId('system-health-pill'));
+    expect(screen.getByRole('dialog', { name: 'System health' })).toBeInTheDocument();
+    act(() => { window.dispatchEvent(new CustomEvent('pan:shutdown-open')); });
+    expect(screen.queryByRole('dialog', { name: 'System health' })).not.toBeInTheDocument();
+  });
+
   it('stays open for any pointer-down while an alertdialog is up', () => {
     setSnapshot('healthy');
     const { rerender } = render(<div />);

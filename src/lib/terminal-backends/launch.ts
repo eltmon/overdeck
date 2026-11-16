@@ -26,6 +26,7 @@ import { homedir } from 'node:os';
 
 import { Effect } from 'effect';
 
+import { assertNotShuttingDown } from '../shutdown/drain-record.js';
 import { defaultCpuClass, withCpuClass, type CpuClass } from './cpu-class.js';
 import { AGENT_ID_TOKEN, HerdrBackend } from './herdr.js';
 import './tmux.js';
@@ -182,6 +183,7 @@ export async function launchAgentPane(
   request: LaunchPaneRequest,
   backend?: TerminalBackend,
 ): Promise<AgentPaneRef> {
+  assertNotShuttingDown(); // PAN-5342: a drain refuses every pane launch
   const resolved = backend ?? (await resolveLaunchBackend());
   const workspace = await Effect.runPromise(
     resolved.workspaceFor(request.issueId ?? CONVERSATIONS_WORKSPACE, request.cwd),

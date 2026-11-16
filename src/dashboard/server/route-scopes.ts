@@ -220,6 +220,13 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/backend-restart-recovery', scope: 'read:conversations' },
   { method: 'POST', path: '/api/backend-restart-recovery/resume-all', scope: 'operate' },
   { method: 'POST', path: '/api/backend-restart-recovery/dismiss', scope: 'operate' },
+  // PAN-5342: safe shutdown
+  { method: 'GET', path: '/api/shutdown', scope: 'read:state' },
+  { method: 'GET', path: '/api/shutdown/preview', scope: 'read:state' },
+  { method: 'POST', path: '/api/shutdown', scope: 'admin' },
+  { method: 'POST', path: '/api/shutdown/cancel', scope: 'admin' },
+  { method: 'POST', path: '/api/shutdown/force-stop', scope: 'admin' },
+  { method: 'POST', path: '/api/shutdown/force-all', scope: 'admin' },
   // PAN-4654: a linked machine reads this machine's version report for the fleet table.
   { method: 'GET', path: '/api/versions/self', scope: 'read:state' },
   // PAN-4654: an operator-level link starts, escalates or cancels this machine's

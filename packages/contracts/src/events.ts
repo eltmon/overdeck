@@ -14,6 +14,7 @@ import {
   ResourceStats,
   RestartGateSnapshot,
   ProjectDeploySnapshot,
+  ShutdownSnapshot,
   Role,
   SequenceNumber,
   TurnEndAssessment,
@@ -165,6 +166,21 @@ export const ProjectDeployChangedEvent = Schema.Struct({
   }),
 })
 export type ProjectDeployChangedEvent = typeof ProjectDeployChangedEvent.Type
+
+/**
+ * PAN-5342 — the safe-shutdown drain snapshot; `null` when no drain runs.
+ * The dashboard's drain service emits it in-memory only (`emitOnly`), like
+ * `project.deploy_changed`: never persisted, never replayed at boot.
+ */
+export const SystemShutdownChangedEvent = Schema.Struct({
+  type: Schema.Literal("system.shutdown_changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    shutdown: Schema.NullOr(ShutdownSnapshot),
+  }),
+})
+export type SystemShutdownChangedEvent = typeof SystemShutdownChangedEvent.Type
 
 // ─── Agent Events ─────────────────────────────────────────────────────────────
 
@@ -1558,6 +1574,7 @@ export const DomainEvent = Schema.Union([
   RestartGateChangedEvent,
   GitHubQuotaChangedEvent,
   ProjectDeployChangedEvent,
+  SystemShutdownChangedEvent,
   AgentCreatedEvent,
   AgentEnrichmentChangedEvent,
   AgentStartedEvent,

@@ -42,6 +42,7 @@ import { revokeAgentMcpTokens } from '../mcp/agent-token.js';
 import { conversationTokenRole, prepareClaudeOverdeckMcp, prepareCodexOverdeckMcp } from '../mcp/agent-injection.js';
 import { validateCwdContainment } from './cwd-containment.js';
 import { conversationWriteRefusal } from './conversation-release.js';
+import { shutdownDrainingRefusal } from '../shutdown/refusal.js';
 import { closeConversationPane, conversationHarnessAlive, conversationSessionAlive, waitForConversationSession } from './conversation-liveness.js';
 import { isSupersededConversation, resolveClearChainHead } from './conversation-clear-chain.js';
 import {
@@ -1046,6 +1047,7 @@ export async function handleConversationCreate(
   deps: { generateAiTitle: (name: string, message: string) => Promise<void> },
 ): Promise<ReturnType<typeof jsonResponse>> {
   try {
+    const draining = shutdownDrainingRefusal(); if (draining) return draining; // PAN-5342
     const message = typeof body['message'] === 'string' ? body['message'].trim() : '';
     const model = typeof body['model'] === 'string' ? body['model'].trim() || undefined : undefined;
     const effort = typeof body['effort'] === 'string' ? body['effort'].trim() || undefined : undefined;
@@ -1130,6 +1132,7 @@ export async function handleConversationResume(
     let conv = getConversationByName(name);
     if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
     const refusal = conversationWriteRefusal(conv); if (refusal) return refusal;
+    const draining = shutdownDrainingRefusal(); if (draining) return draining; // PAN-5342
     // PAN-4485: never respawn a superseded /clear row into the shared session — resume its chain head.
     const requestedName = name;
     if (isSupersededConversation(conv)) {

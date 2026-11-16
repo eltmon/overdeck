@@ -7,7 +7,7 @@
 1 src/lib/conversations/__tests__/scanner.test.ts
 1 src/lib/cost-parsers/__tests__/ohmypi-parser.test.ts
 1 tests/dashboard/cache-service-init-home.test.ts
-11 tests/lib/cloister/review-agent.test.ts
+8 tests/lib/cloister/review-agent.test.ts
 1 tests/lib/mirrorProjectSkills.test.ts
 1 tests/lib/settings-api.test.ts
 2 tests/unit/dashboard/server/ws-rpc-sessions-feed.test.ts

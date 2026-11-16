@@ -93,7 +93,6 @@ import { startSyncAutoService, stopSyncAutoService } from './services/sync-auto-
 import { startOperatorMemorySyncService, stopOperatorMemorySyncService } from './services/operator-memory-sync-service.js';
 import { startEventLoopMonitor, stopEventLoopMonitor } from './services/event-loop-monitor.js';
 import { formatBootGateState, resolveBootGates } from '../../lib/boot-gates.js';
-import { setLastCleanShutdownAt } from '../../lib/overdeck/control-settings.js';
 import { startDeaconChild, stopDeaconChild } from './services/deacon-supervisor.js';
 import { stopAllKnowledgeViewers } from './services/knowledge-viewer.js';
 import { existsSync } from 'node:fs';
@@ -220,6 +219,7 @@ try {
 await bootConversationEnvironmentOrWarn();
 
 if (!isPeerDashboardProcess()) (await import('./services/backend-restart-recovery.js')).startBackendRestartRecovery(); // PAN-5091: before the read model starts the inventory
+if (!isPeerDashboardProcess()) await (await import('./services/shutdown/boot.js')).startShutdownServices(); // PAN-5342
 // Bind the HTTP socket before starting any background service or the Deacon.
 // A bind failure is retried by server.ts and then terminates this process through
 // Effect's Node runtime; no headless orchestrator is allowed to survive it.
@@ -747,11 +747,6 @@ let shuttingDown = false;
 const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   if (shuttingDown) return;
   shuttingDown = true;
-  try {
-    setLastCleanShutdownAt(new Date().toISOString());
-  } catch (err) {
-    console.warn('[overdeck] failed to record clean shutdown marker:', err);
-  }
   console.log(`[overdeck] received ${signal} (pid=${process.pid} ppid=${process.ppid}) — shutting down`);
   try {
     const notifiedClients = broadcastServerRestarting();

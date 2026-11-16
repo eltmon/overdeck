@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { spawn } from 'node:child_process'
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -153,5 +153,97 @@ describe('hooks emit toolDescription with activity events (PAN-4222)', () => {
     const body = readEmittedBody(eventLog)
     expect(body.hookName).toBe('PostToolUse')
     expect(body.toolDescription).toBe('Commit WI-7')
+  })
+})
+
+/**
+ * Runs the hook with an env built from scratch: this test itself runs inside a
+ * managed session, so inheriting process.env would leak OVERDECK_AGENT_ID, TMUX
+ * and the live OVERDECK_HOME into the "unmanaged" case. HOME is the temp dir so
+ * nothing can touch the live ~/.overdeck.
+ */
+function runIsolatedHook(
+  scriptDir: string,
+  tempHome: string,
+  stdin: string,
+  extra: Record<string, string>,
+): Promise<{ stdout: string; stderr: string; code: number }> {
+  return new Promise((resolve) => {
+    const child = spawn(join(scriptDir, 'pre-tool-hook'), [], {
+      env: {
+        PATH: `${scriptDir}:${process.env.PATH ?? '/usr/bin:/bin'}`,
+        HOME: tempHome,
+        OVERDECK_HOME: join(tempHome, '.overdeck'),
+        OVERDECK_DASHBOARD_URL: 'http://127.0.0.1:9',
+        ...extra,
+      },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
+    let stdout = ''
+    let stderr = ''
+    child.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf-8') })
+    child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf-8') })
+    child.on('close', (code) => resolve({ stdout, stderr, code: code ?? 0 }))
+    child.on('error', () => resolve({ stdout, stderr, code: 1 }))
+    child.stdin.on('error', () => {})
+    child.stdin.write(stdin)
+    child.stdin.end()
+  })
+}
+
+describe('shutdown deny (PAN-5342)', () => {
+  let tempDir: string
+  let tempHome: string
+  let eventLog: string
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'overdeck-shutdown-deny-hook-'))
+    tempHome = join(tempDir, 'home')
+    eventLog = join(tempDir, 'events.log')
+    mkdirSync(join(tempHome, '.overdeck'), { recursive: true })
+    writeHookScript(tempDir, 'pre-tool-hook', PRE_TOOL_HOOK_PATH)
+    // The real pan_resolve_agent_id stays in force; only the network emit is stubbed.
+    writeFileSync(join(tempDir, 'pan-hook-lib.sh'), `${readFileSync(HOOK_LIB_PATH, 'utf-8')}
+pan_emit_event() {
+  echo "$1|$2" >> "${eventLog}"
+}
+`, 'utf-8')
+  })
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true })
+  })
+
+  const input = JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'ls', description: 'List files' } })
+  const startDrain = () => writeFileSync(join(tempHome, '.overdeck', 'shutdown.json'), '{"version":1}', 'utf-8')
+  const emitted = () => existsSync(eventLog)
+
+  it('denies the tool call of a managed session while the shutdown record exists', async () => {
+    startDrain()
+    const { stdout, code } = await runIsolatedHook(tempDir, tempHome, input, { OVERDECK_AGENT_ID: 'agent-x' })
+
+    expect(code).toBe(0)
+    const output = JSON.parse(stdout) as { hookSpecificOutput: { hookEventName: string; permissionDecision: string; permissionDecisionReason: string } }
+    expect(output.hookSpecificOutput.hookEventName).toBe('PreToolUse')
+    expect(output.hookSpecificOutput.permissionDecision).toBe('deny')
+    expect(output.hookSpecificOutput.permissionDecisionReason).toContain('pan shutdown')
+    expect(emitted()).toBe(false)
+  })
+
+  it('allows the tool call silently when no shutdown record exists', async () => {
+    const { stdout, code } = await runIsolatedHook(tempDir, tempHome, input, { OVERDECK_AGENT_ID: 'agent-x' })
+
+    expect(code).toBe(0)
+    expect(stdout).toBe('')
+    expect(emitted()).toBe(true)
+  })
+
+  it('leaves an unmanaged session (no OVERDECK_AGENT_ID, no TMUX) untouched even while draining', async () => {
+    startDrain()
+    const { stdout, code } = await runIsolatedHook(tempDir, tempHome, input, {})
+
+    expect(code).toBe(0)
+    expect(stdout).toBe('')
+    expect(emitted()).toBe(false)
   })
 })

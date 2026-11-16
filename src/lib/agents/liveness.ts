@@ -33,6 +33,7 @@
  */
 
 import { Effect } from 'effect';
+import type { AgentRuntimeSnapshot } from '@overdeck/contracts';
 
 import { listPaneValues, listPaneValuesSync, sessionExists } from '../tmux.js';
 import type { RuntimeName } from '../runtimes/types.js';
@@ -40,6 +41,7 @@ import { hostTerminalBackendName } from '../terminal-backends/select.js';
 import type { HerdrLivenessProbe } from '../terminal-backends/herdr.js';
 import type { AgentState as BackendAgentState, TerminalBackendName } from '../terminal-backends/types.js';
 import { getAgentState } from './agent-state.js';
+import { getRuntimeSnapshot } from '../agent-runtime-mirror.js';
 import { getAgentRuntimeStateSync } from './runtime-state.js';
 import {
   LEGACY_TMUX_PROBE_TIMEOUT_MS,
@@ -82,6 +84,29 @@ function getTranscriptHeartbeatMs(agentId: string): number | null {
   } catch {
     return null;
   }
+}
+
+/** PAN-5342 (D-4): slack between the activity label and a later transcript write. */
+export const TURN_BOUNDARY_TRANSCRIPT_SLACK_MS = 5_000;
+
+/**
+ * PAN-5342 (D-4): the turn ended (idle, waiting on a human, or stopped) and the
+ * transcript has not moved since the label was set. A null snapshot is unknown,
+ * so false. This answers "has the turn ended", unlike `isIdle`, which answers
+ * "has work been stale for minutes".
+ */
+export function isAtTurnBoundary(
+  snapshot: Pick<AgentRuntimeSnapshot, 'activity' | 'lastActivity'> | null,
+  transcriptHeartbeatMs: number | null,
+): boolean {
+  if (!snapshot || !(snapshot.activity === 'idle' || snapshot.activity === 'waiting' || snapshot.activity === 'stopped')) return false;
+  const labelMs = Date.parse(snapshot.lastActivity);
+  return transcriptHeartbeatMs === null || !Number.isFinite(labelMs) || transcriptHeartbeatMs <= labelMs + TURN_BOUNDARY_TRANSCRIPT_SLACK_MS;
+}
+
+/** In-process (dashboard) reader for the shutdown drain and the reboot guard. */
+export function isSessionAtTurnBoundary(agentId: string): boolean {
+  return isAtTurnBoundary(Effect.runSync(getRuntimeSnapshot(agentId)), getTranscriptHeartbeatMs(agentId));
 }
 
 export type LivenessVerdict =

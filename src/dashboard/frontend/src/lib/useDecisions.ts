@@ -308,18 +308,29 @@ export function harnessUpdateDecisions(snapshot: HarnessAutoUpdateSnapshot | nul
   }));
 }
 
-/** PAN-5091: the restart recovery offer as one Needs-you item, shown while there is something to resume or a run is in progress. */
+/**
+ * PAN-5091: the restart recovery offer as one Needs-you item, shown while there is something to resume or a run is in progress.
+ * PAN-5342: after `pan shutdown` it also counts the agents the drain stopped.
+ */
 export function backendRestartDecisions(snapshot: BackendRestartRecoverySnapshot | null): Decision[] {
   if (!snapshot || !Array.isArray(snapshot.conversations)) return [];
   const running = snapshot.run?.state === 'running';
-  const count = snapshot.conversations.length;
+  // An older server sends no `agents` or `cause`.
+  const count = snapshot.conversations.length + (Array.isArray(snapshot.agents) ? snapshot.agents.length : 0);
+  const shutdown = snapshot.cause === 'shutdown';
   if (count === 0 && !running) return [];
+  let label: string;
+  if (running && count === 0) {
+    label = shutdown ? 'Resuming the sessions shutdown stopped' : 'Resuming conversations after a terminal-backend restart';
+  } else {
+    label = shutdown
+      ? `Resume the ${count} ${count === 1 ? 'session' : 'sessions'} shutdown stopped`
+      : `${count} ${count === 1 ? 'conversation' : 'conversations'} stopped when the terminal backend restarted`;
+  }
   return [{
     id: 'backend-restart',
     source: 'agent',
-    label: running && count === 0
-      ? 'Resuming conversations after a terminal-backend restart'
-      : `${count} ${count === 1 ? 'conversation' : 'conversations'} stopped when the terminal backend restarted`,
+    label,
     kinds: ['backendRestart'],
     since: snapshot.lostAt ?? snapshot.run?.startedAt ?? '',
     blocking: false,

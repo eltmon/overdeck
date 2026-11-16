@@ -38,6 +38,7 @@ import type { RuntimeName } from '../../lib/runtimes/types.js';
 // launch.js registers both adapters at import time and owns the one backend
 // resolution (policy + Herdr availability probe, PAN-3956).
 import { resolveLaunchBackend } from '../../lib/terminal-backends/launch.js';
+import { assertNotShuttingDown } from '../../lib/shutdown/drain-record.js';
 import {
   isUnsupported,
   type AgentPaneRef,
@@ -176,6 +177,7 @@ export async function spawnCommand(options: SpawnOptions, deps: SpawnDeps = {}):
   }
 
   const agentName = `${issueId.toLowerCase()}-${item.id}`;
+  assertNotShuttingDown(); // PAN-5342
   const pane = await Effect.runPromise(
     backend.startAgent(workspace, {
       kind: harness,

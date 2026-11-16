@@ -53,6 +53,12 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/backend-restart-recovery',              kind: 'http', disposition: 'READ',       door: 'getBackendRestartRecoverySnapshot (PAN-5091): conversations a terminal-backend restart left stopped, and the Resume all run' },
   { surface: 'POST /api/backend-restart-recovery/resume-all',   kind: 'http', disposition: 'WRITE',      door: 'startBackendRestartResumeAll (PAN-5091): handleConversationResume one at a time, waiting under memory pressure' },
   { surface: 'POST /api/backend-restart-recovery/dismiss',      kind: 'http', disposition: 'WRITE',      door: 'dismissBackendRestartRecovery (PAN-5091): drop the in-memory offer' },
+  { surface: 'GET /api/shutdown',                             kind: 'http', disposition: 'READ',       door: 'getShutdownSnapshot (PAN-5342): the live drain snapshot, or null' },
+  { surface: 'GET /api/shutdown/preview',                     kind: 'http', disposition: 'READ',       door: 'getShutdownPreview (PAN-5342): live agent and conversation counts, mid-turn count, server-side writers, restart-lock holder' },
+  { surface: 'POST /api/shutdown',                            kind: 'http', disposition: 'WRITE',      door: 'startShutdown (PAN-5342): write the shutdown record, drain sessions at a turn boundary' },
+  { surface: 'POST /api/shutdown/cancel',                     kind: 'http', disposition: 'WRITE',      door: 'cancelShutdown (PAN-5342): endShutdown deletes the record and seeds the resume offer' },
+  { surface: 'POST /api/shutdown/force-stop',                 kind: 'http', disposition: 'WRITE',      door: 'forceStopSession (PAN-5342): stop one pending session now' },
+  { surface: 'POST /api/shutdown/force-all',                  kind: 'http', disposition: 'WRITE',      door: 'forceAll (PAN-5342): set force now on the shutdown record' },
   { surface: 'GET /api/telemetry/client-config',              kind: 'http', disposition: 'READ',       door: 'telemetryClientConfig (PAN-5100): the machine telemetry setting for the phone app' },
 
   // ── admin.ts ──────────────────────────────────────────────────────────────

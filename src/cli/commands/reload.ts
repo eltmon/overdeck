@@ -38,6 +38,7 @@ import {
   type DashboardRestartResult,
 } from '../../lib/platform-lifecycle.js';
 import { writeRestartStatus, type RestartPhase } from '../../lib/restart-status.js';
+import { SHUTDOWN_REFUSAL, isShutdownDrainingSync } from '../../lib/shutdown/drain-record.js';
 import { restartGateRequesterId, waitForRestartApproval } from '../../lib/restart-gate-client.js';
 import {
   refuseNonPrimaryDashboardCwd,
@@ -157,6 +158,7 @@ async function recordReloadStatus(
 }
 
 export async function reloadCommand(options: ReloadOptions): Promise<void> {
+  if (isShutdownDrainingSync()) { console.error(SHUTDOWN_REFUSAL); process.exitCode = 1; return; } // PAN-5342 D-11
   const activityId = process.env.OVERDECK_COMPOSER_RELOAD_ACTIVITY;
   const logPath = process.env.OVERDECK_COMPOSER_RELOAD_LOG;
   // Do not pass this command's activity identity into the replacement server.

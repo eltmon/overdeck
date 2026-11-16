@@ -16,6 +16,8 @@ import { GitHubQuotaSection } from '../components/GitHubQuotaPill';
 import { SetupChecklistBanner } from '../components/SetupChecklistBanner';
 import { ClaudeCodeUpgradeBanner } from '../components/ClaudeCodeUpgradeBanner';
 import { SyncRequiredBanner } from '../components/SyncRequiredBanner';
+import { HiddenWhenShutDown, ShutdownBanner } from '../components/ShutdownBanner';
+import { ShutdownSystemControl } from '../components/ShutdownDialog';
 import { HealthSection, SystemHealthPill } from '../components/SystemHealthPill';
 import { StaleBuildChip } from '../components/StaleBuildChip';
 import type { Tab } from '../components/Header';
@@ -77,6 +79,8 @@ export function AppChrome({
   return (
     <>
       <AddProjectDialogHost onCreated={onProjectCreated} />
+      {/* PAN-5342: the safe-shutdown drain, on every page while it runs. */}
+      <ShutdownBanner />
       {/* PAN-2908 C-FRESH: system notices render in ONE slim row instead of
           stacked full-width banners. */}
       <div data-component="system-notices-row" className="flex flex-wrap items-stretch border-b border-border">
@@ -115,11 +119,14 @@ export function AppChrome({
 
       {/* Degraded mode (PAN-4279) — the one outage indicator: restarting,
           unreachable, delayed live updates, then a brief "Reconnected". */}
-      <DegradedModeBanner
-        lifecycle={dashboardLifecycle}
-        onRestartBackend={onRestartBackend}
-        isRestartBackendPending={isRestartBackendPending}
-      />
+      {/* Hidden once a safe shutdown completes, so the reconnect loop never shows (PAN-5342 D-12). */}
+      <HiddenWhenShutDown>
+        <DegradedModeBanner
+          lifecycle={dashboardLifecycle}
+          onRestartBackend={onRestartBackend}
+          isRestartBackendPending={isRestartBackendPending}
+        />
+      </HiddenWhenShutDown>
 
       {/* PAN-5236: this tab runs older frontend code than the server — offer Reload. */}
       <NewBuildBanner />
@@ -171,7 +178,8 @@ export function AppChrome({
 
       {/* App bar (PAN-5292) — crumb · search box (opens the palette) · agents
           menu, Needs you, exception chips, health dot, theme. AppChrome calls no
-          store selector: every count lives in its own leaf component (E-D1). */}
+          store selector: every count lives in its own leaf component (E-D1),
+          including the shutdown banner and its HiddenWhenShutDown gate. */}
       <div className="relative flex h-12 shrink-0 items-center gap-3 border-b border-border bg-background px-3">
         {/* PAN-5293 F-D18: below 900 px the left column is a drawer opened here. */}
         <button
@@ -210,7 +218,10 @@ export function AppChrome({
             <GitHubQuotaSection />
             <HealthSection title="Auto-resume"><DeaconPauseToggle /></HealthSection>
             <StoppedAgentsBanner variant="section" />
-            <HealthSection title="System controls"><CloisterStatusBar onOpenSettings={onOpenSettings} /></HealthSection>
+            <HealthSection title="System controls">
+              <CloisterStatusBar onOpenSettings={onOpenSettings} />
+              <ShutdownSystemControl />
+            </HealthSection>
           </SystemHealthPill>
           <ThemeToggleButton />
         </div>

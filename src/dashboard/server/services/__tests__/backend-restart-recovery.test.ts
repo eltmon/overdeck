@@ -1,7 +1,8 @@
 /**
  * PAN-5091: the terminal-backend restart recovery offer. The snapshot of live
  * conversations at the loss, the settle at the restore, the skip rules, and
- * Resume all (one at a time, waiting under memory pressure).
+ * Resume all (one at a time, waiting under memory pressure). PAN-5342: the
+ * offer a safe shutdown seeds, with agents resumed after the conversations.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -16,9 +17,12 @@ import {
   noteBackendRestored,
   startBackendRestartRecovery,
   startBackendRestartResumeAll,
+  seedShutdownOffer,
   type BackendRestartRecoveryDeps,
   type RecoveryConversationRow,
 } from '../backend-restart-recovery.js';
+import type { ResumeCause } from '../../../../lib/resume-contract.js';
+import type { ShutdownStoppedSession } from '../../../../lib/shutdown/drain-record.js';
 
 const NOW = Date.parse('2026-11-06T09:13:00.000Z');
 
@@ -44,6 +48,11 @@ interface World {
   stopped: Map<string, number>;
   bands: MemoryPressureBand[];
   resumed: string[];
+  causes: ResumeCause[];
+  /** Agents with a state file; `liveAgents` null means the inventory did not answer. */
+  agentStates: Set<string>;
+  liveAgents: Set<string> | null;
+  resumedAgents: Array<{ id: string; message: string | undefined; resumeCause: ResumeCause }>;
   deps: BackendRestartRecoveryDeps;
 }
 
@@ -56,6 +65,10 @@ function world(rows: RecoveryConversationRow[]): World {
     stopped: new Map<string, number>(),
     bands: [] as MemoryPressureBand[],
     resumed: [] as string[],
+    causes: [] as ResumeCause[],
+    agentStates: new Set<string>(),
+    liveAgents: new Set<string>(),
+    resumedAgents: [] as World['resumedAgents'],
   } as World;
   w.deps = {
     listConversations: () => [...w.rows.values()],
@@ -65,11 +78,19 @@ function world(rows: RecoveryConversationRow[]): World {
     isHeld: (name) => w.held.has(name),
     stoppedSince: (name, since) => (w.stopped.get(name) ?? -Infinity) >= since,
     pressureBand: async () => w.bands.shift() ?? 'ok',
-    resume: async (name) => {
+    resume: async (name, cause) => {
       w.resumed.push(name);
+      w.causes.push(cause);
       const r = w.rows.get(name);
       if (r) w.live?.add(r.tmuxSession);
       return { status: 200, body: { name, status: 'active', reattached: false } };
+    },
+    liveAgentIds: async () => (w.liveAgents ? new Set(w.liveAgents) : null),
+    hasAgentState: (id) => w.agentStates.has(id),
+    resumeAgent: async (id, message, opts) => {
+      w.resumedAgents.push({ id, message, resumeCause: opts.resumeCause });
+      w.liveAgents?.add(id);
+      return { success: true };
     },
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     now: () => Date.now(),
@@ -170,9 +191,9 @@ describe('a second restart is a new incident', () => {
     const w = world([row('a'), row('p')]);
     // A resume marks the row active again, as handleConversationResume does.
     const resume = w.deps.resume;
-    w.deps.resume = async (name) => {
+    w.deps.resume = async (name, cause) => {
       w.rows.set(name, row(name));
-      return resume(name);
+      return resume(name, cause);
     };
     startBackendRestartRecovery(w.deps);
     await restart(w);
@@ -253,7 +274,7 @@ describe('the offer leaves out what Resume all must not resume', () => {
     startBackendRestartRecovery(w.deps);
     await restart(w);
     dismissBackendRestartRecovery();
-    expect(await getBackendRestartRecoverySnapshot()).toEqual({ lostAt: null, conversations: [], run: null });
+    expect(await getBackendRestartRecoverySnapshot()).toEqual({ lostAt: null, cause: 'backend-restart', conversations: [], agents: [], run: null });
   });
 });
 
@@ -263,12 +284,12 @@ describe('Resume all', () => {
     let inFlight = 0;
     let maxInFlight = 0;
     const resume = w.deps.resume;
-    w.deps.resume = async (name) => {
+    w.deps.resume = async (name, cause) => {
       inFlight++;
       maxInFlight = Math.max(maxInFlight, inFlight);
       await new Promise((resolve) => setTimeout(resolve, 1_000));
       inFlight--;
-      return resume(name);
+      return resume(name, cause);
     };
     startBackendRestartRecovery(w.deps);
     await restart(w);
@@ -331,9 +352,9 @@ describe('Resume all', () => {
   it('reports a refused resume as failed and keeps that conversation offered', async () => {
     const w = world([row('a'), row('b')]);
     const resume = w.deps.resume;
-    w.deps.resume = async (name) => (name === 'a'
+    w.deps.resume = async (name, cause) => (name === 'a'
       ? { status: 409, body: { error: 'Continued on desk; this copy is read-only' } }
-      : resume(name));
+      : resume(name, cause));
     startBackendRestartRecovery(w.deps);
     await restart(w);
 
@@ -360,7 +381,7 @@ describe('Resume all', () => {
     await vi.advanceTimersByTimeAsync(10 * PRESSURE_WAIT_MS);
 
     expect(w.resumed).toEqual([]);
-    expect(await getBackendRestartRecoverySnapshot()).toEqual({ lostAt: null, conversations: [], run: null });
+    expect(await getBackendRestartRecoverySnapshot()).toEqual({ lostAt: null, cause: 'backend-restart', conversations: [], agents: [], run: null });
     expect(await startBackendRestartResumeAll()).toEqual({ started: false, reason: 'nothing-to-resume' });
   });
 
@@ -397,7 +418,7 @@ describe('Resume all', () => {
 
   it('a failed resume whose row comes up and ends again later stays offered', async () => {
     const w = world([row('a')]);
-    w.deps.resume = async (name) => {
+    w.deps.resume = async (name, cause) => {
       w.resumed.push(name);
       return { status: 500, body: { error: 'runtime not ready' } };
     };
@@ -423,5 +444,200 @@ describe('Resume all', () => {
     await vi.advanceTimersByTimeAsync(10 * PRESSURE_WAIT_MS);
     expect(w.resumed).toEqual([]);
     expect(await offeredNames()).toEqual(['a']);
+  });
+});
+
+function stopped(kind: ShutdownStoppedSession['kind'], id: string, overrides: Partial<ShutdownStoppedSession> = {}): ShutdownStoppedSession {
+  return kind === 'conversation'
+    ? { kind, id: `conv-${id}`, name: id, label: `Title ${id}`, wasWorking: true, ...overrides }
+    : { kind, id, issueId: id.replace(/^agent-/, '').toUpperCase(), label: `Agent ${id}`, wasWorking: false, ...overrides };
+}
+
+describe('the offer a safe shutdown seeds (PAN-5342)', () => {
+  it('lists the mid-turn conversations and every agent, with cause shutdown', async () => {
+    const w = world([
+      row('a', { status: 'ended', endedAt: new Date(NOW - 1_000).toISOString() }),
+      row('idle', { status: 'ended', endedAt: new Date(NOW - 1_000).toISOString() }),
+    ]);
+    w.agentStates = new Set(['agent-pan-1', 'agent-pan-2']);
+    // The drain's own stops left stop marks on both conversations.
+    w.stopped.set('a', NOW - 1_000);
+    w.stopped.set('idle', NOW - 1_000);
+    startBackendRestartRecovery(w.deps);
+    seedShutdownOffer([
+      stopped('conversation', 'a'),
+      stopped('conversation', 'idle', { wasWorking: false }),
+      stopped('agent', 'agent-pan-1'),
+      stopped('agent', 'agent-pan-2', { issueId: undefined }),
+    ]);
+
+    const snapshot = await getBackendRestartRecoverySnapshot();
+    expect(snapshot).toEqual({
+      lostAt: new Date(NOW).toISOString(),
+      cause: 'shutdown',
+      conversations: [{ name: 'a', title: 'Title a' }],
+      agents: [
+        { id: 'agent-pan-1', issueId: 'PAN-1', label: 'Agent agent-pan-1' },
+        { id: 'agent-pan-2', issueId: null, label: 'Agent agent-pan-2' },
+      ],
+      run: null,
+    });
+  });
+
+  it('merges the conversations an earlier offer still holds', async () => {
+    const w = world([row('old')]);
+    startBackendRestartRecovery(w.deps);
+    await restart(w);
+    expect(await offeredNames()).toEqual(['old']);
+    // A day later a shutdown stops a conversation started since.
+    vi.setSystemTime(NOW + 24 * 60 * 60_000);
+    w.rows.set('a', row('a', { status: 'ended', endedAt: new Date(NOW + 24 * 60 * 60_000).toISOString() }));
+
+    seedShutdownOffer([stopped('conversation', 'a')]);
+    const snapshot = await getBackendRestartRecoverySnapshot();
+    expect(snapshot.cause).toBe('shutdown');
+    expect(snapshot.conversations.map((c) => c.name)).toEqual(['old', 'a']);
+  });
+
+  it('offers agents alone, and drops a conversation stopped again after the offer', async () => {
+    const endedAt = new Date(NOW - 1_000).toISOString();
+    const w = world([row('a', { status: 'ended', endedAt })]);
+    w.agentStates = new Set(['agent-pan-1']);
+    startBackendRestartRecovery(w.deps);
+    seedShutdownOffer([stopped('conversation', 'a'), stopped('agent', 'agent-pan-1')]);
+    expect(await offeredNames()).toEqual(['a']);
+
+    w.rows.set('a', row('a', { status: 'ended', endedAt: new Date(NOW + 5_000).toISOString() }));
+    const snapshot = await getBackendRestartRecoverySnapshot();
+    expect(snapshot.conversations).toEqual([]);
+    expect(snapshot.agents.map((a) => a.id)).toEqual(['agent-pan-1']);
+    expect(snapshot.lostAt).toBe(new Date(NOW).toISOString());
+  });
+
+  it('seeds nothing when the drain stopped only idle conversations', async () => {
+    const w = world([row('idle', { status: 'ended', endedAt: new Date(NOW).toISOString() })]);
+    startBackendRestartRecovery(w.deps);
+    seedShutdownOffer([stopped('conversation', 'idle', { wasWorking: false })]);
+    expect(await getBackendRestartRecoverySnapshot()).toEqual({ lostAt: null, cause: 'backend-restart', conversations: [], agents: [], run: null });
+  });
+
+  it('drops an agent whose pane runs again or whose state is gone, and keeps it when the inventory does not answer', async () => {
+    const w = world([]);
+    w.agentStates = new Set(['agent-pan-1', 'agent-pan-2']);
+    startBackendRestartRecovery(w.deps);
+    seedShutdownOffer([stopped('agent', 'agent-pan-1'), stopped('agent', 'agent-pan-2'), stopped('agent', 'agent-pan-3')]);
+
+    w.liveAgents = null;
+    expect((await getBackendRestartRecoverySnapshot()).agents.map((a) => a.id)).toEqual(['agent-pan-1', 'agent-pan-2']);
+    w.liveAgents = new Set(['agent-pan-1']);
+    expect((await getBackendRestartRecoverySnapshot()).agents.map((a) => a.id)).toEqual(['agent-pan-2']);
+  });
+
+  it('Resume all resumes the conversations as the operator, then each agent with resume cause operator', async () => {
+    const w = world([row('a', { status: 'ended', endedAt: new Date(NOW).toISOString() })]);
+    w.agentStates = new Set(['agent-pan-1', 'agent-pan-2']);
+    w.bands = ['ok', 'hard', 'ok'];
+    startBackendRestartRecovery(w.deps);
+    seedShutdownOffer([stopped('conversation', 'a'), stopped('agent', 'agent-pan-1'), stopped('agent', 'agent-pan-2')]);
+
+    expect(await startBackendRestartResumeAll()).toEqual({ started: true, conversations: 1, agents: 2 });
+    await vi.advanceTimersByTimeAsync(0);
+    // The second resume waits for memory pressure to fall.
+    expect(w.resumed).toEqual(['a']);
+    expect(w.causes).toEqual(['operator']);
+    expect(w.resumedAgents).toEqual([]);
+    expect((await getBackendRestartRecoverySnapshot()).run).toMatchObject({ state: 'running', waitingForPressure: true });
+
+    await vi.advanceTimersByTimeAsync(PRESSURE_WAIT_MS);
+    expect(w.resumedAgents).toEqual([
+      { id: 'agent-pan-1', message: undefined, resumeCause: 'operator' },
+      { id: 'agent-pan-2', message: undefined, resumeCause: 'operator' },
+    ]);
+    const snapshot = await getBackendRestartRecoverySnapshot();
+    expect(snapshot.run?.results).toEqual([
+      { name: 'a', outcome: 'resumed' },
+      { name: 'agent-pan-1', outcome: 'resumed' },
+      { name: 'agent-pan-2', outcome: 'resumed' },
+    ]);
+    expect(snapshot.run?.state).toBe('done');
+    expect(snapshot.agents).toEqual([]);
+    expect(snapshot.conversations).toEqual([]);
+  });
+
+  it('reports an agent that runs again by the time its turn comes as already-running, and one whose state is gone as skipped', async () => {
+    const w = world([]);
+    w.agentStates = new Set(['agent-pan-1', 'agent-pan-2', 'agent-pan-3']);
+    w.bands = ['hard'];
+    startBackendRestartRecovery(w.deps);
+    seedShutdownOffer([stopped('agent', 'agent-pan-1'), stopped('agent', 'agent-pan-2'), stopped('agent', 'agent-pan-3')]);
+
+    expect(await startBackendRestartResumeAll()).toEqual({ started: true, conversations: 0, agents: 3 });
+    // While the run waits on pressure, agent-pan-1 comes back and agent-pan-2's state is removed.
+    w.liveAgents?.add('agent-pan-1');
+    w.agentStates.delete('agent-pan-2');
+    await vi.advanceTimersByTimeAsync(PRESSURE_WAIT_MS);
+
+    expect(w.resumedAgents.map((a) => a.id)).toEqual(['agent-pan-3']);
+    expect((await getBackendRestartRecoverySnapshot()).run?.results).toEqual([
+      { name: 'agent-pan-1', outcome: 'already-running' },
+      { name: 'agent-pan-2', outcome: 'skipped', reason: 'not found' },
+      { name: 'agent-pan-3', outcome: 'resumed' },
+    ]);
+  });
+
+  it('reports a refused agent resume as failed and keeps that agent offered', async () => {
+    const w = world([]);
+    w.agentStates = new Set(['agent-pan-1']);
+    w.deps.resumeAgent = async () => ({ success: false, error: 'Cannot resume agent-pan-1: troubled' });
+    startBackendRestartRecovery(w.deps);
+    seedShutdownOffer([stopped('agent', 'agent-pan-1')]);
+
+    await startBackendRestartResumeAll();
+    await vi.advanceTimersByTimeAsync(0);
+    const snapshot = await getBackendRestartRecoverySnapshot();
+    expect(snapshot.run?.results).toEqual([{ name: 'agent-pan-1', outcome: 'failed', reason: 'Cannot resume agent-pan-1: troubled' }]);
+    expect(snapshot.agents.map((a) => a.id)).toEqual(['agent-pan-1']);
+  });
+
+  it('a terminal-backend restart after the shutdown offer carries its agents and cause into the new incident', async () => {
+    const w = world([row('b')]);
+    w.agentStates = new Set(['agent-pan-1']);
+    startBackendRestartRecovery(w.deps);
+    seedShutdownOffer([stopped('agent', 'agent-pan-1')]);
+
+    vi.setSystemTime(NOW + 60_000);
+    await restart(w);
+    const snapshot = await getBackendRestartRecoverySnapshot();
+    expect(snapshot.cause).toBe('shutdown');
+    expect(snapshot.lostAt).toBe(new Date(NOW + 60_000).toISOString());
+    expect(snapshot.conversations.map((c) => c.name)).toEqual(['b']);
+    expect(snapshot.agents.map((a) => a.id)).toEqual(['agent-pan-1']);
+  });
+
+  it('a terminal-backend restart with only carried agents keeps the offer', async () => {
+    const w = world([]);
+    w.agentStates = new Set(['agent-pan-1']);
+    startBackendRestartRecovery(w.deps);
+    seedShutdownOffer([stopped('agent', 'agent-pan-1')]);
+    await restart(w);
+    expect((await getBackendRestartRecoverySnapshot()).agents.map((a) => a.id)).toEqual(['agent-pan-1']);
+  });
+
+  it('a terminal-backend restart resumes conversations with resume cause system', async () => {
+    const w = world([row('a')]);
+    startBackendRestartRecovery(w.deps);
+    await restart(w);
+    await startBackendRestartResumeAll();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(w.causes).toEqual(['system']);
+  });
+
+  it('never resumes anything on its own', async () => {
+    const w = world([]);
+    w.agentStates = new Set(['agent-pan-1']);
+    startBackendRestartRecovery(w.deps);
+    seedShutdownOffer([stopped('agent', 'agent-pan-1')]);
+    await vi.advanceTimersByTimeAsync(10 * PRESSURE_WAIT_MS);
+    expect(w.resumedAgents).toEqual([]);
   });
 });

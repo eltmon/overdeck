@@ -41,7 +41,7 @@ const resumeAllRoute = HttpRouter.add(
     if (result.started) return jsonResponse(result, { status: 202 });
     const error = result.reason === 'running'
       ? 'Resume all is already running'
-      : 'No conversations are waiting to be resumed after a terminal-backend restart';
+      : 'No sessions are waiting to be resumed after a restart or shutdown';
     return jsonResponse({ error, code: result.reason }, { status: 409 });
   })),
 );

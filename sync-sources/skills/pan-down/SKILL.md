@@ -13,6 +13,8 @@ allowed-tools:
 
 # Stop Overdeck Services
 
+To reboot safely, use `pan shutdown` instead: it lets each agent finish its current tool call, stops every agent and conversation, then stops the services (`pan down` leaves agents running).
+
 ## Overview
 
 This skill guides you through gracefully stopping all Overdeck services, including the dashboard, API server, Traefik, and optionally workspace containers.

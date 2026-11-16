@@ -272,6 +272,7 @@ export const AgentRuntimeSnapshot = Schema.Struct({
   lastActivity: Schema.String,                    // ISO timestamp of last event for this agent
   currentTool: Schema.optional(Schema.String),   // set when activity === "working"
   currentToolDescription: Schema.optional(Schema.String), // set alongside currentTool when activity === "working"
+  toolStartedAt: Schema.optional(Schema.String), // PAN-5342: set by PreToolUse, cleared by PostToolUse and every non-working activity
   thinking: Schema.optional(ThinkingState),       // set when activity === "thinking"
   waiting: Schema.optional(WaitingState),         // set when activity === "waiting"
   claudeSessionId: Schema.optional(Schema.String),
@@ -522,6 +523,46 @@ export const ProjectDeploySnapshot = Schema.Struct({
 })
 export type ProjectDeploySnapshot = typeof ProjectDeploySnapshot.Type
 
+/**
+ * PAN-5342 — the safe-shutdown drain, derived each tick by the dashboard's
+ * drain service and emitted in-memory only (`system.shutdown_changed`).
+ * The only stored shutdown state is `<OVERDECK_HOME>/shutdown.json`.
+ */
+export const ShutdownPhase = Schema.Literals(["draining", "waiting-for-writers", "verifying", "complete"])
+export type ShutdownPhase = typeof ShutdownPhase.Type
+export const ShutdownPendingSession = Schema.Struct({
+  id: Schema.String,
+  kind: Schema.Literals(["agent", "conversation"]),
+  label: Schema.String,
+  issueId: Schema.optional(Schema.String),
+  conversationName: Schema.optional(Schema.String),
+  /** Runtime activity, or "unknown" when the session has no runtime snapshot. */
+  activity: Schema.String,
+  tool: Schema.optional(Schema.String),
+  toolDescription: Schema.optional(Schema.String),
+  toolStartedAt: Schema.optional(Schema.String),
+})
+export type ShutdownPendingSession = typeof ShutdownPendingSession.Type
+export const ShutdownWriter = Schema.Struct({
+  kind: Schema.Literals(["auto-merge", "post-merge", "verification"]),
+  label: Schema.String,
+  startedAt: Schema.optional(Schema.String),
+})
+export type ShutdownWriter = typeof ShutdownWriter.Type
+export const ShutdownSnapshot = Schema.Struct({
+  phase: ShutdownPhase,
+  startedAt: Schema.String,
+  deadlineAt: Schema.String,
+  overdue: Schema.Boolean,
+  reboot: Schema.Boolean,
+  force: Schema.Literals(["never", "at-deadline", "now"]),
+  pending: Schema.Array(ShutdownPendingSession),
+  writers: Schema.Array(ShutdownWriter),
+  stoppedCount: Schema.Number,
+  warnings: Schema.Array(Schema.String),
+})
+export type ShutdownSnapshot = typeof ShutdownSnapshot.Type
+
 // ─── Restart Gate (PAN-3729) ─────────────────────────────────────────────────
 
 /** What kind of process asked for the voluntary dashboard restart. */
@@ -613,6 +654,7 @@ export const DashboardSnapshot = Schema.Struct({
   githubQuota: Schema.optional(GitHubQuotaSnapshot),
   /** PAN-3751 — in-flight deploys keyed by project key. */
   deployByProjectKey: Schema.optional(Schema.Record(Schema.String, ProjectDeploySnapshot)),
+  shutdown: Schema.optional(Schema.NullOr(ShutdownSnapshot)), // PAN-5342
   timestamp: Schema.String,
 })
 export type DashboardSnapshot = typeof DashboardSnapshot.Type

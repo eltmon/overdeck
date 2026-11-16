@@ -35,7 +35,7 @@ export type PendingInputKind =
   | 'machineUnreachable'
   /** PAN-5108 — the daily background update of a coding-agent CLI failed. */
   | 'harnessUpdateFailed'
-  /** PAN-5091: conversations stopped when the terminal backend restarted. */
+  /** PAN-5091: conversations stopped when the terminal backend restarted; PAN-5342: sessions `pan shutdown` stopped. */
   | 'backendRestart'
   /** PAN-5070 — a bot connector just paired with this machine. */
   | 'connectorConnected';
@@ -59,7 +59,7 @@ export const PENDING_INPUT_KIND_LABEL: Record<string, string> = {
   diskCritical: 'Disk space critical',
   machineUnreachable: "Can't reach machine",
   harnessUpdateFailed: 'Coding agent update failed',
-  backendRestart: 'Stopped by a terminal-backend restart',
+  backendRestart: 'Stopped by a restart or shutdown',
   connectorConnected: 'Bot connected',
 };
 
