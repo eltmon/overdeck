@@ -12,8 +12,12 @@
 
 import { useCallback, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ConversationList } from '../CommandDeck/ConversationList';
-import { ALL_PROJECTS_KEY, ALL_PROJECTS_LABEL, fetchProjects, isRealProjectKey, NO_PROJECT_KEY } from '../CommandDeck/projectsData';
+import { ConversationList, type Conversation } from '../CommandDeck/ConversationList';
+import type { ConversationProjectRef } from '../CommandDeck/conversationProjectGroups';
+import {
+  ALL_PROJECTS_KEY, ALL_PROJECTS_LABEL, fetchProjects, isRealProjectKey, NO_PROJECT_KEY, NO_PROJECT_LABEL, resolveEffectiveProjectKey,
+} from '../CommandDeck/projectsData';
+import { fetchRegisteredProjects, type RegisteredProject } from '../CommandDeck/UnknownProjectState';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { readLastProjectKey } from '../../lib/lastProject';
 import { useDeckNavigation } from './deck/deckNavigation';
@@ -31,6 +35,9 @@ function readScope(): ConversationScope {
     return 'active';
   }
 }
+
+const EMPTY_REGISTERED: RegisteredProject[] = [];
+const NO_PROJECT_REF: ConversationProjectRef = { key: NO_PROJECT_KEY, label: NO_PROJECT_LABEL };
 
 function SegmentButton({ pressed, onClick, children, testId }: { pressed: boolean; onClick: () => void; children: ReactNode; testId: string }) {
   return (
@@ -59,6 +66,18 @@ export function ConversationsSection({ selectedProject }: { selectedProject: str
   // The switcher's project list, read from its cache (no polling of its own).
   const { data: projects = [] } = useQuery({ queryKey: ['command-deck-projects'], queryFn: fetchProjects, staleTime: Infinity });
   const allProjects = selectedProject === ALL_PROJECTS_KEY;
+  // PAN-5343 H-D3: group the All projects list by registered project (same
+  // key as the switcher, so the marks match its colors).
+  const { data: registeredProjects = EMPTY_REGISTERED } = useQuery({
+    queryKey: ['registered-projects'],
+    queryFn: fetchRegisteredProjects,
+    staleTime: 60000,
+  });
+  const groupByProject = useCallback((conv: Conversation): ConversationProjectRef => {
+    const key = resolveEffectiveProjectKey(conv, registeredProjects);
+    const project = key ? registeredProjects.find((p) => p.key === key) : undefined;
+    return project ? { key: project.key, label: project.name ?? project.key } : NO_PROJECT_REF;
+  }, [registeredProjects]);
   const showThisProject = () => {
     const last = readLastProjectKey();
     selectProject(isRealProjectKey(last) ? last : projects[0]?.name ?? NO_PROJECT_KEY);
@@ -89,6 +108,7 @@ export function ConversationsSection({ selectedProject }: { selectedProject: str
         selectedConversation={selectedConversation}
         onSelectConversation={openConversation}
         includeIds={allProjects ? undefined : projectConvIdSet}
+        groupByProject={allProjects ? groupByProject : undefined}
         scope={scope}
       />
     </section>

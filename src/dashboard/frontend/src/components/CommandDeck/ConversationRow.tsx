@@ -12,7 +12,8 @@ import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import type { Conversation } from './ConversationList';
 import type { ConversationMutations } from './useConversationMutations';
 import type { RegisteredProject } from './UnknownProjectState';
-import { resolveEffectiveProjectKey } from './projectsData';
+import { NO_PROJECT_KEY, resolveEffectiveProjectKey } from './projectsData';
+import { ProjectMark } from '../frame/ProjectMark';
 import { fallbackBadgeTone } from './fallbackBadge';
 import { isScrollInsideMenu, MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
 import { isOfflineLinked, LinkedMachineChip, LinkedOfflineMeta, LinkedRowMenuItems } from './LinkedConversationRow';
@@ -94,6 +95,9 @@ interface ConversationRowProps {
   flattenedFrom?: number | null;
   /** PAN-4223 D27: the judged builder's id when this critic nests under it. */
   criticOf?: number | null;
+  /** PAN-5343 H-D3: the row's project mark in the All projects list (NO_PROJECT_KEY renders muted). */
+  markProjectKey?: string;
+  markName?: string;
 }
 
 /** D28: WOWED and PASS use the done token; every other verdict is neutral (routine work, not an alarm). */
@@ -160,6 +164,8 @@ export function ConversationRow({
   orphanOf = null,
   flattenedFrom = null,
   criticOf = null,
+  markProjectKey,
+  markName,
 }: ConversationRowProps) {
   const [copiedId, setCopiedId] = useState(false);
   const [editingName, setEditingName] = useState(false);
@@ -564,6 +570,10 @@ export function ConversationRow({
             color: conv.sessionAlive ? 'var(--success)' : 'var(--muted-foreground)',
           }}
         />
+      )}
+
+      {markProjectKey && (
+        <ProjectMark size="sm" name={markName ?? markProjectKey} projectKey={markProjectKey} muted={markProjectKey === NO_PROJECT_KEY} />
       )}
 
       {/* Title + metadata */}
