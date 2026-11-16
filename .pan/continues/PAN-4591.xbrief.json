@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4591",
   "created": "2026-11-16T11:39:00.796Z",
-  "updated": "2026-11-16T12:31:50.217Z",
+  "updated": "2026-11-16T13:01:02.430Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,9 +156,22 @@
       "doneAt": "2026-11-16T12:31:41.435Z"
     },
     "semgrep-skill": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4591",
-      "claimedAt": "2026-11-16T12:31:50.217Z"
+      "claimedAt": "2026-11-16T12:31:50.217Z",
+      "doneAt": "2026-11-16T13:01:02.430Z"
+    },
+    "semgrep-skill.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T13:01:02.430Z"
+    },
+    "semgrep-skill.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T13:01:02.430Z"
+    },
+    "semgrep-skill.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T13:01:02.430Z"
     }
   }
 }
