@@ -28,6 +28,7 @@
  * - PAN-4589: a failing test check reported as a commit status (Dagger Cloud)
  *   is named with its own link, and a `dagger check dag://<name>` rerun
  *   command when that link is a Dagger Cloud page.
+ * - PAN-4592: a failing Semgrep check (isSemgrepCheckName) gets the findings excerpt and fix/suppression instructions.
  */
 
 import { execFile } from 'node:child_process';
@@ -49,7 +50,7 @@ import {
 } from './verification-cycles.js';
 import { buildFinalFailureInstructions } from './verification-feedback.js';
 import { readDefaultBranchFailingTestChecks } from './ci-default-branch-tests.js';
-import { collectCheckRunFailures, FAILED_CHECK_RUN_CONCLUSIONS, listFailingCheckRunNames } from './ci-check-run-failures.js';
+import { collectCheckRunFailures, FAILED_CHECK_RUN_CONCLUSIONS, isSemgrepCheckName, listFailingCheckRunNames } from './ci-check-run-failures.js';
 import { isDaggerCloudUrl, resolveVerificationTestsMode, TEST_GATE_NAME } from './verification-tests-mode.js';
 
 function execFilePromise(
@@ -537,6 +538,14 @@ async function collectFailures(
   return failures;
 }
 
+/** PAN-4592: what a red Semgrep check asks of the work agent. */
+const SEMGREP_FAILURE_GUIDANCE =
+  'This is the Semgrep check from `.github/workflows/semgrep.yml`. On a pull request it reports only findings ' +
+  'on code this PR adds (`--baseline-commit` at the merge base). For each finding in the excerpt: fix the code, ' +
+  'then rescan the changed files with the managed Semgrep CLI as the `semgrep` skill shows, using the `--config` ' +
+  'values from the workflow. Suppress only a confirmed false positive, on that line only, with ' +
+  '`nosemgrep: <rule-id> -- <reason>`; the security review lane sees every new suppression.\n\n';
+
 function buildFeedbackBody(opts: {
   issueId: string;
   repo: string;
@@ -597,6 +606,7 @@ function buildFeedbackBody(opts: {
       } else {
         body += '*(No log excerpt available.)*\n\n';
       }
+      if (isSemgrepCheckName(f.name)) body += SEMGREP_FAILURE_GUIDANCE;
     }
   }
 

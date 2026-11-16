@@ -549,6 +549,15 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
     expect(existsSync(verificationArtifactPath(workspacePath))).toBe(false);
   });
 
+  it('keeps the CI test gate and adds no Semgrep guidance to a red test job (PAN-4592)', async () => {
+    const result = await redHead('abc123def456');
+
+    expect(result).toMatchObject({ testGateFailed: true });
+    const markdownBody = mockWriteFeedbackFile.mock.calls[0][0].markdownBody as string;
+    expect(markdownBody).toContain('Failed check: test');
+    expect(markdownBody).not.toContain('nosemgrep');
+  });
+
   it('names a failing commit-status test check with its link and a Dagger rerun command (PAN-4589)', async () => {
     (execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation(makeExecFileMock([
       { cmd: 'gh', args: ['run', 'list', '--repo', 'test-owner/test-repo', '--branch', 'main', '--status', 'failure'], stdout: '[]' },
@@ -1201,5 +1210,41 @@ describe('PAN-4534: failures come from the head\'s check runs, with the failing 
     expect(body).toContain('Check: https://github.com/test-owner/test-repo/actions/runs/900/job/452');
     expect(body).toContain(`Check: ${SHARD_URL}`);
     expect(body).toContain('*(No log excerpt available.)*');
+  });
+  describe('PAN-4592: a failing Semgrep check gets fix and suppression instructions', () => {
+    const SEMGREP_LOG = [
+      '2026-11-16T10:00:00.0000000Z │ 1 Code Finding │',
+      '2026-11-16T10:00:00.0000000Z     new.py',
+      '2026-11-16T10:00:00.0000000Z    ❯❯❱ no-eval',
+      '2026-11-16T10:00:00.0000000Z             1┆ eval("2")',
+      '2026-11-16T10:00:00.0000000Z Ran 1 rule on 1 file: 1 finding.',
+    ].join('\n');
+    const section = (body: string, name: string) => {
+      const start = body.indexOf(`### ${name}\n`);
+      const next = body.slice(start + 1).search(/\n##+ /);
+      return next < 0 ? body.slice(start) : body.slice(start, start + 1 + next);
+    };
+
+    it('adds the guidance to the semgrep section only', async () => {
+      mockGh([shard('semgrep', 470), shard('lint', 471)], ([, path]) => ({ stdout: path!.includes('/470/') ? SEMGREP_LOG : 'eslint: 1 error' }));
+
+      const body = (await relay())!;
+
+      const semgrep = section(body, 'semgrep');
+      expect(semgrep).toContain('│ 1 Code Finding │');
+      expect(semgrep).toContain('Ran 1 rule on 1 file: 1 finding.');
+      expect(semgrep).toContain('`nosemgrep: <rule-id> -- <reason>`');
+      expect(section(body, 'lint')).toContain('eslint: 1 error');
+      expect(section(body, 'lint')).not.toContain('nosemgrep');
+    });
+
+    it('adds the guidance to a Semgrep OSS check', async () => {
+      mockGh([shard('Semgrep OSS', 472)], () => ({ stdout: SEMGREP_LOG }));
+
+      const body = (await relay())!;
+
+      expect(section(body, 'Semgrep OSS')).toContain('This is the Semgrep check from `.github/workflows/semgrep.yml`.');
+      expect(section(body, 'Semgrep OSS')).toContain('nosemgrep: <rule-id> -- <reason>');
+    });
   });
 });
