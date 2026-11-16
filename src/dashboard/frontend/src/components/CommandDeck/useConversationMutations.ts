@@ -283,13 +283,15 @@ export function useConversationMutations(
     },
   });
 
+  // The ref is the synchronous double-submit guard; the state copy is what
+  // render reads, so the memoized object below changes when it changes.
   const pendingRetitleNamesRef = useRef(new Set<string>());
-  const [retitleVersion, setRetitleVersion] = useState(0);
+  const [pendingRetitleNames, setPendingRetitleNames] = useState<ReadonlySet<string>>(() => new Set());
   const retitleMutation = useMutation({
     mutationFn: retitleConversation,
     onMutate: (name: string) => {
       pendingRetitleNamesRef.current.add(name);
-      setRetitleVersion(v => v + 1);
+      setPendingRetitleNames(new Set(pendingRetitleNamesRef.current));
     },
     onSuccess: (data, _name) => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
@@ -300,7 +302,7 @@ export function useConversationMutations(
     },
     onSettled: (_data, _error, name) => {
       pendingRetitleNamesRef.current.delete(name);
-      setRetitleVersion(v => v + 1);
+      setPendingRetitleNames(new Set(pendingRetitleNamesRef.current));
     },
   });
 
@@ -492,8 +494,9 @@ export function useConversationMutations(
 
   // PAN-4560: one object per meaningful change, so the memoized conversation
   // list items do not all re-render on every list render. TanStack keeps each
-  // `.mutate` stable; retitleVersion is a dependency so isRetitlePending
-  // re-evaluates after pending changes, and pendingArchiveNames /
+  // `.mutate` stable; isRetitlePending reads pendingRetitleNames (state, not
+  // the ref: the React Compiler drops a dependency the body never reads), so
+  // it re-evaluates after pending changes, and pendingArchiveNames /
   // pendingStopNames are dependencies so isArchivePending / isStopPending do too.
   // PAN-4653 D10: the override is a preference, not a triage move — no undo entry, no success toast.
   const autoSettleOverrideMutation = useMutation({
@@ -547,7 +550,7 @@ export function useConversationMutations(
       if (pendingRetitleNamesRef.current.has(name)) return;
       retitleMutate(name);
     },
-    isRetitlePending: (name) => pendingRetitleNamesRef.current.has(name),
+    isRetitlePending: (name) => pendingRetitleNames.has(name),
     toggleFavorite: (opts) => {
       if (pendingFavoriteNamesRef.current.has(opts.name)) return;
       favoriteMutate(opts);
@@ -574,5 +577,5 @@ export function useConversationMutations(
     forkTargetFocus,
     closeForkModal: () => { setForkTarget(null); setForkTargetMode(undefined); setForkTargetFocus(undefined); },
     isForkPending,
-  }), [archiveMutate, pendingArchiveNames, queryClient, stopMutate, pendingStopNames, renameMutate, retitleMutate, favoriteMutate, moveMutate, linkPullRequestMutate, unlinkPullRequestMutate, triageMutate, autoSettleOverrideMutate, openForkModal, submitFork, forkTarget, forkTargetMode, forkTargetFocus, isForkPending, retitleVersion]);
+  }), [archiveMutate, pendingArchiveNames, queryClient, stopMutate, pendingStopNames, renameMutate, retitleMutate, favoriteMutate, moveMutate, linkPullRequestMutate, unlinkPullRequestMutate, triageMutate, autoSettleOverrideMutate, openForkModal, submitFork, forkTarget, forkTargetMode, forkTargetFocus, isForkPending, pendingRetitleNames]);
 }

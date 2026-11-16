@@ -50,6 +50,7 @@ src/components/CommandDeck/__tests__/pipeline-helpers.test.ts
 src/components/CommandDeck/__tests__/projectsData.isRealProjectKey.test.ts
 src/components/CommandDeck/__tests__/projectsData.origin.test.ts
 src/components/CommandDeck/__tests__/useConversationMutations.archive.test.tsx
+src/components/CommandDeck/__tests__/useConversationMutations.retitle.test.tsx
 src/components/CommandDeck/__tests__/useConversationMutations.stop.test.tsx
 src/components/CommandDeck/__tests__/useConversationMutations.triage.test.tsx
 src/components/CommandDeck/__tests__/useDefaultDeckSelection.test.ts
