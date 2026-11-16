@@ -1,0 +1,550 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-16T22:51:11Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5459: Flaky tests (class): quality-gate-admission memory tests still assert after a fixed drive(N) (PAN-5394 covered only one)",
+    "updated": "2026-11-16T23:01:03.378Z"
+  },
+  "plan": {
+    "id": "pan-5459",
+    "title": "Flaky tests (class): quality-gate-admission memory tests still assert after a fixed drive(N) (PAN-5394 covered only one)",
+    "status": "proposed",
+    "uid": "2c0e4165-8044-4a95-ad89-35c16daa76a8",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-16T22:51:11Z",
+    "updated": "2026-11-16T23:01:03.378Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5459",
+        "label": "PAN-5459",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "flaky-test",
+      "test-only",
+      "quality-gate-admission",
+      "cloister"
+    ],
+    "metadata": {
+      "docsJustification": "Test-only change to private helpers in one test file; no doc in docs/, configuration/, reference/, CLAUDE.md, sync-sources/rules/ or the codebase map describes them. The in-file comments that explain each wait ship inside the code items (PRD Work item 7).",
+      "canonicalFilename": "2026-11-16-PAN-5459-flaky-tests-class-quality-gate-admission-memory-tests-still-assert-after-a-fixed-drive-n-pan-5394-covered-only-one.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Main CI went red at cbb8ebefb9e (run 43969539204, test-shard 2/4) in tests/unit/lib/cloister/quality-gate-admission.test.ts. Every failing frame is a condition wait that ran out of turns (driveUntil's 100-turn cap at lines 573, 700, 919; drive(40, ...) at line 692), not a fixed drive. One turn yields about 1 ms of real time, while an admission needs 15-30 sequential fs ops, so on a loaded runner no turn count is safe. Eleven fixed drive(N) calls also remain. Some are real ordering races: line 963 failed under local load because legacyFitSince started after the clock jump. The rest are negative windows that pass vacuously on a slow host.",
+      "Proposal": "Two parts, test-only. (1) Give every condition wait a 4 s real wall-clock budget (Date.now captured before fake timers start), raise the file's test timeout to 30 s with vi.setConfig, and give driveUntil a failure message that names the budget. (2) Replace each of the eleven fixed drives with a wait on a positive signal: the first onWaiting report, a pressure-sample or memory-read counter, or ticket state on disk (blockedSince, waitKind). Fake timers stay on and no real sleeps are added.",
+      "NonGoals": "- No change under src/; the admission loop is correct\n- No change to tests/unit/lib/deploy/reload-supersede.test.ts or its drive helper\n- No new real sleeps and no turning off fake timers\n- No change to vitest.config.ts (global testTimeout, retry, pool)\n- No quarantine and no move to a *.slow.test.ts file\n- No test removed, renamed, skipped or marked .only; the file keeps 48 tests\n- No change to the readQualityGateQueue or sampleQualityGatePressure describes\n- No changelog.d entry (not user-facing)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix the attempt caps as well as the fixed drives, though the issue blames only fixed drives",
+        "rationale": "The CI log for run 43969539204 shows every failing frame inside driveUntil (100-turn cap) or drive(40, ...); converting fixed drives alone would not have turned that run green. The local loaded repro failed at the same cap (line 693) and at a fixed-drive race (line 967), so both parts are needed."
+      },
+      {
+        "summary": "Use a 4 s real wall-clock budget instead of the issue's example 200-turn cap",
+        "rationale": "Turns consumed per fs op grow with host load, so any fixed count only lowers the odds. A wall-clock bound returns on the first true turn, so fast hosts pay nothing; the issue's 200 was given as an example of a generous cap."
+      },
+      {
+        "summary": "Raise the file's testTimeout to 30 s via vi.setConfig",
+        "rationale": "vitest.config.ts sets 5 s; several 4 s-budget waits per test would otherwise turn an assertion failure into a timeout. The same per-file pattern exists in feedback-target.test.ts and workflows.test.ts."
+      },
+      {
+        "summary": "Retire PAN-5394 NFR-1 (helpers unchanged) and remove drive's fixed-count form",
+        "rationale": "The helpers were the failing point. PAN-5394 D1's reason (non-asserting drive so the following assertion shows the real diff) is kept: drive(done) still never asserts."
+      },
+      {
+        "summary": "Reorder site F so the clock advances only after the head records its memory block at t=1",
+        "rationale": "createdAt and memoryBlockedSince are read after `await mkdir`, so today they are usually 5000 and the test never checks its 'past the bound' case. The change matches its sibling test at line 838."
+      }
+    ],
+    "items": [
+      {
+        "id": "wall-clock-budget",
+        "title": "Bound every condition wait in quality-gate-admission.test.ts by 4 s of real time",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T22:51:11Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5459",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "expected_outputs": [
+            "vitest reports Tests  48 passed (48) for quality-gate-admission.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "nslots-pressure-waits",
+            "slot-report-waits",
+            "head-ordering-waits",
+            "legacy-grace-wait",
+            "memory-progress-waits",
+            "final-load-verify"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5459.md Work item 1. In tests/unit/lib/cloister/quality-gate-admission.test.ts replace the drive/driveUntil helpers (lines 65-83) with the exact 'After' snippet: capture `const nativeNow = Date.now` beside nativeSetTimeout, add `DRIVE_BUDGET_MS = 4_000`, add `vi.setConfig({ testTimeout: 30_000 })` at module top level, extract `turn()`, make `drive(done)` loop until done() or the real-time deadline, add the temporary `driveTurns(turns)`, and give driveUntil the message `condition not met within ${DRIVE_BUDGET_MS} ms of real time`. Migrate the nine predicate sites (lines 557, 560, 590, 618, 662, 692, 865, 890, 1059) by dropping the leading count and keeping the predicate. Rename the eleven fixed calls (lines 246, 252, 308, 393, 412, 917, 935, 963, 981, 1005, 1034) from `await drive(N)` to `await driveTurns(N)`, same N, no other change. Keep the beforeEach fake timers unchanged. Do not run the loaded run here: the site H race (line 967) is still present until item legacy-grace-wait. Commit with trailer `Item: wall-clock-budget`."
+        },
+        "items": [
+          {
+            "id": "wall-clock-budget.ac1",
+            "title": "Given the edited file, when `grep -n \"DRIVE_BUDGET_MS = 4_000\\|const nativeNow = Date.now\\|vi.setConfig({ testTimeout: 30_000 })\" tests/unit/lib/cloister/quality-gate-admission.test.ts` runs, then it prints exactly three lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wall-clock-budget.ac2",
+            "title": "Given a condition that never becomes true, when driveUntil gives up, then expect receives the message `condition not met within ${DRIVE_BUDGET_MS} ms of real time` and the loop exits on the nativeNow() deadline, not on a turn count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wall-clock-budget.ac3",
+            "title": "Given the edited file, when `grep -nE \"drive\\([0-9]\" tests/unit/lib/cloister/quality-gate-admission.test.ts` runs, then it prints nothing, and `grep -c \"nativeSetTimeout(\"` on the file prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wall-clock-budget.ac4",
+            "title": "Given the edited file, when `npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts` runs, then it reports 48 passed and every former fixed drive now calls driveTurns with its original N",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "nslots-pressure-waits",
+        "title": "Wait on pressure samples in the N-slots pressured-second-request test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T22:51:11Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5459",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "expected_outputs": [
+            "vitest reports Tests  48 passed (48) for quality-gate-admission.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 2 (sites A, B), test 'keeps a pressured second request waiting until slot 0 frees and pressure clears'. Replace `await driveTurns(20)` with `await driveUntil(() => samplePressure.mock.calls.length > 0)`. After `await first.release()`, replace `await driveTurns(5)` with `const samplesAtRelease = samplePressure.mock.calls.length` then `await driveUntil(() => samplePressure.mock.calls.length >= samplesAtRelease + 2)`, with the comments from the PRD snippet. Commit with trailer `Item: nslots-pressure-waits`."
+        },
+        "items": [
+          {
+            "id": "nslots-pressure-waits.ac1",
+            "title": "Given the pressured second request, when the test reaches its first negative assertion, then it has waited via driveUntil on `samplePressure.mock.calls.length > 0`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "nslots-pressure-waits.ac2",
+            "title": "Given first.release() has returned, when the test switches pressure to low, then it first waits via driveUntil on `samplePressure.mock.calls.length >= samplesAtRelease + 2`, and `second.slot` still resolves to 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "nslots-pressure-waits.ac3",
+            "title": "Given the edited test, when `npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts` runs, then it reports 48 passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "slot-report-waits",
+        "title": "Wait on the first slots report in the three slot-capacity tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T22:51:11Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5459",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "expected_outputs": [
+            "vitest reports Tests  48 passed (48) for quality-gate-admission.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 3 (sites C, D, E). In 'counts a held slot above a lowered slot count against capacity', 'falls back to two slots when the config loader rejects' (third request) and 'lets an explicit deps.slots win over the config' (second request): add a `vi.fn()` onWaiting to the blocked request's deps (for site D: `{ ...configDeps(rootDir, 3), onWaiting: onThirdWaiting }`), and replace `await driveTurns(20)` with `await driveUntil(() => <mock>.mock.calls.some(([reason]) => reason.kind === 'slots'))`. Leave the assertions after each wait unchanged. Commit with trailer `Item: slot-report-waits`."
+        },
+        "items": [
+          {
+            "id": "slot-report-waits.ac1",
+            "title": "Given each of the three tests, when it reaches its negative assertion (resolved / thirdSettled / secondResolved is false), then it has first waited via driveUntil for an onWaiting call with kind 'slots' on the blocked request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "slot-report-waits.ac2",
+            "title": "Given site D, when the third request is created, then its deps spread configDeps(rootDir, 3) and add onWaiting, so the slot count still comes from the rejecting config loader fallback of 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "slot-report-waits.ac3",
+            "title": "Given the edited tests, when `npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts` runs, then it reports 48 passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "head-ordering-waits",
+        "title": "Order the clock advance after the head's recorded state in two head-of-line tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T22:51:11Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5459",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "expected_outputs": [
+            "vitest reports Tests  48 passed (48) for quality-gate-admission.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 4 (sites F, G). Add the `waitKind(rootDir, gateName)` helper directly below `blockedSince` in the head-of-line fairness describe, exactly as in the PRD. Site F ('never admits a head alone below the hard reserve, and lets smaller gates pass it instead'): delete `clock = 5_000` + `await driveTurns(10)` after the head starts and insert `await driveUntil(() => blockedSince(rootDir, 'vitest') === 1)` followed by `clock = 5_000` (decision D6). Site G ('counts the bound from the head's first memory block, not from when it queued'): replace `await driveTurns(5)` with `await driveUntil(() => waitKind(rootDir, 'vitest') === 'slots')`. Commit with trailer `Item: head-ordering-waits`."
+        },
+        "items": [
+          {
+            "id": "head-ordering-waits.ac1",
+            "title": "Given site F, when the test sets `clock = 5_000`, then the line before it is `await driveUntil(() => blockedSince(rootDir, 'vitest') === 1)`, so the head's memory block is recorded at t=1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "head-ordering-waits.ac2",
+            "title": "Given site G, when the test sets `clock = 10_000`, then it has first waited via driveUntil for `waitKind(rootDir, 'vitest') === 'slots'`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "head-ordering-waits.ac3",
+            "title": "Given the new waitKind helper, when a waiter ticket has `wait.reason.kind` as a string, then it returns that string, and otherwise returns undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "head-ordering-waits.ac4",
+            "title": "Given the edited tests, when `npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts` runs, then it reports 48 passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "legacy-grace-wait",
+        "title": "Wait for the queue report before the legacy-grace clock jump",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T22:51:11Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5459",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "expected_outputs": [
+            "vitest reports Tests  48 passed (48) for quality-gate-admission.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 5 (site H), test 'passes an older-version head that looks as if it fits but stays queued past the grace'. Add `const onWaiting = vi.fn()` and pass `onWaiting` in the small waiter's fairDeps extra (next to isProcessAlive: otherAlive). Replace `await driveTurns(10)` with `await driveUntil(() => onWaiting.mock.calls.some(([reason]) => reason.kind === 'queue'))` and the PRD comment. This is the race that failed at line 967 in the planning-session loaded repro. Commit with trailer `Item: legacy-grace-wait`."
+        },
+        "items": [
+          {
+            "id": "legacy-grace-wait.ac1",
+            "title": "Given the small waiter behind the older-version head, when the test sets `clock = 40_000`, then it has first waited via driveUntil for an onWaiting call with kind 'queue', so the 30 s legacy grace started at t=1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-grace-wait.ac2",
+            "title": "Given the edited test, when `clock = 40_000` is set, then driveUntilResolved(promise) resolves and the handle releases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-grace-wait.ac3",
+            "title": "Given the edited test, when `npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts` runs, then it reports 48 passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "memory-progress-waits",
+        "title": "Gate the three memory negative windows on progress signals",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T22:51:11Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5459",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "expected_outputs": [
+            "vitest reports Tests  48 passed (48) for quality-gate-admission.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 6 (sites I, J, K). Site I ('clamps the alone footprint against the hard reserve, not the soft reserve'): add a `reads` counter inside the sampleMemory override, and after `clock = 5_000` replace `await driveTurns(10)` with `const readsAtBound = reads` then `await driveUntil(() => reads >= readsAtBound + 2)`. Site J ('gives an alone slot back when memory drops below the hard reserve during the settle'): replace `await driveUntil(() => droppedOnce)` + `await driveTurns(5)` with `await driveUntil(() => droppedOnce && !existsSync(join(rootDir, 'owner.json')))`. Site K ('re-reads the estimate every poll, so a corrected footprint unblocks a queued waiter'): add an onWaiting vi.fn() to the fairDeps extra and replace `await driveTurns(10)` with `await driveUntil(() => onWaiting.mock.calls.some(([reason]) => reason.kind === 'memory'))`. Commit with trailer `Item: memory-progress-waits`."
+        },
+        "items": [
+          {
+            "id": "memory-progress-waits.ac1",
+            "title": "Given site I, when it asserts no owner.json after `clock = 5_000`, then it has first waited via driveUntil for `reads >= readsAtBound + 2` counted inside the sampleMemory override",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-progress-waits.ac2",
+            "title": "Given site J, when it asserts settled() is false, then it has first waited via driveUntil for `droppedOnce && !existsSync(join(rootDir, 'owner.json'))`, with no driveTurns call left in that test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-progress-waits.ac3",
+            "title": "Given site K, when it asserts settled() is false, then it has first waited via driveUntil for an onWaiting call with kind 'memory'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-progress-waits.ac4",
+            "title": "Given the edited file, when `npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts` runs, then it reports 48 passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "final-load-verify",
+        "title": "Delete driveTurns and prove the file passes under CPU load",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T22:51:11Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5459",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "! grep -nE \"drive\\([0-9]|driveTurns\" tests/unit/lib/cloister/quality-gate-admission.test.ts",
+            "for i in 1 2 3 4 5; do npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts || exit 1; done",
+            "bash -c '\n  driver=$$\n  pids=\"\"\n  for i in $(seq 1 $(( $(nproc) * 2 ))); do\n    sh -c \"while kill -0 $driver 2>/dev/null; do :; done\" &\n    pids=\"$pids $!\"\n  done\n  trap \"kill $pids 2>/dev/null\" EXIT\n  for r in $(seq 1 10); do\n    kill -0 $pids 2>/dev/null || { echo \"load processes died before run $r\"; exit 1; }\n    OVERDECK_GATE_ADMISSION=0 timeout 140 npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts || exit 1\n    kill -0 $pids 2>/dev/null || { echo \"load processes died during run $r\"; exit 1; }\n  done\n'",
+            "git diff --stat origin/main -- src/ tests/unit/lib/deploy/reload-supersede.test.ts"
+          ],
+          "expected_outputs": [
+            "the grep prints nothing",
+            "vitest reports Tests  48 passed (48) on 5 consecutive idle runs",
+            "the loaded script exits 0: every load process is alive before and after each of 10 consecutive runs, and each run reports 48 passed",
+            "the git diff --stat prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 7. Delete the temporary `driveTurns` helper (no callers remain after items 2-6). Run the grep, the 5 idle runs and the 10-run loaded command exactly as written in the PRD (2 busy loops per CPU that live as long as the driver shell, a kill -0 liveness check before and after each run, OVERDECK_GATE_ADMISSION=0, stop at the first red, EXIT trap cleanup). If a loaded run fails, read the failing frame: a driveUntil budget message means a predicate is wrong or a wait is missing; fix it in the site's test, never by raising DRIVE_BUDGET_MS or skipping a test. Commit with trailer `Item: final-load-verify`."
+        },
+        "items": [
+          {
+            "id": "final-load-verify.ac1",
+            "title": "Given the final file, when `grep -nE \"drive\\([0-9]|driveTurns\" tests/unit/lib/cloister/quality-gate-admission.test.ts` runs, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "final-load-verify.ac2",
+            "title": "Given an idle host, when the file runs 5 times in a row, then every run reports `Tests  48 passed (48)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "final-load-verify.ac3",
+            "title": "Given 2 busy loops per CPU that stay alive for every run and OVERDECK_GATE_ADMISSION=0, when the file runs 10 times in a row, then every run reports 48 passed and the script exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "final-load-verify.ac4",
+            "title": "Given the branch diff, when `git diff --stat origin/main -- src/ tests/unit/lib/deploy/reload-supersede.test.ts` runs, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wall-clock-budget",
+        "to": "nslots-pressure-waits",
+        "type": "blocks"
+      },
+      {
+        "from": "nslots-pressure-waits",
+        "to": "slot-report-waits",
+        "type": "blocks"
+      },
+      {
+        "from": "slot-report-waits",
+        "to": "head-ordering-waits",
+        "type": "blocks"
+      },
+      {
+        "from": "head-ordering-waits",
+        "to": "legacy-grace-wait",
+        "type": "blocks"
+      },
+      {
+        "from": "legacy-grace-wait",
+        "to": "memory-progress-waits",
+        "type": "blocks"
+      },
+      {
+        "from": "memory-progress-waits",
+        "to": "final-load-verify",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
