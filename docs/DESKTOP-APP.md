@@ -288,6 +288,44 @@ The `beta` channel maps to GitHub prereleases; `latest` maps to full releases. O
 
 See [BUILD.md § Electron Desktop App](./BUILD.md#electron-desktop-app-appsdesktop) for the full build pipeline.
 
+### Packaged server dependencies
+
+`apps/desktop/scripts/prepare-server-resources.mjs` stages the dashboard
+server (`server/`, in the `files` list above, so it ships in every flavor —
+npm, npx, and the installers). It discovers the server's runtime
+dependencies by walking the built chunk graph from `server.js` and the
+other entry points for bare `import`/`require` specifiers
+(`scanImportClosure`, `apps/desktop/scripts/import-closure.mjs`), then
+installs each discovered package at the repo's installed version. That scan
+is a regex over chunk source text, so it can also match a specifier that
+only appears in a comment.
+
+`SERVER_SKIP_PACKAGES`, exported from `apps/desktop/scripts/package-policy.mjs`,
+lists bare specifiers the scan must not treat as real server externals: two
+bun-only/lazy packages, and `@huggingface/transformers`. transformers is
+bundled into a `dist/dashboard/transformers.node-*.js` chunk and only
+reachable there through a JSDoc example string (PAN-5424) — the packaged
+server's fact-retrieval path reads cached vectors and never actually loads
+it; embedding runs from the CLI runtime instead, which keeps `transformers`
+as a real dependency (PAN-5358). Skipping it keeps roughly 720 MB of
+`onnxruntime` out of the staged server.
+
+Two guards backstop that skip, both in `prepare-server-resources.mjs` and
+`build-for-publish.mjs`:
+- **Forbidden-package guard** — right after installing the server's
+  externals, `findForbiddenPackages` (`package-policy.mjs`) walks
+  `server/node_modules` recursively (including nested and scoped
+  `node_modules`) for `@huggingface/transformers`, `onnxruntime-node`,
+  `onnxruntime-web`, or `onnxruntime-common`, and fails the build if any is
+  present.
+- **Tarball size guard** — `build-for-publish.mjs` runs
+  `npm pack --dry-run --json` and fails the build (`checkDesktopPackSize`,
+  same module) when the packed `@overdeck/desktop` tarball exceeds
+  300,000,000 bytes.
+
+See "The npm job stopped at 'Build desktop package'" in
+[RELEASING.md](./RELEASING.md) for what to do when either guard fails.
+
 ### Packaged CLI runtime
 
 The packaged app includes a self-contained `pan` CLI runtime at
@@ -319,8 +357,9 @@ or explicitly retain `ELECTRON_RUN_AS_NODE=1`; passing a replacement `env`
 without it launches Electron as an application instead of running the CLI.
 
 This staged CLI runtime belongs to the electron-builder packages (AppImage,
-DMG, and NSIS). The npm/npx flavor does not copy it: npm packaging strips
-nested `node_modules`, and its runtime-vendoring work remains part of the
+DMG, and NSIS). The npm/npx flavor does not copy it: `cli/` is not in
+`apps/desktop/package.json`'s `files` list, so `npm pack` never includes it.
+Its runtime-vendoring work remains part of the
 [PAN-2561](https://github.com/eltmon/overdeck/issues/2561) packaging story.
 
 ---
