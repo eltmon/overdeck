@@ -91,7 +91,7 @@ Links: [Remote access](/configuration/remote-access),
 
     - Everything in Anywhere
     - Stays at &#36;60 for as long as you stay subscribed
-    - Open to the first 500 subscribers or 90 days after the Anywhere release, whichever comes first
+    - Open to the first 500 subscribers or 90 days after the Anywhere release, whichever comes first; your account page shows how many founding places are left
     - Add the relay at the normal &#36;30 a year
   </Card>
 </CardGroup>
@@ -102,16 +102,34 @@ path, the relay connects them, still end-to-end encrypted. It includes 50 GB of 
 month; at 50 GB the relay stops until the next month, and an extra 50 GB is a one-time &#36;3
 purchase. There is no per-gigabyte billing. The relay also carries an [Overdeck connector](/configuration/bots#run-the-overdeck-connector)'s traffic when a bot has no direct path to your machine; it relays only encrypted bytes.
 
-**Availability:** until billing ([PAN-4294](https://github.com/eltmon/overdeck/issues/4294))
-ships, the paid tiers (Anywhere and the relay add-on) are available to invite-allowlisted
-accounts, and nothing can be bought.
+**Availability:** the paid tiers (Anywhere, the founding price and the relay add-on) are sold to
+invited accounts on the [account page](https://account.overdeck.ai/account). Creem handles the
+payment as merchant of record; Overdeck never sees your card details. Sign-up is still
+invite-only.
 
 **Your account page:** [account.overdeck.ai/account](https://account.overdeck.ai/account)
-shows your plan, this month's relay use and your machines. From it you can remove a machine
-(which signs it out and frees its place) or delete your account.
+shows your plan, this month's relay use and your machines. From it you can subscribe, add or
+remove the relay, open **Manage billing** (card, invoices, cancel), remove a machine (which signs
+it out and frees its place) or delete your account.
 
 In the dashboard, **Settings → Anywhere → Account** shows the same plan and relay use and links
 to the account page with **Manage account**; **Sign in** there replaces `pan account login`.
+
+### When a subscription ends
+
+If you cancel, or a payment keeps failing (Creem retries a failed payment for 7 days), your plan
+returns to the free account when the paid period ends:
+
+- The relay and the webhook inbox stop at once. Machines already in the directory stay; you only
+  cannot add more than 3.
+- For 30 days your hosted vault data stays readable and you can export it with
+  `pan vault migrate`. Writes follow the free 1 GB, so a larger vault is read-only.
+- For 30 more days the same holds, and the account page warns of the deletion date.
+- After 60 days, hosted vault data above the free 1 GB is deleted, and the account continues as a
+  free account. A vault within 1 GB is kept.
+
+`pan vault migrate` works throughout. Subscribing again before the deletion date restores
+everything.
 
 **Extra storage:** +&#36;3 a month or +&#36;30 a year per 100 GB of hosted vault, for the few who
 pass 100 GB and prefer not to prune old records.
