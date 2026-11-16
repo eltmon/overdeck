@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T13:12:05.615510Z · model: claude-opus-5-5 · open: 893_
+_Last sequenced: 2026-11-16T13:42:22.399849Z · model: claude-opus-5-5 · open: 892_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -278,7 +278,6 @@ _Last sequenced: 2026-11-16T13:12:05.615510Z · model: claude-opus-5-5 · open: 
 | 281 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
 | 282 | PAN-4811 | M | medium | ok |  |  | Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; PAN-4743 landed the Fly target door, so this is now unblocked. |
 | 283 | PAN-5079 | S | high | ok |  |  | pan task claim/cancel/done write any id, so a typo leaves a stray row in the committed continue file an agent can't remove. |
-| 284 | PAN-4756 | L | medium | ok |  |  | Done: PR #5441 merged and issue closed via close-out 2026-11-16; drops off the backlog on the next run. |
 | 285 | PAN-4778 | S | medium | ok |  |  | Workspace-image CI never published: wrong Fly app, fly not on PATH, no FLY_API_TOKEN (operator). Fly VMs run a June image. |
 | 286 | PAN-4817 | S | medium | ok |  | PAN-4778 | Fly app's cached image predates pan serve --no-open, so every new Fly VM crashes and rolls back; blocks live Fly verification. |
 | 287 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
@@ -1228,10 +1227,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T13:12:05.615510Z",
+  "generatedAt": "2026-11-16T13:42:22.399849Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 893,
+  "openCount": 892,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -4714,19 +4713,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4756",
-      "rank": 284,
-      "size": "L",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Done: PR #5441 merged and issue closed via close-out 2026-11-16; drops off the backlog on the next run.",
-      "rationale": "Rank held, not pickable: PR #5441 merged and the issue was closed by the close-out ceremony after the manifest snapshot.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4778",
       "rank": 285,
       "size": "S",
@@ -6775,7 +6761,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
         "PAN-4561"
       ],
       "why": "React Compiler burn-down for all remaining components: 78 skips in 42 files, 288 memo sites. Largest group; do last.",
-      "rationale": "New child of PAN-4561 (in pipeline): it can start only after the React 19 upgrade and compiler land, so it sits in a free slot below the parent at medium importance.",
+      "rationale": "New comment adds components/shared/Modal.tsx to this group's skip baseline after PAN-4561 merged main; scope grows by one file, rank unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
