@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4591",
   "created": "2026-11-16T11:39:00.796Z",
-  "updated": "2026-11-16T12:10:42.610Z",
+  "updated": "2026-11-16T12:18:22.169Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,9 +82,38 @@
       "doneAt": "2026-11-16T12:10:35.095Z"
     },
     "edit-hook-script": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4591",
-      "claimedAt": "2026-11-16T12:10:42.610Z"
+      "claimedAt": "2026-11-16T12:10:42.610Z",
+      "doneAt": "2026-11-16T12:18:22.169Z"
+    },
+    "edit-hook-script.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:18:22.169Z"
+    },
+    "edit-hook-script.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:18:22.169Z"
+    },
+    "edit-hook-script.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:18:22.169Z"
+    },
+    "edit-hook-script.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:18:22.169Z"
+    },
+    "edit-hook-script.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:18:22.169Z"
+    },
+    "edit-hook-script.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:18:22.169Z"
+    },
+    "edit-hook-script.ac7": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:18:22.169Z"
     }
   }
 }
