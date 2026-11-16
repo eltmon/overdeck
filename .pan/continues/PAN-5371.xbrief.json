@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5371",
   "created": "2026-11-16T01:41:59.414Z",
-  "updated": "2026-11-16T02:04:06.862Z",
+  "updated": "2026-11-16T02:04:11.746Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,11 @@
     "simple-home-count-agreement-test.ac4": {
       "status": "completed",
       "doneAt": "2026-11-16T02:04:06.862Z"
+    },
+    "docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5371",
+      "claimedAt": "2026-11-16T02:04:11.746Z"
     }
   }
 }
