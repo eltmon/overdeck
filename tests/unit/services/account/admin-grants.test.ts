@@ -175,3 +175,66 @@ describe('admin screen: accounts, add, revoke (PAN-4293 account-admin-grants-scr
     expect((await admin.post('/admin/grants/100/revoke', {}, { origin: 'https://evil.example' })).status).toBe(403);
   });
 });
+
+describe('admin screen billing view (PAN-4294 admin-billing-view)', () => {
+  async function billingSetup(withBilling = true) {
+    const env = makeEnv(withBilling ? billingEnv() : {});
+    const deps = makeDeps({ now: NOW });
+    const rc = makeRc({ env, deps });
+    const admin = await makeAdminClient(env, deps);
+    const user = (id: string, githubId: number, login: string) =>
+      env.DB.prepare('INSERT INTO users (user_id, github_id, github_login, created_at) VALUES (?, ?, ?, ?)').bind(id, githubId, login, NOW).run();
+    return { env, rc, admin, user };
+  }
+
+  it('shows each grant’s billing state in a Billing column', async () => {
+    const { env, rc, admin, user } = await billingSetup();
+    for (const [id, gh, login] of [['u-paid', 100, 'paid'], ['u-due', 200, 'due'], ['u-lapsed', 300, 'lapsed'], ['u-none', 400, 'none']] as const) {
+      await addGrant(rc, gh, login, {}, 'admin-add');
+      await user(id, gh, login);
+    }
+    await seedSubscription(env, { subscriptionId: 'sub_paid', userId: 'u-paid', productKey: 'anywhere_annual_relay', paidThrough: Date.UTC(2027, 0, 2) });
+    await seedSubscription(env, { subscriptionId: 'sub_due', userId: 'u-due', status: 'past_due', paidThrough: NOW - DAY });
+    await seedSubscription(env, { subscriptionId: 'sub_lapsed', userId: 'u-lapsed', status: 'expired', paidThrough: Date.UTC(2026, 8, 1) });
+    const page = await (await admin.get()).text();
+    expect(page).toContain('<th>Billing</th>');
+    expect(page).toContain('<td>Anywhere annual with the relay, paid through 2027-01-02</td>');
+    expect(page).toContain('<td>Past due</td>');
+    expect(page).toContain('<td>Lapsed on 2026-09-01</td>');
+    expect(page.match(/<td>—<\/td>/g)?.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows founding places sold, failing cancels, unmatched events and subscribers without an invite', async () => {
+    const { env, admin, user } = await billingSetup();
+    for (let i = 0; i < 3; i++) {
+      await user(`u-f${i}`, 500 + i, `founder${i}`);
+      await seedSubscription(env, { subscriptionId: `sub_f${i}`, userId: `u-f${i}`, productKey: 'founding_annual', founding: 1, paidThrough: NOW + DAY });
+    }
+    await env.DB.prepare("UPDATE subscriptions SET cancel_requested_at = ?, cancel_attempts = 2, cancel_error = '500 <boom>' WHERE subscription_id = 'sub_f0'").bind(NOW).run();
+    await env.DB.prepare('INSERT INTO billing_unresolved (event_id, event_type, subscription_id, first_seen_at, last_seen_at, attempts) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind('evt_lost', 'subscription.paid', 'sub_lost', NOW, NOW, 3)
+      .run();
+    const page = await (await admin.get()).text();
+    expect(page).toContain('Founding places sold: 3 of 500');
+    expect(page).toContain('<h2>Subscription cancels failing</h2>');
+    expect(page).toContain('Cancel these by hand in the Creem dashboard.');
+    expect(page).toContain('<tr><td>founder0</td><td>sub_f0</td><td>2</td><td>500 &lt;boom&gt;</td></tr>');
+    expect(page).toContain('<h2>Webhook events not matched to an account</h2>');
+    expect(page).toContain('Creem retries these for 24 hours. Match them by hand if they stay.');
+    expect(page).toContain('<tr><td>evt_lost</td><td>subscription.paid</td><td>sub_lost</td><td>2026-10-01 12:00 UTC</td><td>3</td></tr>');
+    expect(page).toContain('<h2>Subscribers without an invite</h2>');
+    expect(page).toContain(`<tr><td>founder1</td><td>501</td><td>Founding annual, paid through ${new Date(NOW + DAY).toISOString().slice(0, 10)}</td></tr>`);
+  });
+
+  it('hides the whole billing view when billing is not configured', async () => {
+    const { env, rc, admin, user } = await billingSetup(false);
+    await addGrant(rc, 100, 'alice', {}, 'admin-add');
+    await user('u-alice', 100, 'alice');
+    await seedSubscription(env, { subscriptionId: 'sub_1', userId: 'u-alice', founding: 1, paidThrough: NOW + DAY });
+    await env.DB.prepare("UPDATE subscriptions SET cancel_error = 'x'").run();
+    const page = await (await admin.get()).text();
+    for (const text of ['Founding places sold', '<th>Billing</th>', 'Subscription cancels failing', 'Webhook events not matched', 'Subscribers without an invite']) {
+      expect(page).not.toContain(text);
+    }
+  });
+});

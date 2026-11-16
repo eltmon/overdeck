@@ -2,6 +2,7 @@
  * Admin screen: header, owner line, allowlisted accounts table, add form, revoke (PRD PAN-4293 §7.12 parts 1–4; D-9, D-14, D-15, D-26).
  * Server-rendered, no JavaScript; every value passes through escapeHtml().
  */
+import { adminBillingSections, billingCellText, foundingSoldText, loadAdminBilling, type AdminBilling } from '../billing/admin-view.ts';
 import { runPendingCancels } from '../billing/cancel.ts';
 import { parseBillingConfig } from '../billing/catalog.ts';
 import { DEFAULT_STORAGE_CAP_BYTES } from '../entitlement.ts';
@@ -43,7 +44,8 @@ function expiresCell(expiresAt: number | null, now: number): string {
   return escapeHtml(formatDate(expiresAt));
 }
 
-function grantRow(g: GrantWithStats, csrf: string, now: number): string {
+function grantRow(g: GrantWithStats, csrf: string, now: number, billing: AdminBilling | null): string {
+  const billingCell = billing === null ? '' : `\n<td>${escapeHtml(billingCellText(billing.byGithubId.get(g.github_id)))}</td>`;
   return `<tr>
 <td><a href="https://github.com/${escapeHtml(g.github_login)}">${escapeHtml(g.github_login)}</a></td>
 <td>${escapeHtml(g.github_id)}</td>
@@ -53,7 +55,7 @@ function grantRow(g: GrantWithStats, csrf: string, now: number): string {
 <td>${escapeHtml(g.note ?? '')}</td>
 <td>${expiresCell(g.expires_at, now)}</td>
 <td>${escapeHtml(g.active_devices)}</td>
-<td>${g.last_seen_at === null ? '—' : escapeHtml(formatDateTime(g.last_seen_at))}</td>
+<td>${g.last_seen_at === null ? '—' : escapeHtml(formatDateTime(g.last_seen_at))}</td>${billingCell}
 <td><form class="inline" method="post" action="/admin/grants/${escapeHtml(g.github_id)}/revoke"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"><button type="submit">Revoke</button></form></td>
 </tr>`;
 }
@@ -82,18 +84,23 @@ ${error}
 export async function renderAdminPage(rc: RequestContext, session: AdminSession, state: AddFormState = {}, status = 200): Promise<Response> {
   const now = rc.deps.now();
   const grants = await listGrantsWithDeviceStats(rc);
-  const rows = grants.map((g) => grantRow(g, session.csrfToken, now)).join('\n');
+  // PAN-4294 WI-8: the billing view exists only when billing is configured.
+  const billing = parseBillingConfig(rc.env) === null ? null : await loadAdminBilling(rc);
+  const rows = grants.map((g) => grantRow(g, session.csrfToken, now, billing)).join('\n');
+  const columns = billing === null ? 10 : 11;
+  const foundingLine = billing === null ? '' : `\n<p>${escapeHtml(foundingSoldText(billing.foundingSold))}</p>`;
+  const billingSections = billing === null ? '' : `\n${adminBillingSections(billing, new Set(grants.map((g) => g.github_id)))}`;
   const body = `<h1>Overdeck accounts (invite-only)</h1>
 <p class="muted">Signed in as GitHub id ${escapeHtml(session.githubId)}.
 <form class="inline" method="post" action="/admin/logout"><input type="hidden" name="csrf" value="${escapeHtml(session.csrfToken)}"><button type="submit">Sign out</button></form></p>
-<p>Owner (always allowed): GitHub id ${escapeHtml(rc.config.ownerGithubId)}</p>
+<p>Owner (always allowed): GitHub id ${escapeHtml(rc.config.ownerGithubId)}</p>${foundingLine}
 <h2>Allowlisted accounts</h2>
 <table>
-<thead><tr><th>Login</th><th>GitHub id</th><th>Granted</th><th>Entitlement</th><th>Storage cap</th><th>Note</th><th>Expires</th><th>Active devices</th><th>Last seen</th><th></th></tr></thead>
+<thead><tr><th>Login</th><th>GitHub id</th><th>Granted</th><th>Entitlement</th><th>Storage cap</th><th>Note</th><th>Expires</th><th>Active devices</th><th>Last seen</th>${billing === null ? '' : '<th>Billing</th>'}<th></th></tr></thead>
 <tbody>
-${rows || '<tr><td colspan="10" class="muted">No accounts allowlisted yet.</td></tr>'}
+${rows || `<tr><td colspan="${columns}" class="muted">No accounts allowlisted yet.</td></tr>`}
 </tbody>
-</table>
+</table>${billingSections}
 ${addForm(session.csrfToken, state)}
 ${await renderPendingSections(rc, session)}`;
   return html(layout('Overdeck accounts', body), status);
