@@ -13,9 +13,9 @@ analysis (SAST) scanner. It is **off by default**.
 Turning the feature on makes Overdeck install a pinned Semgrep binary and report its health in
 `pan doctor`. It also adds in-session tools (#4591): a `semgrep` MCP server, a post-edit scan
 hook, and a `semgrep` skill. The verification gate runs a `sast` scan of each branch, and its
-findings go to the security review lane (#4590). A Codex edit hook (#5434), CI (#4592), a
-Platform/Guardian tier (#4593), and dashboard controls (#4594) are planned but not part of this
-release.
+findings go to the security review lane (#4590). A Codex edit hook (#5434), CI (#4592), and a
+Platform/Guardian tier (#4593) are planned but not part of this release. Findings in the
+dashboard (#5449) are planned.
 
 ## Turn it on
 
@@ -37,6 +37,9 @@ security:
 The four gate keys show their defaults; see [Verification gate](#verification-gate).
 Then run `pan sync` (or `pan install`) to trigger the managed install. A config change reaches
 new agent sessions only — it does not affect an agent already running.
+
+You can also set every key in the dashboard: **Settings → Security**. Each control saves only
+its own key, so comments and other settings in `config.yaml` are kept.
 
 A repo-committed `.pan.yaml` project layer **cannot** set `security` — any `security:` block
 there is silently ignored. A work agent can commit a `.pan.yaml` to its own feature branch, so
@@ -117,7 +120,8 @@ scanned on its own: a finding in a repo that was scanned still counts, and a rep
 be scanned is named in the result and in the review context.
 
 To set the mode for one project, add `verification.sast` to that project in
-`~/.overdeck/projects.yaml`:
+`~/.overdeck/projects.yaml`, or use the **Semgrep gate** control in the project's Project
+settings:
 
 ```yaml
 projects:
@@ -138,6 +142,34 @@ If you would rather run your own Semgrep command, a plain quality gate in `proje
 works, for example `quality_gates.semgrep: { command: "semgrep scan --config p/default --error .", required: true }`.
 Do not name it `sast`, which is the built-in check's name.
 That gate blocks on any finding in the whole tree, and it is not diff-scoped.
+
+## Dashboard
+
+Settings → **Security** edits every `security.semgrep` key without hand-editing
+`~/.overdeck/config.yaml`:
+
+| Row | Does |
+| --- | --- |
+| Semgrep | Turns the feature on or off (`enabled`) |
+| Managed install | Shows whether the pinned CLI is installed and, while off, is disabled; otherwise an **Install Semgrep &lt;version&gt;** button runs the same managed install as `pan sync` (can take several minutes) |
+| Gate mode | `off` / `advisory` / `blocking` (`gate`) |
+| Minimum severity | `INFO` / `WARNING` / `ERROR` (`severity`) |
+| Rule configs | Registry ids or repo-relative rule paths, one per line (`configs`) |
+| Scan timeout (seconds) | Wall-clock limit for one repo's scan (`timeout_seconds`) |
+| MCP server for agents | Turns the `semgrep` MCP server on or off (`mcp`) |
+| Post-edit scan hook | Turns the post-edit scan hook on or off (`edit_hook`) |
+
+Each control writes only its own key, so comments and every other setting in `config.yaml`
+survive the save, and an invalid value is rejected without writing anything.
+
+A gate mode, severity, rule configs or timeout change applies to the next verification run; the
+MCP server and edit hook apply to agent sessions started after the change — neither one affects
+an agent already running.
+
+Project settings has a **Semgrep gate** control (Off / Advisory / Blocking / Global default)
+that writes `verification.sast` for that project only. It shows the effective mode and its
+reason, and says plainly when Semgrep is off for every project. Like the YAML key, it cannot
+turn Semgrep on.
 
 ## Harness support
 
