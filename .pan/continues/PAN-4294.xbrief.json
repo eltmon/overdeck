@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4294",
   "created": "2026-11-16T20:10:42.311Z",
-  "updated": "2026-11-16T20:41:55.865Z",
+  "updated": "2026-11-16T20:41:57.230Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -176,6 +176,11 @@
     "admin-billing-view.ac3": {
       "status": "completed",
       "doneAt": "2026-11-16T20:41:55.865Z"
+    },
+    "connect-paid-plans": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4294",
+      "claimedAt": "2026-11-16T20:41:57.230Z"
     }
   }
 }
