@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4294",
   "created": "2026-11-16T20:10:42.311Z",
-  "updated": "2026-11-16T20:40:10.298Z",
+  "updated": "2026-11-16T20:41:55.865Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -160,9 +160,22 @@
       "doneAt": "2026-11-16T20:40:09.002Z"
     },
     "admin-billing-view": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4294",
-      "claimedAt": "2026-11-16T20:40:10.298Z"
+      "claimedAt": "2026-11-16T20:40:10.298Z",
+      "doneAt": "2026-11-16T20:41:55.865Z"
+    },
+    "admin-billing-view.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:41:55.865Z"
+    },
+    "admin-billing-view.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:41:55.865Z"
+    },
+    "admin-billing-view.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T20:41:55.865Z"
     }
   }
 }
