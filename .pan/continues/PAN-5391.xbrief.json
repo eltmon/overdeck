@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5391",
   "created": "2026-11-16T02:26:12.740Z",
-  "updated": "2026-11-16T02:47:46.825Z",
+  "updated": "2026-11-16T02:51:16.155Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,9 +76,22 @@
       "doneAt": "2026-11-16T02:47:39.160Z"
     },
     "e2e-amber-step": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5391",
-      "claimedAt": "2026-11-16T02:47:46.825Z"
+      "claimedAt": "2026-11-16T02:47:46.825Z",
+      "doneAt": "2026-11-16T02:51:16.155Z"
+    },
+    "e2e-amber-step.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:51:16.155Z"
+    },
+    "e2e-amber-step.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:51:16.155Z"
+    },
+    "e2e-amber-step.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T02:51:16.155Z"
     }
   }
 }
