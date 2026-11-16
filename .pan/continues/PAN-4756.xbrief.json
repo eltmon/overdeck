@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4756",
   "created": "2026-11-16T11:19:47.790Z",
-  "updated": "2026-11-16T11:51:06.833Z",
+  "updated": "2026-11-16T11:51:32.568Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -624,9 +624,22 @@
       "doneAt": "2026-11-16T11:51:05.052Z"
     },
     "migrate-feature-metadata-modals": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4756",
-      "claimedAt": "2026-11-16T11:51:06.832Z"
+      "claimedAt": "2026-11-16T11:51:06.832Z",
+      "doneAt": "2026-11-16T11:51:32.567Z"
+    },
+    "migrate-feature-metadata-modals.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:51:32.567Z"
+    },
+    "migrate-feature-metadata-modals.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:51:32.567Z"
+    },
+    "migrate-feature-metadata-modals.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T11:51:32.567Z"
     }
   }
 }
