@@ -1,0 +1,306 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-16T06:52:42Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5427: Markdown Preview renders YAML front matter as body text",
+    "updated": "2026-11-16T06:54:57.526Z"
+  },
+  "plan": {
+    "id": "pan-5427",
+    "title": "Markdown Preview renders YAML front matter as body text",
+    "status": "running",
+    "uid": "b66443ae-19a5-4879-babf-115763f5a2fa",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-16T06:52:42Z",
+    "updated": "2026-11-16T06:54:57.526Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5427",
+        "label": "PAN-5427",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5427.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "markdown-preview",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "MarkdownTab passes the raw body to ChatMarkdown, so a leading YAML front matter block renders as an <hr> plus a bold setext paragraph ('title: Mission Control description: ...') above the real heading. Every Mintlify page in features/, configuration/ and reference/ is affected, in every Preview surface (code pane, diff window, dock Changes, editor pane, Docs pane, cockpit dig tabs), because all of them render through MarkdownTab.",
+      "Proposal": "Add a pure, dependency-free splitFrontMatter(body) in src/dashboard/frontend/src/lib/frontMatter.ts that detects a leading ---/--- block with at least one top-level key line and returns ordered entries (title, description, then source order) plus the remaining content; otherwise it returns the body unchanged. MarkdownTab renders the entries as a compact <dl data-testid=\"markdown-front-matter\"> (keys muted mono, values plain pre-wrap text) above ChatMarkdown, which receives only the content. All MarkdownTab callers inherit the fix. Full detail, value rules and decisions D1-D6 are in .pan/drafts/PAN-5427.md.",
+      "NonGoals": "- MDX import/export lines and JSX components (e.g. <ThemedImage .../>) keep rendering as text\n- TOML (+++) front matter is not detected\n- No full YAML semantics: no anchors, flow collections, escape processing or type coercion\n- No new npm dependency (no yaml/js-yaml/gray-matter/remark-frontmatter in the frontend)\n- No collapse/hide toggle and no editing of front matter from the Preview\n- No change to the Monaco code/editor view, which still shows raw text\n- A --- that is not the first line keeps rendering as a horizontal rule\n- A fenced leading block with no key line (e.g. ---/prose/---) keeps rendering exactly as today"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Hand-rolled front matter splitter instead of a YAML library",
+        "rationale": "The frontend declares no YAML package and the issue asks for values as plain text; lists and maps render as their source text, so a parser adds bundle weight for no visible gain."
+      },
+      {
+        "summary": "Strip the block only when it closes with --- and has at least one top-level key line",
+        "rationale": "Keeps the issue's 'a body without that leading block renders exactly as today' guarantee for a leading <hr> followed by prose."
+      },
+      {
+        "summary": "Nested values (lists, maps, block scalars) render as dedented source text with pre-wrap",
+        "rationale": "This repo's own front matter (skills, agents) uses lists and nested hooks maps; showing their text is faithful and needs no YAML semantics."
+      },
+      {
+        "summary": "Only --- closes the block; YAML '...' is not accepted",
+        "rationale": "Mintlify, Jekyll and this repo all close with ---."
+      },
+      {
+        "summary": "The list renders inside the markdown-tab container above ChatMarkdown, so it is part of the EditorPane citable surface",
+        "rationale": "Citations quote text and never use line numbers (resolveSelectionCitation.ts), so removing the block from the rendered body shifts nothing."
+      }
+    ],
+    "items": [
+      {
+        "id": "frontmatter-parser",
+        "title": "Add the pure splitFrontMatter parser with unit tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T06:52:42Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5427",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/frontMatter.ts",
+            "src/dashboard/frontend/src/lib/__tests__/frontMatter.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/frontMatter.test.ts",
+            "grep -n '^import' src/dashboard/frontend/src/lib/frontMatter.ts || true",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "frontMatter.test.ts passes every case listed in PRD WI-1",
+            "grep prints no import lines in frontMatter.ts",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 exactly. Create src/dashboard/frontend/src/lib/frontMatter.ts exporting FrontMatterEntry {key, value}, FrontMatterSplit {entries, content} and splitFrontMatter(body): strip a leading U+FEFF, split on /\\r?\\n/, require line 0 to be a fence line (exactly '---' after trimming trailing whitespace/\\r), find the next fence line, parse the lines between with the PRD 'Value rules' (top-level key regex ^([A-Za-z0-9_][A-Za-z0-9_.-]*)\\s*:(?:\\s+(.*)|\\s*)$; unquote matching quotes; block scalars and list/map continuation lines become dedented text joined by \\n; column-0 '#' comments dropped; duplicate keys kept). If there is no closing fence or no key line, return { entries: [], content: body } with body strictly unchanged. Order entries title, description, then source order. content is the lines after the closing fence joined by \\n. No imports, never throws. Write src/dashboard/frontend/src/lib/__tests__/frontMatter.test.ts with one it() per PRD WI-1 test case, and add 'src/lib/__tests__/frontMatter.test.ts' to scripts/frontend-test-subset.txt directly after 'src/lib/__tests__/flywheelNeedsYouLinks.test.ts'."
+        },
+        "items": [
+          {
+            "id": "frontmatter-parser.ac1",
+            "title": "Given the first 8 lines of features/mission-control.mdx, splitFrontMatter returns entries [title: 'Mission Control', description: 'Unified monitoring dashboard for projects, features, and AI agent activity'] and content that contains '# Mission Control' and does not contain 'title:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontmatter-parser.ac2",
+            "title": "Given a body with no closing fence, a body not starting with ---, or a ---/Some prose/--- block, splitFrontMatter returns empty entries and content strictly equal to the input body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontmatter-parser.ac3",
+            "title": "Given description before title and a third key icon, splitFrontMatter returns keys in order title, description, icon; CRLF and BOM-prefixed inputs produce the same entries as LF input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontmatter-parser.ac4",
+            "title": "Given quoted scalars, a list value (allowed-tools), a nested map (hooks), a '|' block scalar and a column-0 '# note' comment, splitFrontMatter produces unquoted text, '- Bash\\n- Read', relative-indented map text, 'line one\\nline two', and no entry or value containing '# note'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontmatter-parser.ac5",
+            "title": "scripts/frontend-test-subset.txt lists src/lib/__tests__/frontMatter.test.ts between flywheelNeedsYouLinks.test.ts and issue-pipeline-state.test.ts, and git diff origin/main shows no change to package.json, src/dashboard/frontend/package.json or bun.lock",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "markdowntab-frontmatter-list",
+        "title": "Render the front matter key/value list in MarkdownTab",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T06:52:42Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5427",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/MarkdownTab.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/__tests__/MarkdownTab.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/ZoneCOverviewTabs/__tests__/MarkdownTab.test.tsx src/components/diff/__tests__/DiffMarkdownPreview.test.tsx src/components/Stage/panes/EditorPane.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MarkdownTab.test.tsx passes the 2 existing PAN-5337 cases and the 5 new PAN-5427 cases; DiffMarkdownPreview and EditorPane tests still pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5",
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2 exactly. In MarkdownTab.tsx import splitFrontMatter/FrontMatterEntry from '../../../lib/frontMatter' and Fragment from 'react'. After the unchanged loading and empty branches, compute { entries, content } = splitFrontMatter(body). Inside the existing data-testid=\"markdown-tab\" div render <FrontMatterList entries={entries}/> when entries is non-empty, then ChatMarkdown with text={content} (same other props as today) only when content.trim() is non-empty. FrontMatterList is a local function rendering <dl data-testid=\"markdown-front-matter\" className=\"mb-3 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 border-b border-border pb-3 text-[12px]\"> with <dt className=\"font-mono-ui text-muted-foreground\"> keys and <dd className=\"m-0 whitespace-pre-wrap\"> values. Add one header-comment sentence citing PAN-5427. Add describe('MarkdownTab front matter (PAN-5427)') to the existing MarkdownTab.test.tsx with the five PRD WI-2 cases, reusing renderTab and mocking rpc.listDir to return an empty listing for the located case."
+        },
+        "items": [
+          {
+            "id": "markdowntab-frontmatter-list.ac1",
+            "title": "Given the Mission Control body with docLocation, MarkdownTab renders markdown-front-matter whose first <dt> is 'title' and second is 'description', and the list precedes the 'Mission Control' heading in document order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "markdowntab-frontmatter-list.ac2",
+            "title": "Given the Mission Control body with and without docLocation, no rendered <p> contains the text 'title: Mission Control' and no <hr> precedes the heading",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "markdowntab-frontmatter-list.ac3",
+            "title": "Given a body with a mid-document --- line or a leading ---/Some prose/--- block, MarkdownTab renders an <hr> and does not render markdown-front-matter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "markdowntab-frontmatter-list.ac4",
+            "title": "Given a front-matter-only body '---\\ntitle: X\\n---\\n', MarkdownTab renders markdown-front-matter and does not render markdown-tab-empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "markdowntab-frontmatter-list.ac5",
+            "title": "UAT on :3011 with an isolated Playwright browser profile: the dock Changes diff view Preview of features/mission-control.mdx renders the front matter list (title, then description) above the Mission Control heading and shows no bold 'title: Mission Control' paragraph",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-frontmatter",
+        "title": "Document front matter rendering in the Preview docs and changelog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T06:52:42Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5427",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/file-explorer.mdx",
+            "docs/MARKDOWN-EDITOR-PANE.md",
+            "changelog.d/pan-5427.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'front matter' features/file-explorer.mdx docs/MARKDOWN-EDITOR-PANE.md changelog.d/pan-5427.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep prints matches in all three files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3 exactly. In features/file-explorer.mdx, after the paragraph starting 'In Preview, a relative link opens', add the PRD's one-paragraph text about front matter showing as a key/value list with title and description first, --- elsewhere still a rule, and MDX import lines/components still shown as text. In docs/MARKDOWN-EDITOR-PANE.md add a '## Front matter in the Preview (PAN-5427)' section after '## Links in the Preview (PAN-5337)' naming splitFrontMatter in src/dashboard/frontend/src/lib/frontMatter.ts, the detection rule, the no-key-line-means-unchanged rule, a value-rules summary, and that every MarkdownTab caller inherits it. Create changelog.d/pan-5427.md with the PRD's '#### Fixed' bullet. Run npm run lint:docs."
+        },
+        "items": [
+          {
+            "id": "docs-frontmatter.ac1",
+            "title": "features/file-explorer.mdx contains a paragraph stating that a file starting with YAML front matter shows a key/value list above the content with title and description first, and that a --- elsewhere is still a horizontal rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-frontmatter.ac2",
+            "title": "docs/MARKDOWN-EDITOR-PANE.md contains a 'Front matter in the Preview (PAN-5427)' section that names splitFrontMatter and src/dashboard/frontend/src/lib/frontMatter.ts and states that a fenced block with no key line renders unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-frontmatter.ac3",
+            "title": "changelog.d/pan-5427.md exists with a single '#### Fixed' heading and one bullet linking #5427, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "frontmatter-parser",
+        "to": "markdowntab-frontmatter-list",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-16-PAN-5427-markdown-preview-renders-yaml-front-matter-as-body-text.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

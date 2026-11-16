@@ -1,0 +1,82 @@
+{
+  "version": "1",
+  "issueId": "PAN-5427",
+  "created": "2026-11-16T06:55:17.473Z",
+  "updated": "2026-11-16T07:30:32.443Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "frontmatter-parser": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5427",
+      "claimedAt": "2026-11-16T06:55:17.473Z",
+      "doneAt": "2026-11-16T07:07:16.622Z"
+    },
+    "frontmatter-parser.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:07:16.622Z"
+    },
+    "frontmatter-parser.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:07:16.622Z"
+    },
+    "frontmatter-parser.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:07:16.622Z"
+    },
+    "frontmatter-parser.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:07:16.622Z"
+    },
+    "frontmatter-parser.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:07:16.622Z"
+    },
+    "markdowntab-frontmatter-list": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5427",
+      "claimedAt": "2026-11-16T07:07:27.492Z",
+      "doneAt": "2026-11-16T07:22:38.799Z"
+    },
+    "markdowntab-frontmatter-list.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:22:38.799Z"
+    },
+    "markdowntab-frontmatter-list.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:22:38.799Z"
+    },
+    "markdowntab-frontmatter-list.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:22:38.799Z"
+    },
+    "markdowntab-frontmatter-list.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:22:38.799Z"
+    },
+    "docs-frontmatter": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5427",
+      "claimedAt": "2026-11-16T07:22:48.127Z",
+      "doneAt": "2026-11-16T07:23:51.451Z"
+    },
+    "docs-frontmatter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:23:51.451Z"
+    },
+    "docs-frontmatter.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:23:51.451Z"
+    },
+    "docs-frontmatter.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:23:51.451Z"
+    },
+    "markdowntab-frontmatter-list.ac5": {
+      "status": "cancelled"
+    }
+  }
+}

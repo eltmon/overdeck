@@ -504,6 +504,7 @@ src/lib/__tests__/deliveredToast.test.ts
 src/lib/__tests__/explorer-drag-paths.test.ts
 src/lib/__tests__/flywheelNeedsYou.test.ts
 src/lib/__tests__/flywheelNeedsYouLinks.test.ts
+src/lib/__tests__/frontMatter.test.ts
 src/lib/__tests__/issue-pipeline-state.test.ts
 src/lib/__tests__/issueActions.menu-by-state.test.ts
 src/lib/__tests__/issueActions.no-actions-lost.test.ts
