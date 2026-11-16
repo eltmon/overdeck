@@ -1,6 +1,7 @@
-import { exec } from 'node:child_process';
+import { exec, execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 import type { ChatMessage, ConversationChanges, WorkLogEntry } from '@overdeck/contracts';
@@ -204,6 +205,21 @@ async function diffPatchForFiles(
   return diffPatchSinceBase(repoRoot, baseCommit, filePaths, options);
 }
 
+/** PAN-5408 FR-5: a new-file patch for an untracked path; `git diff --no-index` exits 1 when the files differ. */
+async function untrackedFilePatch(repoRoot: string, path: string, options: DiffOptions = {}): Promise<string> {
+  try {
+    const { stdout } = await promisify(execFile)(
+      'git',
+      ['diff', '--no-index', '--patch', '--minimal', '--no-color', ...diffOptionArgs(options), '--', '/dev/null', path],
+      { cwd: repoRoot, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 },
+    );
+    return stdout;
+  } catch (error: unknown) {
+    const stdout = (error as { stdout?: unknown }).stdout;
+    return typeof stdout === 'string' ? stdout : '';
+  }
+}
+
 /** PAN-5408: the attributed file set, keyed by repo-relative path, stats summed per path. */
 export function attributedFiles(changes: ConversationChanges | null): Map<string, TurnDiffFileChange> {
   const files = new Map<string, TurnDiffFileChange>();
@@ -376,19 +392,28 @@ export async function getConversationDiffFull(
       const paths = [...attributed.keys()];
       if (paths.length > 0) {
         const baseCommit = await findCommitAtTime(cwdRepoRoot, attributionBaseTime(conv, changes));
-        const patchPaths = fileFilter === undefined ? paths : paths.filter((path) => path === fileFilter);
-        if (patchPaths.length > 0) {
-          const patch = baseCommit
-            ? await diffPatchSinceBase(cwdRepoRoot, baseCommit, patchPaths, options)
-            : await diffPatchFilesAgainstHead(cwdRepoRoot, patchPaths, options);
-          if (patch) patches.push(patch);
-        }
         const net = new Map(
           (baseCommit
             ? await diffFilesSinceBase(cwdRepoRoot, baseCommit, paths)
             : await diffFilesAgainstHead(cwdRepoRoot, paths)
           ).map((file) => [file.path, file]),
         );
+        const patchPaths = fileFilter === undefined ? paths : paths.filter((path) => path === fileFilter);
+        if (patchPaths.length > 0) {
+          const patch = baseCommit
+            ? await diffPatchSinceBase(cwdRepoRoot, baseCommit, patchPaths, options)
+            : await diffPatchFilesAgainstHead(cwdRepoRoot, patchPaths, options);
+          if (patch) patches.push(patch);
+          // PAN-5408 FR-5: an untracked attributed file has no net diff; render it as a new-file patch.
+          const uncommittedByPath = new Map((changes?.uncommitted ?? []).map((file) => [file.path, file]));
+          for (const path of patchPaths) {
+            if (net.has(path)) continue;
+            if (uncommittedByPath.get(path)?.status !== 'A') continue;
+            if (!existsSync(join(cwdRepoRoot, path))) continue;
+            const untrackedPatch = await untrackedFilePatch(cwdRepoRoot, path, options);
+            if (untrackedPatch) patches.push(untrackedPatch);
+          }
+        }
         addFiles(paths.map((path) => net.get(path) ?? attributed.get(path)!));
       }
     }

@@ -152,4 +152,55 @@ describe('getConversationDiffFull attribution (PAN-5408)', () => {
       expect(diff).not.toContain(unattributed);
     }
   });
+
+  it('renders an untracked attributed file as a new-file patch (FR-5)', async () => {
+    const INITIAL_DATE = '2020-01-01T00:00:00Z';
+    const repo = join(testRoot, 'repo-untracked');
+    mkdirSync(repo, { recursive: true });
+    git(repo, ['init', '--quiet'], INITIAL_DATE);
+    git(repo, ['config', 'user.email', 'test@example.com'], INITIAL_DATE);
+    git(repo, ['config', 'user.name', 'Test User'], INITIAL_DATE);
+    writeFileSync(join(repo, 'README.md'), '# readme\n');
+    git(repo, ['add', '.'], INITIAL_DATE);
+    git(repo, ['commit', '--quiet', '-m', 'initial'], INITIAL_DATE);
+
+    createConversation({ name: 'attr-untracked', tmuxSession: 'conv-attr-untracked', cwd: repo });
+
+    // mine-new.txt is untracked but recorded as edited; stray.txt is untracked and unrecorded.
+    writeFileSync(join(repo, 'mine-new.txt'), 'new line\n');
+    writeFileSync(join(repo, 'stray.txt'), 'stray\n');
+
+    const sessionFile = join(testRoot, 'session-untracked.jsonl');
+    writeFileSync(sessionFile, '{}\n');
+
+    const parsed = {
+      messages: [{ role: 'assistant' as const, id: 'a1', createdAt: new Date().toISOString() }],
+      workLog: [],
+      fileEditsByAssistantId: new Map([['a1', [{ filePath: join(repo, 'mine-new.txt') }]]]),
+    };
+    const changesDeps = {
+      resolveSessionFile: async () => sessionFile,
+      getCachedMessages: async () => parsed,
+      peekCachedMessages: () => null,
+      listConversations: () => [],
+      now: Date.now,
+    };
+    const fullDeps = {
+      resolveSessionFile: changesDeps.resolveSessionFile,
+      getCachedMessages: changesDeps.getCachedMessages,
+      conversationChanges: async (n: string) =>
+        (await getConversationChanges(n, { scope: 'conversation' }, changesDeps)).body as ConversationChanges,
+    };
+
+    const fullResult = await getConversationDiffFull('attr-untracked', undefined, fullDeps);
+    const files = (fullResult.body as { files: Array<{ path: string }> }).files.map((f) => f.path);
+    expect(files).toContain('mine-new.txt');
+    expect(files).not.toContain('stray.txt');
+
+    const fileResult = await getConversationDiffFull('attr-untracked', 'mine-new.txt', fullDeps);
+    const diff = (fileResult.body as { diff: string }).diff;
+    expect(diff).toContain('+++ b/mine-new.txt');
+    expect(diff).toContain('+new line');
+    expect(diff).not.toContain('stray.txt');
+  });
 });
