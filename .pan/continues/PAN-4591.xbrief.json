@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4591",
   "created": "2026-11-16T11:39:00.796Z",
-  "updated": "2026-11-16T12:01:35.032Z",
+  "updated": "2026-11-16T12:10:35.096Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,34 @@
       "doneAt": "2026-11-16T12:01:23.703Z"
     },
     "inject-mcp": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4591",
-      "claimedAt": "2026-11-16T12:01:35.031Z"
+      "claimedAt": "2026-11-16T12:01:35.031Z",
+      "doneAt": "2026-11-16T12:10:35.095Z"
+    },
+    "inject-mcp.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:10:35.095Z"
+    },
+    "inject-mcp.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:10:35.095Z"
+    },
+    "inject-mcp.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:10:35.095Z"
+    },
+    "inject-mcp.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:10:35.095Z"
+    },
+    "inject-mcp.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:10:35.095Z"
+    },
+    "inject-mcp.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-16T12:10:35.095Z"
     }
   }
 }
