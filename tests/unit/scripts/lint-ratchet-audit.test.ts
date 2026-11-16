@@ -63,6 +63,15 @@ function writeHarnessBranchesBaseline(root: string, rows: string[]): void {
   );
 }
 
+function writeCountPathBaseline(root: string, file: string, rows: string[]): void {
+  mkdirSync(join(root, 'scripts'), { recursive: true });
+  writeFileSync(join(root, 'scripts', file), `# Ratchet baseline (PAN-4561).\n# Lower with --update\n${rows.join('\n')}\n`);
+}
+
+function writeCompilerAllowlist(root: string, paths: string[]): void {
+  writeFileSync(join(root, 'eslint-react-compiler-allowlist.json'), `${JSON.stringify(paths, null, 2)}\n`);
+}
+
 function commitAll(root: string, message: string): string {
   execFileSync('git', ['add', '-A'], { cwd: root });
   execFileSync('git', ['commit', '-m', message, '--quiet'], { cwd: root });
@@ -425,5 +434,78 @@ describe('lint-ratchet-audit.sh', () => {
     commitAll(lowered, 'lower harness-branch rows');
 
     expect(runAudit(lowered, ['--range', 'HEAD~1..HEAD']).ok).toBe(true);
+  });
+
+  for (const [file, label] of [
+    ['react-compiler-skip-baseline.txt', 'react-compiler skip baseline'],
+    ['manual-memo-baseline.txt', 'manual-memo baseline'],
+  ] as const) {
+    it(`requires an issue reference to raise or add a ${label} row, and lowers freely (PAN-4561)`, () => {
+      const seed = ['3 src/a.tsx', '2 src/b.tsx'];
+      const raised = ['4 src/a.tsx', '2 src/b.tsx', '1 src/c.tsx'];
+
+      const refLess = setupRepo();
+      writeCountPathBaseline(refLess, file, seed);
+      commitAll(refLess, `initialize ${label}`);
+      writeCountPathBaseline(refLess, file, raised);
+      const commit = commitAll(refLess, `raise ${label} rows`);
+      const failed = runAudit(refLess, ['--range', 'HEAD~1..HEAD']);
+      expect(failed.ok).toBe(false);
+      expect(failed.output).toContain(commit.slice(0, 12));
+      expect(failed.output).toContain(`${label} increased: 4 src/a.tsx`);
+      expect(failed.output).toContain(`${label} increased: 1 src/c.tsx`);
+      expect(failed.output).not.toContain('increased: 2 src/b.tsx');
+
+      const withRef = setupRepo();
+      writeCountPathBaseline(withRef, file, seed);
+      commitAll(withRef, `initialize ${label}`);
+      writeCountPathBaseline(withRef, file, raised);
+      commitAll(withRef, `raise ${label} rows PAN-1`);
+      expect(runAudit(withRef, ['--range', 'HEAD~1..HEAD']).ok).toBe(true);
+
+      const lowered = setupRepo();
+      writeCountPathBaseline(lowered, file, seed);
+      commitAll(lowered, `initialize ${label}`);
+      writeCountPathBaseline(lowered, file, ['1 src/a.tsx']);
+      commitAll(lowered, `lower ${label} rows`);
+      expect(runAudit(lowered, ['--range', 'HEAD~1..HEAD']).ok).toBe(true);
+    });
+  }
+
+  it('requires an issue reference to add a React Compiler lint allowlist path, and removes freely (PAN-4561)', () => {
+    const refLess = setupRepo();
+    writeCompilerAllowlist(refLess, ['src/a.tsx', 'src/b.tsx']);
+    commitAll(refLess, 'initialize compiler allowlist');
+    writeCompilerAllowlist(refLess, ['src/a.tsx', 'src/b.tsx', 'src/c.tsx']);
+    const commit = commitAll(refLess, 'allowlist c');
+    const failed = runAudit(refLess, ['--range', 'HEAD~1..HEAD']);
+    expect(failed.ok).toBe(false);
+    expect(failed.output).toContain(commit.slice(0, 12));
+    expect(failed.output).toContain('react-compiler allowlist added: src/c.tsx');
+
+    const withRef = setupRepo();
+    writeCompilerAllowlist(withRef, ['src/a.tsx']);
+    commitAll(withRef, 'initialize compiler allowlist');
+    writeCompilerAllowlist(withRef, ['src/a.tsx', 'src/c.tsx']);
+    commitAll(withRef, 'allowlist c PAN-1');
+    expect(runAudit(withRef, ['--range', 'HEAD~1..HEAD']).ok).toBe(true);
+
+    const removed = setupRepo();
+    writeCompilerAllowlist(removed, ['src/a.tsx', 'src/b.tsx']);
+    commitAll(removed, 'initialize compiler allowlist');
+    writeCompilerAllowlist(removed, ['src/a.tsx']);
+    commitAll(removed, 'fix b');
+    expect(runAudit(removed, ['--range', 'HEAD~1..HEAD']).ok).toBe(true);
+  });
+
+  it('treats the first React Compiler lint allowlist as an initialization (PAN-4561)', () => {
+    const root = setupRepo();
+    writeCompilerAllowlist(root, ['src/a.tsx', 'src/b.tsx']);
+    commitAll(root, 'create compiler allowlist');
+
+    const result = runAudit(root, ['--range', 'HEAD~1..HEAD']);
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('ratchet audit passed');
   });
 });
