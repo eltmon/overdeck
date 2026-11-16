@@ -1,0 +1,993 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-16T11:11:49.586Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4561: Upgrade the dashboard to React 19 and enable the React Compiler with a no-manual-memo ratchet",
+    "updated": "2026-11-16T11:21:00.024Z"
+  },
+  "plan": {
+    "id": "pan-4561",
+    "title": "Upgrade the dashboard to React 19 and enable the React Compiler with a no-manual-memo ratchet",
+    "status": "proposed",
+    "uid": "b9738b93-cbf6-4cb1-b9d1-e6c24b3abe66",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-16T11:11:49.586Z",
+    "updated": "2026-11-16T11:21:00.024Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4561",
+        "label": "PAN-4561",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4561.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "react-19",
+      "react-compiler",
+      "ratchet",
+      "lint"
+    ],
+    "metadata": {
+      "sizeJustification": "The plan names about 34 files across 13 path prefixes, but most are one-line edits: 8 React 19 type fixes, 3 Vite/Vitest config lines, 3 package.json files plus bun.lock, and docs. The burn-down that would make the issue large (159 skipped files, about 200 files of manual memo) is already split into six sibling issues by WI-11. What remains cannot be split further. The coverage test and its baseline only mean something once the compiler is on with the exact pinned toolchain, and the before/after timings bracket the React upgrade and the compiler switch together (PAN-4560 precedent). The three ratchets and the ratchet audit share the same baseline-file contract. Every item is still its own commit with its own Item: trailer and its own test.",
+      "canonicalFilename": "2026-11-16-PAN-4561-upgrade-the-dashboard-to-react-19-and-enable-the-react-compiler-with-a-no-manual-memo-ratchet.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The dashboard frontend memoizes by hand: 404 useMemo and 532 useCallback call lines, plus 12 memo() wrappers, across 1,208 source files. It runs React 18, and the React Compiler's output targets React 19. Nothing stops new manual memo, and nothing reports components the compiler skips. A planning probe with oxc-transform-react@0.152.0 found 159 files with 345 compiler diagnostics today. eslint-plugin-react-hooks@7.1.1 finds rule violations in 165 files.",
+      "Proposal": "Upgrade the frontend and apps/mobile to React 19.3 and fix the 8 resulting type errors. Move visx to 4.0.0. Enable the oxc React Compiler natively through @vitejs/plugin-react 6.1.2 react({ compiler }), with options shared by Vite, Vitest and the phone app in one module. Add three shrink-only ratchets with baselines created in this PR: a Vitest coverage test that compiles every frontend source file and fails on any new or raised skip (diagnostics plus 'use no memo' directives) or any stale row; a lint step that counts useMemo/useCallback/memo call sites per file; and the eslint-plugin-react-hooks compiler rules with a per-file allowlist. Extend lint-ratchet-audit.sh to cover them. Record before and after dev cold-start and vite build timings on the issue, document the rules, and file six sibling burn-down issues by directory.",
+      "NonGoals": "- Fixing any currently skipped file, including the App.tsx route split (sibling issues do this)\n- Removing any existing useMemo, useCallback or memo\n- Adopting new React 19 APIs (use, actions, ref as a prop, <Context> as provider)\n- Ratcheting apps/mobile/src's own source\n- Turning on react-hooks/exhaustive-deps\n- Moving ESLint to v9 or flat config\n- Upgrading zustand or any dependency not named in the PRD\n- Adding babel-plugin-react-compiler or @rolldown/plugin-babel to any build or test pipeline\n- Failing the build on a compiler diagnostic (panicThreshold stays 'none')\n- Editing the OKF knowledge bundle"
+    },
+    "autoDecisions": [
+      {
+        "summary": "AC 3 ('a test fails when the compiler skips any file') is met as a shrink-only ratchet. The test fails on any skip in a file without a baseline row, on a raised count and on a stale row, and the 159 currently skipped files are baselined.",
+        "rationale": "Fixing 159 files across about 50 directories, plus manual-memo removal in about 200 files, is far beyond one reviewable PR and the finalize size limits. The issue title says 'ratchet' and Proposal step 4 says 'file by file'. The ratchet makes new skips impossible from the day it lands, and WI-11 files the burn-down as six sibling issues."
+      },
+      {
+        "summary": "Pin @vitejs/plugin-react exactly to 6.1.2 and oxc-transform-react exactly to 0.152.0.",
+        "rationale": "The issue asks for the latest 6.1.x. 6.1.2's peer range is oxc-transform-react ^0.152.0. A probe with 0.156.0 (the newest 6.3.0 accepts) gave the same diagnostics (161 files versus 159). Exact pins keep the skip baseline reproducible between machines."
+      },
+      {
+        "summary": "React and react-dom ^19.3.1, @types/react and @types/react-dom ^19.3.0, in both the frontend and apps/mobile.",
+        "rationale": "These are the newest releases that are at least two weeks old. apps/mobile imports frontend source and dedupes React, so both must share the React major."
+      },
+      {
+        "summary": "Move @visx/group, @visx/scale and @visx/shape to ^4.0.0.",
+        "rationale": "visx 3.12 is the only React dependency whose peer range stops at React 18. 4.0.0 (2026-06) declares React 19. The frontend's ambient.d.ts already types these modules, and only two GodView components use them."
+      },
+      {
+        "summary": "Enable the compiler in vitest.config.ts and apps/mobile/vite.config.ts too, through one shared options module.",
+        "rationale": "Tests must exercise what ships. A shared object keeps the coverage scan, the build and the tests from drifting. If a test fails only when compiled, the component is fixed; the fallback is a single 'use no memo' plus a baseline raise named in the PR."
+      },
+      {
+        "summary": "oxc (the build's compiler) is the authority for skipped files. eslint-plugin-react-hooks gets its own file allowlist, and exhaustive-deps stays off.",
+        "rationale": "The ESLint plugin's Babel compiler disagrees with oxc on 84 files and adds lint-only rules. exhaustive-deps would warn on hundreds of existing effects."
+      },
+      {
+        "summary": "The manual-memo check is a count-per-file ratchet script in the lint chain, not an ESLint rule.",
+        "rationale": "Lint runs with --no-inline-config, so ESLint cannot exempt lines. A per-file ESLint exemption would let new memo calls into the 200 files that already have one."
+      },
+      {
+        "summary": "Timings: 'before' at the branch base (React 18, no compiler), 'after' at the end. Medians of 3. vite build alone, without tsc. Dev cold start = vite spawn with an empty .vite cache until #root has a child in headless Chromium.",
+        "rationale": "This brackets the two changes the issue asks about and isolates the compiler transform cost from type checking."
+      },
+      {
+        "summary": "Burn-down is six sibling issues, split by directory, each covering skip fixes, lint allowlist entries and memo removal for its paths.",
+        "rationale": "Directory groups are independent and reviewable. Combining skip fixes and memo removal per directory enforces the ordering rule (remove memo only after a file compiles)."
+      }
+    ],
+    "items": [
+      {
+        "id": "timings-before",
+        "title": "Measure dev cold start and vite build on React 18 without the compiler, and post them on #4561",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T11:11:49.586Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "spike",
+          "issueLabel": "pan-4561",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".tmp/pan-4561/measure-timings.mjs"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git diff origin/main -- src/dashboard/frontend/package.json",
+            "node .tmp/pan-4561/measure-timings.mjs before",
+            "gh issue view 4561 --repo eltmon/overdeck --comments"
+          ],
+          "expected_outputs": [
+            "the package.json diff prints nothing (still React 18)",
+            "the script exits 0 and writes .tmp/pan-4561/timings-before.md with 3 runs and a median per metric",
+            "issue #4561 contains a comment beginning '## Frontend timings — before'"
+          ],
+          "readiness": "sequential",
+          "readinessReason": "Must observe the unmodified tree, so it runs before any other item commits.",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1. Write the gitignored script .tmp/pan-4561/measure-timings.mjs as specified: 3 timed `npx vite build` runs in src/dashboard/frontend; 3 dev cold-start runs, each deleting the literal path src/dashboard/frontend/node_modules/.vite, spawning `npx vite --port 3019 --strictPort --host 127.0.0.1` and timing until the static #pan-boot spinner inside #root is gone (React's first commit replaces it), in a fresh headless Chromium from @playwright/test. Write timings-<label>.json and .md with the commit, Node version, CPU count, load averages, runs and medians. Run it with label 'before' and post the markdown with `gh issue comment 4561`, first line '## Frontend timings — before (<short sha>, React 18, no compiler)'. Commit with `git commit --allow-empty` carrying the Item: trailer."
+        },
+        "items": [
+          {
+            "id": "timings-before.ac1",
+            "title": "Given the frontend package.json still pins react ^18.3.1, when the script runs, then it produces .tmp/pan-4561/timings-before.md with 3 runs and a median for dev cold start and vite build",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "timings-before.ac2",
+            "title": "Issue #4561 shows a comment starting '## Frontend timings — before' that contains both medians and the load average",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "react19-deps",
+        "title": "Upgrade react, react-dom and their types to 19 in the frontend and apps/mobile, and fix the 8 type errors",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T11:11:49.586Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4561",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/package.json",
+            "apps/mobile/package.json",
+            "bun.lock",
+            "src/dashboard/frontend/src/components/Agents/directory/DirectoryList.tsx",
+            "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/useProjectRename.ts",
+            "src/dashboard/frontend/src/components/skills/SkillPacksSection.tsx",
+            "src/dashboard/frontend/src/components/workspace/new/SmartWorkspaceField.tsx",
+            "src/dashboard/frontend/src/components/SensitiveText.tsx",
+            "src/dashboard/frontend/src/components/orders/RunSettingsPanel.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "bash scripts/lint-frontend-types.sh",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/App.test.tsx src/App/AppLiveStoreHost.render-count.test.tsx src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx src/test-utils/renderCounter.test.tsx",
+            "npm --prefix apps/mobile test",
+            "npm --prefix apps/mobile run build"
+          ],
+          "expected_outputs": [
+            "npm run typecheck exits 0",
+            "lint-frontend-types.sh reports 0 errors against a 0-row baseline",
+            "the four Vitest files pass",
+            "the phone app tests pass and its vite build exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In src/dashboard/frontend/package.json and apps/mobile/package.json set react and react-dom to ^19.3.1 and @types/react and @types/react-dom to ^19.3.0, then run `bun install` at the repo root and commit bun.lock. Fix the five RefObject TS2322 errors by widening the receiving type to RefObject<T | null>: DirectoryList.tsx:43 filterRef, IssueActionMenu.tsx:283 triggerRef, useProjectRename.ts:21 inputRef, SkillPacksSection.tsx:70 sectionRef, SmartWorkspaceField.tsx:25 inputRef. Add `?.` where a consumer reads .current. Never cast or use `!`. Fix the three TS2554 errors by changing `useRef<ReturnType<typeof setTimeout>>()` to `useRef<ReturnType<typeof setTimeout> | undefined>(undefined)` in SensitiveText.tsx:12 and RunSettingsPanel.tsx:115-116. Any other new type error gets the same widening rule. CI judges the full frontend subset."
+        },
+        "items": [
+          {
+            "id": "react19-deps.ac1",
+            "title": "Both package.json files pin react ^19.3.1, react-dom ^19.3.1, @types/react ^19.3.0 and @types/react-dom ^19.3.0, and bun.lock resolves react 19.3.x",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "react19-deps.ac2",
+            "title": "npm run typecheck exits 0 and scripts/frontend-types-baseline.txt still contains 0 error rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "react19-deps.ac3",
+            "title": "The diff contains no new `as RefObject` casts or non-null assertions on ref objects; the five receiving types accept `| null`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "react19-deps.ac4",
+            "title": "npm --prefix apps/mobile run build exits 0 and npm --prefix apps/mobile test passes on React 19",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "visx-4",
+        "title": "Move @visx/group, @visx/scale and @visx/shape to 4.0.0 for React 19 peer support",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T11:11:49.586Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4561",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/package.json",
+            "bun.lock"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/GodView/confluence/__tests__/topbar-enrichment.test.tsx",
+            "npm --prefix src/dashboard/frontend run build"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "topbar-enrichment.test.tsx passes (it renders <InfraGauges /> unmocked)",
+            "the frontend build exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. Set @visx/group, @visx/scale and @visx/shape to ^4.0.0 in src/dashboard/frontend/package.json and run `bun install` at the root. Keep the declarations in src/types/ambient.d.ts lines 91-120 unchanged. The consumers are components/GodView/CostDonut.tsx and InfraGauges.tsx (Group, Arc, scaleOrdinal)."
+        },
+        "items": [
+          {
+            "id": "visx-4.ac1",
+            "title": "src/dashboard/frontend/package.json pins the three @visx packages at ^4.0.0 and bun.lock resolves 4.x for each",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "visx-4.ac2",
+            "title": "topbar-enrichment.test.tsx, which renders InfraGauges unmocked, passes, and `npm --prefix src/dashboard/frontend run build` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "compiler-on",
+        "title": "Enable the oxc React Compiler in Vite, Vitest and apps/mobile through one shared options module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T11:11:49.586Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "infra",
+          "issueLabel": "pan-4561",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "compile-coverage",
+            "timings-after"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/reactCompiler.ts",
+            "src/dashboard/frontend/vite.config.ts",
+            "src/dashboard/frontend/vitest.config.ts",
+            "src/dashboard/frontend/tsconfig.node.json",
+            "src/dashboard/frontend/package.json",
+            "src/dashboard/frontend/src/__tests__/reactCompilerEnabled.test.tsx",
+            "scripts/frontend-test-subset.txt",
+            "apps/mobile/vite.config.ts",
+            "apps/mobile/package.json",
+            "bun.lock"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/__tests__/reactCompilerEnabled.test.tsx",
+            "cd src/dashboard/frontend && npx vite build --minify false --outDir ../../../.tmp/pan-4561/build-check --emptyOutDir",
+            "cat .tmp/pan-4561/build-check/assets/*.js | grep -c '=== Symbol.for(\"react.memo_cache_sentinel\")'",
+            "git grep -n 'babel-plugin-react-compiler\\|plugin-babel' -- src/dashboard/frontend/vite.config.ts src/dashboard/frontend/vitest.config.ts apps/mobile/vite.config.ts",
+            "npm --prefix apps/mobile run build",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "reactCompilerEnabled.test.tsx passes with one Child render after three clicks",
+            "the non-minified build exits 0",
+            "the sentinel-comparison grep prints a number above 100 (or the PRD step 7 fallback matches)",
+            "the babel git grep prints nothing",
+            "the phone app build exits 0",
+            "typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Owns the three compiler config files and the new options module; its only shared files (package.json, bun.lock, frontend-test-subset.txt) are ordered by blocks edges.",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. Pin \"@vitejs/plugin-react\": \"6.1.2\" and add \"oxc-transform-react\": \"0.152.0\" (both exact) to the devDependencies of the frontend and apps/mobile, then run `bun install`. Create src/dashboard/frontend/reactCompiler.ts exporting `reactCompilerOptions = { target: '19', panicThreshold: 'none' } as const satisfies ReactCompilerOptions`, with the header comment from the PRD, and add it to tsconfig.node.json include. Change `react()` to `react({ compiler: reactCompilerOptions })` in vite.config.ts, vitest.config.ts and apps/mobile/vite.config.ts (importing '../../src/dashboard/frontend/reactCompiler'). Add src/__tests__/reactCompilerEnabled.test.tsx exactly as in the PRD and list it in scripts/frontend-test-subset.txt. Check the non-minified build with the PRD step 7 grep, using its fallback if needed. If a test fails only with the compiler on, apply PRD Decision 3: fix the component, or as a last resort add one 'use no memo' and name it in the PR body. Never disable the compiler in vitest.config.ts."
+        },
+        "items": [
+          {
+            "id": "compiler-on.ac1",
+            "title": "vite.config.ts, vitest.config.ts and apps/mobile/vite.config.ts each pass the imported reactCompilerOptions to react({ compiler }), and a git grep for babel-plugin-react-compiler or plugin-babel in those three files prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compiler-on.ac2",
+            "title": "When reactCompilerEnabled.test.tsx clicks the Parent button three times, the constant Child records exactly one render, and the test file is listed in scripts/frontend-test-subset.txt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compiler-on.ac3",
+            "title": "The non-minified vite build output contains more than 100 inline `=== Symbol.for(\"react.memo_cache_sentinel\")` comparisons, or the PR body records the step 7 fallback evidence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compiler-on.ac4",
+            "title": "Each of the two package.json files contains the exact pins @vitejs/plugin-react 6.1.2 and oxc-transform-react 0.152.0 with no range operator",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compiler-on.ac5",
+            "title": "With the compiler enabled, CI job test-e2e (frontend subset and Playwright specs) passes and CI job mobile-android passes on the PR",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "compile-coverage",
+        "title": "Add the React Compiler skip scan, its shrink-only baseline and the Vitest coverage test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T11:11:49.586Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4561",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "ratchet-audit",
+            "burn-down-issues",
+            "docs"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/scripts/reactCompilerCoverage.ts",
+            "scripts/react-compiler-skip-baseline.txt",
+            "src/dashboard/frontend/src/__tests__/reactCompilerCoverage.test.ts",
+            "scripts/frontend-test-subset.txt",
+            "src/dashboard/frontend/tsconfig.node.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/__tests__/reactCompilerCoverage.test.ts",
+            "npx tsx src/dashboard/frontend/scripts/reactCompilerCoverage.ts --check",
+            "node scripts/run-frontend-test-subset.mjs --dry-run",
+            "bash scripts/lint-source-introspection.sh"
+          ],
+          "expected_outputs": [
+            "reactCompilerCoverage.test.ts passes (fixture, directive and tree cases)",
+            "--check exits 0 against the committed baseline",
+            "the dry-run args contain src/__tests__/reactCompilerCoverage.test.ts",
+            "lint-source-introspection.sh exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. Create src/dashboard/frontend/scripts/reactCompilerCoverage.ts exporting isFrontendSourceFile, skipCountForSource (transformSync from oxc-transform-react with { jsx: { runtime: 'automatic' }, reactCompiler: { ...reactCompilerOptions, reportDiagnostics: true } }; count = errors.length + matches of /['\"]use no (?:memo|forget)['\"]/g), scanFrontend, readBaseline, writeBaseline, compareToBaseline ({ added, raised, stale }), and a CLI with --check (default), --update (lowers only) and --init. Paths are repo-root-relative. readFileSync takes a variable path, never a literal ending in .ts/.tsx. Create scripts/react-compiler-skip-baseline.txt with --init and the PRD header. Write src/__tests__/reactCompilerCoverage.test.ts with the fixture (Bad.tsx try/finally versus Good.tsx promise.finally in a mkdtemp dir), directive and tree cases. Add it to scripts/frontend-test-subset.txt in sorted position. After the final `pan sync-main` before `pan done`, re-run --init and commit with PAN-4561 in the message."
+        },
+        "items": [
+          {
+            "id": "compile-coverage.ac1",
+            "title": "Given a temp dir with a component using try/finally, scanFrontend reports that file with count >= 1, and it does not report the same component rewritten with promise.finally()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compile-coverage.ac2",
+            "title": "skipCountForSource returns count 1 for a component whose only problem is a \"use no memo\" directive",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compile-coverage.ac3",
+            "title": "The tree case fails, naming the path and first diagnostic, when a non-baselined frontend source file gains a skip, and also when a baseline row is higher than its file's current count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compile-coverage.ac4",
+            "title": "`--update` lowers or drops stale rows and exits 1 without writing any added or raised row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compile-coverage.ac5",
+            "title": "scripts/frontend-test-subset.txt contains src/__tests__/reactCompilerCoverage.test.ts, so CI's test:frontend-subset runs it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "manual-memo-ratchet",
+        "title": "Add the lint:manual-memo ratchet that rejects new useMemo, useCallback and memo in frontend source",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T11:11:49.586Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-4561",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-manual-memo.sh",
+            "scripts/manual-memo-baseline.txt",
+            "tests/unit/scripts/lint-manual-memo.test.ts",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/scripts/lint-manual-memo.test.ts",
+            "bash scripts/lint-manual-memo.sh",
+            "node scripts/run-lint-group.mjs --list"
+          ],
+          "expected_outputs": [
+            "lint-manual-memo.test.ts passes",
+            "the lint script exits 0 on the branch",
+            "the core group lists `npm run lint:manual-memo`"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6. Model scripts/lint-manual-memo.sh on scripts/lint-harness-branches.sh: check and --update modes, never raise or add, initialize a missing baseline, LC_ALL=C. Scan src/dashboard/frontend/src *.ts/*.tsx, excluding *.test.*, *.spec.*, *.d.ts, __tests__/ and test-utils/. Skip comment lines. Count every occurrence of `(^|[^A-Za-z0-9_$.])(React\\.)?(useMemo|useCallback)[[:space:]]*[(<]` and `(^|[^A-Za-z0-9_$])(React\\.)?memo[[:space:]]*[(<]`. The baseline is scripts/manual-memo-baseline.txt with rows `<count> <path>`. Add \"lint:manual-memo\": \"bash scripts/lint-manual-memo.sh\" to the root package.json and append `&& npm run lint:manual-memo` after lint:harness-branches in the lint script. Write tests/unit/scripts/lint-manual-memo.test.ts modeled on lint-harness-branches.test.ts, with the cases listed in the PRD."
+        },
+        "items": [
+          {
+            "id": "manual-memo-ratchet.ac1",
+            "title": "When a frontend source file gains one new useMemo( call, `bash scripts/lint-manual-memo.sh` exits 1 and prints that file's path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "manual-memo-ratchet.ac2",
+            "title": "The script counts React.memo(, memo<Props>( and useCallback<T>( call sites, and when useMemo appears only in a // comment, an import specifier or a *.test.tsx file the count stays 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "manual-memo-ratchet.ac3",
+            "title": "`--update` lowers a reduced row and refuses to raise or add rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "manual-memo-ratchet.ac4",
+            "title": "The root lint script runs `npm run lint:manual-memo`, and run-lint-group.mjs --list shows it in the core group",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "compiler-lint-rules",
+        "title": "Run the eslint-plugin-react-hooks compiler rules as errors on frontend source with a shrink-only file allowlist",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T11:11:49.586Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-4561",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".eslintrc.cjs",
+            "eslint-react-compiler-allowlist.json",
+            "package.json",
+            "bun.lock"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx eslint --no-inline-config --ext .ts,.tsx src/dashboard/frontend/src",
+            "npx eslint src/ --ext .js,.ts,.tsx --no-inline-config"
+          ],
+          "expected_outputs": [
+            "frontend eslint exits 0 with the allowlist in place",
+            "the full src/ eslint step exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7. Add \"eslint-plugin-react-hooks\": \"7.1.1\" (exact) to the root devDependencies and run `bun install`. In .eslintrc.cjs, load eslint-react-compiler-allowlist.json in a try like eslint-any-allowlist.json. Define REACT_COMPILER_RULES (rules-of-hooks, static-components, use-memo, preserve-manual-memoization, incompatible-library, immutability, globals, refs, set-state-in-effect, error-boundaries, purity, set-state-in-render, unsupported-syntax, config, gating, all 'error') and set exhaustive-deps 'off' with a comment citing PRD Decision 6. Add an override for src/dashboard/frontend/src/**/*.{ts,tsx} (excluding tests, __tests__ and test-utils) with plugins ['react-hooks'], plus an allowlist override turning those rules off. Generate the allowlist once by running eslint with JSON output and the allowlist absent, keeping every file with a react-hooks/* message, sorted and repo-root-relative. Check that a deliberate render-time ref read in a non-allowlisted file fails, then revert it."
+        },
+        "items": [
+          {
+            "id": "compiler-lint-rules.ac1",
+            "title": "`npx eslint src/ --ext .js,.ts,.tsx --no-inline-config` exits 0 with eslint-react-compiler-allowlist.json committed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compiler-lint-rules.ac2",
+            "title": "When a non-allowlisted frontend component reads `useRef(0).current` during render, eslint reports react-hooks/refs as an error and exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compiler-lint-rules.ac3",
+            "title": "The allowlist contains only files that have at least one react-hooks/* finding without it; removing any one entry makes eslint fail on that file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ratchet-audit",
+        "title": "Extend lint-ratchet-audit.sh to require an issue reference for raising the new baselines and allowlist",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T11:11:49.586Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-4561",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-ratchet-audit.sh",
+            "tests/unit/scripts/lint-ratchet-audit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/scripts/lint-ratchet-audit.test.ts",
+            "bash scripts/lint-ratchet-audit.sh"
+          ],
+          "expected_outputs": [
+            "lint-ratchet-audit.test.ts passes, existing and new cases",
+            "the audit exits 0 on the branch"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-8. Generalize harness_branches_baseline_at and harness_branches_baseline_increases_for_commit into count_path_baseline_at <file> <rev> and count_path_baseline_increases_for_commit <file> <label> <commit> <parents...>. Call them for scripts/harness-branches-baseline.txt (existing output unchanged), scripts/react-compiler-skip-baseline.txt and scripts/manual-memo-baseline.txt. Generalize the ESLint allowlist functions the same way for eslint-any-allowlist.json and eslint-react-compiler-allowlist.json, treating a JSON allowlist with no parent version as an initialization. Add the three files to the audit loop and update the success message. Add one test case per new file: raise without an issue reference fails, with PAN-1 passes, lowering passes."
+        },
+        "items": [
+          {
+            "id": "ratchet-audit.ac1",
+            "title": "A commit that raises a row in scripts/react-compiler-skip-baseline.txt without an issue reference in its message fails the audit, and the same commit with PAN-1 passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-audit.ac2",
+            "title": "A commit that adds a row to scripts/manual-memo-baseline.txt or a path to eslint-react-compiler-allowlist.json without an issue reference fails the audit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-audit.ac3",
+            "title": "Lowering or removing a row in any of the three files passes the audit, and every existing lint-ratchet-audit.test.ts case still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "timings-after",
+        "title": "Measure dev cold start and vite build on React 19 with the compiler, and post the before/after comparison on #4561",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T11:11:49.586Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "spike",
+          "issueLabel": "pan-4561",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".tmp/pan-4561/measure-timings.mjs"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node .tmp/pan-4561/measure-timings.mjs after",
+            "gh issue view 4561 --repo eltmon/overdeck --comments"
+          ],
+          "expected_outputs": [
+            "the script exits 0 and writes .tmp/pan-4561/timings-after.md",
+            "issue #4561 contains a comment beginning '## Frontend timings — after' with before median, after median and percent change for both metrics"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-9. With react19-deps, visx-4 and compiler-on committed, run `node .tmp/pan-4561/measure-timings.mjs after` (re-create the WI-1 script if .tmp was cleaned). Write .tmp/pan-4561/timings-compare.md with first line '## Frontend timings — after (<short sha>, React 19, React Compiler)', a table of metric, before median, after median and change in percent, then both raw tables and the load averages. Post it with `gh issue comment 4561 --repo eltmon/overdeck --body-file`. Never re-run the 'before' label (the tree is on React 19 now). If .tmp was cleaned, read the before medians from the WI-1 comment on #4561. If the 1-minute load average at the start of the after run is more than 2.0 above the before run's, wait and re-run only 'after'. Post both load averages. Use an empty commit for the Item: trailer."
+        },
+        "items": [
+          {
+            "id": "timings-after.ac1",
+            "title": "Issue #4561 shows a comment starting '## Frontend timings — after' that contains, for dev cold start and vite build, the before median, the after median and the percent change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "timings-after.ac2",
+            "title": "The after measurement records a commit where both package.json files pin React 19 and vite.config.ts passes reactCompilerOptions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the React Compiler rules, the three ratchets and the no-manual-memo policy",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T11:11:49.586Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4561",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "sync-sources/dev-skills/pan-style-guide/SKILL.md",
+            ".overdeck/context/codebase/stack.md",
+            ".overdeck/context/codebase/conventions.md",
+            "changelog.d/pan-4561.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "npm run lint:last-verified",
+            "grep -c '## React Compiler (PAN-4561)' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "lint:last-verified exits 0",
+            "the grep prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-10. In docs/DASHBOARD-ARCHITECTURE.md add '## React Compiler (PAN-4561)' directly after '## Render discipline (PAN-4560)'. Cover: React 19 compiled by oxc through react({ compiler }) with no Babel, and the shared reactCompiler.ts; the skip causes and their fix patterns (module-level function, promise.finally(), splitting a component); the three ratchet files with what fails and the exact check and update commands; the no-manual-memo policy and the ordering rule; and that panicThreshold 'none' keeps builds green while the coverage test is the gate. Add one pointer sentence in Render discipline. In sync-sources/dev-skills/pan-style-guide/SKILL.md ## Workflow, add the review-finding bullet. In .overdeck/context/codebase/stack.md change 'React 18' to React 19 with the oxc React Compiler, and add a conventions.md ## Frontend bullet; leave both last-verified lines unchanged. Create changelog.d/pan-4561.md with the #### Improved entry from the PRD."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains '## React Compiler (PAN-4561)', which names scripts/react-compiler-skip-baseline.txt, scripts/manual-memo-baseline.txt and eslint-react-compiler-allowlist.json with their check and update commands",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "The new section contains the ordering rule: a file's manual memo is removed only after that file has no row in the skip baseline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "sync-sources/dev-skills/pan-style-guide/SKILL.md ## Workflow contains a bullet that marks a new `useMemo(`/`useCallback(`/`memo(` or a raised ratchet row as a review finding",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "stack.md shows React 19 with the React Compiler, changelog.d/pan-4561.md contains an #### Improved bullet linking #4561, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "burn-down-issues",
+        "title": "File six sibling burn-down issues by directory and link them from #4561",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T11:11:49.586Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "spike",
+          "issueLabel": "pan-4561",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/react-compiler-skip-baseline.txt",
+            "scripts/manual-memo-baseline.txt",
+            "eslint-react-compiler-allowlist.json"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "gh issue list --repo eltmon/overdeck --search 'React Compiler burn-down in:title' --state open --json number,title",
+            "gh issue view 4561 --repo eltmon/overdeck --comments"
+          ],
+          "expected_outputs": [
+            "six open issues titled 'React Compiler burn-down: …'",
+            "issue #4561 contains a comment linking all six"
+          ],
+          "readiness": "ready",
+          "acJustification": "Two criteria cover the item: the six issues exist with full content, and the parent links them.",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-11 and Decision 8. Read the three baseline files (do not edit them). Partition their rows into the six directory groups: (1) everything outside components/; (2) components/chat/; (3) components/Settings/; (4) components/CommandDeck, Stage, frame, dock; (5) components/explorer, GodView, conversations, workspace, project; (6) every other path under components/. For each group run `gh issue create --repo eltmon/overdeck` with title 'React Compiler burn-down: <group> — compile every file and drop manual memo'. The body starts '**Parent:** #4561' and contains the group's skip rows with first diagnostics, its memo rows, its allowlist paths, the fix patterns, the ordering rule, and acceptance criteria. Then comment on #4561 listing all six. Use an empty commit for the Item: trailer, with the six issue numbers in the commit body."
+        },
+        "items": [
+          {
+            "id": "burn-down-issues.ac1",
+            "title": "Six open issues titled 'React Compiler burn-down: …' exist on eltmon/overdeck. Together their bodies cover every row of the skip baseline, the memo baseline and the compiler lint allowlist, and each contains the ordering rule.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "burn-down-issues.ac2",
+            "title": "Issue #4561 shows a comment that links all six burn-down issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-screens",
+        "title": "Render the main dashboard screens from the branch build in an isolated headless browser with no uncaught errors",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T11:11:49.586Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4561",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".tmp/pan-4561/uat-screens.mjs"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run build",
+            "ss -ltn | grep -c ':3010 '",
+            "node .tmp/pan-4561/uat-screens.mjs"
+          ],
+          "expected_outputs": [
+            "the frontend build exits 0",
+            "the port check prints 0 before vite preview starts",
+            ".tmp/pan-4561/uat-screens.md lists 8 routes, each rendered, with 0 page errors and 0 matched console errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-12. Build the branch frontend. When port 3010 is free, serve the build with `npx vite preview --port 3010 --strictPort` in src/dashboard/frontend (it proxies to the dashboard on 127.0.0.1:3011, and the server trusts the localhost:3010 origin). Write the gitignored .tmp/pan-4561/uat-screens.mjs: a fresh chromium.launch() from @playwright/test, never a shared profile, visiting /command-deck, /command-deck/overdeck, /board, /pipeline, /agents, /costs, /settings and /god-view. On each route, wait until #pan-boot is gone and body text exceeds 200 characters, record pageerror events and console errors matching /Minified React error|findDOMNode|is not a function|Invalid hook call/, and save a screenshot. Navigation only: never click a control that changes server state. Look at every screenshot yourself. Put the uat-screens.md table in the PR body. If a route fails, fix the cause and re-run all routes. Empty commit for the Item: trailer when there is no fix."
+        },
+        "items": [
+          {
+            "id": "uat-screens.ac1",
+            "title": "Given the branch build served by vite preview on :3010, when an isolated headless Chromium visits the eight PRD routes, then every route renders past #pan-boot with more than 200 characters of body text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-screens.ac2",
+            "title": "The run records 0 pageerror events and 0 console errors matching /Minified React error|findDOMNode|is not a function|Invalid hook call/ across all eight routes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-screens.ac3",
+            "title": "The PR body contains the uat-screens.md table, and the /god-view screenshot shows the CostDonut and InfraGauges visx charts rendered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "timings-before",
+        "to": "react19-deps",
+        "type": "blocks"
+      },
+      {
+        "from": "react19-deps",
+        "to": "visx-4",
+        "type": "blocks"
+      },
+      {
+        "from": "visx-4",
+        "to": "compiler-on",
+        "type": "blocks"
+      },
+      {
+        "from": "compiler-on",
+        "to": "compile-coverage",
+        "type": "blocks"
+      },
+      {
+        "from": "compiler-on",
+        "to": "compiler-lint-rules",
+        "type": "blocks"
+      },
+      {
+        "from": "manual-memo-ratchet",
+        "to": "compiler-lint-rules",
+        "type": "blocks"
+      },
+      {
+        "from": "compiler-on",
+        "to": "timings-after",
+        "type": "blocks"
+      },
+      {
+        "from": "compile-coverage",
+        "to": "ratchet-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "manual-memo-ratchet",
+        "to": "ratchet-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "compiler-lint-rules",
+        "to": "ratchet-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "compile-coverage",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "manual-memo-ratchet",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "compiler-lint-rules",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "compile-coverage",
+        "to": "burn-down-issues",
+        "type": "blocks"
+      },
+      {
+        "from": "manual-memo-ratchet",
+        "to": "burn-down-issues",
+        "type": "blocks"
+      },
+      {
+        "from": "compiler-lint-rules",
+        "to": "burn-down-issues",
+        "type": "blocks"
+      },
+      {
+        "from": "compiler-on",
+        "to": "uat-screens",
+        "type": "blocks"
+      },
+      {
+        "from": "timings-before",
+        "to": "timings-after",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
