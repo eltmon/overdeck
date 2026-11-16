@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5423",
   "created": "2026-11-16T05:56:13.176Z",
-  "updated": "2026-11-16T05:59:00.288Z",
+  "updated": "2026-11-16T05:59:30.727Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,6 +34,11 @@
     "delivered-toast-helper.ac5": {
       "status": "completed",
       "doneAt": "2026-11-16T05:59:00.288Z"
+    },
+    "wire-auq-answer-toast": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5423",
+      "claimedAt": "2026-11-16T05:59:30.727Z"
     }
   }
 }
