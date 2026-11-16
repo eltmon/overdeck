@@ -167,7 +167,7 @@ For tags like `v0.7.1` the workflow will:
 - run the full test suite and smoke-test the CLI
 - pack `@overdeck/core` into one tarball (job `pack`)
 - install that exact tarball on a bare macOS host and run the bare-host smoke (job `bare-host-macos`)
-- publish that tarball to npm `latest`, then build and publish `@overdeck/contracts` and `@overdeck/desktop` (job `npm`)
+- build `@overdeck/desktop` and check it (no `onnxruntime`/`transformers` in `server/node_modules`, tarball at most 300 MB), then publish that tarball to npm `latest`, followed by `@overdeck/contracts` and `@overdeck/desktop` (job `npm`, PAN-5424)
 - build the Linux desktop app
 - generate a structured release body from git history
 - create a normal GitHub Release
@@ -303,6 +303,14 @@ A workspace package leaked into runtime `dependencies` as `workspace:*`. npm can
 ### The release stopped at `bare-host-macos`
 
 The macOS bare-host smoke failed on the tarball the release was about to publish, so nothing went to npm and no GitHub Release exists. Download the `bare-host-macos-release-logs` artifact from the run and read `result.json` (see "Bare-host smoke (PAN-5176)"): `panUp.forbiddenToolLines` for a `pan up` that needs a missing tool, `idle.spawns.top` for the program the idle dashboard spawns too often. Fix it on `main`, then cut the next version through `pan release stable`. Never publish by hand to get around the gate.
+
+### The npm job stopped at "Build desktop package"
+
+That step builds and size-checks `@overdeck/desktop` before anything is published (PAN-5424), so nothing went to npm and no GitHub Release exists. The step log shows one of two messages:
+- "server/node_modules contains packages the desktop server must not ship": a bundled chunk now names the package (the output lists each offending path). If the server only loads it lazily and degrades without it, add it to `SERVER_SKIP_PACKAGES` in `apps/desktop/scripts/package-policy.mjs`; otherwise make it unreachable from the server's chunk graph.
+- "tarball … MB … limit 300.0 MB": find the heavy dependency with `du -sh apps/desktop/server/node_modules/* | sort -h | tail`. npm itself cannot publish a tarball above roughly 402 MB (`ERR_STRING_TOO_LONG`), so 300 MB is a safety margin, not the hard limit.
+
+Either way: fix it on `main`, then cut the next version through `pan release stable`.
 
 ### `pan release check` fails tests on the no-loss matrix
 

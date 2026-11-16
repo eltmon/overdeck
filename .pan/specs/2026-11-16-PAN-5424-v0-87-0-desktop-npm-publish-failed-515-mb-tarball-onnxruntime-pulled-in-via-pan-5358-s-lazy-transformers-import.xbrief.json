@@ -1,0 +1,401 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-16T06:12:55Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5424: v0.87.0 desktop npm publish failed: 515 MB tarball (onnxruntime pulled in via PAN-5358's lazy transformers import)",
+    "updated": "2026-11-16T06:25:11.645Z"
+  },
+  "plan": {
+    "id": "pan-5424",
+    "title": "v0.87.0 desktop npm publish failed: 515 MB tarball (onnxruntime pulled in via PAN-5358's lazy transformers import)",
+    "status": "running",
+    "uid": "ecc82bbd-418c-4068-a6ae-269ab4caf07a",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-16T06:12:55Z",
+    "updated": "2026-11-16T06:25:11.645Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5424",
+        "label": "PAN-5424",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-5424.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "desktop",
+      "release",
+      "packaging",
+      "npm",
+      "infra"
+    ],
+    "narratives": {
+      "Problem": "The v0.87.0 release npm job failed at 'Publish desktop to npm' with ERR_STRING_TOO_LONG on a 515.2 MB tarball, leaving a half-release (core and contracts published, desktop stuck at 0.86.0, no GitHub Release). PAN-5358's namespace dynamic import of index-builder (vectors.ts lines 24-25) stopped rolldown from tree-shaking the local-embedding path, so the dashboard server build now bundles @huggingface/transformers into dist/dashboard/transformers.node-<hash>.js. scanImportClosure matches a JSDoc `from \"@huggingface/transformers\"` string in that chunk, lists transformers as an external, and the npm install in apps/desktop/server pulls onnxruntime-node (574 MB) and onnxruntime-web (145 MB).",
+      "Proposal": "Per PRD .pan/drafts/pan-5424.md: (WI-1) move the server skip set into a new importable apps/desktop/scripts/package-policy.mjs as SERVER_SKIP_PACKAGES and add @huggingface/transformers; (WI-2) after installDependencies(serverDir) in prepare-server-resources.mjs, fail when server/node_modules contains @huggingface/transformers or onnxruntime-{node,web,common} at any depth; (WI-3) in build-for-publish.mjs measure the tarball with `npm pack --dry-run --json --ignore-scripts` and fail over 300,000,000 bytes; (WI-4) in release.yml run build-for-publish.mjs in a new 'Build desktop package' step before the first publish so a guard failure publishes nothing; (WI-5) document the skip, both guards and their failure recovery in docs/RELEASING.md and docs/DESKTOP-APP.md, plus changelog.d/pan-5424.md. Behavioral tests live in tests/unit/scripts/desktop-package-policy.test.ts.",
+      "NonGoals": "- No change to CLI staging (apps/desktop/cli, scanImportClosure over cli/index.js); it keeps @huggingface/transformers for pan docs and pan memory reindex in the installers\n- No change to the dashboard tsdown bundling (neverBundle), to vectors.ts or index-builder.ts imports, or to the scanImportClosure regexes in import-closure.mjs\n- No addition of sharp, int32 or onnxruntime-* to SERVER_SKIP_PACKAGES (they are already dropped or never scanned; the forbidden-package guard covers them)\n- No new PR CI job that builds, stages or packs the desktop package (the pre-merge proof is the mandatory local build-for-publish run)\n- No change to the release job graph: the npm job does not gain a dependency on the desktop installer matrix\n- No version bump, release cut, re-run of the v0.87.0 release, or manual npm publish\n- No change to the PTY-supervisor vendor/ staging or its comments\n- No tests that read source files and assert on their text (lint:source-introspection), and no added it.skip/skipIf/.only"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Skip @huggingface/transformers by package name in the server skip set, exactly as the issue proposes.",
+        "rationale": "Planning verified the scanner's only transformers hit is a JSDoc string in the bundled chunk and that the skip drops exactly that one package; the server never embeds (injection.ts reads cached vectors inside try/catch), and the CLI runtime keeps transformers. Rewriting the scanner or vectors.ts imports has wider blast radius for no extra safety."
+      },
+      {
+        "summary": "Move the skip set into a new importable module apps/desktop/scripts/package-policy.mjs.",
+        "rationale": "prepare-server-resources.mjs has top-level side effects, so tests cannot import its constants; repo lint rejects new source-text-reading tests. An importable module allows behavioral tests."
+      },
+      {
+        "summary": "Put the tests under root tests/unit/scripts/ rather than apps/desktop/tests/.",
+        "rationale": "CI's ci.yml runs root Vitest (tests/**) and has no apps/desktop test job, so tests under apps/desktop/tests would not run on PRs; tests/unit/scripts already imports .mjs helpers (bare-host-smoke-result.test.ts)."
+      },
+      {
+        "summary": "Measure the tarball with `npm pack --dry-run --json --ignore-scripts` and fail above 300,000,000 bytes (decimal MB, inclusive limit).",
+        "rationale": "The issue names 300 MB. v0.86.0 packed at 133.3 MB (2.25x headroom) and the hard npm limit is about 402 MB raw (base64 into a 0x1fffffe8-char string). npm 10.9.4 on this host returns a numeric size from dry-run (verified on packages/contracts); a real npm pack plus stat is the documented fallback."
+      },
+      {
+        "summary": "Also check for forbidden packages right after the server npm install in prepare-server-resources.mjs.",
+        "rationale": "The issue asks to fail if server/node_modules contains onnxruntime-node; checking in prepare-server-resources covers both the npm publish path and the dist:linux|mac|win installer builds and fails earlier than the pack."
+      },
+      {
+        "summary": "Move build-for-publish.mjs into its own release.yml step before 'Publish CLI to npm'.",
+        "rationale": "Today it runs inside 'Publish desktop to npm', after core and contracts already published, so any guard failure would reproduce the half-release. The PAN-5176 comment in the same job already states every build step runs before the first publish."
+      }
+    ],
+    "items": [
+      {
+        "id": "skip-transformers",
+        "title": "Skip @huggingface/transformers in desktop server staging via importable package-policy.mjs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T06:12:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5424",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/desktop/scripts/package-policy.mjs",
+            "apps/desktop/scripts/prepare-server-resources.mjs",
+            "tests/unit/scripts/desktop-package-policy.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/desktop-package-policy.test.ts",
+            "grep -n 'const SKIP_PACKAGES' apps/desktop/scripts/prepare-server-resources.mjs || echo none"
+          ],
+          "expected_outputs": [
+            "desktop-package-policy.test.ts passes, including the JSDoc-fixture scan test",
+            "grep prints 'none' (the inline SKIP_PACKAGES constant is gone)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create apps/desktop/scripts/package-policy.mjs exporting SERVER_SKIP_PACKAGES = new Set(['@effect/platform-bun', 'playwright', 'playwright-core', '@huggingface/transformers']) with the comments from the PRD snippet. In prepare-server-resources.mjs import it, delete the inline `const SKIP_PACKAGES = new Set([` block (around line 279), and pass SERVER_SKIP_PACKAGES to scanImportClosure(serverDir, ENTRY_POINTS, ...). Rewrite the header's 'Deliberately skipped externals' paragraph (search `Deliberately skipped externals`) to list transformers and point at package-policy.mjs, and replace the false 'npm pack strips nested node_modules' sentence (search `npm pack strips nested`; it wraps across header lines 28-29) with: npm pack includes server/node_modules, so its size counts toward the npm tarball. Create tests/unit/scripts/desktop-package-policy.test.ts importing scanImportClosure from ../../../apps/desktop/scripts/import-closure.mjs and SERVER_SKIP_PACKAGES from ../../../apps/desktop/scripts/package-policy.mjs; build the server.js + transformers.node-abc.js fixture from the PRD in a mkdtempSync dir and assert the scan with the skip set equals new Set(['yaml']) and the scan without it contains '@huggingface/transformers'; assert the three pre-existing skips remain. Do not touch the CLI scan (scanImportClosure(distRoot, ['cli/index.js'])). Do not read source files in tests."
+        },
+        "items": [
+          {
+            "id": "skip-transformers.ac1",
+            "title": "Given a fixture chunk whose only transformers reference is a JSDoc `from \"@huggingface/transformers\"` line, when scanImportClosure runs with SERVER_SKIP_PACKAGES, then it returns exactly the set {\"yaml\"}, and without the skip set it returns a set containing @huggingface/transformers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skip-transformers.ac2",
+            "title": "SERVER_SKIP_PACKAGES exported from apps/desktop/scripts/package-policy.mjs contains @effect/platform-bun, playwright, playwright-core and @huggingface/transformers, asserted by desktop-package-policy.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skip-transformers.ac3",
+            "title": "prepare-server-resources.mjs passes SERVER_SKIP_PACKAGES to the server scanImportClosure call, no longer defines its own SKIP_PACKAGES, and its header names @huggingface/transformers as a deliberately skipped external",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "forbidden-packages-guard",
+        "title": "Fail desktop server staging when server/node_modules contains onnxruntime or transformers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T06:12:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5424",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/desktop/scripts/package-policy.mjs",
+            "apps/desktop/scripts/prepare-server-resources.mjs",
+            "tests/unit/scripts/desktop-package-policy.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/desktop-package-policy.test.ts"
+          ],
+          "expected_outputs": [
+            "findForbiddenPackages tests pass for top-level, nested, scoped, clean and missing trees"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add FORBIDDEN_SERVER_PACKAGES = ['@huggingface/transformers', 'onnxruntime-node', 'onnxruntime-web', 'onnxruntime-common'] and findForbiddenPackages(nodeModulesDir, forbidden = FORBIDDEN_SERVER_PACKAGES) to package-policy.mjs: a recursive walk (readdirSync withFileTypes, descend only isDirectory entries, handle @scope dirs, descend into each package's own node_modules) returning sorted paths relative to nodeModulesDir; [] when the dir is missing. In prepare-server-resources.mjs, directly after `installDependencies(serverDir);`, call it on join(serverDir, 'node_modules'); on any hit print the three console.error lines from the PRD (listing every path, mentioning SERVER_SKIP_PACKAGES in scripts/package-policy.mjs) and process.exit(1); otherwise log '[prepare-server] Verified: server/node_modules has no onnxruntime / @huggingface/transformers'. Do not apply it to cli/node_modules. Add the five fixture tests from the PRD to tests/unit/scripts/desktop-package-policy.test.ts, building expectations with path.join."
+        },
+        "items": [
+          {
+            "id": "forbidden-packages-guard.ac1",
+            "title": "Given fixture trees, findForbiddenPackages returns ['onnxruntime-node'] for a top-level hit, join('foo','node_modules','onnxruntime-web') for a nested hit, and ['@huggingface/transformers'] for a scoped hit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "forbidden-packages-guard.ac2",
+            "title": "Given a clean tree (yaml, @scope/pkg) or a missing directory, findForbiddenPackages returns an empty array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "forbidden-packages-guard.ac3",
+            "title": "prepare-server-resources.mjs calls findForbiddenPackages on server/node_modules immediately after installDependencies(serverDir) and exits 1 with every offending path printed when the result is non-empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pack-size-guard",
+        "title": "Fail build-for-publish.mjs when the desktop tarball exceeds 300 MB",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T06:12:55Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-5424",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/desktop/scripts/package-policy.mjs",
+            "apps/desktop/scripts/build-for-publish.mjs",
+            "tests/unit/scripts/desktop-package-policy.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/desktop-package-policy.test.ts",
+            "SKIP_DOCS_INDEX=1 npm run build && (cd apps/desktop && node scripts/build-for-publish.mjs); git restore apps/desktop/package.json",
+            "ls apps/desktop/server/node_modules | grep -E 'onnxruntime|@huggingface' || echo clean"
+          ],
+          "expected_outputs": [
+            "checkDesktopPackSize tests pass",
+            "build-for-publish.mjs exits 0 and prints '[build-for-publish] @overdeck/desktop tarball <N> MB ...' with N under 300, plus the prepare-server 'Verified: server/node_modules has no onnxruntime' line",
+            "the ls/grep prints 'clean'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Add MAX_DESKTOP_TARBALL_BYTES = 300_000_000 and checkDesktopPackSize(entry, limit = MAX_DESKTOP_TARBALL_BYTES) to package-policy.mjs: never throws; returns { ok, message } with message '@overdeck/desktop tarball <size/1e6 toFixed(1)> MB (unpacked <MB> MB, <entryCount> files); limit <limit/1e6 toFixed(1)> MB'; size > limit is ok:false (limit inclusive); a missing or non-numeric size is ok:false with 'could not be measured' in the message. In build-for-publish.mjs, after the electron-promotion block and before the final Done log, run execFileSync(npm, ['pack','--dry-run','--json','--ignore-scripts'], { cwd: desktopDir, encoding: 'utf8', maxBuffer: 512*1024*1024, stdio: ['ignore','pipe','inherit'], shell: process.platform === 'win32' }) with npm = 'npm.cmd' on win32, parse the JSON array, pass [0] to checkDesktopPackSize, log the message on ok, else console.error the message plus the du advice line and process.exit(1). Ship the PRD D5 fallback as code in a local measurePackedSize() helper: on JSON parse failure, a non-array, a missing [0], or a non-numeric size, run a real `npm pack --ignore-scripts --pack-destination <mkdtempSync dir>`, use statSync(tgz).size, then remove the temp dir; fail closed only if that also cannot measure. (npm 10.9.4 and npm 11.21.2 both return a numeric [0].size from dry-run; the release job uses npm 11.) Update the header: replace the 'npm pack strips server/node_modules' sentence and add step 4 'Measures the packed tarball and fails over 300 MB (PAN-5424)'. Add the checkDesktopPackSize tests from the PRD. Then run the local end-to-end proof (SKIP_DOCS_INDEX=1 npm run build; cd apps/desktop && node scripts/build-for-publish.mjs), paste the tarball size line into the PR body, and `git restore apps/desktop/package.json` (never commit the electron promotion). This local run is mandatory before pan done; a scanner-only probe is not acceptable proof. If the environment blocks it after retrying, do not run pan done: pan tell flywheel-orchestrator that the desktop packaging proof is blocked and why."
+        },
+        "items": [
+          {
+            "id": "pack-size-guard.ac1",
+            "title": "checkDesktopPackSize returns ok:true with '133.3 MB' in the message for size 133_300_000, ok:true for exactly 300_000_000, and ok:false with '515.2 MB' and '300.0 MB' for size 515_200_000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-size-guard.ac2",
+            "title": "checkDesktopPackSize returns ok:false with 'could not be measured' in the message for an entry without a numeric size and for undefined, and honors a custom limit argument",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-size-guard.ac3",
+            "title": "Given SKIP_DOCS_INDEX=1 npm run build on the branch, when `node scripts/build-for-publish.mjs` runs in apps/desktop before pan done, then it exits 0, prints a tarball size line under 300 MB, its Externalized deps line omits @huggingface/transformers, and apps/desktop/server/node_modules contains no onnxruntime-* or @huggingface entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-size-guard.ac4",
+            "title": "build-for-publish.mjs falls back to a real npm pack plus statSync when the dry-run output has no numeric size, exits 1 with the size message on stderr when checkDesktopPackSize returns ok:false, and the committed apps/desktop/package.json still lists electron under devDependencies",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "release-build-before-publish",
+        "title": "Run build-for-publish.mjs in its own release step before the first npm publish",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-16T06:12:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5424",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/release.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'name: Build contracts\\|name: Build desktop package\\|name: Publish CLI to npm\\|name: Publish desktop to npm\\|build-for-publish' .github/workflows/release.yml",
+            "node -e \"require('yaml').parse(require('fs').readFileSync('.github/workflows/release.yml','utf8'))\" && echo yaml-ok"
+          ],
+          "expected_outputs": [
+            "grep shows 'Build desktop package' between 'Build contracts' and 'Publish CLI to npm', and build-for-publish appears only in that step",
+            "yaml-ok"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In .github/workflows/release.yml job `npm`, add the step from the PRD (comment block citing PAN-5424, `name: Build desktop package`, `run: cd apps/desktop && node scripts/build-for-publish.mjs`) between the 'Build contracts' step and the 'Publish CLI to npm' step. Remove the `node scripts/build-for-publish.mjs` line from 'Publish desktop to npm' and leave every other line of that step and every other job unchanged. If an HTTPS push of this workflow file is refused for missing `workflow` scope, push over SSH: git push git@github.com:eltmon/overdeck.git HEAD:feature/pan-5424. Scope: this only orders the npm job; do not add a dependency between the npm job and the desktop installer matrix job."
+        },
+        "items": [
+          {
+            "id": "release-build-before-publish.ac1",
+            "title": "Given .github/workflows/release.yml job npm, when the steps are listed in order, then a step named 'Build desktop package' that runs `cd apps/desktop && node scripts/build-for-publish.mjs` sits after 'Build contracts' and before 'Publish CLI to npm'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "release-build-before-publish.ac2",
+            "title": "Given the edited release.yml, when it is parsed with the yaml package, then it parses without error, and the 'Publish desktop to npm' step no longer invokes build-for-publish.mjs and preserves its retry-safe npm view check and publish commands",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-release-and-desktop",
+        "title": "Document the transformers skip and both desktop packaging guards",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-16T06:12:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5424",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/RELEASING.md",
+            "docs/DESKTOP-APP.md",
+            "changelog.d/pan-5424.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'Build desktop package' docs/RELEASING.md",
+            "grep -n 'Packaged server dependencies' docs/DESKTOP-APP.md",
+            "grep -n 'strips nested' docs/DESKTOP-APP.md || echo no-strips-claim"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "RELEASING.md has the troubleshooting heading and the updated stable-tags line",
+            "DESKTOP-APP.md has the new subsection",
+            "no-strips-claim"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. docs/RELEASING.md: rewrite the 'Stable tags' bullet at line 170 so it says the npm job first builds @overdeck/desktop and checks it (no onnxruntime/transformers in server/node_modules, tarball at most 300 MB) before publishing @overdeck/core, @overdeck/contracts and @overdeck/desktop; add a troubleshooting entry '### The npm job stopped at \"Build desktop package\"' after the bare-host-macos entry covering both failure messages, SERVER_SKIP_PACKAGES in apps/desktop/scripts/package-policy.mjs, the du command, the ~402 MB ERR_STRING_TOO_LONG hard limit, and 'fix on main, then pan release stable'. docs/DESKTOP-APP.md: add '### Packaged server dependencies' under '## Building the Desktop App' before '### Packaged CLI runtime' describing external discovery, SERVER_SKIP_PACKAGES and why transformers is skipped (packaged server only reads cached fact vectors; embedding runs in the CLI runtime, which keeps transformers), the forbidden-package guard, and the 300 MB tarball guard; fix the sentence near line 322 so the npm flavor lacks the CLI runtime because cli/ is not in the package files list (drop the 'npm packaging strips nested node_modules' claim). Create changelog.d/pan-5424.md with the exact '#### Fixed' entry from the PRD. Run npm run lint:docs."
+        },
+        "items": [
+          {
+            "id": "docs-release-and-desktop.ac1",
+            "title": "docs/RELEASING.md renders a troubleshooting section titled 'The npm job stopped at \"Build desktop package\"' that names SERVER_SKIP_PACKAGES, apps/desktop/scripts/package-policy.mjs and the 300 MB limit, and its stable-tags list states the desktop package is built and checked before any publish",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-release-and-desktop.ac2",
+            "title": "docs/DESKTOP-APP.md renders a 'Packaged server dependencies' subsection describing the transformers skip and both guards, and `grep -n 'strips nested' docs/DESKTOP-APP.md` returns no line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-release-and-desktop.ac3",
+            "title": "changelog.d/pan-5424.md exists with a single '#### Fixed' bullet linking #5424, and `npm run lint:docs` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "skip-transformers",
+        "to": "forbidden-packages-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "forbidden-packages-guard",
+        "to": "pack-size-guard",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-16-PAN-5424-v0-87-0-desktop-npm-publish-failed-515-mb-tarball-onnxruntime-pulled-in-via-pan-5358-s-lazy-transformers-import.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

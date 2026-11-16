@@ -1,0 +1,103 @@
+{
+  "version": "1",
+  "issueId": "PAN-5424",
+  "created": "2026-11-16T06:26:53.865Z",
+  "updated": "2026-11-16T07:47:16.487Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "skip-transformers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5424",
+      "claimedAt": "2026-11-16T06:26:53.865Z",
+      "doneAt": "2026-11-16T06:48:05.902Z"
+    },
+    "skip-transformers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T06:48:05.902Z"
+    },
+    "skip-transformers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T06:48:05.902Z"
+    },
+    "skip-transformers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T06:48:05.902Z"
+    },
+    "forbidden-packages-guard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5424",
+      "claimedAt": "2026-11-16T06:48:14.127Z",
+      "doneAt": "2026-11-16T07:06:28.334Z"
+    },
+    "forbidden-packages-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:06:28.334Z"
+    },
+    "forbidden-packages-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:06:28.334Z"
+    },
+    "forbidden-packages-guard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:06:28.334Z"
+    },
+    "pack-size-guard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5424",
+      "claimedAt": "2026-11-16T07:06:37.112Z",
+      "doneAt": "2026-11-16T07:27:07.400Z"
+    },
+    "pack-size-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:27:07.400Z"
+    },
+    "pack-size-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:27:07.400Z"
+    },
+    "pack-size-guard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:27:07.400Z"
+    },
+    "pack-size-guard.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:27:07.400Z"
+    },
+    "release-build-before-publish": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5424",
+      "claimedAt": "2026-11-16T07:27:18.385Z",
+      "doneAt": "2026-11-16T07:43:52.058Z"
+    },
+    "release-build-before-publish.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:43:52.058Z"
+    },
+    "release-build-before-publish.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:43:52.058Z"
+    },
+    "docs-release-and-desktop": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5424",
+      "claimedAt": "2026-11-16T07:44:06.498Z",
+      "doneAt": "2026-11-16T07:47:16.487Z"
+    },
+    "docs-release-and-desktop.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:47:16.487Z"
+    },
+    "docs-release-and-desktop.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:47:16.487Z"
+    },
+    "docs-release-and-desktop.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-16T07:47:16.487Z"
+    }
+  }
+}

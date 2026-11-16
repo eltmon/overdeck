@@ -20,13 +20,18 @@
  *   - dist/cli/ + chunk closure → cli/              (self-contained CLI runtime)
  *   - sync-sources/             → sync-sources/     (full sync payload, not hooks only)
  *
- * Deliberately skipped externals: bun-only modules (never imported under
- * Node), and playwright (lazy import for artifact thumbnails, PAN-1645 —
- * degrades gracefully and would drag in browser binaries).
+ * Deliberately skipped externals (apps/desktop/scripts/package-policy.mjs,
+ * SERVER_SKIP_PACKAGES): bun-only modules (never imported under Node),
+ * playwright (lazy import for artifact thumbnails, PAN-1645 — degrades
+ * gracefully and would drag in browser binaries), and
+ * @huggingface/transformers, which is bundled into the server and only
+ * falsely detected through a JSDoc string — installing it pulls in
+ * onnxruntime (~720 MB, PAN-5424).
  *
  * Consumed by electron-builder extraResources ({from: "server", to: "server"})
- * and by build-for-publish.mjs for the npm package (npm pack strips nested
- * node_modules — the npx flavor's node-pty story is tracked on PAN-2561).
+ * and by build-for-publish.mjs for the npm package (npm pack includes
+ * server/node_modules, so its size counts toward the npm tarball — see the
+ * packaging guards).
  *
  * Prerequisite: `npm run build` at the repo root.
  */
@@ -49,6 +54,7 @@ import * as OS from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { scanImportClosure } from "./import-closure.mjs";
+import { findForbiddenPackages, SERVER_SKIP_PACKAGES } from "./package-policy.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const desktopDir = join(__dirname, "..");
@@ -276,13 +282,7 @@ const ENTRY_POINTS = [
   "memory-fts-worker.js",
   "explorer-watch-child.js",
 ];
-const SKIP_PACKAGES = new Set([
-  "@effect/platform-bun", // bun-only dynamic import, never reached under Node
-  "playwright", // lazy import, degrades gracefully (PAN-1645)
-  "playwright-core",
-]);
-
-const { seen, packages } = scanImportClosure(serverDir, ENTRY_POINTS, SKIP_PACKAGES);
+const { seen, packages } = scanImportClosure(serverDir, ENTRY_POINTS, SERVER_SKIP_PACKAGES);
 
 // Pin each external to the version actually installed at the repo root, so
 // the packaged server runs exactly what `pan up` runs. An external the root
@@ -330,6 +330,15 @@ writeFileSync(
 
 console.log("[prepare-server] Installing externalized deps...");
 installDependencies(serverDir);
+
+const forbiddenServerPackages = findForbiddenPackages(join(serverDir, "node_modules"));
+if (forbiddenServerPackages.length > 0) {
+  console.error(`[prepare-server] server/node_modules contains packages the desktop server must not ship: ${forbiddenServerPackages.join(", ")}`);
+  console.error("  These drag ~720 MB of onnxruntime into the npm tarball and the installers (PAN-5424).");
+  console.error("  Find the chunk that names them (scanImportClosure output) and add the package to SERVER_SKIP_PACKAGES in scripts/package-policy.mjs, or make it unreachable.");
+  process.exit(1);
+}
+console.log("[prepare-server] Verified: server/node_modules has no onnxruntime / @huggingface/transformers");
 
 const desktopRequire = Module.createRequire(join(desktopDir, "package.json"));
 

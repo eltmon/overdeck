@@ -252,6 +252,12 @@ jobs:
       - name: Build contracts
         run: cd packages/contracts && npm run build
 
+      # PAN-5424: build and size-check the desktop package before ANY publish,
+      # so an oversized or broken desktop package stops the job before
+      # @overdeck/core and @overdeck/contracts reach npm (no half-release).
+      - name: Build desktop package
+        run: cd apps/desktop && node scripts/build-for-publish.mjs
+
       # Trusted Publishing: no NODE_AUTH_TOKEN. npm authenticates to npmjs.org
       # using the GitHub OIDC token granted by `id-token: write` above. The
       # trusted-publisher config on each @overdeck/* package on npmjs.com pins
@@ -292,7 +298,6 @@ jobs:
       - name: Publish desktop to npm
         run: |
           cd apps/desktop
-          node scripts/build-for-publish.mjs
           PKG_NAME=$(node -p "require('./package.json').name")
           PKG_VERSION=$(node -p "require('./package.json').version")
           if npm view "${PKG_NAME}@${PKG_VERSION}" version >/dev/null 2>&1; then
