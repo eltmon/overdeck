@@ -4,17 +4,17 @@
     "created": "2026-11-16T05:53:01Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5423: Make the 'Answer delivered to …' toast clickable: open the conversation or issue that got the answer",
-    "updated": "2026-11-16T05:54:50.303Z"
+    "updated": "2026-11-16T05:55:58.196Z"
   },
   "plan": {
     "id": "pan-5423",
     "title": "Make the 'Answer delivered to …' toast clickable: open the conversation or issue that got the answer",
-    "status": "proposed",
+    "status": "running",
     "uid": "42dc4ae0-d120-46fa-bbcb-7ec46b16976c",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-16T05:53:01Z",
-    "updated": "2026-11-16T05:54:50.303Z",
+    "updated": "2026-11-16T05:55:58.196Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5423",
@@ -424,5 +424,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
