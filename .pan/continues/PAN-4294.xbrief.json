@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4294",
   "created": "2026-11-16T20:10:42.311Z",
-  "updated": "2026-11-16T20:18:07.748Z",
+  "updated": "2026-11-16T20:18:12.188Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,11 @@
     "creem-client.ac3": {
       "status": "completed",
       "doneAt": "2026-11-16T20:18:07.748Z"
+    },
+    "creem-webhook": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4294",
+      "claimedAt": "2026-11-16T20:18:12.187Z"
     }
   }
 }
