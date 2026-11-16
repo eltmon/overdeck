@@ -4,17 +4,17 @@
     "created": "2026-11-16T06:52:42Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5427: Markdown Preview renders YAML front matter as body text",
-    "updated": "2026-11-16T06:53:49.705Z"
+    "updated": "2026-11-16T06:54:57.526Z"
   },
   "plan": {
     "id": "pan-5427",
     "title": "Markdown Preview renders YAML front matter as body text",
-    "status": "proposed",
+    "status": "running",
     "uid": "b66443ae-19a5-4879-babf-115763f5a2fa",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-16T06:52:42Z",
-    "updated": "2026-11-16T06:53:49.705Z",
+    "updated": "2026-11-16T06:54:57.526Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5427",
@@ -302,5 +302,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
