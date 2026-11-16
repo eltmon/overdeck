@@ -94,11 +94,19 @@ export type UserSessionResult =
   | { ok: false; response: Response };
 
 /**
- * Requires an unexpired session of a user who is not being deleted and still has access: the owner or any
- * grant row, expired or not (D-9). A session whose grant was revoked is deleted. For non-GET requests the
+ * Requires an unexpired session of a user who is not being deleted and still has access: the owner, any
+ * grant row, expired or not (D-9), or a non-revoked subscription row (PAN-4294 FR-7). A session whose grant was revoked is deleted. For non-GET requests the
  * form must carry `csrf` equal to the session's token and the Origin header must match PUBLIC_BASE_URL
  * (NFR-1); the parsed form is returned so handlers do not read the body twice.
  */
+/** A subscriber keeps the account page, so a lapsed one can still manage billing (PAN-4294 FR-7). */
+async function hasLiveSubscription(rc: RequestContext, userId: string): Promise<boolean> {
+  const found = await rc.env.DB.prepare('SELECT EXISTS (SELECT 1 FROM subscriptions WHERE user_id = ? AND revoked_at IS NULL) AS found')
+    .bind(userId)
+    .first<number>('found');
+  return found === 1;
+}
+
 export async function requireUserSession(req: Request, rc: RequestContext): Promise<UserSessionResult> {
   const cookie = parseCookies(req)[ACCOUNT_COOKIE];
   if (!cookie || !/^[0-9a-f]{64}$/.test(cookie)) return { ok: false, response: signInPage() };
@@ -110,7 +118,7 @@ export async function requireUserSession(req: Request, rc: RequestContext): Prom
     .bind(await sha256Hex(cookie), rc.deps.now())
     .first<SessionRow>();
   if (!row) return { ok: false, response: signInPage() };
-  if (!isOwner(rc, row.github_id) && (await getGrant(rc, row.github_id)) === null) {
+  if (!isOwner(rc, row.github_id) && (await getGrant(rc, row.github_id)) === null && !(await hasLiveSubscription(rc, row.user_id))) {
     await rc.env.DB.prepare('DELETE FROM user_sessions WHERE session_hash = ?').bind(row.session_hash).run();
     return { ok: false, response: signInPage(ACCESS_REMOVED_MESSAGE) };
   }

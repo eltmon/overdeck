@@ -18,6 +18,7 @@ export const LIMITS = {
   'admin-login': { limit: 10, windowMs: 600_000 },
   'account-login': { limit: 10, windowMs: 600_000 },
   'account-action': { limit: 30, windowMs: 900_000 },
+  'billing-action': { limit: 20, windowMs: 900_000 },
 } as const;
 
 export type Bucket = keyof typeof LIMITS;

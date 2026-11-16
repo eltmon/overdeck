@@ -24,6 +24,7 @@ import * as adminPending from './admin/pending.ts';
 import * as accountActions from './account-page/actions.ts';
 import * as accountPage from './account-page/page.ts';
 import * as accountSession from './account-page/session.ts';
+import * as billingActions from './billing/actions.ts';
 import * as creemWebhook from './billing/webhook.ts';
 import { WEBHOOK_MAX_BODY_BYTES } from './billing/webhook.ts';
 
@@ -67,6 +68,9 @@ const ROUTES: Route[] = [
   { method: 'POST', pattern: '/account/machines/:environmentId/remove', handler: accountActions.removeMachine, bucket: 'account-action' },
   { method: 'POST', pattern: '/account/delete', handler: accountActions.deleteAccount, bucket: 'account-action' },
   { method: 'POST', pattern: '/account/delete/confirm', handler: accountActions.confirmDeleteAccount, bucket: 'account-action' },
+  { method: 'POST', pattern: '/account/billing/checkout', handler: billingActions.checkout, bucket: 'billing-action' },
+  { method: 'POST', pattern: '/account/billing/relay', handler: billingActions.relay, bucket: 'billing-action' },
+  { method: 'POST', pattern: '/account/billing/portal', handler: billingActions.portal, bucket: 'billing-action' },
   // No bucket: Creem retries on its own schedule, and the signature check is the gate (PAN-4294 NFR-2).
   { method: 'POST', pattern: '/webhooks/creem', handler: creemWebhook.handle, maxBodyBytes: WEBHOOK_MAX_BODY_BYTES },
 ];
