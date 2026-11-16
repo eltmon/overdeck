@@ -3,10 +3,10 @@
  * client (Hermes, OpenClaw, Grok Build, Grok Bot, the xAI API) scoped, revocable access to
  * this machine. Every reach is wired here: connector, tailscale, this-computer and public.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { X } from 'lucide-react';
-
+import { Modal } from '../../shared/Modal';
+import formStyles from '../../shared/ModalForm.module.css';
 import {
   ANYWHERE_ACCESS_TOKENS_QUERY_KEY,
   ANYWHERE_ENVIRONMENT_QUERY_KEY,
@@ -77,6 +77,13 @@ function ConnectBotDialogBody({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [output, setOutput] = useState<ConnectBotResult | null>(null);
+  const outputRef = useRef<HTMLDivElement>(null);
+
+  // The output replaces the form (and its focused button); keep focus inside
+  // the dialog so Escape and the Tab trap still work (D6).
+  useEffect(() => {
+    if (output) outputRef.current?.closest<HTMLElement>('[data-component="modal"]')?.focus();
+  }, [output]);
 
   // PAN-4947: the same key and loader as the Public MCP panel. A failed load (an older server
   // answers 404) leaves `publicMcp` undefined, which reads as off (D-6).
@@ -171,139 +178,125 @@ function ConnectBotDialogBody({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
-      <div
-        className="bg-card border border-border rounded-lg shadow-2xl w-full max-w-lg mx-4"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="connect-bot-title"
-        data-component="connect-bot-dialog"
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <h3 id="connect-bot-title" className="text-base font-medium text-foreground">Connect a bot</h3>
-          <button type="button" onClick={onClose} aria-label="Close" className="text-muted-foreground hover:text-foreground transition-colors">
-            <X className="w-5 h-5" />
-          </button>
+    <Modal title="Connect a bot" onClose={onClose}>
+      {output ? (
+        <div ref={outputRef} className={`${formStyles.content} text-sm`} data-component="connect-bot-dialog">
+          <ConnectBotOutput platform={platform} result={output} onDone={onClose} />
         </div>
+      ) : (
+        <div className={formStyles.form} data-component="connect-bot-dialog">
+          <div className={formStyles.field}>
+            <span className={formStyles.label}>1. Platform</span>
+            <div className="flex flex-wrap gap-3">
+              {BOT_PLATFORMS.map((entry) => (
+                <label key={entry.id} className={formStyles.choice}>
+                  <input
+                    type="radio"
+                    name="connect-bot-platform"
+                    checked={platform === entry.id}
+                    onChange={() => handlePlatformChange(entry.id)}
+                  />
+                  <span className={formStyles.choiceTitle}>{entry.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
 
-        <div className="p-4 space-y-4 text-sm">
-          {output ? (
-            <ConnectBotOutput platform={platform} result={output} onDone={onClose} />
-          ) : (
-            <>
-              <div className="space-y-1">
-                <span className="text-xs text-muted-foreground">1. Platform</span>
-                <div className="flex flex-wrap gap-3">
-                  {BOT_PLATFORMS.map((entry) => (
-                    <label key={entry.id} className="flex items-center gap-1.5 text-xs text-foreground">
-                      <input
-                        type="radio"
-                        name="connect-bot-platform"
-                        checked={platform === entry.id}
-                        onChange={() => handlePlatformChange(entry.id)}
-                      />
-                      {entry.label}
-                    </label>
-                  ))}
-                </div>
+          <div className={formStyles.field}>
+            <span className={formStyles.label}>2. Reach</span>
+            <div className="flex flex-wrap gap-3">
+              {platformEntry.reaches.map((candidate) => (
+                <label key={candidate} className={formStyles.choice}>
+                  <input
+                    type="radio"
+                    name="connect-bot-reach"
+                    checked={reach === candidate}
+                    onChange={() => setReach(candidate)}
+                  />
+                  <span className={formStyles.choiceTitle}>{REACH_LABELS[candidate]}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className={formStyles.field}>
+            <span className={formStyles.label}>3. Access</span>
+            {platform === 'grok-bot' && reach === 'public' ? (
+              <p className={formStyles.text}>
+                You choose the access level when you approve the sign-in in this dashboard.
+              </p>
+            ) : (
+              <div className="space-y-1.5">
+                <label className={formStyles.choice}>
+                  <input type="checkbox" checked disabled />
+                  <span className={formStyles.choiceTitle}>{SCOPE_INFO['read:state'].label} (always on)</span>
+                </label>
+                {TICKABLE_SCOPES.map((scope) => (
+                  <label key={scope} className={formStyles.choice}>
+                    <input
+                      type="checkbox"
+                      checked={ticked.has(scope)}
+                      onChange={(e) => toggleScope(scope, e.target.checked)}
+                    />
+                    <span className={formStyles.choiceTitle}>
+                      {SCOPE_INFO[scope].label}
+                      {SCOPE_INFO[scope].hint && <span className="text-muted-foreground">({SCOPE_INFO[scope].hint})</span>}
+                    </span>
+                  </label>
+                ))}
               </div>
+            )}
+          </div>
 
-              <div className="space-y-1">
-                <span className="text-xs text-muted-foreground">2. Reach</span>
-                <div className="flex flex-wrap gap-3">
-                  {platformEntry.reaches.map((candidate) => (
-                    <label key={candidate} className="flex items-center gap-1.5 text-xs text-foreground">
-                      <input
-                        type="radio"
-                        name="connect-bot-reach"
-                        checked={reach === candidate}
-                        onChange={() => setReach(candidate)}
-                      />
-                      {REACH_LABELS[candidate]}
-                    </label>
-                  ))}
-                </div>
-              </div>
+          <div className={formStyles.field}>
+            <label htmlFor="connect-bot-name" className={formStyles.label}>Name</label>
+            <input
+              id="connect-bot-name"
+              value={name}
+              maxLength={64}
+              onChange={(e) => setName(e.target.value)}
+              className={formStyles.input}
+            />
+          </div>
 
-              <div className="space-y-1">
-                <span className="text-xs text-muted-foreground">3. Access</span>
-                {platform === 'grok-bot' && reach === 'public' ? (
-                  <p className="text-xs text-foreground">
-                    You choose the access level when you approve the sign-in in this dashboard.
-                  </p>
-                ) : (
-                  <div className="space-y-1">
-                    <label className="flex items-center gap-2 text-xs text-foreground">
-                      <input type="checkbox" checked disabled />
-                      {SCOPE_INFO['read:state'].label} (always on)
-                    </label>
-                    {TICKABLE_SCOPES.map((scope) => (
-                      <label key={scope} className="flex items-center gap-2 text-xs text-foreground">
-                        <input
-                          type="checkbox"
-                          checked={ticked.has(scope)}
-                          onChange={(e) => toggleScope(scope, e.target.checked)}
-                        />
-                        {SCOPE_INFO[scope].label}
-                        {SCOPE_INFO[scope].hint && <span className="text-muted-foreground">({SCOPE_INFO[scope].hint})</span>}
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-1">
-                <label htmlFor="connect-bot-name" className="text-xs text-muted-foreground">Name</label>
-                <input
-                  id="connect-bot-name"
-                  value={name}
-                  maxLength={64}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-                />
-              </div>
-
-              {reach === 'public' ? (
-                publicMcp?.enabled ? (
-                  <button
-                    type="button"
-                    onClick={handleShowSetup}
-                    className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 transition-colors"
-                  >
-                    Show setup
-                  </button>
-                ) : (
-                  <>
-                    <p className="text-xs text-muted-foreground">
-                      Public MCP is off. Hosted bots need it: turn it on under Public MCP in Settings → Anywhere.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={showPublicMcpSettings}
-                      className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground hover:bg-muted/50 transition-colors"
-                    >
-                      Show Public MCP settings
-                    </button>
-                  </>
-                )
-              ) : forbidden ? (
-                <p className="text-xs text-muted-foreground">Only a browser on this machine can connect bots.</p>
-              ) : (
+          {reach === 'public' ? (
+            publicMcp?.enabled ? (
+              <button
+                type="button"
+                onClick={handleShowSetup}
+                className={`${formStyles.primaryButton} self-start`}
+              >
+                Show setup
+              </button>
+            ) : (
+              <>
+                <p className={formStyles.hint}>
+                  Public MCP is off. Hosted bots need it: turn it on under Public MCP in Settings → Anywhere.
+                </p>
                 <button
                   type="button"
-                  onClick={() => void handleCreate()}
-                  disabled={!canSubmit}
-                  className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  onClick={showPublicMcpSettings}
+                  className={`${formStyles.button} self-start`}
                 >
-                  {reach === 'connector' ? `Copy for ${platformEntry.label}` : 'Create token'}
+                  Show Public MCP settings
                 </button>
-              )}
-              {error && <p className="text-xs text-destructive">{error}</p>}
-            </>
+              </>
+            )
+          ) : forbidden ? (
+            <p className={formStyles.hint}>Only a browser on this machine can connect bots.</p>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void handleCreate()}
+              disabled={!canSubmit}
+              className={`${formStyles.primaryButton} self-start`}
+            >
+              {reach === 'connector' ? `Copy for ${platformEntry.label}` : 'Create token'}
+            </button>
           )}
+          {error && <p className={formStyles.error}>{error}</p>}
         </div>
-      </div>
-    </div>
+      )}
+    </Modal>
   );
 }
