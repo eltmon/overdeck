@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5370",
   "created": "2026-11-15T20:57:54.789Z",
-  "updated": "2026-11-16T00:26:42.590Z",
+  "updated": "2026-11-16T00:26:51.150Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,11 @@
     "default-model-on-load.ac4": {
       "status": "completed",
       "doneAt": "2026-11-16T00:26:42.589Z"
+    },
+    "docs-and-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5370",
+      "claimedAt": "2026-11-16T00:26:51.150Z"
     }
   }
 }
