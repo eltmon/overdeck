@@ -4,17 +4,17 @@
     "created": "2026-11-16T05:04:14Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5413: Kanban Needs-you strip counts with the old Simple Home rule, not the shared needs-you selector",
-    "updated": "2026-11-16T05:07:28.787Z"
+    "updated": "2026-11-16T05:08:43.272Z"
   },
   "plan": {
     "id": "pan-5413",
     "title": "Kanban Needs-you strip counts with the old Simple Home rule, not the shared needs-you selector",
-    "status": "proposed",
+    "status": "running",
     "uid": "9a87133f-829a-4dd5-ac71-4c6b8697d444",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-16T05:04:14Z",
-    "updated": "2026-11-16T05:07:28.787Z",
+    "updated": "2026-11-16T05:08:43.272Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5413",
@@ -310,5 +310,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
