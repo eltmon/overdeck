@@ -434,6 +434,7 @@ const TELEMETRY_CLIENT_ROUTE_AREAS = [
   "resume-all",
   "review",
   "self",
+  "semgrep",
   "session-trees",
   "settings",
   "shadow",
