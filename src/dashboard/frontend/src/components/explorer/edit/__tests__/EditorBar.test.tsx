@@ -323,6 +323,47 @@ describe('EditorBar with a PR', () => {
     expect(screen.queryByRole('button', { name: 'Push changes' })).toBeNull()
   })
 
+  it('reads the amber checks sentence with an enabled outline Merge for an UNSTABLE PR', async () => {
+    stubServer({ body: status(pr({ mergeStateStatus: 'UNSTABLE', checksPassing: false })) })
+    renderWorkspaceBar()
+    await waitFor(() => expect(sentence()).toBe('PR #7 · no conflicts, but its checks have not all passed.'))
+    const merge = screen.getByRole('button', { name: 'Merge' })
+    expect(merge).toBeEnabled()
+    expect(merge.className).not.toContain('bg-primary')
+    const lead = screen.getByTestId('editor-bar').querySelector('[data-dot]')
+    expect(lead).toHaveAttribute('data-dot', 'unchecked')
+  })
+
+  it('asks before merging an UNSTABLE PR and only Merge anyway merges', async () => {
+    stubServer({ body: status(pr({ mergeStateStatus: 'UNSTABLE', checksPassing: false })) })
+    mocks.mergeEditWorkspace.mockResolvedValue({ merged: true })
+    renderWorkspaceBar()
+    fireEvent.click(await screen.findByRole('button', { name: 'Merge' }))
+    expect(screen.getByTestId('merge-anyway-dialog')).toBeInTheDocument()
+    expect(screen.getByText('Merge PR #7 before its checks pass?')).toBeInTheDocument()
+    expect(mocks.mergeEditWorkspace).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Merge anyway' }))
+    await waitFor(() => expect(mocks.mergeEditWorkspace).toHaveBeenCalledWith('w1'))
+    await waitFor(() => expect(mocks.leaveEditWorkspace).toHaveBeenCalledWith(ROOT, 'p'))
+  })
+
+  it('Cancel closes the confirmation without merging', async () => {
+    stubServer({ body: status(pr({ mergeStateStatus: 'UNSTABLE', checksPassing: false })) })
+    renderWorkspaceBar()
+    fireEvent.click(await screen.findByRole('button', { name: 'Merge' }))
+    expect(screen.getByTestId('merge-anyway-dialog')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByTestId('merge-anyway-dialog')).toBeNull()
+    expect(mocks.mergeEditWorkspace).not.toHaveBeenCalled()
+  })
+
+  it('an UNSTABLE PR with uncommitted changes shows the local reason, not the amber sentence', async () => {
+    stubServer({ body: status(pr({ mergeStateStatus: 'UNSTABLE', checksPassing: false })) }, { body: changes({ uncommittedPaths: ['README.md'] }) })
+    renderWorkspaceBar()
+    await waitFor(() => expect(screen.getByTestId('edit-pr-merge-reason').textContent).toBe(UNCOMMITTED_REASON))
+    expect(screen.getByRole('button', { name: 'Merge' })).toBeDisabled()
+  })
+
   it('disables Merge and offers Push changes while there are uncommitted changes', async () => {
     stubServer({ body: status(pr()) }, { body: changes({ uncommittedPaths: ['README.md'] }) })
     renderWorkspaceBar()
@@ -453,6 +494,7 @@ describe('shouldPollPr (PAN-5290 C-D6)', () => {
     renderWorkspaceBar()
     await act(() => vi.advanceTimersByTimeAsync(10))
     expect(statusCalls()).toBe(1)
+    expect(sentence()).toBe('PR #7 · no conflicts, but its checks have not all passed.')
     statusAnswer = { body: status(pr()) }
     await act(() => vi.advanceTimersByTimeAsync(PR_STATUS_REFETCH_MS + 100))
     expect(statusCalls()).toBe(2)
