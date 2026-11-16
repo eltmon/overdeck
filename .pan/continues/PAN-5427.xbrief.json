@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5427",
   "created": "2026-11-16T06:55:17.473Z",
-  "updated": "2026-11-16T07:22:38.799Z",
+  "updated": "2026-11-16T07:22:48.128Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
     "markdowntab-frontmatter-list.ac4": {
       "status": "completed",
       "doneAt": "2026-11-16T07:22:38.799Z"
+    },
+    "docs-frontmatter": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5427",
+      "claimedAt": "2026-11-16T07:22:48.127Z"
     }
   }
 }
