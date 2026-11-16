@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4594",
   "created": "2026-11-16T16:04:35.511Z",
-  "updated": "2026-11-16T16:37:14.069Z",
+  "updated": "2026-11-16T16:43:05.973Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,9 +50,10 @@
       "doneAt": "2026-11-16T16:37:05.271Z"
     },
     "project-sast-override-route": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4594",
-      "claimedAt": "2026-11-16T16:37:14.068Z"
+      "claimedAt": "2026-11-16T16:37:14.068Z",
+      "doneAt": "2026-11-16T16:43:05.973Z"
     }
   }
 }
