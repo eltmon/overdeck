@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5343",
   "created": "2026-11-16T00:09:01.559Z",
-  "updated": "2026-11-16T00:59:54.408Z",
+  "updated": "2026-11-16T01:00:25.230Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -262,9 +262,10 @@
       "doneAt": "2026-11-16T00:43:34.409Z"
     },
     "conv-deeplink": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5343",
-      "claimedAt": "2026-11-16T00:43:35.810Z"
+      "claimedAt": "2026-11-16T00:43:35.810Z",
+      "doneAt": "2026-11-16T01:00:25.230Z"
     },
     "conv-deeplink.ac1": {
       "status": "completed",
@@ -339,6 +340,10 @@
     "preset-bar.ac5": {
       "status": "completed",
       "doneAt": "2026-11-16T00:59:54.407Z"
+    },
+    "conv-deeplink.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-16T01:00:25.230Z"
     }
   }
 }
