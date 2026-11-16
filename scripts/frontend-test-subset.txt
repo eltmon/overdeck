@@ -159,6 +159,8 @@ src/components/Settings/sections/__tests__/PermissionsSection.test.tsx
 src/components/Settings/sections/__tests__/TelemetrySection.test.tsx
 src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx
 src/components/Settings/sections/__tests__/tiered-crews.test.ts
+src/components/ShutdownBanner.test.tsx
+src/components/ShutdownDialog.test.tsx
 src/components/Stage/__tests__/openBeside.test.tsx
 src/components/Stage/HomePane/HomeActions.test.tsx
 src/components/Stage/HomePane/HomeFacts.test.tsx

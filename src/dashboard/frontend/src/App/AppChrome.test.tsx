@@ -3,9 +3,10 @@
  * test pins only what AppChrome itself composes: order, removals, the search
  * box and what the health dot hosts.
  */
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ShutdownSnapshot } from '@overdeck/contracts';
 
 import type { Tab } from '../components/Header';
 
@@ -33,9 +34,15 @@ vi.mock('../components/SystemHealthPill', () => ({
   ),
 }));
 vi.mock('../components/project/new/AddProjectDialog', () => ({ AddProjectDialogHost: () => null }));
+// PAN-5342: the banner and the System-controls entry are markers; HiddenWhenShutDown stays real.
+vi.mock('../components/ShutdownBanner', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../components/ShutdownBanner')>()),
+  ShutdownBanner: marker('mock-shutdown-banner'),
+}));
+vi.mock('../components/ShutdownDialog', () => ({ ShutdownSystemControl: marker('mock-shutdown-control') }));
+vi.mock('../components/DegradedModeBanner', () => ({ DegradedModeBanner: marker('mock-degraded') }));
 // The system-notices row and banners above the bar are unchanged by this child.
 for (const [path, name] of [
-  ['../components/DegradedModeBanner', 'DegradedModeBanner'],
   ['../components/NewBuildBanner', 'NewBuildBanner'],
   ['../components/CodexAuthBanner', 'CodexAuthBanner'],
   ['../components/ConversationSearchBanner', 'ConversationSearchBanner'],
@@ -51,6 +58,7 @@ for (const [path, name] of [
 }
 
 const { AppChrome } = await import('./AppChrome');
+const { useDashboardStore } = await import('../lib/store');
 const { PALETTE_SEARCH_PLACEHOLDER, paletteKeycap } = await import('./appChromeLabels');
 
 function renderChrome(overrides: { activeTab?: Tab; onPaletteOpen?: () => void; onGoHome?: () => void } = {}) {
@@ -81,6 +89,10 @@ function domOrder(...testIds: string[]): number[] {
 }
 
 describe('AppChrome top bar (PAN-5292)', () => {
+  afterEach(() => {
+    useDashboardStore.setState({ shutdown: null } as Parameters<typeof useDashboardStore.setState>[0]);
+  });
+
   it('leads with the Overdeck brand, which opens Home (PAN-5293 F-D14)', () => {
     const onGoHome = vi.fn();
     renderChrome({ onGoHome });
@@ -147,12 +159,41 @@ describe('AppChrome top bar (PAN-5292)', () => {
     expect(onPaletteOpen).toHaveBeenCalledTimes(1);
   });
 
+  it('renders the shutdown banner above the system-notices row (PAN-5342)', () => {
+    renderChrome();
+    const banner = screen.getByTestId('mock-shutdown-banner');
+    const row = document.querySelector('[data-component="system-notices-row"]')!;
+    expect(banner.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('hides the degraded-mode banner once the shutdown is complete (PAN-5342 D-12)', () => {
+    const setShutdown = (phase: ShutdownSnapshot['phase'] | null) => act(() => {
+      useDashboardStore.setState({
+        shutdown: phase === null ? null : {
+          phase, startedAt: '', deadlineAt: '', overdue: false, reboot: false, force: 'never',
+          pending: [], writers: [], stoppedCount: 0, warnings: [],
+        },
+      } as Parameters<typeof useDashboardStore.setState>[0]);
+    });
+    setShutdown(null);
+    renderChrome();
+    expect(screen.getByTestId('mock-degraded')).toBeInTheDocument();
+
+    setShutdown('draining');
+    expect(screen.getByTestId('mock-degraded')).toBeInTheDocument();
+
+    setShutdown('complete');
+    expect(screen.queryByTestId('mock-degraded')).toBeNull();
+  });
+
   it('hosts the quota, auto-resume, stopped-agents and system-controls sections in the health dot', () => {
     renderChrome();
     const dot = screen.getByTestId('mock-health-dot');
     expect(within(dot).getByTestId('mock-quota-section')).toBeInTheDocument();
     expect(within(within(dot).getByRole('region', { name: 'Auto-resume' })).getByTestId('mock-auto-resume')).toBeInTheDocument();
     expect(within(dot).getByTestId('mock-stopped-section')).toBeInTheDocument();
-    expect(within(within(dot).getByRole('region', { name: 'System controls' })).getByTestId('mock-cloister')).toBeInTheDocument();
+    const controls = within(dot).getByRole('region', { name: 'System controls' });
+    expect(within(controls).getByTestId('mock-cloister')).toBeInTheDocument();
+    expect(within(controls).getByTestId('mock-shutdown-control')).toBeInTheDocument();
   });
 });
