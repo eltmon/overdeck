@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T19:39:52.439344Z · model: claude-opus-5-5 · open: 893_
+_Last sequenced: 2026-11-16T20:11:24.877147Z · model: claude-opus-5-5 · open: 897_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -228,6 +228,7 @@ _Last sequenced: 2026-11-16T19:39:52.439344Z · model: claude-opus-5-5 · open: 
 | 228 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 229 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
 | 230 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
+| 231 | PAN-5454 | S | medium | ok |  | PAN-4294 | Clients read welcome.tier and gate on capabilities; Account card and pan account status show the paid plan. Follows PAN-4294. |
 | 232 | PAN-5116 | S | high | ok |  |  | restart-all closes the pane but the launcher ignores SIGHUP, so the old ACP host and agent child keep running; stop runtime first. |
 | 233 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 234 | PAN-4909 | S | high | ok |  |  | Mac set up with connect: Safari on localhost:3011 gets HTTP 401 from the loopback session mint, so the Mac's own dashboard won't load. |
@@ -886,6 +887,8 @@ _Last sequenced: 2026-11-16T19:39:52.439344Z · model: claude-opus-5-5 · open: 
 | 887 | PAN-4555 | XS | low | ok |  |  | Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then. |
 | 888 | PAN-5449 | M | low | ok |  |  | Unblocked: PAN-4590 sast gate merged. A skipped sast scan renders as a green pass; add skipped state + findings list. |
 | 889 | PAN-5434 | M | low | ok |  |  | Codex apply_patch post-edit Semgrep scan; needs a hooks.json composer shared with SageOx. PAN-4591 merged; live Codex probe first. |
+| 890 | PAN-5453 | M | low | ok |  | PAN-4294 | One-time $3 Creem 'Extra 50 GB relay' product, per-account relayCapBytes and a live entitlement push to connect. After PAN-4294. |
+| 891 | PAN-5455 | M | low | ok |  | PAN-4294 | SIGNUP_MODE invite|open switch for overdeck.ai plus abuse limits; opening sign-up is the operator's launch call. After PAN-4294. |
 | 892 | PAN-4593 | L | low | needs-refinement |  |  | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
 | 893 | PAN-5022 | L | medium | ok |  |  | Phone app: relay notification preferences to offline machines via the directory, and drop muted pushes on the phone. |
 | 894 | PAN-5021 | M | low | needs-refinement |  |  | PAN-5100 landed phone telemetry with conflicting decisions; re-scope to any remaining gap or close as superseded. |
@@ -894,6 +897,7 @@ _Last sequenced: 2026-11-16T19:39:52.439344Z · model: claude-opus-5-5 · open: 
 | 897 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
 | 898 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
 | 899 | PAN-5207 | L | low | needs-refinement |  | PAN-5202 | Parked by the operator: Flux meeting bots for Zoom, Teams, Meet, Slack as a paid integration. Do not start. |
+| 900 | PAN-5456 | M | low | needs-refinement |  | PAN-4294, PAN-4297 | +100 GB hosted vault add-on; billing model (Creem per-unit vs variants) undecided; needs hosted vault PAN-4297 first. |
 | 901 | PAN-5181 | XS | low | ok |  |  | Fix shipped in PR #5179 (merged 2026-11-13); the body says it closes on merge. Verify and close. |
 | 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
 | 903 | PAN-5444 | XS | low | ok |  |  | Two Minor CodeRabbit findings left on merged PR #5443: semgrep repo rules resolve from event cwd; hook tests not isolated from Docker. |
@@ -1228,10 +1232,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T19:39:52.439344Z",
+  "generatedAt": "2026-11-16T20:11:24.877147Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 893,
+  "openCount": 897,
   "nodes": [
     {
       "issue": "PAN-5452",
@@ -4091,6 +4095,21 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "planning": "auto"
     },
     {
+      "issue": "PAN-5454",
+      "rank": 231,
+      "size": "S",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4294"
+      ],
+      "why": "Clients read welcome.tier and gate on capabilities; Account card and pan account status show the paid plan. Follows PAN-4294.",
+      "rationale": "New issue split from in-pipeline PAN-4294; small, file-scoped client work that makes the paid plan visible as soon as billing lands, so it sits in a free slot ahead of the Anywhere tail.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-5116",
       "rank": 232,
       "size": "S",
@@ -5214,7 +5233,7 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "condition": "ok",
       "dependsOn": [],
       "why": "Hosted encrypted vault on overdeck.ai in tester mode; account service built 2026-10-02, billing no longer a prerequisite",
-      "rationale": "Blocker PAN-4293 closed since the prior run, so it is dropped from dependsOn; rank held because the remaining scope and value are unchanged.",
+      "rationale": "Body re-read 2026-11-16: no material change; PAN-4294 billing is now in pipeline and the storage add-on PAN-5456 now waits on this issue, so rank held.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12180,6 +12199,36 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "planning": "auto"
     },
     {
+      "issue": "PAN-5453",
+      "rank": 890,
+      "size": "M",
+      "importance": "low",
+      "score": 28,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4294"
+      ],
+      "why": "One-time $3 Creem 'Extra 50 GB relay' product, per-account relayCapBytes and a live entitlement push to connect. After PAN-4294.",
+      "rationale": "New issue split from PAN-4294; useful only once relay users hit the monthly allowance, so it goes to the tail.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5455",
+      "rank": 891,
+      "size": "M",
+      "importance": "low",
+      "score": 25,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4294"
+      ],
+      "why": "SIGNUP_MODE invite|open switch for overdeck.ai plus abuse limits; opening sign-up is the operator's launch call. After PAN-4294.",
+      "rationale": "New issue split from PAN-4294; the operator's launch decision gates its value, so it ranks at the tail.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-4593",
       "rank": 892,
       "size": "L",
@@ -12279,6 +12328,22 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
         "PAN-5202"
       ],
       "why": "Parked by the operator: Flux meeting bots for Zoom, Teams, Meet, Slack as a paid integration. Do not start.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5456",
+      "rank": 900,
+      "size": "M",
+      "importance": "low",
+      "score": 22,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-4294",
+        "PAN-4297"
+      ],
+      "why": "+100 GB hosted vault add-on; billing model (Creem per-unit vs variants) undecided; needs hosted vault PAN-4297 first.",
+      "rationale": "New issue split from PAN-4294; no user can pass 100 GB until PAN-4297 ships and the billing approach is still open, so it ranks last in the cluster.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12533,6 +12598,13 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
     {
       "from": "PAN-2350",
       "to": "PAN-4420",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-5453",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
@@ -13149,6 +13221,41 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
     {
       "from": "PAN-4294",
       "to": "PAN-4298",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4294",
+      "to": "PAN-5453",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4294",
+      "to": "PAN-5454",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4294",
+      "to": "PAN-5455",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4294",
+      "to": "PAN-5456",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4297",
+      "to": "PAN-5456",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
