@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5464",
   "created": "2026-11-17T12:41:33.533Z",
-  "updated": "2026-11-17T14:46:38.078Z",
+  "updated": "2026-11-17T14:46:39.739Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -187,6 +187,11 @@
     "skills-cli-group.ac4": {
       "status": "completed",
       "doneAt": "2026-11-17T14:46:38.078Z"
+    },
+    "handoff-group": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5464",
+      "claimedAt": "2026-11-17T14:46:39.739Z"
     }
   }
 }
