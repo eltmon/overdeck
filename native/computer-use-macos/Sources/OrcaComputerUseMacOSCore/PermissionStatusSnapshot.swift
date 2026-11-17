@@ -1,5 +1,6 @@
 // Ported from Orca (MIT, Copyright (c) 2026 Lovecast Inc.)
 // upstream: native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/PermissionStatusSnapshot.swift @ c6b9ac9549b
+// modified for Overdeck: queue labels renamed to com.overdeck
 import Dispatch
 import Foundation
 
@@ -17,7 +18,7 @@ public enum PermissionStatusSnapshotProbe {
     public typealias Probe = @Sendable () -> Bool
 
     private static let probeQueue = DispatchQueue(
-        label: "com.stablyai.orca.computer-use-permission-status",
+        label: "com.overdeck.computer-use.permission-status",
         attributes: .concurrent
     )
 
@@ -56,7 +57,7 @@ public final class PermissionStatusRefreshCoordinator: @unchecked Sendable {
 
     public init(
         workerQueue: DispatchQueue = DispatchQueue(
-            label: "com.stablyai.orca.computer-use-permission-refresh",
+            label: "com.overdeck.computer-use.permission-refresh",
             qos: .userInitiated
         ),
         callbackQueue: DispatchQueue = .main,

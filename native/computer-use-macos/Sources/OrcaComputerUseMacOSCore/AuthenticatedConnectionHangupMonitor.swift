@@ -1,5 +1,6 @@
 // Ported from Orca (MIT, Copyright (c) 2026 Lovecast Inc.)
 // upstream: native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/AuthenticatedConnectionHangupMonitor.swift @ c6b9ac9549b
+// modified for Overdeck: queue labels renamed to com.overdeck
 import Darwin
 import Dispatch
 import Foundation
@@ -28,7 +29,7 @@ public final class AuthenticatedConnectionHangupMonitor: @unchecked Sendable {
     public convenience init(
         fileDescriptor: Int32,
         queue: DispatchQueue = DispatchQueue(
-            label: "com.stablyai.orca.computer-use-owner-hangup"
+            label: "com.overdeck.computer-use.owner-hangup"
         ),
         onEvent: @escaping @Sendable () -> Void = {},
         onHangup: @escaping @Sendable () -> Void
@@ -53,7 +54,7 @@ public final class AuthenticatedConnectionHangupMonitor: @unchecked Sendable {
     init(
         fileDescriptor: Int32,
         queue: DispatchQueue = DispatchQueue(
-            label: "com.stablyai.orca.computer-use-owner-hangup"
+            label: "com.overdeck.computer-use.owner-hangup"
         ),
         registerEvents: RegisterEvents,
         closeDescriptor: @escaping CloseDescriptor,

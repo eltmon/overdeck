@@ -44,6 +44,17 @@ Overdeck changes only these:
   authenticated connection is `.claimed` and every later one is `.retained`,
   even after all connections closed (tested by the Overdeck-authored
   `AgentSessionOwnershipTests.swift`).
+- User-visible strings (`main.swift`, `PermissionWindowCopy.swift`): "Orca"
+  becomes "Overdeck" in the permission window copy (English and Chinese), the
+  `permission_denied` and Screen Recording messages (which now point at
+  Settings → Computer Use in the Overdeck dashboard), the usage lines, the
+  no-arguments exit-13 message and the handshake provider name
+  (`overdeck-computer-use-macos`). Dispatch queue labels move from
+  `com.stablyai.orca.*` to `com.overdeck.computer-use.*`
+  (`PermissionStatusSnapshot.swift`, `AuthenticatedConnectionHangupMonitor.swift`).
+  Internal names that users never see keep Orca's spelling: the Swift module,
+  target and type names, the `ORCA_COMPUTER_USE_SCK_SCREENSHOTS` environment
+  variable and the `orca-action` associated-object key.
 
 ## Build and test
 
