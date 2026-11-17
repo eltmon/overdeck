@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5465",
   "created": "2026-11-17T12:56:05.449Z",
-  "updated": "2026-11-17T14:47:42.621Z",
+  "updated": "2026-11-17T14:47:48.545Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -170,6 +170,11 @@
     "skills-routes.ac4": {
       "status": "completed",
       "doneAt": "2026-11-17T14:47:42.621Z"
+    },
+    "cli-skills-add": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5465",
+      "claimedAt": "2026-11-17T14:47:48.545Z"
     }
   }
 }
