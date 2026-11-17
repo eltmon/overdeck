@@ -2,10 +2,11 @@
 // upstream: src/main/computer/action-contracts/computer-blocked-key-combos.ts @ c6b9ac9549b
 // Design ported from vercel-labs/agent-desktop's per-platform blocked_combo lists (Apache-2.0).
 //
-// Linux-only slice of Orca's blocked-shortcut port (PAN-5452 D-7): the macOS
-// and Windows tables and the platform argument are dropped, since Overdeck's
-// computer use is Linux-only for now (D-4).
+// Linux-only slice of Orca's blocked-shortcut port (PAN-5452 D-7). The platform
+// argument is back (PAN-5461 D-16), but only the Linux table exists so far;
+// 'windows' and 'mac' fail closed until PAN-5462/5463 add their tables.
 import { ComputerUseError } from './errors.js';
+import type { KeyPlatform } from './platform-types.js';
 
 interface BlockedKeyCombo {
   modifiers: readonly string[];
@@ -106,8 +107,14 @@ function findBlockedKeyCombo(key: string): BlockedKeyCombo | null {
   );
 }
 
-/** Throws `system_shortcut_blocked` for a chord that quits, locks, logs out or switches VTs (FR-8). */
-export function assertKeyComboAllowed(key: string, allowSystemShortcut: boolean): void {
+/**
+ * Throws `system_shortcut_blocked` for a chord that quits, locks, logs out or switches VTs (FR-8).
+ * Platforms without a rule table throw `unsupported_platform`, even with allowSystemShortcut (D-16).
+ */
+export function assertKeyComboAllowed(key: string, allowSystemShortcut: boolean, platform: KeyPlatform = 'linux'): void {
+  if (platform !== 'linux') {
+    throw new ComputerUseError('unsupported_platform', `No blocked-shortcut rules for ${platform} yet.`);
+  }
   if (allowSystemShortcut) return;
   const blocked = findBlockedKeyCombo(key);
   if (blocked) {

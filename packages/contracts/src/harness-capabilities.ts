@@ -17,6 +17,8 @@ export type HarnessLaunchPreflight = "claude-code-model-minimum"
 export type HarnessAskAnswerDelivery = "message" | "pi-ask-modal" | "codex-approval"
 /** claude-project-hash = resolve via HashResolver; agent-dir = first-message cwd, else the agent dir; first-message-only = first-message cwd, else null. */
 export type HarnessWorkspaceResolution = "claude-project-hash" | "agent-dir" | "first-message-only"
+/** hot-reload = pack skills load into the running session with /reload-plugins; restart = they load only on a resume (PAN-5465). */
+export type HarnessConversationSkillApply = "hot-reload" | "restart"
 
 export interface HarnessCapabilities {
   /** Channel the launcher delivers the context layer through. */
@@ -70,6 +72,8 @@ export interface HarnessCapabilities {
   readonly overdeckMcp: boolean
   /** The composer / menu lists skills as /<name> because the harness runs a typed /<skill> (PAN-5347). */
   readonly skillSlashCommands: boolean
+  /** How pack skills added to a running conversation load (PAN-5465), or null when this harness gets no conversation packs. */
+  readonly conversationSkillApply: HarnessConversationSkillApply | null
 }
 
 export const HARNESS_CAPABILITY_KEYS = [
@@ -96,6 +100,7 @@ export const HARNESS_CAPABILITY_KEYS = [
   "runsOnFlyMachine",
   "overdeckMcp",
   "skillSlashCommands",
+  "conversationSkillApply",
 ] as const satisfies readonly (keyof HarnessCapabilities)[]
 
 export const CLAUDE_CODE_CAPABILITIES: HarnessCapabilities = {
@@ -122,6 +127,7 @@ export const CLAUDE_CODE_CAPABILITIES: HarnessCapabilities = {
   runsOnFlyMachine: true,
   overdeckMcp: true,
   skillSlashCommands: true,
+  conversationSkillApply: "hot-reload",
 }
 
 export const OHMYPI_CAPABILITIES: HarnessCapabilities = {
@@ -148,6 +154,7 @@ export const OHMYPI_CAPABILITIES: HarnessCapabilities = {
   runsOnFlyMachine: false,
   overdeckMcp: false,
   skillSlashCommands: false,
+  conversationSkillApply: null,
 }
 
 /**
@@ -187,6 +194,7 @@ export const CODEX_CAPABILITIES: HarnessCapabilities = {
   runsOnFlyMachine: true,
   overdeckMcp: true,
   skillSlashCommands: false,
+  conversationSkillApply: "restart",
 }
 
 export const ACP_CAPABILITIES: HarnessCapabilities = {
@@ -213,6 +221,7 @@ export const ACP_CAPABILITIES: HarnessCapabilities = {
   runsOnFlyMachine: false,
   overdeckMcp: true,
   skillSlashCommands: false,
+  conversationSkillApply: null,
 }
 
 export const KIMI_CODE_CAPABILITIES: HarnessCapabilities = {
@@ -239,6 +248,7 @@ export const KIMI_CODE_CAPABILITIES: HarnessCapabilities = {
   runsOnFlyMachine: false,
   overdeckMcp: false,
   skillSlashCommands: false,
+  conversationSkillApply: null,
 }
 
 export const OPENCODE_CAPABILITIES: HarnessCapabilities = {
@@ -265,6 +275,7 @@ export const OPENCODE_CAPABILITIES: HarnessCapabilities = {
   runsOnFlyMachine: false,
   overdeckMcp: true,
   skillSlashCommands: false,
+  conversationSkillApply: null,
 }
 
 export const GROK_CAPABILITIES: HarnessCapabilities = {
@@ -299,6 +310,7 @@ export const MUSE_CAPABILITIES: HarnessCapabilities = {
   runsOnFlyMachine: false,
   overdeckMcp: false,
   skillSlashCommands: false,
+  conversationSkillApply: null,
 }
 
 export const PRIME_AGENT_CAPABILITIES: HarnessCapabilities = {
@@ -325,4 +337,5 @@ export const PRIME_AGENT_CAPABILITIES: HarnessCapabilities = {
   runsOnFlyMachine: false,
   overdeckMcp: false,
   skillSlashCommands: false,
+  conversationSkillApply: null,
 }

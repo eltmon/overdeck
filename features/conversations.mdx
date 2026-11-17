@@ -200,6 +200,18 @@ click:
   alt="The composer model and harness picker, showing Claude Code / Pi / Codex harnesses over Anthropic and other provider models with per-million pricing"
 />
 
+### Adding skills to a running conversation
+
+To give a running conversation more pack skills, open **Add skills…** in the
+conversation tab menu or the conversation header menu, or run
+`pan skills add <conversation> --pack <id>`. A Claude Code conversation loads
+them in place and keeps its context. A Codex conversation, and some packs on
+Claude Code, must restart to load them; **Restart and load** (or `--restart`)
+resumes the conversation with its history. An agent can add skills to itself
+with the `add_skills` MCP tool; they arrive after its current turn. See
+[Adding skills to a running conversation](/features/skill-packs#for-one-conversation)
+for the outcomes and which packs need a restart.
+
 ### New conversation with options
 
 **New conversation** in the left column is a split button:
@@ -700,6 +712,7 @@ pan handoff source-conv --author external --author-model claude-haiku-4-5 cheap 
 | `--author-harness <harness>` | Harness for the external authoring session: `claude-code` or `pi` (external only). |
 | `--skill <name>` | Turn this skill on for the new conversation only (repeatable). `<name>` is a native skill name or a pack skill id `<pack>/<skill>`. Claude Code and Codex only; a Pi successor stores the values but never applies them. |
 | `--pack <id>` | Turn on every non-opt-in skill of this cached skill pack, for the new conversation only (repeatable). Claude Code and Codex only; a Pi successor stores the values but never applies them. The values are a snapshot of the pack at creation. |
+| `--group <name>` | Turn on every cached pack of this [pack group](/features/skill-packs#pack-groups) (for example `video`), for the new conversation only (repeatable). Each member pack that is not added or not cached is skipped with a note. |
 | `--hold` | Create and launch the new conversation without sending the kickoff. Start it with Send in the dashboard composer, or `pan handoff start <conv>`. |
 | `--fresh` | Start a clean conversation: no handoff document, no summary, no parent link. The focus becomes its first message. Project, cwd, model and effort still default from the source. |
 

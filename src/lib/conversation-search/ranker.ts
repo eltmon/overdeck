@@ -38,6 +38,24 @@ export interface RankConversationSearchOptions {
   limit?: number;
   candidateLimit?: number;
   rrfK?: number;
+  /** Request signal; abort rejects with signal.reason and skips the vector leg. */
+  signal?: AbortSignal;
+  /** Query-embedding budget; default DEFAULT_EMBED_TIMEOUT_MS. */
+  embedTimeoutMs?: number;
+  /** Called once when the embedding fails or times out (not on abort). */
+  onEmbedFailure?: (error: unknown) => void;
+  /** Called once when the embedding succeeds. */
+  onEmbedSuccess?: () => void;
+}
+
+/** Query-embedding budget (PAN-5447): measured 220-420 ms, so ~6x headroom. */
+export const DEFAULT_EMBED_TIMEOUT_MS = 2_500;
+
+export class ConversationQueryEmbedTimeoutError extends Error {
+  constructor(readonly timeoutMs: number) {
+    super(`Query embedding timed out after ${timeoutMs} ms`);
+    this.name = 'ConversationQueryEmbedTimeoutError';
+  }
 }
 
 const DEFAULT_LIMIT = 10;
@@ -45,24 +63,61 @@ const DEFAULT_CANDIDATE_LIMIT = 50;
 const DEFAULT_RRF_K = 60;
 const EXCERPT_CONTEXT_CHARS = 96;
 
+/**
+ * BM25 starts at once; the vector leg waits only for the query embedding
+ * (PAN-5447). An embedding failure or timeout degrades to BM25 hits; an abort
+ * rejects with the signal's reason and never runs the vector leg.
+ */
 export async function rankConversationSearch(
   options: RankConversationSearchOptions,
 ): Promise<ConversationSearchHit[]> {
   const query = options.query.trim();
   if (!query) return [];
+  options.signal?.throwIfAborted();
 
   const limit = options.limit ?? DEFAULT_LIMIT;
   const candidateLimit = options.candidateLimit ?? Math.max(DEFAULT_CANDIDATE_LIMIT, limit);
-  const embeddedQuery = await options.provider.embed([query]);
-  const queryEmbedding = embeddedQuery.embeddings[0];
-  if (!queryEmbedding) return [];
 
-  const [bm25Rows, vectorRows] = await Promise.all([
-    Promise.resolve(options.store.searchBm25(query, candidateLimit)),
-    Promise.resolve(options.store.searchVector(queryEmbedding, candidateLimit)),
-  ]);
+  const bm25 = Promise.resolve().then(() => options.store.searchBm25(query, candidateLimit));
+  const vector = embedQuery(options, query).then(
+    (embedding) => {
+      options.signal?.throwIfAborted();
+      return embedding ? options.store.searchVector(embedding, candidateLimit) : [];
+    },
+    (error: unknown) => {
+      options.signal?.throwIfAborted();
+      options.onEmbedFailure?.(error);
+      return [];
+    },
+  );
+  const [bm25Rows, vectorRows] = await Promise.all([bm25, vector]);
+  options.signal?.throwIfAborted();
 
   return fuseRankedRows({ bm25Rows, vectorRows, query, limit, rrfK: options.rrfK ?? DEFAULT_RRF_K });
+}
+
+async function embedQuery(options: RankConversationSearchOptions, query: string): Promise<Float32Array | null> {
+  const timeoutMs = options.embedTimeoutMs ?? DEFAULT_EMBED_TIMEOUT_MS;
+  const controller = new AbortController();
+  const onAbort = () => controller.abort(options.signal?.reason);
+  options.signal?.addEventListener('abort', onAbort, { once: true });
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+  try {
+    const result = await options.provider.embed([query], { signal: controller.signal });
+    options.signal?.throwIfAborted();
+    options.onEmbedSuccess?.();
+    return result.embeddings[0] ?? null;
+  } catch (error) {
+    if (timedOut) throw new ConversationQueryEmbedTimeoutError(timeoutMs);
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    options.signal?.removeEventListener('abort', onAbort);
+  }
 }
 
 export function fuseRankedRows(input: {

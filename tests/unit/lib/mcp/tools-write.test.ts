@@ -11,10 +11,43 @@ import { callTool, connectClient, fakeApi, resultJson, resultText } from './harn
 const SCOPES = ['read:state', 'read:conversations', 'operate'];
 
 describe('MCP write tools (PAN-4649 W-6)', () => {
-  it('the write tools are send_message, start_conversation, start_worker, start_issue, stop_conversation, resume_conversation and interrupt_conversation', () => {
+  it('the write tools are send_message, start_conversation, start_worker, start_issue, stop_conversation, resume_conversation, interrupt_conversation and add_skills', () => {
     expect(WRITE_TOOLS.map((tool) => tool.name)).toEqual([
-      'send_message', 'start_conversation', 'start_worker', 'start_issue', 'stop_conversation', 'resume_conversation', 'interrupt_conversation',
+      'send_message', 'start_conversation', 'start_worker', 'start_issue', 'stop_conversation', 'resume_conversation', 'interrupt_conversation', 'add_skills',
     ]);
+  });
+
+  it('PAN-5465: add_skills without conversation posts to the self route', async () => {
+    const api = fakeApi({ 'POST /api/self/skills': { status: 200, json: { outcome: 'queued', added: ['mattpocock/tdd'], warnings: [] } } });
+    const client = await connectClient(api, SCOPES);
+    const result = await callTool(client, 'add_skills', { packs: ['mattpocock'] });
+    expect(result.isError).toBeFalsy();
+    expect(resultJson(result)).toMatchObject({ outcome: 'queued' });
+    expect(api.calls).toEqual([{ method: 'POST', path: '/api/self/skills', body: { packs: ['mattpocock'] } }]);
+  });
+
+  it('PAN-5465: add_skills with conversation posts packs, skills and restart to the encoded conversation route', async () => {
+    const api = fakeApi({ 'POST /api/conversations/conv-a/skills': { status: 200, json: { outcome: 'restarted', added: ['p/s'], warnings: [] } } });
+    const client = await connectClient(api, SCOPES);
+    expect((await callTool(client, 'add_skills', { conversation: 'conv-a', packs: ['mattpocock'], skills: ['p/s'], restart: true })).isError).toBeFalsy();
+    expect(api.calls).toEqual([{ method: 'POST', path: '/api/conversations/conv-a/skills', body: { packs: ['mattpocock'], skills: ['p/s'], restart: true } }]);
+  });
+
+  it('PAN-5465: add_skills rejects a non-list packs value before any request', async () => {
+    const api = fakeApi({});
+    const client = await connectClient(api, SCOPES);
+    const result = await callTool(client, 'add_skills', { packs: 'mattpocock' });
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toBe('packs must be a list of ids');
+    expect(api.calls).toEqual([]);
+  });
+
+  it('PAN-5465: add_skills needs operate, the scope of both skill routes', () => {
+    const addSkills = WRITE_TOOLS.find((candidate) => candidate.name === 'add_skills')!;
+    expect(addSkills.scope).toBe('operate');
+    expect(addSkills.scope).toBe(requiredScopeFor('POST', '/api/self/skills'));
+    expect(addSkills.scope).toBe(requiredScopeFor('POST', '/api/conversations/c/skills'));
+    expect(addSkills.audience).toBe('any');
   });
 
   it('PAN-5091: resume_conversation posts {} to the encoded conversation resume route', async () => {

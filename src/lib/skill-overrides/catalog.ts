@@ -153,6 +153,7 @@ export async function listPackCatalog(): Promise<PackCatalogEntry[]> {
           pluginRoot: known?.pluginRoot,
           browser: browser === 'ready',
           skillsExclude: known?.skillsExclude,
+          rootSkill: known?.rootSkill,
         };
         const stamp = `${stats.ino}:${stats.mtimeMs}:${stats.ctimeMs}:${adapter}:${JSON.stringify(readOpts)}`;
         const hit = manifestCache.get(dir);

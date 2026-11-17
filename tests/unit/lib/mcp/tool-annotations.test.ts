@@ -21,6 +21,7 @@ const SINGLE_ROUTE_PATHS: Record<string, { method: string; path: string }> = {
   send_message: { method: 'POST', path: '/api/conversations/conv-a/message' },
   start_conversation: { method: 'POST', path: '/api/fleet/conversations' },
   start_worker: { method: 'POST', path: '/api/fleet/workers' },
+  add_skills: { method: 'POST', path: '/api/conversations/conv-a/skills' },
   schedule_message: { method: 'POST', path: '/api/conversations/conv-a/scheduled-messages' },
   schedule_recurring: { method: 'POST', path: '/api/conversations/conv-a/schedules' },
   answer_permission: { method: 'POST', path: '/api/conversations/conv-a/permission' },

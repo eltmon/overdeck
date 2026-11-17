@@ -349,14 +349,20 @@ function toPaletteConversationHit(
 
 const CONVERSATION_CHUNK_POOL = 300;
 
-async function searchConversations(rawQuery: string, matchQuery: string, limit: number): Promise<PaletteConversationHit[]> {
+async function searchConversations(
+  rawQuery: string,
+  matchQuery: string,
+  limit: number,
+  signal?: AbortSignal,
+): Promise<PaletteConversationHit[]> {
   const [hits, titleMatches] = await Promise.all([
-    searchConversationChunks({ rawQuery, matchQuery, limit: CONVERSATION_CHUNK_POOL, candidateLimit: CONVERSATION_CHUNK_POOL }),
+    searchConversationChunks({ rawQuery, matchQuery, limit: CONVERSATION_CHUNK_POOL, candidateLimit: CONVERSATION_CHUNK_POOL, signal }),
     Promise.resolve().then(() => searchConversationTitles(rawQuery)).catch((error: unknown) => {
       console.error('[palette] conversation title search failed:', error);
       return [];
     }),
   ]);
+  signal?.throwIfAborted();
   // Batch-resolve every distinct root session id in one query instead of one
   // query per root — the palette's 300-chunk pool made the per-root lookup a
   // 250-500ms synchronous event-loop stall (mostly misses: agent/specialist/
@@ -442,7 +448,11 @@ const getPaletteCommandsRoute = HttpRouter.add(
 
 // ─── Route: GET /api/palette/search?q=&limit= ─────────────────────────────────
 
-export async function runPaletteSearch(rawQuery: string, limit: number) {
+/**
+ * `signal` is the HTTP request's abort signal (PAN-5447): a client that left
+ * (a superseded palette keystroke) stops the search before its vector scan.
+ */
+export async function runPaletteSearch(rawQuery: string, limit: number, signal?: AbortSignal) {
   if (rawQuery.length === 0) return { memory: [], observations: [], summaries: [], conversations: [] };
 
   const matchQuery = buildMatchQuery(rawQuery);
@@ -455,12 +465,14 @@ export async function runPaletteSearch(rawQuery: string, limit: number) {
     console.error('[palette] failed to list projects:', error);
     return { memory: [], observations: [], summaries: [], conversations: [] };
   }
-  if (projects.length === 0) return { memory: [], observations: [], summaries: [], conversations: await searchConversations(rawQuery, matchQuery, limit) };
 
-  const perProject = Math.max(5, Math.ceil((limit * 2) / projects.length));
-  const nested = await Promise.all(
-    projects.map((projectId) => searchProjectMemory(projectId, matchQuery, perProject)),
-  );
+  // Memory FTS and conversation search run concurrently (PAN-5447 D10).
+  const perProject = Math.max(5, Math.ceil((limit * 2) / Math.max(1, projects.length)));
+  const [nested, conversations] = await Promise.all([
+    Promise.all(projects.map((projectId) => searchProjectMemory(projectId, matchQuery, perProject))),
+    searchConversations(rawQuery, matchQuery, limit, signal),
+  ]);
+  signal?.throwIfAborted();
 
   const all = nested.flat().sort((a, b) => a.rank - b.rank);
   const observations: PaletteSearchHit[] = [];
@@ -471,7 +483,6 @@ export async function runPaletteSearch(rawQuery: string, limit: number) {
     else if (hit.kind === 'summary') summaries.push(hit);
     else memory.push(hit);
   }
-  const conversations = await searchConversations(rawQuery, matchQuery, limit);
   return {
     memory: memory.slice(0, limit),
     observations: observations.slice(0, limit),
@@ -495,11 +506,14 @@ const getPaletteSearchRoute = HttpRouter.add(
     const limitParam = url.searchParams.get('limit');
     const limit = Math.max(1, Math.min(50, limitParam ? parseInt(limitParam, 10) || 20 : 20));
 
-    return yield* Effect.promise(async () => {
+    // The signal aborts when NodeHttpServer interrupts this request fiber on
+    // client disconnect (PAN-5447), so superseded searches stop early.
+    return yield* Effect.promise(async (signal) => {
       try {
-        const data = await runPaletteSearch(rawQuery, limit);
+        const data = await runPaletteSearch(rawQuery, limit, signal);
         return jsonResponse(data);
       } catch (err) {
+        if (signal.aborted) return jsonResponse({ error: 'palette search aborted' }, { status: 499 });
         const msg = err instanceof Error ? `${err.message}\n${err.stack ?? ''}` : String(err);
         console.error('[palette] search failed:', msg);
         return jsonResponse({ error: 'palette search failed', detail: msg }, { status: 500 });

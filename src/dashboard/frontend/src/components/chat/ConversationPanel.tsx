@@ -35,6 +35,7 @@ import { BookmarksDrawer } from './bookmarks/BookmarksDrawer';
 import { isNativeShell } from '../../lib/nativeShell';
 import { useConversationMutations } from '../CommandDeck/useConversationMutations';
 import { ForkModal } from '../CommandDeck/ForkModal';
+import { AddSkillsModal } from '../CommandDeck/AddSkillsModal';
 import { conversationMessagesQueryKey, useConversationMessagesStream } from './useConversationMessagesStream';
 import { buildMessagesQueryFn, type MessagesResponse } from './messagesQuery';
 import { useOlderHistory } from './useOlderHistory';
@@ -500,6 +501,9 @@ export function ConversationPanel({
             convMutations.submitFork(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness, projectKey);
           }}
         />
+      )}
+      {convMutations.addSkillsTarget && (
+        <AddSkillsModal conversation={convMutations.addSkillsTarget} onClose={convMutations.closeAddSkillsModal} />
       )}
     </div></ConversationChangesScope></ConversationBookmarksProvider></ConversationPullRequestProvider>
   );

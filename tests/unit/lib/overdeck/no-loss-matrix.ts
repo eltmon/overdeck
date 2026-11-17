@@ -290,6 +290,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/conversations/:name/diffs',                       kind: 'http', disposition: 'RELOCATE',    door: 'Diffs' },
   { surface: 'GET /api/conversations/:name/diffs/full',                  kind: 'http', disposition: 'RELOCATE',    door: 'Diffs' },
   { surface: 'GET /api/conversations/:name/diffs/:turnId',               kind: 'http', disposition: 'RELOCATE',    door: 'Diffs' },
+  { surface: 'GET /api/conversations/:name/skills',                      kind: 'http', disposition: 'READ',        door: 'conversation-skill-apply.readConversationSkills (PAN-5465)' },
+  { surface: 'POST /api/conversations/:name/skills',                     kind: 'http', disposition: 'WRITE',       door: 'conversation-skill-apply.applyConversationSkills (PAN-5465)' },
   { surface: 'GET /api/conversations/:name/changes',                     kind: 'http', disposition: 'RELOCATE',    door: 'Diffs' },
   { surface: 'GET /api/conversations/:name/changes/lines',               kind: 'http', disposition: 'RELOCATE',    door: 'Diffs' },
   { surface: 'GET /api/projects/:projectKey/changes',                    kind: 'http', disposition: 'READ',        door: 'getProjectChanges (PAN-5288)' },
@@ -554,6 +556,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/self/lanes',                       kind: 'http', disposition: 'WRITE',       door: 'lanes.handleLaneLaunch with parent = the calling conversation (PAN-4938 W-DEL1)' },
   { surface: 'POST /api/self/lanes/wait',                  kind: 'http', disposition: 'READ',        door: 'lanes/wait.waitForLaneSet over lanes/views.listLaneViews (at most 50 s), agent tokens only (PAN-4938 W-DEL1)' },
   { surface: 'POST /api/self/lanes/report',                kind: 'http', disposition: 'WRITE',       door: 'self-jobs lane-report job → pan lane report (lanes/report.reportLane), lane conversations only (PAN-4938 W-DEL1)' },
+  { surface: 'POST /api/self/skills',                      kind: 'http', disposition: 'WRITE',       door: 'conversation-skill-apply.applyConversationSkills for the calling conversation (PAN-5465)' },
   { surface: 'POST /api/self/tasks/claim',                 kind: 'http', disposition: 'WRITE',       door: 'services/self-jobs.start task-claim -> pan task claim <caller issue> <item> --json, agent tokens only (PAN-4927 W-SELF2)' },
   { surface: 'POST /api/self/tasks/done',                  kind: 'http', disposition: 'WRITE',       door: 'services/self-jobs.start task-done -> pan task done <caller issue> <item> --json, agent tokens only (PAN-4927 W-SELF2)' },
   { surface: 'POST /api/self/tasks/block',                 kind: 'http', disposition: 'WRITE',       door: 'services/self-jobs.start task-block -> pan task block <caller issue> <item> [--on=<ref>…] --json, agent tokens only (PAN-4927 W-SELF2)' },
@@ -778,6 +781,12 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   // ── semgrep.ts ────────────────────────────────────────────────────────────
   { surface: 'GET /api/semgrep/settings',                            kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG via semgrep settings door (PAN-4594)' },
   { surface: 'PUT /api/semgrep/settings',                            kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via semgrep settings path-scoped write (PAN-4594)' },
+
+  // ── computer-use.ts ──────────────────────────────────────────────────────
+  { surface: 'GET /api/computer-use/status',                         kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG + host probes via computer-use status (PAN-5461)' },
+  { surface: 'POST /api/computer-use/setup',                         kind: 'http', disposition: 'WRITE',       door: 'host package install + computer_use.enabled via computer-use setup (PAN-5461)' },
+  { surface: 'PUT /api/computer-use/settings',                       kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via computer-use settings path-scoped write (PAN-5461)' },
+  { surface: 'POST /api/computer-use/release',                       kind: 'http', disposition: 'WRITE',       door: 'desktop lease file via pan computer release (PAN-5461)' },
 
   // ── color-themes.ts (PAN-4644) ───────────────────────────────────────────
   { surface: 'GET /api/color-themes',                                kind: 'http', disposition: 'READ',        door: 'color theme store + selection resolve (PAN-4644)' },

@@ -275,27 +275,46 @@ pan sync
 
 ## Backups
 
-By default, Overdeck creates backups before syncing.
+By default, `pan sync` copies `~/.claude/skills`, `~/.claude/commands` and `~/.claude/agents`
+into `~/.overdeck/backups/<timestamp>/` before syncing.
 
 ### Backup Location
 
 ```
 ~/.overdeck/backups/
   2024-01-15T10-30-00/
-    claude/
-      skills/
-    codex/
-      skills/
+    skills/
+    commands/
+    agents/
 ```
+
+### Retention
+
+After each backup, sync keeps the newest 10 timestamp backups and deletes older ones. Set the
+number with `backup_keep` under `[sync]` in `~/.overdeck/config.toml` (integer >= 1; any other
+value means 10). Retention never touches non-timestamp dirs such as `dist-rollbacks/`, and never
+deletes `<timestamp>/context/` backups that `pan context detach --apply` writes — delete those by
+hand. A prune failure prints a warning and sync continues. `pan backup clean --keep <n>` prunes on
+demand with the same rules.
 
 ### Restore from Backup
 
+`pan backup list` lists backups. `pan restore <timestamp>` restores only `skills/` and
+`commands/`; it skips `agents/` and `context/`. Restore those manually:
+
 ```bash
 # List backups
-ls ~/.overdeck/backups/
+pan backup list
 
-# Restore specific backup (manual)
-cp -r ~/.overdeck/backups/2024-01-15T10-30-00/claude/skills/* ~/.claude/skills/
+# Restore skills/commands for a timestamp
+pan restore 2024-01-15T10-30-00
+
+# Restore agents/ manually (pan restore does not cover it)
+cp -r ~/.overdeck/backups/2024-01-15T10-30-00/agents/* ~/.claude/agents/
+
+# Restore a context backup manually — its filename is the original absolute
+# path with / replaced by __
+cp ~/.overdeck/backups/2024-01-15T10-30-00/context/home__user__.claude__CLAUDE.md ~/.claude/CLAUDE.md
 ```
 
 ### Disable Backups
