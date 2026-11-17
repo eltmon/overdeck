@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-5465",
   "created": "2026-11-17T12:56:05.449Z",
-  "updated": "2026-11-17T14:56:13.472Z",
+  "updated": "2026-11-17T15:35:40.407Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-17T15:35Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-17T15:35:40.407Z"
+    }
+  ],
   "items": {
     "empty-mount": {
       "status": "completed",
@@ -229,5 +235,14 @@
       "status": "completed",
       "doneAt": "2026-11-17T14:56:13.472Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-17T15:35:40Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5465\n\nPull request: https://github.com/eltmon/overdeck/pull/5509 (head `ce582b99`)\n\nSource: check_run:test-shard (2/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (2/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/134151089353/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/44115155288/job/134151089353  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/telemetry-docs.test.ts\u001b[2m > \u001b[22mtelemetry documentation\u001b[2m > \u001b[22mkeeps every event, property, and allowed value domain in exact contract sync\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/telemetry-docs.test.ts\u001b[2m > \u001b[22mtelemetry documentation\u001b[2m > \u001b[22mkeeps every event, property, and allowed value domain in exact contract sync\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected { events: { …(29) }, …(1) } to deeply equal { events: { …(29) }, …(1) }\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[33m@@ -148,11 +148,10 @@\u001b[39m\n\u001b[2m        \"/api/conversations/:name/scheduled-messages\",\u001b[22m\n\u001b[2m        \"/api/conversations/:name/scheduled-messages/:id\",\u001b[22m\n\u001b[2m        \"/api/conversations/:name/schedules\",\u001b[22m\n\u001b[2m        \"/api/conversations/:name/schedules/:id\",\u001b[22m\n\u001b[2m        \"/api/conversations/:name/send-now\",\u001b[22m\n\u001b[32m-       \"/api/conversations/:name/skills\",\u001b[39m\n\u001b[2m        \"/api/conversations/:name/stop\",\u001b[22m\n\u001b[2m        \"/api/conversations/:name/switch-model\",\u001b[22m\n\u001b[2m        \"/api/conversations/:name/thinking-level\",\u001b[22m\n\u001b[2m        \"/api/conversations/:name/tool-body/:toolUseId\",\u001b[22m\n\u001b[2m        \"/api/conversations/:name/upload-image\",\u001b[22m\n\u001b[33m@@ -227,11 +226,10 @@\u001b[39m\n\u001b[2m        \"/api/self/pull-request-watches\",\u001b[22m\n\u001b[2m        \"/api/self/pull-request-watches/:id\",\u001b[22m\n\u001b[2m        \"/api/self/pull-requests\",\u001b[22m\n\u001b[2m        \"/api/self/secret-requests\",\u001b[22m\n\u001b[2m        \"/api/self/secret-requests/:id/wait\",\u001b[22m\n\u001b[32m-       \"/api/self/skills\",\u001b[39m\n\u001b[2m        \"/api/self/tasks/block\",\u001b[22m\n\u001b[2m        \"/api/self/tasks/claim\",\u001b[22m\n\u001b[2m        \"/api/self/tasks/done\",\u001b[22m\n\u001b[2m        \"/api/self/worker-report\",\u001b[22m\n\u001b[2m        \"/api/self/workers\",\u001b[22m\n\u001b[33m@@ -562,11 +560,10 @@\u001b[39m\n\u001b[2m        \"stdio\",\u001b[22m\n\u001b[2m        \"c\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m694 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m1 skipped\u001b[39m\u001b[90m (696)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
 }
