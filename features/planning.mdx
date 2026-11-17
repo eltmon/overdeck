@@ -1,0 +1,268 @@
+---
+title: "Planning: PRDs, xBRIEF plans and the plan critic"
+description: "How Overdeck plans an issue before work starts: the Plan dialog, pan plan, PRD drafts, xBRIEF checklists, pan task, finalize and the plan critic."
+---
+
+# Planning: PRDs, xBRIEF plans and the plan critic
+
+Planning is the step before work on an issue. A planning agent reads the issue and the code, writes a PRD, lowers it into an xBRIEF plan, and finalizes it. Nothing is implemented during planning.
+
+## What planning produces
+
+Planning writes three files, each on the issue's feature branch, under `.pan/` in the project repo (or the configured plan home repo for a polyrepo project):
+
+- `.pan/drafts/<issue>.md`: the PRD.
+- `.pan/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.xbrief.json`: the canonical xBRIEF spec.
+- `.pan/continues/<issue>.xbrief.json`: item status, written by `pan task` as work proceeds.
+
+## Start planning
+
+### From the dashboard
+
+Open the Plan dialog from the issue action menu's `Plan…` item, the Kanban card's `Plan` button, or `Start an issue…` on project Home. It is available only before a plan exists, when no agent is running, and before the issue is done.
+
+The start screen (`Start Planning Session`) explains that the issue moves to In Planning, a git worktree is created for the feature branch, and the planning agent starts a discovery conversation. Its controls:
+
+- `Workspace Location`: `Local` or `Remote (Fly.io)`. Default `Local`, remembered in the browser.
+- `Start work as soon as the plan is ready`: a work agent picks the issue up the moment planning finalizes. Default off.
+- `Stay and watch planning`: keeps the dialog open and shows the agent's terminal. Default on.
+- `Start Docker containers`: the workspace is created with Docker started. Default off, and it applies only when planning creates the workspace.
+- `Model`: defaults to the `roles.plan.model` setting.
+- `Effort`: `Low`, `Medium`, `High`, `Xhigh`, `Max`. Default `High`. `Xhigh` and `Max` add the probe pass.
+
+There is no harness picker: the harness comes from `roles.plan.harness`, or Claude Code if that is unset. There is no probe checkbox either; use `pan plan --probe`, or an effort of `High` or above.
+
+Two buttons start the session. `Plan with me` starts an interactive interview. `Plan automatically` runs planning without interactive questions, the dashboard form of `pan plan --auto`. Both call the same endpoint the CLI uses.
+
+While planning runs, with `Stay and watch planning` on, the dialog shows the agent's live terminal under a `Planning Active` badge, with a footer toggle between `Terminal` and `Tasks` (the xBRIEF task list and dependency graph). Closing the dialog with the X leaves planning running in the background. Clicking outside minimizes it to a chip.
+
+A green `Done` button appears once the plan status is `proposed`; it stops the agent and completes planning, the same action as the issue menu's `Accept plan`.
+
+To stop a planning session without accepting a plan, use the amber footer `Stop` button, or `Abort Planning` on the resume screen. Either one stops the planning agent, returns the issue to Todo, and keeps the workspace. The red header `Stop` button does something different: it stops the agent and completes planning, like `Done`, so do not use it to abort a plan.
+
+For an issue already in planning, the dialog shows `Resume Planning Session` with `Resume Planning` (start a new planning agent session) and `Abort Planning` (return the issue to Todo, keep the workspace).
+
+### From the CLI
+
+```bash
+pan plan <id>                 # Start an interactive planning session
+pan plan <id> --auto          # Non-interactive planning
+pan plan <id> --probe         # Add an adversarial pre-finalize probe pass
+pan plan <id> --model <model> --harness <harness> --effort <level>
+pan plan <id> --remote        # Plan on a Fly.io workspace
+```
+
+In `--auto` mode the planning agent asks no questions. It picks the most defensible default for each one, records it in the xBRIEF `plan.autoDecisions[]` as a summary and rationale, and stops only when the issue and a linked PRD genuinely contradict each other. The probe pass runs when `--probe` is passed, or when the planning effort is `high` or above.
+
+`pan start <id>` plans first when the issue has no plan yet. Its `--plan <mode>` flag picks the depth:
+
+```bash
+pan start <id> --plan interactive   # Full interview
+pan start <id> --plan auto          # Non-interactive planning, no questions
+pan start <id> --plan skip          # Skip planning; synthesize a minimal spec
+```
+
+The precedence is the `--plan` flag, then the deprecated `--auto` flag (which means `skip`), then `planning.default_mode` in the config, then the shipped default `auto`. An invalid value fails with an error naming the three valid choices.
+
+Starting a planning session adds the GitHub label `planning`; completing planning adds `planned`.
+
+## When to skip planning
+
+Skip planning (`pan start <id> --plan skip`) only for small, obvious changes. The synthesized one-item spec has no PRD, no checklist detail, and no plan critic. Use `--plan auto` when the issue is clear but not trivial, and `--plan interactive` when the scope needs your decisions. Set the default with `planning.default_mode`.
+
+## The PRD draft
+
+The PRD is a markdown brief at `.pan/drafts/<issue>.md`. A human can write it, or a planning agent authors a workspace-local draft that gets promoted there. Because a model, not a senior engineer, executes the plan, the PRD carries implementation detail: exact files, before and after code, and numbered work items, not just the what and the why.
+
+`pan plan finalize` will not proceed without a PRD draft of at least 20 lines. See [Finalize the plan](#finalize-the-plan).
+
+## The xBRIEF plan
+
+The plan is an [xBRIEF](https://github.com/deftai/xBRIEF) document (current version 0.8; the old name was vBRIEF). A spec has exactly two top level keys, `xBRIEFInfo` and `plan`. `plan.items[]` is the checklist. Each item has an `id`, `title`, `status`, an optional `narrative.Action`, `metadata`, and nested acceptance criteria.
+
+### Items and acceptance criteria
+
+An item's acceptance criteria are child items with `metadata.kind: "acceptance_criterion"` and ids like `<item>.ac1`. The verification gate requires every acceptance criterion to be `completed` before review. A small example, two items and one dependency between them:
+
+```json
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-04-04T12:00:00Z",
+    "author": "overdeck/0.88.0",
+    "description": "Plan for PAN-999: example"
+  },
+  "plan": {
+    "id": "pan-999",
+    "title": "Example plan",
+    "status": "proposed",
+    "uid": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "author": "agent:example-model",
+    "sequence": 1,
+    "created": "2026-04-04T12:00:00Z",
+    "updated": "2026-04-04T12:00:00Z",
+    "items": [
+      {
+        "id": "add-endpoint",
+        "title": "Add the /widgets endpoint",
+        "status": "pending",
+        "metadata": { "kind": "backend" },
+        "items": [
+          {
+            "id": "add-endpoint.ac1",
+            "title": "GET /widgets returns 200",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "wire-ui",
+        "title": "Call the endpoint from the widgets page",
+        "status": "pending",
+        "metadata": { "kind": "frontend" },
+        "items": [
+          {
+            "id": "wire-ui.ac1",
+            "title": "The widgets page renders the response",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      { "from": "add-endpoint", "to": "wire-ui", "type": "blocks" }
+    ]
+  }
+}
+```
+
+### Edges
+
+An edge is `{ from, to, type }`, with `type` one of `blocks`, `informs`, `invalidates` or `suggests`. Only `blocks` edges order the work: `pan task next` will not offer an item until everything that blocks it has completed.
+
+### Item metadata
+
+| Field | Description |
+| --- | --- |
+| `difficulty` | `trivial`, `simple`, `medium`, `complex` or `expert`; used for model routing |
+| `kind` | `docs`, `api`, `backend`, `frontend`, `infra`, `test`, `refactor`, `design` or `spike` |
+| `files_scope` | Concrete files or narrow globs the item may modify |
+| `files_scope_confidence` | `high`, `medium` or `low` confidence in `files_scope` |
+| `verify_commands` | Commands that verify the committed item |
+| `expected_outputs` | Observable evidence expected from those commands |
+| `readiness` | `ready`, `sequential` or `needs_refinement` |
+| `traces` | PRD requirement ids the item satisfies, such as `FR-1` |
+| `requiresInspection` | Whether a standing tier supervisor should watch this item's commits |
+| `inspectionDepth` | `fast` or `deep` |
+
+### Where the plan lives
+
+The spec's filename never changes once it is created: a UTC creation date, the issue id, and a slug from the plan title. Status is a JSON field; files never move between directories. The lifecycle is:
+
+```
+draft -> proposed -> active -> completed
+                 |                  |
+                 +---> cancelled <--+
+```
+
+| Transition | Trigger |
+| --- | --- |
+| (new) to draft | `pan plan` starts; the PRD is written to `.pan/drafts/` |
+| draft to proposed | Planning completes; the xBRIEF is created in `.pan/specs/` |
+| proposed to active | `pan start` runs |
+| active to completed | The PR merges |
+| active to cancelled | The issue is closed |
+
+## Finalize the plan
+
+```bash
+pan plan finalize              # From the planning workspace
+pan plan finalize --no-prd     # Bypass the PRD gate for a genuinely trivial issue
+pan plan finalize --no-promote # Mark proposed, but defer promotion
+pan plan done <id>             # Promote a plan already marked proposed
+```
+
+Finalize runs the PRD-first gate, then the xBRIEF quality lint, then the plan critic for a flagged plan, then it marks the plan `proposed` and promotes it into `.pan/specs/` on the feature branch.
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | Success |
+| `1` | Other failure: no workspace or plan, or a promotion that did not complete |
+| `3` | The xBRIEF quality lint failed |
+| `4` | The PRD-first gate failed (no draft of at least 20 lines) |
+| `5` | The plan critic refused the plan |
+
+`--no-prd` bypasses the PRD gate and prints a warning. `--no-promote` stops after marking the plan `proposed`; promote it later with `pan plan done <id>` or the dashboard's `Done` button.
+
+After promotion, whether a work agent starts depends on how planning began. By default the issue waits in Planned with a `Start work` action. Work starts automatically when planning began with the Plan dialog's `Start work as soon as the plan is ready` checkbox checked, or when `pan start <id>` itself triggered the planning.
+
+## The plan critic
+
+A plan is flagged for critique when its issue carries the label `architecture`, `substrate-improvement` or `security`, or when you run `pan plan finalize --critic`.
+
+The critic model comes only from the `roles.plan.sub.critic.model` setting. It has no default. It must name a model from a different family than the planner; finalize refuses otherwise, naming the setting in its message.
+
+Finalize dispatches one read only worker to critique the draft and waits up to 9 minutes. Findings are headings: `## blocks-the-design: <title>`, `## sharpens-framing: <title>` or `## footnote: <title>`. Every `blocks-the-design` finding needs an answering `### <title>` heading under a `## Critique response` section in the PRD, or finalize refuses with exit code 5. After two rounds, finalize proceeds anyway and lists any unanswered titles in the PRD.
+
+## Work through the checklist with pan task
+
+| Verb | Does |
+| --- | --- |
+| `next <issue>` | List the next unblocked items |
+| `show <issue> <item>` | Show one item |
+| `claim <issue> <item>` | Mark an item running |
+| `done <issue> <items...>` | Record one or more items done in one commit |
+| `block <issue> <item>` | Record what the item waits on |
+| `unblock <issue> <item>` | Clear a block |
+| `reopen <issue> <item>` | Reopen a completed item |
+| `cancel <issue> <item>` | Cancel an item |
+
+The loop is `pan task next`, `pan task claim <item>`, implement and push, then `pan task done <item>`. `pan task done` checks that a pushed commit carries the trailer `Item: <id>` for every id being completed; if any id lacks one, nothing is written. It accepts several ids at once, for example `pan task done PAN-123 my-item my-item.ac1 my-item.ac2`.
+
+`pan task claim` refuses when a running agent already holds the item, or holds another item whose `files_scope` overlaps it.
+
+`pan task block <issue> <item> --on <refs...>` records which issues or pull requests must merge first. Within about two minutes of the last one merging, the dashboard sends the work agent a `BLOCKERS MERGED` message.
+
+## Plan integrity: the plan is fixed once work starts
+
+A finalized plan cannot be changed by the work agent. The required `plan-integrity` verification check compares the spec at HEAD with the finalized reference and fails on any added, removed or changed item or acceptance criterion, or a changed narrative or edge. Status fields such as `status`, `plan.status`, `plan.updated` and `plan.sequence` may change freely.
+
+To change a plan, return the issue to planning and re-finalize: keep the same item ids, fix the draft, and re-run finalize. It rewrites the same canonical filename, and existing continue file state still applies.
+
+Before spawning a work agent, `pan start` also runs a plan-freshness preflight: it refuses when an item's `files_scope` names a file that a later commit on HEAD deleted. `--skip-freshness` bypasses this check.
+
+## Change lifecycle status with pan scope
+
+```bash
+pan scope list                 # List xBRIEFs across registered projects
+pan scope show <issueId>       # Show plan, items and continue-state summary
+pan scope propose <issueId>    # Set status to proposed
+pan scope approve <issueId>    # Set status to active, plan.status to approved
+pan scope complete <issueId>   # Set status to completed
+pan scope cancel <issueId>     # Set status to cancelled
+pan scope restore <issueId>    # Restore from completed or cancelled to active
+```
+
+`pan scope --help` describes these as moving the xBRIEF between directories. That text is stale: the code rewrites the status fields of the spec in place and never moves any file. `restore` refuses for a merged issue, because its spec on `main` is already `active`.
+
+## Configuration
+
+```yaml
+# ~/.overdeck/config.yaml
+planning:
+  default_mode: auto        # interactive | auto | skip; used by pan start on an unplanned issue
+roles:
+  plan:
+    effort: high
+    sub:
+      critic:
+        model: <a model from a different family than your planner>
+```
+
+See [Reasoning effort](/configuration/effort) for how `roles.plan.effort` resolves, [Swarm](/features/swarm) for how a plan's items can dispatch across parallel work agents, [Jev](/configuration/jev) for the advisory acceptance-criteria review finalize can print, [State model](/reference/state-model) for where plan and task state live, and [Order books](/configuration/order-books) for how a planned issue is picked up by the Flywheel.
+
+## Get help
+
+Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file an issue on [GitHub Issues](https://github.com/eltmon/overdeck/issues).
