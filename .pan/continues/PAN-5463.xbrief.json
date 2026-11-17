@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5463",
   "created": "2026-11-17T12:31:36.411Z",
-  "updated": "2026-11-17T19:35:49.390Z",
+  "updated": "2026-11-17T19:36:51.152Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,7 +100,9 @@
       "doneAt": "2026-11-17T19:35:49.389Z"
     },
     "wi6-skill": {
-      "status": "pending"
+      "status": "pending",
+      "claimedBy": "agent-pan-5463",
+      "claimedAt": "2026-11-17T19:36:51.152Z"
     },
     "wi6-docs": {
       "status": "pending"
