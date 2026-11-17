@@ -28,7 +28,7 @@ function harness(options: {
   steps: SetupStep[];
   stepResults?: Partial<Record<string, SetupStepResult>>;
   helper?: () => Promise<{ ok: boolean; [key: string]: unknown }>;
-  statusOverrides?: Partial<ComputerUseStatusView>;
+  viewOverrides?: Partial<ComputerUseStatusView>;
 }) {
   const order: string[] = [];
   const provider: ComputerUseProvider = {
@@ -50,7 +50,7 @@ function harness(options: {
     return input;
   });
   const withDesktopLock = vi.fn(async <T,>(fn: () => Promise<T>) => fn());
-  const buildStatus = vi.fn(async () => statusWith(options.steps, options.statusOverrides));
+  const buildStatus = vi.fn(async () => statusWith(options.steps, options.viewOverrides));
   const deps: SetupDeps = {
     buildStatus,
     detectPlatform: () => 'linux',
@@ -140,7 +140,7 @@ describe('runSetup (PAN-5461 WI-4b)', () => {
   });
 
   it('returns ok with no steps when ready and enabled', async () => {
-    const h = harness({ steps: [], statusOverrides: { enabled: true } });
+    const h = harness({ steps: [], viewOverrides: { enabled: true } });
     const result = await runSetup(h.deps);
     expect(result.ok).toBe(true);
     expect(result.steps).toEqual([]);
@@ -148,7 +148,7 @@ describe('runSetup (PAN-5461 WI-4b)', () => {
   });
 
   it('refuses an unavailable host', async () => {
-    const h = harness({ steps: [], statusOverrides: { supported: false, session: { ok: false, message: 'nope' } } });
+    const h = harness({ steps: [], viewOverrides: { supported: false, session: { ok: false, message: 'nope' } } });
     const result = await runSetup(h.deps);
     expect(result).toMatchObject({ ok: false, steps: [], message: "Computer use isn't available on this host." });
   });
