@@ -146,7 +146,10 @@ function connectSocket(path: string): Promise<Socket> {
 /** D-16: the helper's error codes, as pan computer error codes. */
 export function mapHelperError(code: unknown, message: unknown): ComputerUseError {
   const text = typeof message === 'string' && message.length > 0 ? message : 'the macOS helper reported an error';
-  if (code === 'permission_denied') return new ComputerUseError('permission_denied', `${text} ${SETUP_HINT}`);
+  if (code === 'permission_denied') {
+    // The helper's own Accessibility message already points at Settings → Computer Use.
+    return new ComputerUseError('permission_denied', text.includes('Settings → Computer Use') ? text : `${text} ${SETUP_HINT}`);
+  }
   if (code === 'invalid_argument') return new ComputerUseError('invalid_argument', text);
   if (code === 'element_not_found') return new ComputerUseError('element_not_found', text);
   return new ComputerUseError('helper_error', `${typeof code === 'string' ? code : 'unknown'}: ${text}`);

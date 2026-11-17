@@ -288,6 +288,12 @@ describe('ensureToken (PAN-5463 D-5)', () => {
 });
 
 describe('mapHelperError (PAN-5463 D-16)', () => {
+  it('does not repeat the setup hint when the helper message already names Settings → Computer Use', () => {
+    const message =
+      'Accessibility permission is required for Overdeck Computer Use. Open Settings → Computer Use in the Overdeck dashboard, allow Overdeck Computer Use, then retry.';
+    expect(mapHelperError('permission_denied', message).message).toBe(message);
+  });
+
   it.each([
     ['invalid_argument', 'invalid_argument', 'bad'],
     ['element_not_found', 'element_not_found', 'bad'],
