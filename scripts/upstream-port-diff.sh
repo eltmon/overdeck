@@ -11,8 +11,8 @@
 #                            path since its recorded commit (no filter = both);
 #                            --patch also prints the diff
 #
-# A .css port carries its header as /* ... */ (PAN-5188); a .py port carries
-# it as # ... (PAN-5452), since neither comment form uses //.
+# A .css port carries its header as /* ... */ (PAN-5188); a .py or .ps1 port
+# carries it as # ... (PAN-5452, PAN-5462), since none of those uses //.
 #
 # Environment: UPSTREAM_PORTS_FILE (default scripts/upstream-ports.json),
 # UPSTREAM_PORTS_ROOT (default the repo root; `local` paths resolve against it),
@@ -102,8 +102,9 @@ check() {
       header="/* ${header#// } */"
       origin_line="/* upstream: $path @ $commit */"
     fi
-    # Python has no // comments: a .py port carries the same two lines as # ... (PAN-5452).
-    if [[ "$local_path" == *.py ]]; then
+    # Python and PowerShell have no // comments: a .py or .ps1 port carries the
+    # same two lines as # ... (PAN-5452, PAN-5462).
+    if [[ "$local_path" == *.py || "$local_path" == *.ps1 ]]; then
       header="# ${header#// }"
       origin_line="# upstream: $path @ $commit"
     fi
