@@ -44,6 +44,7 @@ import { openNewConversationDialog } from './newConversation/newConversationDial
 import { useFleetSearchActions } from './palette-fleet-hits';
 import { useFileProviderActions } from './palette/fileProvider';
 import { anywherePaletteActions, ANYWHERE_PALETTE_GROUP } from './palette-anywhere-actions';
+import { computerUsePaletteActions } from './palette-computer-use-actions';
 import { rememberRunSession } from './workspace/WorkspaceActionBand';
 import { isAgentRunningStatus } from '../lib/pipeline-state';
 import { useDashboardStore, selectAgents, selectIssues } from '../lib/store';
@@ -587,6 +588,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
       onSelect: () => onNavigate('agents'),
     },
     ...anywherePaletteActions(onNavigate),
+    ...computerUsePaletteActions(onNavigate),
   ], [onNavigate, onNewWorkspace]);
 
   // ─── Dynamic: issues + agents ─────────────────────────────────────────────
