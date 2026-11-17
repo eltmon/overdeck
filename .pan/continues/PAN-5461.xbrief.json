@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5461",
   "created": "2026-11-17T12:13:42.164Z",
-  "updated": "2026-11-17T17:35:46.234Z",
+  "updated": "2026-11-17T17:36:08.624Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -264,6 +264,22 @@
     "palette.ac3": {
       "status": "completed",
       "doneAt": "2026-11-17T17:35:46.234Z"
+    },
+    "docs": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:36:08.624Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:36:08.624Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:36:08.624Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:36:08.624Z"
     }
   }
 }
