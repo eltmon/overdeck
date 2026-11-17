@@ -62,11 +62,11 @@ describe('ComputerUseSection (PAN-5461)', () => {
   afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
   it('shows Unavailable with the host message and no button', async () => {
-    serveStatus(view({ platform: 'wsl', supported: false, session: { ok: false, message: "Computer use isn't supported on this host (wsl) yet." }, checks: [], setupSteps: [] }));
+    serveStatus(view({ platform: 'darwin', supported: false, session: { ok: false, message: "Computer use isn't supported on this host (darwin) yet." }, checks: [], setupSteps: [] }));
     renderSection();
     expect(await screen.findByText('Not available on this machine')).toBeInTheDocument();
     expect(screen.getByTestId('computer-use-badge')).toHaveTextContent('Unavailable');
-    expect(screen.getByText("Computer use isn't supported on this host (wsl) yet.")).toBeInTheDocument();
+    expect(screen.getByText("Computer use isn't supported on this host (darwin) yet.")).toBeInTheDocument();
     expect(screen.queryByTestId('computer-use-cta')).toBeNull();
   });
 

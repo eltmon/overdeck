@@ -41,13 +41,13 @@ function deps(overrides: StatusDeps & { report?: ReadinessReport; enabled?: bool
 
 describe('buildStatus (PAN-5461 WI-3b)', () => {
   it('reports an unsupported host with no checks or steps', async () => {
-    const status = await buildStatus({ probeHelper: 'if-free' }, deps({ detectPlatform: () => 'wsl', enabled: false }));
+    const status = await buildStatus({ probeHelper: 'if-free' }, deps({ detectPlatform: () => 'darwin', enabled: false }));
     expect(status).toMatchObject({
-      platform: 'wsl',
+      platform: 'darwin',
       supported: false,
       enabled: false,
       hostname: 'desk',
-      session: { ok: false, message: "Computer use isn't supported on this host (wsl) yet." },
+      session: { ok: false, message: "Computer use isn't supported on this host (darwin) yet." },
       checks: [],
       setupSteps: [],
     });

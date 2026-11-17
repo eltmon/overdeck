@@ -134,6 +134,13 @@ describe('resolveHelperDir (PAN-5462 D-5)', () => {
     expect(harness.calls).toEqual([]);
   });
 
+  it('sets WSL_INTEROP for the LocalApplicationData probe when the env lacks it (D-17)', async () => {
+    const harness = makeHarness({ env: { PATH: '/usr/bin' }, sockets: ['1_interop'] });
+    await resolveHelperDir(harness.deps);
+    const probe = harness.calls.find((call) => call.args.includes('-Command'));
+    expect(probe?.options.env.WSL_INTEROP).toBe('/run/WSL/1_interop');
+  });
+
   it('re-resolves when the cached dir is gone', async () => {
     const harness = makeHarness({ files: { [CACHE]: '/mnt/c/old/computer-use\nC:\\old\\computer-use\n' } });
     expect(await resolveHelperDir(harness.deps)).toEqual({ linux: LINUX_DIR, win: WIN_DIR });

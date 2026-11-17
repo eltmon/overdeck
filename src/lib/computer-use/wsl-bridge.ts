@@ -155,10 +155,12 @@ export async function resolveHelperDir(deps: WslBridgeDeps = {}, powershell?: st
   const cached = await readCachedHelperDir(deps);
   if (cached) return cached;
 
-  const env = deps.env ?? process.env;
-  const exe = powershell ?? (await resolvePowershell(deps));
+  // Readiness calls this directly, so it needs the D-17 guard as much as runWindowsHelper.
+  const env = await interopEnv(deps);
+  const bridgeDeps: WslBridgeDeps = { ...deps, env };
+  const exe = powershell ?? (await resolvePowershell(bridgeDeps));
   if (!exe) throw new ComputerUseError('no_desktop_session', POWERSHELL_NOT_FOUND_MESSAGE);
-  const { stdout } = await execFor(deps)(
+  const { stdout } = await execFor(bridgeDeps)(
     exe,
     [...POWERSHELL_ARGS, '-Command', "[Environment]::GetFolderPath('LocalApplicationData')"],
     probeOptions(env),
@@ -167,7 +169,7 @@ export async function resolveHelperDir(deps: WslBridgeDeps = {}, powershell?: st
   if (!localAppData) {
     throw new ComputerUseError('helper_error', 'pan computer: Windows did not report a LocalApplicationData folder.');
   }
-  const linuxBase = await wslpath('-u', localAppData, env, deps);
+  const linuxBase = await wslpath('-u', localAppData, env, bridgeDeps);
   const dir: HelperDir = {
     linux: join(linuxBase, 'Overdeck', 'computer-use'),
     win: `${localAppData.replace(/\\+$/, '')}\\Overdeck\\computer-use`,

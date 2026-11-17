@@ -75,15 +75,15 @@ describe('runComputerOperation preamble (PAN-5452)', () => {
     expect(loadConfig).not.toHaveBeenCalled();
   });
 
-  it('refuses WSL with unsupported_platform before reading config (PAN-5461 D-9)', async () => {
+  it('refuses a host with no provider with unsupported_platform before reading config (PAN-5461 D-9)', async () => {
     const loadConfig = vi.fn().mockReturnValue({ computerUse: { enabled: true } });
     const resolveSession = vi.fn();
-    const deps = baseDeps({ detectPlatform: () => 'wsl', loadConfig, resolveSession });
+    const deps = baseDeps({ detectPlatform: () => 'darwin', loadConfig, resolveSession });
 
     const error = await runComputerOperation({ kind: 'read', operation: {} }, deps).catch((e) => e);
     expect(isComputerUseError(error)).toBe(true);
     expect(error.code).toBe('unsupported_platform');
-    expect(error.message).toBe("Computer use isn't supported on this host (wsl) yet.");
+    expect(error.message).toBe("Computer use isn't supported on this host (darwin) yet.");
     expect(loadConfig).not.toHaveBeenCalled();
     expect(resolveSession).not.toHaveBeenCalled();
   });
@@ -189,8 +189,8 @@ describe('runCapabilities (PAN-5452 FR-13)', () => {
   });
 
   it('reports the unsupported message without throwing when the platform has no provider', async () => {
-    const result = await runCapabilities(baseDeps({ detectPlatform: () => 'wsl' }));
-    expect(result.desktopSession).toEqual({ ok: false, message: "Computer use isn't supported on this host (wsl) yet." });
+    const result = await runCapabilities(baseDeps({ detectPlatform: () => 'darwin' }));
+    expect(result.desktopSession).toEqual({ ok: false, message: "Computer use isn't supported on this host (darwin) yet." });
     expect(result.helper).toBeNull();
   });
 
