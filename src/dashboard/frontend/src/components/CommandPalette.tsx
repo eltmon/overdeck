@@ -250,9 +250,18 @@ async function fetchWorkspaceRegistry(): Promise<WorkspaceRegistryRow[]> {
   }
 }
 
+const PALETTE_SEARCH_TIMEOUT_MS = 10_000;
+const SEARCH_TIMED_OUT = 'timed out';
+
 async function fetchPaletteSearch(query: string, signal: AbortSignal): Promise<PaletteSearchResponse> {
+  // Own controller: a supersede abort (signal) and our timeout must stay distinguishable (PAN-5447).
+  const request = new AbortController();
+  const onSupersede = () => request.abort();
+  signal.addEventListener('abort', onSupersede, { once: true });
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; request.abort(); }, PALETTE_SEARCH_TIMEOUT_MS);
   try {
-    const res = await fetch(`/api/palette/search?q=${encodeURIComponent(query)}&limit=15`, { signal });
+    const res = await fetch(`/api/palette/search?q=${encodeURIComponent(query)}&limit=15`, { signal: request.signal });
     // PAN-3975: non-OK statuses (401 expired session, 500, …) must surface as
     // an error, not collapse into "zero results".
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -264,8 +273,12 @@ async function fetchPaletteSearch(query: string, signal: AbortSignal): Promise<P
       conversations: data.conversations ?? [],
     };
   } catch (err) {
-    if ((err as { name?: string }).name === 'AbortError') return EMPTY_SEARCH;
+    if (signal.aborted) return EMPTY_SEARCH;
+    if (timedOut) throw new Error(SEARCH_TIMED_OUT);
     throw err;
+  } finally {
+    clearTimeout(timer);
+    signal.removeEventListener('abort', onSupersede);
   }
 }
 
@@ -866,6 +879,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
       : groupOrder.filter((g) => filtered.some((a) => a.group === g && inScope(a)))),
     [groupOrder, filtered, scope, inScope],
   );
+  const searchTimedOut = searchError === SEARCH_TIMED_OUT && query.trim().length >= 2;
 
   if (!isOpen) return null;
 
@@ -934,8 +948,13 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
                 {scope === 'conversations' ? 'Searching conversations…' : 'Searching conversations & memory…'}
               </div>
             )}
+            {!isSearchLoading && searchTimedOut && (
+              <div className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground">
+                Search timed out after 10 s. Try again.
+              </div>
+            )}
             {visibleGroups.length === 0 ? (
-              isSearchLoading && query.trim().length >= 2 ? null : (
+              (isSearchLoading && query.trim().length >= 2) || searchTimedOut ? null : (
                 <Command.Empty className="py-6 text-center text-sm text-muted-foreground">
                   {query.trim().length === 0
                     ? (scope === 'conversations' ? 'Type to search conversations…' : 'Start typing…')
