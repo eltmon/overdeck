@@ -4,17 +4,17 @@
     "created": "2026-11-17T11:57:13Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5463: Computer use on macOS: port Orca's Swift helper with Accessibility and Screen Recording setup",
-    "updated": "2026-11-17T12:00:48.454Z"
+    "updated": "2026-11-17T12:31:17.979Z"
   },
   "plan": {
     "id": "pan-5463",
     "title": "Computer use on macOS: port Orca's Swift helper with Accessibility and Screen Recording setup",
-    "status": "proposed",
+    "status": "running",
     "uid": "763773df-3a8b-400b-b485-803e31cfe6ab",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-17T11:57:13Z",
-    "updated": "2026-11-17T12:00:48.454Z",
+    "updated": "2026-11-17T12:31:17.979Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5463",
@@ -1499,5 +1499,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
