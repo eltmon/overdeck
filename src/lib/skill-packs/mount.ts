@@ -22,6 +22,7 @@ import { getOverdeckHome } from '../paths.js';
 import { applyDeftHostNotice, DEFT_HOST_NOTICE_VERSION } from './deft.js';
 import { GSTACK_RENDER_VERSION } from './gstack.js';
 import { PACK_ID_PATTERN, packsHome } from './sources.js';
+import { applyVideoUseHostNotice, requirementsFromPyproject, VIDEO_USE_NOTICE_VERSION } from './video-use.js';
 
 export const MOUNT_FORMAT_VERSION = 2;
 export const CODEX_PACK_MARKETPLACE = 'overdeck-packs';
@@ -42,13 +43,16 @@ const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
  * `deft-readonly`: rename each SKILL.md to the stripped name and insert the Deft host notice.
  * `gstack-runtime`: copy verbatim from the gstack render root (PAN-4727); the tag keys the hash on
  * GSTACK_RENDER_VERSION.
+ * `video-use`: insert the video-use host notice into the `video-use` skill and write its requirements.txt
+ * (PAN-5464); the tag keys the hash on VIDEO_USE_NOTICE_VERSION.
  */
-export type MountTransform = 'deft-readonly' | 'gstack-runtime';
+export type MountTransform = 'deft-readonly' | 'gstack-runtime' | 'video-use';
 
 /** The transform's part of a mount hash entry, versioned so a contract change yields new mounts. */
 function transformTag(transform: MountTransform | undefined): string {
   if (transform === 'deft-readonly') return `deft-readonly.${DEFT_HOST_NOTICE_VERSION}`;
   if (transform === 'gstack-runtime') return `gstack-runtime.${GSTACK_RENDER_VERSION}`;
+  if (transform === 'video-use') return `video-use.${VIDEO_USE_NOTICE_VERSION}`;
   return '';
 }
 
@@ -58,7 +62,8 @@ export interface MountPack {
   /** Extraction dir of the pack at `commit` (the render dir for `gstack-runtime`). */
   root: string;
   transform?: MountTransform;
-  skills: Array<{ name: string; dir: string }>;
+  /** `paths` (a root skill, PAN-5464): copy only these, relative to `dir`, instead of the whole dir. */
+  skills: Array<{ name: string; dir: string; paths?: readonly string[] }>;
   /** Repo-relative plugin root the extras are read from (default: the repo root). */
   pluginRoot?: string;
   /** Plugin-root-relative files or dirs copied to plugins/<pack>/<extra>. */
@@ -79,10 +84,20 @@ export function mountsDir(): string {
   return join(packsHome(), 'mounts');
 }
 
+/** D-2 (PAN-5465): the fixed empty plugins dir a launch with no packs links to. */
+export function emptyMountPluginsDir(): string {
+  return join(mountsDir(), 'empty', 'plugins');
+}
+
 export function mountHash(selection: MountSelection): string {
   const entries = selection.packs
     .flatMap((pack) =>
-      pack.skills.map((skill) => `${pack.id}@${pack.commit}:${skill.name}:${transformTag(pack.transform)}`),
+      pack.skills.map(
+        (skill) =>
+          // NFR-2: the paths suffix appears only for a skill that sets paths, so existing mounts keep their hash.
+          // JSON keeps ['a', 'b'] and ['a,b'] apart.
+          `${pack.id}@${pack.commit}:${skill.name}:${transformTag(pack.transform)}${skill.paths ? `:${JSON.stringify(skill.paths)}` : ''}`,
+      ),
     )
     .concat(
       selection.packs.flatMap((pack) =>
@@ -96,7 +111,12 @@ export function mountHash(selection: MountSelection): string {
 function assertMountPack(pack: MountPack): void {
   if (!PACK_ID_PATTERN.test(pack.id)) throw new Error(`invalid pack id: ${JSON.stringify(pack.id)}`);
   if (!COMMIT_PATTERN.test(pack.commit)) throw new Error(`invalid pack commit: ${JSON.stringify(pack.commit)}`);
-  if (pack.transform !== undefined && pack.transform !== 'deft-readonly' && pack.transform !== 'gstack-runtime') {
+  if (
+    pack.transform !== undefined &&
+    pack.transform !== 'deft-readonly' &&
+    pack.transform !== 'gstack-runtime' &&
+    pack.transform !== 'video-use'
+  ) {
     throw new Error(`invalid pack transform: ${JSON.stringify(pack.transform)}`);
   }
   for (const skill of pack.skills) {
@@ -104,6 +124,12 @@ function assertMountPack(pack: MountPack): void {
     const normalized = posix.normalize(skill.dir);
     if (isAbsolute(skill.dir) || normalized === '..' || normalized.startsWith('../')) {
       throw new Error(`skill dir escapes pack ${pack.id}: ${JSON.stringify(skill.dir)}`);
+    }
+    for (const path of skill.paths ?? []) {
+      const normalizedPath = posix.normalize(path);
+      if (isAbsolute(path) || normalizedPath === '..' || normalizedPath.startsWith('../')) {
+        throw new Error(`skill path escapes pack ${pack.id}: ${JSON.stringify(path)}`);
+      }
     }
   }
   for (const extra of pack.extras ?? []) {
@@ -170,11 +196,22 @@ async function populateMount(dir: string, packs: MountPack[], hash: string): Pro
     });
     for (const skill of skills) {
       const dst = join(pluginDir, 'skills', skill.name);
-      await copyWithoutSymlinks(join(pack.root, skill.dir), dst);
+      if (skill.paths) {
+        // A root skill (PAN-5464 D-8): copy only its paths, never the whole repo root.
+        for (const path of skill.paths) {
+          const src = join(pack.root, skill.dir, path);
+          if (!(await exists(src))) continue;
+          await mkdir(dirname(join(dst, path)), { recursive: true });
+          await copyWithoutSymlinks(src, join(dst, path));
+        }
+      } else {
+        await copyWithoutSymlinks(join(pack.root, skill.dir), dst);
+      }
       if (pack.transform === 'deft-readonly') {
         const skillMd = join(dst, 'SKILL.md');
         await writeFile(skillMd, applyDeftHostNotice(await readFile(skillMd, 'utf8'), skill.name), 'utf8');
       }
+      if (pack.transform === 'video-use' && skill.name === 'video-use') await applyVideoUseTransform(dst);
     }
     for (const extra of pack.extras ?? []) {
       const src = join(pack.root, pack.pluginRoot ?? '', extra);
@@ -182,6 +219,16 @@ async function populateMount(dir: string, packs: MountPack[], hash: string): Pro
       await copyWithoutSymlinks(src, join(pluginDir, extra));
     }
     if (pack.transform === 'gstack-runtime') await writeFile(join(pluginDir, MOUNT_RENDER_ROOT_FILE), `${pack.root}\n`, 'utf8');
+  }
+}
+
+/** PAN-5464 D-9: the video-use host notice in SKILL.md, and requirements.txt from the copied pyproject.toml. */
+async function applyVideoUseTransform(dst: string): Promise<void> {
+  const skillMd = join(dst, 'SKILL.md');
+  if (await exists(skillMd)) await writeFile(skillMd, applyVideoUseHostNotice(await readFile(skillMd, 'utf8')), 'utf8');
+  const pyproject = join(dst, 'pyproject.toml');
+  if (await exists(pyproject)) {
+    await writeFile(join(dst, 'requirements.txt'), requirementsFromPyproject(await readFile(pyproject, 'utf8')), 'utf8');
   }
 }
 
@@ -220,16 +267,14 @@ export async function buildMount(selection: MountSelection): Promise<Mount | nul
   return mount;
 }
 
-/** Point the per-launch plugin link at `<mount>/plugins` (atomic replace), or remove it when there is no mount. */
+/** Point the per-launch plugin link at `<mount>/plugins` (atomic replace), or at the empty mount when there is none (D-2). */
 export async function linkClaudeMount(link: string, mount: Mount | null): Promise<void> {
-  if (mount === null) {
-    await rm(link, { force: true });
-    return;
-  }
+  const target = mount === null ? emptyMountPluginsDir() : join(mount.path, 'plugins');
+  if (mount === null) await mkdir(target, { recursive: true });
   await mkdir(dirname(link), { recursive: true });
   const tmp = `${link}.tmp-${process.pid}`;
   await rm(tmp, { force: true });
-  await symlink(join(mount.path, 'plugins'), tmp);
+  await symlink(target, tmp);
   await rename(tmp, link);
 }
 
@@ -368,6 +413,8 @@ export async function gcMounts(
   const removedMounts: string[] = [];
   const root = mountsDir();
   for (const name of await listDirNames(root)) {
+    // D-2 (PAN-5465): the empty mount is fixed and shared by every pack-less launch.
+    if (name === 'empty') continue;
     const path = join(root, name);
     let stats;
     try {

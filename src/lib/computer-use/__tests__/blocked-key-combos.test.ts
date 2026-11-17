@@ -46,3 +46,24 @@ describe('assertKeyComboAllowed (PAN-5452)', () => {
     );
   });
 });
+
+describe('assertKeyComboAllowed platform (PAN-5461 D-16)', () => {
+  it('applies the Linux rules when the platform is linux', () => {
+    expect(() => assertKeyComboAllowed('alt+F4', false, 'linux')).toThrow(/close the window/);
+    expect(() => assertKeyComboAllowed('ctrl+a', false, 'linux')).not.toThrow();
+  });
+
+  it.each(['windows', 'mac'] as const)('fails closed for %s even with allowSystemShortcut', (platform) => {
+    for (const allow of [false, true]) {
+      let error: unknown = null;
+      try {
+        assertKeyComboAllowed('ctrl+a', allow, platform);
+      } catch (caught) {
+        error = caught;
+      }
+      expect(isComputerUseError(error)).toBe(true);
+      expect((error as { code: string }).code).toBe('unsupported_platform');
+      expect((error as Error).message).toBe(`No blocked-shortcut rules for ${platform} yet.`);
+    }
+  });
+});

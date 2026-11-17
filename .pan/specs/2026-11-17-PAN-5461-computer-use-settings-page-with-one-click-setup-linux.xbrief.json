@@ -1,0 +1,1244 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-17T12:00:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5461: Computer use: Settings page with one-click setup (Linux)",
+    "updated": "2026-11-17T12:13:28.060Z"
+  },
+  "plan": {
+    "id": "pan-5461",
+    "title": "Computer use: Settings page with one-click setup (Linux)",
+    "status": "running",
+    "uid": "92c91047-17eb-4707-8d14-f9b0ac67fb0e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-17T12:00:00Z",
+    "updated": "2026-11-17T12:13:28.060Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5461",
+        "label": "PAN-5461",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5461/.pan/drafts/pan-5461.md",
+        "label": "PRD draft (.pan/drafts/pan-5461.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "computer-use",
+      "settings",
+      "dashboard",
+      "linux",
+      "provider-seam"
+    ],
+    "metadata": {
+      "sizeJustification": "Operator approved this scope as one issue (mockup 2026-11-17); Windows and macOS are already split into PAN-5462/PAN-5463. The seam, routes and Settings page are one feature: a seam with no page, or a page with no setup, gives the operator nothing. Most of the ~40 files are new small modules and their tests (PRD D-13).",
+      "canonicalFilename": "2026-11-17-PAN-5461-computer-use-settings-page-with-one-click-setup-linux.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Turning on computer use (PAN-5452) means hand-editing ~/.overdeck/config.yaml, and its readiness checks exist only inside pan doctor, which prints nothing while the feature is off. There is also no seam for the Windows (PAN-5462) and macOS (PAN-5463) providers, so they would have to edit Linux-only branches.",
+      "Proposal": "Add a platform provider seam (src/lib/computer-use/platform.ts) with one Linux provider; move the readiness probes into the library (doctor wraps them with its legacy rows); add Linux setup steps (pkexec install with a terminal fallback, gsettings accessibility); add a settings door, a status view and a setup orchestrator; expose four admin-only routes; and add Settings -> Computer Use with one primary button, a command-palette entry, and docs. Full detail in the PRD work items WI-1a..WI-8.",
+      "NonGoals": "- Windows/WSL2 and macOS providers (PAN-5462, PAN-5463); WSL2 is detected and refused here\n- Uninstalling packages or turning GNOME accessibility off when the feature is turned off\n- Running apt-get update or any package-index refresh\n- Taking package names, commands or paths from any request body\n- route-scopes.ts rows or any scoped-token access to the new routes\n- Per-project computer-use settings; the flag stays global-layer-only\n- A dashboard feed of agent desktop actions or screenshots\n- Individual per-check fix buttons (one primary button only)\n- Changing pan doctor output content or pan computer capabilities output shape\n- Raising any scripts/file-size-allowlist.txt cap"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Ship as one issue with plan.metadata.sizeJustification instead of splitting into more sibling issues.",
+        "rationale": "The operator approved this scope as one issue; platform siblings already exist; the remaining slices are not useful to the operator on their own (PRD D-13)."
+      },
+      {
+        "summary": "pan doctor keeps its exact rows through a fixed legacy message table, runs the handshake without the desktop lock, and skips setup-step planning.",
+        "rationale": "FR-11 requires unchanged doctor content and the existing doctor test must pass unedited; taking the lock in doctor would be a behavior change nobody asked for (PRD D-14)."
+      },
+      {
+        "summary": "Detect the Linux package manager locally with which through the injected execFile; never import src/lib/prereqs/registry.ts.",
+        "rationale": "registry.ts pulls chalk, Semgrep install and terminal-backend code into the computer-use lib and its checkCommand spawns real processes tests cannot inject (PAN-5461 D-15)."
+      },
+      {
+        "summary": "assertKeyComboAllowed fails closed (unsupported_platform) for windows/mac until their rule tables exist.",
+        "rationale": "A fail-open default on a safety check is the wrong failure mode even when unreachable (PRD D-16)."
+      },
+      {
+        "summary": "Ship both the pkexec install path and the terminal-window fallback; the live checkpoint only records which one this desktop takes.",
+        "rationale": "Whether polkit finds an agent for a systemd user service varies by desktop; both paths are needed for real operators and can be unit-tested without a desktop (PRD D-17)."
+      },
+      {
+        "summary": "Use the MousePointerClick icon instead of MonitorCog.",
+        "rationale": "MonitorCog does not exist in the installed lucide-react@0.400.0 (PRD D-18)."
+      },
+      {
+        "summary": "Entry points are the Settings nav item, the command palette, and the disabled error text; no conversation-tab or Home entry.",
+        "rationale": "This is a one-time host setting; operators meet it through an agent's disabled error, which now names the page (PRD D-19)."
+      }
+    ],
+    "items": [
+      {
+        "id": "platform-types",
+        "title": "Add platform-types.ts (seam types) and platform.ts (detectPlatform)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5461",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "readiness-linux",
+            "setup-linux",
+            "linux-provider",
+            "status-view",
+            "setup-orchestrator"
+          ],
+          "files_scope": [
+            "src/lib/computer-use/platform-types.ts",
+            "src/lib/computer-use/platform.ts",
+            "src/lib/computer-use/__tests__/platform.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/platform.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "platform.test.ts reports all detection cases green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1a. Create src/lib/computer-use/platform-types.ts with the exact exported types from the PRD (ComputerUsePlatformId, ReadinessStatus, ReadinessCheck, ProviderSession, SetupStepId, SetupStep, SetupStepResult, ReadinessReport, KeyPlatform, ComputerUseProvider), and src/lib/computer-use/platform.ts with DetectPlatformDeps, detectPlatform(deps) and an explicit `export type { ... } from './platform-types.js'`. Providers and their helper modules import types from platform-types.ts, never platform.ts (D-10: platform.ts will import every provider and lint:circular counts import type edges). providerFor is NOT added here (WI-1c). The default readOsRelease reads /proc/sys/kernel/osrelease with readFileSync inside try/catch. Tests inject platform/env/readOsRelease; no real /proc read."
+        },
+        "items": [
+          {
+            "id": "platform-types.ac1",
+            "title": "Given platform 'linux' with WSL_DISTRO_NAME set, or an osrelease containing 'microsoft' (any case), detectPlatform returns 'wsl'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "platform-types.ac2",
+            "title": "detectPlatform returns 'linux' for plain linux, 'darwin' for darwin, and 'unsupported' for win32, all through injected deps in platform.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "platform-types.ac3",
+            "title": "platform-types.ts exports the ComputerUseProvider interface with resolveSession, readiness({probeHelper}), runSetupStep, runHelper and blockedKeyPlatform members exactly as the PRD WI-1a block shows, and platform.ts re-exports every type",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lock-additions",
+        "title": "Add FileLockTimeoutError/timeoutMs to file-lock and readLease/tryWithDesktopLock to lease.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5461",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/file-lock.ts",
+            "src/lib/computer-use/lease.ts",
+            "src/lib/vault/__tests__/file-lock.test.ts",
+            "src/lib/computer-use/__tests__/lease.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/vault/__tests__/file-lock.test.ts src/lib/computer-use/__tests__/lease.test.ts src/lib/__tests__/disk-floor.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "file-lock.test.ts, lease.test.ts and disk-floor.test.ts report green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2a. In file-lock.ts add an exported FileLockTimeoutError (extends Error, same message as today) and an optional timeoutMs deadline in acquire; both exhaustion paths throw FileLockTimeoutError. In lease.ts rename the private readLease(path, readFileFn) to readLeaseRecord (D-20) and update claimLease/releaseLease, then add exported readLease(now, deps) returning { holder, expiresAt } or null (never throws), add withFileLock? to WithDesktopLockDeps, and add tryWithDesktopLock(fn, { waitMs }, deps) that maps only FileLockTimeoutError to { acquired: false }. NFR-3: never fake timers over real fs (PAN-3305/PAN-3320 race) — file-lock.test.ts uses real timers with retryMs 1 and timeoutMs 20 in an mkdtemp dir; lease.test.ts injects a fake withFileLock/readFile/mkdir. Never write the real ~/.overdeck."
+        },
+        "items": [
+          {
+            "id": "lock-additions.ac1",
+            "title": "Given a lock file created by hand in an mkdtemp dir, withFileLock(path, fn, { retryMs: 1, timeoutMs: 20 }) rejects with FileLockTimeoutError using real timers and never calls fn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lock-additions.ac2",
+            "title": "readLease returns null for a missing, corrupt or expired lease file and returns { holder, expiresAt } for a live one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lock-additions.ac3",
+            "title": "tryWithDesktopLock returns { acquired: false } when an injected withFileLock throws FileLockTimeoutError, returns { acquired: true, value } when it runs fn, and rethrows an error thrown by fn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "readiness-linux",
+        "title": "Move the Linux readiness probes into readiness-linux.ts and make pan doctor wrap them",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5461",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/computer-use/readiness-linux.ts",
+            "src/cli/commands/doctor-computer-use.ts",
+            "src/lib/computer-use/__tests__/readiness-linux.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/readiness-linux.test.ts src/cli/commands/__tests__/doctor-computer-use.test.ts",
+            "git diff --exit-code origin/main -- src/cli/commands/__tests__/doctor-computer-use.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "readiness-linux.test.ts and the unedited doctor-computer-use.test.ts report green",
+            "git diff on the doctor test file prints nothing and exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "readinessReason": "Touches only new readiness-linux.ts and doctor-computer-use.ts; no other item edits them.",
+          "traces": [
+            "FR-3",
+            "FR-11",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2b. Create src/lib/computer-use/readiness-linux.ts exporting ExecFileFn, LinuxPackageManagerId, HelperLockMode, LinuxProbeResult, LinuxReadinessDeps, LinuxReadinessReport, LinuxInstallPlan, LINUX_PACKAGES, probeLinux, planLinuxInstall and linuxReadiness (types imported from platform-types.ts; linuxReadiness calls probeLinux({ detectPackageManager: options.setupSteps }); zypper/apk/no manager still list install-packages without needsPassword, D-4) exactly as the PRD specifies (row table, package table, probe order, helper lock modes 'wait'|'if-free'|'none', fixCommand rules for zypper/apk, local package-manager detection via which, D-15: no import of prereqs/registry.ts). Rewrite checkComputerUse in doctor-computer-use.ts to call linuxReadiness({ helperLock: 'none', setupSteps: false }) and map rows back through the PRD's legacy table in legacy order; decide Linux via detectPlatform (WSL gets the non-Linux warn row); re-export ExecFileFn; add optional detectPlatform to CheckComputerUseDeps. Do not edit the doctor test file. Tests inject execFile/resolveDesktopEnv/runHelper/lock fakes through deps; never vi.mock child_process."
+        },
+        "items": [
+          {
+            "id": "readiness-linux.ac1",
+            "title": "linuxReadiness returns the seven rows in FR-3 order with the PRD table's ok and not-ok details, and returns exactly [session, atspi] rows without calling runHelper when there is no desktop session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readiness-linux.ac2",
+            "title": "Given xdotool missing on X11, setupSteps contains install-packages labelled 'Install xdotool' with needsPassword true for apt-get, dnf and pacman, and without needsPassword for zypper, apk or no manager, where zypper and apk rows also carry a fixCommand",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readiness-linux.ac3",
+            "title": "With helperLock 'if-free' and tryWithDesktopLock returning { acquired: false }, the helper row shows 'Skipped: an agent is using the desktop' and runHelper is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readiness-linux.ac4",
+            "title": "The existing doctor-computer-use.test.ts passes with zero edits (git diff against origin/main prints nothing for that file)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "setup-linux",
+        "title": "Add Linux setup steps: pkexec package install with terminal fallback, and gsettings accessibility",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5461",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "linux-provider",
+            "setup-orchestrator",
+            "live-verify"
+          ],
+          "files_scope": [
+            "src/lib/computer-use/setup-linux.ts",
+            "src/lib/computer-use/__tests__/setup-linux.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/setup-linux.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "setup-linux.test.ts reports every pkexec and gsettings case green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "readinessReason": "Touches only the new setup-linux.ts and its test.",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4a. Create src/lib/computer-use/setup-linux.ts (types from platform-types.ts) with installCommandText (all five managers), installPackages(pm, packages, session, deps) for apt-get/dnf/pacman, manualInstallResult(pm, packages) for zypper/apk/null (failed with the command, or the package names when no manager, D-4) and enableGnomeAccessibility(session, deps). installPackages resolves the manager path with which, runs execFile('pkexec', [pmPath, ...args, ...packages], { env: session.env, timeout: 600000 }), maps exit 126 to the cancelled message, exit 127 / 'No authentication agent found' / ENOENT to the terminal fallback (gnome-terminal, x-terminal-emulator, konsole, xterm via an injected spawnDetached that defaults to spawn(...).unref()), and other errors to failed with the apt 'Unable to locate package' hint. Every failed result carries the copyable sudo command. Packages only come from LINUX_PACKAGES (D-3). Tests inject execFile and spawnDetached; never vi.mock child_process; never run apt-get update."
+        },
+        "items": [
+          {
+            "id": "setup-linux.ac1",
+            "title": "Given apt-get and ['xdotool'], installPackages calls execFile with 'pkexec' and ['/usr/bin/apt-get','install','-y','xdotool'] and session.env, and returns status 'done' on success",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setup-linux.ac2",
+            "title": "When pkexec exits 126, installPackages returns failed with the 'password prompt was cancelled' message and command 'sudo apt-get install -y xdotool'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setup-linux.ac3",
+            "title": "When pkexec exits 127 or is missing (ENOENT), installPackages spawns gnome-terminal with ['--','bash','-c',<script>] and returns failed with the 'terminal window opened' message; with no terminal found it returns the 'Run this command' message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setup-linux.ac4",
+            "title": "enableGnomeAccessibility runs gsettings set org.gnome.desktop.interface toolkit-accessibility true with session.env and returns done, or failed with the gsettings command on error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setup-linux.ac5",
+            "title": "manualInstallResult('zypper', ['xdotool']) returns failed with command 'sudo zypper install -y xdotool', and manualInstallResult(null, ...) returns failed with no command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "linux-provider",
+        "title": "Add the Linux provider and providerFor, and route run.ts through the provider seam",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5461",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/computer-use/providers/linux.ts",
+            "src/lib/computer-use/platform.ts",
+            "src/lib/computer-use/run.ts",
+            "src/lib/computer-use/__tests__/run.test.ts",
+            "src/lib/computer-use/__tests__/providers-linux.test.ts",
+            "src/lib/computer-use/__tests__/platform.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/run.test.ts src/lib/computer-use/__tests__/providers-linux.test.ts src/lib/computer-use/__tests__/platform.test.ts src/lib/computer-use/__tests__/commands.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "run, providers-linux, platform and commands test files report green",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "readinessReason": "Runs after platform-types, readiness-linux and setup-linux; key-platform and disabled-message wait on it via edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1c. Create src/lib/computer-use/providers/linux.ts (types imported from ../platform-types.js, never platform.ts) exporting createLinuxProvider(deps) and linuxProvider: resolveSession label '<XDG_SESSION_TYPE> · display <DISPLAY ?? WAYLAND_DISPLAY>'; readiness via linuxReadiness with setupSteps true; runSetupStep install-packages via probeLinux+planLinuxInstall then installPackages when plan.automatic else manualInstallResult, enable-accessibility via enableGnomeAccessibility, grant-permissions skipped; runHelper via helper.ts; blockedKeyPlatform 'linux'. Add providerFor(id) to platform.ts (switch: 'linux' -> linuxProvider, else null). In run.ts add detectPlatform/providerFor to RunDeps (default detectPlatform uses deps.platform), drop resolveDesktopEnv/runHelper, export unsupportedMessage, and rewrite runComputerOperation and runCapabilities per the PRD before/after (capabilities result shape unchanged). Update run.test.ts to inject a fake provider. Confirm with npm run lint:circular."
+        },
+        "items": [
+          {
+            "id": "linux-provider.ac1",
+            "title": "runComputerOperation throws unsupported_platform with \"Computer use isn't supported on this host (wsl) yet.\" when detectPlatform returns 'wsl', before reading config",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linux-provider.ac2",
+            "title": "providerFor('linux') returns linuxProvider and providerFor returns null for 'wsl', 'darwin' and 'unsupported'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linux-provider.ac3",
+            "title": "runCapabilities returns the same keys as before (platform, enabled, desktopSession with sessionType and display, helper) for a Linux fake provider",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linux-provider.ac4",
+            "title": "linuxProvider.runSetupStep('install-packages') returns skipped when nothing is missing and calls pkexec with the planned packages when xdotool is missing (providers-linux.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "key-platform",
+        "title": "Make assertKeyComboAllowed take the provider's key platform and fail closed for windows/mac",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5461",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/computer-use/blocked-key-combos.ts",
+            "src/lib/computer-use/commands.ts",
+            "src/lib/computer-use/__tests__/blocked-key-combos.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/blocked-key-combos.test.ts src/lib/computer-use/__tests__/commands.test.ts",
+            "npm run lint:upstream-ports",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "blocked-key-combos and commands test files report green",
+            "lint:upstream-ports exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1b. Change assertKeyComboAllowed to (key, allowSystemShortcut, platform: KeyPlatform = 'linux'); for 'windows' and 'mac' throw ComputerUseError('unsupported_platform', 'No blocked-shortcut rules for <platform> yet.') regardless of allowSystemShortcut (D-16). Keep the two port-header lines unchanged; update the comment on lines 5-7. In commands.ts add CommandDeps.keyPlatform defaulting to providerFor(detectPlatform())?.blockedKeyPlatform ?? 'linux' and pass it from pressKey and hotkey."
+        },
+        "items": [
+          {
+            "id": "key-platform.ac1",
+            "title": "assertKeyComboAllowed('ctrl+alt+delete', true, 'windows') throws a ComputerUseError with code unsupported_platform, and the same call with 'mac' throws it too",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "key-platform.ac2",
+            "title": "Every existing Linux case in blocked-key-combos.test.ts passes without changing its assertions, and lint:upstream-ports exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "disabled-message",
+        "title": "Change the disabled error text to point at Settings -> Computer Use",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:00:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-5461",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/computer-use/run.ts",
+            "src/lib/computer-use/__tests__/run.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/run.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "run.test.ts reports green including the exact disabled-message assertion",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Replace DISABLED_MESSAGE in src/lib/computer-use/run.ts with the D-12 text exactly: 'Computer use is off. Turn it on in the dashboard under Settings → Computer Use, or set computer_use: { enabled: true } in ~/.overdeck/config.yaml.' and assert that exact string in run.test.ts's disabled case."
+        },
+        "items": [
+          {
+            "id": "disabled-message.ac1",
+            "title": "With computer_use disabled, runComputerOperation throws code 'disabled' whose message equals the D-12 text exactly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disabled-message.ac2",
+            "title": "grep -rn 'The operator turns it on with computer_use' src sync-sources configuration returns no matches after the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-door",
+        "title": "Add the computer_use.enabled settings door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5461",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/computer-use/settings.ts",
+            "src/lib/computer-use/__tests__/settings.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/settings.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "settings.test.ts reports green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3a. Create src/lib/computer-use/settings.ts mirroring src/lib/semgrep/settings.ts: ComputerUseSettingsDeps { configPath? }, ComputerUseSettingsValidationError (bad input, route 400), ComputerUseConfigSyntaxError (YAML syntax error, route 422), readComputerUseSettings and saveComputerUseSettings(input) that accepts only { enabled: boolean }, writes computer_use.enabled with doc.setIn inside runSettingsWriteSerialized via writeFileAtomic(path, ..., 0o600), then clearConfigCache(). Tests use a temp configPath."
+        },
+        "items": [
+          {
+            "id": "settings-door.ac1",
+            "title": "saveComputerUseSettings({ enabled: true }) writes computer_use.enabled: true and preserves existing comments and unrelated keys in the temp config.yaml",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-door.ac2",
+            "title": "saveComputerUseSettings rejects { enabled: 'yes' } and { enabled: true, other: 1 } with ComputerUseSettingsValidationError and leaves the file unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-door.ac3",
+            "title": "readComputerUseSettings returns { enabled: false } for a missing file and throws ComputerUseConfigSyntaxError for a YAML syntax error, and saveComputerUseSettings rejects with ComputerUseConfigSyntaxError without writing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "status-view",
+        "title": "Add status.ts that assembles ComputerUseStatusView",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5461",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/computer-use/status.ts",
+            "src/lib/computer-use/__tests__/status.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/status.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "status.test.ts reports green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3b. Create src/lib/computer-use/status.ts exporting ComputerUseStatusView, StatusDeps and buildStatus({ probeHelper }, deps): unsupported host -> supported false with unsupportedMessage; otherwise provider.readiness, then append enable-flag ('Turn on Computer Use') when disabled and test-helper ('Test the helper') when the list is non-empty or the helper check is not ok; no session -> setupSteps []. Fill lease via readLease(now) and skill via async fs access on ~/.claude/skills and ~/.agents/skills pan-computer-use/SKILL.md. Settings read errors propagate as ComputerUseConfigSyntaxError."
+        },
+        "items": [
+          {
+            "id": "status-view.ac1",
+            "title": "Given an enabled host with every check ok, buildStatus returns setupSteps []; given a disabled host with every check ok, it returns [enable-flag, test-helper]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-view.ac2",
+            "title": "Given xdotool missing and the feature off, buildStatus returns setupSteps [install-packages, enable-flag, test-helper]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-view.ac3",
+            "title": "When providerFor returns null, buildStatus returns supported false, checks [] and session.ok false with the unsupported message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-view.ac4",
+            "title": "buildStatus returns the live lease from readLease and skill.locations ['~/.claude/skills'] when only that SKILL.md exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "setup-orchestrator",
+        "title": "Add runSetup that runs the listed steps in order with a single in-flight guard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5461",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/computer-use/setup.ts",
+            "src/lib/computer-use/__tests__/setup.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/setup.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "setup.test.ts reports green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4b. Create src/lib/computer-use/setup.ts exporting SetupStepReport, SetupResult, SetupInProgressError and runSetup(deps). Build status with probeHelper 'if-free'; refuse when unsupported or no session; run provider steps via provider.runSetupStep, enable-flag via saveComputerUseSettings({ enabled: true }), test-helper via withDesktopLock(() => provider.runHelper({ tool: 'handshake' }, session)); stop at the first failed or waiting step; return steps plus a fresh status. A module-level in-flight promise makes a concurrent call throw SetupInProgressError. All deps injected in tests."
+        },
+        "items": [
+          {
+            "id": "setup-orchestrator.ac1",
+            "title": "On the success path runSetup writes the flag after the provider steps and before test-helper, and returns ok true with every step done",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setup-orchestrator.ac2",
+            "title": "When install-packages fails, runSetup stops before enable-flag, never calls saveComputerUseSettings, and returns the step's command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setup-orchestrator.ac3",
+            "title": "A second runSetup call while the first is pending throws SetupInProgressError",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setup-orchestrator.ac4",
+            "title": "When test-helper fails, runSetup returns ok false with the helper error message and the flag stays written",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "routes",
+        "title": "Add the four admin-only /api/computer-use routes and register them",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5461",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/computer-use.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/routes/__tests__/computer-use.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/computer-use.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "computer-use route test and the no-loss-matrix tests report green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-13",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3c. Create src/dashboard/server/routes/computer-use.ts modeled on routes/semgrep.ts with GET /api/computer-use/status, POST /api/computer-use/setup (body never read; SetupInProgressError -> 409), PUT /api/computer-use/settings ({ enabled: boolean }; ComputerUseSettingsValidationError -> 400, ComputerUseConfigSyntaxError -> 422; GET also maps ComputerUseConfigSyntaxError -> 422) and POST /api/computer-use/release (runRelease({ force: true })); call rejectUnsafeDashboardMutationRequest first in every non-GET handler. Register computerUseRouteLayer after semgrepRouteLayer in server.ts and add the four no-loss-matrix rows from the PRD. No route-scopes.ts rows (D-8). Route tests vi.mock the lib modules, never child_process."
+        },
+        "items": [
+          {
+            "id": "routes.ac1",
+            "title": "GET /api/computer-use/status returns the status view JSON, and PUT /api/computer-use/settings with { enabled: 'yes' } returns 400",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes.ac2",
+            "title": "A cross-site PUT or POST is rejected by the mutation guard, and POST /api/computer-use/setup during a running setup returns 409 { error: 'Setup is already running' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes.ac3",
+            "title": "requiredScopeFor returns 'admin' for all four computer-use routes, and the no-loss-matrix tests pass with the four new rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes.ac4",
+            "title": "POST /api/computer-use/release calls runRelease({ force: true }) and returns the refreshed status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ui-section",
+        "title": "Build the ComputerUseSection component and its useComputerUseStatus hook",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5461",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/ComputerUseSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/hooks/useComputerUseStatus.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/ComputerUseSection.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/sections/__tests__/ComputerUseSection.test.tsx",
+            "npm run typecheck",
+            "npm run lint:manual-memo"
+          ],
+          "expected_outputs": [
+            "ComputerUseSection.test.tsx reports all six states green",
+            "typecheck completes without errors",
+            "lint:manual-memo exits 0"
+          ],
+          "readiness": "ready",
+          "readinessReason": "New files only plus one appended line in frontend-test-subset.txt; it relies on the PRD's view shape, not server code.",
+          "traces": [
+            "FR-8",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6a. Create useComputerUseStatus.ts (react-query key ['computer-use','status'], ensureDashboardSession + credentials include, dashboardMutationJsonHeaders for writes, refetchInterval 5000 only while a lease exists, refetch on window focus; refresh/runSetup/setEnabled/release write the returned status into the cache) and ComputerUseSection.tsx (section id 'computer-use', header, lede with hostname, one card with the Unavailable / Off / Running / Failed-or-waiting / On states, the collapsed 'What Overdeck checked' details list with the skill line, Refresh button, sonner toasts) exactly as the PRD describes, following pan-style-guide (no font-bold/semibold, rounded-md badges, amber = act, emerald = Ready, blue In use). Append the test path to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "ui-section.ac1",
+            "title": "Given a disabled status with an install-packages step, the section renders 'Computer Use is off', a 'Set up and turn on' button and the password fine print; with no provider steps it renders 'Turn on Computer Use' and 'No password needed.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-section.ac2",
+            "title": "Given a setup result whose install step failed with a command, the section renders the message, a Copy button and a 'Try again' button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-section.ac3",
+            "title": "Given an enabled status with a lease, the section renders the 'In use' badge, the holder text and an enabled 'Take back control' button; without a lease it renders 'Free' and a disabled button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-section.ac4",
+            "title": "Given supported false, the section renders 'Not available on this machine' with no primary button, and scripts/frontend-test-subset.txt contains the ComputerUseSection test path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ui-mount",
+        "title": "Add the Computer Use nav item after Security and mount the section on the Settings page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5461",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/settingsPageConstants.ts",
+            "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/ComputerUseSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/sections/__tests__/ComputerUseSection.test.tsx src/components/Settings/sections/__tests__/GitHubIdentitiesSection.test.tsx src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three Settings section test files report green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6b. Insert { id: 'computer-use', label: 'Computer Use', icon: MousePointerClick } directly after the security row in SETTINGS_NAV_ITEMS (import MousePointerClick from lucide-react; MonitorCog does not exist in lucide-react 0.400.0), render <ComputerUseSection /> directly after <SecuritySection /> in SettingsPage.tsx, and add a nav-order test case to ComputerUseSection.test.tsx."
+        },
+        "items": [
+          {
+            "id": "ui-mount.ac1",
+            "title": "SETTINGS_NAV_ITEMS contains 'computer-use' labelled 'Computer Use' immediately after 'security' (asserted in ComputerUseSection.test.tsx)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-mount.ac2",
+            "title": "SettingsPage.tsx renders <ComputerUseSection /> on the line after <SecuritySection />, and the existing GitHubIdentities and AccessTokens nav tests still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "palette",
+        "title": "Add the 'Open Computer Use settings' command-palette row",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-17T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5461",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/palette-computer-use-actions.ts",
+            "src/dashboard/frontend/src/components/CommandPalette.tsx",
+            "src/dashboard/frontend/src/components/__tests__/palette-computer-use-actions.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/__tests__/palette-computer-use-actions.test.ts",
+            "npm run lint:file-size",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "palette-computer-use-actions.test.ts reports green",
+            "lint:file-size exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7a. Create palette-computer-use-actions.ts exporting computerUsePaletteActions(onNavigate) with one row (id 'computer-use-open-settings', label 'Open Computer Use settings', group 'Navigation', icon MousePointerClick, keywords computer/desktop/automation/screen/settings) whose onSelect calls requestSettingsSection('computer-use') then onNavigate('settings'). In CommandPalette.tsx add the import and one spread line after ...anywherePaletteActions(onNavigate) (at most 2 added lines). Add the test and append its path to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "palette.ac1",
+            "title": "computerUsePaletteActions returns one row labelled 'Open Computer Use settings' whose keywords contain 'computer', 'desktop', 'automation' and 'screen'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette.ac2",
+            "title": "When the row is selected, onSelect invokes requestSettingsSection('computer-use') and then onNavigate('settings') (asserted with mocks)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette.ac3",
+            "title": "git diff --numstat origin/main on CommandPalette.tsx shows at most 2 added lines, and scripts/frontend-test-subset.txt contains the palette test path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the Settings flow in computer-use.mdx, the skill and a changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5461",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/computer-use.mdx",
+            "sync-sources/skills/pan-computer-use/SKILL.md",
+            "changelog.d/pan-5461.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "npm run lint:skills"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "lint:skills exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7b. In configuration/computer-use.mdx split 'Turn it on' into '### From Settings' (the one button, the package names per manager, the single password prompt, the terminal-window fallback, GNOME accessibility, the off switch, Take back control, the palette entry) and '### In config.yaml' (the existing YAML); add the WSL2 refusal under Requirements and a paragraph listing the four admin-only dashboard routes. In SKILL.md change the disabled row to 'Ask the operator to turn it on in the dashboard under Settings → Computer Use' and the unsupported_platform row to mention WSL2. Add changelog.d/pan-5461.md with the PRD's #### New bullet."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "configuration/computer-use.mdx contains a '### From Settings' section naming the 'Set up and turn on' button, the password prompt and the terminal-window fallback, plus a paragraph listing the four /api/computer-use routes as admin-only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "The SKILL.md disabled row contains 'Settings → Computer Use' and the unsupported_platform row contains 'WSL2'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "changelog.d/pan-5461.md contains a '#### New' heading with the Computer Use settings bullet, and npm run lint:docs and npm run lint:skills exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-verify",
+        "title": "Verify setup live on the operator's desktop in a throwaway OVERDECK_HOME and commit the evidence note",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5461",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/notes/pan-5461-live-verify.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "curl -s http://127.0.0.1:3471/api/computer-use/status",
+            "test -f .pan/notes/pan-5461-live-verify.md"
+          ],
+          "expected_outputs": [
+            "build exits 0",
+            "status JSON shows supported true and setupSteps [enable-flag, test-helper] on eltmon-z790",
+            "the evidence note exists and contains the four step outputs"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. After npm run build, start `OVERDECK_HOME=/home/eltmon/.overdeck/tmp/pan-5461-verify PORT=3471 node dist/dashboard/server.js` from the workspace (env only on that command; never pan up, never export, never touch ~/.overdeck/config.yaml). Run steps 1-5: GET status, POST setup, the pkexec checkpoint by running the source module with Bun (installPackages('apt-get', ['xdotool'], session, { spawnDetached: () => {} })) under the PRD's 10-second rule, isolated-profile Playwright screenshots of Off, On/Free and On/In use that you inspect yourself, then stop the server and rm -rf /home/eltmon/.overdeck/tmp/pan-5461-verify. Write outputs, the checkpoint outcome and screenshot descriptions to .pan/notes/pan-5461-live-verify.md (no PNGs), commit it with the Item: live-verify line, push, and paste the same text into the PR body."
+        },
+        "items": [
+          {
+            "id": "live-verify.ac1",
+            "title": ".pan/notes/pan-5461-live-verify.md records GET /api/computer-use/status output showing supported true and setupSteps [enable-flag, test-helper], and POST setup output showing both steps done with computer_use.enabled true in the throwaway config",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-verify.ac2",
+            "title": ".pan/notes/pan-5461-live-verify.md records which result the pkexec checkpoint produced under the 10-second rule (dialog, terminal fallback, cached done, or the verbatim other result)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-verify.ac3",
+            "title": ".pan/notes/pan-5461-live-verify.md describes three inspected screenshots (Off, On/Free, On/In use), and `test -e /home/eltmon/.overdeck/tmp/pan-5461-verify` fails afterwards because the throwaway home was deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "platform-types",
+        "to": "readiness-linux",
+        "type": "blocks"
+      },
+      {
+        "from": "platform-types",
+        "to": "setup-linux",
+        "type": "blocks"
+      },
+      {
+        "from": "platform-types",
+        "to": "linux-provider",
+        "type": "blocks"
+      },
+      {
+        "from": "lock-additions",
+        "to": "readiness-linux",
+        "type": "blocks"
+      },
+      {
+        "from": "lock-additions",
+        "to": "status-view",
+        "type": "blocks"
+      },
+      {
+        "from": "readiness-linux",
+        "to": "linux-provider",
+        "type": "blocks"
+      },
+      {
+        "from": "setup-linux",
+        "to": "linux-provider",
+        "type": "blocks"
+      },
+      {
+        "from": "linux-provider",
+        "to": "key-platform",
+        "type": "blocks"
+      },
+      {
+        "from": "linux-provider",
+        "to": "disabled-message",
+        "type": "blocks"
+      },
+      {
+        "from": "linux-provider",
+        "to": "status-view",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-door",
+        "to": "status-view",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-door",
+        "to": "setup-orchestrator",
+        "type": "blocks"
+      },
+      {
+        "from": "status-view",
+        "to": "setup-orchestrator",
+        "type": "blocks"
+      },
+      {
+        "from": "setup-orchestrator",
+        "to": "routes",
+        "type": "blocks"
+      },
+      {
+        "from": "ui-section",
+        "to": "ui-mount",
+        "type": "blocks"
+      },
+      {
+        "from": "ui-section",
+        "to": "palette",
+        "type": "blocks"
+      },
+      {
+        "from": "routes",
+        "to": "live-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "ui-mount",
+        "to": "live-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "disabled-message",
+        "to": "live-verify",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "active"
+}

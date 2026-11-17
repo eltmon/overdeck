@@ -17,7 +17,9 @@ vi.mock('../../skill-packs/sources.js', async (importOriginal) => {
 
 vi.mock('../../skill-packs/adapters.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../skill-packs/adapters.js')>();
-  return { ...actual, readPackManifest: vi.fn(actual.readPackManifest) };
+  // PAN-5464: a fixture known pack with a root skill, to prove the catalog passes rootSkill to the manifest read.
+  const rooty = { id: 'rooty', adapter: 'plain' as const, rootSkill: { name: 'video-use', paths: ['SKILL.md', 'helpers'] } };
+  return { ...actual, KNOWN_PACKS: { ...actual.KNOWN_PACKS, rooty }, readPackManifest: vi.fn(actual.readPackManifest) };
 });
 
 const { getCounters } = vi.hoisted(() => {
@@ -154,6 +156,26 @@ describe('listPackCatalog', () => {
 
     expect(readPackManifest).toHaveBeenCalledTimes(2);
     expect(second[0]?.manifest?.skills.map((s) => s.name)).toEqual(['goodbye']);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reads a known pack root skill before the skills/ scan (PAN-5464)', async () => {
+    const dir = buildPackExtractDir('manim-video');
+    writeFileSync(join(dir, 'SKILL.md'), '---\nname: video-use\ndescription: Edit videos.\n---\nBody.');
+    mkdirSync(join(dir, 'helpers'));
+    writeFileSync(join(dir, 'helpers', 'a.py'), 'print(1)\n');
+    vi.mocked(listPacks).mockResolvedValue([
+      { id: 'rooty', url: 'https://example.invalid/rooty', ref: 'v1', commit, adapter: 'plain' },
+    ]);
+    vi.mocked(packExtractDir).mockReturnValue(dir);
+    vi.mocked(packRenderDir).mockReturnValue(join(dir, 'render'));
+
+    const [entry] = await listPackCatalog();
+
+    expect(entry?.manifest?.skills.map((s) => [s.name, s.dir, s.paths])).toEqual([
+      ['video-use', '.', ['SKILL.md', 'helpers']],
+      ['manim-video', 'skills/manim-video', undefined],
+    ]);
     rmSync(dir, { recursive: true, force: true });
   });
 

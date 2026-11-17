@@ -34,5 +34,11 @@
     "name": "Workflow redesign (PAN-5284)",
     "status": "ready",
     "updatedAt": "2026-11-16T15:44:57.641Z"
+  },
+  {
+    "id": "2026-11-17-docs-overhaul-pan-5467",
+    "name": "Docs overhaul (PAN-5467)",
+    "status": "ready",
+    "updatedAt": "2026-11-17T12:47:59.268Z"
   }
 ]

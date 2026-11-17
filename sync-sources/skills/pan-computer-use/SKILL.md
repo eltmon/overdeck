@@ -150,8 +150,8 @@ For browser-hosted forms, verify the focused element after each field action. If
 
   | Code | What to do |
   | --- | --- |
-  | `disabled` | Not retryable. `computer_use.enabled` is off in `~/.overdeck/config.yaml`; only the operator can turn it on. |
-  | `unsupported_platform` | Not retryable. This host is not Linux; computer use only works on Linux desktops. |
+  | `disabled` | Not retryable. Computer use is off. Ask the operator to turn it on in the dashboard under Settings → Computer Use. |
+  | `unsupported_platform` | Not retryable. This host isn't supported yet (only Linux desktops; WSL2 is refused). |
   | `no_desktop_session` | Not retryable. No `DISPLAY`/`WAYLAND_DISPLAY` resolved; this host has no logged-in desktop. |
   | `helper_missing_dependency` | Install the package the message names, then retry once. |
   | `helper_timeout` | The helper did not respond in time. The input may already have been applied. For read-only commands, retry once; if it recurs, stop and report it. For `click`, `type-text`, `paste-text` or `press-key`, run `get-app-state` first and repeat the input only if the state shows it did not take effect. |

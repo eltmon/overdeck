@@ -29,6 +29,9 @@ every config key, see
 | `gstack.ts` | `GSTACK_SKILL_MAP`, `classifyGstackSkill`, `GSTACK_DISCLOSURE` |
 | `deft.ts` | `DEFT_SKILL_MAP`, `DEFT_READONLY_SKILLS`, `applyDeftHostNotice` |
 | `ox-build.ts` | `buildOx`, `isOxBuildReady`, `assertGoAvailable`, `oxBuildCommands`, `oxBuildDownloads`, `oxBuildEnv`, `OX_BINARIES`, `OX_BUILD_MARKER`: the `sageox` pack's `go build` of `ox` and its two adapters (PAN-4852) |
+| `groups.ts` | `KNOWN_PACK_GROUPS`, `PackGroupError`, `resolvePackGroup`, `listPackGroups`: pack groups (built-in `video`, plus `skills.pack_groups` in `config.yaml`, which overrides built-ins by name); a group is an alias with no state (PAN-5464) |
+| `openmontage.ts` | `OPENMONTAGE_EXCLUDED_NAMES`, `OPENMONTAGE_EXCLUDE`, `OPENMONTAGE_DISCLOSURE`: the `openmontage` known pack's curation, frozen at `2e003e6` (PAN-5464) |
+| `video-use.ts` | `VIDEO_USE_NOTICE_VERSION`, `VIDEO_USE_HOST_NOTICE`, `applyVideoUseHostNotice`, `requirementsFromPyproject`: the `video-use` mount transform (PAN-5464) |
 | `atlassian.ts` | `ATLASSIAN_PACK_ID`, `ATLASSIAN_PACK_URL`, `ATLASSIAN_PACK_COMMIT`, `ATLASSIAN_MCP_HOST`, `ATLASSIAN_MCP_URL`, `ATLASSIAN_OPT_IN_SKILLS`, `ATLASSIAN_DISCLOSURE`, `atlassianBasicAuth`, `withAtlassianAuth`, `atlassianNeedsInteractiveAuth`: the `atlassian` known pack's constants and its Jira Basic auth header (PAN-5165). Leaf: imports nothing from `skill-overrides/`, `projects/` or `mcp/`. |
 
 ### `src/lib/skill-overrides/`
@@ -244,7 +247,10 @@ applied. `mcpServerLabels(manifest)` renders each applied server as
 | `mountExtras` | Plugin-root-relative files or directories the mount copies next to `skills/` | `pstack` |
 | `skillsExclude` | Plugin-root-relative dirs the skill scan skips entirely, before the `SKILL.md` check (PAN-5165) | `atlassian` (`skills/v1`) |
 | `optIn` | Skill names that are opt-in: the pack toggle never turns them on | `mattpocock`, `sageox`, `pstack`, `atlassian` |
-| `disclosure` | One-line statement of what leaves the machine, shown on the pack row | `sageox`, `gstack`, `atlassian` |
+| `disclosure` | One-line statement of what leaves the machine, shown on the pack row | `sageox`, `gstack`, `atlassian`, the four video packs |
+| `archivePaths` | Repo-relative paths `git archive` receives; extraction adds `CAPABILITY_PROBE_PATHS` and keeps only paths that exist at the commit. Never combined with `pluginRoot` (a test asserts it) | `hyperframes`, `openmontage`, `video-use` |
+| `rootSkill` | `{ name, paths }`: a skill whose `SKILL.md` sits at the repo root; the manifest lists it first with `dir: '.'` and its `paths`, and the mount copies only those paths | `video-use` |
+| `mountTransform` | Mount transform for a pack whose adapter has none (`'video-use'`: host notice and `requirements.txt`) | `video-use` |
 
 `gstack` ignores the `optIn` field: `readPackManifest` takes its opt-ins from
 `GSTACK_OPT_IN_SKILLS` and `GSTACK_BROWSER_OPT_IN_SKILLS` (`gstack.ts`)
@@ -315,6 +321,13 @@ instead.
   launching role's own servers, then the project's `mcp_servers`, then pack
   servers in ascending pack id order; a later source's server with an
   already-claimed name is skipped with one warning (PAN-5165 D-6).
+- Extraction never smudges Git LFS: the `git()` helper in `sources.ts` sets
+  `GIT_LFS_SKIP_SMUDGE=1`, so pointer files stay pointers and the manifest
+  counts them as `lfsObjects` (PAN-5464).
+- A root skill's consumers follow its `paths`, never `.`: the manifest lists
+  executables and LFS pointers under the paths, `updatePack` hashes each path,
+  and the mount copies only the paths. Nothing passes `.` to `treeHash` or
+  `listExecutables` (PAN-5464 D-8).
 - `atlassian.ts` is a leaf: it imports nothing from `skill-overrides/`,
   `projects/` or `mcp/` (its header comment), so `adapters.ts` can import it
   without creating a cycle.
@@ -327,6 +340,43 @@ registered in `registerSkillsCommands` (`skills.command('launch-settings'`)
 and handled by `skillsLaunchSettingsCommand` in
 `src/cli/commands/skills.ts`. The step exits 2 for any harness except
 `claude-code` and `codex`.
+
+## Live apply (PAN-5465)
+
+A running conversation can take new pack skills without a relaunch.
+`POST /api/conversations/:name/skills` (and `POST /api/self/skills` for the
+caller's own conversation) merge the request into the `/clear` chain head's
+skill map and then apply it. The CLI (`pan skills add`), the MCP tool
+`add_skills` and the dashboard's **Add skills…** dialog all call these routes.
+
+- `src/lib/overdeck/conversation-skill-apply.ts` validates the request, writes
+  the map, and picks the path: `next-launch` for a stopped conversation,
+  `needs-restart` / `restarted` (a resume apply) for Codex and for changes a
+  hot apply cannot make, and a hot apply for a running Claude Code
+  conversation. One apply runs at a time per terminal session.
+- `src/lib/overdeck/conversation-skill-hot-apply.ts` runs the hot apply: it
+  builds the new mount, re-points the plugin link, and delivers
+  `/reload-plugins` through `deliverAgentMessage` (method `tmux`), after the
+  permission-prompt and main-input-target checks the message path uses.
+- **Empty mount (D-2).** `linkClaudeMount(link, null)` points the plugin link
+  at the fixed `~/.overdeck/packs/mounts/empty/plugins/` instead of removing
+  it, so every Claude Code launch passes `--plugin-dir <link>` and can reload
+  into it later. `gcMounts` never removes `mounts/empty`.
+- **Process-table check (D-3).** A conversation is hot-capable only when
+  `ps -eo pid=,ppid=,args=` shows a process whose args contain
+  `--plugin-dir <its link>`. Liveness is not enough: Herdr reports no runtime
+  pid. A conversation that started before the empty mount existed answers
+  `needs-restart` once.
+- **Two-reload confirmation (D-5).** A `Reloaded:` line prints whether or not
+  a new pack loaded, so an idle hot apply reloads twice: once with the old
+  link (baseline skill count), then again after the re-point. The outcome is
+  `hot` only when the count rose by exactly the mounted-skill delta, else
+  `sent`. A mid-turn conversation gets `queued`, because Claude Code runs a
+  queued slash command when the turn ends.
+- **Launch-wired packs (D-8).** A change to `deft`, `sageox`, a
+  `gstack-runtime` pack, or a pack in the selection's `mcp[]` needs
+  launch-time settings, so it always answers `needs-restart`. So does any
+  native skill name, because native skills are hidden through `--settings`.
 
 ## Tests
 

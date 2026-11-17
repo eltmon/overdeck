@@ -17,6 +17,7 @@ import {
 import { SAGEOX_DISCLOSURE } from '../../sageox/disclosure.js';
 import { ATLASSIAN_DISCLOSURE, ATLASSIAN_OPT_IN_SKILLS } from '../atlassian.js';
 import { DEFT_SKILL_MAP } from '../deft.js';
+import { OPENMONTAGE_EXCLUDED_NAMES } from '../openmontage.js';
 import { GSTACK_BROWSER_NEEDED, GSTACK_DISCLOSURE, GSTACK_OPT_IN_SKILLS, GSTACK_SKILL_MAP } from '../gstack.js';
 
 const roots: string[] = [];
@@ -325,6 +326,135 @@ describe('plain adapter', () => {
       ['ox-cli-init', 'extensions/skills/ox-cli-init', true],
       ['sageox', 'extensions/skills/sageox', false],
     ]);
+  });
+});
+
+describe('video production known packs (PAN-5464)', () => {
+  it.each(['remotion', 'hyperframes', 'openmontage', 'video-use'])('pins %s to an eltmon fork commit', (id) => {
+    const known = KNOWN_PACKS[id];
+    expect(known?.url).toMatch(/^https:\/\/github\.com\/eltmon\//);
+    expect(known?.ref).toMatch(/^[0-9a-f]{40}$/);
+    expect(known?.optIn).toBeUndefined();
+  });
+
+  it('never combines pluginRoot with archivePaths', () => {
+    expect(Object.values(KNOWN_PACKS).filter((known) => known.pluginRoot && known.archivePaths)).toEqual([]);
+  });
+
+  it('excludes 55 unique OpenMontage names', () => {
+    expect(OPENMONTAGE_EXCLUDED_NAMES).toHaveLength(55);
+    expect(new Set(OPENMONTAGE_EXCLUDED_NAMES).size).toBe(55);
+  });
+
+  it('reads only the standalone OpenMontage skills with the known-pack options', async () => {
+    const root = fixture({
+      '.agents/skills/ffmpeg/SKILL.md': skillMd('ffmpeg', 'FFmpeg.'),
+      '.agents/skills/hyperframes/SKILL.md': skillMd('hyperframes', 'Duplicate.'),
+      '.agents/skills/gsap-core/SKILL.md': skillMd('gsap-core', 'Generic.'),
+      '.agents/skills/acestep/SKILL.md': skillMd('acestep', 'Repo-bound.'),
+      'skills/pipeline/README.md': '# not a skill\n',
+      LICENSE: '                    GNU AFFERO GENERAL PUBLIC LICENSE\n',
+    });
+    const known = KNOWN_PACKS['openmontage'];
+    const manifest = await readPackManifest(root, known?.adapter ?? 'plain', {
+      skillsRoot: known?.skillsRoot,
+      skillsExclude: known?.skillsExclude,
+    });
+    expect(manifest.skills.map((skill) => skill.name)).toEqual(['ffmpeg']);
+    expect(manifest.license).toBe('AGPL-3.0');
+  });
+
+  it('reads video-use as its root skill plus skills/', async () => {
+    const root = fixture({
+      'SKILL.md': skillMd('video-use', 'Edit videos.'),
+      'helpers/a.py': 'print(1)\n',
+      'skills/manim-video/SKILL.md': skillMd('manim-video', 'Manim.'),
+    });
+    const known = KNOWN_PACKS['video-use'];
+    const manifest = await readPackManifest(root, 'plain', { rootSkill: known?.rootSkill });
+    expect(manifest.skills.map((skill) => skill.name)).toEqual(['video-use', 'manim-video']);
+    expect(known?.mountTransform).toBe('video-use');
+  });
+});
+
+describe('root skill (PAN-5464)', () => {
+  const rootSkill = { name: 'video-use', paths: ['SKILL.md', 'helpers'] };
+  const LFS = 'version https://git-lfs.github.com/spec/v1\noid sha256:' + '1'.repeat(64) + '\nsize 3\n';
+
+  function rootFixture(): string {
+    const root = fixture({
+      'SKILL.md': skillMd('video-use', 'Edit videos.'),
+      'helpers/a.py': 'print(1)\n',
+      'helpers/clip.mp4': LFS,
+      'tests/x.py': 'print(2)\n',
+      'tests/clip.mp4': LFS,
+      'skills/manim-video/SKILL.md': skillMd('manim-video', 'Manim.'),
+    });
+    chmodSync(join(root, 'helpers', 'a.py'), 0o755);
+    chmodSync(join(root, 'tests', 'x.py'), 0o755);
+    return root;
+  }
+
+  it('lists the root skill first, then the skills/ scan', async () => {
+    const manifest = await readPackManifest(rootFixture(), 'plain', { rootSkill });
+    expect(manifest.skills.map((skill) => [skill.name, skill.dir, skill.paths])).toEqual([
+      ['video-use', '.', ['SKILL.md', 'helpers']],
+      ['manim-video', 'skills/manim-video', undefined],
+    ]);
+    expect(manifest.skills[0]?.description).toBe('Edit videos.');
+  });
+
+  it('lists executables and LFS pointers only from the root skill paths', async () => {
+    const manifest = await readPackManifest(rootFixture(), 'plain', { rootSkill });
+    expect(manifest.capabilities.executables).toContain('helpers/a.py');
+    expect(manifest.capabilities.executables).not.toContain('tests/x.py');
+    expect(manifest.capabilities.lfsObjects).toBe(1);
+  });
+
+  it('skips the root skill without a root SKILL.md, and ignores it for other adapters', async () => {
+    const root = fixture({ 'skills/manim-video/SKILL.md': skillMd('manim-video', 'Manim.') });
+    expect((await readPackManifest(root, 'plain', { rootSkill })).skills.map((skill) => skill.name)).toEqual(['manim-video']);
+    const plugin = fixture({
+      '.claude-plugin/plugin.json': JSON.stringify({ name: 'p' }),
+      'SKILL.md': skillMd('video-use', 'Edit videos.'),
+      'skills/b/SKILL.md': skillMd('b', 'B.'),
+    });
+    expect((await readPackManifest(plugin, 'claude-plugin', { rootSkill })).skills.map((skill) => skill.name)).toEqual(['b']);
+  });
+});
+
+describe('LFS pointer count (PAN-5464)', () => {
+  const POINTER = 'version https://git-lfs.github.com/spec/v1\noid sha256:' + '0'.repeat(64) + '\nsize 3\n';
+
+  it('reports pointer files inside included skill dirs under Not applied', async () => {
+    const root = fixture({
+      'skills/a/SKILL.md': skillMd('a', 'A.'),
+      'skills/a/assets/clip.mp4': POINTER,
+      'skills/a/assets/real.txt': 'not a pointer\n',
+      'skills/a/big.txt': `${POINTER}${'x'.repeat(2048)}`,
+      'other/clip.mp4': POINTER,
+    });
+    const manifest = await readPackManifest(root, 'plain');
+    expect(manifest.capabilities.lfsObjects).toBe(1);
+    expect(notAppliedLabels(manifest.capabilities)).toContain('LFS objects (1)');
+  });
+
+  it('leaves lfsObjects unset and adds no label without pointer files', async () => {
+    const root = fixture({ 'skills/a/SKILL.md': skillMd('a', 'A.'), 'skills/a/notes.txt': 'plain\n' });
+    const manifest = await readPackManifest(root, 'plain');
+    expect(manifest.capabilities.lfsObjects).toBeUndefined();
+    expect(notAppliedLabels(manifest.capabilities).some((label) => label.startsWith('LFS objects'))).toBe(false);
+  });
+});
+
+describe('license detection by full name (PAN-5464)', () => {
+  it.each([
+    ['                    GNU AFFERO GENERAL PUBLIC LICENSE\n                       Version 3\n', 'AGPL-3.0'],
+    ['GNU LESSER GENERAL PUBLIC LICENSE\nVersion 3\n', 'LGPL'],
+    ['\nMIT License\n\nCopyright\n', 'MIT'],
+  ])('reads %j as %s', async (license, expected) => {
+    const root = fixture({ 'skills/a/SKILL.md': skillMd('a', 'A.'), LICENSE: license });
+    expect((await readPackManifest(root, 'plain')).license).toBe(expected);
   });
 });
 

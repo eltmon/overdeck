@@ -22,6 +22,7 @@ interface HandoffOptions {
   allowPrimary?: boolean;
   skill?: string[];
   pack?: string[];
+  group?: string[];
   hold?: boolean;
   fresh?: boolean;
 }
@@ -38,6 +39,41 @@ function looksLikeBareFocusText(convRef: string, focusArgs: string[]): boolean {
 function printIgnoredHarnessNotice(flag: '--harness' | '--author-harness', harness: string | undefined): void {
   if (harness === undefined) return;
   console.log(chalk.yellow(`${flag} is provider-default-only (PAN-1984); ignoring "${harness}".`));
+}
+
+/**
+ * PAN-5464: `--group` adds each cached member pack of a pack group to `--pack`, without duplicates.
+ * A member that is not added, or added but not cached, is skipped with the command that fixes it;
+ * an unknown group returns null.
+ */
+async function expandPackGroups(groups: readonly string[], packs: readonly string[]): Promise<string[] | null> {
+  const [{ resolvePackGroup, PackGroupError }, { listPackCatalog }] = await Promise.all([
+    import('../../lib/skill-packs/groups.js'),
+    import('../../lib/skill-overrides/catalog.js'),
+  ]);
+  const catalog = new Map((await listPackCatalog()).map((pack) => [pack.id, pack]));
+  const merged = [...packs];
+  for (const group of groups) {
+    let members: readonly string[];
+    try {
+      members = await resolvePackGroup(group);
+    } catch (error) {
+      if (!(error instanceof PackGroupError)) throw error;
+      console.log(chalk.red(error.message));
+      return null;
+    }
+    for (const id of members) {
+      const entry = catalog.get(id);
+      if (!entry) {
+        console.log(chalk.yellow(`skipped ${id}: not added (pan skills pack add --group ${group})`));
+      } else if (!entry.cached) {
+        console.log(chalk.yellow(`skipped ${id}: not cached (pan skills pack sync ${id})`));
+      } else if (!merged.includes(id)) {
+        merged.push(id);
+      }
+    }
+  }
+  return merged;
 }
 
 export async function handoffCommand(
@@ -131,6 +167,12 @@ export async function handoffCommand(
     console.log(chalk.yellow('fresh with hold needs focus text: there is nothing to hold'));
     return exitCli(1);
   }
+  let packs = options.pack;
+  if (options.group?.length) {
+    const expanded = await expandPackGroups(options.group, packs ?? []);
+    if (!expanded) return exitCli(1);
+    packs = expanded;
+  }
   if (options.fresh) {
     console.log(chalk.gray(`Starting a fresh conversation from the defaults of ${conv.name} (${conv.title || 'untitled'})`));
     console.log(chalk.gray('  No handoff document, no summary, no parent link.'));
@@ -147,7 +189,7 @@ export async function handoffCommand(
   }
   if (role) console.log(chalk.gray(`  Role: ${role}`));
   if (options.skill?.length) console.log(chalk.gray(`  Skills: ${options.skill.join(', ')}`));
-  if (options.pack?.length) console.log(chalk.gray(`  Packs: ${options.pack.join(', ')}`));
+  if (packs?.length) console.log(chalk.gray(`  Packs: ${packs.join(', ')}`));
   if (!options.fresh) {
     console.log(chalk.gray('  Authoring the handoff and spawning the session — this can take a minute…'));
   }
@@ -170,7 +212,7 @@ export async function handoffCommand(
       ...(options.fresh ? {} : { handoffAuthor: author, handoffAuthorModel: options.authorModel }),
       allowPrimary: options.allowPrimary,
       skills: options.skill,
-      packs: options.pack,
+      packs,
       hold: options.hold,
       fresh: options.fresh,
     });

@@ -899,6 +899,12 @@ export function setConversationModel(name: string, model: string): void {
   overdeckDb().prepare(`UPDATE conversations SET model = ? WHERE name = ?`).run(model, name);
 }
 
+/** PAN-5465: replace the conversation skill map (PAN-4486); an empty map stores NULL. */
+export function setConversationSkillOverrides(name: string, overrides: Record<string, boolean> | null): void {
+  overdeckDb().prepare(`UPDATE conversations SET skill_overrides = ? WHERE name = ?`)
+    .run(overrides && Object.keys(overrides).length > 0 ? JSON.stringify(overrides) : null, name);
+}
+
 export function setConversationEffort(name: string, effort: string | null): void {
   overdeckDb().prepare(`UPDATE conversations SET effort = ? WHERE name = ?`).run(effort, name);
 }

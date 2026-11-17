@@ -33,6 +33,7 @@ import { LayoutPresetBar } from './LayoutPresetBar'
 import { useConversationDragStore } from './conversationDragStore'
 import { openConversationBeside, showConversation } from './openConversationInDeck'
 import { ForkModal } from '../CommandDeck/ForkModal'
+import { AddSkillsModal } from '../CommandDeck/AddSkillsModal'
 import { Bot, Terminal as TerminalIcon, Globe, FolderTree, GitCompare, Search } from 'lucide-react'
 import { PaneBar, type NewPaneAction } from './PaneBar'
 import { useStageShortcuts } from './useStageShortcuts'
@@ -875,6 +876,9 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
               convMutations.submitFork(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness, projectKey)
             }}
           />
+        )}
+        {convMutations.addSkillsTarget && (
+          <AddSkillsModal conversation={convMutations.addSkillsTarget} onClose={convMutations.closeAddSkillsModal} />
         )}
       </div>
     </StageDeckProvider>

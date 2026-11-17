@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 
 const { overdeckHome } = await vi.hoisted(async () => {
@@ -22,6 +22,7 @@ const { overdeckHome } = await vi.hoisted(async () => {
 import { getGlobalConfigPath } from '../../config-yaml/load.js';
 import {
   addPack,
+  CAPABILITY_PROBE_PATHS,
   deletePackEntry,
   extractCommit,
   fetchPackSource,
@@ -296,6 +297,115 @@ describe('pack git cache', () => {
   it('leaves no partial clone after a failed fetch', async () => {
     await expect(fetchPackSource('gone', join(scratch, 'missing.git'))).rejects.toThrow();
     expect(existsSync(packRepoDir('gone'))).toBe(false);
+  });
+});
+
+describe('archive paths (PAN-5464)', () => {
+  let up: Upstream;
+  let withLicense = '';
+  let noLicense: Upstream;
+  let bare = '';
+
+  beforeAll(() => {
+    up = createUpstream();
+    up.commitFile('skills/a/SKILL.md', skillMd('a'), 'skill');
+    up.commitFile('big/blob.txt', 'big\n', 'blob');
+    withLicense = up.commitFile('LICENSE', 'MIT License\n', 'license');
+    noLicense = createUpstream();
+    bare = noLicense.commitFile('skills/a/SKILL.md', skillMd('a'), 'skill');
+  });
+
+  afterAll(() => {
+    rmSync(up.scratch, { recursive: true, force: true });
+    rmSync(noLicense.scratch, { recursive: true, force: true });
+  });
+
+  it('archives only the declared paths plus the probe paths that exist', async () => {
+    expect(CAPABILITY_PROBE_PATHS).toContain('LICENSE');
+    await fetchPackSource('ap', up.url);
+    const dir = await extractCommit('ap', withLicense, undefined, ['skills']);
+    expect(existsSync(join(dir, 'skills', 'a', 'SKILL.md'))).toBe(true);
+    expect(readFileSync(join(dir, 'LICENSE'), 'utf8')).toBe('MIT License\n');
+    expect(existsSync(join(dir, 'big'))).toBe(false);
+  });
+
+  it('drops a declared path that does not exist at the commit', async () => {
+    await fetchPackSource('ap-missing', up.url);
+    const dir = await extractCommit('ap-missing', withLicense, undefined, ['skills', 'missing']);
+    expect(existsSync(join(dir, 'skills', 'a', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(dir, 'missing'))).toBe(false);
+  });
+
+  it('rejects when none of the paths exist', async () => {
+    await fetchPackSource('ap-none', noLicense.url);
+    await expect(extractCommit('ap-none', bare, undefined, ['missing'])).rejects.toThrow(
+      `pack ap-none: none of its archive paths exist at ${bare}`,
+    );
+    expect(existsSync(packExtractDir('ap-none', bare))).toBe(false);
+  });
+
+  it('rejects an archive path that looks like an option', async () => {
+    await expect(extractCommit('ap', withLicense, undefined, ['--output=x'])).rejects.toThrow('invalid pack archive path');
+  });
+
+  it('rebuilds an extraction that lacks a path and reuses one that has them all', async () => {
+    await fetchPackSource('ap-reuse', up.url);
+    const stale = packExtractDir('ap-reuse', withLicense);
+    mkdirSync(stale, { recursive: true });
+    writeFileSync(join(stale, 'LICENSE'), 'stale\n');
+    const dir = await extractCommit('ap-reuse', withLicense, undefined, ['skills']);
+    expect(dir).toBe(stale);
+    expect(existsSync(join(dir, 'skills', 'a', 'SKILL.md'))).toBe(true);
+    expect(readFileSync(join(dir, 'LICENSE'), 'utf8')).toBe('MIT License\n');
+    const inode = statSync(dir).ino;
+    expect(await extractCommit('ap-reuse', withLicense, undefined, ['skills'])).toBe(dir);
+    expect(statSync(dir).ino).toBe(inode);
+  });
+});
+
+describe('Git LFS smudge filter (PAN-5464)', () => {
+  const POINTER = 'version https://git-lfs.github.com/spec/v1\noid sha256:' + '0'.repeat(64) + '\nsize 12\n';
+  const saved: Record<string, string | undefined> = {};
+  const keys = ['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'GIT_LFS_SKIP_SMUDGE'] as const;
+  let scratch = '';
+
+  beforeEach(() => {
+    for (const key of keys) saved[key] = process.env[key];
+    // A fake LFS driver: clean passes the pointer through; smudge fails unless LFS smudging is skipped.
+    const filterDir = mkdtempSync(join(tmpdir(), 'skill-pack-lfs-'));
+    const smudge = join(filterDir, 'smudge.sh');
+    writeFileSync(smudge, 'if [ "$GIT_LFS_SKIP_SMUDGE" = 1 ]; then exec cat; fi\ncat >/dev/null\nexit 1\n');
+    const gitconfig = join(filterDir, 'gitconfig');
+    writeFileSync(gitconfig, `[filter "lfs"]\n\tclean = cat\n\tsmudge = sh ${smudge}\n\trequired = true\n`);
+    process.env.GIT_CONFIG_GLOBAL = gitconfig;
+    process.env.GIT_CONFIG_NOSYSTEM = '1';
+    delete process.env.GIT_LFS_SKIP_SMUDGE;
+    scratch = filterDir;
+  });
+
+  afterEach(() => {
+    for (const key of keys) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+    rmSync(scratch, { recursive: true, force: true });
+  });
+
+  it('extractCommit skips the LFS smudge filter', async () => {
+    const up = createUpstream();
+    try {
+      up.commitFile('.gitattributes', '*.bin filter=lfs\n', 'attributes');
+      const commit = up.commitFile('assets/big.bin', POINTER, 'pointer');
+      await fetchPackSource('lfs', up.url);
+      // The fake filter really runs during git archive: without the skip variable the archive fails.
+      expect(() =>
+        execFileSync('git', ['--git-dir', packRepoDir('lfs'), 'archive', '--format=tar', commit], { stdio: 'pipe' }),
+      ).toThrow();
+      const dir = await extractCommit('lfs', commit);
+      expect(readFileSync(join(dir, 'assets', 'big.bin'), 'utf8')).toBe(POINTER);
+    } finally {
+      rmSync(up.scratch, { recursive: true, force: true });
+    }
   });
 });
 

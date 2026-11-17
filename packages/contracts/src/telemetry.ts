@@ -126,6 +126,7 @@ const TELEMETRY_CHANNEL_ROUTES = ["lan", "tailnet", "ssh", "public", "direct", "
 
 /** PAN-5083: the Overdeck MCP tool names (ALL_TOOLS in src/lib/mcp/server.ts); a unit test keeps them in step. */
 const TELEMETRY_MCP_TOOLS = [
+  "add_skills",
   "answer_agent_permission",
   "answer_agent_plan",
   "answer_codex_approval",
@@ -235,6 +236,7 @@ const TELEMETRY_CLIENT_ROUTES = [
   "/api/conversations/:name/schedules",
   "/api/conversations/:name/schedules/:id",
   "/api/conversations/:name/send-now",
+  "/api/conversations/:name/skills",
   "/api/conversations/:name/stop",
   "/api/conversations/:name/switch-model",
   "/api/conversations/:name/thinking-level",
@@ -313,6 +315,7 @@ const TELEMETRY_CLIENT_ROUTES = [
   "/api/self/pull-requests",
   "/api/self/secret-requests",
   "/api/self/secret-requests/:id/wait",
+  "/api/self/skills",
   "/api/self/tasks/block",
   "/api/self/tasks/claim",
   "/api/self/tasks/done",
@@ -365,6 +368,7 @@ const TELEMETRY_CLIENT_ROUTE_AREAS = [
   "color-themes",
   "command-deck",
   "commands",
+  "computer-use",
   "confirmations",
   "connectors",
   "context",

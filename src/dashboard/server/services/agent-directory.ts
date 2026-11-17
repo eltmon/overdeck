@@ -375,7 +375,8 @@ function isIssueAgent(entry: DirectoryEntry): boolean {
 /**
  * The live scope (PAN-4197 FR-2): what is running or waiting now, with no time
  * window. An entry is kept when it is live, when it is a paused native agent
- * of an issue that is not merged or closed (or of no issue), or when it is the
+ * of an issue with a derived state that is not merged or closed (or of no
+ * issue), or when it is the
  * newest work/strike agent of an issue waiting in the pipeline.
  */
 export async function buildLiveAgentDirectory(deps: AgentDirectoryDeps = {}): Promise<AgentDirectoryResponse> {
@@ -392,7 +393,10 @@ export async function buildLiveAgentDirectory(deps: AgentDirectoryDeps = {}): Pr
   for (const entry of all) {
     if (isLiveDirectoryState(entry.state)) kept.add(entry.id);
     const state = issueState(entry.issueId);
-    if (entry.pause && entry.source === 'overdeck' && !(state && FINISHED_ISSUE_STATES.has(state))) kept.add(entry.id);
+    // PAN-5466: state.json keeps a pause after its issue finishes, and an old
+    // closed issue has no derived state, so an issue with none holds nothing.
+    const unfinishedIssue = entry.issueId ? state !== undefined && !FINISHED_ISSUE_STATES.has(state) : true;
+    if (entry.pause && entry.source === 'overdeck' && unfinishedIssue) kept.add(entry.id);
     if (entry.issueId && isIssueAgent(entry)) {
       const newest = newestIssueAgent.get(entry.issueId);
       const newer = !newest

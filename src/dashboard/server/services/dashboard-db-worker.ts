@@ -1,6 +1,11 @@
 import { getCostsByIssueSnapshot } from './dashboard-cost-snapshot.js';
 import { getAgentCostStats } from '../../../lib/overdeck/cost-sync.js';
 import { getConversationSearchStats } from '../../../lib/overdeck/conversations-search.js';
+import {
+  filterLiveConversationSessionsJob,
+  searchConversationBm25Job,
+  searchConversationVectorJob,
+} from '../../../lib/conversation-search/chunk-search-jobs.js';
 import { parseMuseConversationMessages } from './muse-conversation-parser.js';
 import { parsePrimeAgentConversationMessages } from './prime-agent-conversation-parser.js';
 import { parentPort } from 'node:worker_threads';
@@ -59,7 +64,10 @@ type DashboardDbOperation =
   | 'listArtifactsForWorkspaceOrIssue'
   | 'unshareArtifactBySlug'
   | 'parseTranscriptSnapshot'
-  | 'costReconcileSweep';
+  | 'costReconcileSweep'
+  | 'searchConversationBm25'
+  | 'searchConversationVector'
+  | 'filterLiveConversationSessions';
 
 type TranscriptParserName = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi' | 'muse' | 'prime-agent' | 'claude-initial';
 type TranscriptParser = (sessionFile: string) => Promise<ParseResult>;
@@ -178,6 +186,12 @@ async function runJob(
       return (payload as { source: 'codex' | 'pi' }).source === 'pi'
         ? collectPiCostEvents({ ...(payload as { maxEvents?: number }), onBatch: emitProgress })
         : collectCodexCostEvents({ ...(payload as { maxEvents?: number }), onBatch: emitProgress });
+    case 'searchConversationBm25':
+      return searchConversationBm25Job(payload as Parameters<typeof searchConversationBm25Job>[0]);
+    case 'searchConversationVector':
+      return searchConversationVectorJob(payload as Parameters<typeof searchConversationVectorJob>[0]);
+    case 'filterLiveConversationSessions':
+      return filterLiveConversationSessionsJob(payload as Parameters<typeof filterLiveConversationSessionsJob>[0]);
   }
 }
 

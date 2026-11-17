@@ -9,6 +9,8 @@ import { assertKeyComboAllowed as assertKeyComboAllowedReal } from './blocked-ke
 import { ComputerUseError } from './errors.js';
 import type { HelperResponse } from './helper.js';
 import { holderKey as holderKeyReal } from './lease.js';
+import { detectPlatform, providerFor } from './platform.js';
+import type { KeyPlatform } from './platform-types.js';
 import { type OperationKind, runComputerOperation as runComputerOperationReal, type RunComputerOperationResult } from './run.js';
 import { type ElementRecord, elementRecord as elementRecordReal } from './snapshot-store.js';
 import { filterTree } from './tree-filter.js';
@@ -28,6 +30,12 @@ export interface CommandDeps {
   holderKey?: () => string;
   readStdin?: () => Promise<string>;
   assertKeyComboAllowed?: typeof assertKeyComboAllowedReal;
+  keyPlatform?: () => KeyPlatform;
+}
+
+/** A null provider falls back to Linux rules; runComputerOperation then refuses with unsupported_platform. */
+function keyPlatformOf(deps: CommandDeps): KeyPlatform {
+  return deps.keyPlatform ? deps.keyPlatform() : (providerFor(detectPlatform())?.blockedKeyPlatform ?? 'linux');
 }
 
 async function readStdinReal(): Promise<string> {
@@ -207,7 +215,7 @@ export interface PressKeyOptions extends BaseAppOptions {
 }
 
 export async function pressKey(options: PressKeyOptions, deps: CommandDeps = {}): Promise<RunComputerOperationResult> {
-  (deps.assertKeyComboAllowed ?? assertKeyComboAllowedReal)(options.key, Boolean(options.allowSystemShortcut));
+  (deps.assertKeyComboAllowed ?? assertKeyComboAllowedReal)(options.key, Boolean(options.allowSystemShortcut), keyPlatformOf(deps));
   const fields = baseFields(options);
   fields.key = options.key;
   return (deps.runComputerOperation ?? runComputerOperationReal)({ kind: 'input', operation: { tool: 'press_key', ...fields } });
@@ -219,7 +227,7 @@ export interface HotkeyOptions extends BaseAppOptions {
 }
 
 export async function hotkey(options: HotkeyOptions, deps: CommandDeps = {}): Promise<RunComputerOperationResult> {
-  (deps.assertKeyComboAllowed ?? assertKeyComboAllowedReal)(options.key, Boolean(options.allowSystemShortcut));
+  (deps.assertKeyComboAllowed ?? assertKeyComboAllowedReal)(options.key, Boolean(options.allowSystemShortcut), keyPlatformOf(deps));
   const fields = baseFields(options);
   fields.key = options.key;
   return (deps.runComputerOperation ?? runComputerOperationReal)({ kind: 'input', operation: { tool: 'hotkey', ...fields } });

@@ -149,6 +149,15 @@ describe('hotkey / press-key (PAN-5452 ac4)', () => {
     expect(isComputerUseError(error)).toBe(true);
     expect(error.code).toBe('system_shortcut_blocked');
   });
+
+  it("passes the provider's key platform to the key check (PAN-5461)", async () => {
+    const { runComputerOperation } = captureRunComputerOperation();
+    const assertKeyComboAllowed = vi.fn();
+    await hotkey({ app: 'calc', key: 'ctrl+a' }, { runComputerOperation, assertKeyComboAllowed, keyPlatform: () => 'mac' });
+    await pressKey({ app: 'calc', key: 'Return', allowSystemShortcut: true }, { runComputerOperation, assertKeyComboAllowed, keyPlatform: () => 'mac' });
+    expect(assertKeyComboAllowed).toHaveBeenNthCalledWith(1, 'ctrl+a', false, 'mac');
+    expect(assertKeyComboAllowed).toHaveBeenNthCalledWith(2, 'Return', true, 'mac');
+  });
 });
 
 describe('get-app-state (PAN-5452 ac5)', () => {
