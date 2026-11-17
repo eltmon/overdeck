@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-17T12:41:27.741800Z · model: claude-opus-5-5 · open: 922_
+_Last sequenced: 2026-11-17T13:12:01.061839Z · model: claude-opus-5-5 · open: 938_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -11,6 +11,7 @@ _Last sequenced: 2026-11-17T12:41:27.741800Z · model: claude-opus-5-5 · open: 
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
 | 5 | PAN-5469 | M | medium | ok |  |  | New features/planning.mdx page: Plan dialog, pan plan, PRDs, xBRIEF checklist, critic, finalize. In pipeline, lane B first. |
 | 6 | PAN-5489 | S | high | ok |  |  | pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause. |
+| 7 | PAN-5498 | S | critical | ok |  |  | pan start --plan auto --host loses the host override at the planning→work handoff; no work agent starts. Hit twice 11-17. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
@@ -85,9 +86,10 @@ _Last sequenced: 2026-11-17T12:41:27.741800Z · model: claude-opus-5-5 · open: 
 | 80 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
 | 81 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent pane, so a single hungry agent inflates the unit and oomd kills the whole fleet — twice now. |
 | 82 | PAN-3278 | S | critical | needs-refinement |  |  | A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts. |
-| 83 | PAN-5472 | M | high | ok |  | PAN-5483 | Docs P1: first-read pages (state branch, Cloister routing, Inspect, phone, intro) contradict the shipped product. |
+| 82 | PAN-5505 | M | high | ok |  | PAN-5483 | Docs: rewrite introduction.mdx, the docs landing page: false Doctor Who epigraph, removed features, Panopticon history. Lane A item 2. |
+| 83 | PAN-5472 | M | high | ok |  | PAN-5483 | Docs P1: first-read pages (state branch, Cloister routing, Inspect, phone, concepts) contradict the shipped product. Lane A item 3. |
 | 84 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
-| 84 | PAN-5467 | XL | high | ok | ✓ |  | Epic: docs overhaul, 16 child pages from the v0.87.2 feature inventory; driven by order book 2026-11-17-docs-overhaul. Not workable. |
+| 84 | PAN-5467 | XL | high | ok | ✓ |  | Epic: docs overhaul, 16 page issues, 6 accuracy audits (PAN-5499..5504) and an intro rewrite (PAN-5505); order book drives pickup. |
 | 85 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
 | 86 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
 | 87 | PAN-3106 | S | critical | ok |  |  | auto_merge_default: hold is consulted on one merge path only, so held issues merge individually and defeat the UAT train. |
@@ -339,12 +341,19 @@ _Last sequenced: 2026-11-17T12:41:27.741800Z · model: claude-opus-5-5 · open: 
 | 332 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
 | 333 | PAN-5058 | XL | high | ok |  |  | Parked, in planning: TLS passthrough relay at <name>.mcp.overdeck.ai so hosted bots reach /mcp without Tailscale Funnel. |
 | 334 | PAN-1479 | M | high | ok |  |  | RTK: Add telemetry to measure token savings from bash output compression |
+| 334 | PAN-5490 | M | medium | ok |  | PAN-5058 | MCP relay S-A: hostname registry, relay tickets in account service, wire contract. First slice; waits on PAN-5058 PRD. |
 | 335 | PAN-2950 | L | high | ok |  |  | Refactor god files back under file-size ceilings after the UX overhaul |
+| 335 | PAN-5491 | L | medium | ok |  | PAN-5058, PAN-5490 | MCP relay S-B: SNI passthrough relay service on Fly (services/mcp-relay); never decrypts. Needs S-A (PAN-5490). |
 | 336 | PAN-2720 | M | high | ok |  |  | File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve |
+| 336 | PAN-5492 | L | medium | ok |  | PAN-5058, PAN-5490 | MCP relay S-C: machine tunnel client and TLS listener for public /mcp; one public-ingress predicate. Needs S-A (PAN-5490). |
 | 337 | PAN-2650 | S | high | ok |  |  | Shed-stack half is moot (slot merges verify on host); remaining: pan swarm recover path for a stuck ready-to-merge slot. |
+| 337 | PAN-5493 | M | medium | ok |  | PAN-5058, PAN-5492 | MCP relay S-D: ACME TLS-ALPN-01 certificates on the machine; key never leaves it. Needs S-C (PAN-5492). |
 | 338 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
+| 338 | PAN-5494 | M | medium | ok |  | PAN-5058, PAN-5491, PAN-5492, PAN-5493 | MCP relay S-E: Settings switch, enable flow, loopback end-to-end test and user docs. Needs S-B, S-C and S-D. |
 | 339 | PAN-2334 | XS | high | ok |  |  | write a Definition of Ready (DoR) |
+| 339 | PAN-5495 | S | medium | ok |  | PAN-5058, PAN-5493 | MCP relay S-F: Google Trust Services fallback CA via EAB when Let's Encrypt rate-limits. Needs S-D (PAN-5493). |
 | 340 | PAN-2193 | S | high | ok |  |  | Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree |
+| 340 | PAN-5496 | S | medium | ok |  | PAN-5058, PAN-5493 | MCP relay S-G: daily Certificate Transparency watch for the relay hostname; ships with S-E. Needs S-D (PAN-5493). |
 | 341 | PAN-1984 | XS | high | ok |  |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
 | 342 | PAN-1913 | XS | high | ok |  |  | Project description: show on click, edit in dashboard, mirror into the project layer (and document what's in .pan and ~/.panopticon) |
 | 343 | PAN-1906 | M | high | ok |  |  | Enforce harness restrictions with subscription: gray out non-claude-code, validate everywhere |
@@ -354,10 +363,10 @@ _Last sequenced: 2026-11-17T12:41:27.741800Z · model: claude-opus-5-5 · open: 
 | 347 | PAN-630 | M | high | ok |  |  | Multi-tenant workspace isolation with ACLs |
 | 348 | PAN-471 | M | high | ok |  |  | Cost reconciler: auto-trigger on agent lifecycle events with debounce |
 | 349 | PAN-438 | M | high | ok |  |  | Migrate remaining REST polling endpoints to Effect RPC |
-| 350 | PAN-5468 | M | medium | ok |  | PAN-5483 | Docs P1: features/issue-pipeline.mdx, the pipeline from pan start through merge and close-out. Lane A item 3. |
+| 350 | PAN-5468 | M | medium | ok |  | PAN-5483 | Docs P1: features/issue-pipeline.mdx, the pipeline from pan start through merge and close-out. Lane A item 4. |
 | 350 | PAN-578 | M | high | ok |  |  | Security: Comment mediation layer to prevent prompt injection via tracker comments |
 | 351 | PAN-2921 | S | medium | ok |  |  | Strike merge door can report fetch failure after merge and land the same head twice |
-| 351 | PAN-5470 | M | medium | ok |  | PAN-5483 | Docs P1: features/flywheel.mdx, the loop, lane board, switches and backlog sequencer. Supersedes PAN-2070. Lane A item 4. |
+| 351 | PAN-5470 | M | medium | ok |  | PAN-5483 | Docs P1: features/flywheel.mdx, the loop, lane board, switches and backlog sequencer. Supersedes PAN-2070. Lane A item 5. |
 | 352 | PAN-4195 | M | medium | ok |  |  | Every pan call costs ~0.5s/230MB from eager command imports; lazy-load command modules, target --version <100ms |
 | 352 | PAN-5471 | M | medium | ok |  |  | Docs P1: configuration/model-routing.mdx, roles, workhorse slots, tiered execution; drop stale Cloister routing. Lane B item 2. |
 | 353 | PAN-2839 | S | medium | ok |  |  | plan→work autoSpawn now 500s with a duplicated workspace prep |
@@ -458,26 +467,29 @@ _Last sequenced: 2026-11-17T12:41:27.741800Z · model: claude-opus-5-5 · open: 
 | 448 | PAN-5264 | M | medium | ok |  |  | Attribute the app-rest GitHub caller (1,422 untraced App REST calls/hour), then cut the largest path. |
 | 449 | PAN-5340 | S | medium | ok |  |  | A Preview link to another Markdown file should open it in Preview, not Edit. Follows PAN-5337. |
 | 450 | PAN-5440 | L | medium | ok |  |  | React Compiler burn-down for all remaining components: 78 skips in 42 files, 288 memo sites. Largest group; do last. |
-| 450 | PAN-5473 | S | medium | ok |  | PAN-5483 | Docs P2: features/desktop-app.mdx, downloads, how pan up finds the app, tray. Supersedes PAN-2073. Lane A item 5. |
+| 450 | PAN-5473 | S | medium | ok |  | PAN-5483 | Docs P2: features/desktop-app.mdx, downloads, how pan up finds the app, tray. Supersedes PAN-2073. Lane A item 6. |
 | 451 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
 | 451 | PAN-5474 | M | medium | ok |  |  | Docs P2: features/dashboard-views.mdx replacing the outdated 13-views table and the Experimental switch. Lane B item 3. |
 | 452 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
-| 452 | PAN-5475 | S | medium | ok |  | PAN-5483 | Docs P2: features/costs.mdx, attribution, pan cost verbs, API-rate vs plan costs. Lane A item 6. |
+| 452 | PAN-5475 | S | medium | ok |  | PAN-5483 | Docs P2: features/costs.mdx, attribution, pan cost verbs, API-rate vs plan costs. Lane A item 7. |
 | 453 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
 | 453 | PAN-5476 | S | medium | ok |  |  | Docs P2: conversation search and Ctrl+K palette scopes, semantic search setup, pan conv search. Lane B item 4. |
 | 454 | PAN-5322 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5319: unguarded identifier.toUpperCase(), modal focus, needs-you rows that open nothing. |
-| 454 | PAN-5477 | M | medium | ok |  | PAN-5483 | Docs P2: configuration/permissions.mdx, auto-approve hook, --yolo, operator-only labels, git shim. Lane A item 7. |
+| 454 | PAN-5477 | M | medium | ok |  | PAN-5483 | Docs P2: configuration/permissions.mdx, auto-approve hook, --yolo, operator-only labels, git shim. Lane A item 8. |
 | 455 | PAN-5317 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5127: route live Codex app-server sends correctly; no replayable mail for keyed sends. |
 | 455 | PAN-5478 | L | medium | ok |  |  | Docs P2: CLI reference completeness for conversation, pipeline, memory and core verbs. Lane B item 5. |
 | 456 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
-| 456 | PAN-5479 | S | medium | ok |  | PAN-5483 | Docs P2: merge the unpublished workspaces config page into features/workspaces and memory pages. Lane A item 8. |
+| 456 | PAN-5479 | S | medium | ok |  | PAN-5483 | Docs P2: merge the unpublished workspaces config page into features/workspaces and memory pages. Lane A item 9. |
 | 457 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
-| 457 | PAN-5480 | XS | medium | ok |  |  | Docs P2: add the install script and overdeck up to quickstart.mdx, as the homepage advertises. Lane B item 6. |
+| 457 | PAN-5480 | XS | medium | ok |  |  | Docs P2: quickstart.mdx install script and overdeck up; drop the nonexistent work verb and model-swap claim. Lane B item 6. |
 | 458 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
-| 458 | PAN-5481 | S | medium | ok |  | PAN-5483 | Docs P2: configuration/voice.mdx, dictation, tts.enabled, local Qwen3-TTS daemon, sidecars. Lane A item 9. |
+| 458 | PAN-5481 | S | medium | ok |  | PAN-5483 | Docs P2: configuration/voice.mdx, dictation, tts.enabled, local Qwen3-TTS daemon, sidecars. Lane A item 10. |
 | 459 | PAN-2469 | S | medium | ok |  |  | Assembly landed (mergeReadySlots + finalization); remaining: alarm when all slots merged but no review requested. Swarm dormant. |
+| 459 | PAN-5500 | L | medium | ok |  | PAN-5472 | Docs audit: line-by-line accuracy check of the 21 Overdeck Anywhere pages against main. Lane A item 11. |
 | 460 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
+| 460 | PAN-5502 | L | medium | ok |  | PAN-5471, PAN-5472, PAN-5474, PAN-5479, PAN-5482 | Docs audit: line-by-line accuracy check of the 14 Features pages; waits on PAN-5471/5472/5474/5479/5482. Lane A item 12. |
 | 461 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
+| 461 | PAN-5504 | L | medium | ok |  | PAN-5472, PAN-5482 | Docs audit: line-by-line accuracy check of the 16 Guides and Reference pages; waits on PAN-5472/5482. Lane A item 13. |
 | 462 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
 | 463 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
 | 464 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
@@ -504,6 +516,7 @@ _Last sequenced: 2026-11-17T12:41:27.741800Z · model: claude-opus-5-5 · open: 
 | 483 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
 | 484 | PAN-5465 | L | medium | ok |  |  | Add skill packs to a live conversation: /reload-plugins hot apply, resume fallback, CLI, MCP tool, dashboard modal. PRD on main. |
 | 484 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
+| 485 | PAN-5497 | S | medium | ok |  | PAN-5464, PAN-5465 | Follow-up: accept pack groups in pan skills add, add_skills and the Add skills dialog; starts after PAN-5464 and PAN-5465 merge. |
 | 485 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
 | 486 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
 | 487 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
@@ -632,8 +645,11 @@ _Last sequenced: 2026-11-17T12:41:27.741800Z · model: claude-opus-5-5 · open: 
 | 610 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
 | 610 | PAN-5482 | L | medium | ok |  |  | Docs P3 batch: operating guide, foreman, CI integrations, unpublished pages, proposal in nav, blog draft. Lane B item 7. |
 | 611 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
+| 611 | PAN-5503 | L | medium | ok |  | PAN-5471, PAN-5472 | Docs audit: line-by-line accuracy check of the 21 Configuration pages; waits on PAN-5471/5472. Lane B item 8. |
 | 612 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
+| 612 | PAN-5501 | M | medium | ok |  | PAN-5478 | Docs audit: line-by-line accuracy check of the 7 CLI Reference pages; waits on PAN-5478. Lane B item 9. |
 | 613 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
+| 613 | PAN-5499 | S | medium | ok |  | PAN-5505, PAN-5480, PAN-5470, PAN-5472 | Docs audit: Getting Started, Vision, Changelog intro (5 pages); waits on PAN-5505/5480/5470/5472. Lane B item 10. |
 | 614 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
 | 615 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
 | 616 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
@@ -954,6 +970,10 @@ New and in the pipeline as lane B's first docs item, so it takes a free top slot
 
 New pipeline-path bug: the CLI result depends on the caller's environment, so Flywheel-launched planning can fail and strand workspaces; it outranks routine work.
 
+### PAN-5498 (rank 7)
+
+New substrate-improvement issue in the free rank-7 slot. The paved road promises the work agent starts after planning, but the post-planning spawn drops host:true, so the stack-health gate refuses it and the deferred retry never fires; two Overdeck issues stalled this way on 2026-11-17. The fix is small and named (consent record, spawn args, finalize-timeout path, retry survival), and it sits in the same failure family as PAN-4554 at rank 14.
+
 ### PAN-5385 (rank 8)
 
 New issue. Phones (iOS, Android) and the connector cannot reach the machine at all, directly or through the relay, because RtcTransport.accept awaits ICE servers before registering the signalling session and drops trickle candidates that arrive in that window. The root cause and the fix (buffer candidates from offer acceptance) are stated in the body and touch only the dashboard server, so this is a small, well-defined fix for a full outage of a shipped feature. It takes the open rank-8 slot ahead of the remaining pipeline-substrate bugs.
@@ -1246,10 +1266,6 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
 
 New this pass. Every agent pane is a child of one transient tmux-server unit, so agent memory is the unit's memory and systemd-oomd's kill decision is all-or-nothing: one hungry agent takes the entire fleet with it. That has now happened twice, the second time killing seven work agents, four strikes and a live review convoy. Blast-radius containment is a different fix from choosing a better victim.
 
-### PAN-3278 (rank 82)
-
-Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1257,10 +1273,10 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-17T12:41:27.741800Z",
+  "generatedAt": "2026-11-17T13:12:01.061839Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 922,
+  "openCount": 938,
   "nodes": [
     {
       "issue": "PAN-5484",
@@ -1337,6 +1353,19 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "dependsOn": [],
       "why": "pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause.",
       "rationale": "New pipeline-path bug: the CLI result depends on the caller's environment, so Flywheel-launched planning can fail and strand workspaces; it outranks routine work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5498",
+      "rank": 7,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan start --plan auto --host loses the host override at the planning→work handoff; no work agent starts. Hit twice 11-17.",
+      "rationale": "New substrate-improvement issue in the free rank-7 slot. The paved road promises the work agent starts after planning, but the post-planning spawn drops host:true, so the stack-health gate refuses it and the deferred retry never fires; two Overdeck issues stalled this way on 2026-11-17. The fix is small and named (consent record, spawn args, finalize-timeout path, retry survival), and it sits in the same failure family as PAN-4554 at rank 14.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2305,6 +2334,21 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "planning": "auto"
     },
     {
+      "issue": "PAN-5505",
+      "rank": 82,
+      "size": "M",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5483"
+      ],
+      "why": "Docs: rewrite introduction.mdx, the docs landing page: false Doctor Who epigraph, removed features, Panopticon history. Lane A item 2.",
+      "rationale": "New child of the docs epic. The docs landing page is the second thing every new user reads and it describes removed features plus a false epigraph; the operator asked for a full rewrite. The order book runs it as lane A item 2, just before PAN-5472, so it ranks one slot ahead of that issue.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-5472",
       "rank": 83,
       "size": "M",
@@ -2314,8 +2358,8 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "dependsOn": [
         "PAN-5483"
       ],
-      "why": "Docs P1: first-read pages (state branch, Cloister routing, Inspect, phone, intro) contradict the shipped product.",
-      "rationale": "New; the pages new users read first describe removed features, and it is lane A item 2 in the operator's docs order book, so it takes the free rank-83 slot.",
+      "why": "Docs P1: first-read pages (state branch, Cloister routing, Inspect, phone, concepts) contradict the shipped product. Lane A item 3.",
+      "rationale": "Rank unchanged. introduction.mdx moved to PAN-5505 (comment 2026-11-17), so this issue now covers the other six first-read pages; it is lane A item 3 behind PAN-5505.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2340,8 +2384,8 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "score": 62,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Epic: docs overhaul, 16 child pages from the v0.87.2 feature inventory; driven by order book 2026-11-17-docs-overhaul. Not workable.",
-      "rationale": "New epic container ranked by its children's aggregate impact; the order book drives child pickup, so the epic itself is never picked.",
+      "why": "Epic: docs overhaul, 16 page issues, 6 accuracy audits (PAN-5499..5504) and an intro rewrite (PAN-5505); order book drives pickup.",
+      "rationale": "Rank unchanged; the epic body gained seven children (six nav-group accuracy audits and the introduction rewrite), so its why now lists them. The order book still drives child pickup, so the epic itself is never picked.",
       "gate": "auto",
       "planning": "auto",
       "isEpic": true
@@ -5508,6 +5552,21 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "planning": "auto"
     },
     {
+      "issue": "PAN-5490",
+      "rank": 334,
+      "size": "M",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5058"
+      ],
+      "why": "MCP relay S-A: hostname registry, relay tickets in account service, wire contract. First slice; waits on PAN-5058 PRD.",
+      "rationale": "New sibling slice of PAN-5058 (relay add-on). Its body says it cannot be planned until the PAN-5058 PRD is on main, so it ranks directly behind PAN-5058 in the slice build order (S-A, then S-B/S-C, S-D, S-E/S-F/S-G).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2950",
       "rank": 335,
       "size": "L",
@@ -5520,6 +5579,22 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "planning": "interactive"
     },
     {
+      "issue": "PAN-5491",
+      "rank": 335,
+      "size": "L",
+      "importance": "medium",
+      "score": 54,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5058",
+        "PAN-5490"
+      ],
+      "why": "MCP relay S-B: SNI passthrough relay service on Fly (services/mcp-relay); never decrypts. Needs S-A (PAN-5490).",
+      "rationale": "New sibling slice of PAN-5058 (relay add-on). Its body says it cannot be planned until the PAN-5058 PRD is on main, so it ranks directly behind PAN-5058 in the slice build order (S-A, then S-B/S-C, S-D, S-E/S-F/S-G).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2720",
       "rank": 336,
       "size": "M",
@@ -5528,6 +5603,22 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "condition": "ok",
       "dependsOn": [],
       "why": "File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5492",
+      "rank": 336,
+      "size": "L",
+      "importance": "medium",
+      "score": 54,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5058",
+        "PAN-5490"
+      ],
+      "why": "MCP relay S-C: machine tunnel client and TLS listener for public /mcp; one public-ingress predicate. Needs S-A (PAN-5490).",
+      "rationale": "New sibling slice of PAN-5058 (relay add-on). Its body says it cannot be planned until the PAN-5058 PRD is on main, so it ranks directly behind PAN-5058 in the slice build order (S-A, then S-B/S-C, S-D, S-E/S-F/S-G).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5545,6 +5636,22 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "planning": "interactive"
     },
     {
+      "issue": "PAN-5493",
+      "rank": 337,
+      "size": "M",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5058",
+        "PAN-5492"
+      ],
+      "why": "MCP relay S-D: ACME TLS-ALPN-01 certificates on the machine; key never leaves it. Needs S-C (PAN-5492).",
+      "rationale": "New sibling slice of PAN-5058 (relay add-on). Its body says it cannot be planned until the PAN-5058 PRD is on main, so it ranks directly behind PAN-5058 in the slice build order (S-A, then S-B/S-C, S-D, S-E/S-F/S-G).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2358",
       "rank": 338,
       "size": "M",
@@ -5553,6 +5660,24 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "condition": "ok",
       "dependsOn": [],
       "why": "PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition)",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5494",
+      "rank": 338,
+      "size": "M",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5058",
+        "PAN-5491",
+        "PAN-5492",
+        "PAN-5493"
+      ],
+      "why": "MCP relay S-E: Settings switch, enable flow, loopback end-to-end test and user docs. Needs S-B, S-C and S-D.",
+      "rationale": "New sibling slice of PAN-5058 (relay add-on). Its body says it cannot be planned until the PAN-5058 PRD is on main, so it ranks directly behind PAN-5058 in the slice build order (S-A, then S-B/S-C, S-D, S-E/S-F/S-G).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5569,6 +5694,22 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "planning": "auto"
     },
     {
+      "issue": "PAN-5495",
+      "rank": 339,
+      "size": "S",
+      "importance": "medium",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5058",
+        "PAN-5493"
+      ],
+      "why": "MCP relay S-F: Google Trust Services fallback CA via EAB when Let's Encrypt rate-limits. Needs S-D (PAN-5493).",
+      "rationale": "New sibling slice of PAN-5058 (relay add-on). Its body says it cannot be planned until the PAN-5058 PRD is on main, so it ranks directly behind PAN-5058 in the slice build order (S-A, then S-B/S-C, S-D, S-E/S-F/S-G).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2193",
       "rank": 340,
       "size": "S",
@@ -5577,6 +5718,22 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "condition": "ok",
       "dependsOn": [],
       "why": "Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5496",
+      "rank": 340,
+      "size": "S",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5058",
+        "PAN-5493"
+      ],
+      "why": "MCP relay S-G: daily Certificate Transparency watch for the relay hostname; ships with S-E. Needs S-D (PAN-5493).",
+      "rationale": "New sibling slice of PAN-5058 (relay add-on). Its body says it cannot be planned until the PAN-5058 PRD is on main, so it ranks directly behind PAN-5058 in the slice build order (S-A, then S-B/S-C, S-D, S-E/S-F/S-G).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5699,8 +5856,8 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "dependsOn": [
         "PAN-5483"
       ],
-      "why": "Docs P1: features/issue-pipeline.mdx, the pipeline from pan start through merge and close-out. Lane A item 3.",
-      "rationale": "New P1 docs page; banded with medium work because the docs order book, not the sequence, sets its pickup order.",
+      "why": "Docs P1: features/issue-pipeline.mdx, the pipeline from pan start through merge and close-out. Lane A item 4.",
+      "rationale": "New P1 docs page; banded with medium work because the docs order book, not the sequence, sets its pickup order. Rank unchanged; why updated because the docs order book now places it at lane A item 4.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5738,8 +5895,8 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "dependsOn": [
         "PAN-5483"
       ],
-      "why": "Docs P1: features/flywheel.mdx, the loop, lane board, switches and backlog sequencer. Supersedes PAN-2070. Lane A item 4.",
-      "rationale": "New P1 docs page that supersedes the older PAN-2070 request; banded with medium work behind the order book.",
+      "why": "Docs P1: features/flywheel.mdx, the loop, lane board, switches and backlog sequencer. Supersedes PAN-2070. Lane A item 5.",
+      "rationale": "New P1 docs page that supersedes the older PAN-2070 request; banded with medium work behind the order book. Rank unchanged; why updated because the docs order book now places it at lane A item 5.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6982,8 +7139,8 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "dependsOn": [
         "PAN-5483"
       ],
-      "why": "Docs P2: features/desktop-app.mdx, downloads, how pan up finds the app, tray. Supersedes PAN-2073. Lane A item 5.",
-      "rationale": "New P2 docs page that supersedes PAN-2073; banded with mid-medium work.",
+      "why": "Docs P2: features/desktop-app.mdx, downloads, how pan up finds the app, tray. Supersedes PAN-2073. Lane A item 6.",
+      "rationale": "New P2 docs page that supersedes PAN-2073; banded with mid-medium work. Rank unchanged; why updated because the docs order book now places it at lane A item 6.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7034,8 +7191,8 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "dependsOn": [
         "PAN-5483"
       ],
-      "why": "Docs P2: features/costs.mdx, attribution, pan cost verbs, API-rate vs plan costs. Lane A item 6.",
-      "rationale": "New P2 docs page; banded with mid-medium work.",
+      "why": "Docs P2: features/costs.mdx, attribution, pan cost verbs, API-rate vs plan costs. Lane A item 7.",
+      "rationale": "New P2 docs page; banded with mid-medium work. Rank unchanged; why updated because the docs order book now places it at lane A item 7.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7086,8 +7243,8 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "dependsOn": [
         "PAN-5483"
       ],
-      "why": "Docs P2: configuration/permissions.mdx, auto-approve hook, --yolo, operator-only labels, git shim. Lane A item 7.",
-      "rationale": "New P2 docs page; banded with mid-medium work.",
+      "why": "Docs P2: configuration/permissions.mdx, auto-approve hook, --yolo, operator-only labels, git shim. Lane A item 8.",
+      "rationale": "New P2 docs page; banded with mid-medium work. Rank unchanged; why updated because the docs order book now places it at lane A item 8.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7138,8 +7295,8 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "dependsOn": [
         "PAN-5483"
       ],
-      "why": "Docs P2: merge the unpublished workspaces config page into features/workspaces and memory pages. Lane A item 8.",
-      "rationale": "New P2 docs page; banded with mid-medium work.",
+      "why": "Docs P2: merge the unpublished workspaces config page into features/workspaces and memory pages. Lane A item 9.",
+      "rationale": "New P2 docs page; banded with mid-medium work. Rank unchanged; why updated because the docs order book now places it at lane A item 9.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7163,8 +7320,8 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "score": 48,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Docs P2: add the install script and overdeck up to quickstart.mdx, as the homepage advertises. Lane B item 6.",
-      "rationale": "New P2 docs fix; banded with mid-medium work.",
+      "why": "Docs P2: quickstart.mdx install script and overdeck up; drop the nonexistent work verb and model-swap claim. Lane B item 6.",
+      "rationale": "Rank unchanged; a 2026-11-17 comment adds two small quickstart.mdx fixes (no overdeck work verb, no mid-conversation model swap), so the why now names them.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7190,8 +7347,8 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "dependsOn": [
         "PAN-5483"
       ],
-      "why": "Docs P2: configuration/voice.mdx, dictation, tts.enabled, local Qwen3-TTS daemon, sidecars. Lane A item 9.",
-      "rationale": "New P2 docs page; banded with mid-medium work.",
+      "why": "Docs P2: configuration/voice.mdx, dictation, tts.enabled, local Qwen3-TTS daemon, sidecars. Lane A item 10.",
+      "rationale": "New P2 docs page; banded with mid-medium work. Rank unchanged; why updated because the docs order book now places it at lane A item 10.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7209,6 +7366,21 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "planning": "interactive"
     },
     {
+      "issue": "PAN-5500",
+      "rank": 459,
+      "size": "L",
+      "importance": "medium",
+      "score": 46,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5472"
+      ],
+      "why": "Docs audit: line-by-line accuracy check of the 21 Overdeck Anywhere pages against main. Lane A item 11.",
+      "rationale": "New child of the docs epic: an accuracy audit that runs after the page PRs it names merge, so it ranks just behind the last of them in its order-book lane.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1433",
       "rank": 460,
       "size": "S",
@@ -7217,6 +7389,25 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "condition": "ok",
       "dependsOn": [],
       "why": "Conversation agents can leave host main repo in abandoned git rebase state for hours",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5502",
+      "rank": 460,
+      "size": "L",
+      "importance": "medium",
+      "score": 45,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5471",
+        "PAN-5472",
+        "PAN-5474",
+        "PAN-5479",
+        "PAN-5482"
+      ],
+      "why": "Docs audit: line-by-line accuracy check of the 14 Features pages; waits on PAN-5471/5472/5474/5479/5482. Lane A item 12.",
+      "rationale": "New child of the docs epic: an accuracy audit that runs after the page PRs it names merge, so it ranks just behind the last of them in its order-book lane.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7231,6 +7422,22 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "why": "Workspace-spawned dashboards must never claim the canonical dashboard port",
       "gate": "auto",
       "planning": "skip"
+    },
+    {
+      "issue": "PAN-5504",
+      "rank": 461,
+      "size": "L",
+      "importance": "medium",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5472",
+        "PAN-5482"
+      ],
+      "why": "Docs audit: line-by-line accuracy check of the 16 Guides and Reference pages; waits on PAN-5472/5482. Lane A item 13.",
+      "rationale": "New child of the docs epic: an accuracy audit that runs after the page PRs it names merge, so it ranks just behind the last of them in its order-book lane.",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-1392",
@@ -7552,6 +7759,22 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "condition": "ok",
       "dependsOn": [],
       "why": "pan done: polyrepo uncommitted changes check + existing MR handling",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5497",
+      "rank": 485,
+      "size": "S",
+      "importance": "medium",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5464",
+        "PAN-5465"
+      ],
+      "why": "Follow-up: accept pack groups in pan skills add, add_skills and the Add skills dialog; starts after PAN-5464 and PAN-5465 merge.",
+      "rationale": "New follow-up to PAN-5465 (PRD decision D-10); it can only start once both PAN-5464 and PAN-5465 merge, so it ranks right behind them.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9123,6 +9346,22 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "planning": "auto"
     },
     {
+      "issue": "PAN-5503",
+      "rank": 611,
+      "size": "L",
+      "importance": "medium",
+      "score": 42,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5471",
+        "PAN-5472"
+      ],
+      "why": "Docs audit: line-by-line accuracy check of the 21 Configuration pages; waits on PAN-5471/5472. Lane B item 8.",
+      "rationale": "New child of the docs epic: an accuracy audit that runs after the page PRs it names merge, so it ranks just behind the last of them in its order-book lane.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1490",
       "rank": 612,
       "size": "M",
@@ -9131,6 +9370,21 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "condition": "ok",
       "dependsOn": [],
       "why": "show each conversation's current git branch (port t3code BranchToolbar pattern)",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5501",
+      "rank": 612,
+      "size": "M",
+      "importance": "medium",
+      "score": 41,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5478"
+      ],
+      "why": "Docs audit: line-by-line accuracy check of the 7 CLI Reference pages; waits on PAN-5478. Lane B item 9.",
+      "rationale": "New child of the docs epic: an accuracy audit that runs after the page PRs it names merge, so it ranks just behind the last of them in its order-book lane.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9144,6 +9398,24 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "dependsOn": [],
       "why": "Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call.",
       "rationale": "Rank unchanged; a 2026-11-02 comment confirms PAN-4655 delivers idle auto-settle, so only day-10 archive and favorite clearing remain (size M→S, score trimmed), still needs-refinement pending the operator close decision.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5499",
+      "rank": 613,
+      "size": "S",
+      "importance": "medium",
+      "score": 41,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5505",
+        "PAN-5480",
+        "PAN-5470",
+        "PAN-5472"
+      ],
+      "why": "Docs audit: Getting Started, Vision, Changelog intro (5 pages); waits on PAN-5505/5480/5470/5472. Lane B item 10.",
+      "rationale": "New child of the docs epic: an accuracy audit that runs after the page PRs it names merge, so it ranks just behind the last of them in its order-book lane.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13769,6 +14041,55 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "confidence": 0.6
     },
     {
+      "from": "PAN-5058",
+      "to": "PAN-5490",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5058",
+      "to": "PAN-5491",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5058",
+      "to": "PAN-5492",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5058",
+      "to": "PAN-5493",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5058",
+      "to": "PAN-5494",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5058",
+      "to": "PAN-5495",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5058",
+      "to": "PAN-5496",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
       "from": "PAN-5097",
       "to": "PAN-2954",
       "type": "informs",
@@ -13902,6 +14223,20 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "confidence": 0.8
     },
     {
+      "from": "PAN-5464",
+      "to": "PAN-5497",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5465",
+      "to": "PAN-5497",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
       "from": "PAN-5467",
       "to": "PAN-5468",
       "type": "contains",
@@ -14014,11 +14349,67 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "confidence": 1
     },
     {
+      "from": "PAN-5467",
+      "to": "PAN-5499",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5467",
+      "to": "PAN-5500",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5467",
+      "to": "PAN-5501",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5467",
+      "to": "PAN-5502",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5467",
+      "to": "PAN-5503",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5467",
+      "to": "PAN-5504",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5467",
+      "to": "PAN-5505",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
       "from": "PAN-5470",
       "to": "PAN-2070",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.85
+    },
+    {
+      "from": "PAN-5470",
+      "to": "PAN-5499",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-5471",
@@ -14028,6 +14419,20 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "confidence": 0.6
     },
     {
+      "from": "PAN-5471",
+      "to": "PAN-5502",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5471",
+      "to": "PAN-5503",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
       "from": "PAN-5472",
       "to": "PAN-5471",
       "type": "informs",
@@ -14035,11 +14440,88 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "confidence": 0.6
     },
     {
+      "from": "PAN-5472",
+      "to": "PAN-5499",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5472",
+      "to": "PAN-5500",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5472",
+      "to": "PAN-5502",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5472",
+      "to": "PAN-5503",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5472",
+      "to": "PAN-5504",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
       "from": "PAN-5473",
       "to": "PAN-2073",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.85
+    },
+    {
+      "from": "PAN-5474",
+      "to": "PAN-5502",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5478",
+      "to": "PAN-5501",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5479",
+      "to": "PAN-5502",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5480",
+      "to": "PAN-5499",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5482",
+      "to": "PAN-5502",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5482",
+      "to": "PAN-5504",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-5483",
@@ -14112,6 +14594,13 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "confidence": 0.8
     },
     {
+      "from": "PAN-5483",
+      "to": "PAN-5505",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
       "from": "PAN-5487",
       "to": "PAN-5469",
       "type": "informs",
@@ -14123,6 +14612,76 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "to": "PAN-5469",
       "type": "informs",
       "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-5490",
+      "to": "PAN-5491",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5490",
+      "to": "PAN-5492",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5491",
+      "to": "PAN-5494",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5492",
+      "to": "PAN-5493",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5492",
+      "to": "PAN-5494",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5493",
+      "to": "PAN-5494",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5493",
+      "to": "PAN-5495",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5493",
+      "to": "PAN-5496",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5498",
+      "to": "PAN-4554",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-5505",
+      "to": "PAN-5499",
+      "type": "unblocks",
+      "source": "ai-inferred",
       "confidence": 0.8
     },
     {
