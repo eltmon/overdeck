@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5484",
   "created": "2026-11-17T12:42:28.378Z",
-  "updated": "2026-11-17T13:05:53.098Z",
+  "updated": "2026-11-17T15:44:08.587Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -35,6 +35,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-5484",
       "claimedAt": "2026-11-17T13:05:53.098Z"
+    },
+    "backup-retention-docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5484",
+      "claimedAt": "2026-11-17T15:44:08.587Z"
     }
   }
 }
