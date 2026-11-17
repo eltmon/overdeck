@@ -58,10 +58,13 @@ export type DashboardDbOperation =
   | 'listArtifactsForWorkspaceOrIssue'
   | 'unshareArtifactBySlug'
   | 'parseTranscriptSnapshot'
-  | 'costReconcileSweep';
+  | 'costReconcileSweep'
+  | 'searchConversationBm25'
+  | 'searchConversationVector'
+  | 'filterLiveConversationSessions';
 
 type ProgressHandler = (progress: unknown) => void | Promise<void>;
-export type WorkerLane = 'read' | 'long' | 'semantic' | 'parse' | 'poll';
+export type WorkerLane = 'read' | 'long' | 'semantic' | 'parse' | 'poll' | 'conversation-text' | 'conversation-vector';
 
 type TranscriptParserName = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi' | 'muse' | 'prime-agent' | 'claude-initial';
 type TranscriptParser = (sessionFile: string) => Promise<ParseResult>;
@@ -127,7 +130,15 @@ const COALESCED_OPERATIONS = new Set<DashboardDbOperation>([
   'parseTranscriptSnapshot',
 ]);
 
-const workers: Record<WorkerLane, Worker | null> = { read: null, long: null, semantic: null, parse: null, poll: null };
+const workers: Record<WorkerLane, Worker | null> = {
+  read: null,
+  long: null,
+  semantic: null,
+  parse: null,
+  poll: null,
+  'conversation-text': null,
+  'conversation-vector': null,
+};
 const pending = new Map<string, PendingJob>();
 const sharedJobs = new Map<string, SharedJob>();
 let latestSemanticJobId: string | null = null;
@@ -204,6 +215,10 @@ export function workerLane(operation: DashboardDbOperation): WorkerLane {
   if (operation === 'searchSessionsSemantic') return 'semantic';
   if (operation === 'parseTranscriptSnapshot') return 'parse';
   if (operation === 'costReconcileSweep') return 'long';
+  // PAN-5447: palette chunk search. The vector scan cannot be stopped once
+  // started, so it gets its own lane and never delays the next query's BM25.
+  if (operation === 'searchConversationVector') return 'conversation-vector';
+  if (operation === 'searchConversationBm25' || operation === 'filterLiveConversationSessions') return 'conversation-text';
   return COALESCED_OPERATIONS.has(operation) ? 'long' : 'read';
 }
 
@@ -354,6 +369,18 @@ async function executeInline(
       return (payload as { source: 'codex' | 'pi' }).source === 'pi'
         ? collectPiCostEvents({ ...(payload as { maxEvents?: number }), onBatch: async batch => onProgress?.(batch) })
         : collectCodexCostEvents({ ...(payload as { maxEvents?: number }), onBatch: async batch => onProgress?.(batch) });
+    case 'searchConversationBm25': {
+      const { searchConversationBm25Job } = await import('../../../lib/conversation-search/chunk-search-jobs.js');
+      return searchConversationBm25Job(payload as Parameters<typeof searchConversationBm25Job>[0]);
+    }
+    case 'searchConversationVector': {
+      const { searchConversationVectorJob } = await import('../../../lib/conversation-search/chunk-search-jobs.js');
+      return searchConversationVectorJob(payload as Parameters<typeof searchConversationVectorJob>[0]);
+    }
+    case 'filterLiveConversationSessions': {
+      const { filterLiveConversationSessionsJob } = await import('../../../lib/conversation-search/chunk-search-jobs.js');
+      return filterLiveConversationSessionsJob(payload as Parameters<typeof filterLiveConversationSessionsJob>[0]);
+    }
   }
 }
 
