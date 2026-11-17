@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-17T12:10:48.379262Z · model: claude-opus-5-5 · open: 901_
+_Last sequenced: 2026-11-17T12:12:47.596119Z · model: claude-opus-5-5 · open: 901_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -481,8 +481,9 @@ _Last sequenced: 2026-11-17T12:10:48.379262Z · model: claude-opus-5-5 · open: 
 | 480 | PAN-1113 | S | medium | ok |  |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
 | 481 | PAN-1068 | S | medium | ok |  |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
 | 482 | PAN-3938 | M | medium | needs-refinement |  |  | Run Muse Spark under Claude Code via cliproxy — only the paid Zen model is routable; free tier is OpenCode-client gated; needs credit… |
-| 482 | PAN-5464 | L | medium | needs-refinement |  |  | Video skill set: Remotion, HyperFrames, OpenMontage, video-use packs + 'video' group; fixes LFS extraction. Issue says PRD to follow. |
+| 482 | PAN-5464 | L | medium | ok |  |  | Video skill set: Remotion, HyperFrames, OpenMontage, video-use packs + 'video' group; fixes LFS extraction. PRD on main. |
 | 483 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
+| 484 | PAN-5465 | L | medium | ok |  |  | Add skill packs to a live conversation: /reload-plugins hot apply, resume fallback, CLI, MCP tool, dashboard modal. PRD on main. |
 | 484 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
 | 485 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
 | 486 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
@@ -500,7 +501,6 @@ _Last sequenced: 2026-11-17T12:10:48.379262Z · model: claude-opus-5-5 · open: 
 | 498 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
 | 499 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
 | 500 | PAN-3563 | S | medium | needs-refinement |  |  | pan unstick is gone; verify whether a spawned-but-never-briefed role agent can still read as running forever under liveness.ts |
-| 500 | PAN-5465 | M | medium | needs-refinement |  |  | Add skill packs to a running conversation via /reload-plugins hot-load with a resume fallback. PRD not written yet. |
 | 501 | PAN-1041 | M | medium | ok |  |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
 | 502 | PAN-924 | L | medium | needs-refinement |  |  | Spike: evaluate GitNexus for Panopticon integration |
 | 503 | PAN-3770 | S | medium | ok |  |  | Codex conversations never show the working spinner mid-turn; parser marks every agent_message instantly complete. |
@@ -1236,7 +1236,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-17T12:10:48.379262Z",
+  "generatedAt": "2026-11-17T12:12:47.596119Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 901,
@@ -7225,11 +7225,11 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "rank": 482,
       "size": "L",
       "importance": "medium",
-      "score": 46,
-      "condition": "needs-refinement",
+      "score": 48,
+      "condition": "ok",
       "dependsOn": [],
-      "why": "Video skill set: Remotion, HyperFrames, OpenMontage, video-use packs + 'video' group; fixes LFS extraction. Issue says PRD to follow.",
-      "rationale": "New issue. Ships four known skill packs and a pack-group alias, and fixes two real skill-pack gaps on the way (Git LFS smudge breaking extraction, root SKILL.md repos being missed). The issue body still says the PRD is to follow, and the draft is uncommitted in the primary checkout, so it stays needs-refinement in the mid tier.",
+      "why": "Video skill set: Remotion, HyperFrames, OpenMontage, video-use packs + 'video' group; fixes LFS extraction. PRD on main.",
+      "rationale": "New issue. Ships four known skill packs and a pack-group alias, and fixes two real skill-pack gaps on the way: the Git LFS smudge that breaks HyperFrames extraction, and repos whose only skill is a root SKILL.md. A full PRD with verified research, seven work items and acceptance criteria landed on main, so it is workable and ranks with mid-tier medium features.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7242,6 +7242,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "condition": "ok",
       "dependsOn": [],
       "why": "Review poster cannot post to GitLab MRs (only supports GitHub PRs)",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5465",
+      "rank": 484,
+      "size": "L",
+      "importance": "medium",
+      "score": 47,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Add skill packs to a live conversation: /reload-plugins hot apply, resume fallback, CLI, MCP tool, dashboard modal. PRD on main.",
+      "rationale": "New issue. Lets an operator or agent add skill packs to a running conversation without losing context, proven by a 2026-11-17 spike that /reload-plugins rebuilds the skill list in place. The PRD on main covers the route, launcher change, CLI, MCP tool and dashboard modal (FR-1 to FR-9), so it is workable; it ranks just after PAN-5464 because its --group support waits on that issue.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7451,19 +7464,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "dependsOn": [],
       "why": "pan unstick is gone; verify whether a spawned-but-never-briefed role agent can still read as running forever under liveness.ts",
       "rationale": "Triage: pan unstick is gone, but the invisible zombie role agent (prompt never delivered, state says running) is a liveness-detection gap that may persist under deacon-lite/liveness.ts. Raised from the tail to medium.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5465",
-      "rank": 500,
-      "size": "M",
-      "importance": "medium",
-      "score": 44,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Add skill packs to a running conversation via /reload-plugins hot-load with a resume fallback. PRD not written yet.",
-      "rationale": "New issue. Companion to PAN-5464: lets an operator add skill packs to a live conversation instead of relaunching. The body is a title plus 'PRD to follow', so scope is not yet defined; it ranks just below PAN-5464, whose pack groups it will accept once both land.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13581,7 +13581,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "to": "PAN-5465",
       "type": "informs",
       "source": "ai-inferred",
-      "confidence": 0.7
+      "confidence": 0.8
     },
     {
       "from": "PAN-750",
