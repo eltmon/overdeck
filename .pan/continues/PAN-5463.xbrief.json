@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5463",
   "created": "2026-11-17T12:31:36.411Z",
-  "updated": "2026-11-17T12:37:56.358Z",
+  "updated": "2026-11-17T12:41:14.158Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -77,6 +77,22 @@
     },
     "wi6-docs": {
       "status": "blocked"
+    },
+    "wi4-ci-workflow": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:41:14.157Z"
+    },
+    "wi4-ci-workflow.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:41:14.157Z"
+    },
+    "wi4-ci-workflow.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:41:14.157Z"
+    },
+    "wi4-ci-workflow.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:41:14.157Z"
     }
   }
 }
