@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5463",
   "created": "2026-11-17T12:31:36.411Z",
-  "updated": "2026-11-17T19:40:17.828Z",
+  "updated": "2026-11-17T19:42:10.774Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -200,7 +200,9 @@
       "doneAt": "2026-11-17T12:53:05.238Z"
     },
     "wi7-live-verify": {
-      "status": "pending"
+      "status": "pending",
+      "claimedBy": "agent-pan-5463",
+      "claimedAt": "2026-11-17T19:42:10.774Z"
     },
     "seam-gate.ac1": {
       "status": "completed",
