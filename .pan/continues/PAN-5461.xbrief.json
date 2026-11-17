@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5461",
   "created": "2026-11-17T12:13:42.164Z",
-  "updated": "2026-11-17T17:25:55.636Z",
+  "updated": "2026-11-17T17:26:15.695Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -196,6 +196,26 @@
     "status-view.ac4": {
       "status": "completed",
       "doneAt": "2026-11-17T17:25:55.635Z"
+    },
+    "setup-orchestrator": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:26:15.694Z"
+    },
+    "setup-orchestrator.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:26:15.694Z"
+    },
+    "setup-orchestrator.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:26:15.694Z"
+    },
+    "setup-orchestrator.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:26:15.694Z"
+    },
+    "setup-orchestrator.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:26:15.694Z"
     }
   }
 }
