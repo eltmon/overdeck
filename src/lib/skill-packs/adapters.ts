@@ -23,6 +23,7 @@ import {
   GSTACK_OPT_IN_SKILLS,
   classifyGstackSkill,
 } from './gstack.js';
+import { OPENMONTAGE_DISCLOSURE, OPENMONTAGE_EXCLUDE } from './openmontage.js';
 
 export type PackAdapterId = 'plain' | 'claude-plugin' | 'deft-readonly' | 'gstack-runtime';
 
@@ -173,6 +174,47 @@ export const KNOWN_PACKS: Readonly<Record<string, KnownPack>> = {
     skillsExclude: ['skills/v1'],
     optIn: ATLASSIAN_OPT_IN_SKILLS,
     disclosure: ATLASSIAN_DISCLOSURE,
+  },
+  // Video production packs (PAN-5464), the members of the built-in `video` pack group.
+  // eltmon/remotion-skills main head 2026-11-17 (PAN-5464)
+  remotion: {
+    id: 'remotion',
+    url: 'https://github.com/eltmon/remotion-skills',
+    ref: '3e20ac75161bc34468845df714701cc9bf6075f4',
+    adapter: 'plain',
+    disclosure:
+      'Remotion skills. The repo has no license file; Remotion itself needs a company license for some uses (see the remotion-license skill).',
+  },
+  // eltmon/hyperframes main head 2026-11-17 (PAN-5464)
+  hyperframes: {
+    id: 'hyperframes',
+    url: 'https://github.com/eltmon/hyperframes',
+    ref: '34f98e6a04e572296e314485d8e2f330edb0ca69',
+    adapter: 'claude-plugin',
+    archivePaths: ['skills', 'plugin.json'],
+    disclosure: 'HyperFrames skills. media-use and figma call HeyGen or Figma APIs only with keys you set.',
+  },
+  // eltmon/OpenMontage main head 2026-11-17 (PAN-5464)
+  openmontage: {
+    id: 'openmontage',
+    url: 'https://github.com/eltmon/OpenMontage',
+    ref: '2e003e65fa99a0f329478a2c1cdcf26bc481933a',
+    adapter: 'plain',
+    skillsRoot: '.agents/skills',
+    skillsExclude: OPENMONTAGE_EXCLUDE,
+    archivePaths: ['.agents/skills'],
+    disclosure: OPENMONTAGE_DISCLOSURE,
+  },
+  // eltmon/video-use main head 2026-11-17 (PAN-5464)
+  'video-use': {
+    id: 'video-use',
+    url: 'https://github.com/eltmon/video-use',
+    ref: '43cfc566833548093455c9d4a46bd69913b7e552',
+    adapter: 'plain',
+    rootSkill: { name: 'video-use', paths: ['SKILL.md', 'helpers', 'install.md', 'pyproject.toml'] },
+    mountTransform: 'video-use',
+    archivePaths: ['SKILL.md', 'helpers', 'install.md', 'pyproject.toml', 'skills'],
+    disclosure: 'video-use sends audio to ElevenLabs Scribe for transcription, using ELEVENLABS_API_KEY.',
   },
 };
 
