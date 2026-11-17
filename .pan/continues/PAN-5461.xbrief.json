@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5461",
   "created": "2026-11-17T12:13:42.164Z",
-  "updated": "2026-11-17T12:21:46.646Z",
+  "updated": "2026-11-17T12:23:43.667Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,9 +68,30 @@
       "doneAt": "2026-11-17T12:21:37.748Z"
     },
     "setup-linux": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5461",
-      "claimedAt": "2026-11-17T12:21:46.646Z"
+      "claimedAt": "2026-11-17T12:21:46.646Z",
+      "doneAt": "2026-11-17T12:23:43.666Z"
+    },
+    "setup-linux.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:23:43.666Z"
+    },
+    "setup-linux.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:23:43.666Z"
+    },
+    "setup-linux.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:23:43.666Z"
+    },
+    "setup-linux.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:23:43.666Z"
+    },
+    "setup-linux.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:23:43.666Z"
     }
   }
 }
