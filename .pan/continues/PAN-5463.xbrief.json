@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5463",
   "created": "2026-11-17T12:31:36.411Z",
-  "updated": "2026-11-17T19:13:01.475Z",
+  "updated": "2026-11-17T19:13:27.052Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,7 +52,9 @@
       "doneAt": "2026-11-17T19:13:01.475Z"
     },
     "wi3-install": {
-      "status": "pending"
+      "status": "pending",
+      "claimedBy": "agent-pan-5463",
+      "claimedAt": "2026-11-17T19:13:27.052Z"
     },
     "wi3-protocol": {
       "status": "pending"
