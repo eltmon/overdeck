@@ -514,5 +514,185 @@
     "upstream": "orca",
     "path": "src/main/computer/action-contracts/computer-blocked-key-combos.ts",
     "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Package.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Package.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/AccessibilityWindowIdentity.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/AccessibilityWindowIdentity.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/ActionArgumentValidation.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/ActionArgumentValidation.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/AgentConnectionRequestLoop.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/AgentConnectionRequestLoop.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/AgentSessionOwnership.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/AgentSessionOwnership.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/AttributeValueCoercion.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/AttributeValueCoercion.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/AuthenticatedConnectionHangupMonitor.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/AuthenticatedConnectionHangupMonitor.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/BackgroundInputTransport.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/BackgroundInputTransport.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/ComputerSnapshotCachePolicy.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/ComputerSnapshotCachePolicy.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/ElementActionability.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/ElementActionability.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/KeyboardInputSafety.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/KeyboardInputSafety.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/NumericArgumentParsing.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/NumericArgumentParsing.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/PermissionStatusSnapshot.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/PermissionStatusSnapshot.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/PermissionTrustSettling.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/PermissionTrustSettling.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/PermissionWindowCopy.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/PermissionWindowCopy.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/RowSelectionClick.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/RowSelectionClick.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/SnapshotRendering.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/SnapshotRendering.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/StableElementIndexes.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/StableElementIndexes.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/SyntheticMouseClickDelivery.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/SyntheticMouseClickDelivery.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/TextInsertionReadback.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/TextInsertionReadback.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/TrustedOrcaApplication.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/TrustedOrcaApplication.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/UnixSocketPathSafety.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/UnixSocketPathSafety.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Tests/OrcaComputerUseMacOSTests/AgentConnectionRequestLoopTests.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Tests/OrcaComputerUseMacOSTests/AgentConnectionRequestLoopTests.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Tests/OrcaComputerUseMacOSTests/AttributeValueCoercionTests.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Tests/OrcaComputerUseMacOSTests/AttributeValueCoercionTests.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Tests/OrcaComputerUseMacOSTests/AuthenticatedConnectionHangupMonitorTests.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Tests/OrcaComputerUseMacOSTests/AuthenticatedConnectionHangupMonitorTests.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Tests/OrcaComputerUseMacOSTests/BackgroundInputTransportTests.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Tests/OrcaComputerUseMacOSTests/BackgroundInputTransportTests.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Tests/OrcaComputerUseMacOSTests/ElementActionabilityTests.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Tests/OrcaComputerUseMacOSTests/ElementActionabilityTests.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Tests/OrcaComputerUseMacOSTests/RowSelectionClickTests.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Tests/OrcaComputerUseMacOSTests/RowSelectionClickTests.swift",
+    "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-macos/Tests/OrcaComputerUseMacOSTests/TextInsertionReadbackTests.swift",
+    "upstream": "orca",
+    "path": "native/computer-use-macos/Tests/OrcaComputerUseMacOSTests/TextInsertionReadbackTests.swift",
+    "commit": "c6b9ac9549b"
   }
 ]
