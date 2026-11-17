@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5464",
   "created": "2026-11-17T12:41:33.533Z",
-  "updated": "2026-11-17T14:46:16.529Z",
+  "updated": "2026-11-17T14:46:38.078Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -36,9 +36,10 @@
       "doneAt": "2026-11-17T14:46:15.341Z"
     },
     "skills-cli-group": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5464",
-      "claimedAt": "2026-11-17T14:46:16.529Z"
+      "claimedAt": "2026-11-17T14:46:16.529Z",
+      "doneAt": "2026-11-17T14:46:38.078Z"
     },
     "docs-changelog": {
       "status": "in_progress",
@@ -170,6 +171,22 @@
     "groups-lib.ac3": {
       "status": "completed",
       "doneAt": "2026-11-17T14:46:15.341Z"
+    },
+    "skills-cli-group.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T14:46:38.078Z"
+    },
+    "skills-cli-group.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T14:46:38.078Z"
+    },
+    "skills-cli-group.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T14:46:38.078Z"
+    },
+    "skills-cli-group.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T14:46:38.078Z"
     }
   }
 }
