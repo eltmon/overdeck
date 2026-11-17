@@ -328,6 +328,17 @@ describe('plain adapter', () => {
   });
 });
 
+describe('license detection by full name (PAN-5464)', () => {
+  it.each([
+    ['                    GNU AFFERO GENERAL PUBLIC LICENSE\n                       Version 3\n', 'AGPL-3.0'],
+    ['GNU LESSER GENERAL PUBLIC LICENSE\nVersion 3\n', 'LGPL'],
+    ['\nMIT License\n\nCopyright\n', 'MIT'],
+  ])('reads %j as %s', async (license, expected) => {
+    const root = fixture({ 'skills/a/SKILL.md': skillMd('a', 'A.'), LICENSE: license });
+    expect((await readPackManifest(root, 'plain')).license).toBe(expected);
+  });
+});
+
 describe('deft-readonly adapter', () => {
   const deftFiles = (omit: readonly string[] = []): Record<string, string> => {
     const files: Record<string, string> = { LICENSE: 'MIT License\n\nCopyright (c) Deft\n' };

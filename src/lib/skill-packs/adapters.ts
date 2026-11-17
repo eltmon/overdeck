@@ -159,6 +159,12 @@ const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const PLAIN_MAX_DEPTH = 4;
 const PLUGIN_JSON = join('.claude-plugin', 'plugin.json');
 const LICENSE_TOKENS = ['MIT', 'Apache', 'BSD', 'GPL'] as const;
+/** Full license names, checked before the tokens: GNU license titles spell the name out and never contain `GPL`. */
+const LICENSE_NAMES: ReadonlyArray<readonly [RegExp, string]> = [
+  [/GNU AFFERO GENERAL PUBLIC LICENSE/i, 'AGPL-3.0'],
+  [/GNU LESSER GENERAL PUBLIC LICENSE/i, 'LGPL'],
+  [/GNU GENERAL PUBLIC LICENSE/i, 'GPL'],
+];
 const MANIFEST_FS_CONCURRENCY = 32;
 const limitFs = createPromiseConcurrencyLimiter(MANIFEST_FS_CONCURRENCY);
 
@@ -461,6 +467,8 @@ async function readLicense(root: string, plugin: Record<string, unknown> | null)
     if (text === null) continue;
     const firstLine = text.split('\n').find((line) => line.trim());
     if (!firstLine) continue;
+    const named = LICENSE_NAMES.find(([pattern]) => pattern.test(firstLine));
+    if (named) return named[1];
     return LICENSE_TOKENS.find((token) => firstLine.includes(token)) ?? null;
   }
   return null;
