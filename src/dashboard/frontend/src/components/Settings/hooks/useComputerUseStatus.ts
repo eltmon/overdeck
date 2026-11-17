@@ -132,6 +132,10 @@ export function useComputerUseStatus() {
 
   const release = () => runAction('POST', '/api/computer-use/release', {}, 'Failed to release the desktop');
 
+  /** macOS (PAN-5463): opens one System Settings permission pane on the host. */
+  const openPermission = (id: 'accessibility' | 'screen-recording') =>
+    runAction('POST', '/api/computer-use/open-permission', { id }, 'Failed to open System Settings');
+
   return {
     status,
     loadError: loadErrorObj ? (loadErrorObj instanceof Error ? loadErrorObj.message : String(loadErrorObj)) : null,
@@ -142,6 +146,7 @@ export function useComputerUseStatus() {
     setupResult,
     setEnabled,
     release,
+    openPermission,
     busy,
     actionError,
   };
