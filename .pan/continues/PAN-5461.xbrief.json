@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5461",
   "created": "2026-11-17T12:13:42.164Z",
-  "updated": "2026-11-17T12:23:43.667Z",
+  "updated": "2026-11-17T12:23:54.857Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,11 @@
     "setup-linux.ac5": {
       "status": "completed",
       "doneAt": "2026-11-17T12:23:43.666Z"
+    },
+    "linux-provider": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5461",
+      "claimedAt": "2026-11-17T12:23:54.856Z"
     }
   }
 }
