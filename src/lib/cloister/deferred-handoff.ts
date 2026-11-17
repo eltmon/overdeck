@@ -18,6 +18,12 @@
  *
  * The schedule lives in the pipeline journal, never in memory, so a dashboard
  * or deacon restart resumes it where it stood.
+ *
+ * PAN-5498: complete-planning also journals `handoff.requested` just before
+ * it sends the spawn. When the request finishes, a newer entry replaces it.
+ * When the dashboard dies mid-request (a slow stack rebuild, then a restart),
+ * `handoff.requested` stays the last entry, and the same retry resumes the
+ * hand-off after `HANDOFF_REQUEST_RESUME_DELAY_MS`.
  */
 import { existsSync } from 'node:fs';
 
@@ -38,13 +44,24 @@ export const DEFERRED_HANDOFF_WINDOW_MS = 2 * 60 * 60_000;
 const DEFERRED_HANDOFF_BASE_DELAY_MS = 2 * 60_000;
 const DEFERRED_HANDOFF_MAX_DELAY_MS = 20 * 60_000;
 
+/**
+ * How long a `handoff.requested` entry waits before a retry treats the request
+ * as lost. The original request can run a workspace stack rebuild for minutes
+ * before it claims the agent start, so an earlier retry could run a second
+ * rebuild beside it.
+ */
+export const HANDOFF_REQUEST_RESUME_DELAY_MS = 10 * 60_000;
+
 /** The delay before retry number `attempt + 1`: 2, 4, 8, 16, then every 20 minutes. */
 export function deferredHandoffDelayMs(attempt: number): number {
   return Math.min(DEFERRED_HANDOFF_BASE_DELAY_MS * 2 ** Math.max(0, attempt), DEFERRED_HANDOFF_MAX_DELAY_MS);
 }
 
-/** Why the auto-spawn was refused: a spawn guardrail, or an unhealthy workspace Docker stack. */
-export type DeferredHandoffReason = 'guardrails' | 'stack-unhealthy';
+/**
+ * Why the auto-spawn is pending: a spawn guardrail refused it, an unhealthy
+ * workspace Docker stack refused it, or the request never answered (PAN-5498).
+ */
+export type DeferredHandoffReason = 'guardrails' | 'stack-unhealthy' | 'interrupted';
 
 /** The schedule each `handoff.deferred` / `handoff.retried` entry carries. */
 interface DeferredHandoffSchedule {
@@ -90,9 +107,42 @@ export function recordHandoffDeferred(options: {
   });
 }
 
+/**
+ * PAN-5498: journal the planning hand-off immediately before complete-planning
+ * sends the spawn, so a request that dies with the dashboard is still retried.
+ */
+export function recordHandoffRequested(options: {
+  workspacePath: string;
+  issueId: string;
+  now?: number;
+}): PipelineJournalEntry {
+  const now = options.now ?? Date.now();
+  const requestedAt = new Date(now).toISOString();
+  return appendPipelineEntry(options.workspacePath, {
+    type: 'handoff.requested',
+    issueId: options.issueId.toUpperCase(),
+    source: 'complete-planning',
+    data: {
+      deferredAt: requestedAt,
+      requestedAt,
+      attempt: 0,
+      nextRetryAt: new Date(now + HANDOFF_REQUEST_RESUME_DELAY_MS).toISOString(),
+      reason: 'interrupted',
+    },
+  });
+}
+
 /** The deferral reason a journal entry carries, defaulting to `'guardrails'`. */
 function readReason(entry: PipelineJournalEntry): DeferredHandoffReason {
-  return entry.data?.['reason'] === 'stack-unhealthy' ? 'stack-unhealthy' : 'guardrails';
+  const reason = entry.data?.['reason'];
+  return reason === 'stack-unhealthy' || reason === 'interrupted' ? reason : 'guardrails';
+}
+
+/** Plain words for what held up the hand-off, used in activity messages. */
+function describeCleared(reason: DeferredHandoffReason): string {
+  if (reason === 'stack-unhealthy') return 'after the workspace docker stack recovered';
+  if (reason === 'interrupted') return 'after the first start request was interrupted';
+  return 'after the spawn guardrails cleared';
 }
 
 function readSchedule(entry: PipelineJournalEntry): DeferredHandoffSchedule | null {
@@ -186,7 +236,8 @@ export async function retryDeferredHandoffs(
     const issueId = workspace.issueId?.toUpperCase();
     if (!issueId || !workspace.path || !existsSync(workspace.path)) continue;
     const last = lastPipelineEntry(workspace.path, 'handoff.');
-    if (!last || (last.type !== 'handoff.deferred' && last.type !== 'handoff.retried')) continue;
+    if (!last || (last.type !== 'handoff.deferred' && last.type !== 'handoff.retried'
+      && last.type !== 'handoff.requested')) continue;
     const schedule = readSchedule(last);
     if (!schedule) continue;
     if (inFlight.has(issueId)) continue;
@@ -230,7 +281,9 @@ async function retryOne(input: {
   if (now - deferredAtMs >= DEFERRED_HANDOFF_WINDOW_MS) {
     const message = schedule.lastError ?? (schedule.reason === 'stack-unhealthy'
       ? 'the workspace docker stack is still unhealthy'
-      : 'spawn guardrails still refused the work agent');
+      : schedule.reason === 'interrupted'
+        ? 'the work agent start request never completed'
+        : 'spawn guardrails still refused the work agent');
     giveUpHandoff(workspacePath, issueId, schedule, schedule.reason, message, emitActivity);
     return `gave up after ${schedule.attempt} retries`;
   }
@@ -259,7 +312,7 @@ async function retryOne(input: {
       source: 'deacon-lite',
       data: { deferredAt: schedule.deferredAt, attempt, agentId: result.agentId, requestedAt, ...(result.queued ? { queued: true } : {}) },
     });
-    const cleared = schedule.reason === 'stack-unhealthy' ? 'after the workspace docker stack recovered' : 'after the spawn guardrails cleared';
+    const cleared = describeCleared(schedule.reason);
     emitActivity({
       source: 'plan',
       level: 'info',

@@ -65,6 +65,7 @@ export const JOURNAL_ACTIVITY_LABELS: Record<PipelineJournalEntryType, string> =
   'conflict.repair-escalated': 'conflict repair escalated',
   'blocked.declared': 'agent declared a blocker',
   'blocked.woken': 'blocker cleared, agent woken',
+  'handoff.requested': 'handoff requested',
   'handoff.deferred': 'handoff deferred',
   'handoff.retried': 'handoff retried',
   'handoff.started': 'handoff started',

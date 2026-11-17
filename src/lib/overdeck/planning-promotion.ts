@@ -18,7 +18,7 @@ import { getAgentState } from '../agents.js';
 import { planningHandoffStartedBy } from '../agents/provenance.js';
 import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
 import { appendPipelineEntry } from '../cloister/pipeline-journal.js';
-import { recordHandoffDeferred, type DeferredHandoffReason } from '../cloister/deferred-handoff.js';
+import { recordHandoffDeferred, recordHandoffRequested, type DeferredHandoffReason } from '../cloister/deferred-handoff.js';
 import { isDeaconGloballyPaused } from './control-settings.js';
 import { createInFlightGuard } from '../cloister/in-flight-guard.js';
 import { saveAgentStateAndEmitEvent } from '../../dashboard/server/services/agent-projection.js';
@@ -898,6 +898,17 @@ export async function completePlanningForIssue(options: {
     emitCompletePlanningPhase(id, 'branchPush', push.pushed ? 'success' : 'failure', push.reason ?? `pushed feature/${issueLower}`);
     const gitPushed = push.pushed;
 
+    // PAN-5498: journal the hand-off before sending it. If the dashboard dies
+    // while the spawn request runs (a slow stack rebuild, then a restart), this
+    // stays the last handoff entry and deacon-lite resumes the start.
+    const handoffJournaled = effectiveAutoSpawn && Boolean(workspacePath) && existsSync(workspacePath);
+    if (handoffJournaled) {
+      try {
+        recordHandoffRequested({ workspacePath, issueId: id });
+      } catch (error) {
+        console.warn(`[complete-planning] Could not journal the ${id} hand-off request: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
     const autoSpawnResult = await completePlanningAutoSpawnAndKill({
       issueId: id,
       autoSpawn: effectiveAutoSpawn,
@@ -930,6 +941,20 @@ export async function completePlanningForIssue(options: {
         result: autoSpawnResult,
         eventStore,
       });
+      // PAN-5498: close the journaled request so deacon-lite does not retry a
+      // failure no wait fixes. Only guardrail and stack refusals are retried.
+      if (handoffJournaled) {
+        appendPipelineEntry(workspacePath, {
+          type: 'handoff.abandoned',
+          issueId: id.toUpperCase(),
+          source: 'complete-planning',
+          data: {
+            outcome: 'failed',
+            skipReason: autoSpawnResult.workAgentSkipReason ?? 'spawn-failed',
+            error: autoHandoffError,
+          },
+        });
+      }
     } else {
       if (autoSpawnResult?.workAgentSpawned && workspacePath && existsSync(workspacePath)) {
         appendPipelineEntry(workspacePath, {

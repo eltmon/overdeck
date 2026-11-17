@@ -705,6 +705,8 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
                 effort: options.effort,
                 workspaceLocation: effectiveRemote ? 'remote' : 'local',
                 startedBy: process.env['OVERDECK_AGENT_STARTED_BY'],
+                // PAN-5498: confirmHostOverride() already confirmed --host above.
+                hostOverrideIssueId: options.host ? id : undefined,
               }),
             },
           );

@@ -7,6 +7,7 @@ import {
   autoSpawnOnFinalizeFlagPath,
   claimAutoSpawnConsentForWorkStart,
   completeAutoSpawnConsentClaim,
+  readAutoSpawnConsentHostOverride,
   readAutoSpawnConsentWorkModel,
   readAutoSpawnConsentWorkspaceLocation,
   readAutoSpawnOnFinalizeFlagAsync,
@@ -49,6 +50,16 @@ describe('auto-spawn consent claims', () => {
     })).rejects.toThrow('tmux start failed');
 
     await expect(readAutoSpawnOnFinalizeFlagAsync(issueId)).resolves.toBe(true);
+  });
+
+  it('keeps the host override through a claim release, so a deferred retry still sees it', async () => {
+    await writeAutoSpawnOnFinalizeFlag(issueId, true, { hostOverride: true });
+
+    await expect(withAutoSpawnConsentClaim(issueId, async () => {
+      throw new Error('stack gate refused');
+    })).rejects.toThrow('stack gate refused');
+
+    await expect(readAutoSpawnConsentHostOverride(issueId)).resolves.toBe(true);
   });
 
   it('allows only one launch to own a granted consent generation', async () => {
@@ -234,6 +245,54 @@ describe('auto-spawn consent claims', () => {
       }));
 
       await expect(readAutoSpawnConsentWorkspaceLocation(issueId)).resolves.toBeUndefined();
+    });
+  });
+
+  describe('hostOverride (PAN-5498)', () => {
+    it('returns the recorded override', async () => {
+      await writeAutoSpawnOnFinalizeFlag(issueId, true, { hostOverride: true });
+
+      await expect(readAutoSpawnConsentHostOverride(issueId)).resolves.toBe(true);
+    });
+
+    it('preserves the override across a rewrite with no options (resolveAutoSpawnOnFinalize path)', async () => {
+      await writeAutoSpawnOnFinalizeFlag(issueId, true, { workModel: 'k3', workspaceLocation: 'local', hostOverride: true });
+
+      await writeAutoSpawnOnFinalizeFlag(issueId, true);
+
+      await expect(readAutoSpawnConsentHostOverride(issueId)).resolves.toBe(true);
+    });
+
+    it('clears the override when a new planning cycle runs without --host', async () => {
+      await writeAutoSpawnOnFinalizeFlag(issueId, true, { hostOverride: true });
+
+      await writeAutoSpawnOnFinalizeFlag(issueId, true, { workModel: null, workspaceLocation: 'local', hostOverride: null });
+
+      await expect(readAutoSpawnConsentHostOverride(issueId)).resolves.toBe(false);
+    });
+
+    it('stops returning the override once the claim is spent', async () => {
+      await writeAutoSpawnOnFinalizeFlag(issueId, true, { hostOverride: true });
+      const claim = await claimAutoSpawnConsentForWorkStart(issueId);
+      if (!claim) throw new Error('expected a claim');
+      await expect(readAutoSpawnConsentHostOverride(issueId)).resolves.toBe(true);
+
+      await completeAutoSpawnConsentClaim(claim);
+
+      await expect(readAutoSpawnConsentHostOverride(issueId)).resolves.toBe(false);
+    });
+
+    it('ignores a stored override that is not the boolean true', async () => {
+      await writeAutoSpawnOnFinalizeFlag(issueId, true);
+      writeFileSync(autoSpawnOnFinalizeFlagPath(issueId), JSON.stringify({
+        version: 2,
+        generation: 'g1',
+        status: 'granted',
+        hostOverride: 'yes',
+        updatedAt: new Date().toISOString(),
+      }));
+
+      await expect(readAutoSpawnConsentHostOverride(issueId)).resolves.toBe(false);
     });
   });
 });

@@ -144,6 +144,8 @@ export interface SpawnPlanningOptions {
   autoSpawnOnFinalize?: boolean;
   /** Operator-chosen work-agent model (PAN-2997/PAN-3022), stored on the auto-start consent. */
   workModel?: string;
+  /** PAN-5498: the operator confirmed `pan start --host`; stored on the auto-start consent. */
+  hostOverride?: boolean;
   /** Origin token for the planning agent state. */
   startedBy: string;
   /** Optional callback for streaming progress events to the client. */
@@ -395,7 +397,7 @@ export function buildPlanningSessionEnv(startedBy: string): Record<string, strin
  * is sent. It updates agent state to 'running' on success or 'failed' on error.
  */
 export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<SpawnPlanningResult> {
-  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, auto, probe, autoSpawnOnFinalize, workModel, startedBy, onProgress } = opts;
+  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, auto, probe, autoSpawnOnFinalize, workModel, hostOverride, startedBy, onProgress } = opts;
   const issueLower = issue.identifier.toLowerCase();
   const agentStateDir = join(homedir(), '.overdeck', 'agents', sessionName);
 
@@ -405,7 +407,12 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
   };
 
   try {
-    await writeAutoSpawnOnFinalizeFlag(issue.identifier, autoSpawnOnFinalize === true, { workModel: workModel ?? null, workspaceLocation });
+    await writeAutoSpawnOnFinalizeFlag(issue.identifier, autoSpawnOnFinalize === true, {
+      workModel: workModel ?? null,
+      workspaceLocation,
+      // A new planning cycle without --host clears an override an earlier cycle recorded.
+      hostOverride: hostOverride === true ? true : null,
+    });
     console.log(`[start-planning] Background setup starting for ${issue.identifier}`);
 
     // ── Step 1: Create workspace if needed ─────────────────────────────────

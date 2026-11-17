@@ -187,6 +187,8 @@ export function summarizePipelineEntry(entry: PipelineJournalEntry): string {
       return `${data.item ?? 'item'} ${data.outcome === 'unreachable' ? 'needs you — agent unreachable' : `woke ${data.agentId ?? 'the work agent'}`}`;
     case 'strike.landed':
       return `worktree ${data.worktreeRemoved ? 'removed' : 'kept'}, branch ${data.branchDeleted ? 'deleted' : 'kept'}`;
+    case 'handoff.requested':
+      return `work agent start requested; resumed after ${typeof data.nextRetryAt === 'string' ? data.nextRetryAt : '?'} if it never answers`;
     case 'handoff.deferred':
     case 'handoff.retried':
       return `attempt ${data.attempt ?? 0}: ${data.skipReason ?? data.reason ?? 'refused'}`;
@@ -224,7 +226,8 @@ export function pendingHandoffHold(
   if (!deaconPaused) return null;
   const lastHandoff = [...journal].reverse().find((entry) => entry.type.startsWith('handoff.'));
   if (!lastHandoff) return null;
-  if (lastHandoff.type !== 'handoff.deferred' && lastHandoff.type !== 'handoff.retried') return null;
+  if (lastHandoff.type !== 'handoff.deferred' && lastHandoff.type !== 'handoff.retried'
+    && lastHandoff.type !== 'handoff.requested') return null;
   return `Deferred work-agent start is held: the Deacon is frozen. Unfreeze it or run pan start ${issueId}.`;
 }
 
