@@ -7,6 +7,13 @@
 #         The handshake must succeed; the Notepad tree and screenshot are a
 #         soft check, since the hosted desktop may not expose them. Each
 #         call's wall-clock time goes to the job summary (PRD D-3).
+# pack    builds the npm tarball exactly as windows-smoke.yml does and fails
+#         unless it ships native/computer-use-windows/runtime.ps1 (PRD D-13).
+# wsl     installs that tarball inside Ubuntu-24.04 on WSL2 and runs
+#         `pan computer` against Notepad on the Windows desktop, timing each
+#         command, plus the D-17 checkpoint (no WSL_INTEROP in the env). It is
+#         continue-on-error: when WSL2 does not start, the summary says the
+#         WSL bridge is covered by unit tests only.
 #
 # Manual and path-triggered only; not part of ci.yml and not a required check.
 # PRD: .pan/drafts/pan-5462.md (WI-7).
@@ -102,3 +109,134 @@ jobs:
           if ($failed) { exit 1 }
           # The runner ends a pwsh step with exit $LASTEXITCODE; the soft check must not inherit a helper's exit code.
           exit 0
+
+  pack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        run: bun run build
+
+      - name: Pack
+        run: |
+          mkdir -p subject
+          npm pack --ignore-scripts --pack-destination subject
+
+      - name: Tarball ships the Windows helper (D-13)
+        run: |
+          tar tzf subject/*.tgz > subject-files.txt
+          grep -qx 'package/native/computer-use-windows/runtime.ps1' subject-files.txt
+          grep -qx 'package/dist/cli/index.js' subject-files.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: subject
+          path: subject/*.tgz
+          if-no-files-found: error
+
+  wsl:
+    needs: pack
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: subject
+          path: ${{ runner.temp }}/subject
+
+      - name: Set up WSL2
+        id: wsl2
+        continue-on-error: true
+        uses: Vampire/setup-wsl@v7
+        with:
+          distribution: Ubuntu-24.04
+          wsl-version: 2
+
+      - name: Start Notepad
+        shell: pwsh
+        run: |
+          Start-Process notepad.exe
+          Start-Sleep -Seconds 3
+
+      # Writes markdown to $RUNNER_TEMP/wsl-summary.md; the next step copies it
+      # into the job summary, since GITHUB_STEP_SUMMARY is a Windows path.
+      - name: pan computer inside WSL2
+        id: wsl
+        if: steps.wsl2.outcome == 'success'
+        continue-on-error: true
+        shell: wsl-bash {0}
+        run: |
+          set -uo pipefail
+          export OVERDECK_TELEMETRY=0 NO_COLOR=1
+          tmp="$(wslpath -u '${{ runner.temp }}')"
+          out="$tmp/wsl-summary.md"
+          : > "$out"
+          for pkg in curl xz-utils; do
+            bin=$pkg; [[ $pkg == xz-utils ]] && bin=xz
+            command -v "$bin" >/dev/null || { apt-get update -qq && apt-get install -y -qq "$pkg"; }
+          done
+          if [[ ! -x "$HOME/node/bin/node" ]]; then
+            NODE_DIST=https://nodejs.org/dist/latest-v22.x
+            NODE_TAR=$(curl -fsSL "$NODE_DIST/SHASUMS256.txt" | awk '/linux-x64\.tar\.xz$/ { print $2 }')
+            mkdir -p "$HOME/node"
+            curl -fsSL "$NODE_DIST/$NODE_TAR" | tar -xJ -C "$HOME/node" --strip-components=1
+          fi
+          export PATH="$HOME/node/bin:$PATH"
+          mkdir -p "$HOME/subject"
+          cp "$tmp"/subject/*.tgz "$HOME/subject/"
+          npm install -g --silent "$(ls "$HOME"/subject/*.tgz)"
+          export OVERDECK_HOME="$HOME/cu-home"
+          mkdir -p "$OVERDECK_HOME"
+          printf 'computer_use:\n  enabled: true\n' > "$OVERDECK_HOME/config.yaml"
+
+          {
+            echo '## computer-use-windows: pan computer inside WSL2'
+            echo
+            echo "WSL: $(uname -r); node $(node --version); interop: $(ls /proc/sys/fs/binfmt_misc | grep -i wslinterop | tr '\n' ' ')"
+            echo
+            echo '| command | seconds | exit |'
+            echo '| --- | --- | --- |'
+          } >> "$out"
+          details=""
+          timed() {
+            local label="$1"; shift
+            local start end code output
+            start=$(date +%s.%N)
+            output="$("$@" 2>&1)"; code=$?
+            end=$(date +%s.%N)
+            echo "| \`$label\` | $(awk "BEGIN { printf \"%.2f\", $end - $start }") | $code |" >> "$out"
+            details+=$'\n'"### $label"$'\n\n```\n'"${output:0:3000}"$'\n```\n'
+            echo "== $label (exit $code)"; echo "${output:0:3000}"
+          }
+          timed 'pan computer capabilities --json' pan computer capabilities --json
+          timed 'pan computer list-apps --json' pan computer list-apps --json
+          timed 'pan computer get-app-state --app notepad --json' pan computer get-app-state --app notepad --json
+          # D-17 checkpoint: does a Windows exe and pan computer still run without WSL_INTEROP?
+          timed 'env -u WSL_INTEROP powershell.exe -NoProfile -Command 1' env -u WSL_INTEROP /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile -Command 1
+          timed 'env -u WSL_INTEROP pan computer list-apps --json' env -u WSL_INTEROP pan computer list-apps --json
+          printf '%s\n' "$details" >> "$out"
+
+      - name: Job summary
+        if: always()
+        shell: pwsh
+        run: |
+          $file = Join-Path $env:RUNNER_TEMP 'wsl-summary.md'
+          $lines = @()
+          if (Test-Path $file) { $lines += Get-Content -Raw $file }
+          if ('${{ steps.wsl2.outcome }}' -ne 'success' -or '${{ steps.wsl.outcome }}' -ne 'success') {
+            $lines += '', "WSL2 setup: ${{ steps.wsl2.outcome }}; WSL step: ${{ steps.wsl.outcome }}.", 'The WSL end-to-end check did not complete, so the WSL bridge is covered by unit tests only. Run it once by hand on a Windows PC with WSL2.'
+          }
+          $lines | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8NoBOM
