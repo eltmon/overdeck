@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5462",
   "created": "2026-11-17T12:53:58.478Z",
-  "updated": "2026-11-17T19:18:56.808Z",
+  "updated": "2026-11-17T19:20:35.882Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,9 +38,10 @@
       "doneAt": "2026-11-17T19:18:51.968Z"
     },
     "wsl-readiness": {
-      "status": "pending",
+      "status": "completed",
       "claimedBy": "agent-pan-5462",
-      "claimedAt": "2026-11-17T19:18:56.808Z"
+      "claimedAt": "2026-11-17T19:18:56.808Z",
+      "doneAt": "2026-11-17T19:20:35.882Z"
     },
     "windows-blocked-keys": {
       "status": "pending"
@@ -109,6 +110,22 @@
     "wsl-bridge.ac6": {
       "status": "completed",
       "doneAt": "2026-11-17T19:18:51.968Z"
+    },
+    "wsl-readiness.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:20:35.882Z"
+    },
+    "wsl-readiness.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:20:35.882Z"
+    },
+    "wsl-readiness.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:20:35.882Z"
+    },
+    "wsl-readiness.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:20:35.882Z"
     }
   }
 }
