@@ -1386,8 +1386,11 @@ experimental-features gate.
 `{ generatedAt, windowHours: 0, scope: 'live', entries }` and keeps an entry when:
 
 1. its state is live (`working`, `idle`, `blocked`, `unknown`);
-2. it is a native agent with a pause gate (`pause`, below) and its issue's derived state is not
-   `merged` or `closed` (an agent with no issue is kept);
+2. it is a native agent with a pause gate (`pause`, below) and its issue has a derived state that
+   is not `merged` or `closed` (an agent with no issue is kept). `state.json` keeps a pause after
+   its issue finishes, and an old closed issue has no derived state, so such a pause is dropped
+   (PAN-5466). The Home page Paused card applies the same rule and also leaves out the post-merge
+   `awaiting close-out (verify on main)` pause;
 3. it is the newest (by `startedAt`, then id) `work`/`strike` agent of an issue whose derived
    state is `in-review`, `changes-requested` or `ready`.
 
