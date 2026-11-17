@@ -368,6 +368,7 @@ const TELEMETRY_CLIENT_ROUTE_AREAS = [
   "color-themes",
   "command-deck",
   "commands",
+  "computer-use",
   "confirmations",
   "connectors",
   "context",

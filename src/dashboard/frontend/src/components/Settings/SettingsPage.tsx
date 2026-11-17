@@ -20,6 +20,7 @@ import { ConversationSettingsSection } from './sections/ConversationSettingsSect
 import { PROVIDER_ROW_ID_PREFIX, ProviderManagementSection, type ProviderFocusRequest } from './sections/ProviderManagementSection';
 import { PermissionsSection } from './sections/PermissionsSection';
 import { SecuritySection } from './sections/SecuritySection';
+import { ComputerUseSection } from './sections/ComputerUseSection';
 import { HarnessesSection } from './sections/HarnessesSection';
 import { TieredExecutionSection } from './sections/TieredExecutionSection';
 import { SwarmSettingsSection } from './sections/SwarmSettingsSection';
@@ -541,6 +542,7 @@ export function SettingsPage() {
       />
 
       <SecuritySection />
+      <ComputerUseSection />
 
       <HarnessesSection formData={formData} onSettingsChange={applySettings} />
 

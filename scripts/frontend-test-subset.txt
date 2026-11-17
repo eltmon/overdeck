@@ -566,3 +566,5 @@ src/test-utils/renderCounter.test.tsx
 src/vite-build-commit.test.ts
 src/components/chat/messagesTimeline/__tests__/toolBodyLoader.test.tsx
 src/components/chat/__tests__/MessagesTimeline.test.tsx
+src/components/Settings/sections/__tests__/ComputerUseSection.test.tsx
+src/components/__tests__/palette-computer-use-actions.test.ts
