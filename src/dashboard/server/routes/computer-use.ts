@@ -10,10 +10,15 @@
  *   POST /api/computer-use/setup     — run the listed setup steps
  *   PUT  /api/computer-use/settings  — body: { enabled: boolean }
  *   POST /api/computer-use/release   — force-release the desktop lease
+ *   POST /api/computer-use/open-permission — macOS only (PAN-5463): body
+ *        { id: 'accessibility' | 'screen-recording' } opens that System
+ *        Settings pane through the helper; 409 not_darwin elsewhere
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
+import { detectPlatform } from '../../../lib/computer-use/platform.js';
+import { openPermissionPane } from '../../../lib/computer-use/providers/darwin.js';
 import { runRelease } from '../../../lib/computer-use/run.js';
 import {
   ComputerUseConfigSyntaxError,
@@ -109,4 +114,31 @@ const postReleaseRoute = HttpRouter.add(
   })),
 );
 
-export const computerUseRouteLayer = Layer.mergeAll(getStatusRoute, postSetupRoute, putSettingsRoute, postReleaseRoute);
+const postOpenPermissionRoute = HttpRouter.add(
+  'POST',
+  '/api/computer-use/open-permission',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const body = yield* readJsonBody;
+    const id = (body as { id?: unknown } | null)?.id;
+    if (id !== 'accessibility' && id !== 'screen-recording') {
+      return jsonResponse({ error: "id must be 'accessibility' or 'screen-recording'" }, { status: 400 });
+    }
+    if (detectPlatform() !== 'darwin') return jsonResponse({ error: 'not_darwin' }, { status: 409 });
+
+    return yield* Effect.promise(async () => {
+      await openPermissionPane(id);
+      return statusResponse();
+    });
+  })),
+);
+
+export const computerUseRouteLayer = Layer.mergeAll(
+  getStatusRoute,
+  postSetupRoute,
+  putSettingsRoute,
+  postReleaseRoute,
+  postOpenPermissionRoute,
+);

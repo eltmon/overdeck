@@ -4,11 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-const { mockBuildStatus, mockRunSetup, mockSaveSettings, mockRunRelease } = vi.hoisted(() => ({
+const { mockBuildStatus, mockRunSetup, mockSaveSettings, mockRunRelease, mockDetectPlatform, mockOpenPermissionPane } = vi.hoisted(() => ({
   mockBuildStatus: vi.fn(),
   mockRunSetup: vi.fn(),
   mockSaveSettings: vi.fn(),
   mockRunRelease: vi.fn(),
+  mockDetectPlatform: vi.fn(),
+  mockOpenPermissionPane: vi.fn(),
 }));
 
 vi.mock('../../../../lib/computer-use/status.js', async (importOriginal) => ({
@@ -22,6 +24,14 @@ vi.mock('../../../../lib/computer-use/setup.js', async (importOriginal) => ({
 vi.mock('../../../../lib/computer-use/settings.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../lib/computer-use/settings.js')>()),
   saveComputerUseSettings: mockSaveSettings,
+}));
+vi.mock('../../../../lib/computer-use/platform.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/computer-use/platform.js')>()),
+  detectPlatform: mockDetectPlatform,
+}));
+vi.mock('../../../../lib/computer-use/providers/darwin.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/computer-use/providers/darwin.js')>()),
+  openPermissionPane: mockOpenPermissionPane,
 }));
 vi.mock('../../../../lib/computer-use/run.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../lib/computer-use/run.js')>()),
@@ -185,12 +195,51 @@ describe('POST /api/computer-use/release (PAN-5461)', () => {
   });
 });
 
+describe('POST /api/computer-use/open-permission (PAN-5463)', () => {
+  it.each([{ id: 'bluetooth' }, {}, { id: 3 }])('answers 400 for body %o', async (body) => {
+    mockDetectPlatform.mockReturnValue('darwin');
+    const res = await callRoute('POST', '/api/computer-use/open-permission', body);
+    expect(res.status).toBe(400);
+    expect(mockOpenPermissionPane).not.toHaveBeenCalled();
+  });
+
+  it('answers 400 with no body at all', async () => {
+    mockDetectPlatform.mockReturnValue('darwin');
+    const res = await callRoute('POST', '/api/computer-use/open-permission');
+    expect(res.status).toBe(400);
+  });
+
+  it('answers 409 not_darwin on a Linux host', async () => {
+    mockDetectPlatform.mockReturnValue('linux');
+    const res = await callRoute('POST', '/api/computer-use/open-permission', { id: 'accessibility' });
+    expect(res).toEqual({ status: 409, body: { error: 'not_darwin' } });
+    expect(mockOpenPermissionPane).not.toHaveBeenCalled();
+  });
+
+  it('opens the pane on macOS and returns the status view', async () => {
+    mockDetectPlatform.mockReturnValue('darwin');
+    mockOpenPermissionPane.mockResolvedValue(undefined);
+    mockBuildStatus.mockResolvedValue({ ...STATUS, platform: 'darwin' });
+    const res = await callRoute('POST', '/api/computer-use/open-permission', { id: 'screen-recording' });
+    expect(mockOpenPermissionPane).toHaveBeenCalledWith('screen-recording');
+    expect(res).toEqual({ status: 200, body: { ...STATUS, platform: 'darwin' } });
+  });
+
+  it('is refused without credentials', async () => {
+    mockDetectPlatform.mockReturnValue('darwin');
+    const res = await callRoute('POST', '/api/computer-use/open-permission', { id: 'accessibility' }, {});
+    expect(res.status).toBe(401);
+    expect(mockOpenPermissionPane).not.toHaveBeenCalled();
+  });
+});
+
 describe('computer-use route scopes (PAN-5461 D-8)', () => {
   it.each([
     ['GET', '/api/computer-use/status'],
     ['POST', '/api/computer-use/setup'],
     ['PUT', '/api/computer-use/settings'],
     ['POST', '/api/computer-use/release'],
+    ['POST', '/api/computer-use/open-permission'],
   ])('%s %s is admin-only', (method, path) => {
     expect(requiredScopeFor(method, path)).toBe('admin');
   });
