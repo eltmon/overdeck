@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5483",
   "created": "2026-11-17T13:01:33.028Z",
-  "updated": "2026-11-17T15:08:43.373Z",
+  "updated": "2026-11-17T15:08:54.580Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -204,6 +204,11 @@
     "frontmatter-reference-guides.ac4": {
       "status": "completed",
       "doneAt": "2026-11-17T15:08:43.373Z"
+    },
+    "broken-links": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5483",
+      "claimedAt": "2026-11-17T15:08:54.579Z"
     }
   }
 }
