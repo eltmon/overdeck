@@ -1,0 +1,267 @@
+{
+  "version": "1",
+  "issueId": "PAN-5462",
+  "created": "2026-11-17T12:53:58.478Z",
+  "updated": "2026-11-17T19:55:12.488Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "vendor-windows-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5462",
+      "claimedAt": "2026-11-17T12:53:58.478Z",
+      "doneAt": "2026-11-17T12:55:21.213Z"
+    },
+    "vendor-windows-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:55:21.213Z"
+    },
+    "vendor-windows-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:55:21.213Z"
+    },
+    "vendor-windows-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:55:21.213Z"
+    },
+    "vendor-windows-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:55:21.213Z"
+    },
+    "wsl-bridge": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5462",
+      "claimedAt": "2026-11-17T19:11:43.217Z",
+      "doneAt": "2026-11-17T19:18:51.968Z"
+    },
+    "wsl-readiness": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5462",
+      "claimedAt": "2026-11-17T19:18:56.808Z",
+      "doneAt": "2026-11-17T19:20:35.882Z"
+    },
+    "windows-blocked-keys": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5462",
+      "claimedAt": "2026-11-17T19:20:39.645Z",
+      "doneAt": "2026-11-17T19:21:37.007Z"
+    },
+    "wsl-provider": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5462",
+      "claimedAt": "2026-11-17T19:21:40.567Z",
+      "doneAt": "2026-11-17T19:25:28.366Z"
+    },
+    "wsl-doctor-rows": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5462",
+      "claimedAt": "2026-11-17T19:25:32.409Z",
+      "doneAt": "2026-11-17T19:29:31.720Z"
+    },
+    "wsl-capabilities": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5462",
+      "claimedAt": "2026-11-17T19:29:35.283Z",
+      "doneAt": "2026-11-17T19:34:49.952Z"
+    },
+    "settings-wsl-wording": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5462",
+      "claimedAt": "2026-11-17T19:34:54.545Z",
+      "doneAt": "2026-11-17T19:39:26.405Z"
+    },
+    "skill-and-help-text": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5462",
+      "claimedAt": "2026-11-17T19:39:27.710Z",
+      "doneAt": "2026-11-17T19:41:25.330Z"
+    },
+    "config-docs-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5462",
+      "claimedAt": "2026-11-17T19:41:26.333Z",
+      "doneAt": "2026-11-17T19:42:22.988Z"
+    },
+    "ci-wsl-e2e": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5462",
+      "claimedAt": "2026-11-17T19:42:24.214Z",
+      "doneAt": "2026-11-17T19:55:12.488Z"
+    },
+    "ci-windows-native": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:58:35.489Z"
+    },
+    "ci-windows-native.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:58:35.489Z"
+    },
+    "ci-windows-native.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:58:35.489Z"
+    },
+    "ci-windows-native.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:58:35.489Z"
+    },
+    "ci-windows-native.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:58:35.489Z"
+    },
+    "wsl-bridge.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:51.968Z"
+    },
+    "wsl-bridge.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:51.968Z"
+    },
+    "wsl-bridge.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:51.968Z"
+    },
+    "wsl-bridge.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:51.968Z"
+    },
+    "wsl-bridge.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:51.968Z"
+    },
+    "wsl-bridge.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:51.968Z"
+    },
+    "wsl-readiness.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:20:35.882Z"
+    },
+    "wsl-readiness.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:20:35.882Z"
+    },
+    "wsl-readiness.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:20:35.882Z"
+    },
+    "wsl-readiness.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:20:35.882Z"
+    },
+    "windows-blocked-keys.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:21:37.007Z"
+    },
+    "windows-blocked-keys.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:21:37.007Z"
+    },
+    "windows-blocked-keys.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:21:37.007Z"
+    },
+    "windows-blocked-keys.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:21:37.007Z"
+    },
+    "wsl-provider.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:25:28.366Z"
+    },
+    "wsl-provider.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:25:28.366Z"
+    },
+    "wsl-provider.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:25:28.366Z"
+    },
+    "wsl-provider.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:25:28.366Z"
+    },
+    "wsl-doctor-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:29:31.720Z"
+    },
+    "wsl-doctor-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:29:31.720Z"
+    },
+    "wsl-doctor-rows.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:29:31.720Z"
+    },
+    "wsl-capabilities.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:34:49.952Z"
+    },
+    "wsl-capabilities.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:34:49.952Z"
+    },
+    "wsl-capabilities.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:34:49.952Z"
+    },
+    "settings-wsl-wording.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:39:26.405Z"
+    },
+    "settings-wsl-wording.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:39:26.405Z"
+    },
+    "settings-wsl-wording.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:39:26.405Z"
+    },
+    "settings-wsl-wording.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:39:26.405Z"
+    },
+    "skill-and-help-text.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:41:25.330Z"
+    },
+    "skill-and-help-text.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:41:25.330Z"
+    },
+    "skill-and-help-text.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:41:25.330Z"
+    },
+    "config-docs-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:42:22.988Z"
+    },
+    "config-docs-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:42:22.988Z"
+    },
+    "config-docs-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:42:22.988Z"
+    },
+    "ci-wsl-e2e.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:55:12.488Z"
+    },
+    "ci-wsl-e2e.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:55:12.488Z"
+    },
+    "ci-wsl-e2e.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:55:12.488Z"
+    },
+    "ci-wsl-e2e.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:55:12.488Z"
+    }
+  }
+}

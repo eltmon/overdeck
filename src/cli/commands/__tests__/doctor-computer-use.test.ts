@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { mergeConfigs } from '../../../lib/config-yaml/merge.js';
+import type { ComputerUseProvider, ReadinessCheck } from '../../../lib/computer-use/platform.js';
+import { INTEROP_FIX } from '../../../lib/computer-use/readiness-wsl.js';
 import { checkComputerUse, type CheckComputerUseDeps, type ExecFileFn } from '../doctor-computer-use.js';
 
 function enabledConfig() {
@@ -42,7 +44,9 @@ describe('checkComputerUse (PAN-5452)', () => {
   it('warns that an unsupported host is unsupported and runs no further probe', async () => {
     const execFile = vi.fn();
     const checks = await checkComputerUse({ config: enabledConfig(), platform: 'win32', deps: { execFile } });
-    expect(checks).toEqual([{ name: 'Computer use', status: 'warn', message: 'Enabled, but computer use supports Linux and macOS only' }]);
+    expect(checks).toEqual([
+      { name: 'Computer use', status: 'warn', message: 'Enabled, but computer use supports Linux, macOS, and Windows through WSL2 only' },
+    ]);
     expect(execFile).not.toHaveBeenCalled();
   });
 
@@ -126,5 +130,56 @@ describe('checkComputerUse (PAN-5452)', () => {
     });
     expect(checks.some((c) => c.status === 'ok')).toBe(false);
     expect(checks).toContainEqual(expect.objectContaining({ status: 'error', message: expect.stringContaining('boom') }));
+  });
+});
+
+describe('checkComputerUse under WSL2 (PAN-5462 FR-7)', () => {
+  function fakeWslProvider(checks: ReadinessCheck[]): ComputerUseProvider {
+    return {
+      id: 'wsl',
+      blockedKeyPlatform: 'windows',
+      resolveSession: async () => ({ ok: true, session: { label: 'windows', env: {} } }),
+      readiness: vi.fn(async () => ({ session: { ok: true as const, label: 'windows · 10.0.22631.0' }, checks, setupSteps: [] })),
+      runSetupStep: async () => ({ status: 'skipped' as const }),
+      runHelper: async () => ({ ok: true }),
+    };
+  }
+
+  const okChecks: ReadinessCheck[] = [
+    { id: 'interop', label: 'Windows interop', status: 'ok', detail: 'enabled' },
+    { id: 'powershell', label: 'Windows PowerShell', status: 'ok', detail: 'PowerShell 5.1.22621.4391' },
+    { id: 'helper-dir', label: 'Helper folder', status: 'ok', detail: 'C:\\Users\\me\\AppData\\Local\\Overdeck\\computer-use' },
+    { id: 'helper', label: 'Helper test', status: 'ok', detail: 'handshake ok' },
+  ];
+
+  const wslDeps = (provider: ComputerUseProvider): CheckComputerUseDeps => ({ detectPlatform: () => 'wsl', wslProvider: provider });
+
+  it('returns one ok row per readiness check (ac1)', async () => {
+    const checks = await checkComputerUse({ config: enabledConfig(), deps: wslDeps(fakeWslProvider(okChecks)) });
+    expect(checks.map((row) => row.status)).toEqual(['ok', 'ok', 'ok', 'ok']);
+    expect(checks.map((row) => row.message.split(':')[0])).toEqual(['Windows interop', 'Windows PowerShell', 'Helper folder', 'Helper test']);
+  });
+
+  it('gives the interop row status error with the FR-4 fix when interop is missing (ac2)', async () => {
+    const provider = fakeWslProvider([
+      { id: 'interop', label: 'Windows interop', status: 'missing', detail: "WSL can't run Windows programs", fixCommand: INTEROP_FIX },
+      { id: 'powershell', label: 'Windows PowerShell', status: 'unavailable', detail: 'needs Windows interop' },
+      { id: 'helper-dir', label: 'Helper folder', status: 'unavailable', detail: 'needs Windows interop' },
+      { id: 'helper', label: 'Helper test', status: 'unavailable', detail: 'needs Windows interop' },
+    ]);
+    const checks = await checkComputerUse({ config: enabledConfig(), deps: wslDeps(provider) });
+    expect(checks[0]).toEqual({
+      name: 'Computer use',
+      status: 'error',
+      message: "Windows interop: WSL can't run Windows programs",
+      fix: INTEROP_FIX,
+    });
+  });
+
+  it('returns no rows when the feature is disabled (ac3)', async () => {
+    const provider = fakeWslProvider(okChecks);
+    const checks = await checkComputerUse({ config: disabledConfig(), deps: wslDeps(provider) });
+    expect(checks).toEqual([]);
+    expect(provider.readiness).not.toHaveBeenCalled();
   });
 });

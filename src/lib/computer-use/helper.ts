@@ -60,6 +60,19 @@ function lastNonEmptyLine(text: string): string | undefined {
   return lines.at(-1);
 }
 
+/** The last non-empty stdout line as JSON; shared by the Linux and Windows bridges (PAN-5462 D-6). */
+export function parseHelperOutput(stdout: string, stderr: string): HelperResponse {
+  const lastLine = lastNonEmptyLine(stdout);
+  if (lastLine === undefined) {
+    throw new ComputerUseError('helper_error', `pan computer: the helper printed no output.${stderr ? ` stderr: ${stderr.slice(-500)}` : ''}`);
+  }
+  try {
+    return JSON.parse(lastLine) as HelperResponse;
+  } catch {
+    throw new ComputerUseError('helper_error', `pan computer: the helper's output was not JSON: ${lastLine.slice(0, 500)}`);
+  }
+}
+
 export async function runHelper(
   operation: Record<string, unknown>,
   env: NodeJS.ProcessEnv,
@@ -110,16 +123,7 @@ export async function runHelper(
     await rmFn(opFile, { force: true });
   }
 
-  const lastLine = lastNonEmptyLine(stdout);
-  if (lastLine === undefined) {
-    throw new ComputerUseError('helper_error', `pan computer: the helper printed no output.${stderr ? ` stderr: ${stderr.slice(-500)}` : ''}`);
-  }
-  let parsed: HelperResponse;
-  try {
-    parsed = JSON.parse(lastLine) as HelperResponse;
-  } catch {
-    throw new ComputerUseError('helper_error', `pan computer: the helper's output was not JSON: ${lastLine.slice(0, 500)}`);
-  }
+  const parsed = parseHelperOutput(stdout, stderr);
   if (parsed.ok === false) {
     const message = typeof parsed.error === 'string' ? parsed.error : 'unknown helper error';
     if (mentionsMissingAtspi(message)) {

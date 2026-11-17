@@ -516,6 +516,12 @@
     "commit": "c6b9ac9549b"
   },
   {
+    "local": "native/computer-use-windows/runtime.ps1",
+    "upstream": "orca",
+    "path": "native/computer-use-windows/runtime.ps1",
+    "commit": "c6b9ac9549b"
+  },
+  {
     "local": "native/computer-use-macos/Package.swift",
     "upstream": "orca",
     "path": "native/computer-use-macos/Package.swift",

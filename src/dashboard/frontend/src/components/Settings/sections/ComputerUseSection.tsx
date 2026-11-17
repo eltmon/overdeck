@@ -82,6 +82,8 @@ const MAC_PERMISSION_IDS = ['accessibility', 'screen-recording'];
 
 function offDescription(status: ComputerUseStatusView): string {
   if (status.platform === 'darwin' && providerSteps(status).length > 0) return MAC_OFF_COPY;
+  // WSL2 drives Windows through built-in PowerShell and UI Automation (PAN-5462 FR-6).
+  if (status.platform === 'wsl') return 'Nothing to install: Windows already includes what it needs. One click turns it on.';
   const parts: string[] = [];
   for (const step of providerSteps(status)) {
     if (step.id === 'install-packages') parts.push(`installs ${step.label.replace(/^Install /, '')}`);
@@ -228,10 +230,13 @@ export function ComputerUseSection() {
       Computer Use
     </h2>
   );
+  const isWsl = status?.platform === 'wsl';
   const lede = (
     <p className="text-xs text-muted-foreground mb-4">
-      Lets agents see and operate desktop apps on <span className="font-mono">{status?.hostname ?? 'this host'}</span>{' '}
-      (the machine running Overdeck) when you ask them to: read windows, click, type and take screenshots.
+      Lets agents see and operate {isWsl ? 'Windows' : 'desktop'} apps on{' '}
+      <span className="font-mono">{status?.hostname ?? 'this host'}</span>{' '}
+      {isWsl ? '(the PC running Overdeck in WSL)' : '(the machine running Overdeck)'} when you ask them to: read windows, click,
+      type and take screenshots.
     </p>
   );
 
@@ -314,7 +319,9 @@ export function ComputerUseSection() {
     body = (
       <>
         <p className="text-xs text-muted-foreground">
-          Agents can operate desktop apps when you ask them to. They can&apos;t quit apps, lock the screen or log you out.
+          {isWsl
+            ? "Agents can operate Windows apps when you ask them to. They can't close apps with Alt+F4, lock Windows or open Task Manager."
+            : "Agents can operate desktop apps when you ask them to. They can't quit apps, lock the screen or log you out."}
         </p>
         {macPermissionMissing ? (
           <p data-testid="computer-use-mac-regrant" className="mt-2 text-xs text-warning-foreground">

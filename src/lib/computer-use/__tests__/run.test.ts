@@ -75,15 +75,15 @@ describe('runComputerOperation preamble (PAN-5452)', () => {
     expect(loadConfig).not.toHaveBeenCalled();
   });
 
-  it('refuses WSL with unsupported_platform before reading config (PAN-5461 D-9)', async () => {
+  it('refuses a host with no provider with unsupported_platform before reading config (PAN-5461 D-9)', async () => {
     const loadConfig = vi.fn().mockReturnValue({ computerUse: { enabled: true } });
     const resolveSession = vi.fn();
-    const deps = baseDeps({ detectPlatform: () => 'wsl', loadConfig, resolveSession });
+    const deps = baseDeps({ detectPlatform: () => 'darwin', loadConfig, resolveSession });
 
     const error = await runComputerOperation({ kind: 'read', operation: {} }, deps).catch((e) => e);
     expect(isComputerUseError(error)).toBe(true);
     expect(error.code).toBe('unsupported_platform');
-    expect(error.message).toBe("Computer use isn't supported on this host (wsl) yet.");
+    expect(error.message).toBe("Computer use isn't supported on this host (darwin) yet.");
     expect(loadConfig).not.toHaveBeenCalled();
     expect(resolveSession).not.toHaveBeenCalled();
   });
@@ -188,9 +188,9 @@ describe('runCapabilities (PAN-5452 FR-13)', () => {
     });
   });
 
-  it('reports the unsupported message for WSL without throwing', async () => {
-    const result = await runCapabilities(baseDeps({ detectPlatform: () => 'wsl' }));
-    expect(result.desktopSession).toEqual({ ok: false, message: "Computer use isn't supported on this host (wsl) yet." });
+  it('reports the unsupported message without throwing when the platform has no provider', async () => {
+    const result = await runCapabilities(baseDeps({ detectPlatform: () => 'darwin' }));
+    expect(result.desktopSession).toEqual({ ok: false, message: "Computer use isn't supported on this host (darwin) yet." });
     expect(result.helper).toBeNull();
   });
 
@@ -199,6 +199,48 @@ describe('runCapabilities (PAN-5452 FR-13)', () => {
     const result = await runCapabilities(baseDeps({ runHelper }));
     expect(result.helper).toBeNull();
     expect(result.helperError).toBe('boom');
+  });
+});
+
+describe('runCapabilities under WSL2 (PAN-5462 FR-1)', () => {
+  function wslDeps(runHelper: ComputerUseProvider['runHelper'], windowsVersion = vi.fn(async () => ({ powershell: '5.1', build: '10.0.22631.0' }))) {
+    const provider: ComputerUseProvider = {
+      id: 'wsl',
+      blockedKeyPlatform: 'windows',
+      resolveSession: async () => ({
+        ok: true,
+        session: { label: 'windows', env: { XDG_SESSION_TYPE: 'wayland', DISPLAY: ':0', WAYLAND_DISPLAY: 'wayland-0' } },
+      }),
+      readiness: vi.fn(async () => ({ session: { ok: true as const, label: 'windows' }, checks: [], setupSteps: [] })),
+      runSetupStep: async () => ({ status: 'skipped' }),
+      runHelper,
+    };
+    return { provider, windowsVersion, deps: baseDeps({ detectPlatform: () => 'wsl', providerFor: (id) => (id === 'wsl' ? provider : null), windowsVersion }) };
+  }
+
+  it('reports the Windows build as the session label, never WSLg session fields (ac1)', async () => {
+    const { deps, provider, windowsVersion } = wslDeps(async () => ({ ok: true, capabilities: { platform: 'win32' } }));
+    const result = await runCapabilities(deps);
+
+    expect(result.desktopSession).toEqual({ ok: true, label: 'windows · 10.0.22631.0' });
+    expect(windowsVersion).toHaveBeenCalledTimes(1);
+    expect(provider.readiness).not.toHaveBeenCalled();
+  });
+
+  it('keeps the handshake in helper (ac2)', async () => {
+    const runHelper = vi.fn(async () => ({ ok: true, capabilities: { platform: 'win32', provider: 'orca-computer-use-windows' } }));
+    const result = await runCapabilities(wslDeps(runHelper).deps);
+
+    expect(runHelper).toHaveBeenCalledWith({ tool: 'handshake' }, expect.anything());
+    expect(result.helper).toMatchObject({ platform: 'win32', provider: 'orca-computer-use-windows' });
+  });
+
+  it('keeps the bare windows label when the version probe fails', async () => {
+    const failing = vi.fn(async () => {
+      throw new Error('powershell.exe failed');
+    });
+    const result = await runCapabilities(wslDeps(async () => ({ ok: true }), failing).deps);
+    expect(result.desktopSession).toEqual({ ok: true, label: 'windows' });
   });
 });
 

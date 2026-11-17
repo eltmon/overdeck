@@ -53,18 +53,47 @@ describe('assertKeyComboAllowed platform (PAN-5461 D-16)', () => {
     expect(() => assertKeyComboAllowed('ctrl+a', false, 'linux')).not.toThrow();
   });
 
-  it.each(['windows'] as const)('fails closed for %s even with allowSystemShortcut', (platform) => {
-    for (const allow of [false, true]) {
-      let error: unknown = null;
-      try {
-        assertKeyComboAllowed('ctrl+a', allow, platform);
-      } catch (caught) {
-        error = caught;
-      }
-      expect(isComputerUseError(error)).toBe(true);
-      expect((error as { code: string }).code).toBe('unsupported_platform');
-      expect((error as Error).message).toBe(`No blocked-shortcut rules for ${platform} yet.`);
+  it('has a rule table for every key platform, so none fails closed', () => {
+    for (const platform of ['linux', 'windows', 'mac'] as const) {
+      expect(() => assertKeyComboAllowed('ctrl+a', false, platform)).not.toThrow();
     }
+  });
+});
+
+describe('assertKeyComboAllowed on windows (PAN-5462 D-8)', () => {
+  function windowsError(key: string, allowSystemShortcut = false): unknown {
+    try {
+      assertKeyComboAllowed(key, allowSystemShortcut, 'windows');
+      return null;
+    } catch (error) {
+      return error;
+    }
+  }
+
+  it.each([
+    ['alt+f4', 'close the app'],
+    ['win+l', 'lock Windows'],
+    ['cmd+l', 'lock Windows'],
+    ['super+l', 'lock Windows'],
+    ['ctrl+shift+esc', 'open Task Manager'],
+  ])('blocks %s and names the effect (ac1)', (key, effect) => {
+    const error = windowsError(key);
+    expect(isComputerUseError(error)).toBe(true);
+    expect((error as { code: string }).code).toBe('system_shortcut_blocked');
+    expect((error as Error).message).toContain(`would ${effect}`);
+  });
+
+  it('accepts ctrl+q, which Windows apps handle themselves (ac2)', () => {
+    expect(windowsError('ctrl+q')).toBeNull();
+  });
+
+  it('still rejects alt+f4 and ctrl+q on linux (ac3)', () => {
+    expect(() => assertKeyComboAllowed('alt+f4', false, 'linux')).toThrow(/close the window/);
+    expect(() => assertKeyComboAllowed('ctrl+q', false, 'linux')).toThrow(/quit the app/);
+  });
+
+  it('accepts alt+f4 when allowSystemShortcut is true (ac4)', () => {
+    expect(windowsError('alt+f4', true)).toBeNull();
   });
 });
 

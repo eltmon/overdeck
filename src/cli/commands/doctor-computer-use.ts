@@ -9,7 +9,12 @@ interface CheckResult {
 import type { NormalizedConfig } from '../../lib/config-yaml/schema.js';
 import type { ResolveDesktopEnvDeps, ResolveDesktopEnvResult } from '../../lib/computer-use/desktop-env.js';
 import type { HelperResponse } from '../../lib/computer-use/helper.js';
-import { detectPlatform as detectPlatformReal } from '../../lib/computer-use/platform.js';
+import {
+  detectPlatform as detectPlatformReal,
+  providerFor,
+  type ComputerUseProvider,
+  type ReadinessStatus,
+} from '../../lib/computer-use/platform.js';
 import { linuxReadiness, type ExecFileFn, type LinuxReadinessDeps } from '../../lib/computer-use/readiness-linux.js';
 
 export type { ExecFileFn };
@@ -21,6 +26,25 @@ export interface CheckComputerUseDeps {
   resolveDesktopEnv?: (deps?: ResolveDesktopEnvDeps) => Promise<ResolveDesktopEnvResult>;
   runHelper?: (operation: Record<string, unknown>, env: NodeJS.ProcessEnv) => Promise<HelperResponse>;
   detectPlatform?: typeof detectPlatformReal;
+  /** The wsl provider; defaults to providerFor('wsl') (PAN-5462). */
+  wslProvider?: ComputerUseProvider;
+}
+
+const DOCTOR_STATUS: Record<ReadinessStatus, CheckResult['status']> = {
+  ok: 'ok',
+  action: 'warn',
+  missing: 'error',
+  unavailable: 'warn',
+};
+
+/** WSL2 (PAN-5462 FR-7): one row per readiness check, with fixCommand as the row's fix. */
+async function wslRows(provider: ComputerUseProvider): Promise<CheckResult[]> {
+  const report = await provider.readiness({ probeHelper: 'if-free' });
+  return report.checks.map((check) => {
+    const row: CheckResult = { name: NAME, status: DOCTOR_STATUS[check.status], message: `${check.label}: ${check.detail}` };
+    if (check.fixCommand) row.fix = check.fixCommand;
+    return row;
+  });
 }
 
 export interface CheckComputerUseOptions {
@@ -37,6 +61,8 @@ export interface CheckComputerUseOptions {
  * The probes live in lib/computer-use/readiness-linux.ts (PAN-5461 D-6); this
  * wrapper maps its rows back to doctor's legacy rows, order and apt fix strings
  * (D-14). The handshake runs without the desktop lock, as it always has.
+ * Under WSL2 the wsl provider's four checks map to rows directly (PAN-5462 FR-7);
+ * its handshake skips while an agent holds the desktop.
  */
 export async function checkComputerUse(options: CheckComputerUseOptions): Promise<CheckResult[]> {
   if (!options.config.computerUse.enabled) return [];
@@ -48,8 +74,12 @@ export async function checkComputerUse(options: CheckComputerUseOptions): Promis
     // The macOS checks launch the helper app; Settings → Computer Use runs them (PAN-5463).
     return [{ name: NAME, status: 'ok', message: 'Enabled; on macOS, Settings → Computer Use checks the helper and permissions' }];
   }
+  if (platformId === 'wsl') {
+    const provider = deps.wslProvider ?? providerFor('wsl');
+    if (provider) return wslRows(provider);
+  }
   if (platformId !== 'linux') {
-    return [{ name: NAME, status: 'warn', message: 'Enabled, but computer use supports Linux and macOS only' }];
+    return [{ name: NAME, status: 'warn', message: 'Enabled, but computer use supports Linux, macOS, and Windows through WSL2 only' }];
   }
 
   const readinessDeps: LinuxReadinessDeps = {};
