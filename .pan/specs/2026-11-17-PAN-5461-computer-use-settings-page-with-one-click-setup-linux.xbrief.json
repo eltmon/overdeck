@@ -4,17 +4,17 @@
     "created": "2026-11-17T12:00:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5461: Computer use: Settings page with one-click setup (Linux)",
-    "updated": "2026-11-17T12:11:40.952Z"
+    "updated": "2026-11-17T12:13:28.060Z"
   },
   "plan": {
     "id": "pan-5461",
     "title": "Computer use: Settings page with one-click setup (Linux)",
-    "status": "proposed",
+    "status": "running",
     "uid": "92c91047-17eb-4707-8d14-f9b0ac67fb0e",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-17T12:00:00Z",
-    "updated": "2026-11-17T12:11:40.952Z",
+    "updated": "2026-11-17T12:13:28.060Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5461",
@@ -1240,5 +1240,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
