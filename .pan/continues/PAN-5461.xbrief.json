@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5461",
   "created": "2026-11-17T12:13:42.164Z",
-  "updated": "2026-11-17T17:25:35.454Z",
+  "updated": "2026-11-17T17:25:55.636Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -176,6 +176,26 @@
     "settings-door.ac3": {
       "status": "completed",
       "doneAt": "2026-11-17T17:25:35.454Z"
+    },
+    "status-view": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:25:55.635Z"
+    },
+    "status-view.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:25:55.635Z"
+    },
+    "status-view.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:25:55.635Z"
+    },
+    "status-view.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:25:55.635Z"
+    },
+    "status-view.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:25:55.635Z"
     }
   }
 }
