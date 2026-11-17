@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5463",
   "created": "2026-11-17T12:31:36.411Z",
-  "updated": "2026-11-17T12:53:05.239Z",
+  "updated": "2026-11-17T12:53:11.467Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -165,6 +165,9 @@
     "wi1-strings.ac3": {
       "status": "completed",
       "doneAt": "2026-11-17T12:53:05.238Z"
+    },
+    "wi7-live-verify": {
+      "status": "blocked"
     }
   }
 }
