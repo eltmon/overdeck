@@ -159,6 +159,7 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/self/workers', scope: 'read:state' },
   { method: 'GET', path: '/api/self/workers/:id', scope: 'read:state' },
   { method: 'POST', path: '/api/self/lanes', scope: 'operate' },
+  { method: 'POST', path: '/api/self/skills', scope: 'operate' },
   { method: 'POST', path: '/api/self/lanes/wait', scope: 'read:state' },
   { method: 'POST', path: '/api/self/lanes/report', scope: 'tell' },
   // PAN-4927 W-SELF2: agent workflow routes; the handler also requires an agent token (D-10).
@@ -209,6 +210,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/conversations/:name/diffs/:turnId', scope: 'read:conversations' },
   { method: 'GET', path: '/api/conversations/:name/changes', scope: 'read:conversations' },
   { method: 'GET', path: '/api/conversations/:name/changes/lines', scope: 'read:conversations' },
+  { method: 'GET', path: '/api/conversations/:name/skills', scope: 'read:conversations' },
+  { method: 'POST', path: '/api/conversations/:name/skills', scope: 'operate' },
   { method: 'POST', path: '/api/conversations/:name/upload-image', scope: 'tell' },
   // PAN-4835 D-7: the undo of upload-image.
   { method: 'POST', path: '/api/conversations/:name/delete-image', scope: 'tell' },

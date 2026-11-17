@@ -84,6 +84,11 @@ export function mountsDir(): string {
   return join(packsHome(), 'mounts');
 }
 
+/** D-2 (PAN-5465): the fixed empty plugins dir a launch with no packs links to. */
+export function emptyMountPluginsDir(): string {
+  return join(mountsDir(), 'empty', 'plugins');
+}
+
 export function mountHash(selection: MountSelection): string {
   const entries = selection.packs
     .flatMap((pack) =>
@@ -262,16 +267,14 @@ export async function buildMount(selection: MountSelection): Promise<Mount | nul
   return mount;
 }
 
-/** Point the per-launch plugin link at `<mount>/plugins` (atomic replace), or remove it when there is no mount. */
+/** Point the per-launch plugin link at `<mount>/plugins` (atomic replace), or at the empty mount when there is none (D-2). */
 export async function linkClaudeMount(link: string, mount: Mount | null): Promise<void> {
-  if (mount === null) {
-    await rm(link, { force: true });
-    return;
-  }
+  const target = mount === null ? emptyMountPluginsDir() : join(mount.path, 'plugins');
+  if (mount === null) await mkdir(target, { recursive: true });
   await mkdir(dirname(link), { recursive: true });
   const tmp = `${link}.tmp-${process.pid}`;
   await rm(tmp, { force: true });
-  await symlink(join(mount.path, 'plugins'), tmp);
+  await symlink(target, tmp);
   await rename(tmp, link);
 }
 
@@ -410,6 +413,8 @@ export async function gcMounts(
   const removedMounts: string[] = [];
   const root = mountsDir();
   for (const name of await listDirNames(root)) {
+    // D-2 (PAN-5465): the empty mount is fixed and shared by every pack-less launch.
+    if (name === 'empty') continue;
     const path = join(root, name);
     let stats;
     try {

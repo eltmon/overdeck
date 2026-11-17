@@ -12,6 +12,7 @@ import {
   readdirSync,
   readFileSync,
   readlinkSync,
+  realpathSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -34,6 +35,7 @@ const { overdeckHome } = await vi.hoisted(async () => {
 import {
   buildMount,
   CODEX_PACK_BLOCK_BEGIN,
+  emptyMountPluginsDir,
   CODEX_PACK_MARKETPLACE,
   gcMounts,
   linkClaudeMount,
@@ -345,7 +347,7 @@ describe('root skills and the video-use transform (PAN-5464)', () => {
 describe('linkClaudeMount', () => {
   const link = join(overdeckHome, 'launch', 'agent-1', 'skill-packs');
 
-  it('links to the mount plugins, replaces the target, and removes the link for null', async () => {
+  it('links to the mount plugins and replaces the target', async () => {
     const first = await buildMount({ packs: [alpha()] });
     const second = await buildMount({ packs: [beta()] });
     await linkClaudeMount(link, first);
@@ -353,9 +355,30 @@ describe('linkClaudeMount', () => {
     await linkClaudeMount(link, second);
     expect(readlinkSync(link)).toBe(join(second?.path ?? '', 'plugins'));
     expect(existsSync(join(link, 'beta', '.claude-plugin', 'plugin.json'))).toBe(true);
+  });
+
+  it('links to an existing empty mount when there is no mount (PAN-5465 D-2)', async () => {
+    rmSync(join(mountsDir(), 'empty'), { recursive: true, force: true });
+    rmSync(link, { force: true });
     await linkClaudeMount(link, null);
-    expect(() => lstatSync(link)).toThrow();
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(link)).toBe(emptyMountPluginsDir());
+    expect(emptyMountPluginsDir()).toBe(join(mountsDir(), 'empty', 'plugins'));
+    expect(realpathSync(link)).toBe(realpathSync(emptyMountPluginsDir()));
+    expect(readdirSync(link)).toEqual([]);
     await linkClaudeMount(link, null);
+    expect(readlinkSync(link)).toBe(emptyMountPluginsDir());
+  });
+
+  it('re-points a link at a real mount to the empty mount without removing it (PAN-5465 D-2)', async () => {
+    const mount = await buildMount({ packs: [alpha()] });
+    await linkClaudeMount(link, mount);
+    expect(readlinkSync(link)).toBe(join(mount?.path ?? '', 'plugins'));
+    await linkClaudeMount(link, null);
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(link)).toBe(emptyMountPluginsDir());
+    expect(readdirSync(link)).toEqual([]);
+    expect(readdirSync(join(overdeckHome, 'launch', 'agent-1')).filter((name) => name.includes('.tmp-'))).toEqual([]);
   });
 });
 
@@ -474,6 +497,15 @@ describe('gcMounts', () => {
     expect(existsSync(freshUnused.path)).toBe(true);
     expect(existsSync(oldUnused.path)).toBe(false);
     expect(() => lstatSync(danglingLink)).toThrow();
+  });
+
+  it('keeps the old, unreferenced empty mount (PAN-5465 D-2)', async () => {
+    mkdirSync(emptyMountPluginsDir(), { recursive: true });
+    const emptyMount = join(mountsDir(), 'empty');
+    age(emptyMount, 30);
+    const result = await gcMounts({ maxAgeMs: 0, now });
+    expect(result.removedMounts).not.toContain(emptyMount);
+    expect(existsSync(emptyMountPluginsDir())).toBe(true);
   });
 
   it('touches a reused mount so it stays young', async () => {
