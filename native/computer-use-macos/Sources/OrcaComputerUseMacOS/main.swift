@@ -1,6 +1,6 @@
 // Ported from Orca (MIT, Copyright (c) 2026 Lovecast Inc.)
 // upstream: native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift @ c6b9ac9549b
-// modified for Overdeck: same-uid peer trust replaces Orca bundle-id check; idle exit replaces exit on last disconnect; user-visible Orca strings renamed
+// modified for Overdeck: same-uid peer trust replaces Orca bundle-id check; idle exit replaces exit on last disconnect; user-visible Orca strings renamed; CF type checks before AX casts; scroll pages capped at 50
 import AppKit
 import ApplicationServices
 import CoreGraphics
@@ -13,6 +13,8 @@ import ScreenCaptureKit
 private let providerName = "overdeck-computer-use-macos"
 private let providerVersion = "1.0.0"
 private let providerProtocolVersion = 1
+/// Overdeck: the most pages one scroll request may ask for.
+private let maxScrollPages: Double = 50
 
 struct Request: Decodable {
     let id: Int
@@ -1138,6 +1140,10 @@ final class Provider {
         let snapshot = try currentSnapshot(params: params)
         let direction = try scrollDirection(try requiredString(params, "direction"))
         let pages = try positiveNumber(params["pages"]?.number, defaultValue: 1, name: "pages")
+        // Overdeck: the accessibility path performs one action per page while holding the provider lock.
+        guard pages <= maxScrollPages else {
+            throw ProviderError.coded("invalid_argument", "pages must be at most \(Int(maxScrollPages))")
+        }
         if let elementIndex = try optionalInteger(params, "elementIndex") {
             let record = try element(snapshot, elementIndex)
             let action = "AXScroll\(direction.capitalized)ByPage"
@@ -1423,7 +1429,7 @@ private func copyElementProbe(_ element: AXUIElement, _ attribute: String) -> AX
     var value: CFTypeRef?
     switch AXUIElementCopyAttributeValue(element, attribute as CFString, &value) {
     case .success:
-        guard let value else { return .unavailable }
+        guard let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return .unavailable }
         return .value(value as! AXUIElement)
     case .noValue:
         return .absent
@@ -1888,7 +1894,10 @@ private func focusedElement(appElement: AXUIElement) -> AXUIElement? {
 
 private func copyElement(_ element: AXUIElement, _ attribute: String) -> AXUIElement? {
     var value: CFTypeRef?
-    guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success, let value else {
+    guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success,
+          let value,
+          CFGetTypeID(value) == AXUIElementGetTypeID()
+    else {
         return nil
     }
     return (value as! AXUIElement)
@@ -1986,7 +1995,9 @@ private func absoluteFrame(_ element: AXUIElement) -> CGRect? {
     }
     var point = CGPoint.zero
     var size = CGSize.zero
-    guard AXValueGetValue(positionValue as! AXValue, .cgPoint, &point),
+    guard CFGetTypeID(positionValue) == AXValueGetTypeID(),
+          CFGetTypeID(sizeValue) == AXValueGetTypeID(),
+          AXValueGetValue(positionValue as! AXValue, .cgPoint, &point),
           AXValueGetValue(sizeValue as! AXValue, .cgSize, &size)
     else {
         return nil
@@ -2222,7 +2233,9 @@ private func frame(_ element: AXUIElement, windowBounds: CGRect) -> CGRect? {
     }
     var point = CGPoint.zero
     var size = CGSize.zero
-    guard AXValueGetValue(positionValue as! AXValue, .cgPoint, &point),
+    guard CFGetTypeID(positionValue) == AXValueGetTypeID(),
+          CFGetTypeID(sizeValue) == AXValueGetTypeID(),
+          AXValueGetValue(positionValue as! AXValue, .cgPoint, &point),
           AXValueGetValue(sizeValue as! AXValue, .cgSize, &size)
     else {
         return nil
@@ -2745,7 +2758,9 @@ private final class AXSnapshotReader {
         }
         var point = CGPoint.zero
         var size = CGSize.zero
-        guard AXValueGetValue(positionValue as! AXValue, .cgPoint, &point),
+        guard CFGetTypeID(positionValue) == AXValueGetTypeID(),
+              CFGetTypeID(sizeValue) == AXValueGetTypeID(),
+              AXValueGetValue(positionValue as! AXValue, .cgPoint, &point),
               AXValueGetValue(sizeValue as! AXValue, .cgSize, &size)
         else {
             return nil
@@ -4715,6 +4730,10 @@ private final class SocketListener: @unchecked Sendable {
                 if registration == .claimed {
                     onSessionClaimed()
                 }
+            }
+            // Restart the idle timer when a request starts too, so a slow request never outlives it.
+            if registeredSession {
+                onRequestHandled()
             }
             let response = handleRequest(
                 provider: provider,

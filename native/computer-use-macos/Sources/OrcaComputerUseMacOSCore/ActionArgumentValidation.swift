@@ -1,5 +1,6 @@
 // Ported from Orca (MIT, Copyright (c) 2026 Lovecast Inc.)
 // upstream: native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/ActionArgumentValidation.swift @ c6b9ac9549b
+// modified for Overdeck: positiveInteger rejects fractional values
 public struct ActionArgumentValidationError: Error, Equatable {
     public let message: String
 
@@ -27,7 +28,8 @@ public enum ActionArgumentValidation {
         name: String
     ) -> Result<Int, ActionArgumentValidationError> {
         guard let value else { return .success(defaultValue) }
-        guard value.isFinite, value > 0, let parsed = boundedInteger(value, as: Int.self) else {
+        // Overdeck: Int(exactly:) rejects fractions (0.5, 1.5) instead of truncating them.
+        guard value.isFinite, value > 0, let parsed = Int(exactly: value) else {
             return .failure(ActionArgumentValidationError("\(name) must be a positive integer"))
         }
         return .success(parsed)

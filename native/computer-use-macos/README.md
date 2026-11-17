@@ -56,6 +56,20 @@ Overdeck changes only these:
   target and type names, the `ORCA_COMPUTER_USE_SCK_SCREENSHOTS` environment
   variable and the `orca-action` associated-object key.
 
+- Robustness fixes from review (PR #5513):
+  - `main.swift` checks the CF type (`AXUIElementGetTypeID`, `AXValueGetTypeID`) before every
+    forced accessibility cast.
+  - `main.swift` caps `scroll` at 50 pages, because the accessibility path performs one action
+    per page while it holds the provider lock.
+  - `main.swift` restarts the idle timer when a request starts as well as when it ends.
+  - `ActionArgumentValidation.swift`: `positiveInteger` rejects fractions (`Int(exactly:)`)
+    instead of truncating them.
+  - `PermissionStatusSnapshot.swift` keeps one pending permission refresh instead of dropping it.
+  - `SyntheticMouseClickDelivery.swift` checks the recipient before the first pointer move.
+
+  Overdeck-authored tests: `ActionArgumentValidationTests.swift`,
+  `PermissionStatusRefreshCoordinatorTests.swift`, `SyntheticMouseClickDeliveryTests.swift`.
+
 ## Build and test
 
 ```bash

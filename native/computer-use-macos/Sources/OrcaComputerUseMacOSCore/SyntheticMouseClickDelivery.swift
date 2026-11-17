@@ -1,5 +1,6 @@
 // Ported from Orca (MIT, Copyright (c) 2026 Lovecast Inc.)
 // upstream: native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/SyntheticMouseClickDelivery.swift @ c6b9ac9549b
+// modified for Overdeck: recipient fence before the first click move
 /// Foreground (--restore-window) clicks: HID taps behind a focused-recipient fence; background clicks use BackgroundInputTransport.
 /// Pace down/up events or WindowServer can drop mouseUp.
 public enum SyntheticMouseClickDelivery {
@@ -123,6 +124,8 @@ public enum SyntheticMouseClickDelivery {
         post: (Event) -> Void,
         pause: (UInt32) -> Void
     ) throws {
+        // Overdeck: fence the recipient before the first move, like deliverScroll and deliverDrag.
+        try requireRecipient(target, currentObservation: currentObservation)
         post(try makeEvent(.move))
         pause(interEventPauseMicroseconds)
         let pressCount = min(max(clickCount, 1), maxClickCount)

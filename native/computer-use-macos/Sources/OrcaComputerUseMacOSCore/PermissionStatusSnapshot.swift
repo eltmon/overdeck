@@ -1,6 +1,6 @@
 // Ported from Orca (MIT, Copyright (c) 2026 Lovecast Inc.)
 // upstream: native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/PermissionStatusSnapshot.swift @ c6b9ac9549b
-// modified for Overdeck: queue labels renamed to com.overdeck
+// modified for Overdeck: queue labels renamed to com.overdeck; pending permission refresh is kept and coalesced
 import Dispatch
 import Foundation
 
@@ -54,6 +54,7 @@ public final class PermissionStatusRefreshCoordinator: @unchecked Sendable {
     private let stateLock = NSLock()
     private let workerQueue: DispatchQueue
     private var refreshInFlight = false
+    private var refreshPending = false
 
     public init(
         workerQueue: DispatchQueue = DispatchQueue(
@@ -70,22 +71,35 @@ public final class PermissionStatusRefreshCoordinator: @unchecked Sendable {
         self.handler = handler
     }
 
+    /// Overdeck: a refresh asked for while a probe runs is kept as one pending probe,
+    /// so a permission change during a probe is never lost; repeated asks coalesce.
     public func refresh() {
         stateLock.lock()
         guard !refreshInFlight else {
+            refreshPending = true
             stateLock.unlock()
             return
         }
         refreshInFlight = true
         stateLock.unlock()
+        startProbe()
+    }
 
+    private func startProbe() {
         workerQueue.async { [self] in
             let snapshot = probe()
             callbackQueue.async { [self] in
                 stateLock.lock()
-                refreshInFlight = false
+                let rerun = refreshPending
+                refreshPending = false
+                if !rerun {
+                    refreshInFlight = false
+                }
                 stateLock.unlock()
                 handler(snapshot)
+                if rerun {
+                    startProbe()
+                }
             }
         }
     }
