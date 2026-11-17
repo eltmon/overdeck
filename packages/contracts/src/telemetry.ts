@@ -126,6 +126,7 @@ const TELEMETRY_CHANNEL_ROUTES = ["lan", "tailnet", "ssh", "public", "direct", "
 
 /** PAN-5083: the Overdeck MCP tool names (ALL_TOOLS in src/lib/mcp/server.ts); a unit test keeps them in step. */
 const TELEMETRY_MCP_TOOLS = [
+  "add_skills",
   "answer_agent_permission",
   "answer_agent_plan",
   "answer_codex_approval",
