@@ -1,0 +1,1503 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-17T11:57:13Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5463: Computer use on macOS: port Orca's Swift helper with Accessibility and Screen Recording setup",
+    "updated": "2026-11-17T12:00:48.454Z"
+  },
+  "plan": {
+    "id": "pan-5463",
+    "title": "Computer use on macOS: port Orca's Swift helper with Accessibility and Screen Recording setup",
+    "status": "proposed",
+    "uid": "763773df-3a8b-400b-b485-803e31cfe6ab",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-17T11:57:13Z",
+    "updated": "2026-11-17T12:00:48.454Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5463",
+        "label": "PAN-5463",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5463/.pan/drafts/pan-5463.md",
+        "label": "PRD draft (.pan/drafts/pan-5463.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5461",
+        "label": "PAN-5461 (provider seam, prerequisite)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "computer-use",
+      "macos",
+      "swift",
+      "native-helper",
+      "ci",
+      "settings"
+    ],
+    "metadata": {
+      "sizeJustification": "The helper (native/, scripts/, workflows) is unusable without the darwin provider (src/lib) and the provider cannot be verified without the helper; the operator already split computer use into PAN-5461/5462/5463 by platform. The DAG keeps the independent native/CI slices parallel with the gated TypeScript slices.",
+      "canonicalFilename": "2026-11-17-PAN-5463-computer-use-on-macos-port-orca-s-swift-helper-with-accessibility-and-screen-recording-setup.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "pan computer and Settings → Computer Use work only on Linux. Overdeck runs natively on macOS (npx @overdeck/core and the desktop app), but macOS needs a signed .app helper that holds Accessibility and Screen Recording grants, which no app can grant itself.",
+      "Proposal": "Vendor Orca's MIT Swift helper into native/computer-use-macos/, adapt its trust (token + same uid), lifetime (idle exit, reconnects) and strings, build it as 'Overdeck Computer Use.app' in CI and ship the zip in the npm tarball. A darwin provider on PAN-5461's seam installs the helper to ~/.overdeck/computer-use/macos/, launches it through LaunchServices as a shared daemon on /tmp/overdeck-cu-<uid>/agent.sock, maps Linux-shape operations to the helper protocol, and walks the operator through the two permission panes from Settings. Native/CI items run before PAN-5461 merges; everything touching the seam waits behind seam-gate.",
+      "NonGoals": "- Creating or recreating any part of PAN-5461's seam: platform.ts, providers/linux.ts, routes/computer-use.ts, ComputerUseSection.tsx, tryWithDesktopLock, or the platform parameter of assertKeyComboAllowed\n- Changing the ComputerUseProvider interface in platform.ts\n- Buying or creating an Apple Developer ID certificate, or adding repository secrets\n- Windows/WSL support (PAN-5462) and the Linux Settings page (PAN-5461)\n- Orca's drag-assistant window and TCC permission reset (tccutil)\n- Changing the helper's wire protocol beyond D-3/D-5/D-8/D-14\n- Putting the socket under os.tmpdir() or ~/.overdeck\n- Bundling the helper only in the desktop app\n- A nested .gitignore under native/computer-use-macos/\n- New route-scopes.ts rows"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Planned from the PRD corrected on main in 3f991307412 and added D-14..D-20 plus an exact response-mapping table after reading the Swift source",
+        "rationale": "The operator directed planning from that version; the original WI-3 passthrough mapping would have broken element resolution (elementRecord needs elements[]) and JSON rendering."
+      },
+      {
+        "summary": "Encode the PAN-5461 dependency as a seam-gate item that blocks every WI-3/WI-5/WI-6 item and WI-4 part B",
+        "rationale": "task_block cannot run before finalize creates the task state; a gate item makes the check mechanical for the work agent, matching the PRD's order paragraph."
+      },
+      {
+        "summary": "Widen ComputerUseErrorCode with permission_denied only; other helper codes surface as helper_error with a code prefix",
+        "rationale": "permission_denied is the only helper error an operator must act on; keeping the union small avoids churn in the CLI exit-code mapping."
+      },
+      {
+        "summary": "Run the macOS workflow on pushes to feature/** so Swift changes are verified before a PR exists",
+        "rationale": "The work agent's host is Linux and cannot run swift."
+      },
+      {
+        "summary": "CI permission assertions are tolerant (log values; accept ok or permission_denied)",
+        "rationale": "GitHub macOS runners may pre-grant TCC permissions, so asserting not-granted could fail spuriously."
+      },
+      {
+        "summary": "Set sizeJustification instead of splitting further",
+        "rationale": "The issue is already the macOS slice of an operator-made three-way split; the helper and provider are only verifiable together."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-vendor",
+        "title": "Vendor Orca's macOS Swift package verbatim with port headers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-5463",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "native/computer-use-macos/Package.swift",
+            "native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift",
+            "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/*.swift",
+            "native/computer-use-macos/Tests/OrcaComputerUseMacOSTests/*.swift",
+            "native/computer-use-macos/README.md",
+            "scripts/upstream-ports.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:upstream-ports",
+            "grep -c 'overdeck-computer-use-macos' native/computer-use-macos/Package.swift"
+          ],
+          "expected_outputs": [
+            "upstream-ports prints 'records OK' with the new Swift records included",
+            "grep prints a count of at least 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "D-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Independent of PAN-5461. WI-1 step 1 of the PRD. Copy every file under ~/Projects/orca/native/computer-use-macos/ (Package.swift, Sources/OrcaComputerUseMacOS/main.swift, the 21 Sources/OrcaComputerUseMacOSCore/*.swift files, the 7 Tests/OrcaComputerUseMacOSTests/*.swift files) from Orca commit c6b9ac9549b (`git -C ~/Projects/orca show c6b9ac9549b:<path>`) into native/computer-use-macos/ unchanged. Add the two port-header lines (`// Ported from Orca (MIT, Copyright (c) 2026 Lovecast Inc.)` and `// upstream: <path> @ c6b9ac9549b`) at the top of every file; in Package.swift keep `// swift-tools-version: 6.0` as line 1 and put the headers on lines 2-3 (D-12). Add one scripts/upstream-ports.json record per file (upstream orca, path = Orca path, commit c6b9ac9549b), matching the existing native/computer-use-linux record's shape. In Package.swift rename only the executable product to `overdeck-computer-use-macos` (keep target names) and add the third header line `// modified for Overdeck: executable product renamed`. Create native/computer-use-macos/README.md modeled on native/computer-use-linux/README.md: provenance (Orca MIT, commit), a 'Modifications' list (start with the product rename), build (`npm run build:computer-macos`) and test (`swift test --package-path native/computer-use-macos`) commands, and how to re-vendor. Swift cannot compile on the Linux host; compile proof comes from wi4-ci-workflow."
+        },
+        "items": [
+          {
+            "id": "wi1-vendor.ac1",
+            "title": "Given the vendored tree, when `npm run lint:upstream-ports` runs, then it passes with one record per vendored Swift file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-vendor.ac2",
+            "title": "Given Package.swift, then line 1 is `// swift-tools-version: 6.0` and the executable product is named `overdeck-computer-use-macos`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-vendor.ac3",
+            "title": "Given native/computer-use-macos/README.md, then it contains the Orca commit c6b9ac9549b, a Modifications section and the swift test command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-build-script",
+        "title": "Add the macOS helper build script and package wiring",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-5463",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/build-computer-macos.mjs",
+            "package.json",
+            ".gitignore"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:computer-macos",
+            "node -e \"const p=require('./package.json');process.exit(p.files.includes('!native/computer-use-macos/.build')?0:1)\""
+          ],
+          "expected_outputs": [
+            "on Linux the script exits 0 and prints a skip line naming the platform",
+            "node exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "D-2",
+            "D-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Independent of PAN-5461. WI-2 of the PRD. Adapt ~/Projects/orca/config/scripts/native-build/macos/build-computer-macos.mjs into scripts/build-computer-macos.mjs (port header + upstream-ports record if the file is substantially Orca's; otherwise no header). On non-darwin: print `build-computer-macos: skipped (platform <p>)` and exit 0. On darwin: `swift build -c release --package-path native/computer-use-macos --triple arm64-apple-macosx` and `--triple x86_64-apple-macosx`, `lipo -create`, assemble `native/computer-use-macos/dist/Overdeck Computer Use.app` (Contents/MacOS/overdeck-computer-use-macos; Info.plist with CFBundleIdentifier = env OVERDECK_COMPUTER_MACOS_BUNDLE_ID or `com.overdeck.computer-use`, CFBundleName `Overdeck Computer Use`, LSUIElement true, LSMinimumSystemVersion 14.0, NSAccessibilityUsageDescription and NSScreenCaptureUsageDescription saying Overdeck), codesign with identity env OVERDECK_COMPUTER_MACOS_SIGN_IDENTITY or `-` (ad-hoc); when the identity is not `-` add `--options runtime --timestamp --entitlements <generated empty entitlements plist>`; when APPLE_API_KEY, APPLE_API_KEY_ID and APPLE_API_ISSUER_ID are set, zip, `xcrun notarytool submit --wait`, `xcrun stapler staple` the .app (D-2). Finally `ditto -c -k --keepParent` into native/computer-use-macos/dist/overdeck-computer-use-macos.zip and write `<zip>.sha256` (hex sha256 of the zip). Use async child_process (execFile promisified). package.json: add script `\"build:computer-macos\": \"node scripts/build-computer-macos.mjs\"` and add `\"!native/computer-use-macos/.build\"` to `files` (D-13). Root .gitignore: add `native/computer-use-macos/dist/` and `native/computer-use-macos/.build/` (root only, never a nested .gitignore: npm-packlist honours nested ones and would drop the zip)."
+        },
+        "items": [
+          {
+            "id": "wi2-build-script.ac1",
+            "title": "Given a Linux host, when `npm run build:computer-macos` runs, then it exits 0 and prints a line containing `skipped`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-build-script.ac2",
+            "title": "Given package.json, then `files` contains `!native/computer-use-macos/.build` and `scripts` contains `build:computer-macos`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-build-script.ac3",
+            "title": "Given the root .gitignore, then it contains `native/computer-use-macos/dist/` and no .gitignore file exists under native/computer-use-macos/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-ci-workflow",
+        "title": "Add the macOS helper CI workflow (swift test, build, permission-status)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-5463",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/computer-use-macos.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "gh run list --workflow computer-use-macos.yml --branch feature/pan-5463 --limit 1 --json conclusion -q '.[0].conclusion'"
+          ],
+          "expected_outputs": [
+            "prints success for the latest run on the feature branch"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "AC-4",
+            "D-19",
+            "D-20"
+          ]
+        },
+        "narrative": {
+          "Action": "Independent of PAN-5461 (WI-4 part A). Create .github/workflows/computer-use-macos.yml: triggers `push` (branches feature/**, paths native/computer-use-macos/**, scripts/build-computer-macos.mjs, src/lib/computer-use/**, .github/workflows/computer-use-macos.yml), `pull_request` (same paths) and `workflow_dispatch`; one job on macos-latest: checkout, setup-node 22, `swift test --package-path native/computer-use-macos`, `npm run build:computer-macos`, `ditto -x -k` the zip into $RUNNER_TEMP, run `<app>/Contents/MacOS/overdeck-computer-use-macos --permission-status` and assert with node that stdout parses as JSON and has exactly the keys `accessibility` and `screenshots`, each `granted` or `not-granted`; log the values without asserting them (D-20, runners may pre-grant TCC). Upload the zip as an artifact. Push the workflow over SSH: `git push git@github.com:eltmon/overdeck.git HEAD` (gh OAuth lacks workflow scope). Watch it with `gh run watch`; this run is the compile proof for wi1-vendor and wi2-build-script. If swift test fails on verbatim code, fix only what the rename broke."
+        },
+        "items": [
+          {
+            "id": "wi4-ci-workflow.ac1",
+            "title": "Given a push to feature/pan-5463, when the workflow runs on macos-latest, then the swift test step passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-ci-workflow.ac2",
+            "title": "Given the built zip, when the job runs `--permission-status`, then the step passes after parsing JSON with keys accessibility and screenshots whose values are granted or not-granted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-ci-workflow.ac3",
+            "title": "Given the workflow file, then its triggers include push to feature/**, pull_request and workflow_dispatch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi1-trust",
+        "title": "Replace Orca's peer check with token plus same-uid trust in the Swift helper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T11:57:13Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5463",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift",
+            "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/TrustedOrcaApplication.swift",
+            "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/PeerCredentialTrust.swift",
+            "native/computer-use-macos/Tests/OrcaComputerUseMacOSTests/PeerCredentialTrustTests.swift",
+            "scripts/upstream-ports.json",
+            "native/computer-use-macos/README.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:upstream-ports",
+            "grep -rn 'TrustedOrcaApplication\\|computer-sidecar.js' native/computer-use-macos/Sources || true",
+            "gh run list --workflow computer-use-macos.yml --branch feature/pan-5463 --limit 1 --json conclusion -q '.[0].conclusion'"
+          ],
+          "expected_outputs": [
+            "upstream-ports passes",
+            "the grep prints nothing",
+            "latest workflow run prints success"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "D-5",
+            "AC-1"
+          ],
+          "foundationFor": [
+            "wi3-daemon",
+            "wi4-ci-smoke"
+          ],
+          "parallelSafeReason": "Runs alone in the Swift chain: blocks edges serialize it with every other item touching main.swift; no TypeScript item shares its files."
+        },
+        "narrative": {
+          "Action": "Independent of PAN-5461. WI-1 step 2 and D-5. In main.swift replace the body of `isAuthorizedAgentPeer` (~4742-4754) with: read the peer uid via `getpeereid(fd, &uid, &gid)` and return `PeerCredentialTrust.isAuthorized(peerUid: uid, ownUid: getuid())`. New Core file PeerCredentialTrust.swift (Overdeck-authored, no port header) with a pure `public static func isAuthorized(peerUid: uid_t, ownUid: uid_t) -> Bool` (equal ⇒ true). Delete the command-line substring checks, `isTrustedOrcaApplication`, and TrustedOrcaApplication.swift plus its upstream-ports record. Token check stays (`isAuthenticatedAgentSession`). Add Tests/OrcaComputerUseMacOSTests/PeerCredentialTrustTests.swift (same uid ⇒ true, different ⇒ false). Add `// modified for Overdeck: same-uid peer trust replaces Orca bundle-id check` as main.swift's third header line and list the change in README Modifications (README edit is allowed here). Push and confirm the macOS workflow is green."
+        },
+        "items": [
+          {
+            "id": "wi1-trust.ac1",
+            "title": "Given a peer with a different uid, when PeerCredentialTrust.isAuthorized runs, then it returns false, and the Swift test covering this passes in CI",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-trust.ac2",
+            "title": "Given the Sources tree, then grep for `TrustedOrcaApplication` and `computer-sidecar.js` returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-trust.ac3",
+            "title": "Given an authenticated request with a wrong token, then the helper still rejects it with permission_denied (token check unchanged in isAuthenticatedAgentSession)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi1-lifetime",
+        "title": "Make the Swift daemon idle-exit and accept reconnects",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T11:57:13Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5463",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift",
+            "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/AgentSessionOwnership.swift",
+            "native/computer-use-macos/Tests/OrcaComputerUseMacOSTests/AuthenticatedConnectionHangupMonitorTests.swift",
+            "native/computer-use-macos/Tests/OrcaComputerUseMacOSTests/AgentSessionOwnershipTests.swift",
+            "native/computer-use-macos/README.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'sessionClosed' native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/AgentSessionOwnership.swift || true",
+            "gh run list --workflow computer-use-macos.yml --branch feature/pan-5463 --limit 1 --json conclusion -q '.[0].conclusion'"
+          ],
+          "expected_outputs": [
+            "grep prints nothing",
+            "latest workflow run prints success"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "D-3",
+            "D-14",
+            "AC-1"
+          ],
+          "parallelSafeReason": "Serialized after wi1-trust by a blocks edge on main.swift; shares no files with any TypeScript item."
+        },
+        "narrative": {
+          "Action": "Independent of PAN-5461. WI-1 step 3, D-3 and D-14. AgentSessionOwnership.swift: delete `sessionClosed`; `registerConnection` returns `.rejected` only when unauthenticated or already inserted, `.claimed` for the first ever authenticated connection, `.retained` afterwards; `disconnect` only removes the connection and returns false. main.swift AgentRuntime (~3505-3546): keep the 30 s unclaimed deadline; replace the `onSessionClosed` terminate with an idle timer of 600 s that is rescheduled on every request handled (cancel the pending DispatchWorkItem, schedule a new one); `method: terminate` still quits. Update AuthenticatedConnectionHangupMonitorTests if it asserts the old exit-on-last-close behavior; add AgentSessionOwnershipTests.swift (Overdeck-authored) covering connect A → claimed, disconnect A, connect B → retained, and an unauthenticated connection → rejected. Add the modification note to README."
+        },
+        "items": [
+          {
+            "id": "wi1-lifetime.ac1",
+            "title": "Given connection A claimed and then disconnected, when connection B registers authenticated, then registerConnection returns .retained, and this Swift test passes in CI",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-lifetime.ac2",
+            "title": "Given AgentSessionOwnership.swift, then it contains no `sessionClosed` symbol",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-lifetime.ac3",
+            "title": "Given main.swift, then the idle exit interval is 600 seconds and is rescheduled per handled request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi1-strings",
+        "title": "Rename user-visible Orca strings in the Swift helper to Overdeck",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5463",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift",
+            "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/PermissionWindowCopy.swift",
+            "native/computer-use-macos/README.md",
+            "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/PermissionStatusSnapshot.swift"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -rn 'Orca Computer Use\\|orca computer\\|orca-computer-use-macos\\|stablyai' native/computer-use-macos/Sources || true",
+            "gh run list --workflow computer-use-macos.yml --branch feature/pan-5463 --limit 1 --json conclusion -q '.[0].conclusion'"
+          ],
+          "expected_outputs": [
+            "grep prints nothing",
+            "latest workflow run prints success"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "D-8",
+            "AC-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Independent of PAN-5461. D-8. Replace user-visible text only: PermissionWindowCopy.swift copy ('Orca' → 'Overdeck'); the permission_denied messages in main.swift (~707 and ~1366) become e.g. 'Accessibility permission is required for Overdeck Computer Use. Open Settings → Computer Use in the Overdeck dashboard, allow Overdeck Computer Use, then retry.'; usage lines (`usage: orca-computer-use-macos …`, ~4941/4953) and the exit-13 message name `overdeck-computer-use-macos`. Keep code identifiers (type/target names) unchanged. Update README Modifications and each changed file's modification header line. Update any Swift test asserting the old copy. Also rename the DispatchQueue label `com.stablyai.orca.computer-use-permission-status` in PermissionStatusSnapshot.swift to `com.overdeck.computer-use.permission-status` (the AC grep forbids `stablyai` anywhere in Sources); grep the whole Sources tree for any other `stablyai` occurrence and rename it the same way."
+        },
+        "items": [
+          {
+            "id": "wi1-strings.ac1",
+            "title": "Given the Sources tree, when grepping for `Orca Computer Use`, `orca computer`, `orca-computer-use-macos` and `stablyai`, then no match is printed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-strings.ac2",
+            "title": "Given an accessibility-denied observe, then the permission_denied message names Overdeck Computer Use and Settings → Computer Use",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-strings.ac3",
+            "title": "Given the helper started with no arguments, then the usage line it prints names overdeck-computer-use-macos",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-release-job",
+        "title": "Build the helper in the release workflow and ship it in the npm tarball",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-5463",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/release.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'computer-use-macos' .github/workflows/release.yml",
+            "grep -n 'package/native/computer-use-macos/dist/overdeck-computer-use-macos.zip' .github/workflows/release.yml"
+          ],
+          "expected_outputs": [
+            "prints the new job and the pack needs entry",
+            "prints the tarball assertion line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "AC-4",
+            "D-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Independent of PAN-5461 (WI-4). In .github/workflows/release.yml add job `computer-use-macos` (runs-on macos-latest, needs classify): checkout, setup-node 22, import the Developer ID certificate into a temporary keychain only when secrets.MACOS_CERTIFICATE is non-empty (mirror the desktop job's HAS_MAC_CERT pattern ~352-411) and export OVERDECK_COMPUTER_MACOS_SIGN_IDENTITY, decode APPLE_API_KEY to a file when present and export APPLE_API_KEY/APPLE_API_KEY_ID/APPLE_API_ISSUER_ID, run `npm run build:computer-macos`, upload-artifact the zip and .sha256. `pack` (~78): `needs: [classify, computer-use-macos]`, add download-artifact into native/computer-use-macos/dist/ before `npm pack` (~150), a step failing if the zip is missing, and after pack `tar -tzf <tarball> | grep -qx 'package/native/computer-use-macos/dist/overdeck-computer-use-macos.zip'` plus the same for `.sha256`. Push over SSH."
+        },
+        "items": [
+          {
+            "id": "wi4-release-job.ac1",
+            "title": "Given release.yml, then a job named computer-use-macos runs on macos-latest and needs classify",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-release-job.ac2",
+            "title": "Given the pack job, then it needs computer-use-macos and fails when the downloaded zip is missing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-release-job.ac3",
+            "title": "Given the packed tarball, then the pack job asserts it contains both the helper zip and its .sha256 under package/native/computer-use-macos/dist/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "seam-gate",
+        "title": "Confirm PAN-5461's provider seam is on main before seam-dependent work",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T11:57:13Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "spike",
+          "issueLabel": "pan-5463",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/computer-use/platform.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n 'export function providerFor' -- src/lib/computer-use/platform.ts"
+          ],
+          "expected_outputs": [
+            "prints the providerFor export line after pan sync-main"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "D-7"
+          ]
+        },
+        "narrative": {
+          "Action": "GATE FIRST: run `pan sync-main`, then `git grep -n \"export function providerFor\" -- src/lib/computer-use/platform.ts`. If it prints nothing, PAN-5461 is not on main: `task_block` this item with reason \"waits for PAN-5461 (provider seam)\" and stop. Never create platform.ts, providers/linux.ts, routes/computer-use.ts, ComputerUseSection.tsx, tryWithDesktopLock, or the platform parameter of assertKeyComboAllowed. This item edits no file; platform.ts is listed only as the file being checked. When the grep prints the export, mark this item done. When it does not, task_block this item and every item that depends on it, then continue only with items not downstream of it. The orchestrator messages you when PAN-5461 merges; then rerun this check."
+        },
+        "items": [
+          {
+            "id": "seam-gate.ac1",
+            "title": "Given `pan sync-main` has run, when `git grep -n 'export function providerFor' -- src/lib/computer-use/platform.ts` prints a match, then this item is marked done",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "seam-gate.ac2",
+            "title": "Given the grep prints nothing, then this item and all its dependents are task_blocked with reason `waits for PAN-5461 (provider seam)` and no seam file is created",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-install",
+        "title": "Add macOS helper install and currency check",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5463",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/computer-use/macos-install.ts",
+            "src/lib/computer-use/__tests__/macos-install.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/macos-install.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "macos-install.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-6",
+            "D-1",
+            "D-11"
+          ]
+        },
+        "narrative": {
+          "Action": "GATE FIRST: run `pan sync-main`, then `git grep -n \"export function providerFor\" -- src/lib/computer-use/platform.ts`. If it prints nothing, PAN-5461 is not on main: `task_block` this item with reason \"waits for PAN-5461 (provider seam)\" and stop. Never create platform.ts, providers/linux.ts, routes/computer-use.ts, ComputerUseSection.tsx, tryWithDesktopLock, or the platform parameter of assertKeyComboAllowed. WI-3 macos-install.ts. Exports: `installedHelperDir()` = join(computerUseDir(), 'macos'); `installedHelperPath()` = join(installedHelperDir(), 'Overdeck Computer Use.app'); `bundledZipPath()` = join(packageRoot, 'native','computer-use-macos','dist','overdeck-computer-use-macos.zip'); `isInstalledCurrent()` compares `<zip>.sha256` contents with `installed.sha256` in installedHelperDir and checks the .app exists; `installHelper()` extracts with `/usr/bin/ditto -x -k <zip> <installedHelperDir>/.extract-<uuid>`, removes the old .app, renames the extracted .app into place, writes installed.sha256, removes the temp dir; returns `{ status: 'installed' | 'current' | 'updated' }` ('updated' when a different sha was installed — the Settings copy for re-granting, FR-6, keys off this). Dev fallback (D-11): no zip → if `swift` resolves on PATH run `npm run build:computer-macos` in packageRoot then install; else throw ComputerUseError('helper_missing_dependency', 'Install Xcode Command Line Tools: xcode-select --install'). Async execFile only (NFR-1); all fs/exec injected via a deps object like helper.ts. Tests cover fresh install, current (skip, no ditto call), changed sha (re-extract, status updated), missing zip with and without swift."
+        },
+        "items": [
+          {
+            "id": "wi3-install.ac1",
+            "title": "Given no installed helper, when installHelper runs, then it calls ditto -x -k into a temp dir, renames the .app into place and writes installed.sha256",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-install.ac2",
+            "title": "Given installed.sha256 equals the bundled sha256, then isInstalledCurrent returns true and installHelper returns current without calling ditto",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-install.ac3",
+            "title": "Given a different installed sha, when installHelper runs, then it re-extracts and returns updated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-install.ac4",
+            "title": "Given no bundled zip and no swift on PATH, then installHelper throws helper_missing_dependency naming xcode-select --install",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-protocol",
+        "title": "Add the darwin protocol adapter and delivery in action output",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T11:57:13Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5463",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/computer-use/macos-protocol.ts",
+            "src/lib/computer-use/__tests__/macos-protocol.test.ts",
+            "src/lib/computer-use/__tests__/fixtures/macos-get-app-state.json",
+            "src/lib/computer-use/format.ts",
+            "src/lib/computer-use/__tests__/format.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/macos-protocol.test.ts src/lib/computer-use/__tests__/format.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "D-7",
+            "D-15"
+          ],
+          "foundationFor": [
+            "wi3-provider"
+          ],
+          "parallelSafeReason": "Owns new macos-protocol.ts plus format.ts; no other item edits those files."
+        },
+        "narrative": {
+          "Action": "GATE FIRST: run `pan sync-main`, then `git grep -n \"export function providerFor\" -- src/lib/computer-use/platform.ts`. If it prints nothing, PAN-5461 is not on main: `task_block` this item with reason \"waits for PAN-5461 (provider seam)\" and stop. Never create platform.ts, providers/linux.ts, routes/computer-use.ts, ComputerUseSection.tsx, tryWithDesktopLock, or the platform parameter of assertKeyComboAllowed. Implement the PRD section 'WI-3 mapping table' exactly: `toMacRequest(operation, holderKey)` and `fromMacResponse(method, result, request)` including toRawSnapshot (treeText header/footer stripping, focusedSummary from the footer, elements parsed with /^\\t*(\\d+)(?:\\s|$)/, screenshot fields, screenshotError) and toHelperAction (verification reason fallback). Always add `session: holderKey`. Unknown tool → ComputerUseError('invalid_argument'). Build the fixture JSON by hand from the Swift renderSnapshot shape (main.swift ~802-850): a treeText with header lines, a blank, tab-indented element lines with non-contiguous indexes (e.g. 0, 1, 4, 7) and a '... 3 more not shown' line, a blank, and 'The focused UI element is 4 text field.'. format.ts: HelperAction gains `delivery?: 'background' | 'foreground'`; renderActionLine appends `, delivery: <value>` when present; add a format test."
+        },
+        "items": [
+          {
+            "id": "wi3-protocol.ac1",
+            "title": "Given every Linux tool name, when toMacRequest runs, then it returns the macOS method and renamed params from the mapping table, with session set to the holder key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-protocol.ac2",
+            "title": "Given the getAppState fixture, when fromMacResponse runs, then snapshot.treeLines holds only the element lines, elements equals the indexes [0,1,4,7] and focusedSummary equals `4 text field`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-protocol.ac3",
+            "title": "Given an action result with verification {state:'verified', property:'value'} and delivery background, then the HelperAction has reason `value read back` and renderActionLine prints `delivery: background`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-protocol.ac4",
+            "title": "Given a null screenshot and screenshotStatus failed, then screenshotPngBase64 is null and screenshotError carries the helper message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-daemon",
+        "title": "Add the macOS daemon client: token, socket, launch and NDJSON requests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T11:57:13Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5463",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/computer-use/macos-daemon.ts",
+            "src/lib/computer-use/__tests__/macos-daemon.test.ts",
+            "src/lib/computer-use/errors.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/macos-daemon.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "macos-daemon.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "D-3",
+            "D-4",
+            "D-5",
+            "D-6",
+            "D-16",
+            "D-17",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "wi3-provider",
+            "wi4-ci-smoke"
+          ],
+          "parallelSafeReason": "Owns new macos-daemon.ts and errors.ts; no other item edits those files; reads macos-install.ts only after wi3-install lands."
+        },
+        "narrative": {
+          "Action": "GATE FIRST: run `pan sync-main`, then `git grep -n \"export function providerFor\" -- src/lib/computer-use/platform.ts`. If it prints nothing, PAN-5461 is not on main: `task_block` this item with reason \"waits for PAN-5461 (provider seam)\" and stop. Never create platform.ts, providers/linux.ts, routes/computer-use.ts, ComputerUseSection.tsx, tryWithDesktopLock, or the platform parameter of assertKeyComboAllowed. WI-3 macos-daemon.ts. `ensureToken()`: 32 random bytes hex at join(installedHelperDir(),'agent.token') mode 0600, created once and reused (D-5). `socketPath()`: `/tmp/overdeck-cu-<uid>/agent.sock` (D-6: never os.tmpdir()); create the dir 0700 if missing; if it exists and its owner uid differs from process.getuid(), throw ComputerUseError('helper_error', 'refusing /tmp/overdeck-cu-<uid>: owned by another user'). `connectOrLaunch()` (call only inside withDesktopLock, D-17): connect; on ENOENT launch; on ECONNREFUSED lstat the path and unlink it only if isSocket(), then launch. Launch = execFile('/usr/bin/open', ['-n','-g','-a', installedHelperPath(), '--args','--agent', socketPath(), '--token-file', tokenPath]) (D-4); retry connect every 100 ms up to 10 s, then throw helper_timeout. `request(method, params, { timeoutMs = 60_000 })`: NDJSON `{id, method, params, token}` with incrementing id, match response by id; `ok:false` maps per D-16; timeout → helper_timeout. errors.ts: add 'permission_denied' to ComputerUseErrorCode. One connection per process; `closeDaemonConnection()` for exit. Tests use a real net.Server on a temp socket path inside a mkdtemp dir (NFR-3) and vi.useFakeTimers() for the 10 s launch window and request timeout (NFR-2, fake-timers rule)."
+        },
+        "items": [
+          {
+            "id": "wi3-daemon.ac1",
+            "title": "Given a listening fake NDJSON server, when request('handshake') runs, then it sends the token and an incrementing id and resolves with the result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-daemon.ac2",
+            "title": "Given ECONNREFUSED on an existing socket file, then connectOrLaunch unlinks it, runs open -n -g -a with --agent and --token-file, and retries until the server accepts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-daemon.ac3",
+            "title": "Given no server within 10 s (fake timers), then connectOrLaunch throws helper_timeout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-daemon.ac4",
+            "title": "Given a response {ok:false,error:{code:'permission_denied'}}, then request throws ComputerUseError permission_denied, and code app_not_found becomes helper_error with message prefix `app_not_found:`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-daemon.ac5",
+            "title": "Given /tmp/overdeck-cu-<uid> owned by another uid, then socketPath throws and connects nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-blocked-keys",
+        "title": "Add macOS blocked shortcut rules",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5463",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/computer-use/blocked-key-combos.ts",
+            "src/lib/computer-use/__tests__/blocked-key-combos.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/blocked-key-combos.test.ts"
+          ],
+          "expected_outputs": [
+            "blocked-key-combos.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "D-10"
+          ]
+        },
+        "narrative": {
+          "Action": "GATE FIRST: run `pan sync-main`, then `git grep -n \"export function providerFor\" -- src/lib/computer-use/platform.ts`. If it prints nothing, PAN-5461 is not on main: `task_block` this item with reason \"waits for PAN-5461 (provider seam)\" and stop. Never create platform.ts, providers/linux.ts, routes/computer-use.ts, ComputerUseSection.tsx, tryWithDesktopLock, or the platform parameter of assertKeyComboAllowed. PAN-5461 adds the platform parameter to assertKeyComboAllowed; build on it, do not add it. Port Orca's MACOS_RULES (~/Projects/orca/src/main/computer/action-contracts/computer-blocked-key-combos.ts 21-45 @ c6b9ac9549b): modifier aliases cmd/command/meta/super/win/cmdorctrl → cmd, alt/option → alt, ctrl/control → ctrl, shift; key aliases esc→escape, delete→backspace; blocked cmd+ctrl+q (lock screen), cmd+shift+q (log out), cmd+alt+escape (Force Quit), cmd+shift+backspace (empty Trash), cmd+q (quit the app), most specific first. Select MACOS_RULES when platform is 'mac'. Update the file's port-header comment so it no longer says Linux-only."
+        },
+        "items": [
+          {
+            "id": "wi3-blocked-keys.ac1",
+            "title": "Given platform mac, when assertKeyComboAllowed('cmd+q', false) runs, then it throws system_shortcut_blocked naming quit the app",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-blocked-keys.ac2",
+            "title": "Given platform mac and key `command+option+esc`, then it throws for Force Quit through the aliases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-blocked-keys.ac3",
+            "title": "Given allowSystemShortcut true, then cmd+shift+q passes, and linux rules still block ctrl+alt+delete",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-provider",
+        "title": "Add the darwin provider and register it in providerFor",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T11:57:13Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5463",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/computer-use/providers/darwin.ts",
+            "src/lib/computer-use/platform.ts",
+            "src/lib/computer-use/__tests__/providers-darwin.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/providers-darwin.test.ts src/lib/computer-use/__tests__/platform.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-6",
+            "D-9",
+            "D-18"
+          ],
+          "parallelSafeReason": "Owns new providers/darwin.ts and one switch case in platform.ts; all inputs land first via blocks edges."
+        },
+        "narrative": {
+          "Action": "GATE FIRST: run `pan sync-main`, then `git grep -n \"export function providerFor\" -- src/lib/computer-use/platform.ts`. If it prints nothing, PAN-5461 is not on main: `task_block` this item with reason \"waits for PAN-5461 (provider seam)\" and stop. Never create platform.ts, providers/linux.ts, routes/computer-use.ts, ComputerUseSection.tsx, tryWithDesktopLock, or the platform parameter of assertKeyComboAllowed. providers/darwin.ts implements PAN-5461's ComputerUseProvider without changing the interface. resolveSession: not ok (no_desktop_session) when os.release() major < 23 ('needs macOS 14 or newer') or the helper isn't installed ('Run setup in Settings → Computer Use'); else label `macOS <version>`. readiness (FR-3) checks in order macos-version, helper (installed and current), accessibility, screen-recording, handshake; permission status = execFile('/usr/bin/open', ['-n','-g','-a', app, '--args','--permission-status-file', <~/.overdeck/computer-use/macos/permission-status-<uuid>.json>]) then poll that file 50×100 ms; it contains `{\"accessibility\":\"granted|not-granted\",\"screenshots\":\"granted|not-granted\"}` (main.swift ~4824-4830; `screenshots` is Screen Recording); delete it (D-18); a missing file after 5 s makes both checks `unavailable` with detail 'Could not read permission status'; handshake honours probeHelper ('if-free' via tryWithDesktopLock). setupSteps: install-packages ('Install the Overdeck Computer Use helper', no password) when missing or not current; grant-permissions ('Allow Accessibility and Screen Recording') when either permission is not granted. runSetupStep: install-packages → installHelper; grant-permissions → if both granted 'done', else open -n -a <app> --args --permissions and return { status: 'waiting', message: 'Switch on \"Overdeck Computer Use\" in the two System Settings pages that opened, then press Continue.' } (D-9). runHelper(op, session) → toMacRequest(op, holderKey()) → connectOrLaunch + request → fromMacResponse. blockedKeyPlatform 'mac'. Export `openPermissionPane(id: 'accessibility' | 'screen-recording')` → open -n -a <app> --args --permission <accessibility|screenshots>. platform.ts: add `case 'darwin': return darwinProvider;` only. Tests inject fakes for exec/fs/daemon (fake timers for the poll)."
+        },
+        "items": [
+          {
+            "id": "wi3-provider.ac1",
+            "title": "Given providerFor('darwin'), then it returns the darwin provider with blockedKeyPlatform mac",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-provider.ac2",
+            "title": "Given accessibility granted and screen recording not granted, when readiness runs, then checks report accessibility ok and screen-recording action, and setupSteps contains grant-permissions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-provider.ac3",
+            "title": "Given grant-permissions with a permission still missing, when runSetupStep runs, then it opens the helper with --permissions and returns status waiting with the Switch on message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-provider.ac4",
+            "title": "Given os.release() 22.x, then resolveSession returns no_desktop_session naming macOS 14",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-ci-smoke",
+        "title": "Run the TS daemon client against the real helper in CI",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5463",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/ci/macos-helper-smoke.ts",
+            ".github/workflows/computer-use-macos.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "gh run list --workflow computer-use-macos.yml --branch feature/pan-5463 --limit 1 --json conclusion -q '.[0].conclusion'"
+          ],
+          "expected_outputs": [
+            "prints success for the latest run, which includes the smoke step"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "AC-4",
+            "D-20"
+          ]
+        },
+        "narrative": {
+          "Action": "GATE FIRST: run `pan sync-main`, then `git grep -n \"export function providerFor\" -- src/lib/computer-use/platform.ts`. If it prints nothing, PAN-5461 is not on main: `task_block` this item with reason \"waits for PAN-5461 (provider seam)\" and stop. Never create platform.ts, providers/linux.ts, routes/computer-use.ts, ComputerUseSection.tsx, tryWithDesktopLock, or the platform parameter of assertKeyComboAllowed. WI-4 part B. scripts/ci/macos-helper-smoke.ts takes the .app path, sets OVERDECK_HOME to a dir under $RUNNER_TEMP, copies the .app to installedHelperPath(), then via macos-daemon.ts: connectOrLaunch, request('handshake') must return ok with platform darwin, request('getAppState', {app:'Finder', session:'ci'}) must return ok or throw permission_denied (D-20: either passes, anything else fails), request('terminate'). Exit 0 on pass, 1 with the error printed otherwise. Add a workflow step after the build: oven-sh/setup-bun@v2, `bun install --frozen-lockfile`, `npx tsx scripts/ci/macos-helper-smoke.ts <app>`. Push over SSH and watch the run."
+        },
+        "items": [
+          {
+            "id": "wi4-ci-smoke.ac1",
+            "title": "Given the built helper on macos-latest, when the smoke script runs, then handshake returns ok with platform darwin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-ci-smoke.ac2",
+            "title": "Given getAppState for Finder, then the script accepts ok or permission_denied and exits 1 on any other error code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-ci-smoke.ac3",
+            "title": "Given the workflow file, then the smoke step runs after the build step in the same job",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-route",
+        "title": "Add the open-permission route for macOS permission panes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5463",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/computer-use.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/computer-use-routes.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/computer-use-routes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "computer-use-routes.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "GATE FIRST: run `pan sync-main`, then `git grep -n \"export function providerFor\" -- src/lib/computer-use/platform.ts`. If it prints nothing, PAN-5461 is not on main: `task_block` this item with reason \"waits for PAN-5461 (provider seam)\" and stop. Never create platform.ts, providers/linux.ts, routes/computer-use.ts, ComputerUseSection.tsx, tryWithDesktopLock, or the platform parameter of assertKeyComboAllowed. In PAN-5461's routes/computer-use.ts add `POST /api/computer-use/open-permission`, body `{ id: 'accessibility' | 'screen-recording' }`: mutation guard first like the other non-GET handlers; 400 for any other id or a missing body; 409 `{ error: 'not_darwin' }` when detectPlatform() !== 'darwin'; else await openPermissionPane(id) and return the status view. Add a no-loss-matrix row next to PAN-5461's computer-use rows: `{ surface: 'POST /api/computer-use/open-permission', kind: 'http', disposition: 'WRITE', door: 'opens a macOS System Settings pane via the computer-use helper (PAN-5463)' }`. No route-scopes.ts row (NFR-4)."
+        },
+        "items": [
+          {
+            "id": "wi5-route.ac1",
+            "title": "Given id `bluetooth`, when POST /api/computer-use/open-permission runs, then it returns 400",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-route.ac2",
+            "title": "Given a linux host, then the route returns 409 with error not_darwin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-route.ac3",
+            "title": "Given a darwin host and id screen-recording, then the route calls openPermissionPane('screen-recording') and returns 200 with the status view",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-route.ac4",
+            "title": "Given the no-loss matrix, then it contains a row for POST /api/computer-use/open-permission",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-ui",
+        "title": "Show macOS setup and permission states in Settings → Computer Use",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5463",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/ComputerUseSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/ComputerUseMacPermissions.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/ComputerUseSection.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/ComputerUseMacPermissions.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/Settings/sections/__tests__/ComputerUseSection.test.tsx src/dashboard/frontend/src/components/Settings/sections/__tests__/ComputerUseMacPermissions.test.tsx"
+          ],
+          "expected_outputs": [
+            "both test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "GATE FIRST: run `pan sync-main`, then `git grep -n \"export function providerFor\" -- src/lib/computer-use/platform.ts`. If it prints nothing, PAN-5461 is not on main: `task_block` this item with reason \"waits for PAN-5461 (provider seam)\" and stop. Never create platform.ts, providers/linux.ts, routes/computer-use.ts, ComputerUseSection.tsx, tryWithDesktopLock, or the platform parameter of assertKeyComboAllowed. WI-5. For platform === 'darwin': Off-state copy exactly 'Setup installs the Overdeck Computer Use helper and opens two macOS permission pages. Switch on Overdeck Computer Use in each, then press Continue.'; the waiting step state renders amber (warning-foreground) message text and the CTA 'Continue' (PAN-5461 may already render waiting — reuse it, don't duplicate). New ComputerUseMacPermissions.tsx renders two rows from checks[] ids accessibility and screen-recording: ok → muted 'Allowed'; otherwise amber 'Not allowed' plus an 'Open settings' button posting `{ id }` to /api/computer-use/open-permission. FR-6: when enabled and either permission is not ok, the On card shows amber 'Needs attention' with 'macOS asks you to allow the updated helper again.' and a 'Fix setup' button running setup. Re-fetch status on window focus. Follow pan-style-guide: no font-bold/semibold, rounded-md badges, amber = operator must act, no new useMemo/useCallback/memo."
+        },
+        "items": [
+          {
+            "id": "wi5-ui.ac1",
+            "title": "Given a darwin status with enabled false, then the section renders the Off copy naming the two macOS permission pages",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-ui.ac2",
+            "title": "Given a setup result with a waiting step, then the section renders the step message in amber and a Continue button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-ui.ac3",
+            "title": "Given enabled true with screen-recording not ok, then the section renders Needs attention, the updated-helper sentence, a Fix setup button, and an Open settings button that posts id screen-recording",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-ui.ac4",
+            "title": "Given both permissions ok, then both rows render Allowed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-skill",
+        "title": "Add macOS guidance to the pan-computer-use skill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5463",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-computer-use/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:skills",
+            "npm run lint:slash-commands"
+          ],
+          "expected_outputs": [
+            "lint:skills passes",
+            "lint:slash-commands passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5",
+            "AC-6"
+          ]
+        },
+        "narrative": {
+          "Action": "GATE FIRST: run `pan sync-main`, then `git grep -n \"export function providerFor\" -- src/lib/computer-use/platform.ts`. If it prints nothing, PAN-5461 is not on main: `task_block` this item with reason \"waits for PAN-5461 (provider seam)\" and stop. Never create platform.ts, providers/linux.ts, routes/computer-use.ts, ComputerUseSection.tsx, tryWithDesktopLock, or the platform parameter of assertKeyComboAllowed. WI-6. Add a macOS section from Orca's skill-guides/orca-computer-use.md (lines 41, 132-153, 177, 208-212): element indexes stay stable across reads; actions run in the background by default and report delivery; use --restore-window only for background_unavailable, silent no-ops or Chromium/Electron drags; prefer set-value for popups and <select>; use cmd+a; cmd+q, cmd+shift+q, cmd+ctrl+q, cmd+alt+escape, cmd+shift+backspace are blocked unless --allow-system-shortcut; on permission_denied stop and ask the operator to finish setup in Settings → Computer Use. If lint:slash-commands reports a stale manifest, regenerate it (build → regenerate → commit)."
+        },
+        "items": [
+          {
+            "id": "wi6-skill.ac1",
+            "title": "Given the skill file, then it contains a macOS section naming delivery, --restore-window, set-value and the five blocked shortcuts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-skill.ac2",
+            "title": "Given the skill file, then it tells agents to stop on permission_denied and ask the operator to finish setup in Settings → Computer Use",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-skill.ac3",
+            "title": "Given the repo, when `npm run lint:skills` runs, then it passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-docs",
+        "title": "Document macOS computer use and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5463",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/computer-use.mdx",
+            "changelog.d/pan-5463.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "test -f changelog.d/pan-5463.md"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "test exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "FR-7",
+            "D-2",
+            "AC-6"
+          ]
+        },
+        "narrative": {
+          "Action": "GATE FIRST: run `pan sync-main`, then `git grep -n \"export function providerFor\" -- src/lib/computer-use/platform.ts`. If it prints nothing, PAN-5461 is not on main: `task_block` this item with reason \"waits for PAN-5461 (provider seam)\" and stop. Never create platform.ts, providers/linux.ts, routes/computer-use.ts, ComputerUseSection.tsx, tryWithDesktopLock, or the platform parameter of assertKeyComboAllowed. WI-6. configuration/computer-use.mdx gets a 'macOS' section: works from npx @overdeck/core and the desktop app on macOS 14+; setup installs 'Overdeck Computer Use' to ~/.overdeck/computer-use/macos/ and opens two System Settings pages; why macOS asks for Accessibility and Screen Recording; ad-hoc signing means an updated helper must be allowed again (Developer ID signing avoids that); for maintainers, the secrets MACOS_CERTIFICATE, MACOS_CERTIFICATE_PWD, APPLE_API_KEY, APPLE_API_KEY_ID, APPLE_API_ISSUER_ID enable Developer ID signing and notarization. changelog.d/pan-5463.md per changelog.d/README.md: 'Computer use now works on macOS, including from npx: Settings → Computer Use installs a small helper and walks you through the two macOS permissions.'"
+        },
+        "items": [
+          {
+            "id": "wi6-docs.ac1",
+            "title": "Given configuration/computer-use.mdx, then it contains a macOS section naming Accessibility, Screen Recording and the five signing secret names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-docs.ac2",
+            "title": "Given the mdx, then it states that an ad-hoc signed helper update must be allowed again in System Settings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-docs.ac3",
+            "title": "Given changelog.d/pan-5463.md, then it contains the sentence about macOS and npx and follows the changelog.d README format",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7-live-verify",
+        "title": "Live-verify setup and permissions on the Mac rig, or record the fallback",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5463",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/computer-use.mdx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "gh pr view --json body -q .body | grep -n 'Live macOS verification'"
+          ],
+          "expected_outputs": [
+            "prints the PR body section heading"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "D-4",
+            "AC-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implementation checkpoint (WI-7). Try the Mac rig (machine memory mac-rig-*; ssh -i ~/.ssh/gauntlet_air eltmon@<DHCP ip>, screen must be unlocked; ask the operator via the PR or `pan tell flywheel-orchestrator` before using it). If reachable: install the PR's built tarball with a throwaway OVERDECK_HOME under the home directory, run setup via the Settings route, ask the operator to switch on both permissions, run `pan computer list-apps` and `pan computer get-app-state --app TextEdit`, and record the output plus whether System Settings listed 'Overdeck Computer Use' or Terminal (D-4). If it listed Terminal, apply the D-4 fallback and document it in configuration/computer-use.mdx. If unreachable: add a 'Live macOS verification' PR body section stating the live permission flow is unverified, with exact manual steps."
+        },
+        "items": [
+          {
+            "id": "wi7-live-verify.ac1",
+            "title": "Given the PR body, then it contains a 'Live macOS verification' section with either the recorded command output and D-4 attribution result or the explicit unverified statement and manual steps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-live-verify.ac2",
+            "title": "Given System Settings listed Terminal instead of Overdeck Computer Use, then configuration/computer-use.mdx documents that grants attach to the terminal app",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-vendor",
+        "to": "wi4-ci-workflow",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-build-script",
+        "to": "wi4-ci-workflow",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-vendor",
+        "to": "wi1-trust",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-ci-workflow",
+        "to": "wi1-trust",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-trust",
+        "to": "wi1-lifetime",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-lifetime",
+        "to": "wi1-strings",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-build-script",
+        "to": "wi4-release-job",
+        "type": "blocks"
+      },
+      {
+        "from": "seam-gate",
+        "to": "wi3-install",
+        "type": "blocks"
+      },
+      {
+        "from": "seam-gate",
+        "to": "wi3-protocol",
+        "type": "blocks"
+      },
+      {
+        "from": "seam-gate",
+        "to": "wi3-daemon",
+        "type": "blocks"
+      },
+      {
+        "from": "seam-gate",
+        "to": "wi3-blocked-keys",
+        "type": "blocks"
+      },
+      {
+        "from": "seam-gate",
+        "to": "wi6-skill",
+        "type": "blocks"
+      },
+      {
+        "from": "seam-gate",
+        "to": "wi6-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-install",
+        "to": "wi3-provider",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-protocol",
+        "to": "wi3-provider",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-daemon",
+        "to": "wi3-provider",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-blocked-keys",
+        "to": "wi3-provider",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-install",
+        "to": "wi3-daemon",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-daemon",
+        "to": "wi4-ci-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-ci-workflow",
+        "to": "wi4-ci-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-trust",
+        "to": "wi4-ci-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-lifetime",
+        "to": "wi4-ci-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-provider",
+        "to": "wi5-route",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-route",
+        "to": "wi5-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-strings",
+        "to": "wi7-live-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-release-job",
+        "to": "wi7-live-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-ci-smoke",
+        "to": "wi7-live-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-ui",
+        "to": "wi7-live-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-skill",
+        "to": "wi7-live-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-docs",
+        "to": "wi7-live-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-vendor",
+        "to": "wi1-lifetime",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-vendor",
+        "to": "wi1-strings",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-trust",
+        "to": "wi1-strings",
+        "type": "blocks"
+      },
+      {
+        "from": "seam-gate",
+        "to": "wi3-provider",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
