@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5483",
   "created": "2026-11-17T13:01:33.028Z",
-  "updated": "2026-11-17T15:01:35.598Z",
+  "updated": "2026-11-17T15:01:48.681Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,6 +146,11 @@
     "frontmatter-features-retitle.ac3": {
       "status": "completed",
       "doneAt": "2026-11-17T15:01:35.598Z"
+    },
+    "frontmatter-features-descriptions": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5483",
+      "claimedAt": "2026-11-17T15:01:48.681Z"
     }
   }
 }
