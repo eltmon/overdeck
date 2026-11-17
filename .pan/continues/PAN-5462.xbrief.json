@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5462",
   "created": "2026-11-17T12:53:58.478Z",
-  "updated": "2026-11-17T12:57:49.696Z",
+  "updated": "2026-11-17T12:57:51.163Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,9 @@
       "status": "blocked"
     },
     "config-docs-changelog": {
+      "status": "blocked"
+    },
+    "ci-wsl-e2e": {
       "status": "blocked"
     }
   }
