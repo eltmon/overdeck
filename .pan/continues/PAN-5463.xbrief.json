@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5463",
   "created": "2026-11-17T12:31:36.411Z",
-  "updated": "2026-11-17T12:49:32.987Z",
+  "updated": "2026-11-17T12:49:35.444Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -147,6 +147,11 @@
     "wi1-lifetime.ac3": {
       "status": "completed",
       "doneAt": "2026-11-17T12:49:32.986Z"
+    },
+    "wi1-strings": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5463",
+      "claimedAt": "2026-11-17T12:49:35.444Z"
     }
   }
 }
