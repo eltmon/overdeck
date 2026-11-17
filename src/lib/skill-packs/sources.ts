@@ -241,7 +241,8 @@ export async function deletePackEntry(id: string): Promise<void> {
 
 async function git(args: string[], opts: { timeout?: number } = {}): Promise<string> {
   const { stdout } = await execFileAsync('git', args, {
-    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+    // Packs never need LFS objects; the smudge filter would download them and can fail on LFS rate limits.
+    env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_LFS_SKIP_SMUDGE: '1' },
     maxBuffer: 16 * 1024 * 1024,
     ...opts,
   });

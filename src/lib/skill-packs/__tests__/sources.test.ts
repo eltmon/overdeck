@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 
 const { overdeckHome } = await vi.hoisted(async () => {
@@ -296,6 +296,52 @@ describe('pack git cache', () => {
   it('leaves no partial clone after a failed fetch', async () => {
     await expect(fetchPackSource('gone', join(scratch, 'missing.git'))).rejects.toThrow();
     expect(existsSync(packRepoDir('gone'))).toBe(false);
+  });
+});
+
+describe('Git LFS smudge filter (PAN-5464)', () => {
+  const POINTER = 'version https://git-lfs.github.com/spec/v1\noid sha256:' + '0'.repeat(64) + '\nsize 12\n';
+  const saved: Record<string, string | undefined> = {};
+  const keys = ['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'GIT_LFS_SKIP_SMUDGE'] as const;
+  let scratch = '';
+
+  beforeEach(() => {
+    for (const key of keys) saved[key] = process.env[key];
+    // A fake LFS driver: clean passes the pointer through; smudge fails unless LFS smudging is skipped.
+    const filterDir = mkdtempSync(join(tmpdir(), 'skill-pack-lfs-'));
+    const smudge = join(filterDir, 'smudge.sh');
+    writeFileSync(smudge, 'if [ "$GIT_LFS_SKIP_SMUDGE" = 1 ]; then exec cat; fi\ncat >/dev/null\nexit 1\n');
+    const gitconfig = join(filterDir, 'gitconfig');
+    writeFileSync(gitconfig, `[filter "lfs"]\n\tclean = cat\n\tsmudge = sh ${smudge}\n\trequired = true\n`);
+    process.env.GIT_CONFIG_GLOBAL = gitconfig;
+    process.env.GIT_CONFIG_NOSYSTEM = '1';
+    delete process.env.GIT_LFS_SKIP_SMUDGE;
+    scratch = filterDir;
+  });
+
+  afterEach(() => {
+    for (const key of keys) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+    rmSync(scratch, { recursive: true, force: true });
+  });
+
+  it('extractCommit skips the LFS smudge filter', async () => {
+    const up = createUpstream();
+    try {
+      up.commitFile('.gitattributes', '*.bin filter=lfs\n', 'attributes');
+      const commit = up.commitFile('assets/big.bin', POINTER, 'pointer');
+      await fetchPackSource('lfs', up.url);
+      // The fake filter really runs during git archive: without the skip variable the archive fails.
+      expect(() =>
+        execFileSync('git', ['--git-dir', packRepoDir('lfs'), 'archive', '--format=tar', commit], { stdio: 'pipe' }),
+      ).toThrow();
+      const dir = await extractCommit('lfs', commit);
+      expect(readFileSync(join(dir, 'assets', 'big.bin'), 'utf8')).toBe(POINTER);
+    } finally {
+      rmSync(up.scratch, { recursive: true, force: true });
+    }
   });
 });
 
