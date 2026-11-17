@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-17T13:12:01.061839Z · model: claude-opus-5-5 · open: 938_
+_Last sequenced: 2026-11-17T20:38:44.366983Z · model: claude-opus-5-5 · open: 938_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -516,7 +516,7 @@ _Last sequenced: 2026-11-17T13:12:01.061839Z · model: claude-opus-5-5 · open: 
 | 483 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
 | 484 | PAN-5465 | L | medium | ok |  |  | Add skill packs to a live conversation: /reload-plugins hot apply, resume fallback, CLI, MCP tool, dashboard modal. PRD on main. |
 | 484 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
-| 485 | PAN-5497 | S | medium | ok |  | PAN-5464, PAN-5465 | Follow-up: accept pack groups in pan skills add, add_skills and the Add skills dialog; starts after PAN-5464 and PAN-5465 merge. |
+| 485 | PAN-5497 | S | medium | ok |  | PAN-5464, PAN-5465 | Follow-up: accept pack groups in pan skills add, add_skills and the Add skills dialog; PAN-5464 and PAN-5465 merged. |
 | 485 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
 | 486 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
 | 487 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
@@ -1273,7 +1273,7 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-17T13:12:01.061839Z",
+  "generatedAt": "2026-11-17T20:38:44.366983Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 938,
@@ -7773,8 +7773,8 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
         "PAN-5464",
         "PAN-5465"
       ],
-      "why": "Follow-up: accept pack groups in pan skills add, add_skills and the Add skills dialog; starts after PAN-5464 and PAN-5465 merge.",
-      "rationale": "New follow-up to PAN-5465 (PRD decision D-10); it can only start once both PAN-5464 and PAN-5465 merge, so it ranks right behind them.",
+      "why": "Follow-up: accept pack groups in pan skills add, add_skills and the Add skills dialog; PAN-5464 and PAN-5465 merged.",
+      "rationale": "Unblocked: PAN-5464 (#5507) and PAN-5465 (#5509) both merged on 2026-11-17, so it can start; rank and score hold, since the merge changes readiness, not impact.",
       "gate": "auto",
       "planning": "auto"
     },
