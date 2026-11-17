@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5447",
   "created": "2026-11-17T12:53:31.732Z",
-  "updated": "2026-11-17T17:36:24.404Z",
+  "updated": "2026-11-17T17:36:32.318Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -166,6 +166,11 @@
     "palette-route-abort.ac4": {
       "status": "completed",
       "doneAt": "2026-11-17T17:36:24.403Z"
+    },
+    "palette-client-timeout": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5447",
+      "claimedAt": "2026-11-17T17:36:32.317Z"
     }
   }
 }
