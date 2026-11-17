@@ -11,12 +11,14 @@ on:
     paths:
       - 'native/computer-use-macos/**'
       - 'scripts/build-computer-macos.mjs'
+      - 'scripts/ci/macos-helper-smoke.ts'
       - 'src/lib/computer-use/**'
       - '.github/workflows/computer-use-macos.yml'
   pull_request:
     paths:
       - 'native/computer-use-macos/**'
       - 'scripts/build-computer-macos.mjs'
+      - 'scripts/ci/macos-helper-smoke.ts'
       - 'src/lib/computer-use/**'
       - '.github/workflows/computer-use-macos.yml'
   workflow_dispatch:
@@ -72,6 +74,19 @@ jobs:
               console.log(`${key}: ${value}`);
             }
           '
+
+      # WI-4 part B: drive the built helper through the real TypeScript daemon
+      # client (launch via LaunchServices, handshake, getAppState, terminate).
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Daemon client smoke test
+        run: npx tsx scripts/ci/macos-helper-smoke.ts "$RUNNER_TEMP/helper/Overdeck Computer Use.app"
 
       - name: Upload the helper zip
         uses: actions/upload-artifact@v4
