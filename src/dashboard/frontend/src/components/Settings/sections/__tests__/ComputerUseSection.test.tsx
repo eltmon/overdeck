@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { installStrictFetchMock } from '../../../../test-utils/strictFetchMock';
 import type { ComputerUseStatusView } from '../../hooks/useComputerUseStatus';
 import { ComputerUseSection } from '../ComputerUseSection';
+import { SETTINGS_NAV_ITEMS } from '../../settingsPageConstants';
 
 vi.mock('../../../../lib/wsTransport', () => ({
   ensureDashboardSession: vi.fn().mockResolvedValue(undefined),
@@ -158,4 +159,9 @@ describe('ComputerUseSection (PAN-5461)', () => {
     expect(screen.getByTestId('computer-use-skill')).toHaveTextContent('pan-computer-use skill — installed in ~/.claude/skills');
   });
 
+  it('lists Computer Use directly after Security in the Settings nav', () => {
+    const ids = SETTINGS_NAV_ITEMS.map((item) => item.id);
+    expect(ids[ids.indexOf('security') + 1]).toBe('computer-use');
+    expect(SETTINGS_NAV_ITEMS.find((item) => item.id === 'computer-use')?.label).toBe('Computer Use');
+  });
 });
