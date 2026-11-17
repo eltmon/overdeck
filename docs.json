@@ -252,6 +252,14 @@
     {
       "source": "/cli/convoy-commands",
       "destination": "/cli/review-commands"
+    },
+    {
+      "source": "/features/tldr",
+      "destination": "/changelog"
+    },
+    {
+      "source": "/configuration/beads",
+      "destination": "/features/skills"
     }
   ]
 }
