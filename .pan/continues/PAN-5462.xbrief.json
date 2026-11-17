@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5462",
   "created": "2026-11-17T12:53:58.478Z",
-  "updated": "2026-11-17T19:42:24.214Z",
+  "updated": "2026-11-17T19:55:12.488Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -86,9 +86,10 @@
       "doneAt": "2026-11-17T19:42:22.988Z"
     },
     "ci-wsl-e2e": {
-      "status": "pending",
+      "status": "completed",
       "claimedBy": "agent-pan-5462",
-      "claimedAt": "2026-11-17T19:42:24.214Z"
+      "claimedAt": "2026-11-17T19:42:24.214Z",
+      "doneAt": "2026-11-17T19:55:12.488Z"
     },
     "ci-windows-native": {
       "status": "completed",
@@ -245,6 +246,22 @@
     "config-docs-changelog.ac3": {
       "status": "completed",
       "doneAt": "2026-11-17T19:42:22.988Z"
+    },
+    "ci-wsl-e2e.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:55:12.488Z"
+    },
+    "ci-wsl-e2e.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:55:12.488Z"
+    },
+    "ci-wsl-e2e.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:55:12.488Z"
+    },
+    "ci-wsl-e2e.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:55:12.488Z"
     }
   }
 }
