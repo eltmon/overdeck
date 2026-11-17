@@ -18,6 +18,7 @@ import {
 import { detectPlatform as detectPlatformReal, providerFor as providerForReal } from './platform.js';
 import type { ComputerUsePlatformId } from './platform-types.js';
 import { type SavedScreenshot, saveScreenshot as saveScreenshotReal, saveSnapshot as saveSnapshotReal } from './snapshot-store.js';
+import { windowsVersion as windowsVersionReal } from './wsl-bridge.js';
 
 export type OperationKind = 'read' | 'input';
 
@@ -47,6 +48,8 @@ export interface RunDeps {
   saveScreenshot?: typeof saveScreenshotReal;
   holderKey?: () => string;
   now?: () => number;
+  /** The Windows build for the wsl provider's capabilities label (PAN-5462 FR-1). */
+  windowsVersion?: () => Promise<{ powershell: string; build: string }>;
 }
 
 const DISABLED_MESSAGE =
@@ -124,9 +127,24 @@ export async function runComputerOperation(
 export interface CapabilitiesResult {
   platform: NodeJS.Platform;
   enabled: boolean;
-  desktopSession: { ok: true; sessionType?: string; display?: string } | { ok: false; message: string };
+  desktopSession: { ok: true; sessionType?: string; display?: string; label?: string } | { ok: false; message: string };
   helper: Record<string, unknown> | null;
   helperError?: string;
+}
+
+/**
+ * Under WSL2 the session is the Windows desktop: WSLg's XDG_SESSION_TYPE and
+ * DISPLAY describe the wrong desktop, so they are never reported (PAN-5462 FR-1).
+ * One windowsVersion() call supplies the build; readiness() is not called because
+ * it would run a second handshake. A failed version probe keeps the bare label.
+ */
+async function windowsSession(fallbackLabel: string, deps: RunDeps): Promise<{ ok: true; label: string }> {
+  try {
+    const { build } = await (deps.windowsVersion ?? (() => windowsVersionReal()))();
+    return { ok: true, label: `windows · ${build}` };
+  } catch {
+    return { ok: true, label: fallbackLabel };
+  }
 }
 
 /** FR-13: never refuses. Reports platform/enabled/desktop-session state and, with a provider and a desktop, the helper's handshake. */
@@ -151,11 +169,14 @@ export async function runCapabilities(deps: RunDeps = {}): Promise<CapabilitiesR
   }
 
   const { session } = sessionResult;
-  const desktopSession = {
-    ok: true as const,
-    sessionType: session.env.XDG_SESSION_TYPE,
-    display: session.env.DISPLAY ?? session.env.WAYLAND_DISPLAY,
-  };
+  const desktopSession: CapabilitiesResult['desktopSession'] =
+    provider.id === 'wsl'
+      ? await windowsSession(session.label, deps)
+      : {
+          ok: true as const,
+          sessionType: session.env.XDG_SESSION_TYPE,
+          display: session.env.DISPLAY ?? session.env.WAYLAND_DISPLAY,
+        };
 
   try {
     const response = await resolved.withDesktopLock(() => provider.runHelper({ tool: 'handshake' }, session));
