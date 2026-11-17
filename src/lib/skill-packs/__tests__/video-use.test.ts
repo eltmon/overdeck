@@ -51,6 +51,15 @@ describe('applyVideoUseHostNotice', () => {
     expect(applyVideoUseHostNotice(once)).toBe(once);
   });
 
+  it('points the vendored manim-video references at the mounted sibling skill', () => {
+    const pinned = `${skillMd}\n- This skill vendors \`skills/manim-video/\`. Read its SKILL.md.\n- **Manim**: read \`skills/manim-video/SKILL.md\`.\n`;
+    const out = applyVideoUseHostNotice(pinned);
+    expect(out).not.toContain('skills/manim-video/');
+    expect(out).toContain('This skill vendors `../manim-video/`.');
+    expect(out).toContain('read `../manim-video/SKILL.md`');
+    expect(applyVideoUseHostNotice(out)).toBe(out);
+  });
+
   it('puts the notice at the top when there is no frontmatter', () => {
     const out = applyVideoUseHostNotice('# Video Use\n');
     expect(out.startsWith(MARKER)).toBe(true);

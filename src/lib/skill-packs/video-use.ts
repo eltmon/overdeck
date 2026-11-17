@@ -20,14 +20,20 @@ export const VIDEO_USE_HOST_NOTICE = [
 
 const HOST_NOTICE_MARKER = `<!-- overdeck:video-use-host-notice v${VIDEO_USE_NOTICE_VERSION} -->`;
 
+// The repo's SKILL.md points at its vendored `skills/manim-video/`; the mount puts that skill beside this one.
+const MANIM_REPO_PATH = /(?<![\w./-])skills\/manim-video\//g;
+const MANIM_MOUNT_PATH = '../manim-video/';
+
 const FRONTMATTER_OPEN = /^---\r?\n/;
 const FRONTMATTER_CLOSE = /^---[ \t]*$/m;
 
 /**
- * Insert the host notice after the SKILL.md frontmatter (or at the top when there is none). Idempotent:
- * a SKILL.md that already holds the marker is returned unchanged. The frontmatter is never rewritten.
+ * Insert the host notice after the SKILL.md frontmatter (or at the top when there is none), and point
+ * `skills/manim-video/` references at the mounted sibling `../manim-video/`. Idempotent: a SKILL.md that
+ * already holds the marker gets no second notice. The frontmatter is never rewritten.
  */
-export function applyVideoUseHostNotice(skillMd: string): string {
+export function applyVideoUseHostNotice(original: string): string {
+  const skillMd = original.replace(MANIM_REPO_PATH, MANIM_MOUNT_PATH);
   if (skillMd.includes(HOST_NOTICE_MARKER)) return skillMd;
   const notice = `${HOST_NOTICE_MARKER}\n${VIDEO_USE_HOST_NOTICE}\n`;
   const open = skillMd.match(FRONTMATTER_OPEN)?.[0];

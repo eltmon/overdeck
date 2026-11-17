@@ -90,7 +90,8 @@ export function mountHash(selection: MountSelection): string {
       pack.skills.map(
         (skill) =>
           // NFR-2: the paths suffix appears only for a skill that sets paths, so existing mounts keep their hash.
-          `${pack.id}@${pack.commit}:${skill.name}:${transformTag(pack.transform)}${skill.paths ? `:${skill.paths.join(',')}` : ''}`,
+          // JSON keeps ['a', 'b'] and ['a,b'] apart.
+          `${pack.id}@${pack.commit}:${skill.name}:${transformTag(pack.transform)}${skill.paths ? `:${JSON.stringify(skill.paths)}` : ''}`,
       ),
     )
     .concat(

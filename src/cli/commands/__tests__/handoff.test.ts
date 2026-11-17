@@ -523,7 +523,7 @@ describe('handoffCommand', () => {
       forkMocks.forkConversationViaServer.mockResolvedValue({ id: 789, name: 'new-conv', tmuxSession: 'conv-new', sessionAlive: true });
     });
 
-    it('sends only the cached members and prints a skipped line for each other member', async () => {
+    it('sends only the cached members and says how to add or sync each other member', async () => {
       catalogMocks.listPackCatalog.mockResolvedValue([
         { id: 'remotion', cached: true },
         { id: 'hyperframes', cached: false },
@@ -539,7 +539,8 @@ describe('handoffCommand', () => {
       );
       const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
       expect(output.split('skipped ')).toHaveLength(4);
-      for (const id of ['hyperframes', 'openmontage', 'video-use']) {
+      expect(output).toContain('skipped hyperframes: not cached (pan skills pack sync hyperframes)');
+      for (const id of ['openmontage', 'video-use']) {
         expect(output).toContain(`skipped ${id}: not added (pan skills pack add --group video)`);
       }
     });

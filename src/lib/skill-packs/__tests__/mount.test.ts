@@ -331,6 +331,9 @@ describe('root skills and the video-use transform (PAN-5464)', () => {
     expect(mountHash({ packs: [base] })).not.toBe(mountHash({ packs: [{ ...base, transform: undefined }] }));
     const fewer = { ...base, skills: [{ name: 'video-use', dir: '.', paths: ['SKILL.md'] }, base.skills[1]!] };
     expect(mountHash({ packs: [base] })).not.toBe(mountHash({ packs: [fewer] }));
+    const split = { ...base, skills: [{ name: 'video-use', dir: '.', paths: ['SKILL.md', 'a', 'b'] }] };
+    const joined = { ...base, skills: [{ name: 'video-use', dir: '.', paths: ['SKILL.md', 'a,b'] }] };
+    expect(mountHash({ packs: [split] })).not.toBe(mountHash({ packs: [joined] }));
   });
 
   it('rejects skill paths that escape the pack', async () => {

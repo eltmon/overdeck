@@ -43,14 +43,15 @@ function printIgnoredHarnessNotice(flag: '--harness' | '--author-harness', harne
 
 /**
  * PAN-5464: `--group` adds each cached member pack of a pack group to `--pack`, without duplicates.
- * A member that is not cached is skipped with a note; an unknown group returns null.
+ * A member that is not added, or added but not cached, is skipped with the command that fixes it;
+ * an unknown group returns null.
  */
 async function expandPackGroups(groups: readonly string[], packs: readonly string[]): Promise<string[] | null> {
   const [{ resolvePackGroup, PackGroupError }, { listPackCatalog }] = await Promise.all([
     import('../../lib/skill-packs/groups.js'),
     import('../../lib/skill-overrides/catalog.js'),
   ]);
-  const cached = new Set((await listPackCatalog()).filter((pack) => pack.cached).map((pack) => pack.id));
+  const catalog = new Map((await listPackCatalog()).map((pack) => [pack.id, pack]));
   const merged = [...packs];
   for (const group of groups) {
     let members: readonly string[];
@@ -62,8 +63,11 @@ async function expandPackGroups(groups: readonly string[], packs: readonly strin
       return null;
     }
     for (const id of members) {
-      if (!cached.has(id)) {
+      const entry = catalog.get(id);
+      if (!entry) {
         console.log(chalk.yellow(`skipped ${id}: not added (pan skills pack add --group ${group})`));
+      } else if (!entry.cached) {
+        console.log(chalk.yellow(`skipped ${id}: not cached (pan skills pack sync ${id})`));
       } else if (!merged.includes(id)) {
         merged.push(id);
       }
