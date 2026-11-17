@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5447",
+  "created": "2026-11-17T12:53:31.732Z",
+  "updated": "2026-11-17T12:53:31.732Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "chunk-search-jobs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5447",
+      "claimedAt": "2026-11-17T12:53:31.732Z"
+    }
+  }
+}
