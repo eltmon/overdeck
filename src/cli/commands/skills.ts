@@ -535,16 +535,20 @@ export async function skillsPackListCommand(options: PackListOptions): Promise<v
   if (rows.length === 0) {
     const url = KNOWN_PACKS['mattpocock']?.url;
     console.log(`No skill packs. Add one with: pan skills pack add mattpocock ${url} --ref v1.2.3`);
-    return;
+  } else {
+    console.log(chalk.bold(`\nSkill packs (${rows.length})\n`));
+    for (const row of rows) {
+      const update = 'updateAvailable' in row && row.updateAvailable ? `  update available: ${short(row.updateAvailable)}` : '';
+      console.log(`${chalk.bold(row.id)}  ${row.url} @ ${row.ref} (${short(row.commit)})${update}`);
+      console.log(chalk.dim(
+        `  cached ${row.cached ? 'yes' : 'no'} · license ${row.license ?? 'unknown'} · ${row.skills} skills · Not applied: ${listOrNone(row.notApplied)}`,
+      ));
+    }
   }
-  console.log(chalk.bold(`\nSkill packs (${rows.length})\n`));
-  for (const row of rows) {
-    const update = 'updateAvailable' in row && row.updateAvailable ? `  update available: ${short(row.updateAvailable)}` : '';
-    console.log(`${chalk.bold(row.id)}  ${row.url} @ ${row.ref} (${short(row.commit)})${update}`);
-    console.log(chalk.dim(
-      `  cached ${row.cached ? 'yes' : 'no'} · license ${row.license ?? 'unknown'} · ${row.skills} skills · Not applied: ${listOrNone(row.notApplied)}`,
-    ));
-  }
+  // PAN-5464 D-2: groups are aliases, listed only in the text output so the --json rows stay unchanged.
+  const { listPackGroups } = await import('../../lib/skill-packs/groups.js');
+  console.log(chalk.bold('\nGroups\n'));
+  for (const group of await listPackGroups()) console.log(`${group.name}  ${group.packs.join(', ')}  (${group.source})`);
 }
 
 /** gstack skills write `.gstack/` and `.gstack-worktrees/` in the projects they run in (PAN-4727 D9); remove never deletes them. */

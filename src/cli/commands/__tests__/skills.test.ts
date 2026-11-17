@@ -797,7 +797,24 @@ describe('pan skills pack', () => {
   it('prints the fork add hint when no packs are registered', async () => {
     mocks.listPackCatalog.mockResolvedValue([]);
     await run('pack', 'list', '--offline');
-    expect(logs.join('\n')).toBe('No skill packs. Add one with: pan skills pack add mattpocock https://github.com/eltmon/skills --ref v1.2.3');
+    expect(logs[0]).toBe('No skill packs. Add one with: pan skills pack add mattpocock https://github.com/eltmon/skills --ref v1.2.3');
+    // PAN-5464: the groups still list, so `--group video` is discoverable before any pack is added.
+    expect(logs).toContain('video  remotion, hyperframes, openmontage, video-use  (built-in)');
+  });
+
+  it('prints a Groups section after the pack rows (PAN-5464)', async () => {
+    mocks.listPackCatalog.mockResolvedValue([
+      { id: 'mattpocock', url: preview.url, ref: 'v1.2.3', commit: COMMIT, adapter: 'claude-plugin', cached: true, manifest: preview.manifest },
+    ]);
+    mocks.listPackGroups.mockResolvedValue([
+      { name: 'animation', packs: ['remotion'], source: 'config' },
+      { name: 'video', packs: VIDEO, source: 'built-in' },
+    ]);
+    await run('pack', 'list', '--offline');
+    const out = logs.join('\n');
+    expect(out.indexOf('Groups')).toBeGreaterThan(out.indexOf('mattpocock'));
+    expect(logs).toContain('video  remotion, hyperframes, openmontage, video-use  (built-in)');
+    expect(logs).toContain('animation  remotion  (config)');
   });
 
   it('reports an up-to-date pack without asking', async () => {
