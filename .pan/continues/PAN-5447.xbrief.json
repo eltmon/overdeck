@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5447",
   "created": "2026-11-17T12:53:31.732Z",
-  "updated": "2026-11-17T17:36:32.318Z",
+  "updated": "2026-11-17T17:36:58.877Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -168,9 +168,30 @@
       "doneAt": "2026-11-17T17:36:24.403Z"
     },
     "palette-client-timeout": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5447",
-      "claimedAt": "2026-11-17T17:36:32.317Z"
+      "claimedAt": "2026-11-17T17:36:32.317Z",
+      "doneAt": "2026-11-17T17:36:58.877Z"
+    },
+    "palette-client-timeout.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:36:58.877Z"
+    },
+    "palette-client-timeout.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:36:58.877Z"
+    },
+    "palette-client-timeout.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:36:58.877Z"
+    },
+    "palette-client-timeout.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:36:58.877Z"
+    },
+    "palette-client-timeout.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:36:58.877Z"
     }
   }
 }
