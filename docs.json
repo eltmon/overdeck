@@ -42,14 +42,8 @@
         ]
       },
       {
-        "tab": "Vision",
+        "tab": "Anywhere",
         "groups": [
-          {
-            "group": "Vision",
-            "pages": [
-              "vision"
-            ]
-          },
           {
             "group": "Overdeck Anywhere",
             "pages": [
@@ -63,7 +57,12 @@
               "configuration/mcp",
               "configuration/bots",
               "configuration/phone",
-              "configuration/push-notifications",
+              "configuration/push-notifications"
+            ]
+          },
+          {
+            "group": "Anywhere CLI",
+            "pages": [
               "cli/vault",
               "cli/pair",
               "cli/tailscale",
@@ -101,20 +100,20 @@
           {
             "group": "Features",
             "pages": [
-              "features/mission-control",
               "features/conversations",
+              "features/file-explorer",
+              "features/mission-control",
+              "features/convoys",
               "features/specialists",
-              "features/cloister",
-              "features/safe-shutdown",
+              "features/merge-batches",
+              "features/swarm",
               "features/skills",
               "features/skill-packs",
               "features/workspaces",
-              "features/file-explorer",
+              "features/cloister",
+              "features/safe-shutdown",
               "features/open-in-overdeck",
-              "features/keyboard-shortcuts",
-              "features/convoys",
-              "features/swarm",
-              "features/merge-batches"
+              "features/keyboard-shortcuts"
             ]
           }
         ]
@@ -178,10 +177,16 @@
               "reference/state-model",
               "reference/harness-landscape",
               "reference/posthog-agents",
-              "reference/template-conversations",
               "reference/prompts",
               "reference/troubleshooting",
               "reference/token-spend-report"
+            ]
+          },
+          {
+            "group": "Roadmap",
+            "pages": [
+              "vision",
+              "reference/template-conversations"
             ]
           }
         ]
