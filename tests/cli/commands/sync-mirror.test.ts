@@ -32,7 +32,9 @@ const mockRunMultiToolSync = vi.fn().mockReturnValue([]);
 const mockResolveAlsoSyncTools = vi.fn().mockReturnValue([]);
 const mockEnsurePlaywrightIsolation = vi.fn().mockReturnValue(false);
 const mockEnsureExcalidrawMcp = vi.fn().mockReturnValue(false);
-const mockCreateBackup = vi.fn().mockReturnValue({ targets: [], timestamp: 'now' });
+const mockBackupBeforeSync = vi
+  .fn()
+  .mockReturnValue({ backup: { targets: [], timestamp: 'now', path: '' }, pruned: 0 });
 const mockCleanupAgentDirectories = vi.fn().mockResolvedValue({ totalOrphaned: 0, removed: [], protected: [], wouldRemove: [] });
 const mockStartupSyncNeeded = vi.fn().mockReturnValue({ needed: true, reason: 'test' });
 const mockProvisionClaudeHooks = vi.fn().mockResolvedValue({
@@ -103,7 +105,8 @@ vi.mock('../../../src/lib/claude-mcp.js', () => ({
 }));
 
 vi.mock('../../../src/lib/backup.js', () => ({
-  createBackup: mockCreateBackup,
+  backupBeforeSync: mockBackupBeforeSync,
+  resolveBackupKeep: () => 10,
 }));
 
 vi.mock('../../../src/lib/agent-directory-cleanup.js', () => ({
