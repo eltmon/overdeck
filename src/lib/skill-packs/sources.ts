@@ -11,7 +11,7 @@
 import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { chmod, lstat, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, join, posix } from 'node:path';
 import { promisify } from 'node:util';
 import { isMap, isScalar, parse as parseYaml, parseDocument, type Document } from 'yaml';
 import { getGlobalConfigPath } from '../config-yaml/load.js';
@@ -25,6 +25,7 @@ import {
   readPackManifest,
   type PackAdapterId,
   type PackManifest,
+  type PackSkill,
 } from './adapters.js';
 import {
   assertBrowserBuildable,
@@ -379,6 +380,17 @@ export async function extractCommit(
   }
 }
 
+/**
+ * A skill's change-detection hash at `commit`: its dir's tree hash, or for a root skill (PAN-5464 D-8)
+ * the tree hash of each of its paths joined with ','. Never hashes the whole repo root.
+ */
+async function skillHash(id: string, commit: string, skill: PackSkill): Promise<string | null> {
+  if (!skill.paths) return treeHash(id, commit, skill.dir);
+  const base = skill.dir === '.' ? '' : skill.dir;
+  const hashes = await Promise.all(skill.paths.map((path) => treeHash(id, commit, base ? posix.join(base, path) : path)));
+  return hashes.join(',');
+}
+
 /** Git object id of `path` at `commit` (a tree for a skill dir), or null when the path is absent. */
 export async function treeHash(id: string, commit: string, path: string): Promise<string | null> {
   assertCommit(commit);
@@ -476,6 +488,7 @@ async function manifestAt(id: string, dir: string, adapter: PackAdapterId, brows
       pluginRoot: pluginRootOf(id),
       browser,
       skillsExclude: KNOWN_PACKS[id]?.skillsExclude,
+      rootSkill: KNOWN_PACKS[id]?.rootSkill,
     }),
   );
 }
@@ -638,7 +651,7 @@ export async function updatePack(
   for (const skill of manifest.skills) {
     const before = oldByName.get(skill.name);
     if (!before) continue;
-    const [oldHash, newHash] = await Promise.all([treeHash(id, entry.commit, before.dir), treeHash(id, commit, skill.dir)]);
+    const [oldHash, newHash] = await Promise.all([skillHash(id, entry.commit, before), skillHash(id, commit, skill)]);
     if (oldHash !== newHash) changed.push(skill.name);
   }
   const oldLabels = new Set(notAppliedLabels(oldManifest.capabilities));

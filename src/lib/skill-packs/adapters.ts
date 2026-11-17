@@ -28,8 +28,13 @@ export type PackAdapterId = 'plain' | 'claude-plugin' | 'deft-readonly' | 'gstac
 
 export interface PackSkill {
   name: string;
-  /** Repo-relative posix path of the skill directory. */
+  /** Repo-relative posix path of the skill directory; `.` for a root skill. */
   dir: string;
+  /**
+   * A root skill's files and dirs, relative to `dir` (PAN-5464 D-8). When set, every consumer follows
+   * these paths instead of the whole `dir`.
+   */
+  paths?: readonly string[];
   description: string;
   optIn: boolean;
 }
@@ -95,6 +100,13 @@ export interface KnownPack {
    * capability-probe paths, that exist at the commit. Never combined with `pluginRoot`.
    */
   archivePaths?: readonly string[];
+  /** A skill whose SKILL.md sits at the repo root (PAN-5464): its name and the root files and dirs it mounts. */
+  rootSkill?: RootSkill;
+}
+
+export interface RootSkill {
+  name: string;
+  paths: readonly string[];
 }
 
 export const KNOWN_PACKS: Readonly<Record<string, KnownPack>> = {
@@ -378,6 +390,18 @@ async function listExecutables(root: string, skillDir: string, skipTopLevel: Rea
 const LFS_POINTER_FIRST_LINE = 'version https://git-lfs.github.com/spec/v1';
 const LFS_POINTER_MAX_BYTES = 1024;
 
+/** `rel` when it is an executable or `.sh` file, or the executables under it when it is a dir (a root skill path). */
+async function executablesAt(root: string, rel: string): Promise<string[]> {
+  let stats;
+  try {
+    stats = await limitFs(() => lstat(join(root, rel)));
+  } catch {
+    return [];
+  }
+  if (stats.isDirectory()) return listExecutables(root, rel);
+  return stats.isFile() && (rel.endsWith('.sh') || (stats.mode & 0o111) !== 0) ? [rel] : [];
+}
+
 /**
  * Git LFS pointer files at `rel` under `root` (PAN-5464): regular files of at most 1024 bytes whose
  * first line is the LFS spec line. `rel` may name a file, which is checked directly, or a dir, which is walked.
@@ -522,6 +546,7 @@ export async function readPackManifest(
     pluginRoot?: string;
     browser?: boolean;
     skillsExclude?: readonly string[];
+    rootSkill?: RootSkill;
   } = {},
 ): Promise<PackManifest> {
   let prefix = '';
@@ -551,6 +576,25 @@ export async function readPackManifest(
   const skills: PackSkill[] = [];
   const seen = new Set<string>();
   const executables: string[] = [];
+  // PAN-5464 D-8: a root skill comes first, so `seen` reserves its name; its executables and LFS
+  // pointers come only from its paths, never from the whole repo root.
+  const rootPaths: string[] = [];
+  const rootSkill = adapter === 'plain' ? opts.rootSkill : undefined;
+  if (rootSkill && SKILL_NAME_PATTERN.test(rootSkill.name)) {
+    const content = await readTextOrNull(join(base, 'SKILL.md'));
+    if (content !== null) {
+      const paths = rootSkill.paths.map(toRepoRelative).filter((path): path is string => path !== null);
+      seen.add(rootSkill.name);
+      skills.push({
+        name: rootSkill.name,
+        dir: prefix || '.',
+        paths,
+        description: readSkillFrontmatter(content).description,
+        optIn: optIn.has(rootSkill.name),
+      });
+      rootPaths.push(...paths);
+    }
+  }
   const contents = await Promise.all(skillDirs.map((dir) => limitFs(() => readTextOrNull(join(base, dir, 'SKILL.md')))));
   const executableDirs: string[] = [];
   const includedDirs: string[] = [];
@@ -572,6 +616,8 @@ export async function readPackManifest(
     includedDirs.push(dir);
     if (!gstack) executableDirs.push(dir);
   });
+  const rootExecutables = (await Promise.all(rootPaths.map((path) => executablesAt(base, path)))).flat();
+  executables.push(...(prefix ? rootExecutables.map((e) => posix.join(prefix, e)) : rootExecutables));
   for (const dirExecutables of await Promise.all(executableDirs.map((dir) => listExecutables(base, dir)))) {
     executables.push(...(prefix ? dirExecutables.map((e) => posix.join(prefix, e)) : dirExecutables));
   }
@@ -581,7 +627,10 @@ export async function readPackManifest(
     executables.push(...(prefix ? runtimeExecutables.map((e) => posix.join(prefix, e)) : runtimeExecutables));
   }
 
-  const lfsObjects = (await Promise.all(includedDirs.map((dir) => countLfsPointers(base, dir)))).reduce((sum, n) => sum + n, 0);
+  const lfsObjects = (await Promise.all([...rootPaths, ...includedDirs].map((dir) => countLfsPointers(base, dir)))).reduce(
+    (sum, n) => sum + n,
+    0,
+  );
 
   // Deft always carries agent hooks, an AGENTS.md section, and .githooks, and its skills call the directive CLI.
   const capabilities: PackCapabilities = {

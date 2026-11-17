@@ -328,6 +328,52 @@ describe('plain adapter', () => {
   });
 });
 
+describe('root skill (PAN-5464)', () => {
+  const rootSkill = { name: 'video-use', paths: ['SKILL.md', 'helpers'] };
+  const LFS = 'version https://git-lfs.github.com/spec/v1\noid sha256:' + '1'.repeat(64) + '\nsize 3\n';
+
+  function rootFixture(): string {
+    const root = fixture({
+      'SKILL.md': skillMd('video-use', 'Edit videos.'),
+      'helpers/a.py': 'print(1)\n',
+      'helpers/clip.mp4': LFS,
+      'tests/x.py': 'print(2)\n',
+      'tests/clip.mp4': LFS,
+      'skills/manim-video/SKILL.md': skillMd('manim-video', 'Manim.'),
+    });
+    chmodSync(join(root, 'helpers', 'a.py'), 0o755);
+    chmodSync(join(root, 'tests', 'x.py'), 0o755);
+    return root;
+  }
+
+  it('lists the root skill first, then the skills/ scan', async () => {
+    const manifest = await readPackManifest(rootFixture(), 'plain', { rootSkill });
+    expect(manifest.skills.map((skill) => [skill.name, skill.dir, skill.paths])).toEqual([
+      ['video-use', '.', ['SKILL.md', 'helpers']],
+      ['manim-video', 'skills/manim-video', undefined],
+    ]);
+    expect(manifest.skills[0]?.description).toBe('Edit videos.');
+  });
+
+  it('lists executables and LFS pointers only from the root skill paths', async () => {
+    const manifest = await readPackManifest(rootFixture(), 'plain', { rootSkill });
+    expect(manifest.capabilities.executables).toContain('helpers/a.py');
+    expect(manifest.capabilities.executables).not.toContain('tests/x.py');
+    expect(manifest.capabilities.lfsObjects).toBe(1);
+  });
+
+  it('skips the root skill without a root SKILL.md, and ignores it for other adapters', async () => {
+    const root = fixture({ 'skills/manim-video/SKILL.md': skillMd('manim-video', 'Manim.') });
+    expect((await readPackManifest(root, 'plain', { rootSkill })).skills.map((skill) => skill.name)).toEqual(['manim-video']);
+    const plugin = fixture({
+      '.claude-plugin/plugin.json': JSON.stringify({ name: 'p' }),
+      'SKILL.md': skillMd('video-use', 'Edit videos.'),
+      'skills/b/SKILL.md': skillMd('b', 'B.'),
+    });
+    expect((await readPackManifest(plugin, 'claude-plugin', { rootSkill })).skills.map((skill) => skill.name)).toEqual(['b']);
+  });
+});
+
 describe('LFS pointer count (PAN-5464)', () => {
   const POINTER = 'version https://git-lfs.github.com/spec/v1\noid sha256:' + '0'.repeat(64) + '\nsize 3\n';
 
