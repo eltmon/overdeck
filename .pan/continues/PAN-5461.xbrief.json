@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5461",
   "created": "2026-11-17T12:13:42.164Z",
-  "updated": "2026-11-17T17:26:15.695Z",
+  "updated": "2026-11-17T17:26:35.765Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -135,23 +135,23 @@
     },
     "routes": {
       "status": "completed",
-      "doneAt": "2026-11-17T17:23:57.366Z"
+      "doneAt": "2026-11-17T17:26:35.764Z"
     },
     "routes.ac1": {
       "status": "completed",
-      "doneAt": "2026-11-17T17:23:57.366Z"
+      "doneAt": "2026-11-17T17:26:35.764Z"
     },
     "routes.ac2": {
       "status": "completed",
-      "doneAt": "2026-11-17T17:23:57.366Z"
+      "doneAt": "2026-11-17T17:26:35.764Z"
     },
     "routes.ac3": {
       "status": "completed",
-      "doneAt": "2026-11-17T17:23:57.366Z"
+      "doneAt": "2026-11-17T17:26:35.764Z"
     },
     "routes.ac4": {
       "status": "completed",
-      "doneAt": "2026-11-17T17:23:57.366Z"
+      "doneAt": "2026-11-17T17:26:35.764Z"
     },
     "key-platform.ac1": {
       "status": "completed",
