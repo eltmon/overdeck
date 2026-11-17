@@ -95,32 +95,33 @@ export function useComputerUseStatus() {
     setSettingUp(true);
     setActionError(null);
     setSetupResult(null);
+    // No try/finally: the React Compiler can't lower a finally clause.
+    let result: ComputerUseSetupResult | null = null;
     try {
-      const result = await mutate<ComputerUseSetupResult>('POST', '/api/computer-use/setup', {}, 'Setup failed');
+      result = await mutate<ComputerUseSetupResult>('POST', '/api/computer-use/setup', {}, 'Setup failed');
       setSetupResult(result);
       await writeStatus(result.status);
       if (result.message) setActionError(result.message);
-      return result;
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err));
-      return null;
-    } finally {
-      setSettingUp(false);
+      result = null;
     }
+    setSettingUp(false);
+    return result;
   };
 
   const runAction = async (method: 'POST' | 'PUT', path: string, body: unknown, fallback: string): Promise<boolean> => {
     setBusy(true);
     setActionError(null);
+    let ok = false;
     try {
       await writeStatus(await mutate<ComputerUseStatusView>(method, path, body, fallback));
-      return true;
+      ok = true;
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err));
-      return false;
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
+    return ok;
   };
 
   const setEnabled = (enabled: boolean) => {
