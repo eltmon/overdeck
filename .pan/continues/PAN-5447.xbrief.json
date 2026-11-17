@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5447",
   "created": "2026-11-17T12:53:31.732Z",
-  "updated": "2026-11-17T17:34:16.473Z",
+  "updated": "2026-11-17T17:34:43.318Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,9 +72,26 @@
       "doneAt": "2026-11-17T17:34:06.059Z"
     },
     "db-ops-lanes": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5447",
-      "claimedAt": "2026-11-17T17:34:16.473Z"
+      "claimedAt": "2026-11-17T17:34:16.473Z",
+      "doneAt": "2026-11-17T17:34:43.318Z"
+    },
+    "db-ops-lanes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:34:43.318Z"
+    },
+    "db-ops-lanes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:34:43.318Z"
+    },
+    "db-ops-lanes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:34:43.318Z"
+    },
+    "db-ops-lanes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:34:43.318Z"
     }
   }
 }
