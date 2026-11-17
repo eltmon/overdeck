@@ -4,17 +4,17 @@
     "created": "2026-11-17T12:44:46Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5447: Command palette conversation search stalls 15s+: synchronous vector scan, superseded searches keep running",
-    "updated": "2026-11-17T12:49:21.626Z"
+    "updated": "2026-11-17T12:53:16.321Z"
   },
   "plan": {
     "id": "pan-5447",
     "title": "Command palette conversation search stalls 15s+: synchronous vector scan, superseded searches keep running",
-    "status": "proposed",
+    "status": "running",
     "uid": "fb9ac1ee-3b69-449a-94fb-2466c44ddd1b",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-17T12:44:46Z",
-    "updated": "2026-11-17T12:49:21.626Z",
+    "updated": "2026-11-17T12:53:16.321Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5447",
@@ -698,5 +698,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
