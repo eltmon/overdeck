@@ -12,6 +12,7 @@ import {
   type ComputerUseSetupStepReport,
   type ComputerUseStatusView,
 } from '../hooks/useComputerUseStatus';
+import { ComputerUseMacPermissions } from './ComputerUseMacPermissions';
 
 type Tone = 'neutral' | 'success' | 'warning' | 'info';
 
@@ -75,7 +76,12 @@ function providerSteps(status: ComputerUseStatusView) {
   return status.setupSteps.filter((step) => PROVIDER_STEP_IDS.has(step.id));
 }
 
+const MAC_OFF_COPY =
+  'Setup installs the Overdeck Computer Use helper and opens two macOS permission pages. Switch on Overdeck Computer Use in each, then press Continue.';
+const MAC_PERMISSION_IDS = ['accessibility', 'screen-recording'];
+
 function offDescription(status: ComputerUseStatusView): string {
+  if (status.platform === 'darwin' && providerSteps(status).length > 0) return MAC_OFF_COPY;
   // WSL2 drives Windows through built-in PowerShell and UI Automation (PAN-5462 FR-6).
   if (status.platform === 'wsl') return 'Nothing to install: Windows already includes what it needs. One click turns it on.';
   const parts: string[] = [];
@@ -149,7 +155,9 @@ function FinishedSteps({ steps }: { steps: ComputerUseSetupStepReport[] }) {
             <StepIcon status={step.status} />
             {step.label}
           </div>
-          {step.message ? <p className="mt-1 pl-6 text-muted-foreground">{step.message}</p> : null}
+          {step.message ? (
+            <p className={`mt-1 pl-6 ${step.status === 'waiting' ? 'text-warning-foreground' : 'text-muted-foreground'}`}>{step.message}</p>
+          ) : null}
           {step.command ? <div className="pl-6"><CommandBlock command={step.command} /></div> : null}
         </li>
       ))}
@@ -207,7 +215,7 @@ function leaseSeconds(expiresAt: string): number {
 
 export function ComputerUseSection() {
   const {
-    status, loadError, refreshing, refresh, runSetup, settingUp, setupResult, setEnabled, release, busy, actionError,
+    status, loadError, refreshing, refresh, runSetup, settingUp, setupResult, setEnabled, release, openPermission, busy, actionError,
   } = useComputerUseStatus();
 
   const startSetup = () => {
@@ -262,6 +270,9 @@ export function ComputerUseSection() {
   const allOk = status.checks.every((check) => check.status === 'ok');
   const hasProviderSteps = providerSteps(status).length > 0;
   const needsPassword = status.setupSteps.some((step) => step.needsPassword);
+  const isMac = status.platform === 'darwin';
+  const macPermissionMissing =
+    isMac && MAC_PERMISSION_IDS.some((id) => status.checks.find((check) => check.id === id)?.status !== 'ok');
 
   let title: string;
   let badge: { tone: Tone; label: string } | null;
@@ -312,6 +323,11 @@ export function ComputerUseSection() {
             ? "Agents can operate Windows apps when you ask them to. They can't close apps with Alt+F4, lock Windows or open Task Manager."
             : "Agents can operate desktop apps when you ask them to. They can't quit apps, lock the screen or log you out."}
         </p>
+        {macPermissionMissing ? (
+          <p data-testid="computer-use-mac-regrant" className="mt-2 text-xs text-warning-foreground">
+            macOS asks you to allow the updated helper again.
+          </p>
+        ) : null}
         {!allOk ? (
           <div className="mt-3">
             <button type="button" data-testid="computer-use-cta" onClick={startSetup} className={PRIMARY_CTA}>
@@ -320,6 +336,15 @@ export function ComputerUseSection() {
           </div>
         ) : null}
         <div className="mt-4 space-y-3">
+          {isMac ? (
+            <ComputerUseMacPermissions
+              checks={status.checks}
+              busy={busy}
+              onOpen={(id) => {
+                void openPermission(id);
+              }}
+            />
+          ) : null}
           <EnableRow busy={busy} setEnabled={setEnabled} />
           <div className="flex items-start justify-between gap-4">
             <div>

@@ -70,12 +70,16 @@ export async function checkComputerUse(options: CheckComputerUseOptions): Promis
   const deps = options.deps ?? {};
   const detectPlatform = deps.detectPlatform ?? detectPlatformReal;
   const platformId = detectPlatform({ platform: options.platform ?? process.platform });
+  if (platformId === 'darwin') {
+    // The macOS checks launch the helper app; Settings → Computer Use runs them (PAN-5463).
+    return [{ name: NAME, status: 'ok', message: 'Enabled; on macOS, Settings → Computer Use checks the helper and permissions' }];
+  }
   if (platformId === 'wsl') {
     const provider = deps.wslProvider ?? providerFor('wsl');
     if (provider) return wslRows(provider);
   }
   if (platformId !== 'linux') {
-    return [{ name: NAME, status: 'warn', message: 'Enabled, but computer use supports Linux and Windows through WSL2 only' }];
+    return [{ name: NAME, status: 'warn', message: 'Enabled, but computer use supports Linux, macOS, and Windows through WSL2 only' }];
   }
 
   const readinessDeps: LinuxReadinessDeps = {};

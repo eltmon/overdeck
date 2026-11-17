@@ -2,9 +2,9 @@
 // upstream: src/main/computer/action-contracts/computer-blocked-key-combos.ts @ c6b9ac9549b
 // Design ported from vercel-labs/agent-desktop's per-platform blocked_combo lists (Apache-2.0).
 //
-// Linux and Windows slices of Orca's blocked-shortcut port (PAN-5452 D-7,
-// PAN-5462 D-8). The platform argument selects the table (PAN-5461 D-16);
-// 'mac' fails closed until PAN-5463 adds its table.
+// Linux, Windows and macOS slices of Orca's blocked-shortcut port (PAN-5452 D-7,
+// PAN-5462 D-8, PAN-5463 D-10). The platform argument selects the table
+// (PAN-5461 D-16).
 import { ComputerUseError } from './errors.js';
 import type { KeyPlatform } from './platform-types.js';
 
@@ -23,6 +23,33 @@ interface PlatformKeyRules {
 }
 
 const SHARED_KEY_ALIASES = { esc: 'escape' };
+
+// Aliases mirror how each provider maps modifier names to physical keys.
+const MACOS_RULES: PlatformKeyRules = {
+  modifierAliases: {
+    cmd: 'cmd',
+    command: 'cmd',
+    meta: 'cmd',
+    super: 'cmd',
+    win: 'cmd',
+    cmdorctrl: 'cmd',
+    commandorcontrol: 'cmd',
+    ctrl: 'ctrl',
+    control: 'ctrl',
+    alt: 'alt',
+    option: 'alt',
+    shift: 'shift',
+  },
+  // The macOS provider sends both names as the same physical Delete key.
+  keyAliases: { ...SHARED_KEY_ALIASES, delete: 'backspace' },
+  blocked: [
+    { modifiers: ['cmd', 'ctrl'], keys: ['q'], effect: 'lock the screen' },
+    { modifiers: ['cmd', 'shift'], keys: ['q'], effect: 'log out of macOS' },
+    { modifiers: ['cmd', 'alt'], keys: ['escape'], effect: 'open the Force Quit window' },
+    { modifiers: ['cmd', 'shift'], keys: ['backspace'], effect: 'empty the Trash' },
+    { modifiers: ['cmd'], keys: ['q'], effect: 'quit the app' },
+  ],
+};
 
 const WINDOWS_RULES: PlatformKeyRules = {
   modifierAliases: {
@@ -135,6 +162,7 @@ function findBlockedKeyCombo(key: string, rules: PlatformKeyRules): BlockedKeyCo
 function rulesFor(platform: KeyPlatform): PlatformKeyRules | null {
   if (platform === 'linux') return LINUX_RULES;
   if (platform === 'windows') return WINDOWS_RULES;
+  if (platform === 'mac') return MACOS_RULES;
   return null;
 }
 

@@ -41,11 +41,20 @@ describe('checkComputerUse (PAN-5452)', () => {
     expect(execFile).not.toHaveBeenCalled();
   });
 
-  it('warns that macOS is unsupported and runs no further probe', async () => {
+  it('warns that an unsupported host is unsupported and runs no further probe', async () => {
+    const execFile = vi.fn();
+    const checks = await checkComputerUse({ config: enabledConfig(), platform: 'win32', deps: { execFile } });
+    expect(checks).toEqual([
+      { name: 'Computer use', status: 'warn', message: 'Enabled, but computer use supports Linux, macOS, and Windows through WSL2 only' },
+    ]);
+    expect(execFile).not.toHaveBeenCalled();
+  });
+
+  it('points macOS at Settings → Computer Use and runs no Linux probe (PAN-5463)', async () => {
     const execFile = vi.fn();
     const checks = await checkComputerUse({ config: enabledConfig(), platform: 'darwin', deps: { execFile } });
     expect(checks).toEqual([
-      { name: 'Computer use', status: 'warn', message: 'Enabled, but computer use supports Linux and Windows through WSL2 only' },
+      { name: 'Computer use', status: 'ok', message: 'Enabled; on macOS, Settings → Computer Use checks the helper and permissions' },
     ]);
     expect(execFile).not.toHaveBeenCalled();
   });

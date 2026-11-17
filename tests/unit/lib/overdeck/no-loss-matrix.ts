@@ -787,6 +787,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/computer-use/setup',                         kind: 'http', disposition: 'WRITE',       door: 'host package install + computer_use.enabled via computer-use setup (PAN-5461)' },
   { surface: 'PUT /api/computer-use/settings',                       kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via computer-use settings path-scoped write (PAN-5461)' },
   { surface: 'POST /api/computer-use/release',                       kind: 'http', disposition: 'WRITE',       door: 'desktop lease file via pan computer release (PAN-5461)' },
+  { surface: 'POST /api/computer-use/open-permission',               kind: 'http', disposition: 'WRITE',       door: 'opens a macOS System Settings pane via the computer-use helper (PAN-5463)' },
 
   // ── color-themes.ts (PAN-4644) ───────────────────────────────────────────
   { surface: 'GET /api/color-themes',                                kind: 'http', disposition: 'READ',        door: 'color theme store + selection resolve (PAN-4644)' },

@@ -198,6 +198,106 @@ describe('ComputerUseSection (PAN-5461)', () => {
   });
 });
 
+describe('ComputerUseSection on macOS (PAN-5463)', () => {
+  afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
+
+  const MAC_CHECKS = (screenRecording: 'ok' | 'action'): ComputerUseStatusView['checks'] => [
+    { id: 'macos-version', label: 'macOS version', status: 'ok', detail: 'macOS 14.6.1' },
+    { id: 'helper', label: 'Overdeck Computer Use helper', status: 'ok', detail: 'Installed' },
+    { id: 'accessibility', label: 'Accessibility', status: 'ok', detail: 'Allowed' },
+    { id: 'screen-recording', label: 'Screen Recording', status: screenRecording, detail: screenRecording === 'ok' ? 'Allowed' : 'Not allowed' },
+    { id: 'handshake', label: 'Helper handshake', status: 'ok', detail: 'Handshake ok' },
+  ];
+
+  function macView(overrides: Partial<ComputerUseStatusView> = {}): ComputerUseStatusView {
+    return view({ platform: 'darwin', session: { ok: true, label: 'macOS 14.6.1' }, checks: MAC_CHECKS('ok'), ...overrides });
+  }
+
+  const MAC_STEPS: ComputerUseStatusView['setupSteps'] = [
+    { id: 'install-packages', label: 'Install the Overdeck Computer Use helper' },
+    { id: 'grant-permissions', label: 'Allow Accessibility and Screen Recording' },
+    { id: 'enable-flag', label: 'Turn on Computer Use' },
+    { id: 'test-helper', label: 'Test the helper' },
+  ];
+
+  it('describes the helper install and the two permission pages when off (ac1)', async () => {
+    serveStatus(macView({ setupSteps: MAC_STEPS }));
+    renderSection();
+    expect(
+      await screen.findByText(
+        'Setup installs the Overdeck Computer Use helper and opens two macOS permission pages. Switch on Overdeck Computer Use in each, then press Continue.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('computer-use-password-note')).toHaveTextContent('No password needed.');
+  });
+
+  it('shows a waiting step message in amber and a Continue button (ac2)', async () => {
+    const status = macView({ setupSteps: MAC_STEPS });
+    serveStatus(status, ({ method, url }) => {
+      if (method === 'POST' && url === '/api/computer-use/setup') {
+        return Response.json({
+          ok: false,
+          steps: [
+            { id: 'install-packages', label: 'Install the Overdeck Computer Use helper', status: 'done' },
+            {
+              id: 'grant-permissions',
+              label: 'Allow Accessibility and Screen Recording',
+              status: 'waiting',
+              message: 'Switch on "Overdeck Computer Use" in the two System Settings pages that opened, then press Continue.',
+            },
+          ],
+          status,
+        });
+      }
+      return undefined;
+    });
+    renderSection();
+    await act(async () => { fireEvent.click(await screen.findByTestId('computer-use-cta')); });
+
+    await waitFor(() => expect(screen.getByTestId('computer-use-cta')).toHaveTextContent('Continue'));
+    const message = screen.getByText(/Switch on "Overdeck Computer Use" in the two System Settings pages/);
+    expect(message.className).toContain('text-warning-foreground');
+    expect(screen.getByTestId('computer-use-badge')).toHaveTextContent('Waiting');
+  });
+
+  it('flags a missing permission when on and opens its settings pane (ac3)', async () => {
+    const status = macView({ enabled: true, checks: MAC_CHECKS('action'), setupSteps: [] });
+    const { fetchMock } = serveStatus(status, ({ method, url }) => {
+      if (method === 'POST' && url === '/api/computer-use/open-permission') return Response.json(status);
+      return undefined;
+    });
+    renderSection();
+
+    expect(await screen.findByTestId('computer-use-badge')).toHaveTextContent('Needs attention');
+    expect(screen.getByTestId('computer-use-mac-regrant')).toHaveTextContent('macOS asks you to allow the updated helper again.');
+    expect(screen.getByTestId('computer-use-cta')).toHaveTextContent('Fix setup');
+    await act(async () => { fireEvent.click(screen.getByTestId('computer-use-open-screen-recording')); });
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/computer-use/open-permission',
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ id: 'screen-recording' }) }),
+      ),
+    );
+  });
+
+  it('shows both permissions as Allowed and Ready when everything is ok (ac4)', async () => {
+    serveStatus(macView({ enabled: true, setupSteps: [] }));
+    renderSection();
+    expect(await screen.findByTestId('computer-use-badge')).toHaveTextContent('Ready');
+    expect(screen.getByTestId('computer-use-permission-accessibility')).toHaveTextContent('Allowed');
+    expect(screen.getByTestId('computer-use-permission-screen-recording')).toHaveTextContent('Allowed');
+    expect(screen.queryByTestId('computer-use-mac-regrant')).toBeNull();
+  });
+
+  it('shows no macOS permission rows on Linux', async () => {
+    serveStatus(view({ enabled: true, setupSteps: [] }));
+    renderSection();
+    await screen.findByTestId('computer-use-badge');
+    expect(screen.queryByTestId('computer-use-mac-permissions')).toBeNull();
+  });
+});
+
 describe('ComputerUseSection under WSL2 (PAN-5462 FR-6)', () => {
   afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
