@@ -1,5 +1,6 @@
 // Ported from Orca (MIT, Copyright (c) 2026 Lovecast Inc.)
 // upstream: native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift @ c6b9ac9549b
+// modified for Overdeck: same-uid peer trust replaces Orca bundle-id check
 import AppKit
 import ApplicationServices
 import CoreGraphics
@@ -4656,7 +4657,7 @@ private final class SocketListener: @unchecked Sendable {
             }
             close(fd)
         }
-        let authorizedPeer = peerProcessId(fd).map(isAuthorizedAgentPeer) == true
+        let authorizedPeer = isAuthorizedAgentPeer(fd)
         let decoder = JSONDecoder()
         AgentConnectionRequestLoop.run(readLine: { readLine(from: fd) }) { line in
             guard let data = line.data(using: .utf8),
@@ -4728,69 +4729,15 @@ private func existingPathMode(_ path: String) -> mode_t? {
     return statInfo.st_mode
 }
 
-private func peerProcessId(_ fd: Int32) -> pid_t? {
-    var pid = pid_t(0)
-    var length = socklen_t(MemoryLayout<pid_t>.size)
-    let result = withUnsafeMutablePointer(to: &pid) { pointer in
-        getsockopt(fd, 0, 2, pointer, &length)
-    }
-    return result == 0 && pid > 0 ? pid : nil
-}
-
-private func isAuthorizedAgentPeer(_ pid: pid_t) -> Bool {
-    guard let command = processCommand(pid),
-          command.contains("/out/main/computer-sidecar.js")
-              || command.contains("/Contents/Resources/app.asar.unpacked/out/main/computer-sidecar.js")
-    else {
+// Overdeck: a peer is trusted when it runs as the same user as the helper. The
+// token check in handleRequest still applies on top of this (PAN-5463 D-5).
+private func isAuthorizedAgentPeer(_ fd: Int32) -> Bool {
+    var uid = uid_t(0)
+    var gid = gid_t(0)
+    guard getpeereid(fd, &uid, &gid) == 0 else {
         return false
     }
-    if isTrustedOrcaApplication(pid) {
-        return true
-    }
-    guard let parentPid = parentProcessId(pid) else { return false }
-    return isTrustedOrcaApplication(parentPid)
-}
-
-private func isTrustedOrcaApplication(_ pid: pid_t) -> Bool {
-    guard let app = NSRunningApplication(processIdentifier: pid),
-          let bundleId = app.bundleIdentifier
-    else {
-        return false
-    }
-    return TrustedOrcaApplication.isTrusted(bundleId: bundleId)
-}
-
-private func parentProcessId(_ pid: pid_t) -> pid_t? {
-    guard let output = processField(pid: pid, field: "ppid=") else {
-        return nil
-    }
-    let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard let parentPid = pid_t(trimmed), parentPid > 1 else {
-        return nil
-    }
-    return parentPid
-}
-
-private func processCommand(_ pid: pid_t) -> String? {
-    return processField(pid: pid, field: "command=")
-}
-
-private func processField(pid: pid_t, field: String) -> String? {
-    let process = Process()
-    let pipe = Pipe()
-    process.executableURL = URL(fileURLWithPath: "/bin/ps")
-    process.arguments = ["-p", "\(pid)", "-o", field]
-    process.standardOutput = pipe
-    process.standardError = Pipe()
-    do {
-        try process.run()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else { return nil }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        return String(data: data, encoding: .utf8)
-    } catch {
-        return nil
-    }
+    return PeerCredentialTrust.isAuthorized(peerUid: uid, ownUid: getuid())
 }
 
 @MainActor

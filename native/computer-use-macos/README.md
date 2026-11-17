@@ -7,7 +7,8 @@ Every file is recorded in `scripts/upstream-ports.json` and checked by
 lines (`// Ported from Orca …` and `// upstream: <path> @ c6b9ac9549b`). In
 `Package.swift` the headers sit on lines 2–3, because
 `// swift-tools-version: 6.0` must stay on line 1. A file that Overdeck changed
-carries a third header line, `// modified for Overdeck: <summary>`.
+carries a third header line, `// modified for Overdeck: <summary>`. Files
+Overdeck wrote from scratch have no port header and no upstream-ports record.
 
 The helper is built as `Overdeck Computer Use.app` so macOS can attach the
 Accessibility and Screen Recording grants to its own code identity. It runs as
@@ -25,6 +26,14 @@ Overdeck changes only these:
 
 - `Package.swift`: the executable product is renamed from
   `orca-computer-use-macos` to `overdeck-computer-use-macos`.
+- Caller trust (`main.swift` `isAuthorizedAgentPeer`): Orca accepted a peer
+  only if its command line named Orca's `computer-sidecar.js` and it or its
+  parent was an app with an Orca bundle id. Overdeck instead trusts a peer
+  whose uid (`getpeereid`) equals the helper's own uid, through the new
+  Overdeck-authored `PeerCredentialTrust.swift` (tested by
+  `PeerCredentialTrustTests.swift`). The agent token check is unchanged.
+  `TrustedOrcaApplication.swift` and the `ps`-based process lookups are
+  deleted.
 
 ## Build and test
 

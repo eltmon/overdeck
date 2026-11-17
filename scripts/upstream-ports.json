@@ -642,12 +642,6 @@
     "commit": "c6b9ac9549b"
   },
   {
-    "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/TrustedOrcaApplication.swift",
-    "upstream": "orca",
-    "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/TrustedOrcaApplication.swift",
-    "commit": "c6b9ac9549b"
-  },
-  {
     "local": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/UnixSocketPathSafety.swift",
     "upstream": "orca",
     "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/UnixSocketPathSafety.swift",
