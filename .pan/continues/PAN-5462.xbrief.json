@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5462",
   "created": "2026-11-17T12:53:58.478Z",
-  "updated": "2026-11-17T12:53:58.478Z",
+  "updated": "2026-11-17T12:55:21.214Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,26 @@
   "sessionHistory": [],
   "items": {
     "vendor-windows-helper": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5462",
-      "claimedAt": "2026-11-17T12:53:58.478Z"
+      "claimedAt": "2026-11-17T12:53:58.478Z",
+      "doneAt": "2026-11-17T12:55:21.213Z"
+    },
+    "vendor-windows-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:55:21.213Z"
+    },
+    "vendor-windows-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:55:21.213Z"
+    },
+    "vendor-windows-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:55:21.213Z"
+    },
+    "vendor-windows-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:55:21.213Z"
     }
   }
 }
