@@ -5,8 +5,10 @@
  *   pan skills [list] [--project <key>] [--issue <id>] [--json]
  *   pan skills set <skill> on|off|inherit [--project <key> | --issue <id>]
  *   pan skills set --pack <id> on|off|inherit [--project <key> | --issue <id>]   (PAN-4334; <skill> may be <pack>/<skill>)
+ *   pan skills set --group <name> on|off|inherit [--project <key> | --issue <id>]   (PAN-5464; every pack of a pack group)
  *   pan skills launch-settings --harness <h> --cwd <dir> [--issue <id>] [--conversation <tmuxSession>] [--codex-home <dir>] [--plugin-link <path>]   (hidden; launchers)
  *   pan skills pack add <id> [url] [--ref <ref>] [--adapter plain|claude-plugin|deft-readonly|gstack-runtime] [--browser] [--yes]      (PAN-4334; known packs default url/ref, PAN-4728)
+ *   pan skills pack add --group <name> [--yes]   (PAN-5464; adds each pack of a pack group in order)
  *   pan skills pack update <id> [--ref <ref>] [--yes]
  *   pan skills pack browser <id> [on|off] [--yes]   (PAN-4730; gstack's browser runtime, second consent; ./skills-pack-browser.ts)
  *   pan skills pack list [--json] [--offline] | remove <id> | sync [id] | gc [--max-age-days <n>]
@@ -25,9 +27,9 @@ import { registerSkillsDeftCommands } from './skills-deft.js';
 import { registerSkillsSageoxCommands } from './skills-sageox.js';
 
 interface ListOptions { project?: string; issue?: string; json?: boolean }
-interface SetOptions { project?: string; issue?: string; pack?: string }
+interface SetOptions { project?: string; issue?: string; pack?: string; group?: string }
 interface LaunchSettingsOptions { harness: string; cwd: string; issue?: string; conversation?: string; codexHome?: string; pluginLink?: string }
-interface PackAddOptions { ref?: string; adapter?: string; yes?: boolean; browser?: boolean }
+interface PackAddOptions { ref?: string; adapter?: string; yes?: boolean; browser?: boolean; group?: string }
 interface PackBrowserOptions { yes?: boolean }
 interface PackUpdateOptions { ref?: string; yes?: boolean }
 interface PackListOptions { json?: boolean; offline?: boolean }
@@ -37,9 +39,13 @@ interface SageoxUploadOptions { project: string }
 
 type PackPreview = import('../../lib/skill-packs/sources.js').PackPreview;
 type NotAppliedLabels = (capabilities: PackPreview['manifest']['capabilities']) => string[];
+type PackAdapterId = import('../../lib/skill-packs/adapters.js').PackAdapterId;
+/** PackAddOptions once skillsPackAddCommand has validated `--adapter`. */
+type AddOneOptions = Omit<PackAddOptions, 'adapter'> & { adapter?: PackAdapterId };
 
 const STATES = { on: true, off: false, inherit: null } as const;
-const SET_USAGE = 'usage: pan skills set <skill> on|off|inherit | pan skills set --pack <id> on|off|inherit [--project <key> | --issue <id>]';
+const SET_USAGE =
+  'usage: pan skills set <skill> on|off|inherit | pan skills set --pack <id>|--group <name> on|off|inherit [--project <key> | --issue <id>]';
 
 async function failOnOverrideError(error: unknown): Promise<never> {
   const { SkillOverrideError } = await import('../../lib/skill-overrides/store.js');
@@ -91,14 +97,42 @@ export async function skillsListCommand(options: ListOptions): Promise<void> {
   console.log(chalk.dim('\nChanges apply to Claude Code and Codex agents at their next launch.'));
 }
 
+/** Member pack ids of a group, exiting 1 on an unknown group. */
+async function groupMembers(group: string): Promise<readonly string[]> {
+  const { resolvePackGroup, PackGroupError } = await import('../../lib/skill-packs/groups.js');
+  try {
+    return await resolvePackGroup(group);
+  } catch (error) {
+    if (!(error instanceof PackGroupError)) throw error;
+    console.error(chalk.red(error.message));
+    process.exit(1);
+  }
+}
+
+/** PAN-5464 D-11: a group sets nothing unless every member pack is registered. */
+async function registeredGroupMembers(group: string): Promise<readonly string[]> {
+  const members = await groupMembers(group);
+  const { listPacks } = await import('../../lib/skill-packs/sources.js');
+  const registered = new Set((await listPacks()).map(entry => entry.id));
+  const missing = members.filter(id => !registered.has(id));
+  if (missing.length > 0) {
+    for (const id of missing) console.error(chalk.red(`pack ${id} is not added; run pan skills pack add --group ${group}`));
+    process.exit(1);
+  }
+  return members;
+}
+
 export async function skillsSetCommand(args: string[], options: SetOptions): Promise<void> {
-  // PD-9: with --pack exactly one positional (the state); without it, skill and state.
-  if (args.length !== (options.pack ? 1 : 2)) {
+  if (options.pack && options.group) {
+    console.error(chalk.red('use either --pack or --group, not both'));
+    process.exit(1);
+  }
+  // PD-9: with --pack or --group exactly one positional (the state); without them, skill and state.
+  if (args.length !== (options.pack || options.group ? 1 : 2)) {
     console.error(chalk.red(SET_USAGE));
     process.exit(1);
   }
   const state = args[args.length - 1] as string;
-  const target = options.pack ? { pack: options.pack } : { skill: args[0] as string };
   if (!Object.prototype.hasOwnProperty.call(STATES, state)) {
     console.error(chalk.red('state must be on, off, or inherit'));
     process.exit(1);
@@ -107,6 +141,13 @@ export async function skillsSetCommand(args: string[], options: SetOptions): Pro
     console.error(chalk.red('use either --project or --issue, not both'));
     process.exit(1);
   }
+  const targets: Array<{ pack: string } | { skill: string }> = options.group
+    ? (await registeredGroupMembers(options.group)).map(pack => ({ pack }))
+    : [options.pack ? { pack: options.pack } : { skill: args[0] as string }];
+  for (const target of targets) await setOne(target, state, options);
+}
+
+async function setOne(target: { pack: string } | { skill: string }, state: string, options: SetOptions): Promise<void> {
   const enabled = STATES[state as keyof typeof STATES];
   const { setSkillOverride } = await import('../../lib/skill-overrides/store.js');
   const issueId = options.issue?.toUpperCase();
@@ -326,7 +367,18 @@ async function packConfirm(
   };
 }
 
-export async function skillsPackAddCommand(id: string, url: string | undefined, options: PackAddOptions): Promise<void> {
+/** A pack add that cannot start (no default url or ref); the single-id path prints it and exits 1. */
+class PackAddUsageError extends Error {}
+
+export async function skillsPackAddCommand(id: string | undefined, url: string | undefined, options: PackAddOptions): Promise<void> {
+  if (!id === !options.group) {
+    console.error(chalk.red('provide a pack id or --group <name>'));
+    process.exit(1);
+  }
+  if (options.group && (options.ref !== undefined || options.adapter !== undefined || options.browser)) {
+    console.error(chalk.red('--group takes no url, --ref, --adapter or --browser; each pack uses its known defaults'));
+    process.exit(1);
+  }
   if (
     options.adapter !== undefined &&
     options.adapter !== 'plain' &&
@@ -337,6 +389,47 @@ export async function skillsPackAddCommand(id: string, url: string | undefined, 
     console.error(chalk.red('--adapter must be plain, claude-plugin, deft-readonly, or gstack-runtime'));
     process.exit(1);
   }
+  // The check above narrowed options.adapter to a PackAdapterId.
+  const validated: AddOneOptions = { ...options, adapter: options.adapter };
+  if (options.group) return addGroupPacks(options.group, validated);
+  const packId = id as string;
+  let outcome;
+  try {
+    outcome = await addOnePack(packId, url, validated);
+  } catch (error) {
+    if (error instanceof PackAddUsageError) {
+      console.error(chalk.red(error.message));
+      process.exit(1);
+    }
+    return failOnPackError(error);
+  }
+  if (outcome === 'declined') process.exit(1);
+  // PAN-4730 D10: the browser runtime is a second, separate consent with its own preview.
+  if (options.browser) await skillsPackBrowserCommand(packId, 'on', { yes: options.yes });
+}
+
+/** PAN-5464 D-11: add every member in order; a registered member is skipped, and any decline or failure exits 1 at the end. */
+async function addGroupPacks(group: string, options: AddOneOptions): Promise<void> {
+  const members = await groupMembers(group);
+  const { PackSourceError } = await import('../../lib/skill-packs/sources.js');
+  let failed = false;
+  for (const member of members) {
+    try {
+      if (await addOnePack(member, undefined, options) === 'declined') failed = true;
+    } catch (error) {
+      if (error instanceof PackSourceError && error.code === 'exists') {
+        console.log(`${member}: already added`);
+        continue;
+      }
+      failed = true;
+      console.error(chalk.red(`${member}: ${error instanceof Error ? error.message : String(error)}`));
+    }
+  }
+  if (failed) process.exit(1);
+}
+
+/** Add one pack; 'declined' when its preview is not trusted. Throws PackSourceError (code 'exists' when registered) and PackAddUsageError. */
+async function addOnePack(id: string, url: string | undefined, options: AddOneOptions): Promise<'added' | 'declined'> {
   const [{ addPack }, { CORE_SKILLS }, { KNOWN_PACKS }] = await Promise.all([
     import('../../lib/skill-packs/sources.js'),
     import('../../lib/skill-overrides/resolve.js'),
@@ -345,33 +438,21 @@ export async function skillsPackAddCommand(id: string, url: string | undefined, 
   const known = KNOWN_PACKS[id];
   const resolvedUrl = url ?? known?.url;
   const ref = options.ref ?? known?.ref;
-  if (!resolvedUrl) {
-    console.error(chalk.red(`pack ${id} has no default url; pass one: pan skills pack add ${id} <url> --ref <ref>`));
-    process.exit(1);
-  }
-  if (!ref) {
-    console.error(chalk.red(`pack ${id} has no default ref; pass --ref <tag-or-branch>`));
-    process.exit(1);
-  }
+  if (!resolvedUrl) throw new PackAddUsageError(`pack ${id} has no default url; pass one: pan skills pack add ${id} <url> --ref <ref>`);
+  if (!ref) throw new PackAddUsageError(`pack ${id} has no default ref; pass --ref <tag-or-branch>`);
   const runtimeNote =
     (options.adapter ?? known?.adapter) === 'gstack-runtime'
       ? '\nTrusting runs the command above once now; skills run the listed scripts when you invoke them.'
       : '';
   const note = `Adding a pack trusts this commit and enables nothing. Turn it on with: pan skills set --pack ${id} on${runtimeNote}`;
   const confirm = await packConfirm(options.yes, note);
-  let result;
-  try {
-    result = await addPack(
-      { id, url: resolvedUrl, ref, ...(options.adapter ? { adapter: options.adapter } : {}), reservedIds: CORE_SKILLS },
-      confirm,
-    );
-  } catch (error) {
-    return failOnPackError(error);
-  }
-  if (!result.written) process.exit(1);
+  const result = await addPack(
+    { id, url: resolvedUrl, ref, ...(options.adapter ? { adapter: options.adapter } : {}), reservedIds: CORE_SKILLS },
+    confirm,
+  );
+  if (!result.written) return 'declined';
   console.log(`Trusted ${id} @ ${short(result.preview.commit)}.`);
-  // PAN-4730 D10: the browser runtime is a second, separate consent with its own preview.
-  if (options.browser) await skillsPackBrowserCommand(id, 'on', { yes: options.yes });
+  return 'added';
 }
 
 const BROWSER_NOTE = 'Trusting runs the command above once now and downloads the listed packages and Chromium.';
@@ -459,16 +540,20 @@ export async function skillsPackListCommand(options: PackListOptions): Promise<v
   if (rows.length === 0) {
     const url = KNOWN_PACKS['mattpocock']?.url;
     console.log(`No skill packs. Add one with: pan skills pack add mattpocock ${url} --ref v1.2.3`);
-    return;
+  } else {
+    console.log(chalk.bold(`\nSkill packs (${rows.length})\n`));
+    for (const row of rows) {
+      const update = 'updateAvailable' in row && row.updateAvailable ? `  update available: ${short(row.updateAvailable)}` : '';
+      console.log(`${chalk.bold(row.id)}  ${row.url} @ ${row.ref} (${short(row.commit)})${update}`);
+      console.log(chalk.dim(
+        `  cached ${row.cached ? 'yes' : 'no'} · license ${row.license ?? 'unknown'} · ${row.skills} skills · Not applied: ${listOrNone(row.notApplied)}`,
+      ));
+    }
   }
-  console.log(chalk.bold(`\nSkill packs (${rows.length})\n`));
-  for (const row of rows) {
-    const update = 'updateAvailable' in row && row.updateAvailable ? `  update available: ${short(row.updateAvailable)}` : '';
-    console.log(`${chalk.bold(row.id)}  ${row.url} @ ${row.ref} (${short(row.commit)})${update}`);
-    console.log(chalk.dim(
-      `  cached ${row.cached ? 'yes' : 'no'} · license ${row.license ?? 'unknown'} · ${row.skills} skills · Not applied: ${listOrNone(row.notApplied)}`,
-    ));
-  }
+  // PAN-5464 D-2: groups are aliases, listed only in the text output so the --json rows stay unchanged.
+  const { listPackGroups } = await import('../../lib/skill-packs/groups.js');
+  console.log(chalk.bold('\nGroups\n'));
+  for (const group of await listPackGroups()) console.log(`${group.name}  ${group.packs.join(', ')}  (${group.source})`);
 }
 
 /** gstack skills write `.gstack/` and `.gstack-worktrees/` in the projects they run in (PAN-4727 D9); remove never deletes them. */
@@ -657,6 +742,7 @@ export function registerSkillsCommands(program: Command): void {
   skills.command('set <args...>').description('Set a skill (<skill> <state>) or a pack (--pack <id> <state>) on, off, or inherit')
     .option('--project <key>', 'Project override').option('--issue <id>', 'Issue override')
     .option('--pack <id>', 'Set a whole skill pack instead of one skill')
+    .option('--group <name>', 'Set every pack in a pack group (e.g. video)')
     .action(skillsSetCommand);
   skills.command('launch-settings', { hidden: true }).description('Resolve skill overrides for a managed launch (used by launchers)')
     .requiredOption('--harness <harness>', 'claude-code or codex').requiredOption('--cwd <dir>', 'Launch working directory')
@@ -666,8 +752,9 @@ export function registerSkillsCommands(program: Command): void {
     .action(skillsLaunchSettingsCommand);
 
   const pack = skills.command('pack').description('Register, update, and cache external skill packs pinned to a commit');
-  pack.command('add <id> [url]')
+  pack.command('add [id] [url]')
     .description('Register a git skill pack at the commit a ref resolves to (enables nothing); known packs default the url and ref')
+    .option('--group <name>', 'Add every pack of a pack group (e.g. video), each with its known url and ref')
     .option('--ref <ref>', 'Tag, branch or commit to pin (default: the known pack ref)')
     .option('--adapter <adapter>', 'plain, claude-plugin, deft-readonly, or gstack-runtime')
     .option('--browser', 'Also build the browser runtime (gstack; asks separately)')

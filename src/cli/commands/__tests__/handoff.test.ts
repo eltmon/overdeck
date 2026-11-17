@@ -34,6 +34,15 @@ const readsMocks = vi.hoisted(() => ({
 }));
 vi.mock('../../../lib/overdeck/conversation-reads.js', () => readsMocks);
 
+// PAN-5464: pack groups expand against the pack catalog's cached packs.
+const catalogMocks = vi.hoisted(() => ({ listPackCatalog: vi.fn(async () => [] as Array<{ id: string; cached: boolean }>) }));
+vi.mock('../../../lib/skill-overrides/catalog.js', () => catalogMocks);
+const groupMocks = vi.hoisted(() => ({ resolvePackGroup: vi.fn() }));
+vi.mock('../../../lib/skill-packs/groups.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../lib/skill-packs/groups.js')>()),
+  resolvePackGroup: groupMocks.resolvePackGroup,
+}));
+
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
   return {
@@ -499,6 +508,61 @@ describe('handoffCommand', () => {
     const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
     expect(output).toContain('Skills: grilling');
     expect(output).toContain('Packs: mattpocock');
+  });
+
+  describe('--group (PAN-5464)', () => {
+    beforeEach(async () => {
+      const { PackGroupError } = await import('../../../lib/skill-packs/groups.js');
+      groupMocks.resolvePackGroup.mockImplementation(async (name: string) => {
+        if (name === 'video') return ['remotion', 'hyperframes', 'openmontage', 'video-use'];
+        throw new PackGroupError(`unknown pack group: ${name} (known: video)`);
+      });
+      conversationMocks.getConversationById.mockReturnValue({
+        id: 123, name: 'source-conv', title: 'Source conversation', cwd: '/workspace', claudeSessionId: 'session-id',
+      });
+      forkMocks.forkConversationViaServer.mockResolvedValue({ id: 789, name: 'new-conv', tmuxSession: 'conv-new', sessionAlive: true });
+    });
+
+    it('sends only the cached members and says how to add or sync each other member', async () => {
+      catalogMocks.listPackCatalog.mockResolvedValue([
+        { id: 'remotion', cached: true },
+        { id: 'hyperframes', cached: false },
+        { id: 'mattpocock', cached: true },
+      ]);
+      const { handoffCommand } = await import('../handoff.js');
+
+      await handoffCommand('123', ['continue'], { group: ['video'], pack: ['mattpocock', 'remotion'] });
+
+      expect(forkMocks.forkConversationViaServer).toHaveBeenCalledWith(
+        'source-conv',
+        expect.objectContaining({ packs: ['mattpocock', 'remotion'] }),
+      );
+      const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+      expect(output.split('skipped ')).toHaveLength(4);
+      expect(output).toContain('skipped hyperframes: not cached (pan skills pack sync hyperframes)');
+      for (const id of ['openmontage', 'video-use']) {
+        expect(output).toContain(`skipped ${id}: not added (pan skills pack add --group video)`);
+      }
+    });
+
+    it('sends one pack when only remotion is cached', async () => {
+      catalogMocks.listPackCatalog.mockResolvedValue([{ id: 'remotion', cached: true }]);
+      const { handoffCommand } = await import('../handoff.js');
+
+      await handoffCommand('123', [], { group: ['video'] });
+
+      expect(forkMocks.forkConversationViaServer).toHaveBeenCalledWith('source-conv', expect.objectContaining({ packs: ['remotion'] }));
+    });
+
+    it('exits 1 on an unknown group without forking', async () => {
+      const { handoffCommand } = await import('../handoff.js');
+
+      await expect(handoffCommand('123', [], { group: ['nope'] })).rejects.toThrow('process.exit');
+
+      const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+      expect(output).toContain('unknown pack group: nope');
+      expect(forkMocks.forkConversationViaServer).not.toHaveBeenCalled();
+    });
   });
 
   it('forwards --hold and prints the start hint', async () => {

@@ -144,14 +144,18 @@ export async function resolveLaunchPackSelection(
     }
     const skills = pack.manifest.skills
       .filter(skill => resolvePackSkill(`${pack.id}/${skill.name}`, skill.optIn, layers).enabled)
-      .map(skill => ({ name: skill.name, dir: skill.dir }));
+      .map(skill => ({ name: skill.name, dir: skill.dir, ...(skill.paths ? { paths: [...skill.paths] } : {}) }));
     if (skills.length > 0) {
       const known = KNOWN_PACKS[pack.id];
       selection.packs.push({
         id: pack.id,
         commit: pack.commit,
         root: pack.adapter === 'gstack-runtime' ? packRenderDir(pack.id, pack.commit) : packExtractDir(pack.id, pack.commit),
-        ...(pack.adapter === 'deft-readonly' || pack.adapter === 'gstack-runtime' ? { transform: pack.adapter } : {}),
+        ...(pack.adapter === 'deft-readonly' || pack.adapter === 'gstack-runtime'
+          ? { transform: pack.adapter }
+          : known?.mountTransform
+            ? { transform: known.mountTransform }
+            : {}),
         skills,
         ...(known?.pluginRoot ? { pluginRoot: known.pluginRoot } : {}),
         ...(known?.mountExtras?.length ? { extras: [...known.mountExtras] } : {}),
