@@ -5,7 +5,7 @@
  * ids to POST /api/conversations/:name/skills. A needs-restart answer offers
  * Restart and load, which re-posts the same body with restart: true.
  */
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Modal } from '../shared/Modal';
 import formStyles from '../shared/ModalForm.module.css';
@@ -93,16 +93,15 @@ export function AddSkillsModal({ conversation, onClose }: AddSkillsModalProps) {
   const queryClient = useQueryClient();
   const queryKey = ['conversation-skills', conversation.name];
   const loaded = useQuery({ queryKey, queryFn: () => fetchConversationSkills(conversation.name) });
-  const [value, setValue] = useState<Record<string, boolean> | null>(null);
+  // The operator's choices; until the first change the dialog shows the loaded map.
+  const [edited, setEdited] = useState<Record<string, boolean> | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SkillApplyResult | null>(null);
   const [sentBody, setSentBody] = useState<SkillChangeBody | null>(null);
 
   const loadedMap = loaded.data?.skillOverrides;
-  useEffect(() => {
-    if (loadedMap && value === null) setValue({ ...loadedMap });
-  }, [loadedMap, value]);
+  const value = edited ?? loadedMap ?? null;
 
   const change = loadedMap && value ? skillChangeBody(loadedMap, value) : {};
   const changed = Boolean(change.skills || change.off);
@@ -180,7 +179,7 @@ export function AddSkillsModal({ conversation, onClose }: AddSkillsModalProps) {
             projectKey={conversation.projectKey ?? undefined}
             issueId={conversation.issueId ?? undefined}
             value={value}
-            onChange={setValue}
+            onChange={setEdited}
           />
         )}
       </div>

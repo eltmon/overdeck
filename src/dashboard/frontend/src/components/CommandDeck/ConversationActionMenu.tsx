@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Star, Pencil, Sparkles, Share2, GitBranchPlus, Download, Copy, Check, Square, Archive, X, FileText, ExternalLink, Loader2, Columns2, Rows2, FolderInput } from 'lucide-react';
+import { Star, Pencil, Sparkles, Share2, GitBranchPlus, Download, Copy, Check, Square, Archive, X, FileText, ExternalLink, Loader2, Columns2, Rows2, FolderInput, PackagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Conversation } from './ConversationList';
 import type { ConversationMutations } from './useConversationMutations';
@@ -285,6 +285,14 @@ export function ConversationActionMenu({ conversation, mutations, position, onCl
               >
                 <GitBranchPlus size={14} />
                 Create summary fork
+              </MenuItemButton>
+            )}
+            {(!conversation.harness || conversation.harness === 'claude-code' || conversation.harness === 'codex') && (
+              <MenuItemButton
+                onClick={() => { mutations.openAddSkillsModal(conversation); onClose(); }}
+              >
+                <PackagePlus size={14} />
+                Add skills…
               </MenuItemButton>
             )}
             <MenuItemButton onClick={handleExport}>
