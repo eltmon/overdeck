@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5462",
   "created": "2026-11-17T12:53:58.478Z",
-  "updated": "2026-11-17T19:41:26.333Z",
+  "updated": "2026-11-17T19:42:22.988Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,9 +80,10 @@
       "doneAt": "2026-11-17T19:41:25.330Z"
     },
     "config-docs-changelog": {
-      "status": "pending",
+      "status": "completed",
       "claimedBy": "agent-pan-5462",
-      "claimedAt": "2026-11-17T19:41:26.333Z"
+      "claimedAt": "2026-11-17T19:41:26.333Z",
+      "doneAt": "2026-11-17T19:42:22.988Z"
     },
     "ci-wsl-e2e": {
       "status": "pending"
@@ -230,6 +231,18 @@
     "skill-and-help-text.ac3": {
       "status": "completed",
       "doneAt": "2026-11-17T19:41:25.330Z"
+    },
+    "config-docs-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:42:22.988Z"
+    },
+    "config-docs-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:42:22.988Z"
+    },
+    "config-docs-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:42:22.988Z"
     }
   }
 }
