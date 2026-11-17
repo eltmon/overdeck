@@ -45,7 +45,13 @@ describe('providerFor', () => {
     expect(providerFor('linux')).toBe(linuxProvider);
   });
 
-  it.each(['wsl', 'darwin', 'unsupported'] as const)('returns null for %s', (id) => {
+  it('returns the wsl provider for wsl (PAN-5462)', () => {
+    const provider = providerFor('wsl');
+    expect(provider?.id).toBe('wsl');
+    expect(provider?.blockedKeyPlatform).toBe('windows');
+  });
+
+  it.each(['darwin', 'unsupported'] as const)('returns null for %s', (id) => {
     expect(providerFor(id)).toBeNull();
   });
 });
