@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5463",
   "created": "2026-11-17T12:31:36.411Z",
-  "updated": "2026-11-17T19:18:26.928Z",
+  "updated": "2026-11-17T19:18:51.259Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,9 +58,10 @@
       "doneAt": "2026-11-17T19:18:26.928Z"
     },
     "wi3-protocol": {
-      "status": "pending",
+      "status": "completed",
       "claimedBy": "agent-pan-5463",
-      "claimedAt": "2026-11-17T19:16:57.668Z"
+      "claimedAt": "2026-11-17T19:16:57.668Z",
+      "doneAt": "2026-11-17T19:18:51.259Z"
     },
     "wi3-daemon": {
       "status": "pending"
@@ -200,6 +201,22 @@
     "wi3-install.ac4": {
       "status": "completed",
       "doneAt": "2026-11-17T19:18:26.928Z"
+    },
+    "wi3-protocol.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:51.259Z"
+    },
+    "wi3-protocol.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:51.259Z"
+    },
+    "wi3-protocol.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:51.259Z"
+    },
+    "wi3-protocol.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:51.259Z"
     }
   }
 }
