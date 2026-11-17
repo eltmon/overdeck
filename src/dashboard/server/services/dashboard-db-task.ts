@@ -143,6 +143,21 @@ const pending = new Map<string, PendingJob>();
 const sharedJobs = new Map<string, SharedJob>();
 let latestSemanticJobId: string | null = null;
 
+/**
+ * PAN-5447 serial lanes. The worker starts a synchronous job inside its
+ * `message` handler, so nothing posted later can cancel a job it already
+ * holds. For these lanes the main thread posts one job at a time and keeps the
+ * rest in a FIFO, so an aborted waiter is dropped before the worker sees it.
+ * The in-flight job always runs to completion; its result is discarded if its
+ * caller aborted. The worker is never terminated to cancel (node:sqlite cannot
+ * interrupt a running query, and a replacement would reopen the DB).
+ */
+const SERIAL_LANES: ReadonlySet<WorkerLane> = new Set<WorkerLane>(['conversation-text', 'conversation-vector']);
+/** lane → id of the job posted to that lane's worker and not yet answered. */
+const laneInFlight = new Map<WorkerLane, string>();
+const laneWaiters = new Map<WorkerLane, Array<{ id: string; post: () => void }>>();
+let forceWorkerPath = false;
+
 export function formatSlowJobLine(input: {
   op: DashboardDbOperation;
   lane: WorkerLane;
@@ -177,11 +192,31 @@ async function terminateWorkers(): Promise<void> {
   for (const lane of Object.keys(workers) as WorkerLane[]) {
     const worker = workers[lane];
     workers[lane] = null;
+    laneInFlight.delete(lane);
+    laneWaiters.delete(lane);
     if (worker) await worker.terminate();
   }
 }
 
-export const __testInternals = { workerScriptUrl, terminateWorkers };
+export const __testInternals = {
+  workerScriptUrl,
+  terminateWorkers,
+  /** Skip the Vitest inline branch so a test can drive the worker path against a mocked worker. */
+  forceWorkerPath(enabled: boolean): void {
+    forceWorkerPath = enabled;
+  },
+};
+
+function postNextWaiter(lane: WorkerLane): void {
+  const waiters = laneWaiters.get(lane);
+  while (waiters && waiters.length > 0) {
+    const next = waiters.shift()!;
+    if (pending.has(next.id)) {
+      next.post();
+      return;
+    }
+  }
+}
 
 function failPendingForLane(lane: WorkerLane, err: Error): void {
   for (const [id, job] of pending.entries()) {
@@ -193,6 +228,8 @@ function failPendingForLane(lane: WorkerLane, err: Error): void {
   for (const [key, job] of sharedJobs.entries()) {
     if (job.lane === lane) sharedJobs.delete(key);
   }
+  laneInFlight.delete(lane);
+  laneWaiters.delete(lane);
   if (lane === 'semantic') latestSemanticJobId = null;
 }
 
@@ -245,6 +282,12 @@ function getWorker(lane: WorkerLane): Worker {
   workers[lane] = worker;
 
   worker.on('message', (message: WorkerResponse) => {
+    // A serial lane frees up when the worker answers, even for a job whose
+    // caller aborted (and is therefore no longer pending).
+    if (message.progress === undefined && laneInFlight.get(lane) === message.id) {
+      laneInFlight.delete(lane);
+      postNextWaiter(lane);
+    }
     const job = pending.get(message.id);
     if (!job) return;
 
@@ -410,11 +453,39 @@ function isPollingSnapshot(operation: DashboardDbOperation): boolean {
     || operation === 'getConversationLedgerCosts';
 }
 
+/** Settle with `inner`, or reject with `signal.reason` as soon as `signal` aborts. */
+function rejectOnAbort<T>(inner: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener('abort', onAbort, { once: true });
+    inner.then(
+      (value) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      (err: unknown) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(err);
+      },
+    );
+  });
+}
+
+/**
+ * Run `operation` on its worker lane. `options.signal` aborts the caller's
+ * wait: the promise rejects with `signal.reason`, a job still waiting in a
+ * serial lane's FIFO is never posted, and a job already running finishes on
+ * the worker with its result discarded.
+ */
 export function runDashboardDbJob<T>(
   operation: DashboardDbOperation,
   payload?: unknown,
   onProgress?: (progress: unknown) => void | Promise<void>,
+  options: { signal?: AbortSignal } = {},
 ): Promise<T> {
+  const { signal } = options;
+  if (signal?.aborted) return Promise.reject(signal.reason);
+
   const key = coalescingKey(operation, payload);
   const existing = key ? sharedJobs.get(key) : undefined;
   if (existing) {
@@ -422,10 +493,11 @@ export function runDashboardDbJob<T>(
     return existing.promise as Promise<T>;
   }
 
-  if (import.meta.url.endsWith('.ts') && process.env['VITEST'] && !isPollingSnapshot(operation)) {
+  if (!forceWorkerPath && import.meta.url.endsWith('.ts') && process.env['VITEST'] && !isPollingSnapshot(operation)) {
     const progressListeners = new Set<ProgressHandler>();
     if (onProgress) progressListeners.add(onProgress);
-    const promise = runInline(operation, payload, onProgress) as Promise<T>;
+    const inline = runInline(operation, payload, onProgress) as Promise<T>;
+    const promise = signal ? rejectOnAbort(inline, signal) : inline;
     if (key) {
       sharedJobs.set(key, { lane: workerLane(operation), promise, progressListeners });
       promise.then(
@@ -464,17 +536,48 @@ export function runDashboardDbJob<T>(
           workers.semantic = null;
         }, Number.isFinite(SEMANTIC_SEARCH_TIMEOUT_MS) ? SEMANTIC_SEARCH_TIMEOUT_MS : 15000)
       : null;
+    const onAbort = () => {
+      if (!pending.has(id)) return;
+      pending.delete(id);
+      if (timeout) clearTimeout(timeout);
+      const waiters = laneWaiters.get(lane);
+      const waiterIndex = waiters?.findIndex(waiter => waiter.id === id) ?? -1;
+      if (waiters && waiterIndex >= 0) waiters.splice(waiterIndex, 1);
+      for (const [sharedKey, sharedJob] of sharedJobs.entries()) {
+        if (sharedJob.promise === promise) sharedJobs.delete(sharedKey);
+      }
+      // laneInFlight stays set: the lane is busy until the worker answers.
+      reject(signal!.reason);
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+    const stopListening = () => signal?.removeEventListener('abort', onAbort);
     pending.set(id, {
       lane,
       operation,
-      resolve: resolve as (value: unknown) => void,
-      reject,
+      resolve: (value: unknown) => {
+        stopListening();
+        resolve(value as T);
+      },
+      reject: (err: Error) => {
+        stopListening();
+        reject(err);
+      },
       progressListeners,
       progressChain: Promise.resolve(),
       timeout,
       enqueuedAt: Date.now(),
     });
-    getWorker(lane).postMessage({ id, operation, payload });
+    const post = () => {
+      if (SERIAL_LANES.has(lane)) laneInFlight.set(lane, id);
+      getWorker(lane).postMessage({ id, operation, payload });
+    };
+    if (SERIAL_LANES.has(lane) && laneInFlight.has(lane)) {
+      const waiters = laneWaiters.get(lane) ?? [];
+      waiters.push({ id, post });
+      laneWaiters.set(lane, waiters);
+    } else {
+      post();
+    }
   });
 
   if (key) {
