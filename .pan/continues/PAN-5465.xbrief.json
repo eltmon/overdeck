@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5465",
   "created": "2026-11-17T12:56:05.449Z",
-  "updated": "2026-11-17T14:30:27.333Z",
+  "updated": "2026-11-17T14:31:18.391Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-17T14:30:27.333Z"
     },
     "docs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5465",
-      "claimedAt": "2026-11-17T14:27:14.867Z"
+      "claimedAt": "2026-11-17T14:27:14.867Z",
+      "doneAt": "2026-11-17T14:31:18.390Z"
     },
     "empty-mount.ac1": {
       "status": "completed",
@@ -57,6 +58,22 @@
     "ui-add-skills-modal.ac4": {
       "status": "completed",
       "doneAt": "2026-11-17T14:30:27.333Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T14:31:18.390Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T14:31:18.390Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T14:31:18.390Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T14:31:18.390Z"
     }
   }
 }
