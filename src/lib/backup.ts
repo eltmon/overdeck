@@ -17,6 +17,15 @@ export function createBackupTimestamp(): string {
   return new Date().toISOString().replace(/[:.]/g, '-');
 }
 
+export const DEFAULT_BACKUP_KEEP = 10;
+
+/** Resolve the configured keep number; a missing or invalid value falls back to 10. */
+export function resolveBackupKeep(value: unknown): number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1
+    ? value
+    : DEFAULT_BACKUP_KEEP;
+}
+
 /**
  * Create a timestamped backup of the supplied source directories. Throws on a
  * copy failure.

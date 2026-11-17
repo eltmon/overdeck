@@ -49,6 +49,27 @@ describe('backup', () => {
     });
   });
 
+  describe('resolveBackupKeep', () => {
+    it('returns a valid integer unchanged', async () => {
+      const { resolveBackupKeep } = await import('../../src/lib/backup.js');
+
+      expect(resolveBackupKeep(3)).toBe(3);
+      expect(resolveBackupKeep(1)).toBe(1);
+    });
+
+    it('falls back to 10 for missing or invalid values', async () => {
+      const { resolveBackupKeep } = await import('../../src/lib/backup.js');
+
+      expect(resolveBackupKeep(undefined)).toBe(10);
+      expect(resolveBackupKeep(0)).toBe(10);
+      expect(resolveBackupKeep(-2)).toBe(10);
+      expect(resolveBackupKeep(2.5)).toBe(10);
+      expect(resolveBackupKeep(NaN)).toBe(10);
+      expect(resolveBackupKeep('5')).toBe(10);
+      expect(resolveBackupKeep(null)).toBe(10);
+    });
+  });
+
   describe('createBackup', () => {
     it('should create backup of existing directories', async () => {
       // Create source directories

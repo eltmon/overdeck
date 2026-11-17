@@ -183,6 +183,8 @@ export interface OverdeckConfig {
   };
   sync: {
     backup_before_sync: boolean;
+    /** PAN-5484: prunable sync backups kept after each `pan sync`. Integer ≥ 1; anything else → 10. */
+    backup_keep?: number;
     auto_sync?: boolean;
     strategy?: 'symlink' | 'copy';
     /**
@@ -222,6 +224,7 @@ const DEFAULT_CONFIG: OverdeckConfig = {
   },
   sync: {
     backup_before_sync: true,
+    backup_keep: 10,
     auto_sync: false,
     strategy: 'symlink',
     // PAN-1201: devroot is deprecated; default off so fresh installs use the
