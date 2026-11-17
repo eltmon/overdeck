@@ -27,7 +27,9 @@
 import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { PackMcpServer } from '../skill-packs/adapters.js';
+import type { SageoxLaunch } from '../sageox/launch.js';
 import type { MountSelection } from '../skill-packs/mount.js';
+import { resolveLaunchScope, type LaunchSkillContext } from './launch-scope.js';
 import type { SkillOverrideLayers } from './resolve.js';
 
 /** A selected `claude-plugin` pack's declared MCP servers and whether the operator consented to them (PAN-5165). */
@@ -37,26 +39,13 @@ export interface LaunchPackMcp {
   consented: boolean;
 }
 
-export interface LaunchSkillContext {
-  cwd: string;
-  issueId?: string;
-  /** Conversation tmux session whose row carries a per-conversation skill map (PAN-4486). */
-  conversation?: string;
-}
+
+// PAN-5465: the context type and scope resolver live in a leaf module so sageox/launch.ts can use them without an import cycle.
+export { resolveLaunchScope, type LaunchSkillContext };
 
 export const CODEX_SKILL_BLOCK_BEGIN = '# overdeck:skill-overrides:begin';
 export const CODEX_SKILL_BLOCK_END = '# overdeck:skill-overrides:end';
 
-/** Issue from ctx or the workspace path, project from the cwd. */
-export async function resolveLaunchScope(ctx: LaunchSkillContext): Promise<{ projectKey?: string; issueId?: string }> {
-  const [{ resolveProjectKeyForCwdAsync }, { issueIdFromWorkspacePath }] = await Promise.all([
-    import('../projects.js'),
-    import('../xbrief/io.js'),
-  ]);
-  const issueId = ctx.issueId ?? issueIdFromWorkspacePath(ctx.cwd) ?? undefined;
-  const projectKey = (await resolveProjectKeyForCwdAsync(ctx.cwd)) ?? undefined;
-  return { projectKey, issueId };
-}
 
 let conversationWarned = false;
 
@@ -77,7 +66,7 @@ async function loadLaunchLayers(ctx: LaunchSkillContext): Promise<SkillOverrideL
   const { loadSkillOverrideLayers } = await import('./store.js');
   const [layers, conversation] = await Promise.all([
     loadSkillOverrideLayers(await resolveLaunchScope(ctx)),
-    ctx.conversation ? loadConversationSkillLayer(ctx.conversation) : undefined,
+    ctx.conversationLayer ?? (ctx.conversation ? loadConversationSkillLayer(ctx.conversation) : undefined),
   ]);
   return conversation ? { ...layers, conversation } : layers;
 }
@@ -181,6 +170,20 @@ export async function applyCodexPacks(ctx: LaunchSkillContext, codexHome: string
   const { selection, warnings } = await resolveLaunchPackSelection(ctx, exclude);
   await writeCodexPackBlock(codexHome, await buildMount(selection));
   return warnings;
+}
+
+/**
+ * PAN-2444 / PAN-5465 D-7: the packs a launch must not mount (SageOx when its
+ * wiring is off), plus the SageOx resolution the caller also needs. The launch
+ * step and the conversation hot apply both call this, so they mount the same packs.
+ */
+export async function launchPackExclude(
+  ctx: LaunchSkillContext,
+  harness: 'claude-code' | 'codex',
+): Promise<{ exclude: ReadonlySet<string>; sageox: SageoxLaunch }> {
+  const { resolveSageoxLaunch, SAGEOX_PACK_ID } = await import('../sageox/launch.js');
+  const sageox = await resolveSageoxLaunch(ctx, harness);
+  return { exclude: new Set(sageox.active ? [] : [SAGEOX_PACK_ID]), sageox };
 }
 
 /** Whether this launch's pack selection mounts any `deft` skill. */

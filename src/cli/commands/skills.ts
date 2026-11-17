@@ -150,18 +150,16 @@ export async function skillsLaunchSettingsCommand(options: LaunchSettingsOptions
     console.error('--codex-home is required for --harness codex');
     process.exit(1);
   }
-  const [launch, { resolveSageoxLaunch, SAGEOX_PACK_ID }, { dirname, join }, { resolveSemgrepLaunchSettings, mergeClaudeHookMaps }] = await Promise.all([
+  const [launch, { dirname, join }, { resolveSemgrepLaunchSettings, mergeClaudeHookMaps }] = await Promise.all([
     import('../../lib/skill-overrides/launch.js'),
-    import('../../lib/sageox/launch.js'),
     import('node:path'),
     import('../../lib/semgrep/in-session.js'),
   ]);
   const ctx = { cwd: options.cwd, issueId: options.issue, conversation: options.conversation };
   const disabled = await launch.resolveLaunchDisabledSkills(ctx);
   // PAN-2444: SageOx wiring fails closed; when it is off, its skills are not mounted either.
-  const sageox = await resolveSageoxLaunch(ctx, options.harness);
+  const { exclude, sageox } = await launch.launchPackExclude(ctx, options.harness);
   for (const warning of sageox.warnings) console.error(warning);
-  const exclude = new Set(sageox.active ? [] : [SAGEOX_PACK_ID]);
   const semgrep = await resolveSemgrepLaunchSettings({ harness: options.harness, conversation: options.conversation });
   if (options.harness === 'claude-code') {
     const link = options.pluginLink;

@@ -21,7 +21,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { SkillOverrideLayers } from '../skill-overrides/resolve.js';
-import type { LaunchSkillContext } from '../skill-overrides/launch.js';
+import type { LaunchSkillContext } from '../skill-overrides/launch-scope.js';
 import type { OxBinary } from './binary.js';
 import type { ensureSageoxPlaced, removeSageoxPlacement } from './placement.js';
 import type { OxProbeResult } from './probe.js';
@@ -60,7 +60,7 @@ export interface SageoxLaunchDeps {
 const defaultDeps: SageoxLaunchDeps = {
   loadLayers: async ctx => {
     const [{ resolveLaunchScope }, { loadSkillOverrideLayers }] = await Promise.all([
-      import('../skill-overrides/launch.js'),
+      import('../skill-overrides/launch-scope.js'),
       import('../skill-overrides/store.js'),
     ]);
     const scope = await resolveLaunchScope(ctx);
