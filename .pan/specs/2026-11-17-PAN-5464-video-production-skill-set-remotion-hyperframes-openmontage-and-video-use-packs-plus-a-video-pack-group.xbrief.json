@@ -1,0 +1,855 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-17T12:36:47Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5464: Video production skill set: Remotion, HyperFrames, OpenMontage and video-use packs, plus a 'video' pack group",
+    "updated": "2026-11-17T12:39:49.803Z"
+  },
+  "plan": {
+    "id": "pan-5464",
+    "title": "Video production skill set: Remotion, HyperFrames, OpenMontage and video-use packs, plus a 'video' pack group",
+    "status": "proposed",
+    "uid": "d700e162-56df-4789-8337-a77f1c5a8729",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-17T12:36:47Z",
+    "updated": "2026-11-17T12:39:49.803Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5464",
+        "label": "PAN-5464",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5464/.pan/drafts/pan-5464.md",
+        "label": "PRD draft (.pan/drafts/pan-5464.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5465",
+        "label": "PAN-5465 companion (imports resolvePackGroup)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "skill-packs",
+      "video",
+      "cli",
+      "lfs",
+      "pack-groups"
+    ],
+    "metadata": {
+      "sizeJustification": "24 files across exactly 6 subsystems (src/lib, src/cli, and four doc paths); within the finalize limits, listed here for reviewers.",
+      "canonicalFilename": "2026-11-17-PAN-5464-video-production-skill-set-remotion-hyperframes-openmontage-and-video-use-packs-plus-a-video-pack-group.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The operator wants one video production skill bundle. Skill packs are one git repo each, the video skills come from four repos with four licenses, and three of the four fail or misread in today's preview: HyperFrames extraction runs the Git LFS smudge filter and dies on the LFS rate limit, OpenMontage's skills live under .agents/skills (0 found) and its AGPL license reads as unknown, and video-use's main skill is a root SKILL.md the scanner never sees.",
+      "Proposal": "Fix extraction (skip LFS smudge, restrict archives to declared paths plus capability-probe paths), recognize GPL-family licenses by full name, support a known pack's root skill through manifest, update diff, launch selection and mount (with a video-use host notice and generated requirements.txt), add four commit-pinned known packs from eltmon forks with a frozen 38-skill OpenMontage curation, and add pack groups (built-in 'video', config skills.pack_groups) to pan skills set, pan skills pack add and pan handoff. Docs and changelog ship with it. Full detail: .pan/drafts/pan-5464.md.",
+      "NonGoals": "- No dashboard UI for pack groups or adding packs to a running conversation (PAN-5465 owns that).\n- No group support in the overdeck MCP handoff tool or the conversations HTTP route.\n- No new runtime adapter and no install step that runs pack code (video-use helpers run only when the agent invokes them, via uv).\n- No removal of the operator's ~/.claude/skills symlinks or npx skills copies; docs explain the double listing.\n- No change to the mount hash of any existing pack.\n- No fork creation, no upstream issues or PRs, no push to any upstream repo.\n- No video-shotcraft known pack.\n- No change to the JSON output shape of pan skills pack list.\n- No live check against the operator's real ~/.overdeck; live checks use an isolated OVERDECK_HOME.\n- No raise of any file-size allowlist row."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Pin each known pack to its eltmon fork's main head on 2026-11-17 (remotion 3e20ac7, hyperframes 34f98e6, openmontage 2e003e6, video-use 43cfc56).",
+        "rationale": "The forks already exist; pinning the verified heads makes the skill counts, exclude list and archive paths in the PRD true by construction, matching the pstack and atlassian precedent of 40-hex pins."
+      },
+      {
+        "summary": "OpenMontage mounts 38 skills: exclude duplicates/generic web skills, repo-maintenance skills, and skills whose description targets OpenMontage or whose body imports/runs OpenMontage code; keep elevenlabs, music-to-video, seedance-2-5 and gemini-omni.",
+        "rationale": "Repo-bound skills fail outside an OpenMontage checkout; a frozen explicit list removes judgment from the executor, and per-skill toggles let the operator turn any excluded behavior back on via a checkout."
+      },
+      {
+        "summary": "Archive paths are filtered to those that exist at the commit and always include capability-probe paths (.claude-plugin, hooks, .mcp.json, commands, agents, LICENSE, LICENSE.md).",
+        "rationale": "git archive exits 128 on an unmatched pathspec (verified), and a restricted archive would otherwise hide hooks or MCP servers from the trust preview."
+      },
+      {
+        "summary": "pan skills set --group writes nothing when any member pack is unregistered.",
+        "rationale": "All-or-nothing avoids a half-applied group that the operator must reason about; the error names the command that fixes it."
+      },
+      {
+        "summary": "pan skills pack list --json keeps its array shape; groups appear only in text output.",
+        "rationale": "Scripts parse the JSON array today; adding groups there would be a breaking change for no requested benefit."
+      },
+      {
+        "summary": "No opt-in lists for the four video packs.",
+        "rationale": "Opt-in is reserved for skills that change Overdeck-owned files or push; none of the 62 mounted skills does, and paid-API skills do nothing without a key the operator sets."
+      }
+    ],
+    "items": [
+      {
+        "id": "lfs-skip",
+        "title": "Skip the Git LFS smudge filter in every pack git call",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:36:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/sources.ts",
+            "src/lib/skill-packs/__tests__/sources.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/sources.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sources.test.ts passes including the LFS-skip test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/lib/skill-packs/sources.ts, the local git() helper (search 'async function git(args') adds GIT_LFS_SKIP_SMUDGE: '1' to its env next to GIT_TERMINAL_PROMPT. Add the test 'extractCommit skips the LFS smudge filter' to sources.test.ts: temp repo with .gitattributes '*.bin filter=lfs', a committed pointer file, GIT_CONFIG_GLOBAL pointing at a temp config whose filter.lfs.smudge exits 1 unless GIT_LFS_SKIP_SMUDGE=1 and filter.lfs.required=true; restore env in afterEach."
+        },
+        "items": [
+          {
+            "id": "lfs-skip.ac1",
+            "title": "Given a fake smudge filter that exits 1 unless GIT_LFS_SKIP_SMUDGE=1, extractCommit resolves and the extracted file contains the LFS pointer text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lfs-skip.ac2",
+            "title": "The git() helper env in sources.ts contains GIT_LFS_SKIP_SMUDGE: '1' and no -c filter.lfs override is added to any git argv",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "license-names",
+        "title": "Recognize AGPL, LGPL and GPL licenses by full name",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:36:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/adapters.ts",
+            "src/lib/skill-packs/__tests__/adapters.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/adapters.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "adapters.test.ts passes including the three license cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In readLicense (adapters.ts, search 'const LICENSE_TOKENS'), check LICENSE_NAMES regexes (GNU AFFERO GENERAL PUBLIC LICENSE -> AGPL-3.0, GNU LESSER GENERAL PUBLIC LICENSE -> LGPL, GNU GENERAL PUBLIC LICENSE -> GPL) on the first non-blank line before the existing token match. Add three fixture tests."
+        },
+        "items": [
+          {
+            "id": "license-names.ac1",
+            "title": "readPackManifest returns license 'AGPL-3.0' for a LICENSE whose first non-blank line is an indented 'GNU AFFERO GENERAL PUBLIC LICENSE'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "license-names.ac2",
+            "title": "readPackManifest returns 'LGPL' for a GNU LESSER GENERAL PUBLIC LICENSE fixture and still returns 'MIT' for an 'MIT License' fixture",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lfs-count",
+        "title": "Report LFS pointer files under Not applied",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:36:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/adapters.ts",
+            "src/lib/skill-packs/__tests__/adapters.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/adapters.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "adapters.test.ts passes including the LFS label cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. PackCapabilities gains optional lfsObjects: number. readPackManifest counts regular files of at most 1024 bytes inside each included skill dir whose first line is 'version https://git-lfs.github.com/spec/v1' (use limitFs) and sets lfsObjects only when above 0. notAppliedLabels pushes 'LFS objects (<n>)' after the executables label. The root-skill branch added later by root-skill-manifest must count over its paths; leave a small helper (countLfsPointers(base, dir)) it can call per path."
+        },
+        "items": [
+          {
+            "id": "lfs-count.ac1",
+            "title": "Given a skill dir holding one LFS pointer file, notAppliedLabels(manifest.capabilities) contains 'LFS objects (1)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lfs-count.ac2",
+            "title": "Given a skill dir with no pointer files, capabilities.lfsObjects is undefined and no 'LFS objects' label is produced",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "archive-paths",
+        "title": "Restrict pack extraction to declared archive paths plus capability-probe paths",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:36:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/adapters.ts",
+            "src/lib/skill-packs/sources.ts",
+            "src/lib/skill-packs/__tests__/sources.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/sources.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sources.test.ts passes including the four archive-path tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4, D-6, D-7. KnownPack gains archivePaths. sources.ts exports CAPABILITY_PROBE_PATHS = ['.claude-plugin','hooks','.mcp.json','commands','agents','LICENSE','LICENSE.md'] and adds archivePathsOf(id) next to pluginRootOf. extractCommit(id, commit, pluginRoot?, archivePaths?): assertOperand each path; effective = dedupe(archivePaths + probe paths) filtered by 'git --git-dir <repo> cat-file -e <commit>:<path>'; empty -> throw 'pack <id>: none of its archive paths exist at <commit>'; reuse an existing extraction only when every effective path exists in it, else rm and rebuild; pass ['--', ...effective] to git archive. Update all 7 extractCommit call sites (search 'extractCommit(id,') to pass archivePathsOf(id). git archive exits 128 on a missing pathspec, which is why the filter exists."
+        },
+        "items": [
+          {
+            "id": "archive-paths.ac1",
+            "title": "Given archivePaths ['skills'], the extraction contains skills/a/SKILL.md and LICENSE and does not contain big/blob.txt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "archive-paths.ac2",
+            "title": "Given archivePaths ['skills','missing'], extractCommit resolves (the missing path is dropped); given only ['missing'] in a repo without LICENSE, it rejects with 'none of its archive paths exist'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "archive-paths.ac3",
+            "title": "extractCommit rebuilds an existing extraction that lacks an effective path, and returns an existing extraction that contains all effective paths unchanged (same inode)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "archive-paths.ac4",
+            "title": "Every extractCommit call in sources.ts passes archivePathsOf(id) as its fourth argument",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "root-skill-manifest",
+        "title": "Read a known pack's root skill into the manifest from both manifest call sites",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:36:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5464",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "root-skill-mount",
+            "known-packs"
+          ],
+          "files_scope": [
+            "src/lib/skill-packs/adapters.ts",
+            "src/lib/skill-packs/sources.ts",
+            "src/lib/skill-overrides/catalog.ts",
+            "src/lib/skill-packs/__tests__/adapters.test.ts",
+            "src/lib/skill-overrides/__tests__/catalog.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/adapters.test.ts src/lib/skill-overrides/__tests__/catalog.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "adapters.test.ts and catalog.test.ts pass including the root-skill cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5, D-8. KnownPack.rootSkill {name, paths}; PackSkill.paths optional. readPackManifest opts gain rootSkill; for the plain adapter, when <base>/SKILL.md is a file, push {name, dir: '.', paths, description, optIn} first, then scan skills/ as today. Executables and LFS pointers for the root skill come only from its paths (file checked directly, dir walked with listExecutables(base, path)); never call listExecutables(base, '.'). Pass rootSkill: KNOWN_PACKS[id]?.rootSkill in BOTH manifestAt (sources.ts) and readOpts in listPackCatalog (catalog.ts). In updatePack (search 'treeHash(id, entry.commit, before.dir)'), when skill.paths is set, hash each side as the treeHash of each path joined with ','."
+        },
+        "items": [
+          {
+            "id": "root-skill-manifest.ac1",
+            "title": "Given a fixture with root SKILL.md (name video-use), helpers/a.py, tests/x.py and skills/manim-video, readPackManifest with rootSkill returns skills ['video-use','manim-video'] with video-use dir '.' and paths set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "root-skill-manifest.ac2",
+            "title": "The fixture manifest's executables list contains helpers/a.py and does not contain tests/x.py",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "root-skill-manifest.ac3",
+            "title": "listPackCatalog returns a 2-skill manifest for a registered fixture pack whose known pack declares a root skill",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "root-skill-manifest.ac4",
+            "title": "No code path passes '.' to treeHash or listExecutables; updatePack hashes a root skill by its paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "root-skill-mount",
+        "title": "Mount root skills by path with the video-use host notice and requirements.txt",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:36:47Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/video-use.ts",
+            "src/lib/skill-packs/mount.ts",
+            "src/lib/skill-packs/adapters.ts",
+            "src/lib/skill-overrides/launch.ts",
+            "src/lib/skill-packs/__tests__/video-use.test.ts",
+            "src/lib/skill-packs/__tests__/mount.test.ts",
+            "src/lib/skill-overrides/__tests__/launch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/video-use.test.ts src/lib/skill-packs/__tests__/mount.test.ts src/lib/skill-overrides/__tests__/launch.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "video-use.test.ts, mount.test.ts and launch.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "Its only shared file, adapters.ts, is ordered by the blocks chain (root-skill-manifest before it, known-packs after); its other files (video-use.ts, mount.ts, launch.ts and their tests) are touched by no other item."
+        },
+        "narrative": {
+          "Action": "PRD WI-6, D-9, D-10. New video-use.ts: VIDEO_USE_NOTICE_VERSION = 1, VIDEO_USE_HOST_NOTICE (exact text in the PRD), applyVideoUseHostNotice (insert after frontmatter with marker '<!-- overdeck:video-use-host-notice v1 -->', idempotent, same split as applyDeftHostNotice, no name rewrite), requirementsFromPyproject (parse with @iarna/toml, [project].dependencies one per line). mount.ts: MountTransform adds 'video-use' (transformTag 'video-use.1', assertMountPack accepts it); skills entries gain paths (reject absolute and '..' paths); mountHash appends ':' + paths.join(',') only when paths is set; populateMount copies each path from join(root, dir, p) when paths is set, then for transform video-use and skill video-use rewrites SKILL.md and writes requirements.txt from the copied pyproject.toml. KnownPack.mountTransform?: 'video-use'. launch.ts resolveLaunchPackSelection passes skill.paths and uses known?.mountTransform when the adapter has no transform. BEFORE editing mountHash, capture the hash of an existing-pack fixture selection and hard-code it in a test."
+        },
+        "items": [
+          {
+            "id": "root-skill-mount.ac1",
+            "title": "Given a video-use transform pack over a fixture root with tests/x.py, buildMount creates skills/video-use/SKILL.md, helpers/a.py and requirements.txt and no tests/ dir",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "root-skill-mount.ac2",
+            "title": "The mounted video-use SKILL.md contains the host notice marker exactly once, and manim-video in the same pack contains no notice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "root-skill-mount.ac3",
+            "title": "requirementsFromPyproject of the pinned video-use pyproject.toml returns 'requests\\nlibrosa\\nmatplotlib\\npillow\\nnumpy\\n'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "root-skill-mount.ac4",
+            "title": "mountHash returns the hex constant captured before the change for a selection with no paths and no new transform",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "root-skill-mount.ac5",
+            "title": "resolveLaunchPackSelection returns transform 'video-use' and the skill's paths for a catalog pack whose known pack sets mountTransform",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "groups-lib",
+        "title": "Add the pack-group library with the built-in video group and config overrides",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:36:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5464",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "skills-cli-group",
+            "handoff-group"
+          ],
+          "files_scope": [
+            "src/lib/skill-packs/groups.ts",
+            "src/lib/skill-packs/__tests__/groups.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/groups.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "groups.test.ts passes all four cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. New src/lib/skill-packs/groups.ts exporting KNOWN_PACK_GROUPS ({ video: ['remotion','hyperframes','openmontage','video-use'] }), PackGroupError, resolvePackGroup(name): Promise<readonly string[]>, listPackGroups(): Promise<Array<{name, packs, source: 'built-in'|'config'}>>. Read skills.pack_groups from getGlobalConfigPath() with parseYaml exactly like listPacks() in sources.ts; drop entries that are not arrays of PACK_ID_PATTERN strings; config overrides built-ins by name. Unknown name error: 'unknown pack group: <name> (known: ...)'. PAN-5465 imports resolvePackGroup: keep the name and signature exactly."
+        },
+        "items": [
+          {
+            "id": "groups-lib.ac1",
+            "title": "resolvePackGroup('video') returns ['remotion','hyperframes','openmontage','video-use'] when config has no pack_groups",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "groups-lib.ac2",
+            "title": "Given config skills.pack_groups.video: [remotion], resolvePackGroup('video') returns ['remotion'] and listPackGroups marks it source 'config'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "groups-lib.ac3",
+            "title": "resolvePackGroup('nope') rejects with a PackGroupError whose message starts 'unknown pack group: nope'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skills-cli-group",
+        "title": "Add --group to pan skills set and pan skills pack add",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:36:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/skills.ts",
+            "src/cli/commands/__tests__/skills.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/skills.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "skills.test.ts passes including the --group cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8, D-11. In src/cli/commands/skills.ts registerSkillsCommands: 'skills set' gains --group <name> (one positional state; --group with --pack exits 1 'use either --pack or --group, not both'; resolve members, check each is in listPacks(), any missing -> print 'pack <id> is not added; run pan skills pack add --group <name>' and exit 1 before writing; else setSkillOverride once per member). 'pack add <id> [url]' becomes 'add [id] [url]' with --group; exactly one of id or --group ('provide a pack id or --group <name>'); --group rejects url and --ref. Extract addOnePack(id, url, options) returning 'added'|'declined'|'exists' without process.exit; the single-id path keeps today's output and exit codes; the group loop prints '<id>: already added' for exists and exits 1 at the end if any member was declined or threw."
+        },
+        "items": [
+          {
+            "id": "skills-cli-group.ac1",
+            "title": "'skills set --group video on --project p' produces four setSkillOverride calls with level 'project', one per member pack id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-cli-group.ac2",
+            "title": "When one member is unregistered, 'skills set --group video on' calls setSkillOverride zero times and exits 1 with the 'is not added' message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-cli-group.ac3",
+            "title": "'skills set --group video --pack x on' exits 1 with 'use either --pack or --group, not both'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-cli-group.ac4",
+            "title": "'skills pack add --group video --yes' calls addPack four times, and an 'exists' error on one member prints '<id>: already added' and does not stop the rest",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handoff-group",
+        "title": "Add pan handoff --group and the Groups section of pan skills pack list",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:36:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/handoff.ts",
+            "src/cli/commands/skills.ts",
+            "src/cli/commands/__tests__/handoff.test.ts",
+            "src/cli/commands/__tests__/skills.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/handoff.test.ts src/cli/commands/__tests__/skills.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "handoff.test.ts and skills.test.ts pass including the group cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. src/cli/index.ts handoff command (search \".option('--pack <id>'\") gains a repeatable --group <name>. handoff.ts: HandoffOptions.group?: string[]; before forkConversationViaServer, expand each group with resolvePackGroup, keep members whose listPackCatalog() entry is cached, print 'skipped <id>: not added (pan skills pack add --group <name>)' for the rest, merge into options.pack without duplicates; an unknown group prints the PackGroupError message and exits 1. skillsPackListCommand prints a 'Groups' heading after the pack rows and one line per listPackGroups() entry: '<name>  <packs joined by \", \">  (<source>)'. The --json output stays the pack-row array unchanged."
+        },
+        "items": [
+          {
+            "id": "handoff-group.ac1",
+            "title": "Given only remotion cached, handoff with --group video sends packs ['remotion'] to the fork call and prints three 'skipped' lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-group.ac2",
+            "title": "handoff with an unknown --group exits 1 and prints 'unknown pack group'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-group.ac3",
+            "title": "'skills pack list' text output contains 'video  remotion, hyperframes, openmontage, video-use  (built-in)' and the --json output remains an array of pack rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "known-packs",
+        "title": "Add the remotion, hyperframes, openmontage and video-use known packs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:36:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/adapters.ts",
+            "src/lib/skill-packs/openmontage.ts",
+            "src/lib/skill-packs/__tests__/adapters.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/adapters.test.ts",
+            "npm run typecheck",
+            "OVERDECK_HOME=$HOME/.overdeck/tmp/pan-5464-live npx tsx src/cli/index.ts skills pack add openmontage </dev/null"
+          ],
+          "expected_outputs": [
+            "adapters.test.ts passes including the known-pack and openmontage fixture tests",
+            "typecheck completes without errors",
+            "the isolated openmontage preview prints Skills 38 and License AGPL-3.0 and registers nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10, D-3, D-4. New src/lib/skill-packs/openmontage.ts: OPENMONTAGE_EXCLUDED_NAMES (the 55 names in the PRD curation section, one comment per rule group), OPENMONTAGE_EXCLUDE = names mapped to '.agents/skills/<name>', OPENMONTAGE_DISCLOSURE. Add the four KNOWN_PACKS entries exactly as in the PRD code block (eltmon urls, pinned 40-hex refs 3e20ac75161bc34468845df714701cc9bf6075f4, 34f98e6a04e572296e314485d8e2f330edb0ca69, 2e003e65fa99a0f329478a2c1cdcf26bc481933a, 43cfc566833548093455c9d4a46bd69913b7e552; archivePaths; rootSkill and mountTransform for video-use; no optIn). First confirm each pinned commit with 'gh api repos/eltmon/<fork>/commits/<sha>'; if any fails, stop and pan tell flywheel-orchestrator. Then run the PRD's isolated live checkpoint for all four ids (OVERDECK_HOME=$HOME/.overdeck/tmp/pan-5464-live, npx tsx src/cli/index.ts, no --yes), check du -sh of the hyperframes extraction is under 20M, and remove the isolated home with the literal path rm -rf /home/eltmon/.overdeck/tmp/pan-5464-live. If the network or tsx fails, record why in the PR body and rely on fixture tests; never run against the real ~/.overdeck."
+        },
+        "items": [
+          {
+            "id": "known-packs.ac1",
+            "title": "KNOWN_PACKS contains remotion, hyperframes, openmontage and video-use, each with a url starting https://github.com/eltmon/ and a ref matching /^[0-9a-f]{40}$/ equal to the PRD's pinned commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "known-packs.ac2",
+            "title": "A test rejects any KNOWN_PACKS entry that sets both pluginRoot and archivePaths, and OPENMONTAGE_EXCLUDED_NAMES contains 55 unique names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "known-packs.ac3",
+            "title": "Given .agents/skills/{ffmpeg,hyperframes,gsap-core,acestep}/SKILL.md, readPackManifest with the openmontage known-pack options returns only ffmpeg",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "known-packs.ac4",
+            "title": "The isolated live previews print Skills 13 (remotion), 9 with no LFS error (hyperframes), 38 with License AGPL-3.0 (openmontage) and 2 (video-use), and the hyperframes extraction is under 20M; or the PR body records why the checkpoint could not run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-changelog",
+        "title": "Document the video packs, pack groups and new KnownPack fields, and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:36:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skill-packs.mdx",
+            "configuration/skills.mdx",
+            "docs/SKILL-PACKS.md",
+            "changelog.d/5464.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-6",
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. features/skill-packs.mdx: four Pack catalog rows (pinned short shas, adapters, counts 13/9/38/2, licenses), a '### Video production (remotion, hyperframes, openmontage, video-use)' section under Packs (quickstart with --group, OpenMontage checkout note and why 54 skills are excluded, video-use needs ffmpeg, uv and ELEVENLABS_API_KEY plus its host notice), a '### Pack groups' section under How packs turn on and off (built-in video, skills.pack_groups YAML, the three --group commands, no state), a Troubleshooting entry for skills listed twice, and 'LFS objects (<n>)' under What is not applied. configuration/skills.mdx: '## skills.pack_groups (global)' with YAML and the override rule. docs/SKILL-PACKS.md: KnownPack field rows for archivePaths, rootSkill, mountTransform; module map rows for groups.ts, openmontage.ts, video-use.ts; invariants 'extraction never smudges LFS' and 'a root skill's consumers follow paths, never .'. changelog.d/5464.md per changelog.d/README.md (#### New and #### Fixed)."
+        },
+        "items": [
+          {
+            "id": "docs-changelog.ac1",
+            "title": "features/skill-packs.mdx contains catalog rows for remotion, hyperframes, openmontage and video-use and a '### Pack groups' heading that shows 'pan skills set --group video on'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac2",
+            "title": "configuration/skills.mdx contains a skills.pack_groups section, and docs/SKILL-PACKS.md contains rows for archivePaths, rootSkill and mountTransform",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac3",
+            "title": "changelog.d/5464.md exists with #### New and #### Fixed headings and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "license-names",
+        "to": "lfs-count",
+        "type": "blocks"
+      },
+      {
+        "from": "lfs-count",
+        "to": "archive-paths",
+        "type": "blocks"
+      },
+      {
+        "from": "lfs-skip",
+        "to": "archive-paths",
+        "type": "blocks"
+      },
+      {
+        "from": "archive-paths",
+        "to": "root-skill-manifest",
+        "type": "blocks"
+      },
+      {
+        "from": "root-skill-manifest",
+        "to": "root-skill-mount",
+        "type": "blocks"
+      },
+      {
+        "from": "root-skill-mount",
+        "to": "known-packs",
+        "type": "blocks"
+      },
+      {
+        "from": "groups-lib",
+        "to": "skills-cli-group",
+        "type": "blocks"
+      },
+      {
+        "from": "skills-cli-group",
+        "to": "handoff-group",
+        "type": "blocks"
+      },
+      {
+        "from": "known-packs",
+        "to": "docs-changelog",
+        "type": "blocks"
+      },
+      {
+        "from": "handoff-group",
+        "to": "docs-changelog",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
