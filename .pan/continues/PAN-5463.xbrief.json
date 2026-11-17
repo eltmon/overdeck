@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5463",
   "created": "2026-11-17T12:31:36.411Z",
-  "updated": "2026-11-17T19:27:32.685Z",
+  "updated": "2026-11-17T19:28:08.184Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,7 +82,9 @@
       "doneAt": "2026-11-17T19:27:32.685Z"
     },
     "wi4-ci-smoke": {
-      "status": "pending"
+      "status": "pending",
+      "claimedBy": "agent-pan-5463",
+      "claimedAt": "2026-11-17T19:28:08.184Z"
     },
     "wi5-route": {
       "status": "pending"
