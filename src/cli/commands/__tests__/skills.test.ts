@@ -64,6 +64,8 @@ const mocks = vi.hoisted(() => {
     setSageoxUpload: vi.fn(),
     readSageoxLinkState: vi.fn(),
     resolveSemgrepLaunchSettings: vi.fn(),
+    resolvePackGroup: vi.fn(),
+    listPackGroups: vi.fn(),
   };
 });
 
@@ -145,7 +147,24 @@ vi.mock('../../../lib/skill-packs/mount.js', () => ({
   renderRootsUsedBy: mocks.renderRootsUsedBy,
 }));
 
+// PAN-5464: groups resolve through mocks; the video packs are known even before KNOWN_PACKS lists them.
+vi.mock('../../../lib/skill-packs/groups.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../../lib/skill-packs/groups.js')>()),
+  resolvePackGroup: mocks.resolvePackGroup,
+  listPackGroups: mocks.listPackGroups,
+}));
+vi.mock('../../../lib/skill-packs/adapters.js', async importOriginal => {
+  const original = await importOriginal<typeof import('../../../lib/skill-packs/adapters.js')>();
+  const video = Object.fromEntries(['remotion', 'hyperframes', 'openmontage', 'video-use'].map(id => [
+    id, { id, url: `https://github.com/eltmon/${id}`, ref: 'f'.repeat(40), adapter: 'plain' as const },
+  ]));
+  return { ...original, KNOWN_PACKS: { ...video, ...original.KNOWN_PACKS } };
+});
+
+import { PackGroupError } from '../../../lib/skill-packs/groups.js';
 import { registerSkillsCommands } from '../skills.js';
+
+const VIDEO = ['remotion', 'hyperframes', 'openmontage', 'video-use'];
 
 const grilling = {
   name: 'grilling', description: 'Grill', core: false, projectSkill: false,
@@ -178,6 +197,11 @@ beforeEach(() => {
   mocks.launchMountsDeft.mockResolvedValue(false);
   mocks.resolveSageoxLaunch.mockResolvedValue({ active: false, warnings: [] });
   mocks.resolveSemgrepLaunchSettings.mockResolvedValue({ hideSkill: false, claudeHooks: null });
+  mocks.resolvePackGroup.mockImplementation(async (name: string) => {
+    if (name === 'video') return VIDEO;
+    throw new PackGroupError(`unknown pack group: ${name} (known: video)`);
+  });
+  mocks.listPackGroups.mockResolvedValue([{ name: 'video', packs: VIDEO, source: 'built-in' }]);
 });
 
 afterEach(() => {
@@ -269,6 +293,99 @@ describe('pan skills set', () => {
     expect(errors.join('\n')).toContain('usage: pan skills set');
     await expect(run('set', 'grilling')).rejects.toThrow('exit 1');
     expect(mocks.setSkillOverride).not.toHaveBeenCalled();
+  });
+});
+
+describe('pan skills set --group (PAN-5464)', () => {
+  it('sets every member pack at the chosen level', async () => {
+    mocks.listPacks.mockResolvedValue(VIDEO.map(id => ({ id })));
+    await run('set', '--group', 'video', 'on', '--project', 'p');
+    expect(mocks.setSkillOverride.mock.calls.map(([update]) => update)).toEqual(
+      VIDEO.map(pack => ({ level: 'project', pack, enabled: true, projectKey: 'p' })),
+    );
+    expect(logs).toContain('video-use (pack): on at project p');
+  });
+
+  it('writes nothing and exits 1 when a member is not added', async () => {
+    mocks.listPacks.mockResolvedValue([{ id: 'remotion' }, { id: 'hyperframes' }, { id: 'openmontage' }]);
+    await expect(run('set', '--group', 'video', 'on')).rejects.toThrow('exit 1');
+    expect(errors.join('\n')).toContain('pack video-use is not added; run pan skills pack add --group video');
+    expect(mocks.setSkillOverride).not.toHaveBeenCalled();
+  });
+
+  it('rejects --group with --pack', async () => {
+    await expect(run('set', '--group', 'video', '--pack', 'x', 'on')).rejects.toThrow('exit 1');
+    expect(errors.join('\n')).toContain('use either --pack or --group, not both');
+    expect(mocks.setSkillOverride).not.toHaveBeenCalled();
+  });
+
+  it('reports an unknown group with exit 1', async () => {
+    await expect(run('set', '--group', 'nope', 'on')).rejects.toThrow('exit 1');
+    expect(errors.join('\n')).toContain('unknown pack group: nope');
+    expect(mocks.setSkillOverride).not.toHaveBeenCalled();
+  });
+});
+
+describe('pan skills pack add --group (PAN-5464)', () => {
+  let isTTY: boolean | undefined;
+  const previewOf = (id: string) => ({
+    id, url: `https://github.com/eltmon/${id}`, ref: 'f'.repeat(40), commit: 'f'.repeat(40), adapter: 'plain',
+    manifest: {
+      skills: [], license: null, pluginName: null,
+      capabilities: {
+        hooks: false, mcpServers: false, commands: false, agents: false, contextInjection: false, gitHooks: false,
+        executables: [], projectMutatingSkills: [], requiresCli: [],
+      },
+    },
+  });
+
+  beforeEach(() => {
+    isTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', { value: false, configurable: true });
+    mocks.addPack.mockImplementation(async (input: { id: string }, confirm: (p: unknown) => Promise<boolean>) => {
+      const preview = previewOf(input.id);
+      return { written: await confirm(preview), preview };
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(process.stdin, 'isTTY', { value: isTTY, configurable: true });
+  });
+
+  it('adds every member in order and keeps going past one that is already added', async () => {
+    mocks.addPack.mockImplementationOnce(async () => {
+      throw new mocks.PackSourceError('exists', 'pack remotion is already registered; use pan skills pack update remotion');
+    });
+    await run('pack', 'add', '--group', 'video', '--yes');
+    expect(mocks.addPack.mock.calls.map(([input]) => (input as { id: string }).id)).toEqual(VIDEO);
+    expect(mocks.addPack).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'hyperframes', url: 'https://github.com/eltmon/hyperframes', ref: 'f'.repeat(40) }),
+      expect.any(Function),
+    );
+    expect(logs).toContain('remotion: already added');
+    expect(logs).toContain(`Trusted video-use @ ${'f'.repeat(7)}.`);
+    expect(process.exit).not.toHaveBeenCalled();
+  });
+
+  it('exits 1 after the loop when a member is declined or fails', async () => {
+    mocks.addPack.mockImplementationOnce(async () => {
+      throw new mocks.PackSourceError('git', 'pack remotion: git failed');
+    });
+    await expect(run('pack', 'add', '--group', 'video')).rejects.toThrow('exit 1');
+    expect(mocks.addPack).toHaveBeenCalledTimes(4);
+    expect(errors.join('\n')).toContain('remotion: pack remotion: git failed');
+  });
+
+  it('requires exactly one of a pack id or --group', async () => {
+    await expect(run('pack', 'add')).rejects.toThrow('exit 1');
+    await expect(run('pack', 'add', 'remotion', '--group', 'video')).rejects.toThrow('exit 1');
+    expect(errors.join('\n')).toContain('provide a pack id or --group <name>');
+    expect(mocks.addPack).not.toHaveBeenCalled();
+  });
+
+  it('rejects --ref with --group', async () => {
+    await expect(run('pack', 'add', '--group', 'video', '--ref', 'main')).rejects.toThrow('exit 1');
+    expect(mocks.addPack).not.toHaveBeenCalled();
   });
 });
 
