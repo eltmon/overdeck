@@ -160,6 +160,8 @@ src/components/Settings/sections/__tests__/AutoSettleIdleRow.test.tsx
 src/components/Settings/sections/__tests__/AutoSettleOnMergeRow.test.tsx
 src/components/Settings/sections/__tests__/CliproxyAccountsPanel.test.tsx
 src/components/Settings/sections/__tests__/CloseOutSection.test.tsx
+src/components/Settings/sections/__tests__/ComputerUseMacPermissions.test.tsx
+src/components/Settings/sections/__tests__/ComputerUseSection.test.tsx
 src/components/Settings/sections/__tests__/GitHubIdentitiesSection.test.tsx
 src/components/Settings/sections/__tests__/MergeTrainBatchingSection.test.tsx
 src/components/Settings/sections/__tests__/ProviderManagementSection.test.tsx
