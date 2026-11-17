@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5463",
   "created": "2026-11-17T12:31:36.411Z",
-  "updated": "2026-11-17T19:16:57.668Z",
+  "updated": "2026-11-17T19:18:26.928Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-11-17T19:13:01.475Z"
     },
     "wi3-install": {
-      "status": "pending",
+      "status": "completed",
       "claimedBy": "agent-pan-5463",
-      "claimedAt": "2026-11-17T19:13:33.987Z"
+      "claimedAt": "2026-11-17T19:13:33.987Z",
+      "doneAt": "2026-11-17T19:18:26.928Z"
     },
     "wi3-protocol": {
       "status": "pending",
@@ -183,6 +184,22 @@
     "seam-gate.ac2": {
       "status": "completed",
       "doneAt": "2026-11-17T19:13:01.475Z"
+    },
+    "wi3-install.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:26.928Z"
+    },
+    "wi3-install.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:26.928Z"
+    },
+    "wi3-install.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:26.928Z"
+    },
+    "wi3-install.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:26.928Z"
     }
   }
 }
