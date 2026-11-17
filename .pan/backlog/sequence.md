@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-16T23:59:16.927822Z · model: claude-opus-5-5 · open: 895_
+_Last sequenced: 2026-11-17T11:42:03.296470Z · model: claude-opus-5-5 · open: 898_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -216,6 +216,7 @@ _Last sequenced: 2026-11-16T23:59:16.927822Z · model: claude-opus-5-5 · open: 
 | 216 | PAN-3196 | S | high | ok |  |  | Root-owned container residue makes close-out die on EACCES after passing every DoD row; same family as PAN-3570. |
 | 217 | PAN-3186 | XS | high | ok |  |  | One configured non-git member (auricle/infra) blanks pipeline membership for the whole project the resolver claims it can answer. |
 | 218 | PAN-3185 | XS | high | ok |  |  | Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail. |
+| 219 | PAN-5461 | M | medium | ok |  |  | Settings → Computer Use one-click setup plus the platform provider seam; operator-approved mockup, PRD drafted. |
 | 220 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time with no production-reach check, so members read shipped while prod serves the old build. |
 | 221 | PAN-3130 | S | high | ok |  |  | Identifier-joined write paths have no containment assertion, so a crafted issue or agent id could redirect a canonical write. |
 | 222 | PAN-3047 | XS | high | ok |  |  | Strike-branch teardown uses --is-ancestor, which cannot see a squash merge, so all 96 strike/* branches survive as residue. |
@@ -684,6 +685,7 @@ _Last sequenced: 2026-11-16T23:59:16.927822Z · model: claude-opus-5-5 · open: 
 | 685 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
 | 686 | PAN-4823 | XL | medium | ok | ✓ |  | Epic: Capacitor phone client for Anywhere without Tailscale; 15 children filed (#4828-4843); OD-1 settled; PAN-4774 done. |
 | 687 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
+| 688 | PAN-5463 | L | medium | needs-refinement |  | PAN-5461 | macOS computer use: port Orca Swift helper and permission setup; needs PAN-5461 seam first, PRD not written yet. |
 | 689 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
 | 690 | PAN-5082 | XL | medium | ok |  |  | Move every MCP surface to SDK v2 for the 2026-07-28 spec while keeping 2025-11-25 clients; time it on PAN-5083 data. |
 | 691 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
@@ -900,6 +902,7 @@ _Last sequenced: 2026-11-16T23:59:16.927822Z · model: claude-opus-5-5 · open: 
 | 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
 | 903 | PAN-5444 | XS | low | ok |  |  | Two Minor CodeRabbit findings left on merged PR #5443: semgrep repo rules resolve from event cwd; hook tests not isolated from Docker. |
 | 904 | PAN-5405 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus. |
+| 905 | PAN-5462 | L | low | needs-refinement |  | PAN-5461 | Windows (WSL2) computer use via Orca PowerShell helper; needs PAN-5461 seam first, PRD not written yet. |
 
 ## Rationale detail
 
@@ -1230,10 +1233,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-16T23:59:16.927822Z",
+  "generatedAt": "2026-11-17T11:42:03.296470Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 895,
+  "openCount": 898,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -3937,6 +3940,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "dependsOn": [],
       "why": "Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail.",
       "rationale": "Rank held at 212: the rescope comment confirms the TOCTOU gap is still in spawn.ts even though the named racer was cut; the remaining spawner (retryDeferredHandoffs) makes it rarer, so score drops slightly. Moved one slot to 218 because rank 219 is pinned to in-pipeline PAN-5371.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5461",
+      "rank": 219,
+      "size": "M",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Settings → Computer Use one-click setup plus the platform provider seam; operator-approved mockup, PRD drafted.",
+      "rationale": "New issue. Follow-up to the closed PAN-5452 computer-use launch: one-click Linux setup on the Settings page and the platform provider seam that the Windows and macOS ports plug into. The operator approved the mockup on 2026-11-17 and a detailed PRD is already drafted, so it is workable now; it ranks with other medium dashboard feature work and ahead of its two siblings, which it unblocks.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9697,6 +9713,20 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "skip"
     },
     {
+      "issue": "PAN-5463",
+      "rank": 688,
+      "size": "L",
+      "importance": "medium",
+      "score": 36,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-5461"
+      ],
+      "why": "macOS computer use: port Orca Swift helper and permission setup; needs PAN-5461 seam first, PRD not written yet.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3133",
       "rank": 689,
       "size": "S",
@@ -12360,6 +12390,20 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "rationale": "New CodeRabbit follow-up from the merged PAN-5295 PR; one Major and four Minor frontend findings, ranked with comparable follow-ups.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-5462",
+      "rank": 905,
+      "size": "L",
+      "importance": "low",
+      "score": 30,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-5461"
+      ],
+      "why": "Windows (WSL2) computer use via Orca PowerShell helper; needs PAN-5461 seam first, PRD not written yet.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13475,6 +13519,20 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-5461",
+      "to": "PAN-5462",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-5461",
+      "to": "PAN-5463",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.95
     },
     {
       "from": "PAN-750",
