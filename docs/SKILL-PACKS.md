@@ -328,6 +328,43 @@ and handled by `skillsLaunchSettingsCommand` in
 `src/cli/commands/skills.ts`. The step exits 2 for any harness except
 `claude-code` and `codex`.
 
+## Live apply (PAN-5465)
+
+A running conversation can take new pack skills without a relaunch.
+`POST /api/conversations/:name/skills` (and `POST /api/self/skills` for the
+caller's own conversation) merge the request into the `/clear` chain head's
+skill map and then apply it. The CLI (`pan skills add`), the MCP tool
+`add_skills` and the dashboard's **Add skills…** dialog all call these routes.
+
+- `src/lib/overdeck/conversation-skill-apply.ts` validates the request, writes
+  the map, and picks the path: `next-launch` for a stopped conversation,
+  `needs-restart` / `restarted` (a resume apply) for Codex and for changes a
+  hot apply cannot make, and a hot apply for a running Claude Code
+  conversation. One apply runs at a time per terminal session.
+- `src/lib/overdeck/conversation-skill-hot-apply.ts` runs the hot apply: it
+  builds the new mount, re-points the plugin link, and delivers
+  `/reload-plugins` through `deliverAgentMessage` (method `tmux`), after the
+  permission-prompt and main-input-target checks the message path uses.
+- **Empty mount (D-2).** `linkClaudeMount(link, null)` points the plugin link
+  at the fixed `~/.overdeck/packs/mounts/empty/plugins/` instead of removing
+  it, so every Claude Code launch passes `--plugin-dir <link>` and can reload
+  into it later. `gcMounts` never removes `mounts/empty`.
+- **Process-table check (D-3).** A conversation is hot-capable only when
+  `ps -eo pid=,ppid=,args=` shows a process whose args contain
+  `--plugin-dir <its link>`. Liveness is not enough: Herdr reports no runtime
+  pid. A conversation that started before the empty mount existed answers
+  `needs-restart` once.
+- **Two-reload confirmation (D-5).** A `Reloaded:` line prints whether or not
+  a new pack loaded, so an idle hot apply reloads twice: once with the old
+  link (baseline skill count), then again after the re-point. The outcome is
+  `hot` only when the count rose by exactly the mounted-skill delta, else
+  `sent`. A mid-turn conversation gets `queued`, because Claude Code runs a
+  queued slash command when the turn ends.
+- **Launch-wired packs (D-8).** A change to `deft`, `sageox`, a
+  `gstack-runtime` pack, or a pack in the selection's `mcp[]` needs
+  launch-time settings, so it always answers `needs-restart`. So does any
+  native skill name, because native skills are hidden through `--settings`.
+
 ## Tests
 
 | Part | Test file |
