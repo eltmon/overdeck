@@ -102,6 +102,8 @@ export interface KnownPack {
   archivePaths?: readonly string[];
   /** A skill whose SKILL.md sits at the repo root (PAN-5464): its name and the root files and dirs it mounts. */
   rootSkill?: RootSkill;
+  /** Mount transform for a pack whose adapter has none (PAN-5464 D-10): 'video-use' adds its host notice. */
+  mountTransform?: 'video-use';
 }
 
 export interface RootSkill {
