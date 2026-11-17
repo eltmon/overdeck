@@ -4,17 +4,17 @@
     "created": "2026-11-17T12:16:34Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5484: pan sync never prunes ~/.overdeck/backups (9 GB of skill copies on a full disk)",
-    "updated": "2026-11-17T12:27:32.332Z"
+    "updated": "2026-11-17T12:41:39.929Z"
   },
   "plan": {
     "id": "pan-5484",
     "title": "pan sync never prunes ~/.overdeck/backups (9 GB of skill copies on a full disk)",
-    "status": "proposed",
+    "status": "running",
     "uid": "83de1584-c57c-44bd-ac08-0106e8514157",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-17T12:16:34Z",
-    "updated": "2026-11-17T12:27:32.332Z",
+    "updated": "2026-11-17T12:41:39.929Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5484",
@@ -434,5 +434,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
