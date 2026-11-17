@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-5463",
   "created": "2026-11-17T12:31:36.411Z",
-  "updated": "2026-11-17T19:42:31.381Z",
+  "updated": "2026-11-17T20:24:01.758Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-17T20:24Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-17T20:24:01.758Z"
+    }
+  ],
   "items": {
     "wi1-vendor": {
       "status": "completed",
@@ -369,5 +375,14 @@
       "status": "completed",
       "doneAt": "2026-11-17T19:42:31.380Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-17T20:24:01Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5463 (PR #5513)\n\nCodeRabbit posted 14 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4605304981 · .github/workflows/release.yml:203 [Major]: Do not notarize an ad-hoc-signed helper.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605304981\n- Thread 4605304995 · .pan/specs/2026-11-17-PAN-5463-computer-use-on-macos-port-orca-s-swift-helper-with-accessibility-and-screen-recording-setup.xbrief.json:773 [Minor]: Define the behavior when a live helper socket belongs to another `OVERDECK_HOME`.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605304995\n- Thread 4605305005 · configuration/computer-use.mdx:115 [Minor]: Document the foreground-input exception.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305005\n- Thread 4605305009 · native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift:1148 [Minor]: Bound `pages` before the accessibility scroll loop.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305009\n- Thread 4605305022 · native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift:1895 [Major]: Check the CF type before each forced AX cast.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305022\n- Thread 4605305069 · native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift:4729 [Minor]: Reschedule the idle timer when a request starts, not only after it ends.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305069\n- Thread 4605305077 · native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/ActionArgumentValidation.swift:30 [Minor]: Reject fractional values before integer conversion.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305077\n- Thread 4605305086 · native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/PermissionStatusSnapshot.swift:77 [Minor]: Keep one pending permission refresh.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305086\n- Thread 4605305098 · native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/SyntheticMouseClickDelivery.swift:127 [Minor]: Fence the recipient before the initial `.move` event in `deliver`.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305098\n- Thread 4605305125 · scripts/build-computer-macos.mjs:122 [Minor]: Publish the final ZIP only after the checksum is ready.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305125\n- Thread 4605305145 · src/dashboard/frontend/src/components/Settings/sections/ComputerUseMacPermissions.tsx:48 [Minor]: Include the permission in each button's accessible name.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305145\n- Thread 4605305163 · src/lib/computer-use/macos-install.ts:183 [Major]: Preserve the installed helper until replacement succeeds.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305163\n- Thread 4605305171 · sync-sources/skills/pan-computer-use/SKILL.md:135 [Minor]: Scope the subtree index rule to Linux, and state the macOS rule where it applies.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305171\n- Thread 4605305178 · sync-sources/skills/pan-computer-use/SKILL.md:167 [Minor]: Give a separate recovery step for older macOS.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305178\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5513/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5463 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5513 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    }
+  ]
 }
