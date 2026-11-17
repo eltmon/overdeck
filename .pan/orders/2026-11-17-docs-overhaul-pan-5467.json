@@ -87,8 +87,71 @@
       "reVerify": false,
       "addedAt": "2026-11-17T12:08:56.719Z",
       "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5469",
+      "lane": "B",
+      "order": 1,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-17T12:09:31.627Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5471",
+      "lane": "B",
+      "order": 2,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-17T12:09:31.627Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5474",
+      "lane": "B",
+      "order": 3,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-17T12:09:31.627Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5476",
+      "lane": "B",
+      "order": 4,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-17T12:09:31.627Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5478",
+      "lane": "B",
+      "order": 5,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-17T12:09:31.627Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5480",
+      "lane": "B",
+      "order": 6,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-17T12:09:31.627Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5482",
+      "lane": "B",
+      "order": 7,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-17T12:09:31.627Z",
+      "addedBy": "conv-20261113-6031"
     }
   ],
   "createdAt": "2026-11-17T12:08:16.980Z",
-  "updatedAt": "2026-11-17T12:08:56.719Z"
+  "updatedAt": "2026-11-17T12:09:31.628Z"
 }
