@@ -22,6 +22,7 @@ const { overdeckHome } = await vi.hoisted(async () => {
 import { getGlobalConfigPath } from '../../config-yaml/load.js';
 import {
   addPack,
+  CAPABILITY_PROBE_PATHS,
   deletePackEntry,
   extractCommit,
   fetchPackSource,
@@ -296,6 +297,69 @@ describe('pack git cache', () => {
   it('leaves no partial clone after a failed fetch', async () => {
     await expect(fetchPackSource('gone', join(scratch, 'missing.git'))).rejects.toThrow();
     expect(existsSync(packRepoDir('gone'))).toBe(false);
+  });
+});
+
+describe('archive paths (PAN-5464)', () => {
+  let up: Upstream;
+  let withLicense = '';
+  let noLicense: Upstream;
+  let bare = '';
+
+  beforeAll(() => {
+    up = createUpstream();
+    up.commitFile('skills/a/SKILL.md', skillMd('a'), 'skill');
+    up.commitFile('big/blob.txt', 'big\n', 'blob');
+    withLicense = up.commitFile('LICENSE', 'MIT License\n', 'license');
+    noLicense = createUpstream();
+    bare = noLicense.commitFile('skills/a/SKILL.md', skillMd('a'), 'skill');
+  });
+
+  afterAll(() => {
+    rmSync(up.scratch, { recursive: true, force: true });
+    rmSync(noLicense.scratch, { recursive: true, force: true });
+  });
+
+  it('archives only the declared paths plus the probe paths that exist', async () => {
+    expect(CAPABILITY_PROBE_PATHS).toContain('LICENSE');
+    await fetchPackSource('ap', up.url);
+    const dir = await extractCommit('ap', withLicense, undefined, ['skills']);
+    expect(existsSync(join(dir, 'skills', 'a', 'SKILL.md'))).toBe(true);
+    expect(readFileSync(join(dir, 'LICENSE'), 'utf8')).toBe('MIT License\n');
+    expect(existsSync(join(dir, 'big'))).toBe(false);
+  });
+
+  it('drops a declared path that does not exist at the commit', async () => {
+    await fetchPackSource('ap-missing', up.url);
+    const dir = await extractCommit('ap-missing', withLicense, undefined, ['skills', 'missing']);
+    expect(existsSync(join(dir, 'skills', 'a', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(dir, 'missing'))).toBe(false);
+  });
+
+  it('rejects when none of the paths exist', async () => {
+    await fetchPackSource('ap-none', noLicense.url);
+    await expect(extractCommit('ap-none', bare, undefined, ['missing'])).rejects.toThrow(
+      `pack ap-none: none of its archive paths exist at ${bare}`,
+    );
+    expect(existsSync(packExtractDir('ap-none', bare))).toBe(false);
+  });
+
+  it('rejects an archive path that looks like an option', async () => {
+    await expect(extractCommit('ap', withLicense, undefined, ['--output=x'])).rejects.toThrow('invalid pack archive path');
+  });
+
+  it('rebuilds an extraction that lacks a path and reuses one that has them all', async () => {
+    await fetchPackSource('ap-reuse', up.url);
+    const stale = packExtractDir('ap-reuse', withLicense);
+    mkdirSync(stale, { recursive: true });
+    writeFileSync(join(stale, 'LICENSE'), 'stale\n');
+    const dir = await extractCommit('ap-reuse', withLicense, undefined, ['skills']);
+    expect(dir).toBe(stale);
+    expect(existsSync(join(dir, 'skills', 'a', 'SKILL.md'))).toBe(true);
+    expect(readFileSync(join(dir, 'LICENSE'), 'utf8')).toBe('MIT License\n');
+    const inode = statSync(dir).ino;
+    expect(await extractCommit('ap-reuse', withLicense, undefined, ['skills'])).toBe(dir);
+    expect(statSync(dir).ino).toBe(inode);
   });
 });
 

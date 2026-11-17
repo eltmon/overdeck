@@ -302,15 +302,54 @@ async function isDirAt(path: string): Promise<boolean> {
 }
 
 /**
- * Extract a commit into `packs/<id>/<commit>/` (temp dir, then rename);
- * reuses an existing extraction, unless `pluginRoot` is given and missing
- * from it, in which case the stale extraction is removed and rebuilt.
+ * Repo-relative paths an archive-path extraction always adds when they exist (PAN-5464 D-6), so the
+ * preview still detects hooks, MCP servers, commands, agents and the license.
  */
-export async function extractCommit(id: string, commit: string, pluginRoot?: string): Promise<string> {
+export const CAPABILITY_PROBE_PATHS: readonly string[] = ['.claude-plugin', 'hooks', '.mcp.json', 'commands', 'agents', 'LICENSE', 'LICENSE.md'];
+
+/**
+ * `archivePaths` plus the capability-probe paths, deduplicated and filtered to the paths that exist at
+ * `commit`: `git archive` exits 128 on a pathspec that matches nothing.
+ */
+async function effectiveArchivePaths(id: string, commit: string, archivePaths: readonly string[]): Promise<string[]> {
+  const candidates = [...new Set([...archivePaths, ...CAPABILITY_PROBE_PATHS])];
+  const present = await Promise.all(
+    candidates.map(async (path) => {
+      try {
+        await git(['--git-dir', packRepoDir(id), 'cat-file', '-e', `${commit}:${path}`]);
+        return true;
+      } catch {
+        return false;
+      }
+    }),
+  );
+  const effective = candidates.filter((_, index) => present[index]);
+  if (effective.length === 0) throw new Error(`pack ${id}: none of its archive paths exist at ${commit}`);
+  return effective;
+}
+
+/**
+ * Extract a commit into `packs/<id>/<commit>/` (temp dir, then rename).
+ * With `archivePaths` (PAN-5464), only those paths and the capability-probe paths that exist at the
+ * commit are archived; otherwise `pluginRoot`, otherwise the whole tree. An existing extraction is
+ * reused when it holds every path this call would archive (a full-tree extraction always does); a
+ * stale one is removed and rebuilt.
+ */
+export async function extractCommit(
+  id: string,
+  commit: string,
+  pluginRoot?: string,
+  archivePaths?: readonly string[],
+): Promise<string> {
   if (pluginRoot !== undefined) assertOperand('plugin root', pluginRoot);
+  for (const path of archivePaths ?? []) assertOperand('archive path', path);
+  const effective = archivePaths ? await effectiveArchivePaths(id, commit, archivePaths) : null;
   const dir = packExtractDir(id, commit);
   if (await exists(dir)) {
-    if (!pluginRoot || (await isDirAt(join(dir, pluginRoot)))) return dir;
+    const complete = effective
+      ? (await Promise.all(effective.map((path) => exists(join(dir, path))))).every(Boolean)
+      : !pluginRoot || (await isDirAt(join(dir, pluginRoot)));
+    if (complete) return dir;
     await rm(dir, { recursive: true, force: true });
   }
   const tmp = `${dir}.tmp-${randomBytes(6).toString('hex')}`;
@@ -325,7 +364,7 @@ export async function extractCommit(id: string, commit: string, pluginRoot?: str
       '-o',
       tar,
       commit,
-      ...(pluginRoot ? ['--', pluginRoot] : []),
+      ...(effective ? ['--', ...effective] : pluginRoot ? ['--', pluginRoot] : []),
     ]);
     await execFileAsync('tar', ['-xf', tar, '-C', tmp]);
     try {
@@ -427,6 +466,7 @@ async function packAdapter(id: string, dir: string, explicit?: PackAdapterId): P
 }
 
 const pluginRootOf = (id: string): string | undefined => KNOWN_PACKS[id]?.pluginRoot;
+const archivePathsOf = (id: string): readonly string[] | undefined => KNOWN_PACKS[id]?.archivePaths;
 
 async function manifestAt(id: string, dir: string, adapter: PackAdapterId, browser = false): Promise<PackManifest> {
   return gitStep(id, () =>
@@ -538,7 +578,7 @@ export async function addPack(
     await fetchPackSource(id, url);
     return resolveRef(id, ref);
   });
-  const dir = await gitStep(id, () => extractCommit(id, commit, pluginRootOf(id)));
+  const dir = await gitStep(id, () => extractCommit(id, commit, pluginRootOf(id), archivePathsOf(id)));
   const adapter = await packAdapter(id, dir, input.adapter);
   const runtime = adapter === 'gstack-runtime' ? await runtimePreview(id, dir, commit) : undefined;
   const preview: PackPreview = {
@@ -584,8 +624,8 @@ export async function updatePack(
     await fetchPackSource(id, entry.url);
     return resolveRef(id, ref);
   });
-  const dir = await gitStep(id, () => extractCommit(id, commit, pluginRootOf(id)));
-  const oldDir = await gitStep(id, () => extractCommit(id, entry.commit, pluginRootOf(id)));
+  const dir = await gitStep(id, () => extractCommit(id, commit, pluginRootOf(id), archivePathsOf(id)));
+  const oldDir = await gitStep(id, () => extractCommit(id, entry.commit, pluginRootOf(id), archivePathsOf(id)));
   const adapter = await packAdapter(id, dir, entry.adapter);
   // With browser consent recorded, both sides list the browser skills that mount.
   const browser = adapter === 'gstack-runtime' && entry.browser === true;
@@ -667,7 +707,7 @@ export async function enablePackBrowser(
   confirm: ConfirmPack,
 ): Promise<{ written: boolean; preview?: PackPreview; alreadyOn?: boolean }> {
   const entry = await requireBrowserPack(id);
-  const dir = await gitStep(id, () => extractCommit(id, entry.commit, pluginRootOf(id)));
+  const dir = await gitStep(id, () => extractCommit(id, entry.commit, pluginRootOf(id), archivePathsOf(id)));
   const renderDir = packRenderDir(id, entry.commit);
   if (!(await isRenderReady(renderDir))) {
     throw new PackSourceError('render', `pack ${id} is not rendered; run pan skills pack sync ${id}`);
@@ -709,7 +749,7 @@ export async function disablePackBrowser(id: string): Promise<{ changed: boolean
       ...(entry.mcp ? { mcp: true as const } : {}),
     });
   }
-  const dir = await gitStep(id, () => extractCommit(id, entry.commit, pluginRootOf(id)));
+  const dir = await gitStep(id, () => extractCommit(id, entry.commit, pluginRootOf(id), archivePathsOf(id)));
   await rm(renderDir, { recursive: true, force: true });
   await renderPack(id, dir, entry.commit);
   const cacheDir = packBrowserDir(id);
@@ -768,7 +808,7 @@ export async function syncPack(id: string): Promise<{ commit: string; dir: strin
   const dir = await gitStep(id, async () => {
     await fetchPackSource(id, entry.url);
     await resolveRef(id, entry.commit);
-    return extractCommit(id, entry.commit, pluginRootOf(id));
+    return extractCommit(id, entry.commit, pluginRootOf(id), archivePathsOf(id));
   });
   if ((entry.adapter ?? KNOWN_PACKS[id]?.adapter) === 'gstack-runtime') {
     await renderPack(id, dir, entry.commit);

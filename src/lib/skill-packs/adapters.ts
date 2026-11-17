@@ -90,6 +90,11 @@ export interface KnownPack {
   disclosure?: string;
   /** Plugin-root-relative dirs the skill scan skips (archived copies). */
   skillsExclude?: readonly string[];
+  /**
+   * Repo-relative paths `git archive` receives (PAN-5464): extraction holds only these, plus the
+   * capability-probe paths, that exist at the commit. Never combined with `pluginRoot`.
+   */
+  archivePaths?: readonly string[];
 }
 
 export const KNOWN_PACKS: Readonly<Record<string, KnownPack>> = {
