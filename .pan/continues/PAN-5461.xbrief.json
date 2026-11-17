@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5461",
   "created": "2026-11-17T12:13:42.164Z",
-  "updated": "2026-11-17T17:35:23.350Z",
+  "updated": "2026-11-17T17:35:46.234Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -248,6 +248,22 @@
     "ui-mount.ac2": {
       "status": "completed",
       "doneAt": "2026-11-17T17:35:23.350Z"
+    },
+    "palette": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:35:46.234Z"
+    },
+    "palette.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:35:46.234Z"
+    },
+    "palette.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:35:46.234Z"
+    },
+    "palette.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:35:46.234Z"
     }
   }
 }
