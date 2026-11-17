@@ -6,16 +6,17 @@
  * which builds the operation and calls `runComputerOperation`.
  */
 import { loadConfigSync } from '../config-yaml.js';
-import { resolveDesktopEnv as resolveDesktopEnvReal, type ResolveDesktopEnvDeps } from './desktop-env.js';
 import { ComputerUseError } from './errors.js';
 import type { RawSnapshot } from './format.js';
-import { type HelperResponse, runHelper as runHelperReal } from './helper.js';
+import type { HelperResponse } from './helper.js';
 import {
   claimLease as claimLeaseReal,
   holderKey as holderKeyReal,
   releaseLease as releaseLeaseReal,
   withDesktopLock as withDesktopLockReal,
 } from './lease.js';
+import { detectPlatform as detectPlatformReal, providerFor as providerForReal } from './platform.js';
+import type { ComputerUsePlatformId } from './platform-types.js';
 import { type SavedScreenshot, saveScreenshot as saveScreenshotReal, saveSnapshot as saveSnapshotReal } from './snapshot-store.js';
 
 export type OperationKind = 'read' | 'input';
@@ -37,11 +38,11 @@ export interface LoadedConfig {
 export interface RunDeps {
   platform?: NodeJS.Platform;
   loadConfig?: () => LoadedConfig;
-  resolveDesktopEnv?: (deps?: ResolveDesktopEnvDeps) => ReturnType<typeof resolveDesktopEnvReal>;
+  detectPlatform?: () => ComputerUsePlatformId | 'unsupported';
+  providerFor?: typeof providerForReal;
   withDesktopLock?: <T>(fn: () => Promise<T>) => Promise<T>;
   claimLease?: (now: number) => Promise<void>;
   releaseLease?: (options: { force?: boolean }) => Promise<void>;
-  runHelper?: (operation: Record<string, unknown>, env: NodeJS.ProcessEnv) => Promise<HelperResponse>;
   saveSnapshot?: typeof saveSnapshotReal;
   saveScreenshot?: typeof saveScreenshotReal;
   holderKey?: () => string;
@@ -51,15 +52,20 @@ export interface RunDeps {
 const DISABLED_MESSAGE =
   'Computer use is off. The operator turns it on with computer_use: { enabled: true } in ~/.overdeck/config.yaml.';
 
+/** The `unsupported_platform` message for a host with no provider (FR-2). */
+export function unsupportedMessage(id: ComputerUsePlatformId | 'unsupported', platform: NodeJS.Platform): string {
+  return `Computer use isn't supported on this host (${id === 'unsupported' ? platform : id}) yet.`;
+}
+
 function resolvedDeps(deps: RunDeps) {
   return {
     platform: deps.platform ?? process.platform,
     loadConfig: deps.loadConfig ?? (() => loadConfigSync().config),
-    resolveDesktopEnv: deps.resolveDesktopEnv ?? ((d?: ResolveDesktopEnvDeps) => resolveDesktopEnvReal(d)),
+    detectPlatform: deps.detectPlatform ?? (() => detectPlatformReal({ platform: deps.platform ?? process.platform })),
+    providerFor: deps.providerFor ?? providerForReal,
     withDesktopLock: deps.withDesktopLock ?? (<T>(fn: () => Promise<T>) => withDesktopLockReal(fn)),
     claimLease: deps.claimLease ?? ((now: number) => claimLeaseReal(now)),
     releaseLease: deps.releaseLease ?? ((options: { force?: boolean }) => releaseLeaseReal(options)),
-    runHelper: deps.runHelper ?? ((operation: Record<string, unknown>, env: NodeJS.ProcessEnv) => runHelperReal(operation, env)),
     saveSnapshot: deps.saveSnapshot ?? saveSnapshotReal,
     saveScreenshot: deps.saveScreenshot ?? saveScreenshotReal,
     holderKey: deps.holderKey ?? (() => holderKeyReal()),
@@ -94,23 +100,22 @@ export async function runComputerOperation(
 ): Promise<RunComputerOperationResult> {
   const resolved = resolvedDeps(deps);
 
-  if (resolved.platform !== 'linux') {
-    throw new ComputerUseError(
-      'unsupported_platform',
-      `Computer use supports Linux desktops only for now (this host is ${resolved.platform}).`,
-    );
+  const platformId = resolved.detectPlatform();
+  const provider = resolved.providerFor(platformId);
+  if (!provider) {
+    throw new ComputerUseError('unsupported_platform', unsupportedMessage(platformId, resolved.platform));
   }
   if (!resolved.loadConfig().computerUse.enabled) {
     throw new ComputerUseError('disabled', DISABLED_MESSAGE);
   }
-  const envResult = await resolved.resolveDesktopEnv();
-  if (!envResult.ok) {
-    throw new ComputerUseError(envResult.code, envResult.message);
+  const sessionResult = await provider.resolveSession();
+  if (!sessionResult.ok) {
+    throw new ComputerUseError(sessionResult.code, sessionResult.message);
   }
 
   return resolved.withDesktopLock(async () => {
     if (input.kind === 'input') await resolved.claimLease(resolved.now());
-    const response = await resolved.runHelper(input.operation, envResult.env);
+    const response = await provider.runHelper(input.operation, sessionResult.session);
     const screenshot = await persistSnapshotIfPresent(response, input.operation, resolved);
     return { response, screenshot };
   });
@@ -124,33 +129,36 @@ export interface CapabilitiesResult {
   helperError?: string;
 }
 
-/** FR-13: never refuses. Reports platform/enabled/desktop-session state and, on Linux with a desktop, the helper's handshake. */
+/** FR-13: never refuses. Reports platform/enabled/desktop-session state and, with a provider and a desktop, the helper's handshake. */
 export async function runCapabilities(deps: RunDeps = {}): Promise<CapabilitiesResult> {
   const resolved = resolvedDeps(deps);
   const enabled = resolved.loadConfig().computerUse.enabled;
 
-  if (resolved.platform !== 'linux') {
+  const platformId = resolved.detectPlatform();
+  const provider = resolved.providerFor(platformId);
+  if (!provider) {
     return {
       platform: resolved.platform,
       enabled,
-      desktopSession: { ok: false, message: `Computer use supports Linux desktops only for now (this host is ${resolved.platform}).` },
+      desktopSession: { ok: false, message: unsupportedMessage(platformId, resolved.platform) },
       helper: null,
     };
   }
 
-  const envResult = await resolved.resolveDesktopEnv();
-  if (!envResult.ok) {
-    return { platform: resolved.platform, enabled, desktopSession: { ok: false, message: envResult.message }, helper: null };
+  const sessionResult = await provider.resolveSession();
+  if (!sessionResult.ok) {
+    return { platform: resolved.platform, enabled, desktopSession: { ok: false, message: sessionResult.message }, helper: null };
   }
 
+  const { session } = sessionResult;
   const desktopSession = {
     ok: true as const,
-    sessionType: envResult.env.XDG_SESSION_TYPE,
-    display: envResult.env.DISPLAY ?? envResult.env.WAYLAND_DISPLAY,
+    sessionType: session.env.XDG_SESSION_TYPE,
+    display: session.env.DISPLAY ?? session.env.WAYLAND_DISPLAY,
   };
 
   try {
-    const response = await resolved.withDesktopLock(() => resolved.runHelper({ tool: 'handshake' }, envResult.env));
+    const response = await resolved.withDesktopLock(() => provider.runHelper({ tool: 'handshake' }, session));
     return { platform: resolved.platform, enabled, desktopSession, helper: (response as { capabilities?: Record<string, unknown> }).capabilities ?? null };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

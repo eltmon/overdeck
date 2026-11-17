@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { detectPlatform } from '../platform.js';
+import { detectPlatform, providerFor } from '../platform.js';
+import { linuxProvider } from '../providers/linux.js';
 
 const noOsRelease = () => null;
 
@@ -36,5 +37,15 @@ describe('detectPlatform', () => {
 
   it('returns unsupported for win32', () => {
     expect(detectPlatform({ platform: 'win32', env: {}, readOsRelease: noOsRelease })).toBe('unsupported');
+  });
+});
+
+describe('providerFor', () => {
+  it('returns the Linux provider for linux', () => {
+    expect(providerFor('linux')).toBe(linuxProvider);
+  });
+
+  it.each(['wsl', 'darwin', 'unsupported'] as const)('returns null for %s', (id) => {
+    expect(providerFor(id)).toBeNull();
   });
 });

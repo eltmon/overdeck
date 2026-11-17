@@ -1,5 +1,5 @@
 /**
- * Computer-use platform detection and (from PAN-5461 WI-1c) provider lookup.
+ * Computer-use platform detection and provider lookup (PAN-5461).
  *
  * `detectPlatform` maps the host to a platform id: 'linux', 'wsl' (Linux under
  * WSL2: WSL_DISTRO_NAME set, or the kernel osrelease names Microsoft),
@@ -7,7 +7,8 @@
  * re-exported here for callers outside the providers (D-10).
  */
 import { readFileSync } from 'node:fs';
-import type { ComputerUsePlatformId } from './platform-types.js';
+import type { ComputerUsePlatformId, ComputerUseProvider } from './platform-types.js';
+import { linuxProvider } from './providers/linux.js';
 
 export type {
   ComputerUsePlatformId,
@@ -48,4 +49,14 @@ export function detectPlatform(deps: DetectPlatformDeps = {}): ComputerUsePlatfo
   const osRelease = (deps.readOsRelease ?? readKernelOsRelease)();
   if (osRelease !== null && /microsoft/i.test(osRelease)) return 'wsl';
   return 'linux';
+}
+
+/** The provider for a platform id, or null where computer use is not supported yet. */
+export function providerFor(id: ComputerUsePlatformId | 'unsupported'): ComputerUseProvider | null {
+  switch (id) {
+    case 'linux':
+      return linuxProvider;
+    default:
+      return null; // PAN-5462 adds 'wsl', PAN-5463 adds 'darwin'
+  }
 }

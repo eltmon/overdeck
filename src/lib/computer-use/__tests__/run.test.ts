@@ -1,22 +1,40 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { ComputerUseError, isComputerUseError } from '../errors.js';
+import type { ComputerUseProvider } from '../platform-types.js';
 import { runCapabilities, runComputerOperation, runRelease, type RunDeps } from '../run.js';
 
-function baseDeps(overrides: Partial<RunDeps> = {}): RunDeps {
+type FakeProviderParts = Partial<Pick<ComputerUseProvider, 'resolveSession' | 'runHelper'>>;
+
+function fakeProvider(parts: FakeProviderParts = {}): ComputerUseProvider {
   return {
-    platform: 'linux',
+    id: 'linux',
+    blockedKeyPlatform: 'linux',
+    resolveSession: parts.resolveSession ?? (async () => ({ ok: true, session: { label: 'x11 · display :1', env: { DISPLAY: ':1' } } })),
+    readiness: async () => ({ session: { ok: true, label: 'x11 · display :1' }, checks: [], setupSteps: [] }),
+    runSetupStep: async () => ({ status: 'skipped' }),
+    runHelper: parts.runHelper ?? (async () => ({ ok: true })),
+  };
+}
+
+/** RunDeps plus the fake provider's parts; a non-Linux `platform` reaches the null-provider branch. */
+function baseDeps(overrides: Partial<RunDeps> & FakeProviderParts = {}): RunDeps {
+  const { resolveSession, runHelper, ...runOverrides } = overrides;
+  const provider = fakeProvider({ resolveSession, runHelper });
+  const platform = runOverrides.platform ?? 'linux';
+  return {
+    platform,
+    detectPlatform: () => (platform === 'linux' ? 'linux' : platform === 'darwin' ? 'darwin' : 'unsupported'),
+    providerFor: (id) => (id === 'linux' ? provider : null),
     loadConfig: () => ({ computerUse: { enabled: true } }),
-    resolveDesktopEnv: async () => ({ ok: true, env: { DISPLAY: ':1' } }),
     withDesktopLock: async (fn) => fn(),
     claimLease: async () => {},
     releaseLease: async () => {},
-    runHelper: async () => ({ ok: true }),
     saveSnapshot: async () => {},
     saveScreenshot: async () => null,
     holderKey: () => 'holder-a',
     now: () => 0,
-    ...overrides,
+    ...runOverrides,
   };
 }
 
@@ -33,14 +51,44 @@ describe('runComputerOperation preamble (PAN-5452)', () => {
 
   it('throws unsupported_platform before the config or env checks (ac2)', async () => {
     const loadConfig = vi.fn().mockReturnValue({ computerUse: { enabled: true } });
-    const resolveDesktopEnv = vi.fn();
-    const deps = baseDeps({ platform: 'darwin', loadConfig, resolveDesktopEnv });
+    const resolveSession = vi.fn();
+    const deps = baseDeps({ platform: 'darwin', loadConfig, resolveSession });
 
     const error = await runComputerOperation({ kind: 'read', operation: {} }, deps).catch((e) => e);
     expect(isComputerUseError(error)).toBe(true);
     expect(error.code).toBe('unsupported_platform');
     expect(loadConfig).not.toHaveBeenCalled();
-    expect(resolveDesktopEnv).not.toHaveBeenCalled();
+    expect(resolveSession).not.toHaveBeenCalled();
+  });
+
+  it('a null provider throws unsupported_platform with the host platform before the config check (PAN-5461 FR-2)', async () => {
+    const loadConfig = vi.fn().mockReturnValue({ computerUse: { enabled: true } });
+    const deps = baseDeps({ platform: 'win32', loadConfig });
+
+    const error = await runComputerOperation({ kind: 'read', operation: {} }, deps).catch((e) => e);
+    expect(isComputerUseError(error)).toBe(true);
+    expect(error.code).toBe('unsupported_platform');
+    expect(error.message).toBe("Computer use isn't supported on this host (win32) yet.");
+    expect(loadConfig).not.toHaveBeenCalled();
+  });
+
+  it('refuses WSL with unsupported_platform before reading config (PAN-5461 D-9)', async () => {
+    const loadConfig = vi.fn().mockReturnValue({ computerUse: { enabled: true } });
+    const resolveSession = vi.fn();
+    const deps = baseDeps({ detectPlatform: () => 'wsl', loadConfig, resolveSession });
+
+    const error = await runComputerOperation({ kind: 'read', operation: {} }, deps).catch((e) => e);
+    expect(isComputerUseError(error)).toBe(true);
+    expect(error.code).toBe('unsupported_platform');
+    expect(error.message).toBe("Computer use isn't supported on this host (wsl) yet.");
+    expect(loadConfig).not.toHaveBeenCalled();
+    expect(resolveSession).not.toHaveBeenCalled();
+  });
+
+  it('passes the provider session to runHelper', async () => {
+    const runHelper = vi.fn().mockResolvedValue({ ok: true, apps: [] });
+    await runComputerOperation({ kind: 'read', operation: { tool: 'list_apps' } }, baseDeps({ runHelper }));
+    expect(runHelper).toHaveBeenCalledWith({ tool: 'list_apps' }, { label: 'x11 · display :1', env: { DISPLAY: ':1' } });
   });
 
   it('an input op throws desktop_busy without calling runHelper when another holder holds the lease (ac3)', async () => {
@@ -102,8 +150,8 @@ describe('runCapabilities (PAN-5452 FR-13)', () => {
 
   it('reports disabled + no desktop session without calling runHelper (ac4)', async () => {
     const runHelper = vi.fn();
-    const resolveDesktopEnv = vi.fn().mockResolvedValue({ ok: false, code: 'no_desktop_session', message: 'no display' });
-    const deps = baseDeps({ loadConfig: () => ({ computerUse: { enabled: false } }), resolveDesktopEnv, runHelper });
+    const resolveSession = vi.fn().mockResolvedValue({ ok: false, code: 'no_desktop_session', message: 'no display' });
+    const deps = baseDeps({ loadConfig: () => ({ computerUse: { enabled: false } }), resolveSession, runHelper });
 
     const result = await runCapabilities(deps);
     expect(result.enabled).toBe(false);
@@ -122,6 +170,27 @@ describe('runCapabilities (PAN-5452 FR-13)', () => {
     expect(result.helper).toEqual({ platform: 'linux' });
   });
 
+  it('keeps the capabilities result shape for a Linux provider (PAN-5461)', async () => {
+    const resolveSession = async () => ({
+      ok: true as const,
+      session: { label: 'x11 · display :1', env: { DISPLAY: ':1', XDG_SESSION_TYPE: 'x11' } },
+    });
+    const runHelper = vi.fn().mockResolvedValue({ ok: true, capabilities: { platform: 'linux' } });
+    const result = await runCapabilities(baseDeps({ resolveSession, runHelper }));
+    expect(result).toEqual({
+      platform: 'linux',
+      enabled: true,
+      desktopSession: { ok: true, sessionType: 'x11', display: ':1' },
+      helper: { platform: 'linux' },
+    });
+  });
+
+  it('reports the unsupported message for WSL without throwing', async () => {
+    const result = await runCapabilities(baseDeps({ detectPlatform: () => 'wsl' }));
+    expect(result.desktopSession).toEqual({ ok: false, message: "Computer use isn't supported on this host (wsl) yet." });
+    expect(result.helper).toBeNull();
+  });
+
   it('fills helperError and still returns a result when the handshake fails', async () => {
     const runHelper = vi.fn().mockRejectedValue(new ComputerUseError('helper_error', 'boom'));
     const result = await runCapabilities(baseDeps({ runHelper }));
@@ -133,14 +202,14 @@ describe('runCapabilities (PAN-5452 FR-13)', () => {
 describe('runRelease (PAN-5452)', () => {
   it('skips the platform/config/env checks and just releases the lease (ac5)', async () => {
     const loadConfig = vi.fn().mockReturnValue({ computerUse: { enabled: false } });
-    const resolveDesktopEnv = vi.fn();
+    const resolveSession = vi.fn();
     const releaseLease = vi.fn().mockResolvedValue(undefined);
-    const deps = baseDeps({ loadConfig, resolveDesktopEnv, releaseLease, platform: 'darwin' });
+    const deps = baseDeps({ loadConfig, resolveSession, releaseLease, platform: 'darwin' });
 
     await runRelease({ force: true }, deps);
 
     expect(releaseLease).toHaveBeenCalledWith({ force: true });
     expect(loadConfig).not.toHaveBeenCalled();
-    expect(resolveDesktopEnv).not.toHaveBeenCalled();
+    expect(resolveSession).not.toHaveBeenCalled();
   });
 });
