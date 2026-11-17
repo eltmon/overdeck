@@ -16,6 +16,7 @@ import { bucketByTime, type TimeBucketKey } from '../lib/timeBuckets';
 import type { DerivedIssueState, Issue } from '../types';
 import { useNeedsYouItems } from '../lib/selectors/needsYou';
 import { useAgentsWorking, type AgentsWorking, type WorkingRole } from '../lib/selectors/agentsWorking';
+import { CLOSE_OUT_PAUSE_REASON } from '../components/GodView/confluence/model';
 
 interface FeatureRegistryResponse {
   entries: FeatureRegistryEntry[];
@@ -433,6 +434,20 @@ function HomeActivityFeedItem({ observation, now }: { observation: MemoryObserva
   );
 }
 
+const FINISHED_ISSUE_STATES: ReadonlySet<DerivedIssueState['state']> = new Set(['merged', 'closed']);
+
+/**
+ * PAN-5466: a pause the Paused tile counts. state.json keeps `paused: true`
+ * after the issue finishes, so a hold on a merged or closed issue, or on an
+ * issue the dashboard no longer derives a state for, is history rather than a
+ * hold. Overdeck's own post-merge close-out pause is not a hold either.
+ */
+function isActivePause(agent: AgentSnapshot, derivedIssueStateByIssueId: Record<string, DerivedIssueState>): boolean {
+  if (agent.paused !== true || agent.pausedReason === CLOSE_OUT_PAUSE_REASON || !agent.issueId) return false;
+  const issueState = derivedIssueStateByIssueId[agent.issueId.toUpperCase()]?.state;
+  return issueState !== undefined && !FINISHED_ISSUE_STATES.has(issueState);
+}
+
 function buildHomeSummaryCards({
   agentsById = {},
   derivedIssueStateByIssueId = {},
@@ -450,7 +465,7 @@ function buildHomeSummaryCards({
   const derivedStates = Object.values(derivedIssueStateByIssueId);
   return {
     agentsWorking,
-    pausedAgents: agents.filter((agent) => agent.paused === true).length,
+    pausedAgents: agents.filter((agent) => isActivePause(agent, derivedIssueStateByIssueId)).length,
     readyToMerge: derivedStates.filter((derived) => derived.state === 'ready').length,
     needsYou: needsYouCount,
     dailyCost: typeof dailyCost === 'number' && Number.isFinite(dailyCost) ? dailyCost : null,
@@ -468,7 +483,7 @@ function buildSummaryCardViews(summary: HomeSummaryCards): SummaryCardView[] {
     {
       label: 'Paused',
       value: String(summary.pausedAgents),
-      detail: 'Agents an operator parked',
+      detail: 'Held agents on open issues',
       tone: summary.pausedAgents > 0 ? 'text-warning' : undefined,
     },
     {

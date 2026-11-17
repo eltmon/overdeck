@@ -549,6 +549,17 @@ describe('buildLiveAgentDirectory (PAN-4197 FR-2)', () => {
     expect(ids(result)).toEqual(['agent-pan-1']);
   });
 
+  it('drops a paused agent whose issue has no derived state (PAN-5466)', async () => {
+    const result = await buildLiveAgentDirectory(deps({
+      listAgentStates: () => [
+        agent({ id: 'agent-pan-1', paused: true, pausedBy: 'operator' }),
+        agent({ id: 'agent-pan-9', issueId: 'PAN-9', paused: true, pausedBy: 'operator' }),
+      ],
+      derivedIssueStates: derived({ 'PAN-1': 'planned' }),
+    }));
+    expect(ids(result)).toEqual(['agent-pan-1']);
+  });
+
   it('keeps a paused agent with no issue', async () => {
     const result = await buildLiveAgentDirectory(deps({
       listAgentStates: () => [agent({ id: 'agent-free', issueId: undefined, paused: true })],
