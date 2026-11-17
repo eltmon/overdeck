@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5447",
   "created": "2026-11-17T12:53:31.732Z",
-  "updated": "2026-11-17T13:57:15.464Z",
+  "updated": "2026-11-17T17:33:29.870Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "chunk-search-jobs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5447",
-      "claimedAt": "2026-11-17T12:53:31.732Z"
+      "claimedAt": "2026-11-17T12:53:31.732Z",
+      "doneAt": "2026-11-17T17:33:29.870Z"
     },
     "docs-search-latency": {
       "status": "completed",
@@ -31,6 +32,22 @@
     "docs-search-latency.ac3": {
       "status": "completed",
       "doneAt": "2026-11-17T13:57:15.464Z"
+    },
+    "chunk-search-jobs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:33:29.870Z"
+    },
+    "chunk-search-jobs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:33:29.870Z"
+    },
+    "chunk-search-jobs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:33:29.870Z"
+    },
+    "chunk-search-jobs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:33:29.870Z"
     }
   }
 }
