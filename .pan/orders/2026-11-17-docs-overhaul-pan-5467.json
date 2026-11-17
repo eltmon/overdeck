@@ -177,8 +177,35 @@
       "reVerify": false,
       "addedAt": "2026-11-17T12:09:31.627Z",
       "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5503",
+      "lane": "B",
+      "order": 8,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-17T12:44:05.868Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5501",
+      "lane": "B",
+      "order": 9,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-17T12:44:05.868Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5499",
+      "lane": "B",
+      "order": 10,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-17T12:44:05.868Z",
+      "addedBy": "conv-20261113-6031"
     }
   ],
   "createdAt": "2026-11-17T12:08:16.980Z",
-  "updatedAt": "2026-11-17T12:43:39.040Z"
+  "updatedAt": "2026-11-17T12:44:05.869Z"
 }
