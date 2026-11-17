@@ -779,6 +779,12 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/semgrep/settings',                            kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG via semgrep settings door (PAN-4594)' },
   { surface: 'PUT /api/semgrep/settings',                            kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via semgrep settings path-scoped write (PAN-4594)' },
 
+  // ── computer-use.ts ──────────────────────────────────────────────────────
+  { surface: 'GET /api/computer-use/status',                         kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG + host probes via computer-use status (PAN-5461)' },
+  { surface: 'POST /api/computer-use/setup',                         kind: 'http', disposition: 'WRITE',       door: 'host package install + computer_use.enabled via computer-use setup (PAN-5461)' },
+  { surface: 'PUT /api/computer-use/settings',                       kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via computer-use settings path-scoped write (PAN-5461)' },
+  { surface: 'POST /api/computer-use/release',                       kind: 'http', disposition: 'WRITE',       door: 'desktop lease file via pan computer release (PAN-5461)' },
+
   // ── color-themes.ts (PAN-4644) ───────────────────────────────────────────
   { surface: 'GET /api/color-themes',                                kind: 'http', disposition: 'READ',        door: 'color theme store + selection resolve (PAN-4644)' },
   { surface: 'PUT /api/color-themes/selection',                      kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via color theme selection path-scoped write (PAN-4644)' },
