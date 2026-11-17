@@ -124,6 +124,38 @@ describe('ComputerUseSection (PAN-5461)', () => {
     expect(screen.getByText(/password prompt was cancelled/)).toBeInTheDocument();
   });
 
+  it('keeps the off switch after a failed helper test leaves the flag on, and turning it off clears the failure', async () => {
+    const status = view();
+    const onStatus = view({ enabled: true, setupSteps: [{ id: 'test-helper', label: 'Test the helper' }] });
+    const { fetchMock } = serveStatus(status, ({ method, url }) => {
+      if (method === 'POST' && url === '/api/computer-use/setup') {
+        return Response.json({
+          ok: false,
+          steps: [
+            { id: 'enable-flag', label: 'Turn on Computer Use', status: 'done' },
+            { id: 'test-helper', label: 'Test the helper', status: 'failed', message: 'helper_timeout' },
+          ],
+          status: onStatus,
+        });
+      }
+      if (method === 'PUT' && url === '/api/computer-use/settings') return Response.json(view());
+      return undefined;
+    });
+    renderSection();
+    const cta = await screen.findByTestId('computer-use-cta');
+    await act(async () => { fireEvent.click(cta); });
+
+    await waitFor(() => expect(screen.getByTestId('computer-use-cta')).toHaveTextContent('Try again'));
+    const toggle = screen.getByTestId('computer-use-enabled-switch');
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    await act(async () => { fireEvent.click(toggle); });
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/computer-use/settings', expect.objectContaining({
+      method: 'PUT', body: JSON.stringify({ enabled: false }),
+    })));
+    await waitFor(() => expect(screen.getByTestId('computer-use-title')).toHaveTextContent('Computer Use is off'));
+  });
+
   it('shows Ready, a checked switch and a disabled Take back control when on and free', async () => {
     serveStatus(view({ enabled: true, setupSteps: [] }));
     renderSection();

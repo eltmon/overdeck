@@ -179,6 +179,26 @@ function ChecksList({ status }: { status: ComputerUseStatusView }) {
   );
 }
 
+function EnableRow({ busy, setEnabled }: { busy: boolean; setEnabled: (enabled: boolean) => Promise<boolean> }) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div>
+        <div className="text-sm text-foreground">Allow agents to use the desktop</div>
+        <div className="text-xs text-muted-foreground">Turning this off stops new actions right away.</div>
+      </div>
+      <Switch
+        checked
+        disabled={busy}
+        onChange={(next) => {
+          void setEnabled(next).then((saved) => {
+            if (saved && !next) toast('Computer Use is off. Agents get a "disabled" error.');
+          });
+        }}
+      />
+    </div>
+  );
+}
+
 function leaseSeconds(expiresAt: string): number {
   return Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 1000));
 }
@@ -268,6 +288,12 @@ export function ComputerUseSection() {
             {stalled === 'waiting' ? 'Continue' : 'Try again'}
           </button>
         </div>
+        {/* A failed test-helper leaves the flag on (WI-4b); the operator can still turn it off here. */}
+        {status.enabled ? (
+          <div className="mt-4">
+            <EnableRow busy={busy} setEnabled={setEnabled} />
+          </div>
+        ) : null}
       </>
     );
   } else if (status.enabled) {
@@ -287,21 +313,7 @@ export function ComputerUseSection() {
           </div>
         ) : null}
         <div className="mt-4 space-y-3">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-sm text-foreground">Allow agents to use the desktop</div>
-              <div className="text-xs text-muted-foreground">Turning this off stops new actions right away.</div>
-            </div>
-            <Switch
-              checked
-              disabled={busy}
-              onChange={(next) => {
-                void setEnabled(next).then((saved) => {
-                  if (saved && !next) toast('Computer Use is off. Agents get a "disabled" error.');
-                });
-              }}
-            />
-          </div>
+          <EnableRow busy={busy} setEnabled={setEnabled} />
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 text-sm text-foreground">

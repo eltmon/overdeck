@@ -124,7 +124,8 @@ export function useComputerUseStatus() {
   };
 
   const setEnabled = (enabled: boolean) => {
-    if (enabled) setSetupResult(null);
+    // A flipped switch supersedes the last setup run's stalled step list.
+    setSetupResult(null);
     return runAction('PUT', '/api/computer-use/settings', { enabled }, 'Failed to save Computer Use setting');
   };
 
