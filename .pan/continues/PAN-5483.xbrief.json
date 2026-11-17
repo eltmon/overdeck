@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5483",
   "created": "2026-11-17T13:01:33.028Z",
-  "updated": "2026-11-17T14:59:18.520Z",
+  "updated": "2026-11-17T15:01:35.598Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,9 +130,22 @@
       "doneAt": "2026-11-17T14:59:06.410Z"
     },
     "frontmatter-features-retitle": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5483",
-      "claimedAt": "2026-11-17T14:59:18.520Z"
+      "claimedAt": "2026-11-17T14:59:18.520Z",
+      "doneAt": "2026-11-17T15:01:35.598Z"
+    },
+    "frontmatter-features-retitle.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T15:01:35.598Z"
+    },
+    "frontmatter-features-retitle.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T15:01:35.598Z"
+    },
+    "frontmatter-features-retitle.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T15:01:35.598Z"
     }
   }
 }
