@@ -104,6 +104,7 @@
           {
             "group": "Features",
             "pages": [
+              "features/planning",
               "features/mission-control",
               "features/conversations",
               "features/specialists",
