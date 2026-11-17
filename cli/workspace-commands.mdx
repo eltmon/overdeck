@@ -78,26 +78,10 @@ This allows multiple workspaces to run simultaneously without port or name confl
 - Environment is ready when the planning agent starts asking questions
 - You can test assumptions during planning without waiting for builds
 
-**Dashboard integration:**
-
-The planning dialog includes a "Start Docker containers" checkbox:
-- **Default:** Enabled (containers start automatically)
-- **Preference saved:** Your choice is remembered in browser localStorage
-- **Key:** `overdeck.planning.startDocker`
-
-To change the default via browser console:
-```javascript
-// Disable Docker by default
-localStorage.setItem('overdeck.planning.startDocker', 'false');
-
-// Enable Docker by default (this is the out-of-box default)
-localStorage.setItem('overdeck.planning.startDocker', 'true');
-```
+**Dashboard integration:** the Plan dialog has a **Start Docker containers** checkbox. It is off by default and remembers your last choice in the browser (localStorage key `overdeck.planning.startDocker`). It applies only when planning creates the workspace; then the workspace is created as if you ran `pan workspace create <issue> --docker`.
 
 **Example workflow:**
 ```bash
-# From dashboard: click "Start Planning" (Docker enabled by default)
-# Or from CLI:
 pan workspace create MIN-123 --docker
 
 # While containers build in background:
@@ -182,47 +166,15 @@ Manual hook installation (for projects not in registry):
 
 ## Workspace Structure
 
-Workspaces include planning artifacts stored inside the workspace directory:
+Planning artifacts live under `.pan/` in the project repo, committed on the feature branch (`.pan/drafts/<issue>.md`, `.pan/specs/…xbrief.json`, `.pan/continues/<issue>.xbrief.json`). The workspace keeps local, gitignored runtime state under `.overdeck/` (for example `continue.json`).
 
-```
-workspaces/feature-min-123/
-├── .planning/                 # ⚠️ NOT tracked in git (ephemeral)
-│   ├── STATE.md               # Current planning state
-│   ├── output.jsonl           # Full conversation history
-│   ├── PLANNING_PROMPT.md     # Initial planning prompt
-│   ├── CONTINUATION_PROMPT.md # Context for continued sessions
-│   └── output-*.jsonl         # Backup of previous rounds
-└── ... (code)
-```
-
-> ⚠️ **Note: `.planning/` is currently ephemeral (not tracked in git)**
->
-> The `.planning/` directory is listed in `.gitignore` to prevent cross-contamination between issues. When branches merge, planning state from issue A could contaminate issue B's workspace, causing agents to work on the wrong tasks.
->
-> **Current behavior:** Planning state is local to your machine only. If you switch machines, you'll need to re-run the planning session.
->
-> See [#111](https://github.com/eltmon/overdeck/issues/111) for the future enhancement to support cross-machine planning sync safely.
-
-When the planning session completes, the AI generates:
-- **STATE.md** - Current understanding, decisions made, and implementation plan
-- **xBRIEF tasks** - Trackable plan items with dependencies for the implementation
-- **Feature PRD** - Copied to `docs/prds/active/{issue}-plan.md` for documentation
-
-**What works:**
-1. **Context recovery** - If an agent's context compacts, the xBRIEF and durable issue record preserve the planning decisions
-2. **Audit trail** - See decisions made in STATE.md
-3. **xBRIEF tasks** - Plan items and their status overlays are persisted through the canonical task writer
+See [Planning](/features/planning) for how these files are made and used.
 
 ## Safeguards
 
 ### Planning vs Work Agent Safeguard
 
-The dashboard prevents starting a work agent (`agent-<issue>`) while a planning agent (`planning-<issue>`) is still running for the same issue. This prevents conflicts where both agents try to modify the same workspace.
-
-If you see "Planning agent is still running" when trying to start work:
-1. **Complete the planning session** - Use "Complete Planning" button
-2. **Or abort planning** - Use "Abort Planning" if you want to discard
-3. **Or kill the session manually** - `tmux kill-session -t planning-<issue>`
+The dashboard offers Start agent for an issue only after planning, and only when no agent is running for it. To stop a planning session without accepting a plan, open the Plan dialog and click the amber **Stop** button in its footer, or **Abort Planning** when you resume a session. Either one stops the planning agent and returns the issue to Todo, and keeps the workspace. See [Planning](/features/planning).
 
 ### Specialist Agent Safeguards
 

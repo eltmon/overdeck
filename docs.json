@@ -100,6 +100,7 @@
           {
             "group": "Features",
             "pages": [
+              "features/planning",
               "features/conversations",
               "features/file-explorer",
               "features/mission-control",
