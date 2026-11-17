@@ -2,7 +2,7 @@
  * `pan computer <sub>` (PAN-5452): let agents read and operate local desktop
  * apps through the vendored Orca helper. See `configuration/computer-use.mdx`
  * and `.pan/drafts/pan-5452.md` for the full design. Opt-in
- * (`computer_use.enabled`), Linux only. Implementations load lazily from
+ * (`computer_use.enabled`), Linux and macOS. Implementations load lazily from
  * `src/lib/computer-use/` inside each action, modeled on `semgrep.ts`.
  */
 import type { Command } from 'commander';
@@ -78,7 +78,7 @@ async function run(json: boolean | undefined, fn: () => Promise<RunComputerOpera
 }
 
 export function registerComputerCommands(program: Command): void {
-  const computer = program.command('computer').description('Let agents read and operate local desktop apps (opt-in, Linux)');
+  const computer = program.command('computer').description('Let agents read and operate local desktop apps (opt-in, Linux and macOS)');
 
   addJsonOption(computer.command('capabilities').description('Report platform, opt-in and desktop-session readiness')).action(
     async (options: { json?: boolean }) => {

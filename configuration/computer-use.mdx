@@ -1,13 +1,14 @@
 ---
 title: Computer use
-description: Opt-in, off-by-default desktop control (accessibility tree, clicks, keys, screenshots) for agents on Linux
+description: Opt-in, off-by-default desktop control (accessibility tree, clicks, keys, screenshots) for agents on Linux and macOS
 ---
 
 # Computer use
 
 Overdeck agents can read and operate a local desktop app — the accessibility tree, clicks,
 typing, keys, scrolling, dragging, and screenshots — through `pan computer`. It is
-**off by default** and **Linux only**.
+**off by default** and works on **Linux and macOS** (see [macOS](#macos)).
+
 
 ## What it does
 
@@ -66,12 +67,79 @@ it off, every `pan computer` command except `capabilities` and `release` refuses
 
 ### Dashboard routes
 
-The Settings page uses four admin-only routes: `GET /api/computer-use/status`,
-`POST /api/computer-use/setup`, `PUT /api/computer-use/settings` and
-`POST /api/computer-use/release`. No scoped access token can call them, so an agent can't turn
+The Settings page uses five admin-only routes: `GET /api/computer-use/status`,
+`POST /api/computer-use/setup`, `PUT /api/computer-use/settings`,
+`POST /api/computer-use/release` and, on macOS only, `POST /api/computer-use/open-permission`
+(opens one System Settings permission pane). No scoped access token can call them, so an agent can't turn
 computer use on for itself.
 
+## macOS
+
+Computer use works on macOS 14 (Sonoma) or newer, both from `npx @overdeck/core` (or a global
+install) and from the Overdeck desktop app. It drives native apps through **Overdeck Computer
+Use**, a small helper app adapted from Orca's macOS helper (MIT, see
+[its README](https://github.com/eltmon/overdeck/blob/main/native/computer-use-macos/README.md)).
+The helper ships inside the npm package, so you don't need the desktop app or Xcode.
+
+### Why macOS asks for two permissions
+
+macOS never lets an app grant itself these permissions, so you switch them on yourself, once:
+
+- **Accessibility** lets the helper read app windows' accessibility trees and click, type and
+  scroll in them.
+- **Screen Recording** lets the helper take window screenshots. Without it the tree still works,
+  but screenshots fail.
+
+macOS ties both permissions to the helper app itself, not to Terminal or Overdeck, which is why
+the helper is installed as its own app.
+
+### Setup
+
+Open **Settings → Computer Use** and press **Set up and turn on**:
+
+1. **Installs the helper** to `~/.overdeck/computer-use/macos/Overdeck Computer Use.app`. No
+   password is needed. The app must stay at that path, because macOS ties the permissions to it.
+2. **Opens the two System Settings pages** (Privacy & Security → Accessibility and Screen
+   Recording). Switch on **Overdeck Computer Use** in each, then press **Continue** in Overdeck.
+3. **Turns `computer_use.enabled` on** and **tests the helper** with a handshake.
+
+Once it is on, the card lists **Accessibility** and **Screen Recording** with their status. A
+permission that is not allowed has an **Open settings** button that opens its System Settings
+page again. Overdeck re-checks when you come back to the dashboard window.
+
+The helper runs as one background process per user, shared by every `pan computer` call. It
+listens on `/tmp/overdeck-cu-<uid>/agent.sock`, only accepts callers running as your user with
+the token in `~/.overdeck/computer-use/macos/agent.token`, and exits after 10 minutes without a
+request. On macOS, actions run in the background: the target app is not brought forward and the
+pointer does not move.
+
+### Updates and signing
+
+Overdeck builds the helper in CI. Without an Apple Developer ID certificate it is **ad-hoc
+signed**, and macOS ties the permissions to that exact build. So after an Overdeck update that
+changes the helper, macOS asks you to allow the updated helper again: the card shows **Needs
+attention**, and **Fix setup** reinstalls the helper and reopens the two System Settings pages,
+where you switch Overdeck Computer Use off and on again. A helper signed with a Developer ID
+certificate keeps its permissions across updates.
+
+For maintainers: the release workflow signs with a Developer ID certificate and notarizes the
+helper when these GitHub Actions secrets exist, and signs ad-hoc otherwise:
+
+| Secret | Holds |
+| --- | --- |
+| `MACOS_CERTIFICATE` | The Developer ID Application certificate as a base64 `.p12` |
+| `MACOS_CERTIFICATE_PWD` | The `.p12` password |
+| `APPLE_API_KEY` | The App Store Connect API key (`.p8`), base64 |
+| `APPLE_API_KEY_ID` | The API key's ID |
+| `APPLE_API_ISSUER_ID` | The API key's issuer ID |
+
+A source checkout without the bundled zip builds the helper on first setup with
+`npm run build:computer-macos`, which needs the Xcode Command Line Tools
+(`xcode-select --install`).
+
 ## Requirements
+
+On macOS, see [macOS](#macos). On Linux:
 
 - A Linux desktop with a logged-in session (X11 or Wayland). A headless host or a linked machine
   with no desktop session gets `no_desktop_session`.
@@ -132,7 +200,8 @@ Everything lives under `~/.overdeck/computer-use/`:
 
 - `hotkey` and `press-key` refuse a chord that would quit, lock, log out or switch virtual
   terminals (`alt+F4`, `ctrl+alt+F2`, `super+l`, `ctrl+q`, …) with `system_shortcut_blocked`,
-  unless `--allow-system-shortcut` is passed.
+  unless `--allow-system-shortcut` is passed. On macOS the refused chords are `cmd+q`,
+  `cmd+shift+q`, `cmd+ctrl+q`, `cmd+alt+escape` and `cmd+shift+backspace`.
 - `--text-stdin` and `--value-stdin` read sensitive text from stdin so it never lands in argv or
   shell history.
 - The shipped skill tells agents never to push, submit, send, buy, delete, or change account
@@ -140,7 +209,7 @@ Everything lives under `~/.overdeck/computer-use/`:
 
 ## Limits
 
-- Linux only. macOS (a signed Swift helper) and Windows (`runtime.ps1`) are follow-ups.
+- Linux and macOS only. Windows (`runtime.ps1`) is a follow-up.
 - Wayland can't do hotkeys (`xdotool` needs X11); screenshots there need `grim`.
 - No remote hosts — a linked machine with no logged-in desktop session always refuses.
 - On some multi-monitor setups, AT-SPI can report a window's bounds at `(0,0)` instead of its
@@ -155,7 +224,12 @@ Everything lives under `~/.overdeck/computer-use/`:
 
 ## Troubleshooting
 
-Run `pan doctor`. With the feature off it prints no `Computer use` row at all. With it on, it
+On macOS, Settings → Computer Use shows every check (macOS version, helper, Accessibility,
+Screen Recording, handshake); `pan doctor` points there instead of probing. A
+`permission_denied` error means a permission is off: open Settings → Computer Use and finish
+setup.
+
+On Linux, run `pan doctor`. With the feature off it prints no `Computer use` row at all. With it on, it
 checks the AT-SPI Python bindings, the desktop session, `xdotool` on X11, a clipboard tool,
 `grim` on Wayland, and GNOME accessibility, ending in a single `Ready (<session>, display <d>)`
 row once the helper's handshake succeeds.
