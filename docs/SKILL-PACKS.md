@@ -29,6 +29,9 @@ every config key, see
 | `gstack.ts` | `GSTACK_SKILL_MAP`, `classifyGstackSkill`, `GSTACK_DISCLOSURE` |
 | `deft.ts` | `DEFT_SKILL_MAP`, `DEFT_READONLY_SKILLS`, `applyDeftHostNotice` |
 | `ox-build.ts` | `buildOx`, `isOxBuildReady`, `assertGoAvailable`, `oxBuildCommands`, `oxBuildDownloads`, `oxBuildEnv`, `OX_BINARIES`, `OX_BUILD_MARKER`: the `sageox` pack's `go build` of `ox` and its two adapters (PAN-4852) |
+| `groups.ts` | `KNOWN_PACK_GROUPS`, `PackGroupError`, `resolvePackGroup`, `listPackGroups`: pack groups (built-in `video`, plus `skills.pack_groups` in `config.yaml`, which overrides built-ins by name); a group is an alias with no state (PAN-5464) |
+| `openmontage.ts` | `OPENMONTAGE_EXCLUDED_NAMES`, `OPENMONTAGE_EXCLUDE`, `OPENMONTAGE_DISCLOSURE`: the `openmontage` known pack's curation, frozen at `2e003e6` (PAN-5464) |
+| `video-use.ts` | `VIDEO_USE_NOTICE_VERSION`, `VIDEO_USE_HOST_NOTICE`, `applyVideoUseHostNotice`, `requirementsFromPyproject`: the `video-use` mount transform (PAN-5464) |
 | `atlassian.ts` | `ATLASSIAN_PACK_ID`, `ATLASSIAN_PACK_URL`, `ATLASSIAN_PACK_COMMIT`, `ATLASSIAN_MCP_HOST`, `ATLASSIAN_MCP_URL`, `ATLASSIAN_OPT_IN_SKILLS`, `ATLASSIAN_DISCLOSURE`, `atlassianBasicAuth`, `withAtlassianAuth`, `atlassianNeedsInteractiveAuth`: the `atlassian` known pack's constants and its Jira Basic auth header (PAN-5165). Leaf: imports nothing from `skill-overrides/`, `projects/` or `mcp/`. |
 
 ### `src/lib/skill-overrides/`
@@ -244,7 +247,10 @@ applied. `mcpServerLabels(manifest)` renders each applied server as
 | `mountExtras` | Plugin-root-relative files or directories the mount copies next to `skills/` | `pstack` |
 | `skillsExclude` | Plugin-root-relative dirs the skill scan skips entirely, before the `SKILL.md` check (PAN-5165) | `atlassian` (`skills/v1`) |
 | `optIn` | Skill names that are opt-in: the pack toggle never turns them on | `mattpocock`, `sageox`, `pstack`, `atlassian` |
-| `disclosure` | One-line statement of what leaves the machine, shown on the pack row | `sageox`, `gstack`, `atlassian` |
+| `disclosure` | One-line statement of what leaves the machine, shown on the pack row | `sageox`, `gstack`, `atlassian`, the four video packs |
+| `archivePaths` | Repo-relative paths `git archive` receives; extraction adds `CAPABILITY_PROBE_PATHS` and keeps only paths that exist at the commit. Never combined with `pluginRoot` (a test asserts it) | `hyperframes`, `openmontage`, `video-use` |
+| `rootSkill` | `{ name, paths }`: a skill whose `SKILL.md` sits at the repo root; the manifest lists it first with `dir: '.'` and its `paths`, and the mount copies only those paths | `video-use` |
+| `mountTransform` | Mount transform for a pack whose adapter has none (`'video-use'`: host notice and `requirements.txt`) | `video-use` |
 
 `gstack` ignores the `optIn` field: `readPackManifest` takes its opt-ins from
 `GSTACK_OPT_IN_SKILLS` and `GSTACK_BROWSER_OPT_IN_SKILLS` (`gstack.ts`)
@@ -315,6 +321,13 @@ instead.
   launching role's own servers, then the project's `mcp_servers`, then pack
   servers in ascending pack id order; a later source's server with an
   already-claimed name is skipped with one warning (PAN-5165 D-6).
+- Extraction never smudges Git LFS: the `git()` helper in `sources.ts` sets
+  `GIT_LFS_SKIP_SMUDGE=1`, so pointer files stay pointers and the manifest
+  counts them as `lfsObjects` (PAN-5464).
+- A root skill's consumers follow its `paths`, never `.`: the manifest lists
+  executables and LFS pointers under the paths, `updatePack` hashes each path,
+  and the mount copies only the paths. Nothing passes `.` to `treeHash` or
+  `listExecutables` (PAN-5464 D-8).
 - `atlassian.ts` is a leaf: it imports nothing from `skill-overrides/`,
   `projects/` or `mcp/` (its header comment), so `adapters.ts` can import it
   without creating a cycle.

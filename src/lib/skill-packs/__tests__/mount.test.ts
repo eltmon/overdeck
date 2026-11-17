@@ -117,6 +117,27 @@ const pWithExtras = (extras: string[] = ['docs', 'README.md']): MountPack => ({
   extras,
 });
 
+const COMMIT_V = 'e'.repeat(40);
+const rootVideo = join(scratch, 'video-use');
+mkdirSync(join(rootVideo, 'helpers'), { recursive: true });
+mkdirSync(join(rootVideo, 'tests'), { recursive: true });
+mkdirSync(join(rootVideo, 'skills', 'manim-video'), { recursive: true });
+writeFileSync(join(rootVideo, 'SKILL.md'), '---\nname: video-use\ndescription: Edit videos.\n---\n\n# Video Use\n');
+writeFileSync(join(rootVideo, 'helpers', 'a.py'), 'print(1)\n');
+writeFileSync(join(rootVideo, 'tests', 'x.py'), 'print(2)\n');
+writeFileSync(join(rootVideo, 'pyproject.toml'), '[project]\nname = "video-use"\ndependencies = ["requests", "numpy"]\n');
+writeFileSync(join(rootVideo, 'skills', 'manim-video', 'SKILL.md'), '---\nname: manim-video\ndescription: Manim.\n---\n');
+const videoUse = (): MountPack => ({
+  id: 'video-use',
+  commit: COMMIT_V,
+  root: rootVideo,
+  transform: 'video-use',
+  skills: [
+    { name: 'video-use', dir: '.', paths: ['SKILL.md', 'helpers', 'pyproject.toml'] },
+    { name: 'manim-video', dir: 'skills/manim-video' },
+  ],
+});
+
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
@@ -276,6 +297,50 @@ describe('buildMount', () => {
     await expect(buildMount({ packs: [pWithExtras(['.claude-plugin/plugin.json'])] })).rejects.toThrow(
       /collides with generated content/,
     );
+  });
+});
+
+describe('root skills and the video-use transform (PAN-5464)', () => {
+  it('mounts only the root skill paths with the host notice and a generated requirements.txt', async () => {
+    const mount = await buildMount({ packs: [videoUse()] });
+    if (!mount) throw new Error('expected a mount');
+    const skillDir = join(mount.path, 'plugins', 'video-use', 'skills', 'video-use');
+    expect(readdirSync(skillDir).sort()).toEqual(['SKILL.md', 'helpers', 'pyproject.toml', 'requirements.txt']);
+    expect(readFileSync(join(skillDir, 'helpers', 'a.py'), 'utf8')).toBe('print(1)\n');
+    expect(readFileSync(join(skillDir, 'requirements.txt'), 'utf8')).toBe('requests\nnumpy\n');
+    const skillMd = readFileSync(join(skillDir, 'SKILL.md'), 'utf8');
+    expect(skillMd.split('<!-- overdeck:video-use-host-notice v1 -->')).toHaveLength(2);
+    expect(skillMd).toMatch(/^---\nname: video-use\n/);
+    const manim = readFileSync(join(mount.path, 'plugins', 'video-use', 'skills', 'manim-video', 'SKILL.md'), 'utf8');
+    expect(manim).toBe(readFileSync(join(rootVideo, 'skills', 'manim-video', 'SKILL.md'), 'utf8'));
+  });
+
+  it('keeps the hash of a selection with no paths and no new transform (NFR-2)', () => {
+    // Captured from mountHash before PAN-5464 changed it.
+    expect(
+      mountHash({
+        packs: [
+          { id: 'mattpocock', commit: COMMIT_A, root: '/x', skills: [{ name: 'grilling', dir: 'skills/grilling' }, { name: 'tdd', dir: 'skills/tdd' }] },
+          { id: 'deft', commit: COMMIT_B, root: '/y', transform: 'deft-readonly', skills: [{ name: 'setup', dir: 'skills/deft-directive-setup' }] },
+          { id: 'pstack', commit: COMMIT_A, root: '/z', pluginRoot: 'harness/p', extras: ['docs'], skills: [{ name: 'p', dir: 'harness/p/skills/p' }] },
+        ],
+      }),
+    ).toBe('49a07f0cd239d252bc8d9d26d0fddf27424c894cb4869dd7ea6f21f9da2ad2e2');
+  });
+
+  it('covers skill paths and the video-use transform in the hash', () => {
+    const base = videoUse();
+    expect(mountHash({ packs: [base] })).not.toBe(mountHash({ packs: [{ ...base, transform: undefined }] }));
+    const fewer = { ...base, skills: [{ name: 'video-use', dir: '.', paths: ['SKILL.md'] }, base.skills[1]!] };
+    expect(mountHash({ packs: [base] })).not.toBe(mountHash({ packs: [fewer] }));
+    const split = { ...base, skills: [{ name: 'video-use', dir: '.', paths: ['SKILL.md', 'a', 'b'] }] };
+    const joined = { ...base, skills: [{ name: 'video-use', dir: '.', paths: ['SKILL.md', 'a,b'] }] };
+    expect(mountHash({ packs: [split] })).not.toBe(mountHash({ packs: [joined] }));
+  });
+
+  it('rejects skill paths that escape the pack', async () => {
+    const escaping = { ...videoUse(), skills: [{ name: 'video-use', dir: '.', paths: ['../outside'] }] };
+    await expect(buildMount({ packs: [escaping] })).rejects.toThrow('skill path escapes pack video-use');
   });
 });
 

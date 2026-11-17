@@ -27,6 +27,12 @@ vi.mock('../../overdeck/conversations.js', () => ({ getSupervisedConversationByT
 vi.mock('../../projects.js', () => ({ resolveProjectKeyForCwdAsync: vi.fn(async () => 'proj') }));
 const { resolveSageoxLaunch } = vi.hoisted(() => ({ resolveSageoxLaunch: vi.fn() }));
 vi.mock('../../sageox/launch.js', () => ({ SAGEOX_PACK_ID: 'sageox', resolveSageoxLaunch }));
+// PAN-5464: a fixture known pack with a mount transform and a root skill.
+vi.mock('../../skill-packs/adapters.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../skill-packs/adapters.js')>();
+  const vidpack = { id: 'vidpack', adapter: 'plain' as const, mountTransform: 'video-use' as const };
+  return { ...actual, KNOWN_PACKS: { ...actual.KNOWN_PACKS, vidpack } };
+});
 vi.mock('node:child_process', async importOriginal => {
   const actual = await importOriginal<typeof import('node:child_process')>();
   return { ...actual, execFile: vi.fn(actual.execFile), spawn: vi.fn(actual.spawn) };
@@ -434,6 +440,34 @@ describe('skill pack launch (PAN-4334)', () => {
     const text = await readFile(join(link, 'deft', 'skills', 'glossary', 'SKILL.md'), 'utf8');
     expect(text).toMatch(/^---\nname: glossary\n/);
     expect(text).toContain('<!-- overdeck:deft-host-notice v1 -->');
+  });
+
+  it('selects a known pack mount transform and a root skill\'s paths (PAN-5464)', async () => {
+    const base = catalogEntry(true);
+    listPackCatalog.mockResolvedValue([
+      {
+        ...base,
+        id: 'vidpack',
+        adapter: 'plain',
+        manifest: {
+          ...base.manifest!,
+          skills: [{ ...skill('video-use', '.'), paths: ['SKILL.md', 'helpers'] }, skill('manim-video', 'skills/manim-video')],
+        },
+      },
+    ]);
+    loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { global: { vidpack: true } } });
+
+    const { selection } = await resolveLaunchPackSelection(ctx);
+
+    expect(selection.packs[0]).toMatchObject({
+      id: 'vidpack',
+      transform: 'video-use',
+      skills: [
+        { name: 'video-use', dir: '.', paths: ['SKILL.md', 'helpers'] },
+        { name: 'manim-video', dir: 'skills/manim-video' },
+      ],
+    });
+    expect(selection.packs[0]?.skills[1]).not.toHaveProperty('paths');
   });
 
   it('leaves the deft pack out for an issue on Deft\'s pipeline (PAN-4820)', async () => {

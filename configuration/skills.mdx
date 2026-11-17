@@ -65,6 +65,19 @@ A malformed entry is ignored, and a `config.yaml` that fails to parse
 yields no packs at all. `pan skills pack sync` re-fetches a pack but never
 moves its `commit`.
 
+## `skills.pack_groups` (global)
+
+Pack groups, in `~/.overdeck/config.yaml`. Each key is a group name and each value is a list of pack ids:
+
+```yaml
+skills:
+  pack_groups:
+    animation: [remotion, hyperframes]
+    video: [remotion, video-use]   # replaces the built-in video group
+```
+
+Overdeck ships the built-in group `video` (`remotion`, `hyperframes`, `openmontage`, `video-use`). A config group with a built-in name replaces the built-in. A value that is not a list of valid pack ids (`[a-z0-9][a-z0-9-]*`) is ignored. A group stores nothing of its own: `pan skills pack add --group`, `pan skills set --group` and `pan handoff --group` expand it to its members when they run. Writer: you, by hand; no command writes this key. See [Pack groups](/features/skill-packs#pack-groups).
+
 ## `skills.pack_overrides` and `skills.overrides` (global)
 
 ```yaml
