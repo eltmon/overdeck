@@ -1,0 +1,598 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-17T12:41:55Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5058: Hosted-bot access without Tailscale: TLS passthrough relay at <name>.mcp.overdeck.ai (relay add-on)",
+    "updated": "2026-11-17T12:52:21.296Z"
+  },
+  "plan": {
+    "id": "pan-5058",
+    "title": "Hosted-bot access without Tailscale: TLS passthrough relay at <name>.mcp.overdeck.ai (relay add-on)",
+    "status": "proposed",
+    "uid": "61d1efa2-f074-4450-aab6-0eeec2e9a2ad",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-17T12:41:55Z",
+    "updated": "2026-11-17T12:52:21.296Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5058",
+        "label": "PAN-5058",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5058.md",
+        "label": "PRD draft (.pan/drafts/PAN-5058.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5490",
+        "label": "S-A account hostnames and tickets",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5491",
+        "label": "S-B relay service",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5492",
+        "label": "S-C machine tunnel and TLS listener",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5493",
+        "label": "S-D ACME certificates",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5494",
+        "label": "S-E settings, enable flow, e2e, user docs",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5495",
+        "label": "S-F GTS fallback CA",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5496",
+        "label": "S-G CT watch",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5486",
+        "label": "PAN-5486 Grok Bot docs and core pins (overlapping docs)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "mcp",
+      "public-mcp",
+      "oauth",
+      "relay",
+      "grok-bot",
+      "muse",
+      "checkpoint",
+      "docs"
+    ],
+    "metadata": {
+      "sizeJustification": "Code touches only two subsystems (src/dashboard, src/lib) plus their tests. The count passes 6 because the two-segment subsystem rule counts each single documentation file (configuration/bots.mdx, configuration/mcp.mdx, changelog.d/pan-5058.md) and the checkpoint record folders (integrations/grok-bot, .pan/drafts) as separate subsystems. The relay build itself is already split out into seven sibling issues #5490-#5496 (PRD D-1).",
+      "canonicalFilename": "2026-11-17-PAN-5058-hosted-bot-access-without-tailscale-tls-passthrough-relay-at-name-mcp-overdeck-ai-relay-add-on.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Hosted bots (Grok Bot, the xAI API, Meta's Muse) cannot run the Overdeck connector and need a public HTTPS /mcp. Today the only route is Tailscale Funnel, which most users will not set up. Grok Bot cannot use the connector at all (no WebRTC egress, PAN-5242), and Public MCP has never been run live with Grok Bot or Muse. The operator ordered a live Grok Bot run over Funnel before any relay code, because the relay reuses that exact OAuth path.",
+      "Proposal": "PRD .pan/drafts/PAN-5058.md designs the whole feature: an Overdeck-run TLS passthrough relay at <label>.mcp.overdeck.ai that forwards ciphertext by SNI to an outbound tunnel from the user's machine, where TLS ends with a certificate the machine gets itself through TLS-ALPN-01. The build is split into seven sibling issues (#5490-#5496). This issue does what must come first: log refused OAuth client registrations (W-1), run Grok Bot live over Funnel (CP-1, W-2), accept private-use redirect URI schemes only if CP-1 shows Grok Bot needs them (W-3), run Meta Muse live (CP-2, W-4), make the Grok Bot docs say what CP-1 found (W-5), and amend the PAN-4927 PRD so it describes the relay as a second public route that forwards ciphertext only (W-6).",
+      "NonGoals": "- Building the relay service, tunnel client, TLS listener, certificates, Settings panel, GTS fallback or CT watch in this issue; those are siblings #5490-#5496\n- Metering relay MCP bytes against the 50 GB relay allowance\n- ARI certificate renewals\n- /hooks/* triggers over the relay\n- Any plaintext MCP relay or TLS termination of user hostnames on overdeck.ai\n- Agents deploying the relay, changing DNS, running wrangler deploy or filing the Let's Encrypt rate-limit override\n- Running or automating Tailscale for the user beyond the one-time CP-1 setup on the operator's machine\n- Changing /mcp tools, token scopes or OAuth access levels\n- Marking any live checkpoint row passed without a dated live run"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split the feature into this issue plus seven sibling issues #5490-#5496 (S-A to S-G); siblings are blocked by this issue.",
+        "rationale": "The full design spans account service, a new relay service, contracts, gate/auth, TLS/ACME, UI and many docs, far past the 25-file / 6-subsystem plan limit. The operator ordered the Grok Bot checkpoint before any relay code, and this issue carries the PRD to main, so it naturally comes first."
+      },
+      {
+        "summary": "Relay hostnames are random 12-character labels allocated per machine by the account service, sticky across toggles, at most 5 active per account.",
+        "rationale": "Every certificate is public in CT logs, so a login or machine name in the hostname would publish it. Per machine because TLS ends on each machine. The cap bounds Let's Encrypt use."
+      },
+      {
+        "summary": "The machine authenticates to the relay with 10-minute HMAC relay tickets from the account service, never with its device token.",
+        "rationale": "A device token can revoke devices and delete the account; the relay must not hold it. Tickets let a Fly app verify offline and make revocation and add-on lapse take effect within about 10 minutes."
+      },
+      {
+        "summary": "Wire protocol: one control WebSocket plus one data WebSocket per inbound stream, at mcp-relay.overdeck.ai (outside the user wildcard).",
+        "rationale": "WebSocket already frames bytes, so no custom multiplexer, flow control or head-of-line handling; one extra round trip per TCP connection is cheap for MCP."
+      },
+      {
+        "summary": "Relay requests are marked by tagging the decrypted TLSSocket and handing it to the HTTP listeners, never by a loopback proxy plus header.",
+        "rationale": "An untagged loopback request is the trusted local operator, so a header-based proxy fails open on any bug; a tagged socket fails closed. The ChannelSocket path in channel-listener.ts is the precedent."
+      },
+      {
+        "summary": "Pre-write the custom-scheme redirect URI fix (W-3) but run it only if CP-1 shows the refusal; otherwise cancel it.",
+        "rationale": "Forum reports show Grok Bot's OAuth registers a cursor:// callback, and Overdeck rejects the whole registration for any non-https URI, but what Grok Bot sends to Overdeck is unverified. The issue comment says to fix Public MCP and OAuth inside this issue if the live run fails."
+      },
+      {
+        "summary": "Meta Muse stays in scope as live checkpoint CP-2.",
+        "rationale": "Third-party Muse guides say Muse connects to any public streamable-HTTP MCP URL with credentials from a secure prompt, so it is not directory-only."
+      },
+      {
+        "summary": "No ARI renewals; renew 30 days before expiry with the same identifier, back off 1 h doubling to 24 h after failures.",
+        "rationale": "Let's Encrypt exempts same-identifier renewals from the per-domain limit, acme-client 5.4.0 has no ARI support, and the 5-failures-per-hour and 5-per-identifier limits have no override."
+      },
+      {
+        "summary": "Relay MCP bytes are not metered against the 50 GB relay allowance in this release.",
+        "rationale": "MCP traffic is small JSON, and metering would require the Fly relay to report into the connect Durable Objects; the relay logs bytes so real use can be measured."
+      }
+    ],
+    "items": [
+      {
+        "id": "w1-registration-audit",
+        "title": "Write one activity entry for every refused MCP client registration",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:41:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5058",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/mcp-oauth.ts",
+            "src/dashboard/server/__tests__/mcp-oauth.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/mcp-oauth.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "mcp-oauth.test.ts passes including the new refused-registration audit tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-1. In routes/mcp-oauth.ts add optional McpOAuthRouteDeps.audit (default emitActivityEntry) and redirectOriginsOf(body). Replace the register handler's local `invalid` helper with one `refuse(status, errorBody, body?)` that writes exactly one activity entry { source: 'dashboard', level: 'warn', message: 'MCP client registration refused', details: JSON.stringify({ error, redirectOrigins }) } and returns the response. Use it for all four refusals: wrong media type, body over 16 KiB, invalid JSON (redirectOrigins [] because the body was never parsed) and a non-ok registerClient result (origins from the parsed body: `${protocol}//${host}` of the first 5 redirect URIs, '<invalid>' for unparseable). Never log a path, query, fragment, token or code."
+        },
+        "items": [
+          {
+            "id": "w1-registration-audit.ac1",
+            "title": "Given a registration whose redirect_uris is [\"cursor://anysphere.cursor-mcp/oauth/callback?x=1\"], when POST /oauth/mcp/register answers 400, then the audit spy receives exactly one entry whose details JSON has redirectOrigins [\"cursor://anysphere.cursor-mcp\"] and contains neither \"/oauth/callback\" nor \"x=1\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-registration-audit.ac2",
+            "title": "Given a text/plain body, a 17 KiB JSON body, or invalid JSON, when POST /oauth/mcp/register answers 400, then the audit spy receives exactly one entry with redirectOrigins []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-registration-audit.ac3",
+            "title": "Given a valid https registration, when POST /oauth/mcp/register answers 201, then the audit spy receives no entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1b-auth-scheme-audit",
+        "title": "Record the authorization scheme (never the value) in the public /mcp audit entry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:41:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5058",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/public-mcp-funnel.ts",
+            "src/dashboard/server/__tests__/public-mcp-funnel.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/public-mcp-funnel.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "public-mcp-funnel.test.ts passes including the authScheme cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-1b. In public-mcp-funnel.ts add exported authSchemeOf(headers): no or empty authorization header -> 'none'; trimmed value split on whitespace: 2+ parts with first part 'bearer' (case-insensitive) -> 'bearer'; exactly one part -> 'bare'; otherwise 'other'. Change the audit details from JSON.stringify({ clientId }) to JSON.stringify({ clientId, authScheme }) where authScheme is authSchemeOf(headers) for surface 'POST /mcp' and undefined otherwise. Never log the header value. CP-1 reads the token form from this field because a 401 alone cannot distinguish a bare token from a missing or expired one."
+        },
+        "items": [
+          {
+            "id": "w1b-auth-scheme-audit.ac1",
+            "title": "Given a Funnel POST /mcp with Authorization 'odk_<64 hex>', when the middleware audits it, then details has authScheme 'bare'; with 'Bearer odk_<64 hex>' it has 'bearer'; with no header 'none'; with 'Basic x' 'other'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1b-auth-scheme-audit.ac2",
+            "title": "Given any audited public request in the test, when its details string is read, then it contains no 'odk_' substring",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2-cp1-grok-funnel",
+        "title": "CP-1: run Grok Bot live against Public MCP over Tailscale Funnel and record the result",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:41:55Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "spike",
+          "issueLabel": "pan-5058",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "integrations/grok-bot/docs/verification.md",
+            ".pan/drafts/PAN-5058.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"PAN-5058 CP-1\" integrations/grok-bot/docs/verification.md",
+            "grep -n \"CP-1\" .pan/drafts/PAN-5058.md"
+          ],
+          "expected_outputs": [
+            "verification.md prints a dated 'Live run ... (PAN-5058 CP-1)' heading",
+            "the PRD 'Checkpoint results' section has a dated CP-1 line"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-2 and D-16. Step 0: the operator's dashboard serves main without W-1/W-1b, so run `npm run build` here and start a peer dashboard that shares ~/.overdeck: `ln -sf \"$PWD/dist/dashboard/server.js\" ~/.overdeck/tmp/pan5058-cp1-server.js` (path must not contain dist/dashboard/server.js or the orphan reaper kills it), then in the background `OVERDECK_DISABLE_DEACON=1 PORT=3041 API_PORT=3041 OVERDECK_TRUSTED_ORIGINS=https://<machine>.<tailnet>.ts.net node ~/.overdeck/tmp/pan5058-cp1-server.js`. Check /api/health on 3041 and that a text/plain POST /oauth/mcp/register on 3041 produces the 'MCP client registration refused' activity entry. Operator steps are only credential steps: install Tailscale with sudo and sign in, sign in to Grok Bot. Ask with `pan tell flywheel-orchestrator` plus a needs-you note; `pan task block` this item while waiting. The agent does the rest: admin-console HTTPS certificates and funnel node attribute (browser, operator signed in), Public MCP on, the three tailscale funnel paths pointed at http://127.0.0.1:3041, curl the discovery document from outside the tailnet, add the custom MCP connector in Grok Bot with https://<host>:8443/mcp, approve the sign-in in the peer UI at http://127.0.0.1:3041, ask Grok Bot to list conversations. Record a dated section in integrations/grok-bot/docs/verification.md with one row per FR-1 fact: registration (201 or the W-1 entry's redirectOrigins), PKCE method in the authorize URL, approval and token exchange, token form from the W-1b authScheme field (never inferred from a status code; no /mcp call observed => 'Not run'), list_conversations, 'redirect_uri not allowed' seen or not. Copy it to the PRD 'Checkpoint results'. Decision rule: custom-scheme refusal => W-3 then re-run; another Overdeck-side failure => fix here with a regression test, documented as W-2a in the PRD; xAI-side failure => record and file a follow-up issue. Never record a token or code; never mark a row passed without the dated run. Stop the peer and remove the Funnel paths after W-4."
+        },
+        "items": [
+          {
+            "id": "w2-cp1-grok-funnel.ac1",
+            "title": "Given the live run happened, when verification.md is read, then it shows a section headed 'Live run 2026-<mm>-<dd> (PAN-5058 CP-1)' with one row each for registration, PKCE, token exchange, token form, list_conversations and redirect_uri error, each reading Passed, Failed: <cause> or Not run: <reason>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-cp1-grok-funnel.ac2",
+            "title": "Given the registration row, when it is read, then it names the redirect origins taken from the W-1 activity entry or the 201 response, and verification.md contains no odk_, odr_ or authorization code value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-cp1-grok-funnel.ac3",
+            "title": "Given the PRD .pan/drafts/PAN-5058.md, when 'Checkpoint results' is read, then it contains a dated CP-1 line that matches the verification.md outcome",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-cp1-grok-funnel.ac4",
+            "title": "Given the token form row, when it is read, then its value is the authScheme from a 'Public MCP POST /mcp' activity entry (bearer, bare, other or none) or 'Not run: no /mcp call observed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w3-private-scheme-redirects",
+        "title": "Accept private-use redirect URI schemes in MCP client registration (only if CP-1 shows the refusal)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:41:55Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5058",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "w5-grok-docs"
+          ],
+          "files_scope": [
+            "src/lib/mcp/oauth-flow.ts",
+            "src/lib/mcp/oauth-service.ts",
+            "tests/unit/lib/mcp/oauth-flow.test.ts",
+            "tests/unit/lib/mcp/oauth-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/mcp/oauth-flow.test.ts tests/unit/lib/mcp/oauth-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "oauth-flow and oauth-service tests pass including the new private-scheme cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-3 and D-15. Run only when W-2 recorded a refused registration whose redirectOrigins include a non-http(s) scheme; otherwise `pan task cancel` this item with the reason 'CP-1 showed no custom-scheme refusal'. In oauth-flow.ts add PRIVATE_SCHEME /^[a-z][a-z0-9+.-]*:$/, BLOCKED_SCHEMES {javascript:, data:, file:, blob:, vbscript:, about:, ws:, wss:, ftp:} and isPrivateUseScheme(url); redirectUriProblem accepts https, loopback http, or a private-use scheme, with the message 'a redirect URI must use https, http on 127.0.0.1, [::1] or localhost, or a private-use app scheme'. Add redirectDisplay(uri) (scheme://host for private schemes, host otherwise) and use it for redirectHost at both oauth-service.ts sites (lines 349 and 376). redirectUriMatches stays exact. After this ships, repeat W-2 steps 4-6."
+        },
+        "items": [
+          {
+            "id": "w3-private-scheme-redirects.ac1",
+            "title": "Given a registration with redirect_uris [\"cursor://anysphere.cursor-mcp/oauth/callback\"], when validateRegistration runs, then it returns ok with that URI",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-private-scheme-redirects.ac2",
+            "title": "Given redirect URIs javascript:alert(1), data:text/html,x, file:///etc/passwd and http://example.com/cb, when each is registered, then validateRegistration rejects each with invalid_redirect_uri",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-private-scheme-redirects.ac3",
+            "title": "Given a client registered with a cursor:// callback, when authorize is called with that exact URI, then the page outcome's redirectHost is 'cursor://anysphere.cursor-mcp'; when called with an unregistered cursor:// URI, then it returns the error page and never a redirect",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-private-scheme-redirects.ac4",
+            "title": "Given CP-1 showed no custom-scheme refusal, when the work agent reaches this item, then it cancels it with pan task cancel and the stated reason and changes no source file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w4-cp2-muse",
+        "title": "CP-2: run Meta Muse live against Public MCP over Funnel and record the result",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:41:55Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "spike",
+          "issueLabel": "pan-5058",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/PAN-5058.md",
+            "configuration/bots.mdx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -n \"CP-2\" .pan/drafts/PAN-5058.md",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the PRD 'Checkpoint results' section has a dated CP-2 line",
+            "lint:docs passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-4 and D-19. Operator step: sign in to Muse (Meta's consumer agent, not the muse harness). With the W-2 Funnel setup, ask Muse in chat to add a custom connector for https://<host>:8443/mcp. If it offers OAuth, approve the sign-in card; if it asks for a credential, give it an access token from `pan mcp oauth issue --name muse --level read` through its secure prompt (never in chat). Ask it to list conversations. Record a dated CP-2 line under 'Checkpoint results' in the PRD naming which credential path worked. Pass => add a 'Meta Muse' subsection after '### Grok Bot' in configuration/bots.mdx with the working steps and the sentence 'Muse runs in Meta's cloud, so it needs Public MCP.' Fail because Muse cannot use a custom URL => record the dated reason in the PRD and its Non-goals, and edit no doc. Operator unavailable => pan task block and pan tell flywheel-orchestrator."
+        },
+        "items": [
+          {
+            "id": "w4-cp2-muse.ac1",
+            "title": "Given the live run happened, when the PRD 'Checkpoint results' is read, then it contains a dated CP-2 line reading Passed (with the credential path: OAuth sign-in or issued token) or Failed: <cause>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-cp2-muse.ac2",
+            "title": "Given CP-2 passed, when configuration/bots.mdx is rendered, then it shows a 'Meta Muse' subsection with the working steps; given CP-2 failed, then configuration/bots.mdx has no Muse subsection and the PRD Non-goals lists Muse with the dated reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w5-grok-docs",
+        "title": "Make the Grok Bot docs and the Connect a bot dialog state the CP-1 result",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:41:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5058",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/bots.mdx",
+            "configuration/mcp.mdx",
+            "integrations/grok-bot/README.md",
+            "src/dashboard/frontend/src/components/Settings/anywhere/botSnippets.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/ConnectBotDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/ConnectBotOutput.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/botSnippets.test.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/ConnectBotDialog.test.tsx",
+            "changelog.d/pan-5058.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/Settings/anywhere/__tests__/botSnippets.test.ts src/dashboard/frontend/src/components/Settings/anywhere/__tests__/ConnectBotDialog.test.tsx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "botSnippets.test.ts and ConnectBotDialog.test.tsx pass with the Grok Bot route and dated-note assertions",
+            "lint:docs passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-5. Run `pan sync-main` first (#5486 edits the same sections; commit item work first because sync-main auto-commits a dirty tree) and edit by anchors. Docs: configuration/bots.mdx ('| Grok Bot |' row, '### Grok Bot'), configuration/mcp.mdx ('**Grok Bot and the xAI API.**'), integrations/grok-bot/README.md. Dialog: botSnippets.ts grok-bot entry, ConnectBotOutput.tsx (after 'Grok Bot signs in with OAuth on first use.'), ConnectBotDialog.tsx. CP-1 passed => all say Grok Bot uses Public MCP (Funnel now, the overdeck.ai relay when #5494 ships), the connector fails from its sandbox (PAN-5242), verified live on <date>; reaches becomes ['public', 'connector']; ConnectBotOutput adds 'Verified live with Grok Bot on <date>. The connector route does not work from Grok Bot's sandbox.' CP-1 failed => all say Public MCP with Grok Bot failed live on <date> with the cause; reaches stays ['connector', 'public']; ConnectBotOutput adds 'Public MCP with Grok Bot failed live on <date>: <cause>. The connector route does not work from Grok Bot's sandbox either.' In both cases ConnectBotDialog shows, for grok-bot with reach 'connector': \"Grok Bot's sandbox cannot run the connector (no WebRTC egress). Use Public MCP.\" Add changelog.d/pan-5058.md: '#### Fixed' bullet only if W-3 shipped, '#### Improved' bullet for the Grok Bot docs and dialog."
+        },
+        "items": [
+          {
+            "id": "w5-grok-docs.ac1",
+            "title": "Given the CP-1 result, when bots.mdx, mcp.mdx and the grok-bot README are read, then all three name the same route for Grok Bot and the same CP-1 date",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-grok-docs.ac2",
+            "title": "Given ConnectBotDialog.test.tsx, when it renders Grok Bot with reach public, then the output shows the dated CP-1 sentence for the recorded outcome, and with reach connector it shows the no-WebRTC-egress warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-grok-docs.ac3",
+            "title": "Given botSnippets.test.ts, when it runs, then it asserts the grok-bot reaches order chosen by the CP-1 decision rule and passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-grok-docs.ac4",
+            "title": "Given changelog.d/pan-5058.md, when npm run lint:docs runs, then it accepts the file, and the file contains '#### Fixed' only if w3-private-scheme-redirects completed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w6-pan4927-amendment",
+        "title": "Amend the PAN-4927 PRD to describe the relay as a second public route that forwards ciphertext only",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-17T12:41:55Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5058",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/pan-4927.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c \"PAN-5058\" .pan/drafts/pan-4927.md"
+          ],
+          "expected_outputs": [
+            "the count printed is 5 or more"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-6 steps 1-5. Edit .pan/drafts/pan-4927.md by anchor: line 9 ('A hosted bot that cannot run a process (Grok Bot, the xAI API) uses an opt-in public'), NFR-7 ('- **NFR-7 No plaintext through overdeck.ai.**'), D-3 items 3 and 4 ('3. **Hosted bots (Grok Bot, the xAI API) use the opt-in public', '4. **No MCP relay on overdeck.ai.**'), D-16 ('- **D-16 Public `/mcp`.**') and FR-12 ('- **FR-12 Public `/mcp` (opt in).**'), using the exact replacement wording in the PRD. Each change names PAN-5058 and keeps the rule that nothing on overdeck.ai sees plaintext MCP traffic."
+        },
+        "items": [
+          {
+            "id": "w6-pan4927-amendment.ac1",
+            "title": "Given .pan/drafts/pan-4927.md, when line 9, NFR-7, D-3 item 3, D-3 item 4, D-16 and FR-12 are read, then each mentions PAN-5058 or the passthrough relay and grep -c PAN-5058 prints 5 or more",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-pan4927-amendment.ac2",
+            "title": "Given the amended NFR-7 and D-3 item 4, when read, then they still state that overdeck.ai never sees plaintext MCP traffic and that the relay holds no key for user hostnames",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w1-registration-audit",
+        "to": "w2-cp1-grok-funnel",
+        "type": "blocks"
+      },
+      {
+        "from": "w1b-auth-scheme-audit",
+        "to": "w2-cp1-grok-funnel",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-cp1-grok-funnel",
+        "to": "w3-private-scheme-redirects",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-cp1-grok-funnel",
+        "to": "w4-cp2-muse",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-cp1-grok-funnel",
+        "to": "w5-grok-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-private-scheme-redirects",
+        "to": "w5-grok-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-cp2-muse",
+        "to": "w5-grok-docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
