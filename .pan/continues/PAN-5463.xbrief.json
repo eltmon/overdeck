@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5463",
   "created": "2026-11-17T12:31:36.411Z",
-  "updated": "2026-11-17T19:19:14.400Z",
+  "updated": "2026-11-17T19:20:10.655Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -67,9 +67,10 @@
       "status": "pending"
     },
     "wi3-blocked-keys": {
-      "status": "pending",
+      "status": "completed",
       "claimedBy": "agent-pan-5463",
-      "claimedAt": "2026-11-17T19:19:14.400Z"
+      "claimedAt": "2026-11-17T19:19:14.400Z",
+      "doneAt": "2026-11-17T19:20:10.655Z"
     },
     "wi3-provider": {
       "status": "pending"
@@ -219,6 +220,18 @@
     "wi3-protocol.ac4": {
       "status": "completed",
       "doneAt": "2026-11-17T19:18:51.259Z"
+    },
+    "wi3-blocked-keys.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:20:10.655Z"
+    },
+    "wi3-blocked-keys.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:20:10.655Z"
+    },
+    "wi3-blocked-keys.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:20:10.655Z"
     }
   }
 }
