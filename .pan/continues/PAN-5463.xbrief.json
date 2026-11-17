@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5463",
   "created": "2026-11-17T12:31:36.411Z",
-  "updated": "2026-11-17T19:38:27.613Z",
+  "updated": "2026-11-17T19:38:49.213Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,9 +100,10 @@
       "doneAt": "2026-11-17T19:35:49.389Z"
     },
     "wi6-skill": {
-      "status": "pending",
+      "status": "completed",
       "claimedBy": "agent-pan-5463",
-      "claimedAt": "2026-11-17T19:38:27.612Z"
+      "claimedAt": "2026-11-17T19:38:27.612Z",
+      "doneAt": "2026-11-17T19:38:49.212Z"
     },
     "wi6-docs": {
       "status": "pending"
@@ -329,6 +330,18 @@
     "wi5-ui.ac4": {
       "status": "completed",
       "doneAt": "2026-11-17T19:35:49.389Z"
+    },
+    "wi6-skill.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:38:49.212Z"
+    },
+    "wi6-skill.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:38:49.212Z"
+    },
+    "wi6-skill.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:38:49.212Z"
     }
   }
 }
