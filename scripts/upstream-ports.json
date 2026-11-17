@@ -514,5 +514,11 @@
     "upstream": "orca",
     "path": "src/main/computer/action-contracts/computer-blocked-key-combos.ts",
     "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "native/computer-use-windows/runtime.ps1",
+    "upstream": "orca",
+    "path": "native/computer-use-windows/runtime.ps1",
+    "commit": "c6b9ac9549b"
   }
 ]

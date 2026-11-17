@@ -62,11 +62,11 @@ describe('ComputerUseSection (PAN-5461)', () => {
   afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
   it('shows Unavailable with the host message and no button', async () => {
-    serveStatus(view({ platform: 'wsl', supported: false, session: { ok: false, message: "Computer use isn't supported on this host (wsl) yet." }, checks: [], setupSteps: [] }));
+    serveStatus(view({ platform: 'darwin', supported: false, session: { ok: false, message: "Computer use isn't supported on this host (darwin) yet." }, checks: [], setupSteps: [] }));
     renderSection();
     expect(await screen.findByText('Not available on this machine')).toBeInTheDocument();
     expect(screen.getByTestId('computer-use-badge')).toHaveTextContent('Unavailable');
-    expect(screen.getByText("Computer use isn't supported on this host (wsl) yet.")).toBeInTheDocument();
+    expect(screen.getByText("Computer use isn't supported on this host (darwin) yet.")).toBeInTheDocument();
     expect(screen.queryByTestId('computer-use-cta')).toBeNull();
   });
 
@@ -195,5 +195,56 @@ describe('ComputerUseSection (PAN-5461)', () => {
     const ids = SETTINGS_NAV_ITEMS.map((item) => item.id);
     expect(ids[ids.indexOf('security') + 1]).toBe('computer-use');
     expect(SETTINGS_NAV_ITEMS.find((item) => item.id === 'computer-use')?.label).toBe('Computer Use');
+  });
+});
+
+describe('ComputerUseSection under WSL2 (PAN-5462 FR-6)', () => {
+  afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
+
+  const WSL_CHECKS: ComputerUseStatusView['checks'] = [
+    { id: 'interop', label: 'Windows interop', status: 'ok', detail: 'enabled' },
+    { id: 'powershell', label: 'Windows PowerShell', status: 'ok', detail: 'PowerShell 5.1.22621.4391' },
+    { id: 'helper-dir', label: 'Helper folder', status: 'ok', detail: 'C:\\Users\\me\\AppData\\Local\\Overdeck\\computer-use' },
+    { id: 'helper', label: 'Helper test', status: 'ok', detail: 'handshake ok' },
+  ];
+
+  function wslView(overrides: Partial<ComputerUseStatusView> = {}): ComputerUseStatusView {
+    return view({ platform: 'wsl', session: { ok: true, label: 'windows · 10.0.22631.0' }, checks: WSL_CHECKS, ...overrides });
+  }
+
+  it('uses Windows wording in the lede and the off description (ac1)', async () => {
+    serveStatus(wslView({ enabled: false }));
+    renderSection();
+    expect(await screen.findByText('Computer Use is off')).toBeInTheDocument();
+    expect(screen.getByText(/Lets agents see and operate Windows apps on/)).toBeInTheDocument();
+    expect(screen.getByText(/the PC running Overdeck in WSL/)).toBeInTheDocument();
+    expect(screen.getByText(/Nothing to install: Windows already includes what it needs\./)).toBeInTheDocument();
+  });
+
+  it('names the blocked Windows shortcuts when on (ac2)', async () => {
+    serveStatus(wslView({ enabled: true }));
+    renderSection();
+    expect(await screen.findByText('Computer Use is on')).toBeInTheDocument();
+    expect(screen.getByText(/close apps with Alt\+F4, lock Windows or open Task Manager/)).toBeInTheDocument();
+  });
+
+  it('keeps the Linux wording on Linux (ac3)', async () => {
+    serveStatus(view({ enabled: true }));
+    renderSection();
+    expect(await screen.findByText('Computer Use is on')).toBeInTheDocument();
+    expect(screen.getByText(/Lets agents see and operate desktop apps on/)).toBeInTheDocument();
+    expect(screen.getByText(/the machine running Overdeck/)).toBeInTheDocument();
+    expect(screen.getByText(/They can't quit apps, lock the screen or log you out\./)).toBeInTheDocument();
+    expect(screen.queryByText(/Windows apps/)).toBeNull();
+  });
+
+  it('lists the four WSL checks under What Overdeck checked (ac4)', async () => {
+    serveStatus(wslView({ enabled: true }));
+    renderSection();
+    fireEvent.click(await screen.findByText('What Overdeck checked'));
+    for (const label of ['Windows interop', 'Windows PowerShell', 'Helper folder', 'Helper test']) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+    expect(screen.getByText('handshake ok')).toBeInTheDocument();
   });
 });

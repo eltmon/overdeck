@@ -9,6 +9,7 @@
 import { readFileSync } from 'node:fs';
 import type { ComputerUsePlatformId, ComputerUseProvider } from './platform-types.js';
 import { linuxProvider } from './providers/linux.js';
+import { wslProvider } from './providers/wsl.js';
 
 export type {
   ComputerUsePlatformId,
@@ -56,7 +57,9 @@ export function providerFor(id: ComputerUsePlatformId | 'unsupported'): Computer
   switch (id) {
     case 'linux':
       return linuxProvider;
+    case 'wsl':
+      return wslProvider;
     default:
-      return null; // PAN-5462 adds 'wsl', PAN-5463 adds 'darwin'
+      return null; // PAN-5463 adds 'darwin'
   }
 }

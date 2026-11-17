@@ -4,8 +4,8 @@ description: >-
   Read and operate a visible local desktop app (native apps, external browser windows) through
   `pan computer`: accessibility tree, clicks, typing, keys, scrolling, dragging and screenshots.
   Prefer a programmatic path (shell, files, git, HTTP, an existing CLI) whenever one can do the
-  job; use this only when a visible window needs GUI control. Linux desktops only; needs
-  computer_use.enabled.
+  job; use this only when a visible window needs GUI control. Works on Linux desktops and on
+  Windows through WSL2; needs computer_use.enabled.
 triggers:
   - pan computer
   - computer use
@@ -140,6 +140,17 @@ Browsers: for Chromium, Firefox and similar browser windows, set the address/sea
 
 For browser-hosted forms, verify the focused element after each field action. If a click or `set-value` does not change the focused receiver, use `press-key --key Tab` from a known focused field, or window-local coordinates from a fresh screenshot. Prefer `paste-text` into the verified focused field for longer text, then inspect the returned state before continuing.
 
+## Windows (WSL2)
+
+When Overdeck runs in WSL2, `pan computer` drives the Windows desktop, not WSLg windows. The same commands and flags apply, with these differences:
+
+- `list-windows` returns only the app's main window (index 0). To wait for a dialog, use `pan computer wait --app <app> --text "<dialog text>" --json`, not `--window-title`.
+- A `helper_error` whose message starts with `window_not_focused:` means the window was not in front. Retry once with `--restore-window`; tell the user first, since it takes over their screen. Browsers (Edge, Chrome) usually need `--restore-window`.
+- A `helper_error` whose message starts with `target_elevated:` means the app runs as administrator and refuses input. Stop and tell the user; do not retry.
+- Screenshots may show whatever covers the window. Trust the tree over the pixels when they disagree.
+- Select all with `ctrl+a`. Alt+F4, Win+L and Ctrl+Shift+Escape are blocked (`system_shortcut_blocked`).
+- Each command takes 1–3 s, because every call starts one Windows PowerShell process. Batch your reading: one `get-app-state` with `--query` beats several narrow calls.
+
 ## Overdeck
 
 - **`desktop_busy`:** another agent or the operator holds the desktop. Don't retry in a loop. Report it and wait for the time named in the message, or ask the operator to run `pan computer release --force`.
@@ -151,8 +162,8 @@ For browser-hosted forms, verify the focused element after each field action. If
   | Code | What to do |
   | --- | --- |
   | `disabled` | Not retryable. Computer use is off. Ask the operator to turn it on in the dashboard under Settings → Computer Use. |
-  | `unsupported_platform` | Not retryable. This host isn't supported yet (only Linux desktops; WSL2 is refused). |
-  | `no_desktop_session` | Not retryable. No `DISPLAY`/`WAYLAND_DISPLAY` resolved; this host has no logged-in desktop. |
+  | `unsupported_platform` | Not retryable. This host is neither a Linux desktop nor Windows through WSL2. |
+  | `no_desktop_session` | Not retryable. On Linux, no `DISPLAY`/`WAYLAND_DISPLAY` resolved; this host has no logged-in desktop. Under WSL2, Windows interop is off or `powershell.exe` was not found; the message says which. |
   | `helper_missing_dependency` | Install the package the message names, then retry once. |
   | `helper_timeout` | The helper did not respond in time. The input may already have been applied. For read-only commands, retry once; if it recurs, stop and report it. For `click`, `type-text`, `paste-text` or `press-key`, run `get-app-state` first and repeat the input only if the state shows it did not take effect. |
   | `helper_error` | The helper reported a specific failure (read its message). Adjust your command; do not retry unchanged. |
