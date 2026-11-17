@@ -9,7 +9,7 @@ import { loadConfigSync as loadYamlConfig } from '../../lib/config-yaml.js';
 import { ensureSemgrepInstalled, formatSemgrepInstallOutcome, SEMGREP_VERSION } from '../../lib/semgrep/install.js';
 import { isXBriefFilename, parseXBriefFilename } from '../../lib/xbrief/lifecycle.js';
 import { resolveGitHubIssue } from '../../lib/tracker-utils.js';
-import { createBackup } from '../../lib/backup.js';
+import { backupBeforeSync, resolveBackupKeep } from '../../lib/backup.js';
 import {
   planSync,
   executeSync,
@@ -323,13 +323,16 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       SYNC_TARGET.agents,
     ];
 
-    const backup = time('backup', () => createBackup(backupDirs));
+    const keep = resolveBackupKeep(config.sync.backup_keep);
+    const { backup, pruned, pruneError } = time('backup', () => backupBeforeSync(backupDirs, keep));
 
     if (backup.targets.length > 0) {
       backupSpinner.succeed(`Backup created: ${backup.timestamp}`);
     } else {
       backupSpinner.info('No existing content to backup');
     }
+    if (pruned > 0) console.log(chalk.dim(`Pruned ${pruned} old backup(s), keeping ${keep}.`));
+    if (pruneError) console.log(chalk.yellow(`Backup prune failed (sync continues): ${pruneError}`));
 
     if (options.backupOnly) {
       printTimings();

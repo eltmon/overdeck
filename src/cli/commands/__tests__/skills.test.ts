@@ -46,6 +46,7 @@ const mocks = vi.hoisted(() => {
     applyClaudePacks: vi.fn(),
     applyCodexPacks: vi.fn(),
     writeCodexPackBlock: vi.fn(),
+    linkClaudeMount: vi.fn(),
     applyDeftForLaunch: vi.fn(),
     launchMountsDeft: vi.fn(),
     listSkillCatalog: vi.fn(),
@@ -142,6 +143,7 @@ vi.mock('../../../lib/skill-overrides/launch.js', async importOriginal => ({
 vi.mock('../../../lib/skill-packs/render.js', () => ({ gcPackRenders: mocks.gcPackRenders }));
 vi.mock('../../../lib/skill-packs/mount.js', () => ({
   writeCodexPackBlock: mocks.writeCodexPackBlock,
+  linkClaudeMount: mocks.linkClaudeMount,
   gcMounts: mocks.gcMounts,
   removePackFromMounts: mocks.removePackFromMounts,
   renderRootsUsedBy: mocks.renderRootsUsedBy,
@@ -465,6 +467,8 @@ describe('pan skills launch-settings', () => {
     await run('launch-settings', '--harness', 'claude-code', '--cwd', '/w', '--plugin-link', '/tmp/none/skill-packs');
     expect(stdout.join('')).toBe('{"skillOverrides":{"grilling":"off"}}\n');
     expect(errors).toEqual(['[launcher] WARNING: skill packs not applied: disk full']);
+    // PAN-5465 D-2: the fail-open re-points the link at the empty mount instead of removing it.
+    expect(mocks.linkClaudeMount).toHaveBeenCalledWith('/tmp/none/skill-packs', null);
     expect(process.exit).not.toHaveBeenCalled();
   });
 

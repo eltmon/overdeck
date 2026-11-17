@@ -1,5 +1,6 @@
 import { conversationSubagentInputRoutes } from './conversation-subagent-input.js';
 import { conversationDiffRoutes } from './conversation-diffs.js';
+import { conversationSkillRoutes } from './conversation-skills.js';
 import { jsonResponse } from "../http-helpers.js";
 import { BLANKED_PROVIDER_ENV } from '../../../lib/child-env.js';
 import { getClaudePermissionFlagsString, resolvePermissionMode, BYPASS_PERMISSION_MODE } from '../../../lib/claude-permissions.js';
@@ -1028,6 +1029,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationSummaryForkRoute,
   postConversationPlanActionRoute,
   conversationDiffRoutes,
+  conversationSkillRoutes,
   postConversationRetitleRoute,
   getConversationAboutRoute,
 );

@@ -1,5 +1,5 @@
 import { execFile, execFileSync, spawn } from 'node:child_process';
-import { existsSync, lstatSync, mkdirSync, readlinkSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readlinkSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -25,6 +25,8 @@ vi.mock('../catalog.js', () => ({ listPackCatalog }));
 vi.mock('../../deft/issue-pipeline.js', () => ({ readIssuePipeline }));
 vi.mock('../../overdeck/conversations.js', () => ({ getSupervisedConversationByTmuxSession }));
 vi.mock('../../projects.js', () => ({ resolveProjectKeyForCwdAsync: vi.fn(async () => 'proj') }));
+const { resolveSageoxLaunch } = vi.hoisted(() => ({ resolveSageoxLaunch: vi.fn() }));
+vi.mock('../../sageox/launch.js', () => ({ SAGEOX_PACK_ID: 'sageox', resolveSageoxLaunch }));
 // PAN-5464: a fixture known pack with a mount transform and a root skill.
 vi.mock('../../skill-packs/adapters.js', async importOriginal => {
   const actual = await importOriginal<typeof import('../../skill-packs/adapters.js')>();
@@ -36,6 +38,7 @@ vi.mock('node:child_process', async importOriginal => {
   return { ...actual, execFile: vi.fn(actual.execFile), spawn: vi.fn(actual.spawn) };
 });
 
+import { emptyMountPluginsDir } from '../../skill-packs/mount.js';
 import { packExtractDir, packRenderDir, writePackEntry } from '../../skill-packs/sources.js';
 import {
   applyClaudePacks,
@@ -43,6 +46,7 @@ import {
   CODEX_SKILL_BLOCK_BEGIN,
   CODEX_SKILL_BLOCK_END,
   claudeSkillSettingsJson,
+  launchPackExclude,
   resolveLaunchDisabledSkills,
   resolveLaunchPackSelection,
   writeCodexSkillOverrides,
@@ -193,6 +197,29 @@ describe('resolveLaunchDisabledSkills conversation layer (PAN-4486)', () => {
     } finally {
       stderr.mockRestore();
     }
+  });
+});
+
+describe('launchPackExclude (PAN-5465 D-7)', () => {
+  beforeEach(() => {
+    resolveSageoxLaunch.mockReset();
+  });
+
+  it('excludes the sageox pack when SageOx wiring is off', async () => {
+    const sageox = { active: false, warnings: ['[launcher] WARNING: SageOx not applied: no link'] };
+    resolveSageoxLaunch.mockResolvedValue(sageox);
+    const ctx = { cwd: '/repo', conversation: 'conv-x' };
+    const result = await launchPackExclude(ctx, 'claude-code');
+    expect([...result.exclude]).toEqual(['sageox']);
+    expect(result.sageox).toBe(sageox);
+    expect(resolveSageoxLaunch).toHaveBeenCalledWith(ctx, 'claude-code');
+  });
+
+  it('excludes nothing when SageOx wiring is active', async () => {
+    resolveSageoxLaunch.mockResolvedValue({ active: true, bin: '/ox', warnings: [] });
+    const result = await launchPackExclude({ cwd: '/repo' }, 'codex');
+    expect([...result.exclude]).toEqual([]);
+    expect(resolveSageoxLaunch).toHaveBeenCalledWith({ cwd: '/repo' }, 'codex');
   });
 });
 
@@ -379,6 +406,20 @@ describe('skill pack launch (PAN-4334)', () => {
     expect(selection.packs[0]).toMatchObject({ id: 'mattpocock', skills: [{ name: 'grilling', dir: 'skills/productivity/grilling' }] });
   });
 
+  it('uses ctx.conversationLayer as the conversation layer and never reads the row (PAN-5465)', async () => {
+    loadSkillOverrideLayers.mockResolvedValue({ global: {} });
+    getSupervisedConversationByTmuxSession.mockReset();
+    getSupervisedConversationByTmuxSession.mockReturnValue({ skillOverrides: { 'mattpocock/grilling': true } });
+    const { selection } = await resolveLaunchPackSelection({
+      ...ctx,
+      conversation: 'conv-x',
+      conversationLayer: { 'mattpocock/tdd': true },
+    });
+    expect(getSupervisedConversationByTmuxSession).not.toHaveBeenCalled();
+    expect(selection.packs).toHaveLength(1);
+    expect(selection.packs[0]).toMatchObject({ id: 'mattpocock', skills: [{ name: 'tdd', dir: 'skills/engineering/tdd' }] });
+  });
+
   it('mounts a deft-readonly pack with the host notice transform (PAN-3943)', async () => {
     const dir = 'content/skills/deft-directive-glossary';
     const root = packExtractDir('deft', COMMIT);
@@ -450,12 +491,12 @@ describe('skill pack launch (PAN-4334)', () => {
     expect(selection.packs.map(pack => pack.id)).toEqual(['mattpocock']);
   });
 
-  it('removes the link when the issue turns the pack off', async () => {
+  it('points the link at the empty mount when the issue turns the pack off (PAN-5465 D-2)', async () => {
     loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { global: { mattpocock: true } } });
     await applyClaudePacks(ctx, link);
     loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { global: { mattpocock: true }, issue: { mattpocock: false } } });
     expect(await applyClaudePacks(ctx, link)).toEqual([]);
-    expect(() => lstatSync(link)).toThrow();
+    expect(readlinkSync(link)).toBe(emptyMountPluginsDir());
   });
 
   it('skips an uncached pack with a warning and runs no git', async () => {
@@ -464,7 +505,7 @@ describe('skill pack launch (PAN-4334)', () => {
     expect(await applyClaudePacks(ctx, link)).toEqual([
       '[launcher] WARNING: skill pack mattpocock not cached; run pan skills pack sync mattpocock',
     ]);
-    expect(() => lstatSync(link)).toThrow();
+    expect(readlinkSync(link)).toBe(emptyMountPluginsDir());
     expect(execFile).not.toHaveBeenCalled();
     expect(spawn).not.toHaveBeenCalled();
   });
@@ -472,7 +513,7 @@ describe('skill pack launch (PAN-4334)', () => {
   it('leaves an excluded pack out of the mount without a not-cached warning (PAN-2444)', async () => {
     loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { global: { mattpocock: true } } });
     expect(await applyClaudePacks(ctx, link, new Set(['mattpocock']))).toEqual([]);
-    expect(() => lstatSync(link)).toThrow();
+    expect(readlinkSync(link)).toBe(emptyMountPluginsDir());
     listPackCatalog.mockResolvedValue([catalogEntry(false)]);
     expect(await applyClaudePacks(ctx, link, new Set(['mattpocock']))).toEqual([]);
   });
@@ -548,7 +589,7 @@ describe('skill pack launch (PAN-4334)', () => {
       expect(await applyClaudePacks(ctx, link)).toEqual([
         '[launcher] WARNING: skill pack gstack not cached; run pan skills pack sync gstack',
       ]);
-      expect(() => lstatSync(link)).toThrow();
+      expect(readlinkSync(link)).toBe(emptyMountPluginsDir());
     });
 
     it('lists gstack in the Codex pack block when on', async () => {
