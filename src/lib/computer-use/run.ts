@@ -50,7 +50,7 @@ export interface RunDeps {
 }
 
 const DISABLED_MESSAGE =
-  'Computer use is off. The operator turns it on with computer_use: { enabled: true } in ~/.overdeck/config.yaml.';
+  'Computer use is off. Turn it on in the dashboard under Settings → Computer Use, or set computer_use: { enabled: true } in ~/.overdeck/config.yaml.';
 
 /** The `unsupported_platform` message for a host with no provider (FR-2). */
 export function unsupportedMessage(id: ComputerUsePlatformId | 'unsupported', platform: NodeJS.Platform): string {

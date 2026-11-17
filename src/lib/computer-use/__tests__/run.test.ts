@@ -46,6 +46,9 @@ describe('runComputerOperation preamble (PAN-5452)', () => {
     const error = await runComputerOperation({ kind: 'read', operation: { tool: 'list_apps' } }, deps).catch((e) => e);
     expect(isComputerUseError(error)).toBe(true);
     expect(error.code).toBe('disabled');
+    expect(error.message).toBe(
+      'Computer use is off. Turn it on in the dashboard under Settings → Computer Use, or set computer_use: { enabled: true } in ~/.overdeck/config.yaml.',
+    );
     expect(runHelper).not.toHaveBeenCalled();
   });
 
