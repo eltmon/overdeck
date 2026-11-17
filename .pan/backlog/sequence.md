@@ -1,12 +1,16 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-17T12:12:47.596119Z · model: claude-opus-5-5 · open: 901_
+_Last sequenced: 2026-11-17T12:41:27.741800Z · model: claude-opus-5-5 · open: 922_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
+| 1 | PAN-5484 | S | high | ok |  |  | pan sync writes a ~92 MB skills backup each run and never prunes; 9 GB filled a 99% disk. In pipeline. |
+| 2 | PAN-5483 | M | high | ok |  |  | Docs canonicalize to panopticon-cli.com and docs.json uses legacy keys the site ignores. In pipeline; lane A first. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
+| 5 | PAN-5469 | M | medium | ok |  |  | New features/planning.mdx page: Plan dialog, pan plan, PRDs, xBRIEF checklist, critic, finalize. In pipeline, lane B first. |
+| 6 | PAN-5489 | S | high | ok |  |  | pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
@@ -81,7 +85,9 @@ _Last sequenced: 2026-11-17T12:12:47.596119Z · model: claude-opus-5-5 · open: 
 | 80 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
 | 81 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent pane, so a single hungry agent inflates the unit and oomd kills the whole fleet — twice now. |
 | 82 | PAN-3278 | S | critical | needs-refinement |  |  | A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts. |
+| 83 | PAN-5472 | M | high | ok |  | PAN-5483 | Docs P1: first-read pages (state branch, Cloister routing, Inspect, phone, intro) contradict the shipped product. |
 | 84 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
+| 84 | PAN-5467 | XL | high | ok | ✓ |  | Epic: docs overhaul, 16 child pages from the v0.87.2 feature inventory; driven by order book 2026-11-17-docs-overhaul. Not workable. |
 | 85 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
 | 86 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
 | 87 | PAN-3106 | S | critical | ok |  |  | auto_merge_default: hold is consulted on one merge path only, so held issues merge individually and defeat the UAT train. |
@@ -198,6 +204,7 @@ _Last sequenced: 2026-11-17T12:12:47.596119Z · model: claude-opus-5-5 · open: 
 | 198 | PAN-3297 | S | high | ok |  |  | After a dashboard restart, delivery calls a healthy agent a zombie while resume calls it healthy; both classifiers can't be right. |
 | 199 | PAN-3274 | S | high | needs-refinement |  |  | A test-role agent spawned and never ran a turn, holding an approved CI-green issue out of the merge gate behind a stale failed verdict. |
 | 200 | PAN-3267 | S | high | ok |  |  | GitLab merged-head oracle spawns one glab subprocess per repo × head, so pipeline membership refresh fails on every cycle. |
+| 200 | PAN-5488 | S | high | ok |  |  | Plan dialog header Stop completes planning while footer Stop aborts to Todo; same label, opposite outcomes. |
 | 201 | PAN-3261 | S | high | ok |  |  | The tmux delivery fallback answered a live session-resume menu because its own paste hid the menu from the detector — silent /compact. |
 | 202 | PAN-3256 | S | high | ok |  |  | glab mr list runs with a polyrepo wrapper root as cwd, which is not a git repo, so MYN membership fails forge_unavailable every cycle. |
 | 203 | PAN-4342 | M | medium | ok |  |  | Re-review rounds resume every lane on its own round-1 findings; give each round one fresh critic lane (Deft method) |
@@ -258,7 +265,6 @@ _Last sequenced: 2026-11-17T12:12:47.596119Z · model: claude-opus-5-5 · open: 
 | 258 | PAN-3332 | S | high | ok |  |  | A detached slash-command spawn died in 150ms while the UI kept saying 'running in the background'; the activity must own its outcome. |
 | 259 | PAN-4426 | M | medium | ok |  |  | Dashboard controls for Deft Directive detection and managed mode over the PAN-3943 library; blocker has closed |
 | 260 | PAN-4345 | XS | medium | ok |  |  | Terse gate-integrity rule (fix the work, never the gate) plus a Rule Authority note in rule authoring |
-| 260 | PAN-5466 | S | medium | ok |  |  | Home Paused tile counts stale holds on closed issues and post-merge pauses (25 shown, ~5 real); filter + one-time flag cleanup. |
 | 261 | PAN-3013 | XS | high | ok |  |  | Role-spawn wrote 26 session-scoped hook paths into the durable ~/.claude/settings.json; they fail on every Linear tool call forever. |
 | 262 | PAN-3771 | M | high | ok |  |  | Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries. |
 | 263 | PAN-4530 | XS | medium | ok |  |  | Flywheel skill: define 'pipeline clear', go idle with conversation open, and never stop on a stuck pipeline |
@@ -348,9 +354,12 @@ _Last sequenced: 2026-11-17T12:12:47.596119Z · model: claude-opus-5-5 · open: 
 | 347 | PAN-630 | M | high | ok |  |  | Multi-tenant workspace isolation with ACLs |
 | 348 | PAN-471 | M | high | ok |  |  | Cost reconciler: auto-trigger on agent lifecycle events with debounce |
 | 349 | PAN-438 | M | high | ok |  |  | Migrate remaining REST polling endpoints to Effect RPC |
+| 350 | PAN-5468 | M | medium | ok |  | PAN-5483 | Docs P1: features/issue-pipeline.mdx, the pipeline from pan start through merge and close-out. Lane A item 3. |
 | 350 | PAN-578 | M | high | ok |  |  | Security: Comment mediation layer to prevent prompt injection via tracker comments |
 | 351 | PAN-2921 | S | medium | ok |  |  | Strike merge door can report fetch failure after merge and land the same head twice |
+| 351 | PAN-5470 | M | medium | ok |  | PAN-5483 | Docs P1: features/flywheel.mdx, the loop, lane board, switches and backlog sequencer. Supersedes PAN-2070. Lane A item 4. |
 | 352 | PAN-4195 | M | medium | ok |  |  | Every pan call costs ~0.5s/230MB from eager command imports; lazy-load command modules, target --version <100ms |
+| 352 | PAN-5471 | M | medium | ok |  |  | Docs P1: configuration/model-routing.mdx, roles, workhorse slots, tiered execution; drop stale Cloister routing. Lane B item 2. |
 | 353 | PAN-2839 | S | medium | ok |  |  | plan→work autoSpawn now 500s with a duplicated workspace prep |
 | 354 | PAN-2824 | S | medium | ok |  |  | pan review pending dies when one project's lens gather fails (non-degrading caller; PAN-2820 class) |
 | 355 | PAN-2792 | S | medium | ok |  |  | Orphan-process sweeps killed the dashboard and live conversations via lsof +D over Bun-hardlinked node_modules |
@@ -449,14 +458,23 @@ _Last sequenced: 2026-11-17T12:12:47.596119Z · model: claude-opus-5-5 · open: 
 | 448 | PAN-5264 | M | medium | ok |  |  | Attribute the app-rest GitHub caller (1,422 untraced App REST calls/hour), then cut the largest path. |
 | 449 | PAN-5340 | S | medium | ok |  |  | A Preview link to another Markdown file should open it in Preview, not Edit. Follows PAN-5337. |
 | 450 | PAN-5440 | L | medium | ok |  |  | React Compiler burn-down for all remaining components: 78 skips in 42 files, 288 memo sites. Largest group; do last. |
+| 450 | PAN-5473 | S | medium | ok |  | PAN-5483 | Docs P2: features/desktop-app.mdx, downloads, how pan up finds the app, tray. Supersedes PAN-2073. Lane A item 5. |
 | 451 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
+| 451 | PAN-5474 | M | medium | ok |  |  | Docs P2: features/dashboard-views.mdx replacing the outdated 13-views table and the Experimental switch. Lane B item 3. |
 | 452 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
+| 452 | PAN-5475 | S | medium | ok |  | PAN-5483 | Docs P2: features/costs.mdx, attribution, pan cost verbs, API-rate vs plan costs. Lane A item 6. |
 | 453 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
+| 453 | PAN-5476 | S | medium | ok |  |  | Docs P2: conversation search and Ctrl+K palette scopes, semantic search setup, pan conv search. Lane B item 4. |
 | 454 | PAN-5322 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5319: unguarded identifier.toUpperCase(), modal focus, needs-you rows that open nothing. |
+| 454 | PAN-5477 | M | medium | ok |  | PAN-5483 | Docs P2: configuration/permissions.mdx, auto-approve hook, --yolo, operator-only labels, git shim. Lane A item 7. |
 | 455 | PAN-5317 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5127: route live Codex app-server sends correctly; no replayable mail for keyed sends. |
+| 455 | PAN-5478 | L | medium | ok |  |  | Docs P2: CLI reference completeness for conversation, pipeline, memory and core verbs. Lane B item 5. |
 | 456 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
+| 456 | PAN-5479 | S | medium | ok |  | PAN-5483 | Docs P2: merge the unpublished workspaces config page into features/workspaces and memory pages. Lane A item 8. |
 | 457 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
+| 457 | PAN-5480 | XS | medium | ok |  |  | Docs P2: add the install script and overdeck up to quickstart.mdx, as the homepage advertises. Lane B item 6. |
 | 458 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
+| 458 | PAN-5481 | S | medium | ok |  | PAN-5483 | Docs P2: configuration/voice.mdx, dictation, tts.enabled, local Qwen3-TTS daemon, sidecars. Lane A item 9. |
 | 459 | PAN-2469 | S | medium | ok |  |  | Assembly landed (mergeReadySlots + finalization); remaining: alarm when all slots merged but no review requested. Swarm dormant. |
 | 460 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
 | 461 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
@@ -474,6 +492,7 @@ _Last sequenced: 2026-11-17T12:12:47.596119Z · model: claude-opus-5-5 · open: 
 | 473 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
 | 474 | PAN-5346 | S | medium | ok |  |  | Auth docs misstate #overdeck_token delivery, the Origin rule and 401 troubleshooting; PAN-5344 fix has landed. |
 | 475 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
+| 475 | PAN-5486 | M | medium | ok |  |  | Bot integration core pins are hand-typed and stale (0.74/0.77); stamp them at release and fix Grok Bot docs. |
 | 476 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
 | 477 | PAN-1130 | S | medium | ok |  |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
 | 478 | PAN-1129 | S | medium | ok |  |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
@@ -611,6 +630,7 @@ _Last sequenced: 2026-11-17T12:12:47.596119Z · model: claude-opus-5-5 · open: 
 | 608 | PAN-1550 | M | medium | ok |  |  | BrowserPane half only; the FilesPane half is superseded by the PAN-5183 file explorer, whose children have all closed. |
 | 609 | PAN-1545 | XS | medium | ok |  |  | New Terminal button |
 | 610 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
+| 610 | PAN-5482 | L | medium | ok |  |  | Docs P3 batch: operating guide, foreman, CI integrations, unpublished pages, proposal in nav, blog draft. Lane B item 7. |
 | 611 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
 | 612 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
 | 613 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
@@ -701,6 +721,7 @@ _Last sequenced: 2026-11-17T12:12:47.596119Z · model: claude-opus-5-5 · open: 
 | 698 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
 | 699 | PAN-2046 | M | low | stale |  |  | Conversation view does not surface terminal command responses |
 | 700 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
+| 700 | PAN-5487 | XS | low | ok |  |  | pan scope --help says it moves xBRIEF files; the code rewrites status fields in place. Reword 5 descriptions. |
 | 701 | PAN-3919 | S | low | needs-refinement |  |  | Review the universal effort-high default and supervisor effort discretion; explicitly an operator decision, no work authorized |
 | 702 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
 | 703 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
@@ -909,6 +930,14 @@ _Last sequenced: 2026-11-17T12:12:47.596119Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
+### PAN-5484 (rank 1)
+
+New and already in the pipeline, so it takes a free top slot; unbounded backup growth filled the root disk on 2026-11-17, which stalls every agent.
+
+### PAN-5483 (rank 2)
+
+New and in the pipeline; the docs order book runs it first in lane A because every other docs page adds itself to the docs.json navigation it restructures.
+
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
@@ -916,6 +945,14 @@ Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat 
 ### PAN-5430 (rank 4)
 
 New issue, sibling of the just-merged front-matter fix PAN-5427, and already queued in the active workflow-redesign order book, so it takes free rank 4 behind critical PAN-5013. It is a small, well-specified MarkdownTab change with named tests, a sanitising allow-list and a concrete acceptance check on the README preview; its parent epic PAN-5284 is closed, so it carries no contains edge.
+
+### PAN-5469 (rank 5)
+
+New and in the pipeline as lane B's first docs item, so it takes a free top slot.
+
+### PAN-5489 (rank 6)
+
+New pipeline-path bug: the CLI result depends on the caller's environment, so Flywheel-launched planning can fail and strand workspaces; it outranks routine work.
 
 ### PAN-5385 (rank 8)
 
@@ -1213,22 +1250,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
 
 Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.
 
-### PAN-3234 (rank 84)
-
-Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
-
-### PAN-3205 (rank 85)
-
-New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
-
-### PAN-3118 (rank 86)
-
-Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
-
-### PAN-3106 (rank 87)
-
-New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1236,11 +1257,37 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-17T12:12:47.596119Z",
+  "generatedAt": "2026-11-17T12:41:27.741800Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 901,
+  "openCount": 922,
   "nodes": [
+    {
+      "issue": "PAN-5484",
+      "rank": 1,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan sync writes a ~92 MB skills backup each run and never prunes; 9 GB filled a 99% disk. In pipeline.",
+      "rationale": "New and already in the pipeline, so it takes a free top slot; unbounded backup growth filled the root disk on 2026-11-17, which stalls every agent.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5483",
+      "rank": 2,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Docs canonicalize to panopticon-cli.com and docs.json uses legacy keys the site ignores. In pipeline; lane A first.",
+      "rationale": "New and in the pipeline; the docs order book runs it first in lane A because every other docs page adds itself to the docs.json navigation it restructures.",
+      "gate": "auto",
+      "planning": "auto"
+    },
     {
       "issue": "PAN-5013",
       "rank": 3,
@@ -1264,6 +1311,32 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "dependsOn": [],
       "why": "Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews.",
       "rationale": "New issue, sibling of the just-merged front-matter fix PAN-5427, and already queued in the active workflow-redesign order book, so it takes free rank 4 behind critical PAN-5013. It is a small, well-specified MarkdownTab change with named tests, a sanitising allow-list and a concrete acceptance check on the README preview; its parent epic PAN-5284 is closed, so it carries no contains edge.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5469",
+      "rank": 5,
+      "size": "M",
+      "importance": "medium",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "New features/planning.mdx page: Plan dialog, pan plan, PRDs, xBRIEF checklist, critic, finalize. In pipeline, lane B first.",
+      "rationale": "New and in the pipeline as lane B's first docs item, so it takes a free top slot.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5489",
+      "rank": 6,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause.",
+      "rationale": "New pipeline-path bug: the CLI result depends on the caller's environment, so Flywheel-launched planning can fail and strand workspaces; it outranks routine work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2232,6 +2305,21 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "auto"
     },
     {
+      "issue": "PAN-5472",
+      "rank": 83,
+      "size": "M",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5483"
+      ],
+      "why": "Docs P1: first-read pages (state branch, Cloister routing, Inspect, phone, intro) contradict the shipped product.",
+      "rationale": "New; the pages new users read first describe removed features, and it is lane A item 2 in the operator's docs order book, so it takes the free rank-83 slot.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3234",
       "rank": 84,
       "size": "S",
@@ -2243,6 +2331,20 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "rationale": "Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-5467",
+      "rank": 84,
+      "size": "XL",
+      "importance": "high",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Epic: docs overhaul, 16 child pages from the v0.87.2 feature inventory; driven by order book 2026-11-17-docs-overhaul. Not workable.",
+      "rationale": "New epic container ranked by its children's aggregate impact; the order book drives child pickup, so the epic itself is never picked.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": true
     },
     {
       "issue": "PAN-3205",
@@ -3729,6 +3831,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "auto"
     },
     {
+      "issue": "PAN-5488",
+      "rank": 200,
+      "size": "S",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Plan dialog header Stop completes planning while footer Stop aborts to Todo; same label, opposite outcomes.",
+      "rationale": "New UX bug where a user who means to cancel accepts an unfinalized plan instead; placed in the high band with small, well-located fixes.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3261",
       "rank": 201,
       "size": "S",
@@ -4465,19 +4580,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "condition": "ok",
       "dependsOn": [],
       "why": "Terse gate-integrity rule (fix the work, never the gate) plus a Rule Authority note in rule authoring",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5466",
-      "rank": 260,
-      "size": "S",
-      "importance": "medium",
-      "score": 56,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Home Paused tile counts stale holds on closed issues and post-merge pauses (25 shown, ~5 real); filter + one-time flag cleanup.",
-      "rationale": "New issue. The Home Paused tile reported 25 parked agents when about five were real, because it counts every paused state.json with no check of issue state or pause source. The root cause and the fix (filter on derived state, exclude the post-merge close-out pause, clear stale flags once) are concrete and small, so it ranks with other medium operator-facing dashboard bugs.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5588,6 +5690,21 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "interactive"
     },
     {
+      "issue": "PAN-5468",
+      "rank": 350,
+      "size": "M",
+      "importance": "medium",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5483"
+      ],
+      "why": "Docs P1: features/issue-pipeline.mdx, the pipeline from pan start through merge and close-out. Lane A item 3.",
+      "rationale": "New P1 docs page; banded with medium work because the docs order book, not the sequence, sets its pickup order.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-578",
       "rank": 350,
       "size": "M",
@@ -5612,6 +5729,21 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "auto"
     },
     {
+      "issue": "PAN-5470",
+      "rank": 351,
+      "size": "M",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5483"
+      ],
+      "why": "Docs P1: features/flywheel.mdx, the loop, lane board, switches and backlog sequencer. Supersedes PAN-2070. Lane A item 4.",
+      "rationale": "New P1 docs page that supersedes the older PAN-2070 request; banded with medium work behind the order book.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-4195",
       "rank": 352,
       "size": "M",
@@ -5621,6 +5753,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "dependsOn": [],
       "why": "Every pan call costs ~0.5s/230MB from eager command imports; lazy-load command modules, target --version <100ms",
       "rationale": "New issue (2026-09-25). Agents and hooks invoke pan constantly, so a 0.5 s, 230 MB floor per call adds latency to every agent turn and memory pressure on the host. The fix (lazy action imports, bundle/compile-cache tuning, a startup regression check) is well scoped with a measurable target, so condition is ok; placed in a free slot among score-63 medium work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5471",
+      "rank": 352,
+      "size": "M",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Docs P1: configuration/model-routing.mdx, roles, workhorse slots, tiered execution; drop stale Cloister routing. Lane B item 2.",
+      "rationale": "New P1 docs page; banded with medium work behind the order book.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6828,6 +6973,21 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "auto"
     },
     {
+      "issue": "PAN-5473",
+      "rank": 450,
+      "size": "S",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5483"
+      ],
+      "why": "Docs P2: features/desktop-app.mdx, downloads, how pan up finds the app, tray. Supersedes PAN-2073. Lane A item 5.",
+      "rationale": "New P2 docs page that supersedes PAN-2073; banded with mid-medium work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1445",
       "rank": 451,
       "size": "S",
@@ -6836,6 +6996,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "condition": "ok",
       "dependsOn": [],
       "why": "PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs)",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5474",
+      "rank": 451,
+      "size": "M",
+      "importance": "medium",
+      "score": 49,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Docs P2: features/dashboard-views.mdx replacing the outdated 13-views table and the Experimental switch. Lane B item 3.",
+      "rationale": "New P2 docs page; banded with mid-medium work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6852,6 +7025,21 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "auto"
     },
     {
+      "issue": "PAN-5475",
+      "rank": 452,
+      "size": "S",
+      "importance": "medium",
+      "score": 49,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5483"
+      ],
+      "why": "Docs P2: features/costs.mdx, attribution, pan cost verbs, API-rate vs plan costs. Lane A item 6.",
+      "rationale": "New P2 docs page; banded with mid-medium work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2982",
       "rank": 453,
       "size": "XS",
@@ -6860,6 +7048,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "condition": "ok",
       "dependsOn": [],
       "why": "Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5476",
+      "rank": 453,
+      "size": "S",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Docs P2: conversation search and Ctrl+K palette scopes, semantic search setup, pan conv search. Lane B item 4.",
+      "rationale": "New P2 docs page; banded with mid-medium work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6876,6 +7077,21 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "auto"
     },
     {
+      "issue": "PAN-5477",
+      "rank": 454,
+      "size": "M",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5483"
+      ],
+      "why": "Docs P2: configuration/permissions.mdx, auto-approve hook, --yolo, operator-only labels, git shim. Lane A item 7.",
+      "rationale": "New P2 docs page; banded with mid-medium work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-5317",
       "rank": 455,
       "size": "S",
@@ -6884,6 +7100,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "condition": "ok",
       "dependsOn": [],
       "why": "CodeRabbit follow-up on PR #5127: route live Codex app-server sends correctly; no replayable mail for keyed sends.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5478",
+      "rank": 455,
+      "size": "L",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Docs P2: CLI reference completeness for conversation, pipeline, memory and core verbs. Lane B item 5.",
+      "rationale": "New P2 docs item, large but mechanical; banded with mid-medium work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6900,6 +7129,21 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "skip"
     },
     {
+      "issue": "PAN-5479",
+      "rank": 456,
+      "size": "S",
+      "importance": "medium",
+      "score": 46,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5483"
+      ],
+      "why": "Docs P2: merge the unpublished workspaces config page into features/workspaces and memory pages. Lane A item 8.",
+      "rationale": "New P2 docs page; banded with mid-medium work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2976",
       "rank": 457,
       "size": "L",
@@ -6912,6 +7156,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "interactive"
     },
     {
+      "issue": "PAN-5480",
+      "rank": 457,
+      "size": "XS",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Docs P2: add the install script and overdeck up to quickstart.mdx, as the homepage advertises. Lane B item 6.",
+      "rationale": "New P2 docs fix; banded with mid-medium work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1444",
       "rank": 458,
       "size": "S",
@@ -6920,6 +7177,21 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "condition": "ok",
       "dependsOn": [],
       "why": "Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5481",
+      "rank": 458,
+      "size": "S",
+      "importance": "medium",
+      "score": 45,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5483"
+      ],
+      "why": "Docs P2: configuration/voice.mdx, dictation, tts.enabled, local Qwen3-TTS daemon, sidecars. Lane A item 9.",
+      "rationale": "New P2 docs page; banded with mid-medium work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7132,6 +7404,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "condition": "ok",
       "dependsOn": [],
       "why": "Settings: \"Anthropic is not configured\" warning persists in Model Routing after claude /login (Provider tab disagrees)",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5486",
+      "rank": 475,
+      "size": "M",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Bot integration core pins are hand-typed and stale (0.74/0.77); stamp them at release and fix Grok Bot docs.",
+      "rationale": "New; stale pins ship connectors that predate one-paste connect, so it bands with medium integration fixes.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8813,6 +9098,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "auto"
     },
     {
+      "issue": "PAN-5482",
+      "rank": 610,
+      "size": "L",
+      "importance": "medium",
+      "score": 36,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Docs P3 batch: operating guide, foreman, CI integrations, unpublished pages, proposal in nav, blog draft. Lane B item 7.",
+      "rationale": "New P3 docs batch, last in lane B; banded with lower-medium work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1524",
       "rank": 611,
       "size": "M",
@@ -9918,6 +10216,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "why": "Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition",
       "gate": "auto",
       "planning": "skip"
+    },
+    {
+      "issue": "PAN-5487",
+      "rank": 700,
+      "size": "XS",
+      "importance": "low",
+      "score": 28,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan scope --help says it moves xBRIEF files; the code rewrites status fields in place. Reword 5 descriptions.",
+      "rationale": "New help-text cleanup; low impact, so it bands with low work.",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-3919",
@@ -13563,6 +13874,13 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "confidence": 0.6
     },
     {
+      "from": "PAN-5447",
+      "to": "PAN-5476",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
       "from": "PAN-5461",
       "to": "PAN-5462",
       "type": "unblocks",
@@ -13581,6 +13899,230 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "to": "PAN-5465",
       "type": "informs",
       "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-5467",
+      "to": "PAN-5468",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5467",
+      "to": "PAN-5469",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5467",
+      "to": "PAN-5470",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5467",
+      "to": "PAN-5471",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5467",
+      "to": "PAN-5472",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5467",
+      "to": "PAN-5473",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5467",
+      "to": "PAN-5474",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5467",
+      "to": "PAN-5475",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5467",
+      "to": "PAN-5476",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5467",
+      "to": "PAN-5477",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5467",
+      "to": "PAN-5478",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5467",
+      "to": "PAN-5479",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5467",
+      "to": "PAN-5480",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5467",
+      "to": "PAN-5481",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5467",
+      "to": "PAN-5482",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5467",
+      "to": "PAN-5483",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5470",
+      "to": "PAN-2070",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.85
+    },
+    {
+      "from": "PAN-5471",
+      "to": "PAN-5482",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-5472",
+      "to": "PAN-5471",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-5473",
+      "to": "PAN-2073",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.85
+    },
+    {
+      "from": "PAN-5483",
+      "to": "PAN-4708",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-5483",
+      "to": "PAN-4779",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-5483",
+      "to": "PAN-5468",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-5483",
+      "to": "PAN-5470",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-5483",
+      "to": "PAN-5472",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-5483",
+      "to": "PAN-5473",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-5483",
+      "to": "PAN-5475",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-5483",
+      "to": "PAN-5477",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-5483",
+      "to": "PAN-5479",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-5483",
+      "to": "PAN-5481",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-5487",
+      "to": "PAN-5469",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-5488",
+      "to": "PAN-5469",
+      "type": "informs",
+      "source": "github-ref",
       "confidence": 0.8
     },
     {
