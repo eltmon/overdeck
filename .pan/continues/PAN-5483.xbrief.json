@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5483",
   "created": "2026-11-17T13:01:33.028Z",
-  "updated": "2026-11-17T15:13:33.435Z",
+  "updated": "2026-11-17T15:22:20.082Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -244,6 +244,11 @@
     "docs-and-map.ac4": {
       "status": "completed",
       "doneAt": "2026-11-17T15:13:33.435Z"
+    },
+    "pr-mint-evidence": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5483",
+      "claimedAt": "2026-11-17T15:22:20.082Z"
     }
   }
 }
