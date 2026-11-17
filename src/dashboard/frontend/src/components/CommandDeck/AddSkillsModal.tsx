@@ -118,9 +118,9 @@ export function AddSkillsModal({ conversation, onClose }: AddSkillsModalProps) {
       await queryClient.invalidateQueries({ queryKey });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setPending(false);
     }
+    // No `finally`: the React Compiler cannot lower a try with a finalizer, and the catch above swallows every error.
+    setPending(false);
   };
 
   return (
