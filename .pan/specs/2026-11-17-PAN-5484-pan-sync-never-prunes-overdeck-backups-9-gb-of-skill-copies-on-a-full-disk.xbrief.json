@@ -1,0 +1,438 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-17T12:16:34Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5484: pan sync never prunes ~/.overdeck/backups (9 GB of skill copies on a full disk)",
+    "updated": "2026-11-17T12:27:32.332Z"
+  },
+  "plan": {
+    "id": "pan-5484",
+    "title": "pan sync never prunes ~/.overdeck/backups (9 GB of skill copies on a full disk)",
+    "status": "proposed",
+    "uid": "83de1584-c57c-44bd-ac08-0106e8514157",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-17T12:16:34Z",
+    "updated": "2026-11-17T12:27:32.332Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5484",
+        "label": "PAN-5484",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5484.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "sync",
+      "backups",
+      "disk",
+      "cli",
+      "retention"
+    ],
+    "narratives": {
+      "Problem": "pan sync writes a ~92 MB copy of ~/.claude/skills, commands and agents to ~/.overdeck/backups/<timestamp>/ on every run (src/cli/commands/sync.ts lines 316-337) and never prunes; 101 backups (9.1 GB) filled the operator's disk on 2026-11-17. In the same module, listBackups() treats named dirs (dist-rollbacks, pan-3783-native-context) as backups, a plain timestamp filter would rotate out the irreplaceable context backups that pan context detach --apply writes, and cleanOldBackups(NaN) (reachable via pan backup clean --keep abc) deletes every backup because [].slice(NaN) returns the whole array.",
+      "Proposal": "In src/lib/backup.ts: listBackups returns only timestamp-named dirs (/^\\d{4}-\\d{2}-\\d{2}T/) and skips entries that vanish mid-read; cleanOldBackups validates its keep count (RangeError for non-non-negative-integers), prunes only timestamp dirs without a context child, and removes with force:true. Add an optional sync.backup_keep config key (default 10) with resolveBackupKeep falling back to 10 for invalid values, and a backupBeforeSync(sourceDirs, keep) helper that creates the backup then prunes, returning (never throwing) a prune error. sync.ts calls only backupBeforeSync, before the --backup-only return, and prints the pruned count or a yellow warning. pan backup clean --keep rejects non-integer input with exit 1. Update the pan-sync skill Backups section, reference/architecture.mdx and add changelog.d/pan-5484.md. Full detail with before/after code in .pan/drafts/PAN-5484.md.",
+      "NonGoals": "- Handling ENOSPC inside createBackup (pruning before create, or removing a partial timestamp dir left by a failed copy); sync still fails on a full disk as today.\n- Fixing pan restore's targetDirs map, which has no agents entry.\n- Making pan backup clean read sync.backup_keep, or changing its default (10) or help text (its deletion rules do change, through cleanOldBackups).\n- Pruning, moving or migrating dist-rollbacks/, pan-3783-native-context/ or any other non-timestamp dir.\n- Auto-pruning context backups (timestamp dirs with a context/ child) written by pan context detach --apply.\n- Size-based or age-based retention; retention is by count only.\n- A dashboard setting for backup_keep."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keep number is an optional sync.backup_keep config key defaulting to 10; values that are not an integer >= 1 resolve to 10.",
+        "rationale": "The issue offered a constant 10 or a configured sync.backup_keep; the key is one optional field plus a resolver and lets an operator on a small disk keep fewer. 0 would delete the backup the same sync just made, and backup_before_sync=false already turns backups off."
+      },
+      {
+        "summary": "Context backups (timestamp dirs containing a context/ child) are never auto-pruned and do not use a keep slot, in both pan sync and pan backup clean.",
+        "rationale": "backupFile() writes them for pan context detach --apply and they are the only copy of hand-authored CLAUDE.md/AGENTS.md content; they are tiny, so keeping them costs nothing while deleting them loses data."
+      },
+      {
+        "summary": "Prune runs after a successful createBackup, as the issue specifies; createBackup failures (ENOSPC) still fail sync.",
+        "rationale": "The issue's fix names after-create ordering; with retention in place backups no longer fill the disk, so pre-create pruning is out of scope (NonGoals)."
+      },
+      {
+        "summary": "A new backupBeforeSync helper in src/lib/backup.ts owns create-then-prune and is the test seam; sync.ts calls only it.",
+        "rationale": "There is no syncCommand test harness; this mirrors the existing syncPanCliShimStep pattern and keeps sync.ts growth to a few lines under the 1000-line ceiling."
+      },
+      {
+        "summary": "pan backup clean's own code changes only by rejecting a --keep value that is not a non-negative integer (exit 1, nothing deleted); default '10' and help text stay. It inherits the new cleanOldBackups rules, so it too stops counting or deleting named dirs and context backups.",
+        "rationale": "--keep abc currently deletes every backup via cleanOldBackups(NaN); leaving the default and help text alone keeps skills/CLI lockstep unaffected, while the shared deletion rules must apply to both callers to protect context backups."
+      }
+    ],
+    "items": [
+      {
+        "id": "backup-retention-rules",
+        "title": "Restrict backup listing to timestamp dirs and make pruning context-safe and keep-validated",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:16:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5484",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "sync-prunes-after-backup"
+          ],
+          "files_scope": [
+            "src/lib/backup.ts",
+            "tests/lib/backup.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/backup.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/lib/backup.test.ts: all tests pass, including the pre-existing ones",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 in src/lib/backup.ts: add TIMESTAMP_DIR_RE = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}-\\d{2}(-\\d{3}Z)?$/ (fully anchored; long form from createBackupTimestamp plus the legacy short form) and CONTEXT_BACKUP_CHILD = 'context'. listBackups() returns only directories whose name matches TIMESTAMP_DIR_RE, skipping (continue) an entry whose inner readdirSync throws ENOENT and rethrowing other errors; sort stays descending by localeCompare. cleanOldBackups(keepCount = 10) first throws RangeError(`keep count must be a non-negative integer, got ${keepCount}`) when !Number.isInteger(keepCount) || keepCount < 0, then filters listBackups() to entries whose targets do not include 'context', keeps the newest keepCount of those, and removes the rest with rmSync(path, { recursive: true, force: true }). Update both JSDocs. Extend the existing tests/lib/backup.test.ts (keep its vi.doMock('../../src/lib/paths.js') + mkdtempSync setup and every existing test unchanged) with the five named tests from PRD WI-1 inside its describe('listBackups') and describe('cleanOldBackups') blocks; do not create a parallel backup test file."
+        },
+        "items": [
+          {
+            "id": "backup-retention-rules.ac1",
+            "title": "Given BACKUPS_DIR holds 2024-01-01T00-00-00/, 2026-11-17T00-00-00-000Z/, dist-rollbacks/, pan-3783-native-context/ and the date-prefixed 2026-11-17Tnotes/, when listBackups() runs, then it returns exactly the two timestamp dirs, newest first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "backup-retention-rules.ac2",
+            "title": "Given three timestamp backups with a skills/ child, an older 2024-01-01T00-00-00/context/x.md, dist-rollbacks/ and 2020-01-01Tnotes/, when cleanOldBackups runs, then the context backup and both named dirs survive and the context backup uses no keep slot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "backup-retention-rules.ac3",
+            "title": "When cleanOldBackups is called with NaN, -1 or 2.5, then it throws RangeError and every fixture dir still exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "backup-retention-rules.ac4",
+            "title": "When cleanOldBackups(0) runs twice on two prunable fixtures, then the first call returns 2 and the second returns 0 without throwing, and the pre-existing tests in tests/lib/backup.test.ts still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "backup-keep-config",
+        "title": "Add the optional sync.backup_keep config key and resolveBackupKeep resolver",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:16:34Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-5484",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config.ts",
+            "src/lib/backup.ts",
+            "tests/lib/backup.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/backup.test.ts tests/unit/lib/config.test.ts tests/lib/config.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2. In src/lib/config.ts add the optional field `backup_keep?: number;` (with a PAN-5484 JSDoc) to OverdeckConfig.sync after backup_before_sync, and `backup_keep: 10,` to DEFAULT_CONFIG.sync after backup_before_sync: true. In src/lib/backup.ts export DEFAULT_BACKUP_KEEP = 10 and resolveBackupKeep(value: unknown): number returning value when it is a number, an integer and >= 1, else DEFAULT_BACKUP_KEEP. Add describe('resolveBackupKeep') with the two named tests from PRD WI-2 to tests/lib/backup.test.ts, and confirm tests/unit/lib/config.test.ts and tests/lib/config.test.ts still pass unchanged (they compare loaded config to getDefaultConfig())."
+        },
+        "items": [
+          {
+            "id": "backup-keep-config.ac1",
+            "title": "resolveBackupKeep(3) returns 3 and resolveBackupKeep(1) returns 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "backup-keep-config.ac2",
+            "title": "resolveBackupKeep falls back to 10 for undefined, 0, -2, 2.5, NaN, the string '5' and null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "backup-keep-config.ac3",
+            "title": "Given a config.toml without backup_keep, when loadConfigSync() runs, then config.sync.backup_keep defaults to 10 (optional in OverdeckConfig.sync), and tests/unit/lib/config.test.ts and tests/lib/config.test.ts still pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sync-prunes-after-backup",
+        "title": "Make pan sync prune old backups after each successful backup via backupBeforeSync",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:16:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5484",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/backup.ts",
+            "src/cli/commands/sync.ts",
+            "tests/lib/backup.test.ts",
+            "tests/cli/commands/sync-mirror.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/backup.test.ts tests/cli/commands/sync-mirror.test.ts",
+            "npm run typecheck",
+            "grep -c 'createBackup(' src/cli/commands/sync.ts",
+            "grep -c 'backupBeforeSync(' src/cli/commands/sync.ts",
+            "wc -l < src/cli/commands/sync.ts"
+          ],
+          "expected_outputs": [
+            "tests/lib/backup.test.ts and tests/cli/commands/sync-mirror.test.ts pass",
+            "typecheck completes without errors",
+            "grep createBackup( prints 0",
+            "grep backupBeforeSync( prints 1",
+            "line count is 1000 or less"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3. In src/lib/backup.ts export interface SyncBackupResult { backup: BackupInfo; pruned: number; pruneError?: string } and backupBeforeSync(sourceDirs, keep) which calls createBackup(sourceDirs) (letting its errors throw), returns { backup, pruned: 0 } without pruning when backup.targets is empty, and otherwise calls cleanOldBackups(keep) inside try/catch, returning { backup, pruned } or { backup, pruned: 0, pruneError: message }. In src/cli/commands/sync.ts change the line-12 import to `backupBeforeSync, resolveBackupKeep` and replace the createBackup call block (lines 326-332) with the PRD's After snippet: resolve keep from config.sync.backup_keep, call backupBeforeSync inside time('backup', ...), keep the existing spinner succeed/info, then print chalk.dim(`Pruned ${pruned} old backup(s), keeping ${keep}.`) when pruned > 0 and chalk.yellow(`Backup prune failed (sync continues): ${pruneError}`) when pruneError is set. The `if (options.backupOnly)` return stays after this block. Add describe('backupBeforeSync') with the three named tests from PRD WI-3 to tests/lib/backup.test.ts. In tests/cli/commands/sync-mirror.test.ts replace the line-35 mockCreateBackup with mockBackupBeforeSync = vi.fn().mockReturnValue({ backup: { targets: [], timestamp: 'now', path: '' }, pruned: 0 }) and make the line-105 backup.js mock factory return { backupBeforeSync: mockBackupBeforeSync, resolveBackupKeep: () => 10 }."
+        },
+        "items": [
+          {
+            "id": "sync-prunes-after-backup.ac1",
+            "title": "Given 12 sync backups 2020-01-01..12, dist-rollbacks/, pan-3783-native-context/ and a 2019 context backup, when backupBeforeSync([skillsSrc], 10) runs, then it returns pruned === 3, exactly 10 prunable timestamp dirs remain including the new one, 2020-01-01..03 are deleted, and the named and context dirs survive",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-prunes-after-backup.ac2",
+            "title": "When backupBeforeSync is called with keep -1, then it returns pruned 0 and a pruneError containing 'non-negative integer' instead of throwing, and the new backup dir exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-prunes-after-backup.ac3",
+            "title": "grep -c 'createBackup(' src/cli/commands/sync.ts prints 0, grep -c 'backupBeforeSync(' prints 1, and that call appears on a line before `if (options.backupOnly)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-prunes-after-backup.ac4",
+            "title": "When backupBeforeSync runs with only missing source dirs over 12 populated backups, then it returns pruned 0 and all 12 populated backups survive; wc -l < src/cli/commands/sync.ts prints 1000 or less",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-prunes-after-backup.ac5",
+            "title": "tests/cli/commands/sync-mirror.test.ts passes with its backup.js mock exporting backupBeforeSync and resolveBackupKeep and no createBackup",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "backup-clean-validates-keep",
+        "title": "Make pan backup clean reject a --keep value that is not a non-negative integer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:16:34Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-5484",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/backup.ts",
+            "src/cli/commands/__tests__/backup-clean-command.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/backup-clean-command.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "backup-clean-command.test.ts: all tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4 in src/cli/commands/backup.ts: in backupCleanCommand take raw = options.keep ?? '10'; when raw does not match /^\\d{1,15}$/ (15 digits keeps Number(raw) a finite exact safe integer) print chalk.red(`--keep must be a non-negative integer, got \"${raw}\"`) via console.error and `return exitCli(1)` (import exitCli from '../exit.js'); otherwise call cleanOldBackups(Number(raw)). Do not change src/cli/index.ts (default '10' and help text stay). Add src/cli/commands/__tests__/backup-clean-command.test.ts mocking '../../../lib/backup.js' and '../../exit.js' with the four named tests from the PRD."
+        },
+        "items": [
+          {
+            "id": "backup-clean-validates-keep.ac1",
+            "title": "When backupCleanCommand({ keep: 'abc' }) runs, then exitCli is called with 1 and cleanOldBackups is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "backup-clean-validates-keep.ac2",
+            "title": "When backupCleanCommand runs with keep '-1', '2.5', a 400-digit string or '9007199254740993', then exitCli is called with 1 and cleanOldBackups is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "backup-clean-validates-keep.ac3",
+            "title": "When backupCleanCommand runs with keep '3', then cleanOldBackups is called with 3; with no keep option it is called with 10",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "backup-retention-docs",
+        "title": "Document sync backup retention in the pan-sync skill, architecture reference and changelog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:16:34Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5484",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-sync/SKILL.md",
+            "reference/architecture.mdx",
+            "changelog.d/pan-5484.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "npm run lint:skills",
+            "grep -c 'backup_keep' sync-sources/skills/pan-sync/SKILL.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "lint:skills exits 0",
+            "grep prints 1 or more"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5. Rewrite the `## Backups` section of sync-sources/skills/pan-sync/SKILL.md (line 276): replace the stale claude/skills + codex/skills layout with <timestamp>/skills, commands, agents; add a `### Retention` subsection stating sync keeps the newest 10 timestamp backups, `backup_keep` under `[sync]` in ~/.overdeck/config.toml sets the number (integer >= 1, else 10), retention never touches non-timestamp dirs such as dist-rollbacks/ and never deletes <timestamp>/context/ backups from `pan context detach --apply`, a prune failure warns and sync continues, and `pan backup clean --keep <n>` prunes on demand with the same rules; make `### Restore from Backup` say `pan backup list` lists backups and `pan restore <timestamp>` restores only skills/ and commands/ (it skips agents/ and context/), then give the manual `cp -r ~/.overdeck/backups/<timestamp>/agents/* ~/.claude/agents/` step and the manual context-file recovery (file name = original absolute path with / replaced by __); keep `### Disable Backups`. Change reference/architecture.mdx line 98 to `backups/              # Sync backups (newest 10 kept)`. Create changelog.d/pan-5484.md with the exact `#### Fixed` bullet from the PRD."
+        },
+        "items": [
+          {
+            "id": "backup-retention-docs.ac1",
+            "title": "The pan-sync SKILL.md Backups section contains backup_keep, dist-rollbacks, `pan context detach`, a sentence that pan restore restores only skills and commands, and the manual agents/ cp command, and contains no `codex/` layout line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "backup-retention-docs.ac2",
+            "title": "reference/architecture.mdx renders the backups/ tree line as `# Sync backups (newest 10 kept)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "backup-retention-docs.ac3",
+            "title": "changelog.d/pan-5484.md exists with a single `#### Fixed` heading and one bullet linking issue #5484, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "backup-retention-rules",
+        "to": "backup-keep-config",
+        "type": "blocks"
+      },
+      {
+        "from": "backup-keep-config",
+        "to": "sync-prunes-after-backup",
+        "type": "blocks"
+      },
+      {
+        "from": "backup-retention-rules",
+        "to": "sync-prunes-after-backup",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One ~150-line bug fix across 10 files. The 7 'subsystems' are directory buckets of the same change: src/lib (backup.ts, config.ts), src/cli/commands (sync.ts, backup.ts), three test dirs that already cover this code (tests/lib, tests/cli/commands, src/cli/commands/__tests__), and the docs/changelog the change must ship with (sync-sources/skills/pan-sync, reference/, changelog.d/). Splitting the docs or the existing-test mock update into sibling issues would ship behaviour without its docs or leave CI red, so it is inseparable.",
+      "canonicalFilename": "2026-11-17-PAN-5484-pan-sync-never-prunes-overdeck-backups-9-gb-of-skill-copies-on-a-full-disk.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
