@@ -1,0 +1,978 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-17T11:57:06Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5462: Computer use on Windows (WSL2): drive the Windows desktop with Orca's PowerShell helper",
+    "updated": "2026-11-17T12:02:49.178Z"
+  },
+  "plan": {
+    "id": "pan-5462",
+    "title": "Computer use on Windows (WSL2): drive the Windows desktop with Orca's PowerShell helper",
+    "status": "proposed",
+    "uid": "139c03a3-c5e5-40dc-8e2f-e4eb26444cd0",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-17T11:57:06Z",
+    "updated": "2026-11-17T12:02:49.178Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5462",
+        "label": "PAN-5462",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5462/.pan/drafts/pan-5462.md",
+        "label": "PRD draft (.pan/drafts/pan-5462.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5461",
+        "label": "PAN-5461 (provider seam, dependency)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "computer-use",
+      "windows",
+      "wsl2",
+      "orca-port"
+    ],
+    "metadata": {
+      "sizeJustification": "Already one of three sibling issues (5461 seam, 5462 Windows, 5463 macOS). The projected surface is about 29 files across many path prefixes (vendored script, port-lint scripts, CI workflow, skill, mdx page, changelog, lib, cli, frontend). Most are small edits or tests. Splitting further would ship a Windows provider without its key rules, docs or CI proof.",
+      "canonicalFilename": "2026-11-17-PAN-5462-computer-use-on-windows-wsl2-drive-the-windows-desktop-with-orca-s-powershell-helper.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "pan computer and Settings → Computer Use only drive Linux desktops. Overdeck on Windows runs inside WSL2, where the Linux helper would drive WSLg windows instead of the Windows desktop, so PAN-5461 refuses WSL until a Windows provider exists.",
+      "Proposal": "Vendor Orca's runtime.ps1 (MIT, c6b9ac9549b, UI Automation, nothing to install), copy it to %LOCALAPPDATA%\\Overdeck\\computer-use\\ and run it one-shot through WSL interop with powershell.exe -ExecutionPolicy Bypass. Add a wsl provider on PAN-5461's seam (bridge, readiness probes, Windows blocked-key table), surface it in doctor, capabilities and Settings, document it and prove it on a windows-2022 runner. Only vendoring and the native CI job run before PAN-5461 merges; every other item task_blocks until then.",
+      "NonGoals": "- Must not create, redefine or stub any part of the PAN-5461 seam: platform.ts types/detectPlatform/providerFor (beyond one `case 'wsl'` line), the platform parameter of assertKeyComboAllowed, the doctor/readiness refactor, or ComputerUseSection.tsx\n- Native Windows Overdeck (no WSL) and WSL1\n- Orca's persistent -Serve mode or any latency work beyond measuring it\n- Edits to the body of the vendored runtime.ps1, or fixes for its known limits (main window only, mixed DPI, elevated apps)\n- New ComputerUseErrorCode values for Windows message prefixes\n- New route-scopes.ts rows or new dashboard routes\n- Making the computer-use-windows workflow a required check"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Record upstream commit c6b9ac9549b for runtime.ps1",
+        "rationale": "Every other Orca record uses it, and runtime.ps1 at c6b9ac9549b is byte-identical to Orca HEAD (verified), so the port lint and diff tooling stay uniform."
+      },
+      {
+        "summary": "Bridge throws helper_error on ok:false instead of returning the response",
+        "rationale": "Matches helper.ts on Linux; run.ts and commands assume a returned response succeeded. The original PRD wording contradicted that contract."
+      },
+      {
+        "summary": "maxBuffer 64 MiB, killSignal SIGKILL",
+        "rationale": "Same as the Linux helper; helper.ts's ExecFileFn requires killSignal, and a 4K screenshot in base64 can exceed 20 MiB."
+      },
+      {
+        "summary": "Go straight to -ExecutionPolicy Bypass (no RemoteSigned retry like Orca)",
+        "rationale": "Overdeck writes the script locally itself; a retry would double a one-shot call's cost. Group Policy blocks get a clear message."
+      },
+      {
+        "summary": "Cache the resolved helper dir on disk",
+        "rationale": "Each pan computer command is a new process; resolving %LOCALAPPDATA% costs an extra powershell.exe start (~0.5 s) per command otherwise."
+      },
+      {
+        "summary": "CI on windows-2022 with Vampire/setup-wsl@v7 and a packed tarball",
+        "rationale": "windows-smoke.yml (PAN-4331) proved WSL2 works there; installing a tarball avoids building from a CRLF /mnt checkout and proves packaging."
+      },
+      {
+        "summary": "WSL1 unsupported",
+        "rationale": "WSL1 has no WSLInterop binfmt entry; Overdeck documents WSL2 as the Windows path."
+      },
+      {
+        "summary": "Window-targeting prefixes stay inside helper_error messages",
+        "rationale": "Avoids widening the error-code union for one platform; the skill teaches agents to read the prefix."
+      },
+      {
+        "summary": "The computer-use-windows workflow also triggers on push (paths-filtered)",
+        "rationale": "The pipeline opens the PR only at pan done, so a pull_request-only trigger would make the CI ACs circular; windows-smoke.yml uses the same push trigger."
+      },
+      {
+        "summary": "Capabilities label comes from windowsVersion(), not the handshake or readiness()",
+        "rationale": "The handshake has no OS build, and readiness() would run a second handshake; one PowerShell version probe is cheap and gives a single defined source."
+      },
+      {
+        "summary": "Keep the WSL_INTEROP guard (D-17) and record a CI checkpoint for it",
+        "rationale": "The guard only acts when the variable is missing, so it can't break a working env; the CI checkpoint records the evidence and a failure turns into a follow-up issue."
+      }
+    ],
+    "items": [
+      {
+        "id": "vendor-windows-helper",
+        "title": "Vendor Orca's runtime.ps1 with its upstream port record",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-5462",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "native/computer-use-windows/runtime.ps1",
+            "native/computer-use-windows/README.md",
+            "scripts/upstream-ports.json",
+            "scripts/upstream-port-diff.sh"
+          ],
+          "verify_commands": [
+            "npm run lint:upstream-ports",
+            "bash -c 'diff <(tail -n +3 native/computer-use-windows/runtime.ps1) <(git -C ~/Projects/orca show c6b9ac9549b:native/computer-use-windows/runtime.ps1)'",
+            "bash -c \"! grep -P '[^\\\\x00-\\\\x7F]' native/computer-use-windows/runtime.ps1\""
+          ],
+          "expected_outputs": [
+            "lint:upstream-ports prints 'upstream-ports: <n> records OK'",
+            "diff prints nothing",
+            "grep finds no non-ASCII byte"
+          ],
+          "traces": [
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2, D-9, D-13, D-14. Independent of PAN-5461; do it first. Create native/computer-use-windows/runtime.ps1 from `git -C ~/Projects/orca show c6b9ac9549b:native/computer-use-windows/runtime.ps1` (never the Orca working tree), prepending exactly two ASCII lines: `# Ported from Orca (MIT, Copyright (c) 2026 Lovecast Inc.)` and `# upstream: native/computer-use-windows/runtime.ps1 @ c6b9ac9549b`. No BOM, LF endings, body untouched. Append the record {local,upstream:'orca',path,commit:'c6b9ac9549b'} to scripts/upstream-ports.json. In scripts/upstream-port-diff.sh change `if [[ \"$local_path\" == *.py ]]` to also match *.ps1 and update the comment there and the top-of-file comment (line ~14). Write native/computer-use-windows/README.md modeled on native/computer-use-linux/README.md: what the script is (Orca's Windows UI Automation bridge, MIT, commit c6b9ac9549b), that Overdeck copies it to %LOCALAPPDATA%\\Overdeck\\computer-use\\ and runs it from WSL2 with `powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File runtime.ps1 <op.json>` (one process per operation, one JSON line out), and how to re-vendor (git show at a new commit, bump the commit in both header and record, run `bash scripts/upstream-port-diff.sh orca` first)."
+        },
+        "items": [
+          {
+            "id": "vendor-windows-helper.ac1",
+            "title": "Given the vendored file, when `diff <(tail -n +3 native/computer-use-windows/runtime.ps1) <(git -C ~/Projects/orca show c6b9ac9549b:native/computer-use-windows/runtime.ps1)` runs, then it produces no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vendor-windows-helper.ac2",
+            "title": "Given the record in scripts/upstream-ports.json, when `npm run lint:upstream-ports` runs, then it exits 0 and prints 'records OK'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vendor-windows-helper.ac3",
+            "title": "Given a .ps1 record whose header line is removed, when `bash scripts/upstream-port-diff.sh --check` runs, then it exits 1 and names native/computer-use-windows/runtime.ps1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vendor-windows-helper.ac4",
+            "title": "Given native/computer-use-windows/README.md, when grepped, then it contains 'c6b9ac9549b', 'MIT', 'LOCALAPPDATA' and 'upstream-port-diff.sh'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-windows-native",
+        "title": "CI job runs the vendored helper natively on windows-2022 against Notepad",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-5462",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            ".github/workflows/computer-use-windows.yml"
+          ],
+          "verify_commands": [
+            "python3 -c \"import yaml;yaml.safe_load(open('.github/workflows/computer-use-windows.yml'))\"",
+            "gh run list --workflow computer-use-windows.yml --branch feature/pan-5462 --limit 1 --json conclusion,url"
+          ],
+          "expected_outputs": [
+            "the workflow file parses as YAML",
+            "the latest run of the native job concludes success"
+          ],
+          "traces": [
+            "FR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 step 1 and step 3. Independent of PAN-5461 (only needs the vendored script). Create .github/workflows/computer-use-windows.yml: name computer-use-windows; on workflow_dispatch, and on push and pull_request with paths native/computer-use-windows/**, src/lib/computer-use/**, .github/workflows/computer-use-windows.yml; permissions contents: read; env OVERDECK_TELEMETRY: '0'. Job `native` on windows-2022, timeout 15 min: checkout; a pwsh step starts notepad.exe and sleeps 3 s; for each op (handshake, list_apps, {\"tool\":\"get_app_state\",\"app\":\"notepad\"}) write the JSON to $env:RUNNER_TEMP, run `powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File native/computer-use-windows/runtime.ps1 <op>`, measure wall-clock with Measure-Command, append op name + seconds + ok to $env:GITHUB_STEP_SUMMARY. Handshake must be ok:true with capabilities.platform == 'win32' (fail the job otherwise). The get_app_state check (ok:true, non-empty snapshot.treeLines, non-null snapshot.screenshotPngBase64) is soft: on failure print the response and write 'Notepad tree/screenshot not available on the hosted desktop' to the summary without failing. Mirror the conventions of .github/workflows/windows-smoke.yml. Push the branch over SSH (`git push git@github.com:eltmon/overdeck.git feature/pan-5462`) because the gh token lacks the workflow scope."
+        },
+        "items": [
+          {
+            "id": "ci-windows-native.ac1",
+            "title": "Given a push to feature/pan-5462 touching native/computer-use-windows/**, when GitHub Actions runs computer-use-windows.yml, then the `native` job runs on windows-2022 and concludes success",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-windows-native.ac2",
+            "title": "Given the native job, when the handshake op runs, then the job fails unless the response has ok:true and capabilities.platform == 'win32'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-windows-native.ac3",
+            "title": "Given the native job, when get_app_state against notepad fails, then the job summary records the response and the job still concludes success",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-windows-native.ac4",
+            "title": "Given the native job, when it finishes, then the job summary lists each op's wall-clock seconds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wsl-bridge",
+        "title": "Windows bridge: run runtime.ps1 through WSL interop (wsl-bridge.ts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:06Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5462",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "foundationFor": [
+            "wsl-readiness",
+            "wsl-provider",
+            "ci-wsl-e2e"
+          ],
+          "files_scope": [
+            "src/lib/computer-use/wsl-bridge.ts",
+            "src/lib/computer-use/helper.ts",
+            "src/lib/computer-use/paths.ts",
+            "src/lib/computer-use/__tests__/wsl-bridge.test.ts",
+            "src/lib/computer-use/__tests__/helper.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/wsl-bridge.test.ts src/lib/computer-use/__tests__/helper.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-2",
+            "D-17",
+            "D-18"
+          ],
+          "acJustification": "Six ACs: the bridge is the one foundation item and each AC pins a distinct failure-mapping or environment rule the provider and CI depend on."
+        },
+        "narrative": {
+          "Action": "Step 0: run `pan sync-main`. If src/lib/computer-use/platform.ts is still absent (PAN-5461 not merged), call task_block on this item with reason \"waits for PAN-5461 (provider seam)\" and stop; never create or redefine any part of the seam. After the seam lands, do the PRD's seam checkpoint (compare platform.ts exports with PAN-5461 PRD WI-1; follow the merged code where it differs). PRD WI-1 (bridge part), D-2..D-7, D-15, D-16. Extract `parseHelperOutput(stdout, stderr)` from src/lib/computer-use/helper.ts exactly as the PRD's before/after snippet shows (helper.test.ts must pass unchanged). Add `windowsHelperSource()` and `windowsHelperDirCachePath()` to paths.ts. Create src/lib/computer-use/wsl-bridge.ts exporting resolvePowershell, resolveHelperDir (disk cache in ~/.overdeck/computer-use/windows-helper-dir.txt, re-resolve when the cached dir is gone), ensureHelperCopied (sha256 compare, overwrite on mismatch), interopEnabled (binfmt_misc WSLInterop or WSLInterop-late exists), runWindowsHelper (steps and failure mapping exactly as in the PRD; execFile options { env, timeout: 30_000, killSignal: 'SIGKILL', maxBuffer: 64 MiB }; `ok:false` throws helper_error with the helper's message; op file removed in finally; execution-policy stderr regex → the D-4 message). Use promisified execFile only (no sync child process). Every dependency is injectable via WslBridgeDeps; tests use fakes and vi.useFakeTimers() for any timing. Also apply D-17 (set WSL_INTEROP from /run/WSL/*_interop when the env lacks it) and D-18 (copy via runtime.ps1.tmp-<uuid> then rename). Export windowsVersion(deps): one `powershell.exe -NoLogo -NoProfile -NonInteractive -Command` call printing $PSVersionTable.PSVersion.ToString() and [Environment]::OSVersion.Version.ToString() on two lines (10 s timeout), returning { powershell, build }."
+        },
+        "items": [
+          {
+            "id": "wsl-bridge.ac1",
+            "title": "Given powershell.exe on PATH and at the System32 fallback, when resolvePowershell runs, then it returns the PATH hit first and the fallback only when `which` finds nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wsl-bridge.ac2",
+            "title": "Given a helper-dir copy whose sha256 matches the vendored file, when runWindowsHelper runs, then it writes no new copy; given a mismatch, then it overwrites the copy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wsl-bridge.ac3",
+            "title": "Given stdout `{\"ok\":true,...}\\r\\n`, when runWindowsHelper runs, then it returns the parsed object, passed both paths through `wslpath -w`, and removed the op file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wsl-bridge.ac4",
+            "title": "Given stdout `{\"ok\":false,\"error\":\"target_elevated: ...\"}` or a killed process or non-JSON output, when runWindowsHelper runs, then it throws helper_error with that message, helper_timeout, or helper_error respectively, and the op file is still removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wsl-bridge.ac5",
+            "title": "Given stderr containing `about_Execution_Policies` and a non-zero exit, when runWindowsHelper runs, then it throws helper_error with the D-4 Group Policy message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wsl-bridge.ac6",
+            "title": "Given an env without WSL_INTEROP and /run/WSL/1_interop present, when runWindowsHelper runs, then powershell.exe receives WSL_INTEROP=/run/WSL/1_interop and the helper copy is written through a temp file then renamed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wsl-readiness",
+        "title": "WSL readiness probes: interop, powershell, helper-dir, helper (readiness-wsl.ts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5462",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/computer-use/readiness-wsl.ts",
+            "src/lib/computer-use/__tests__/readiness-wsl.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/readiness-wsl.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "readiness-wsl.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Step 0: run `pan sync-main`. If src/lib/computer-use/platform.ts is still absent (PAN-5461 not merged), call task_block on this item with reason \"waits for PAN-5461 (provider seam)\" and stop; never create or redefine any part of the seam. After the seam lands, do the PRD's seam checkpoint (compare platform.ts exports with PAN-5461 PRD WI-1; follow the merged code where it differs). PRD WI-1 readiness part, FR-3, FR-4. Create src/lib/computer-use/readiness-wsl.ts exporting wslReadiness(options: { probeHelper: 'wait' | 'if-free' }, deps?) returning PAN-5461's ReadinessReport with checks interop, powershell, helper-dir, helper in that order, with the labels, details and fixCommand text from the PRD. The powershell check calls windowsVersion() from wsl-bridge.ts. The helper check's ok detail is 'handshake ok'. The helper check uses runWindowsHelper({tool:'handshake'}) inside the lease helper PAN-5461 added (tryWithDesktopLock, 2 s wait) for 'if-free' and withDesktopLock for 'wait'; when the lock is busy the check is ok with detail 'skipped: an agent is using the desktop'. setupSteps is always []. session label is `windows · <build>`."
+        },
+        "items": [
+          {
+            "id": "wsl-readiness.ac1",
+            "title": "Given interop off, when wslReadiness runs, then the interop check is `missing` with the FR-4 fixCommand and the other three checks are `unavailable` with detail 'needs Windows interop'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wsl-readiness.ac2",
+            "title": "Given working interop and PowerShell 5.1 on build 10.0.22631, when wslReadiness runs, then the powershell check detail is 'PowerShell 5.1…', the session label is 'windows · 10.0.22631…' and setupSteps is []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wsl-readiness.ac3",
+            "title": "Given the desktop lock held by another agent and probeHelper 'if-free', when wslReadiness runs, then the helper check is ok with detail 'skipped: an agent is using the desktop' within the 2 s wait under fake timers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wsl-readiness.ac4",
+            "title": "Given an unwritable helper dir, when wslReadiness runs, then the helper-dir check is `missing` with the error message as detail",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "windows-blocked-keys",
+        "title": "Refuse Alt+F4, Win+L and Ctrl+Shift+Escape on the windows key table",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5462",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/computer-use/blocked-key-combos.ts",
+            "src/lib/computer-use/__tests__/blocked-key-combos.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/blocked-key-combos.test.ts"
+          ],
+          "expected_outputs": [
+            "blocked-key-combos.test.ts passes"
+          ],
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Step 0: run `pan sync-main`. If src/lib/computer-use/platform.ts is still absent (PAN-5461 not merged), call task_block on this item with reason \"waits for PAN-5461 (provider seam)\" and stop; never create or redefine any part of the seam. After the seam lands, do the PRD's seam checkpoint (compare platform.ts exports with PAN-5461 PRD WI-1; follow the merged code where it differs). PRD WI-3, D-8. In src/lib/computer-use/blocked-key-combos.ts add WINDOWS_RULES ported from Orca computer-blocked-key-combos.ts lines 47-69 at c6b9ac9549b (modifier aliases ctrl/control/cmdorctrl/commandorcontrol→ctrl, meta/super/win/cmd/command→win, alt/option→alt, shift; keyAliases {esc:'escape'}; blocked Alt+F4 'close the app', Win+L 'lock Windows', Ctrl+Shift+Escape 'open Task Manager'). Select it when the platform argument PAN-5461 added is 'windows'; the canonicalKey/side-suffix handling stays Linux-only as written. Update the header comment that says the Windows table is dropped. No upstream-ports.json change (record already at c6b9ac9549b)."
+        },
+        "items": [
+          {
+            "id": "windows-blocked-keys.ac1",
+            "title": "Given platform 'windows', when assertKeyComboAllowed runs on alt+f4, win+l, cmd+l, super+l or ctrl+shift+esc, then it throws system_shortcut_blocked naming the effect",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "windows-blocked-keys.ac2",
+            "title": "Given platform 'windows', when assertKeyComboAllowed runs on ctrl+q, then it accepts the combo",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "windows-blocked-keys.ac3",
+            "title": "Given platform 'linux', when assertKeyComboAllowed runs on alt+f4 and ctrl+q, then it still rejects both",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "windows-blocked-keys.ac4",
+            "title": "Given platform 'windows' and allowSystemShortcut true, when assertKeyComboAllowed runs on alt+f4, then it accepts the combo",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wsl-provider",
+        "title": "Register the wsl provider so pan computer drives Windows from WSL2",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5462",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/computer-use/providers/wsl.ts",
+            "src/lib/computer-use/platform.ts",
+            "src/lib/computer-use/__tests__/providers-wsl.test.ts",
+            "src/lib/computer-use/__tests__/platform.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/providers-wsl.test.ts src/lib/computer-use/__tests__/platform.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "D-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Step 0: run `pan sync-main`. If src/lib/computer-use/platform.ts is still absent (PAN-5461 not merged), call task_block on this item with reason \"waits for PAN-5461 (provider seam)\" and stop; never create or redefine any part of the seam. After the seam lands, do the PRD's seam checkpoint (compare platform.ts exports with PAN-5461 PRD WI-1; follow the merged code where it differs). PRD WI-1 provider part, D-1. Create src/lib/computer-use/providers/wsl.ts implementing ComputerUseProvider: id 'wsl'; resolveSession per the PRD (interop off → no_desktop_session with the FR-4 text; powershell missing → the appendWindowsPath message; ok → { label: 'windows', env: process.env }); readiness → wslReadiness; runSetupStep → { status: 'skipped' } for every id; runHelper → runWindowsHelper; blockedKeyPlatform 'windows'. In platform.ts add only `case 'wsl': return wslProvider;` to providerFor. Update PAN-5461's platform.test.ts expectation that providerFor('wsl') is null to expect the wsl provider."
+        },
+        "items": [
+          {
+            "id": "wsl-provider.ac1",
+            "title": "Given interop off, when wslProvider.resolveSession runs, then it returns ok:false with code no_desktop_session and the FR-4 message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wsl-provider.ac2",
+            "title": "Given interop on and powershell.exe found, when wslProvider.resolveSession runs, then it returns ok:true with label 'windows'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wsl-provider.ac3",
+            "title": "Given platform id 'wsl', when providerFor runs, then it returns a provider whose id is 'wsl' and blockedKeyPlatform is 'windows'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wsl-provider.ac4",
+            "title": "Given any setup step id, when wslProvider.runSetupStep runs, then it returns status 'skipped'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wsl-doctor-rows",
+        "title": "pan doctor shows the four WSL readiness rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5462",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "files_scope": [
+            "src/cli/commands/doctor-computer-use.ts",
+            "src/cli/commands/__tests__/doctor-computer-use.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/doctor-computer-use.test.ts"
+          ],
+          "expected_outputs": [
+            "doctor-computer-use.test.ts passes"
+          ],
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Step 0: run `pan sync-main`. If src/lib/computer-use/platform.ts is still absent (PAN-5461 not merged), call task_block on this item with reason \"waits for PAN-5461 (provider seam)\" and stop; never create or redefine any part of the seam. After the seam lands, do the PRD's seam checkpoint (compare platform.ts exports with PAN-5461 PRD WI-1; follow the merged code where it differs). PRD WI-4 doctor part, FR-7. After PAN-5461, checkComputerUse wraps provider readiness. Make sure a wsl provider's four checks (interop, powershell, helper-dir, helper) map to doctor rows with the same status mapping PAN-5461 uses (missing→error, action→warn, ok→ok) and the fixCommand as the row's fix; remove any leftover 'supports Linux only' warn branch for the wsl platform. Add a test with a fake wsl provider. Feature off still prints no rows."
+        },
+        "items": [
+          {
+            "id": "wsl-doctor-rows.ac1",
+            "title": "Given computer_use.enabled true and a fake wsl provider with all checks ok, when checkComputerUse runs, then it returns rows for interop, powershell, helper-dir and helper with status ok",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wsl-doctor-rows.ac2",
+            "title": "Given a fake wsl provider whose interop check is missing, when checkComputerUse runs, then the interop row has status error and the FR-4 fix text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wsl-doctor-rows.ac3",
+            "title": "Given computer_use.enabled false, when checkComputerUse runs, then it returns no rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wsl-capabilities",
+        "title": "pan computer capabilities reports the Windows session under WSL",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5462",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/computer-use/run.ts",
+            "src/lib/computer-use/format.ts",
+            "src/lib/computer-use/__tests__/run.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/computer-use/__tests__/run.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "run.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Step 0: run `pan sync-main`. If src/lib/computer-use/platform.ts is still absent (PAN-5461 not merged), call task_block on this item with reason \"waits for PAN-5461 (provider seam)\" and stop; never create or redefine any part of the seam. PRD WI-4 capabilities part, FR-1. In runCapabilities (as PAN-5461 left it), when the provider id is 'wsl', call windowsVersion() once and report desktopSession { ok: true, label: `windows · ${build}` } with no sessionType/display (WSLg sets XDG_SESSION_TYPE and DISPLAY; never report them). Do not call provider.readiness() here (it would run a second handshake). Keep the handshake in `helper`. If PAN-5461's CapabilitiesResult ok branch has no label field, add an optional `label?: string` (additive) and render it in format.ts's capabilities text only where format.ts already prints desktopSession fields. FR-13 'never refuses' stays. Inject windowsVersion through RunDeps for tests."
+        },
+        "items": [
+          {
+            "id": "wsl-capabilities.ac1",
+            "title": "Given a fake wsl provider, windowsVersion returning build '10.0.22631.0', and an env with XDG_SESSION_TYPE=wayland and DISPLAY=:0, when runCapabilities runs, then desktopSession equals { ok: true, label: 'windows · 10.0.22631.0' } with no sessionType or display",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wsl-capabilities.ac2",
+            "title": "Given a fake wsl provider whose handshake returns platform 'win32', when runCapabilities runs, then helper.platform is 'win32' and helper.provider is 'orca-computer-use-windows'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wsl-capabilities.ac3",
+            "title": "Given a linux provider, when runCapabilities runs, then the result matches the pre-change Linux shape",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-wsl-wording",
+        "title": "Settings → Computer Use uses Windows wording under WSL",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5462",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/ComputerUseSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/ComputerUseSection.test.tsx"
+          ],
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/sections/__tests__/ComputerUseSection.test.tsx"
+          ],
+          "expected_outputs": [
+            "ComputerUseSection.test.tsx passes"
+          ],
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Step 0: run `pan sync-main`. If src/lib/computer-use/platform.ts is still absent (PAN-5461 not merged), call task_block on this item with reason \"waits for PAN-5461 (provider seam)\" and stop; never create or redefine any part of the seam. After the seam lands, do the PRD's seam checkpoint (compare platform.ts exports with PAN-5461 PRD WI-1; follow the merged code where it differs). PRD WI-5, FR-6. In PAN-5461's ComputerUseSection.tsx, when status.platform === 'wsl': lede 'Lets agents see and operate Windows apps on <hostname> (the PC running Overdeck in WSL) when you ask them to: read windows, click, type and take screenshots.'; Off description 'Nothing to install: Windows already includes what it needs. One click turns it on.'; On description 'Agents can operate Windows apps when you ask them to. They can't close apps with Alt+F4, lock Windows or open Task Manager.'. Linux wording unchanged. Follow pan-style-guide (no font-bold/semibold, rounded-md badges, no new useMemo/useCallback/memo). Use the test file location PAN-5461 created if it differs from files_scope."
+        },
+        "items": [
+          {
+            "id": "settings-wsl-wording.ac1",
+            "title": "Given a wsl status with enabled false, when the section renders, then it shows 'Windows apps' in the lede and 'Nothing to install: Windows already includes what it needs.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-wsl-wording.ac2",
+            "title": "Given a wsl status with enabled true, when the section renders, then it shows 'close apps with Alt+F4, lock Windows or open Task Manager'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-wsl-wording.ac3",
+            "title": "Given a linux status, when the section renders, then it shows the Linux wording unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-wsl-wording.ac4",
+            "title": "Given a wsl status with four checks, when 'What Overdeck checked' is expanded, then it renders the interop, powershell, helper-dir and helper rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill-and-help-text",
+        "title": "Skill and pan computer help describe Windows through WSL2",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5462",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "files_scope": [
+            "sync-sources/skills/pan-computer-use/SKILL.md",
+            "src/cli/commands/computer.ts",
+            "packages/contracts/src/composer-commands.generated.ts"
+          ],
+          "verify_commands": [
+            "npm run lint:skills",
+            "npm run lint:slash-commands",
+            "bash -c \"! grep -n 'Linux desktops only' sync-sources/skills/pan-computer-use/SKILL.md\""
+          ],
+          "expected_outputs": [
+            "lint:skills passes",
+            "lint:slash-commands passes",
+            "grep finds no 'Linux desktops only'"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Step 0: run `pan sync-main`. If src/lib/computer-use/platform.ts is still absent (PAN-5461 not merged), call task_block on this item with reason \"waits for PAN-5461 (provider seam)\" and stop; never create or redefine any part of the seam. After the seam lands, do the PRD's seam checkpoint (compare platform.ts exports with PAN-5461 PRD WI-1; follow the merged code where it differs). PRD WI-6 first two bullets. Edit sync-sources/skills/pan-computer-use/SKILL.md: line 7 platforms list (Linux, Windows via WSL2); the unsupported_platform row (line ~154) text from the PRD; a new 'Windows (WSL2)' section with the six notes in the PRD using only real pan computer flags (`wait --text`, `--restore-window`), the message-prefix guidance (window_not_focused: → retry with --restore-window; target_elevated: → stop and tell the operator), blocked Alt+F4/Win+L/Ctrl+Shift+Escape, and 1–3 s per command. Edit src/cli/commands/computer.ts line 81 description to '(opt-in; Linux, or Windows through WSL2)' and the header comment line 5. Then `npm run build:cli`, `npm run generate:slash-commands`, commit the manifest if it changed, and run lint:skills."
+        },
+        "items": [
+          {
+            "id": "skill-and-help-text.ac1",
+            "title": "Given the edited skill, when `npm run lint:skills` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-and-help-text.ac2",
+            "title": "Given `pan computer --help` from the built CLI, when run, then it prints 'Linux, or Windows through WSL2'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-and-help-text.ac3",
+            "title": "Given the skill, when grepped, then it contains a '## Windows (WSL2)' heading plus the strings 'window_not_focused:' with '--restore-window' and 'target_elevated:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config-docs-changelog",
+        "title": "configuration/computer-use.mdx and changelog.d describe Windows through WSL2",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5462",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "configuration/computer-use.mdx",
+            "changelog.d/pan-5462.md"
+          ],
+          "verify_commands": [
+            "bash -c \"! grep -n 'Linux only' configuration/computer-use.mdx\"",
+            "npm run lint:docs",
+            "test -f changelog.d/pan-5462.md"
+          ],
+          "expected_outputs": [
+            "grep finds no 'Linux only'",
+            "lint:docs passes",
+            "changelog.d/pan-5462.md exists"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Step 0: run `pan sync-main`. If src/lib/computer-use/platform.ts is still absent (PAN-5461 not merged), call task_block on this item with reason \"waits for PAN-5461 (provider seam)\" and stop; never create or redefine any part of the seam. After the seam lands, do the PRD's seam checkpoint (compare platform.ts exports with PAN-5461 PRD WI-1; follow the merged code where it differs). PRD WI-6 docs bullets. configuration/computer-use.mdx: frontmatter description and intro say 'Linux, or Windows through WSL2'; Limits bullet becomes 'macOS (a signed Swift helper) is a follow-up.'; new 'Windows (WSL2)' section covering requirements (WSL2 with interop, Windows 10/11, built-in Windows PowerShell 5.1), what runs where (%LOCALAPPDATA%\\Overdeck\\computer-use\\, one powershell.exe per command, Bypass execution policy scoped to that process), the D-11 limits (main window only, mixed DPI, elevated apps, admin WSL terminal, WSL1, Group Policy), the 30 s timeout and orphan note; Troubleshooting entries for the interop/powershell/helper-dir/helper checks with the FR-4 fix. changelog.d/pan-5462.md per changelog.d/README.md with the PRD sentence."
+        },
+        "items": [
+          {
+            "id": "config-docs-changelog.ac1",
+            "title": "Given configuration/computer-use.mdx, when grepped for 'Linux only', then it produces no match, and it contains a '## Windows (WSL2)' heading",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-docs-changelog.ac2",
+            "title": "Given configuration/computer-use.mdx, when grepped, then it contains 'Enable interop in /etc/wsl.conf ([interop] enabled=true), then run wsl --shutdown from Windows.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-docs-changelog.ac3",
+            "title": "Given changelog.d/pan-5462.md, when grepped, then it contains 'Windows through WSL2' and 'Settings → Computer Use'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-wsl-e2e",
+        "title": "CI runs pan computer inside WSL2 against Notepad from a packed tarball",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T11:57:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-5462",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            ".github/workflows/computer-use-windows.yml"
+          ],
+          "verify_commands": [
+            "gh run list --workflow computer-use-windows.yml --branch feature/pan-5462 --limit 1 --json conclusion,url"
+          ],
+          "expected_outputs": [
+            "the latest run concludes success with pack, native and wsl jobs present"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "D-13",
+            "D-17"
+          ]
+        },
+        "narrative": {
+          "Action": "Step 0: run `pan sync-main`. If src/lib/computer-use/platform.ts is still absent (PAN-5461 not merged), call task_block on this item with reason \"waits for PAN-5461 (provider seam)\" and stop; never create or redefine any part of the seam. After the seam lands, do the PRD's seam checkpoint (compare platform.ts exports with PAN-5461 PRD WI-1; follow the merged code where it differs). PRD WI-7 steps 2-4. In .github/workflows/computer-use-windows.yml add a `pack` job (ubuntu-latest; same steps as windows-smoke.yml's pack job; assert `package/native/computer-use-windows/runtime.ps1` is in `tar tzf`) and a `wsl` job (needs pack; windows-2022; Vampire/setup-wsl@v7 Ubuntu-24.04 wsl-version 2; pwsh step starts notepad.exe; wsl-bash step installs Node 22 into ~/node like scripts/windows-smoke/probe-wsl.sh, `npm i -g` the tarball, writes $HOME/cu-home/config.yaml with computer_use: { enabled: true }, runs `OVERDECK_HOME=$HOME/cu-home pan computer capabilities --json`, `list-apps --json`, `get-app-state --app notepad --json`, timing each into the job summary). The wsl steps are continue-on-error with the PRD fallback wording in the summary. Push over SSH. Put the WSL outcome and get_app_state latency in the PR body. Also run the D-17 checkpoint: `env -u WSL_INTEROP /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile -Command 1` and `env -u WSL_INTEROP pan computer list-apps --json`, writing both exit codes to the job summary; if the second fails, file a follow-up issue and link it from the PR body."
+        },
+        "items": [
+          {
+            "id": "ci-wsl-e2e.ac1",
+            "title": "Given the workflow, when the pack job runs, then it fails unless the tarball lists package/native/computer-use-windows/runtime.ps1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-wsl-e2e.ac2",
+            "title": "Given WSL2 starts on windows-2022, when the wsl job runs, then `pan computer capabilities --json` output with helper.platform 'win32' appears in the job summary",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-wsl-e2e.ac3",
+            "title": "Given WSL2 fails to start, when the wsl job runs, then the job summary states the WSL bridge is covered by unit tests only and the workflow still concludes success",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-wsl-e2e.ac4",
+            "title": "Given the PR body, when read, then it reports whether the WSL step ran, its output, the D-17 checkpoint exit codes and the measured get_app_state latency",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "vendor-windows-helper",
+        "to": "ci-windows-native",
+        "type": "blocks"
+      },
+      {
+        "from": "wsl-bridge",
+        "to": "wsl-readiness",
+        "type": "blocks"
+      },
+      {
+        "from": "wsl-bridge",
+        "to": "wsl-provider",
+        "type": "blocks"
+      },
+      {
+        "from": "wsl-readiness",
+        "to": "wsl-provider",
+        "type": "blocks"
+      },
+      {
+        "from": "windows-blocked-keys",
+        "to": "wsl-provider",
+        "type": "blocks"
+      },
+      {
+        "from": "wsl-provider",
+        "to": "wsl-doctor-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "wsl-provider",
+        "to": "wsl-capabilities",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-windows-native",
+        "to": "ci-wsl-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "wsl-capabilities",
+        "to": "ci-wsl-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "vendor-windows-helper",
+        "to": "wsl-bridge",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
