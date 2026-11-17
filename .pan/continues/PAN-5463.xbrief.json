@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5463",
   "created": "2026-11-17T12:31:36.411Z",
-  "updated": "2026-11-17T19:12:29.539Z",
+  "updated": "2026-11-17T19:12:30.814Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -73,7 +73,7 @@
       "status": "pending"
     },
     "wi6-skill": {
-      "status": "blocked"
+      "status": "pending"
     },
     "wi6-docs": {
       "status": "blocked"
