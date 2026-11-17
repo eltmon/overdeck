@@ -1,0 +1,702 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-17T12:44:46Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5447: Command palette conversation search stalls 15s+: synchronous vector scan, superseded searches keep running",
+    "updated": "2026-11-17T12:49:21.626Z"
+  },
+  "plan": {
+    "id": "pan-5447",
+    "title": "Command palette conversation search stalls 15s+: synchronous vector scan, superseded searches keep running",
+    "status": "proposed",
+    "uid": "fb9ac1ee-3b69-449a-94fb-2466c44ddd1b",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-17T12:44:46Z",
+    "updated": "2026-11-17T12:49:21.626Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5447",
+        "label": "PAN-5447",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5447.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "performance",
+      "conversation-search",
+      "command-palette",
+      "worker-threads"
+    ],
+    "narratives": {
+      "Problem": "Every palette conversation search runs a synchronous 1.1-1.2 s sqlite-vec brute-force scan (plus up to 0.5 s BM25) on the dashboard main thread, the route ignores client disconnects so superseded keystroke searches run to completion and stack, BM25 waits for the query embedding, the embedding has no timeout, and the client never times out. Result: 15 s+ spinners, a 499 after 16.5 s, and /api/version stalling 4.8 s.",
+      "Proposal": "Move BM25, vector and live-filter work into the existing dashboard DB worker on two new serial lanes (conversation-text, conversation-vector) whose waiters queue on the main thread and are dropped on abort; thread the Effect request signal from the palette route through runPaletteSearch, the service, the ranker and the embed call; start BM25 concurrently with a 2.5 s-bounded embedding; give each scan leg a 4 s deadline (live filter 2 s) that degrades to keyword + title results; run memory FTS and conversation search in parallel; add a 10 s palette client timeout with its own message. Full detail in .pan/drafts/PAN-5447.md.",
+      "NonGoals": "- No ANN index, vector quantization, or reindex of embeddings.db\n- No streaming/two-phase palette response and no new response fields marking degraded results\n- No change to the semantic lane, searchSessionsSemantic, or its latest-wins cancellation\n- No global latest-wins cancellation across clients (MCP, fleet peers, other tabs must not cancel each other)\n- No worker termination as a cancellation mechanism\n- No change to indexing (indexer.ts, conversation-search-watcher.ts)\n- No new HTTP route, worker entry, tsdown entry, or desktop ENTRY_POINTS change\n- No file-size allowlist edits"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Scans run in the existing dashboard DB worker on two new lanes (conversation-text for BM25 + live filter, conversation-vector for the KNN scan)",
+        "rationale": "Reuses proven worker plumbing that already loads sqlite-vec (poll lane); two lanes keep an unstoppable vector scan from delaying the next query's BM25; no build/desktop entry changes."
+      },
+      {
+        "summary": "Waiting jobs on the two lanes queue on the main thread; abort removes waiters; in-flight scans run to completion; no worker termination",
+        "rationale": "The worker starts sync jobs inside its message handler so a cancel message cannot overtake a queued job; node:sqlite has no interrupt; terminate leaves the native scan running and reopens a 5.1 GB DB per burst."
+      },
+      {
+        "summary": "Cancellation is per request signal, not global latest-wins",
+        "rationale": "The route also serves MCP search_conversations, fleet peers and other tabs, which must not cancel each other."
+      },
+      {
+        "summary": "Query embedding 2,500 ms timeout; BM25 and vector legs 4,000 ms deadline; live filter 2,000 ms; client 10,000 ms",
+        "rationale": "Embedding measured 220-420 ms; scans 1.1-1.2 s warm; the server bound (~8.5 s) stays under the client timeout so the client sees degraded results rather than its timeout in the common slow case."
+      },
+      {
+        "summary": "Embedding failure/timeout records a health failure and still returns BM25 + title rows; abort and scan deadlines record nothing",
+        "rationale": "Keeps the PAN-3771 banner meaningful (provider problems) without superseded keystrokes raising it."
+      },
+      {
+        "summary": "Memory FTS and conversation search run concurrently in runPaletteSearch",
+        "rationale": "Memory FTS is already a worker; awaiting it first only adds latency."
+      },
+      {
+        "summary": "Response shape unchanged; degraded results are not flagged to clients",
+        "rationale": "Smallest change that fixes the stall; a degraded-mode indicator is a separate UX decision."
+      }
+    ],
+    "items": [
+      {
+        "id": "chunk-search-jobs",
+        "title": "Add worker-side chunk-search jobs module with a cached embeddings.db handle",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:44:46Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/conversation-search/chunk-search-jobs.ts",
+            "src/lib/conversation-search/__tests__/chunk-search-jobs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/conversation-search/__tests__/chunk-search-jobs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "chunk-search-jobs.test.ts passes its four named cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-5447.md). Create src/lib/conversation-search/chunk-search-jobs.ts exporting ChunkSearchDbRef, ChunkSearchJobResult<T>, searchConversationBm25Job, searchConversationVectorJob, filterLiveConversationSessionsJob (moved logic of filterLiveHits from conversation-search-service.ts:108-128) and closeChunkSearchHandles. Import openEmbeddingsDb/dimensionsForModel/types from '../overdeck/conversations-search.js' (never src/lib/database directly) and sessionIdFromPath from './transcript-paths.js'. Cache one handle keyed by `${dbPath}\\u0000${dimensionsForModel(model)}`; close the old handle on key change; never cache an unavailable open — return {available:false, reason}."
+        },
+        "items": [
+          {
+            "id": "chunk-search-jobs.ac1",
+            "title": "Given two BM25/vector jobs for the same dbPath and model, when both run, then openEmbeddingsDb is called exactly once (handle reused)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chunk-search-jobs.ac2",
+            "title": "Given a dbPath whose parent is a regular file, when a job runs, then it returns { available: false, reason } with a non-empty reason and caches nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chunk-search-jobs.ac3",
+            "title": "Given an indexed session whose transcript file was deleted, when filterLiveConversationSessionsJob runs, then the returned session ids exclude it and keep live ones in input order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chunk-search-jobs.ac4",
+            "title": "Given a cached handle, when closeChunkSearchHandles runs, then the next job opens a new handle (second openEmbeddingsDb call)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "db-ops-lanes",
+        "title": "Route the three chunk-search ops to new conversation-text and conversation-vector lanes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:44:46Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/dashboard-db-task.ts",
+            "src/dashboard/server/services/dashboard-db-worker.ts",
+            "tests/unit/dashboard/db-task-lanes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/db-task-lanes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "db-task-lanes.test.ts passes including the two new lane-routing cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add 'searchConversationBm25' | 'searchConversationVector' | 'filterLiveConversationSessions' to BOTH DashboardDbOperation unions (dashboard-db-task.ts and dashboard-db-worker.ts). Extend WorkerLane with 'conversation-text' | 'conversation-vector' and the workers record. workerLane(): searchConversationVector -> 'conversation-vector'; searchConversationBm25 and filterLiveConversationSessions -> 'conversation-text'. Add matching cases to executeInline (task) and runJob (worker) calling the chunk-search-jobs functions. Do not add them to COALESCED_OPERATIONS or isPollingSnapshot."
+        },
+        "items": [
+          {
+            "id": "db-ops-lanes.ac1",
+            "title": "workerLane('searchConversationVector') returns 'conversation-vector'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "db-ops-lanes.ac2",
+            "title": "workerLane('searchConversationBm25') and workerLane('filterLiveConversationSessions') each returns 'conversation-text'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "db-ops-lanes.ac3",
+            "title": "Given the Vitest inline path, when runDashboardDbJob('searchConversationBm25', {dbPath, model, matchQuery, limit}) runs against a temp DB, then it resolves to { available: true, value: [...] }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "db-ops-lanes.ac4",
+            "title": "grep -n \"searchConversationVector\" src/dashboard/server/services/dashboard-db-worker.ts prints a case in runJob (both dispatch tables carry the op)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "abortable-serial-lanes",
+        "title": "Make runDashboardDbJob abortable and queue conversation-lane waiters on the main thread",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:44:46Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5447",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/services/dashboard-db-task.ts",
+            "tests/unit/dashboard/db-task-abort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/db-task-abort.test.ts tests/unit/dashboard/db-task-lanes.test.ts src/dashboard/server/services/__tests__/dashboard-db-task-worker-boot.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "db-task-abort.test.ts passes its five named cases; existing lane and worker-boot tests still pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "service-worker-search",
+            "palette-route-abort"
+          ],
+          "parallelSafeReason": "Its only shared file, dashboard-db-task.ts, is serialized by the blocks edge from db-ops-lanes; no other item touches it, so once that edge clears it can run in its own slot."
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Add 4th parameter options {signal?: AbortSignal} to runDashboardDbJob. SERIAL_LANES = {'conversation-text','conversation-vector'}: post one job per lane at a time; keep waiters in a main-thread FIFO (laneWaiters) and track laneInFlight. In the worker message handler, clear laneInFlight and post the next live waiter for a final message BEFORE the `if (!job) return;` early return. Abort: delete from pending, remove from waiters, reject with signal.reason; lane stays busy until the worker answers. failPendingForLane clears both maps. Already-aborted signal rejects without posting. Inline Vitest path honors the signal. Never terminate a worker on abort. Add __testInternals.forceWorkerPath(enabled) (IC-1) so the test can drive a mocked spawnModuleWorker; fallback per PRD IC-1 is a real-worker test."
+        },
+        "items": [
+          {
+            "id": "abortable-serial-lanes.ac1",
+            "title": "Given two conversation-vector jobs, when both are submitted, then only the first is posted to the worker and the second is posted after the worker answers the first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "abortable-serial-lanes.ac2",
+            "title": "Given a queued waiter, when its signal aborts, then its promise rejects with the abort reason and its message is never posted to the worker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "abortable-serial-lanes.ac3",
+            "title": "Given an in-flight job, when its signal aborts, then its promise rejects at once, the lane stays busy until the worker answers, and then the next waiter is posted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "abortable-serial-lanes.ac4",
+            "title": "Given any abort, then worker.terminate is never called (spy not called)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "abortable-serial-lanes.ac5",
+            "title": "Given an already-aborted signal, when runDashboardDbJob is called, then it rejects with signal.reason and posts nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ranker-concurrent-embed",
+        "title": "Start BM25 concurrently with an abortable, time-limited query embedding in the ranker",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:44:46Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/conversation-search/ranker.ts",
+            "src/lib/conversation-search/__tests__/ranker.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/conversation-search/__tests__/ranker.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ranker.test.ts passes including the four new cases and the updated embed-args assertion",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 (before/after code in the PRD). rankConversationSearch gains signal, embedTimeoutMs (default DEFAULT_EMBED_TIMEOUT_MS = 2_500), onEmbedFailure, onEmbedSuccess. BM25 starts immediately; vector leg runs only after the embedding resolves; embedding failure/timeout reports onEmbedFailure and the vector leg yields []; abort rejects with signal.reason. Timeout via AbortController + setTimeout (never AbortSignal.timeout); throw ConversationQueryEmbedTimeoutError on timeout. provider.embed is called with ([query], { signal }). Update the existing test that asserts embed was called with (['keyword']). Fake timers for the timeout test."
+        },
+        "items": [
+          {
+            "id": "ranker-concurrent-embed.ac1",
+            "title": "Given an embedding promise still pending, when rankConversationSearch runs, then store.searchBm25 has already been called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ranker-concurrent-embed.ac2",
+            "title": "Given provider.embed rejects, when rankConversationSearch runs, then it returns the BM25 hits and calls onEmbedFailure once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ranker-concurrent-embed.ac3",
+            "title": "Given provider.embed never settles, when 2,500 ms of fake time pass, then the signal passed to embed is aborted, onEmbedFailure receives a ConversationQueryEmbedTimeoutError, and BM25 hits are returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ranker-concurrent-embed.ac4",
+            "title": "Given the request signal aborts during the embedding, then rankConversationSearch rejects with the abort reason and store.searchVector is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "service-worker-search",
+        "title": "Run conversation chunk search through the DB worker with request signal and per-leg deadlines",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:44:46Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation-search-service.ts",
+            "src/dashboard/server/services/__tests__/conversation-search-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/conversation-search-service.test.ts src/dashboard/server/routes/__tests__/palette.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-search-service.test.ts passes its five named cases; palette.test.ts still passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Remove the main-thread DB handle (openEmbeddingsDb, filterLiveHits, setImmediate wrapper); getHandle caches only the provider. Export CHUNK_SCAN_DEADLINE_MS = 4_000 and LIVE_FILTER_DEADLINE_MS = 2_000. searchConversationChunks takes signal; each leg goes through runDashboardDbJob(op, payload, undefined, { signal: combined }) where combined = signal ? AbortSignal.any([signal, deadline.signal]) : deadline.signal. Deadline => leg [] (live filter: hits unfiltered) plus one console.warn. Pass onEmbedFailure: recordConversationSearchFailure and onEmbedSuccess: recordConversationSearchSuccess to the ranker. Abort => rethrow signal.reason, record nothing. available:false => [] with no record. Other errors => record failure, console.error, []. closeConversationSearchService also calls closeChunkSearchHandles()."
+        },
+        "items": [
+          {
+            "id": "service-worker-search.ac1",
+            "title": "grep -n \"openEmbeddingsDb\\|setImmediate\" src/dashboard/server/services/conversation-search-service.ts prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "service-worker-search.ac2",
+            "title": "Given a vector leg that does not answer, when CHUNK_SCAN_DEADLINE_MS of fake time pass, then the leg's job signal is aborted and searchConversationChunks returns the BM25 hits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "service-worker-search.ac3",
+            "title": "Given the request signal aborts mid-search, then searchConversationChunks rejects with the abort reason and neither recordConversationSearchFailure nor recordConversationSearchSuccess is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "service-worker-search.ac4",
+            "title": "Given the embedding provider rejects, then recordConversationSearchFailure is called once and BM25 hits are returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "service-worker-search.ac5",
+            "title": "Given the live-filter leg misses LIVE_FILTER_DEADLINE_MS, then all ranked hits are returned unfiltered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "palette-route-abort",
+        "title": "Thread the HTTP request signal through the palette route and run memory and conversation search in parallel",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:44:46Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/palette.ts",
+            "src/dashboard/server/routes/__tests__/palette.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/palette.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "palette.test.ts passes including the abort, concurrency and route-interrupt cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. searchConversations(rawQuery, matchQuery, limit, signal?) passes signal to searchConversationChunks and calls signal?.throwIfAborted() before resolveConversationsByClaudeSessionIds. runPaletteSearch(rawQuery, limit, signal?) runs memory FTS fan-out and searchConversations in one Promise.all (perProject uses Math.max(1, projects.length); delete the zero-project early return). Route uses Effect.promise(async (signal) => …) and, when signal.aborted, returns a 499 JSON body without console.error. Route-interrupt test per PRD IC-2: HttpServerRequest.fromWeb + HttpRouter.toHttpEffect(paletteRouteLayer) run with Effect.runFork, origin/auth mocked to pass, searchConversationChunks mocked to capture input.signal; Fiber.interrupt; assert captured signal.aborted. Real-server path verified at planning: server.ts:203 NodeHttpServer.make installs makeHandler (interrupts the request fiber on response close) and server.ts:613 HttpRouter.serve mounts the routes."
+        },
+        "items": [
+          {
+            "id": "palette-route-abort.ac1",
+            "title": "Given the request fiber is interrupted while conversation search is pending, then the signal received by searchConversationChunks is aborted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-route-abort.ac2",
+            "title": "Given the signal aborts mid-search, then runPaletteSearch rejects and console.error is never called with '[palette] search failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-route-abort.ac3",
+            "title": "Given runMemoryFtsStatement has not resolved, when runPaletteSearch starts, then the embedding provider's embed has already been called (memory and conversation search run concurrently)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-route-abort.ac4",
+            "title": "Given the existing runPaletteSearch('needle', 5) tests with no signal argument, then runPaletteSearch returns the same conversation rows as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "palette-client-timeout",
+        "title": "Add a 10 s client timeout with its own message to the palette search fetch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:44:46Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandPalette.tsx",
+            "src/dashboard/frontend/src/components/CommandPalette.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandPalette.test.tsx",
+            "npm run typecheck",
+            "wc -l src/dashboard/frontend/src/components/CommandPalette.tsx"
+          ],
+          "expected_outputs": [
+            "CommandPalette.test.tsx passes including the three timeout cases",
+            "typecheck completes without errors",
+            "CommandPalette.tsx is at most 1124 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 (after-code in the PRD). fetchPaletteSearch creates its own AbortController linked to the effect's signal, plus a PALETTE_SEARCH_TIMEOUT_MS = 10_000 setTimeout that sets timedOut and aborts; on catch: supersede abort -> EMPTY_SEARCH, timeout -> throw new Error(SEARCH_TIMED_OUT = 'timed out'), else rethrow; finally clears timer and listener. Empty state renders 'Search timed out after 10 s. Try again.' when searchError === SEARCH_TIMED_OUT, else the existing 'Search unavailable (…)' text. Do not add useMemo/useCallback (React Compiler rule). Fake timers in tests; never AbortSignal.timeout. Render the timeout notice in its own row directly after the spinner row (same slot/style, no spinner icon) when !isSearchLoading && searchTimedOut, because Command.Empty only renders when visibleGroups is empty; in the empty-state branch render null when searchTimedOut. Existing 'Search unavailable (…)' text is unchanged for other errors."
+        },
+        "items": [
+          {
+            "id": "palette-client-timeout.ac1",
+            "title": "Given a search request that never settles, when 10,000 ms of fake time pass, then the palette renders 'Search timed out after 10 s. Try again.' and the 'Searching conversations' spinner text is gone",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-client-timeout.ac2",
+            "title": "Given the request times out, then the fetch signal passed to /api/palette/search is aborted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-client-timeout.ac3",
+            "title": "Given the All scope and a query that also matches a static action row (e.g. 'new' -> 'New workspace…'), when the search times out, then the 'Search timed out after 10 s. Try again.' notice still renders alongside the action row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-client-timeout.ac4",
+            "title": "Given the user types a second query before the first settles, then no timeout message renders for the superseded request and only the latest results render",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-client-timeout.ac5",
+            "title": "wc -l src/dashboard/frontend/src/components/CommandPalette.tsx prints a line count of at most 1124",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-search-latency",
+        "title": "Document serial conversation lanes, degraded fallback and the palette timeout",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:44:46Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "docs/DESKTOP-APP.md",
+            "docs/USAGE.md",
+            "changelog.d/pan-5447.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n \"conversation-vector\" docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n \"timed out after 10 s\" docs/DESKTOP-APP.md docs/USAGE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "grep prints the new lane line",
+            "grep prints a line in each of DESKTOP-APP.md and USAGE.md"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. docs/DASHBOARD-ARCHITECTURE.md 'DB job worker lanes' (grep 'Five lanes.'): seven lanes; conversation-text (BM25 + live filter) and conversation-vector (vector scan); serial lanes keep waiters on the main thread, abort removes waiters, in-flight job runs to completion, no worker termination; runDashboardDbJob 4th param { signal }. docs/DESKTOP-APP.md 'Conversation results' and docs/USAGE.md 'Command palette conversation search': keyword and title matches still appear when semantic search is slow or the embedding provider fails; palette stops after 10 s with 'Search timed out after 10 s. Try again.'. changelog.d/pan-5447.md with a '#### Fixed' bullet linking #5447 (format in changelog.d/README.md)."
+        },
+        "items": [
+          {
+            "id": "docs-search-latency.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains the lanes conversation-text and conversation-vector and states that an aborted waiter is removed on the main thread and the worker is never terminated to cancel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-search-latency.ac2",
+            "title": "docs/DESKTOP-APP.md and docs/USAGE.md each state that the palette shows 'Search timed out after 10 s. Try again.' and still returns keyword and title matches when semantic search is slow",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-search-latency.ac3",
+            "title": "changelog.d/pan-5447.md exists with a '#### Fixed' heading and one bullet linking https://github.com/eltmon/overdeck/issues/5447, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "chunk-search-jobs",
+        "to": "db-ops-lanes",
+        "type": "blocks"
+      },
+      {
+        "from": "db-ops-lanes",
+        "to": "abortable-serial-lanes",
+        "type": "blocks"
+      },
+      {
+        "from": "chunk-search-jobs",
+        "to": "service-worker-search",
+        "type": "blocks"
+      },
+      {
+        "from": "abortable-serial-lanes",
+        "to": "service-worker-search",
+        "type": "blocks"
+      },
+      {
+        "from": "ranker-concurrent-embed",
+        "to": "service-worker-search",
+        "type": "blocks"
+      },
+      {
+        "from": "service-worker-search",
+        "to": "palette-route-abort",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One bug path (palette route -> search service -> ranker -> DB worker -> client). The 7 'subsystems' are inflated by colocated tests (tests/unit), docs and changelog.d; code changes span 4 modules on a single request path, 18 files total. Splitting the server-side fix from the client timeout would ship a client message for a stall the server still causes, or a server fix with no client bound; each item is still independently reviewable.",
+      "canonicalFilename": "2026-11-17-PAN-5447-command-palette-conversation-search-stalls-15s-synchronous-vector-scan-superseded-searches-keep-running.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
