@@ -168,7 +168,7 @@ describe('HomePage', () => {
       agentsById: {
         running: makeAgent({ id: 'running', status: 'running' }),
         liveStopped: makeAgent({ id: 'liveStopped', status: 'stopped', hasLivePane: true }),
-        paused: makeAgent({ id: 'paused', status: 'stopped', paused: true }),
+        paused: makeAgent({ id: 'paused', issueId: 'PAN-3', status: 'stopped', paused: true }),
         failedAgent: makeAgent({ id: 'failedAgent', status: 'failed', consecutiveFailures: 1 }),
         staleStoppedFailure: makeAgent({ id: 'staleStoppedFailure', status: 'stopped', consecutiveFailures: 1 }),
       },
@@ -201,6 +201,37 @@ describe('HomePage', () => {
     expect(summaryCard('Ready to merge')).toHaveTextContent('1');
     expect(summaryCard('Needs you')).toHaveTextContent('2');
     expect(await screen.findByText('$12.35')).toBeInTheDocument();
+  });
+
+  it('counts only holds on open issues in the Paused card (PAN-5466)', () => {
+    vi.stubGlobal('fetch', homeFetchStub({}));
+    useDashboardStore.setState({
+      agentsById: {
+        held: makeAgent({ id: 'held', issueId: 'PAN-10', status: 'stopped', paused: true, pausedReason: 'operator hold' }),
+        merged: makeAgent({ id: 'merged', issueId: 'PAN-11', status: 'stopped', paused: true }),
+        closed: makeAgent({ id: 'closed', issueId: 'PAN-12', status: 'stopped', paused: true }),
+        noDerivedState: makeAgent({ id: 'noDerivedState', issueId: 'PAN-13', status: 'stopped', paused: true }),
+        closeOut: makeAgent({
+          id: 'closeOut',
+          issueId: 'PAN-14',
+          status: 'stopped',
+          paused: true,
+          pausedReason: 'awaiting close-out (verify on main)',
+        }),
+        notPaused: makeAgent({ id: 'notPaused', issueId: 'PAN-10', status: 'running' }),
+      },
+      derivedIssueStateByIssueId: {
+        'PAN-10': { issueId: 'PAN-10', state: 'working' },
+        'PAN-11': { issueId: 'PAN-11', state: 'merged' },
+        'PAN-12': { issueId: 'PAN-12', state: 'closed' },
+        'PAN-14': { issueId: 'PAN-14', state: 'in-review' },
+      },
+    });
+
+    renderHomePage();
+
+    expect(summaryCard('Paused')).toHaveTextContent('1');
+    expect(summaryCard('Paused')).toHaveTextContent('Held agents on open issues');
   });
 
   it('reads "Live sessions" under Agents working when nothing is working', () => {
