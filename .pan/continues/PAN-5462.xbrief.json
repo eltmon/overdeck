@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5462",
   "created": "2026-11-17T12:53:58.478Z",
-  "updated": "2026-11-17T12:55:21.214Z",
+  "updated": "2026-11-17T12:57:36.642Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,9 @@
     "vendor-windows-helper.ac4": {
       "status": "completed",
       "doneAt": "2026-11-17T12:55:21.213Z"
+    },
+    "wsl-bridge": {
+      "status": "blocked"
     }
   }
 }
