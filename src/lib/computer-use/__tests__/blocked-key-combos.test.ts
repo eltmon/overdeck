@@ -53,7 +53,7 @@ describe('assertKeyComboAllowed platform (PAN-5461 D-16)', () => {
     expect(() => assertKeyComboAllowed('ctrl+a', false, 'linux')).not.toThrow();
   });
 
-  it.each(['windows', 'mac'] as const)('fails closed for %s even with allowSystemShortcut', (platform) => {
+  it.each(['windows'] as const)('fails closed for %s even with allowSystemShortcut', (platform) => {
     for (const allow of [false, true]) {
       let error: unknown = null;
       try {
@@ -65,5 +65,40 @@ describe('assertKeyComboAllowed platform (PAN-5461 D-16)', () => {
       expect((error as { code: string }).code).toBe('unsupported_platform');
       expect((error as Error).message).toBe(`No blocked-shortcut rules for ${platform} yet.`);
     }
+  });
+});
+
+describe('assertKeyComboAllowed on macOS (PAN-5463 D-10)', () => {
+  function macError(key: string, allow = false): unknown {
+    try {
+      assertKeyComboAllowed(key, allow, 'mac');
+      return null;
+    } catch (error) {
+      return error;
+    }
+  }
+
+  it.each([
+    ['cmd+q', 'quit the app'],
+    ['cmd+ctrl+q', 'lock the screen'],
+    ['cmd+shift+q', 'log out of macOS'],
+    ['command+option+esc', 'open the Force Quit window'],
+    ['meta+alt+escape', 'open the Force Quit window'],
+    ['cmd+shift+delete', 'empty the Trash'],
+    ['CmdOrCtrl+Shift+Backspace', 'empty the Trash'],
+    ['cmd+alt+shift+q', 'log out of macOS'],
+  ])('blocks %s as "%s"', (key, effect) => {
+    const error = macError(key);
+    expect(isComputerUseError(error) && error.code).toBe('system_shortcut_blocked');
+    expect((error as Error).message).toContain(`would ${effect}`);
+  });
+
+  it.each(['cmd+a', 'cmd+c', 'ctrl+q', 'cmd+shift+p', 'Return'])('allows %s', (key) => {
+    expect(macError(key)).toBeNull();
+  });
+
+  it('allows a blocked combo with allowSystemShortcut, while Linux rules still block theirs', () => {
+    expect(macError('cmd+shift+q', true)).toBeNull();
+    expect(() => assertKeyComboAllowed('ctrl+alt+delete', false, 'linux')).toThrow(/log out and power off/);
   });
 });

@@ -2,9 +2,9 @@
 // upstream: src/main/computer/action-contracts/computer-blocked-key-combos.ts @ c6b9ac9549b
 // Design ported from vercel-labs/agent-desktop's per-platform blocked_combo lists (Apache-2.0).
 //
-// Linux-only slice of Orca's blocked-shortcut port (PAN-5452 D-7). The platform
-// argument is back (PAN-5461 D-16), but only the Linux table exists so far;
-// 'windows' and 'mac' fail closed until PAN-5462/5463 add their tables.
+// Linux and macOS slices of Orca's blocked-shortcut port (PAN-5452 D-7,
+// PAN-5463 D-10). The platform argument selects the table (PAN-5461 D-16);
+// 'windows' fails closed until PAN-5462 adds its table.
 import { ComputerUseError } from './errors.js';
 import type { KeyPlatform } from './platform-types.js';
 
@@ -23,6 +23,33 @@ interface PlatformKeyRules {
 }
 
 const SHARED_KEY_ALIASES = { esc: 'escape' };
+
+// Aliases mirror how each provider maps modifier names to physical keys.
+const MACOS_RULES: PlatformKeyRules = {
+  modifierAliases: {
+    cmd: 'cmd',
+    command: 'cmd',
+    meta: 'cmd',
+    super: 'cmd',
+    win: 'cmd',
+    cmdorctrl: 'cmd',
+    commandorcontrol: 'cmd',
+    ctrl: 'ctrl',
+    control: 'ctrl',
+    alt: 'alt',
+    option: 'alt',
+    shift: 'shift',
+  },
+  // The macOS provider sends both names as the same physical Delete key.
+  keyAliases: { ...SHARED_KEY_ALIASES, delete: 'backspace' },
+  blocked: [
+    { modifiers: ['cmd', 'ctrl'], keys: ['q'], effect: 'lock the screen' },
+    { modifiers: ['cmd', 'shift'], keys: ['q'], effect: 'log out of macOS' },
+    { modifiers: ['cmd', 'alt'], keys: ['escape'], effect: 'open the Force Quit window' },
+    { modifiers: ['cmd', 'shift'], keys: ['backspace'], effect: 'empty the Trash' },
+    { modifiers: ['cmd'], keys: ['q'], effect: 'quit the app' },
+  ],
+};
 
 const NUMERIC_KEYSYM = 'numeric keysym';
 
@@ -83,8 +110,13 @@ const LINUX_RULES: PlatformKeyRules = {
   ],
 };
 
+const RULES_BY_PLATFORM: Partial<Readonly<Record<KeyPlatform, PlatformKeyRules>>> = {
+  linux: LINUX_RULES,
+  mac: MACOS_RULES,
+};
+
 // Extra modifiers still match: Ctrl+Alt+Shift+Q quits the app just like Ctrl+Q.
-function findBlockedKeyCombo(key: string): BlockedKeyCombo | null {
+function findBlockedKeyCombo(key: string, rules: PlatformKeyRules): BlockedKeyCombo | null {
   const parts = key === '+' ? ['+'] : key.split('+');
   const modifiers = new Set<string>();
   let keyName = '';
@@ -92,16 +124,16 @@ function findBlockedKeyCombo(key: string): BlockedKeyCombo | null {
     const normalized = part.trim().toLowerCase();
     // X11 keysym names such as Alt_L/Control_R carry a side suffix the alias table doesn't have.
     const modifierName = normalized.replace(/_[lr]$/, '').replace(/[\s_-]/g, '');
-    const modifier = LINUX_RULES.modifierAliases[modifierName];
+    const modifier = rules.modifierAliases[modifierName];
     if (modifier) {
       modifiers.add(modifier);
     } else {
-      const aliased = LINUX_RULES.keyAliases[normalized] ?? normalized;
-      keyName = LINUX_RULES.canonicalKey ? LINUX_RULES.canonicalKey(aliased) : aliased;
+      const aliased = rules.keyAliases[normalized] ?? normalized;
+      keyName = rules.canonicalKey ? rules.canonicalKey(aliased) : aliased;
     }
   }
   return (
-    LINUX_RULES.blocked.find(
+    rules.blocked.find(
       (combo) => combo.keys.includes(keyName) && combo.modifiers.every((modifier) => modifiers.has(modifier)),
     ) ?? null
   );
@@ -112,11 +144,12 @@ function findBlockedKeyCombo(key: string): BlockedKeyCombo | null {
  * Platforms without a rule table throw `unsupported_platform`, even with allowSystemShortcut (D-16).
  */
 export function assertKeyComboAllowed(key: string, allowSystemShortcut: boolean, platform: KeyPlatform = 'linux'): void {
-  if (platform !== 'linux') {
+  const rules = RULES_BY_PLATFORM[platform];
+  if (!rules) {
     throw new ComputerUseError('unsupported_platform', `No blocked-shortcut rules for ${platform} yet.`);
   }
   if (allowSystemShortcut) return;
-  const blocked = findBlockedKeyCombo(key);
+  const blocked = findBlockedKeyCombo(key, rules);
   if (blocked) {
     throw new ComputerUseError(
       'system_shortcut_blocked',
