@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5461",
   "created": "2026-11-17T12:13:42.164Z",
-  "updated": "2026-11-17T12:15:41.739Z",
+  "updated": "2026-11-17T12:15:48.259Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
     "platform-types.ac3": {
       "status": "completed",
       "doneAt": "2026-11-17T12:15:41.739Z"
+    },
+    "lock-additions": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5461",
+      "claimedAt": "2026-11-17T12:15:48.259Z"
     }
   }
 }
