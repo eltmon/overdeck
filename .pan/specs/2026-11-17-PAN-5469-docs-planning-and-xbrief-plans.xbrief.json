@@ -1,0 +1,480 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-17T12:25:03Z",
+    "author": "overdeck/0.88.0",
+    "description": "Plan for PAN-5469: docs: planning and xBRIEF plans",
+    "updated": "2026-11-17T12:29:39.468Z"
+  },
+  "plan": {
+    "id": "pan-5469",
+    "title": "docs: planning and xBRIEF plans",
+    "status": "proposed",
+    "uid": "9407491f-6e89-4b1f-9ea0-473a6aa3f1ed",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-17T12:25:03Z",
+    "updated": "2026-11-17T12:29:39.468Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5469",
+        "label": "PAN-5469",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5469.md",
+        "label": "PAN-5469 PRD draft",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5467",
+        "label": "PAN-5467 docs overhaul epic",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docs",
+      "planning",
+      "xbrief",
+      "mintlify"
+    ],
+    "metadata": {
+      "sizeJustification": "Six doc files only. lintProjectedSurface counts the first two path segments as a subsystem, so each root-level doc file (features/planning.mdx, features/swarm.mdx, docs.json, ...) counts as its own subsystem; the real surface is one docs site.",
+      "canonicalFilename": "2026-11-17-PAN-5469-docs-planning-and-xbrief-plans.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Overdeck has no user-facing docs page for planning. The facts live in developer docs (docs/XBRIEF.md, docs/PIPELINE-GATES.md), the changelog and CLI help, and two published pages (cli/workspace-commands.mdx, reference/state-model.mdx) still describe the retired .planning/ directory, a dolt-backed task store and a Docker checkbox that is on by default.",
+      "Proposal": "Write features/planning.mdx from the verified fact sheet in the PRD (.pan/drafts/PAN-5469.md, F-1 to F-46): the Plan dialog and pan plan, PRD drafts and specs in .pan/, the xBRIEF checklist, pan task, plan integrity, the plan critic and roles.plan.sub.critic.model, pan plan finalize, pan scope, and when to skip planning. Add it to the Features group in docs.json, and link it from features/swarm.mdx, configuration/effort.mdx, reference/state-model.mdx and cli/workspace-commands.mdx, correcting the stale planning claims on those pages.",
+      "NonGoals": "- No source code changes (pan scope help text is PAN-5487; the Plan dialog Stop buttons are PAN-5488)\n- No edits to concepts.mdx or introduction.mdx (PAN-5472)\n- No edits to features/issue-pipeline.mdx (PAN-5468 adds the reverse link)\n- No docs.json changes beyond inserting features/planning (PAN-5483 owns the restructure)\n- No changes to docs/XBRIEF.md, docs/PIPELINE-GATES.md or docs/VBRIEF.md\n- No new screenshots and no invented UI\n- No description of the Plan dialog Shadow Engineering checkbox\n- No changelog.d entry\n- No new CLI reference page for pan plan or pan task (PAN-5478)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Page title is 'Planning: PRDs, xBRIEF plans and the plan critic' with a 145-character description",
+        "rationale": "The issue asks for a specific, searchable title; this names the three things people search for and fits the 50 to 160 character description rule."
+      },
+      {
+        "summary": "pan scope is documented by the code's behavior (status fields rewritten in place), not by its stale --help text; PAN-5487 filed to fix the help",
+        "rationale": "The issue says claims must match code and --help, and here they disagree. The code is what users get; the help fix is code, out of scope for a docs-only issue."
+      },
+      {
+        "summary": "Stale planning claims on the four linking pages are corrected, not only linked",
+        "rationale": "Linking from a page that contradicts the new page sends readers to two opposite answers; the corrections are limited to planning claims on those pages."
+      },
+      {
+        "summary": "features/issue-pipeline.mdx is not edited; PAN-5468 was asked in a comment to add the reverse link",
+        "rationale": "PAN-5468 runs later in lane A, so the file will not exist when this issue runs; editing it would also collide with that issue's work."
+      },
+      {
+        "summary": "docs.json: insert features/planning after features/issue-pipeline if present, else first in the Features group; on conflict take main's file and re-apply",
+        "rationale": "PAN-5483 restructures docs.json and PAN-5468 also inserts at the top of Features; a re-apply rule resolves any landing order deterministically."
+      },
+      {
+        "summary": "The Plan dialog section omits Shadow Engineering and steers users to the footer Stop (abort) and Done (accept), not the header Stop; PAN-5488 filed",
+        "rationale": "Shadow Engineering only writes a stub file and PAN-5472 is verifying it; the header Stop completes planning despite its label, so recommending it would mislead users."
+      },
+      {
+        "summary": "No screenshots",
+        "rationale": "No planning screenshot exists under images/, and the issue forbids inventing UI."
+      }
+    ],
+    "items": [
+      {
+        "id": "planning-page",
+        "title": "Write features/planning.mdx from the PRD fact sheet",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:25:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5469",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/planning.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const t=require('fs').readFileSync('features/planning.mdx','utf8');console.log(t.match(/^title:\\s*\\\"?(.*?)\\\"?$/m)[1]);console.log(t.match(/^description:\\s*\\\"?(.*?)\\\"?$/m)[1].length)\"",
+            "grep -cE '^## (What planning produces|Start planning|When to skip planning|The PRD draft|The xBRIEF plan|Finalize the plan|The plan critic|Work through the checklist with pan task|Plan integrity|Change lifecycle status with pan scope|Configuration|Get help)' features/planning.mdx",
+            "grep -nP '[\\x{2013}\\x{2014}]' features/planning.mdx",
+            "node --input-type=module -e \"import {findMdxProblems} from './scripts/lint-docs.js'; import {readFileSync} from 'node:fs'; console.log(findMdxProblems(readFileSync('features/planning.mdx','utf8')).length)\""
+          ],
+          "expected_outputs": [
+            "first node command prints 'Planning: PRDs, xBRIEF plans and the plan critic' then a number from 50 to 160",
+            "grep -cE prints 12",
+            "the U+2013/U+2014 grep prints nothing (exit 1)",
+            "findMdxProblems node command prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-7",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create features/planning.mdx exactly as PRD work item WI-1 specifies: frontmatter from D-1, the twelve H2 sections in the D-2 order, facts only from F-1 to F-46 (Plan dialog per F-8 to F-14, D-11 and D-12; pan scope per D-8), the two-item xBRIEF example, the finalize exit-code table from D-3, the Configuration YAML block, the outbound links listed in WI-1 step 6, and a Get help section linking the Discord and GitHub Issues. Follow the writing rules in D-10: no em or en dashes, &#36; for a literal dollar sign, &lt; before a digit."
+        },
+        "items": [
+          {
+            "id": "planning-page.ac1",
+            "title": "Given features/planning.mdx, when the first verify command runs, then it prints the title 'Planning: PRDs, xBRIEF plans and the plan critic' and a description length from 50 to 160",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planning-page.ac2",
+            "title": "The page contains the twelve H2 headings named in PRD D-2, so the heading grep prints 12",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planning-page.ac3",
+            "title": "The page contains the finalize exit codes 3, 4 and 5, the 20-line PRD minimum, the labels architecture, substrate-improvement and security, and the setting roles.plan.sub.critic.model with the statement that it has no default",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planning-page.ac4",
+            "title": "The U+2013/U+2014 grep prints nothing and findMdxProblems returns 0 problems for the page",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planning-page.ac5",
+            "title": "The page contains links to https://discord.gg/ZpHE2ZTv5P and https://github.com/eltmon/overdeck/issues and contains no image reference",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-nav-entry",
+        "title": "Add features/planning to the Features group in docs.json",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:25:03Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5469",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const s=JSON.stringify(require('./docs.json'));console.log(s.split('\\\"features/planning\\\"').length-1)\"",
+            "node -e \"const j=require('./docs.json');for(const t of j.navigation.tabs)for(const g of t.groups)if(g.group==='Features'){const p=g.pages;const i=p.indexOf('features/planning');const pi=p.indexOf('features/issue-pipeline');console.log(pi>=0?i===pi+1:i===0)}\"",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "first node command prints 1",
+            "second node command prints true",
+            "npm run lint:docs exits 0 and prints 'docs lint passed'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply PRD decision D-4 to docs.json: find the navigation group named Features, insert features/planning directly after features/issue-pipeline if that entry exists, otherwise as the first entry of that group, keep the existing two-space indentation, and change nothing else. On a rebase conflict in docs.json, take main's whole file and re-apply D-4."
+        },
+        "items": [
+          {
+            "id": "docs-nav-entry.ac1",
+            "title": "docs.json contains features/planning exactly once, so the first verify command prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-nav-entry.ac2",
+            "title": "Given the Features group, the position check prints true: features/planning sits right after features/issue-pipeline when present, else at index 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-nav-entry.ac3",
+            "title": "npm run lint:docs exits 0 and prints 'docs lint passed' with features/planning among the published pages",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workspace-commands-planning",
+        "title": "Replace stale planning sections in cli/workspace-commands.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:25:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5469",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/workspace-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -cE '\\.planning/|STATE\\.md|docs/prds/active|tmux kill-session -t planning-|Enabled \\(containers start automatically\\)' cli/workspace-commands.mdx",
+            "grep -c '/features/planning' cli/workspace-commands.mdx",
+            "git diff --merge-base origin/main -- cli/workspace-commands.mdx | grep -P '^\\+.*[\\x{2013}\\x{2014}]'"
+          ],
+          "expected_outputs": [
+            "first grep prints 0",
+            "second grep prints a number of at least 1",
+            "the added-line dash grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply PRD work item WI-3 to cli/workspace-commands.mdx: keep the Workspace Structure heading and replace everything under it with the .pan/ and .overdeck/ paragraph and Planning link, replace the body of Planning vs Work Agent Safeguard with the exact text in WI-3 step 2, and replace the Docker Integration 'Dashboard integration' block and the two example-workflow comment lines as WI-3 step 3 states. Change nothing else on the page."
+        },
+        "items": [
+          {
+            "id": "workspace-commands-planning.ac1",
+            "title": "The stale-claims grep prints 0: the page contains no .planning/, STATE.md, docs/prds/active, tmux kill-session -t planning- or 'Enabled (containers start automatically)' text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-commands-planning.ac2",
+            "title": "The page contains a link to /features/planning and states that the Start Docker containers checkbox is off by default",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-commands-planning.ac3",
+            "title": "The added-line dash grep prints nothing: no line this item adds contains U+2013 or U+2014",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "swarm-link",
+        "title": "Link the xBRIEF plan mention in features/swarm.mdx to the planning page",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-17T12:25:03Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5469",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/swarm.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '\\[xBRIEF plan\\](/features/planning)' features/swarm.mdx",
+            "git diff --stat --merge-base origin/main -- features/swarm.mdx",
+            "git diff --merge-base origin/main -- features/swarm.mdx | grep -P '^\\+.*[\\x{2013}\\x{2014}]'"
+          ],
+          "expected_outputs": [
+            "grep prints 1",
+            "diff stat shows 1 file changed, 1 insertion(+), 1 deletion(-)",
+            "the added-line dash grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In features/swarm.mdx, on the line starting 'A swarm fits when an issue's xBRIEF plan splits', turn the words 'xBRIEF plan' into the markdown link [xBRIEF plan](/features/planning) and replace the ' — ' in 'faster — there is nothing' on the same line with '; ', so the changed line has no em dash. Change nothing else in the file."
+        },
+        "items": [
+          {
+            "id": "swarm-link.ac1",
+            "title": "features/swarm.mdx contains '[xBRIEF plan](/features/planning)' exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-link.ac2",
+            "title": "git diff --stat --merge-base origin/main shows exactly one changed line (1 insertion, 1 deletion) in features/swarm.mdx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-link.ac3",
+            "title": "The added-line dash grep prints nothing: the changed line contains no U+2013 or U+2014",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "effort-link",
+        "title": "Link the Planning bullet in configuration/effort.mdx to the planning page",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-17T12:25:03Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5469",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/effort.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'See \\[Planning\\](/features/planning)' configuration/effort.mdx",
+            "git diff --merge-base origin/main -- configuration/effort.mdx | grep -P '^\\+.*[\\x{2013}\\x{2014}]'"
+          ],
+          "expected_outputs": [
+            "grep prints 1",
+            "the added-line dash grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In configuration/effort.mdx, at the end of the bullet that starts '- Planning' and mentions pan plan --effort, append the sentence 'See [Planning](/features/planning).' on the bullet's last line, without rewriting the existing bullet text."
+        },
+        "items": [
+          {
+            "id": "effort-link.ac1",
+            "title": "configuration/effort.mdx contains 'See [Planning](/features/planning)' exactly once, inside the Planning bullet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-link.ac2",
+            "title": "The added-line dash grep prints nothing: the appended text contains no U+2013 or U+2014",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "state-model-fix",
+        "title": "Correct the task-completion row and link the plan row in reference/state-model.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:25:03Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5469",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/state-model.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'dolt-backed' reference/state-model.mdx",
+            "grep -c '\\[Plan (xBRIEF spec)\\](/features/planning)' reference/state-model.mdx",
+            "grep -c '.pan/continues/' reference/state-model.mdx",
+            "git diff --merge-base origin/main -- reference/state-model.mdx | grep -P '^\\+.*[\\x{2013}\\x{2014}]'"
+          ],
+          "expected_outputs": [
+            "first grep prints 0",
+            "second grep prints 1",
+            "third grep prints a number of at least 1",
+            "the added-line dash grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In reference/state-model.mdx, table 'What lives where', replace the 'Task completion (tasks) | git (dolt-backed)' row with the row text given in PRD WI-4 step 3, and make the first cell of the 'Plan (xBRIEF spec)' row the link [Plan (xBRIEF spec)](/features/planning). In that same Plan row, replace 'git — `.pan/specs/`' with 'git: `.pan/specs/`' so neither changed row contains an em dash."
+        },
+        "items": [
+          {
+            "id": "state-model-fix.ac1",
+            "title": "reference/state-model.mdx contains no 'dolt-backed' text and its task-completion row names .pan/continues/ and Item: commit trailers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-model-fix.ac2",
+            "title": "reference/state-model.mdx contains '[Plan (xBRIEF spec)](/features/planning)' exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-model-fix.ac3",
+            "title": "The added-line dash grep prints nothing: neither changed table row contains U+2013 or U+2014",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "planning-page",
+        "to": "docs-nav-entry",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
