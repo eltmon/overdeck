@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5483",
   "created": "2026-11-17T13:01:33.028Z",
-  "updated": "2026-11-17T15:22:20.082Z",
+  "updated": "2026-11-17T15:24:29.875Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -246,9 +246,26 @@
       "doneAt": "2026-11-17T15:13:33.435Z"
     },
     "pr-mint-evidence": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5483",
-      "claimedAt": "2026-11-17T15:22:20.082Z"
+      "claimedAt": "2026-11-17T15:22:20.082Z",
+      "doneAt": "2026-11-17T15:24:29.874Z"
+    },
+    "pr-mint-evidence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T15:24:29.874Z"
+    },
+    "pr-mint-evidence.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T15:24:29.874Z"
+    },
+    "pr-mint-evidence.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T15:24:29.874Z"
+    },
+    "pr-mint-evidence.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T15:24:29.874Z"
     }
   }
 }
