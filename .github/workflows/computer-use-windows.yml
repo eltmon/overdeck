@@ -1,0 +1,104 @@
+# PAN-5462: does the vendored Windows computer-use helper
+# (native/computer-use-windows/runtime.ps1, ported from Orca) drive a real
+# Windows desktop?
+#
+# native  runs runtime.ps1 natively on windows-2022 against Notepad, one
+#         powershell.exe per operation, the way Overdeck runs it from WSL2.
+#         The handshake must succeed; the Notepad tree and screenshot are a
+#         soft check, since the hosted desktop may not expose them. Each
+#         call's wall-clock time goes to the job summary (PRD D-3).
+#
+# Manual and path-triggered only; not part of ci.yml and not a required check.
+# PRD: .pan/drafts/pan-5462.md (WI-7).
+name: computer-use-windows
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - native/computer-use-windows/**
+      - src/lib/computer-use/**
+      - .github/workflows/computer-use-windows.yml
+  pull_request:
+    paths:
+      - native/computer-use-windows/**
+      - src/lib/computer-use/**
+      - .github/workflows/computer-use-windows.yml
+
+permissions:
+  contents: read
+
+# PAN-5084: this check is not a real install; never mint an install id for it.
+env:
+  OVERDECK_TELEMETRY: '0'
+
+jobs:
+  native:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start Notepad
+        shell: pwsh
+        run: |
+          Start-Process notepad.exe
+          Start-Sleep -Seconds 3
+
+      - name: Run runtime.ps1 natively
+        shell: pwsh
+        run: |
+          $helper = Join-Path $env:GITHUB_WORKSPACE 'native\computer-use-windows\runtime.ps1'
+          $ops = [ordered]@{
+            handshake     = '{"tool":"handshake"}'
+            list_apps     = '{"tool":"list_apps"}'
+            get_app_state = '{"tool":"get_app_state","app":"notepad"}'
+          }
+          $summary = @('## computer-use-windows: native runtime.ps1', '', '| op | seconds | ok |', '| --- | --- | --- |')
+          $responses = @{}
+          foreach ($name in $ops.Keys) {
+            $opFile = Join-Path $env:RUNNER_TEMP "$name.json"
+            Set-Content -Path $opFile -Value $ops[$name] -Encoding utf8NoBOM -NoNewline
+            $elapsed = Measure-Command {
+              $script:raw = & powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $helper $opFile 2>&1
+            }
+            $line = @($script:raw | ForEach-Object { "$_" } | Where-Object { $_.TrimStart().StartsWith('{') }) | Select-Object -Last 1
+            $response = $null
+            if ($line) {
+              try { $response = $line | ConvertFrom-Json } catch { $response = $null }
+            }
+            $responses[$name] = [pscustomobject]@{ response = $response; raw = ($script:raw | Out-String) }
+            $ok = if ($null -ne $response) { [string]$response.ok } else { 'no JSON' }
+            $seconds = [math]::Round($elapsed.TotalSeconds, 2)
+            Write-Host "$name took $seconds s, ok=$ok"
+            $summary += "| $name | $seconds | $ok |"
+          }
+
+          $failed = $false
+          $handshake = $responses['handshake'].response
+          if ($null -eq $handshake -or $handshake.ok -ne $true -or $handshake.capabilities.platform -ne 'win32') {
+            Write-Host 'handshake failed; raw output:'
+            Write-Host $responses['handshake'].raw
+            $summary += '', '**handshake failed:** expected ok:true and capabilities.platform == win32.'
+            $failed = $true
+          }
+
+          # Soft check: the hosted runner's desktop may not expose Notepad's tree or a screenshot.
+          $state = $responses['get_app_state'].response
+          $snapshot = if ($null -ne $state) { $state.snapshot } else { $null }
+          $treeOk = $null -ne $snapshot -and @($snapshot.treeLines).Count -gt 0
+          $shotOk = $null -ne $snapshot -and $null -ne $snapshot.screenshotPngBase64
+          if ($null -eq $state -or $state.ok -ne $true -or -not $treeOk -or -not $shotOk) {
+            $raw = $responses['get_app_state'].raw
+            if ($raw.Length -gt 4000) { $raw = $raw.Substring(0, 4000) + ' ...(truncated)' }
+            Write-Host 'get_app_state soft check failed; response:'
+            Write-Host $raw
+            $summary += '', 'Notepad tree/screenshot not available on the hosted desktop.', '', '```', $raw.Trim(), '```'
+          } else {
+            $summary += '', "get_app_state: $(@($snapshot.treeLines).Count) tree lines, screenshot $($snapshot.screenshotWidth)x$($snapshot.screenshotHeight)."
+          }
+
+          $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8NoBOM
+          if ($failed) { exit 1 }
+          # The runner ends a pwsh step with exit $LASTEXITCODE; the soft check must not inherit a helper's exit code.
+          exit 0
