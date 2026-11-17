@@ -4,17 +4,17 @@
     "created": "2026-11-17T11:57:06Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5462: Computer use on Windows (WSL2): drive the Windows desktop with Orca's PowerShell helper",
-    "updated": "2026-11-17T12:02:49.178Z"
+    "updated": "2026-11-17T12:53:43.414Z"
   },
   "plan": {
     "id": "pan-5462",
     "title": "Computer use on Windows (WSL2): drive the Windows desktop with Orca's PowerShell helper",
-    "status": "proposed",
+    "status": "running",
     "uid": "139c03a3-c5e5-40dc-8e2f-e4eb26444cd0",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-17T11:57:06Z",
-    "updated": "2026-11-17T12:02:49.178Z",
+    "updated": "2026-11-17T12:53:43.414Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5462",
@@ -974,5 +974,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
