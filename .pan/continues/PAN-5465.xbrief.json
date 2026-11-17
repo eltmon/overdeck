@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5465",
+  "created": "2026-11-17T12:56:05.449Z",
+  "updated": "2026-11-17T12:56:05.449Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "empty-mount": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5465",
+      "claimedAt": "2026-11-17T12:56:05.449Z"
+    }
+  }
+}
