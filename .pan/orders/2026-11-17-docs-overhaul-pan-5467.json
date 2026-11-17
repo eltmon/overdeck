@@ -1,7 +1,7 @@
 {
   "id": "2026-11-17-docs-overhaul-pan-5467",
   "name": "Docs overhaul (PAN-5467)",
-  "status": "draft",
+  "status": "ready",
   "settings": {
     "laneAConcurrency": 1,
     "posture": "open"
@@ -153,5 +153,5 @@
     }
   ],
   "createdAt": "2026-11-17T12:08:16.980Z",
-  "updatedAt": "2026-11-17T12:09:31.628Z"
+  "updatedAt": "2026-11-17T12:10:03.336Z"
 }
