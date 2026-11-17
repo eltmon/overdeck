@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5462",
   "created": "2026-11-17T12:53:58.478Z",
-  "updated": "2026-11-17T19:11:35.197Z",
+  "updated": "2026-11-17T19:11:36.354Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -53,7 +53,7 @@
       "status": "pending"
     },
     "skill-and-help-text": {
-      "status": "blocked"
+      "status": "pending"
     },
     "config-docs-changelog": {
       "status": "blocked"
