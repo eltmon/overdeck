@@ -694,5 +694,11 @@
     "upstream": "orca",
     "path": "native/computer-use-macos/Tests/OrcaComputerUseMacOSTests/TextInsertionReadbackTests.swift",
     "commit": "c6b9ac9549b"
+  },
+  {
+    "local": "scripts/build-computer-macos.mjs",
+    "upstream": "orca",
+    "path": "config/scripts/native-build/macos/build-computer-macos.mjs",
+    "commit": "c6b9ac9549b"
   }
 ]
