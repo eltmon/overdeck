@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5462",
+  "created": "2026-11-17T12:53:58.478Z",
+  "updated": "2026-11-17T12:53:58.478Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "vendor-windows-helper": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5462",
+      "claimedAt": "2026-11-17T12:53:58.478Z"
+    }
+  }
+}
