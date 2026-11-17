@@ -4,17 +4,17 @@
     "created": "2026-11-17T12:42:47Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5465: Add skill packs to a running conversation (hot-load with /reload-plugins, resume fallback)",
-    "updated": "2026-11-17T12:53:16.649Z"
+    "updated": "2026-11-17T12:55:59.575Z"
   },
   "plan": {
     "id": "pan-5465",
     "title": "Add skill packs to a running conversation (hot-load with /reload-plugins, resume fallback)",
-    "status": "proposed",
+    "status": "running",
     "uid": "f4020371-2226-46c0-b96a-3a6b23b4cfcc",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-17T12:42:47Z",
-    "updated": "2026-11-17T12:53:16.649Z",
+    "updated": "2026-11-17T12:55:59.575Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5465",
@@ -866,5 +866,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
