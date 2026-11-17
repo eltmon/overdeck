@@ -1,6 +1,6 @@
 // Ported from Orca (MIT, Copyright (c) 2026 Lovecast Inc.)
 // upstream: native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift @ c6b9ac9549b
-// modified for Overdeck: same-uid peer trust replaces Orca bundle-id check
+// modified for Overdeck: same-uid peer trust replaces Orca bundle-id check; idle exit replaces exit on last disconnect
 import AppKit
 import ApplicationServices
 import CoreGraphics
@@ -3506,11 +3506,16 @@ private enum KeyMap {
 
 private final class AgentRuntime: NSObject, NSApplicationDelegate {
     private static let unclaimedSessionDeadline: TimeInterval = 30
+    // Overdeck: the daemon is shared by many `pan computer` processes, so it
+    // exits after 10 minutes without a request instead of when the last
+    // connection closes (PAN-5463 D-3).
+    private static let idleExitInterval: TimeInterval = 600
 
     private let socketPath: String
     private let token: String?
     private var listener: SocketListener?
     private var unclaimedSessionTimeout: DispatchWorkItem?
+    private var idleTimeout: DispatchWorkItem?
 
     init(socketPath: String, token: String?) {
         self.socketPath = socketPath
@@ -3530,9 +3535,9 @@ private final class AgentRuntime: NSObject, NSApplicationDelegate {
                 onSessionClaimed: {
                     timeout.cancel()
                 },
-                onSessionClosed: {
-                    DispatchQueue.main.async {
-                        NSApp.terminate(nil)
+                onRequestHandled: { [weak self] in
+                    Task { @MainActor in
+                        self?.rescheduleIdleTimeout()
                     }
                 }
             )
@@ -3551,7 +3556,19 @@ private final class AgentRuntime: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         unclaimedSessionTimeout?.cancel()
         unclaimedSessionTimeout = nil
+        idleTimeout?.cancel()
+        idleTimeout = nil
         listener?.stop()
+    }
+
+    private func rescheduleIdleTimeout() {
+        idleTimeout?.cancel()
+        let timeout = DispatchWorkItem {
+            fputs("computer-use agent received no request for \(Int(Self.idleExitInterval)) seconds\n", stderr)
+            NSApp.terminate(nil)
+        }
+        idleTimeout = timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.idleExitInterval, execute: timeout)
     }
 }
 
@@ -4535,7 +4552,7 @@ private final class SocketListener: @unchecked Sendable {
     private let socketPath: String
     private let token: String?
     private let onSessionClaimed: () -> Void
-    private let onSessionClosed: () -> Void
+    private let onRequestHandled: () -> Void
     private let provider = Provider()
     private let providerLock = NSLock()
     private let sessionLock = NSLock()
@@ -4548,12 +4565,12 @@ private final class SocketListener: @unchecked Sendable {
         socketPath: String,
         token: String?,
         onSessionClaimed: @escaping () -> Void,
-        onSessionClosed: @escaping () -> Void
+        onRequestHandled: @escaping () -> Void
     ) throws {
         self.socketPath = socketPath
         self.token = token
         self.onSessionClaimed = onSessionClaimed
-        self.onSessionClosed = onSessionClosed
+        self.onRequestHandled = onRequestHandled
         try bindSocket()
     }
 
@@ -4707,17 +4724,17 @@ private final class SocketListener: @unchecked Sendable {
                 authorizedPeer: authorizedPeer
             )
             writeJSON(response, to: fd)
+            if registeredSession {
+                onRequestHandled()
+            }
             return true
         }
     }
 
     private func disconnectSession(_ connectionID: AgentSessionConnectionID) {
         sessionLock.lock()
-        let shouldTerminate = sessionOwnership.disconnect(connectionID)
+        sessionOwnership.disconnect(connectionID)
         sessionLock.unlock()
-        if shouldTerminate {
-            onSessionClosed()
-        }
     }
 }
 

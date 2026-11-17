@@ -34,6 +34,16 @@ Overdeck changes only these:
   `PeerCredentialTrustTests.swift`). The agent token check is unchanged.
   `TrustedOrcaApplication.swift` and the `ps`-based process lookups are
   deleted.
+- Daemon lifetime (`main.swift` `AgentRuntime` and `SocketListener`,
+  `AgentSessionOwnership.swift`): Orca's helper exited when its last
+  authenticated connection closed and then refused every new connection.
+  Overdeck shares one daemon across many short `pan computer` processes, so
+  the helper now exits after 600 seconds without a handled request (the timer
+  restarts on every request), on `terminate`, or when nothing claims it within
+  30 seconds of launch. `AgentSessionOwnership` has no session latch: the first
+  authenticated connection is `.claimed` and every later one is `.retained`,
+  even after all connections closed (tested by the Overdeck-authored
+  `AgentSessionOwnershipTests.swift`).
 
 ## Build and test
 
