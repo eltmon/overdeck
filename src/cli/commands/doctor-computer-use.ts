@@ -43,8 +43,13 @@ export async function checkComputerUse(options: CheckComputerUseOptions): Promis
 
   const deps = options.deps ?? {};
   const detectPlatform = deps.detectPlatform ?? detectPlatformReal;
-  if (detectPlatform({ platform: options.platform ?? process.platform }) !== 'linux') {
-    return [{ name: NAME, status: 'warn', message: 'Enabled, but computer use supports Linux only' }];
+  const platformId = detectPlatform({ platform: options.platform ?? process.platform });
+  if (platformId === 'darwin') {
+    // The macOS checks launch the helper app; Settings → Computer Use runs them (PAN-5463).
+    return [{ name: NAME, status: 'ok', message: 'Enabled; on macOS, Settings → Computer Use checks the helper and permissions' }];
+  }
+  if (platformId !== 'linux') {
+    return [{ name: NAME, status: 'warn', message: 'Enabled, but computer use supports Linux and macOS only' }];
   }
 
   const readinessDeps: LinuxReadinessDeps = {};

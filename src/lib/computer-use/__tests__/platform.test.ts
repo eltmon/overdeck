@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { detectPlatform, providerFor } from '../platform.js';
+import { darwinProvider } from '../providers/darwin.js';
 import { linuxProvider } from '../providers/linux.js';
 
 const noOsRelease = () => null;
@@ -45,7 +46,12 @@ describe('providerFor', () => {
     expect(providerFor('linux')).toBe(linuxProvider);
   });
 
-  it.each(['wsl', 'darwin', 'unsupported'] as const)('returns null for %s', (id) => {
+  it('returns the darwin provider with mac shortcut rules for darwin (PAN-5463)', () => {
+    expect(providerFor('darwin')).toBe(darwinProvider);
+    expect(providerFor('darwin')?.blockedKeyPlatform).toBe('mac');
+  });
+
+  it.each(['wsl', 'unsupported'] as const)('returns null for %s', (id) => {
     expect(providerFor(id)).toBeNull();
   });
 });
