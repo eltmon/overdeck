@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5483",
   "created": "2026-11-17T13:01:33.028Z",
-  "updated": "2026-11-17T15:24:29.875Z",
+  "updated": "2026-11-17T15:34:24.054Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -266,6 +266,10 @@
     "pr-mint-evidence.ac4": {
       "status": "completed",
       "doneAt": "2026-11-17T15:24:29.874Z"
+    },
+    "docs-json-navigation.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T15:34:24.054Z"
     }
   }
 }
