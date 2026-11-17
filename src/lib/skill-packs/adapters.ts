@@ -51,6 +51,8 @@ export interface PackCapabilities {
   requiresCli: string[];
   /** True when the pack's runtime is mounted and its executables run (gstack). */
   runtime?: boolean;
+  /** Git LFS pointer files inside included skill dirs (PAN-5464); extraction never fetches their content. Absent when 0. */
+  lfsObjects?: number;
 }
 
 export interface PackManifest {
@@ -368,6 +370,38 @@ async function listExecutables(root: string, skillDir: string, skipTopLevel: Rea
   return walk(skillDir);
 }
 
+const LFS_POINTER_FIRST_LINE = 'version https://git-lfs.github.com/spec/v1';
+const LFS_POINTER_MAX_BYTES = 1024;
+
+/**
+ * Git LFS pointer files at `rel` under `root` (PAN-5464): regular files of at most 1024 bytes whose
+ * first line is the LFS spec line. `rel` may name a file, which is checked directly, or a dir, which is walked.
+ */
+export async function countLfsPointers(root: string, rel: string): Promise<number> {
+  const check = async (path: string): Promise<number> => {
+    let stats;
+    try {
+      stats = await limitFs(() => lstat(join(root, path)));
+    } catch {
+      return 0;
+    }
+    if (stats.isDirectory()) {
+      let dirents;
+      try {
+        dirents = await limitFs(() => readdir(join(root, path), { withFileTypes: true }));
+      } catch {
+        return 0;
+      }
+      const counts = await Promise.all(dirents.map((dirent) => check(posix.join(path, dirent.name))));
+      return counts.reduce((sum, count) => sum + count, 0);
+    }
+    if (!stats.isFile() || stats.size > LFS_POINTER_MAX_BYTES) return 0;
+    const text = await limitFs(() => readTextOrNull(join(root, path)));
+    return text?.split('\n', 1)[0]?.trim() === LFS_POINTER_FIRST_LINE ? 1 : 0;
+  };
+  return check(rel);
+}
+
 const MCP_SERVER_NAME_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 /** Parsed JSON's `mcpServers` key as an object, or null when the text is unreadable, invalid, or lacks one. */
@@ -514,6 +548,7 @@ export async function readPackManifest(
   const executables: string[] = [];
   const contents = await Promise.all(skillDirs.map((dir) => limitFs(() => readTextOrNull(join(base, dir, 'SKILL.md')))));
   const executableDirs: string[] = [];
+  const includedDirs: string[] = [];
   skillDirs.forEach((dir, index) => {
     const content = contents[index] ?? null;
     if (content === null) return;
@@ -529,6 +564,7 @@ export async function readPackManifest(
     seen.add(name);
     const repoDir = prefix ? posix.join(prefix, dir) : dir;
     skills.push({ name, dir: repoDir, description: frontmatter.description, optIn: optIn.has(name) });
+    includedDirs.push(dir);
     if (!gstack) executableDirs.push(dir);
   });
   for (const dirExecutables of await Promise.all(executableDirs.map((dir) => listExecutables(base, dir)))) {
@@ -539,6 +575,8 @@ export async function readPackManifest(
     const runtimeExecutables = await listExecutables(base, '', RUNTIME_SKIP_DIRS);
     executables.push(...(prefix ? runtimeExecutables.map((e) => posix.join(prefix, e)) : runtimeExecutables));
   }
+
+  const lfsObjects = (await Promise.all(includedDirs.map((dir) => countLfsPointers(base, dir)))).reduce((sum, n) => sum + n, 0);
 
   // Deft always carries agent hooks, an AGENTS.md section, and .githooks, and its skills call the directive CLI.
   const capabilities: PackCapabilities = {
@@ -553,6 +591,7 @@ export async function readPackManifest(
     projectMutatingSkills: skills.filter((skill) => skill.optIn).map((skill) => skill.name),
     requiresCli: deft ? ['directive'] : gstack ? ['bun'] : [],
     ...(gstack ? { runtime: true } : {}),
+    ...(lfsObjects > 0 ? { lfsObjects } : {}),
   };
   const pluginName = typeof plugin?.['name'] === 'string' ? plugin['name'] : null;
   const manifest: PackManifest = {
@@ -578,6 +617,7 @@ export function notAppliedLabels(capabilities: PackCapabilities): string[] {
   if (capabilities.executables.length > 0 && !capabilities.runtime) {
     labels.push(`executables (${capabilities.executables.length})`);
   }
+  if (capabilities.lfsObjects) labels.push(`LFS objects (${capabilities.lfsObjects})`);
   if (capabilities.projectMutatingSkills.length > 0) {
     labels.push(`project-mutating skills (${capabilities.projectMutatingSkills.length})`);
   }

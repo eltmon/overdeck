@@ -328,6 +328,30 @@ describe('plain adapter', () => {
   });
 });
 
+describe('LFS pointer count (PAN-5464)', () => {
+  const POINTER = 'version https://git-lfs.github.com/spec/v1\noid sha256:' + '0'.repeat(64) + '\nsize 3\n';
+
+  it('reports pointer files inside included skill dirs under Not applied', async () => {
+    const root = fixture({
+      'skills/a/SKILL.md': skillMd('a', 'A.'),
+      'skills/a/assets/clip.mp4': POINTER,
+      'skills/a/assets/real.txt': 'not a pointer\n',
+      'skills/a/big.txt': `${POINTER}${'x'.repeat(2048)}`,
+      'other/clip.mp4': POINTER,
+    });
+    const manifest = await readPackManifest(root, 'plain');
+    expect(manifest.capabilities.lfsObjects).toBe(1);
+    expect(notAppliedLabels(manifest.capabilities)).toContain('LFS objects (1)');
+  });
+
+  it('leaves lfsObjects unset and adds no label without pointer files', async () => {
+    const root = fixture({ 'skills/a/SKILL.md': skillMd('a', 'A.'), 'skills/a/notes.txt': 'plain\n' });
+    const manifest = await readPackManifest(root, 'plain');
+    expect(manifest.capabilities.lfsObjects).toBeUndefined();
+    expect(notAppliedLabels(manifest.capabilities).some((label) => label.startsWith('LFS objects'))).toBe(false);
+  });
+});
+
 describe('license detection by full name (PAN-5464)', () => {
   it.each([
     ['                    GNU AFFERO GENERAL PUBLIC LICENSE\n                       Version 3\n', 'AGPL-3.0'],
