@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5462",
   "created": "2026-11-17T12:53:58.478Z",
-  "updated": "2026-11-17T19:11:43.217Z",
+  "updated": "2026-11-17T19:18:51.969Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,9 +32,10 @@
       "doneAt": "2026-11-17T12:55:21.213Z"
     },
     "wsl-bridge": {
-      "status": "pending",
+      "status": "completed",
       "claimedBy": "agent-pan-5462",
-      "claimedAt": "2026-11-17T19:11:43.217Z"
+      "claimedAt": "2026-11-17T19:11:43.217Z",
+      "doneAt": "2026-11-17T19:18:51.968Z"
     },
     "wsl-readiness": {
       "status": "pending"
@@ -82,6 +83,30 @@
     "ci-windows-native.ac4": {
       "status": "completed",
       "doneAt": "2026-11-17T12:58:35.489Z"
+    },
+    "wsl-bridge.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:51.968Z"
+    },
+    "wsl-bridge.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:51.968Z"
+    },
+    "wsl-bridge.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:51.968Z"
+    },
+    "wsl-bridge.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:51.968Z"
+    },
+    "wsl-bridge.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:51.968Z"
+    },
+    "wsl-bridge.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:51.968Z"
     }
   }
 }
