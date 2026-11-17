@@ -37,6 +37,10 @@ Changes apply at the next launch; a running agent keeps the skills it launched w
 | `deft` | `deftai/directive` | fork `eltmon/directive`, `--ref <ref>` (default branch `master`) | `deft-readonly` | 7 / 0 | No | host notice in every mounted skill |
 | `sageox` | `sageox/ox` | fork `eltmon/ox` at `0e6c7e2` (default ref, branch `overdeck/host-managed-v0.25.0`) | `plain`, skills root `extensions/skills` | 17 / 9 | Overdeck builds `ox` (and the Claude Code and Codex adapters) from the pinned commit; Overdeck-added hooks run it | needs Go; Claude Code and Codex; uploads are a second opt-in |
 | `atlassian` | `atlassian/atlassian-mcp-server` | upstream, `3be5562` (default ref) | `claude-plugin` | 3 / 4 | No | Applies its `atlassian` MCP server (consented); `skills/v1` excluded |
+| `remotion` | `remotion-dev/skills` | fork `eltmon/remotion-skills` at `3e20ac7` (default ref) | `plain` | 13 / 0 | No | no license file in the repo |
+| `hyperframes` | `heygen-com/hyperframes` | fork `eltmon/hyperframes` at `34f98e6` (default ref) | `claude-plugin` | 9 / 0 | No. 6 scripts are copied, never run by Overdeck | Apache-2.0; extracts only `skills/` and `plugin.json`; LFS objects skipped |
+| `openmontage` | `OpenMontageInc/OpenMontage` | fork `eltmon/OpenMontage` at `2e003e6` (default ref) | `plain`, skills root `.agents/skills` | 38 / 0 | No | AGPL-3.0; 54 skills excluded, see [Video production](#video-production-remotion-hyperframes-openmontage-video-use) |
+| `video-use` | `browser-use/video-use` | fork `eltmon/video-use` at `43cfc56` (default ref) | `plain` + root skill | 2 / 0 | Helpers run through `uv` when you invoke the skill | MIT; needs ffmpeg, uv and `ELEVENLABS_API_KEY` |
 | any git repo (example `impeccable`) | `pbakaus/impeccable` | the url you pass, `--ref skill-v4.7.0` | detected: `claude-plugin` (has `.claude-plugin/plugin.json`), else `plain` | 1 / 0 | No | `pan skills pack add impeccable https://github.com/pbakaus/impeccable --ref skill-v4.7.0` |
 
 Counts are at the commit in the Source column. The add and update preview shows the counts for your commit. Each pack has its own section under [Packs](#packs).
@@ -80,9 +84,35 @@ pan handoff self --pack mattpocock "<focus>"         # turn on every non-opt-in 
 pan handoff self --skill mattpocock/grilling "<focus>"  # turn on one pack skill
 ```
 
+`pan handoff self --group video "<focus>"` does the same for every member pack of a [pack group](#pack-groups) that is added and cached, and prints `skipped <id>: not added (pan skills pack add --group video)` for each member that is not.
+
 `--pack` is a snapshot taken at creation: it writes one explicit `on` value per non-opt-in skill the pack has at that moment. A skill a later `pan skills pack update` adds to the pack is not in that snapshot, and falls back to the normal chain (pack toggles, then off).
 
 Conversation pack values apply only to Claude Code and Codex. Pi stores the values on the conversation row like any other harness, but a Pi launch never reads them.
+
+### Pack groups
+
+A **pack group** is a name for a list of packs, so one command acts on all of them. Overdeck ships one built-in group, `video` (`remotion`, `hyperframes`, `openmontage`, `video-use`). A group has no state of its own: it is not a pack, has no registry entry and no toggle, and `pan skills list` does not show it. Each command expands the group to its member packs when it runs, and the member packs carry all the state.
+
+```bash
+pan skills pack add --group video                         # the add flow for each member, in order
+pan skills set --group video on --project myapp           # set each member's pack toggle
+pan handoff self --group video "<focus>"                  # one conversation, every cached member
+pan skills pack list                                      # lists the groups after the packs
+```
+
+`pan skills pack add --group` prints `<id>: already added` for a member that is registered and continues; it exits 1 at the end when any member was declined or failed. `pan skills set --group` writes nothing and exits 1 when any member is not added yet (`pack <id> is not added; run pan skills pack add --group <name>`). `--group` and `--pack` cannot be combined.
+
+Define your own groups, or replace a built-in, in `~/.overdeck/config.yaml`:
+
+```yaml
+skills:
+  pack_groups:
+    animation: [remotion, hyperframes]   # a new group
+    video: [remotion, video-use]         # replaces the built-in video group
+```
+
+See `skills.pack_groups` in [Skill settings](/configuration/skills) for the format.
 
 ## Trust and safety
 
@@ -107,11 +137,13 @@ Adding a pack trusts this commit and enables nothing. Turn it on with: pan skill
 
 Adding a pack trusts the resolved commit and turns nothing on. In a terminal, Overdeck asks `Trust this commit? [y/N]`. Without a terminal, pass `--yes`; otherwise nothing is written. The pack id must match `[a-z0-9][a-z0-9-]*` and cannot be a core skill name. Overdeck picks the adapter itself (the known-pack default, else `claude-plugin` when the repo has `.claude-plugin/plugin.json`, otherwise `plain`); pass `--adapter plain|claude-plugin|deft-readonly|gstack-runtime` to choose. See [Authoring a skill pack](/guides/skill-pack-authoring) for what makes a repository a valid pack. A repository cannot register a pack by committing a file; only `pan skills pack add` can.
 
-For a known pack (`mattpocock`, `pstack`, `gstack`, `deft`, `sageox`, `atlassian`) the url is optional. `pstack`, `sageox` and `atlassian` also have a default ref, so `pan skills pack add pstack`, `pan skills pack add sageox` and `pan skills pack add atlassian` are enough; the others need `--ref`.
+For a known pack (`mattpocock`, `pstack`, `gstack`, `deft`, `sageox`, `atlassian`, `remotion`, `hyperframes`, `openmontage`, `video-use`) the url is optional. `pstack`, `sageox`, `atlassian` and the four video packs also have a default ref, so for example `pan skills pack add pstack` is enough; the others need `--ref`.
 
 ### What is not applied
 
 Overdeck mounts skill directories only. If a pack also carries hooks, commands, agents, context injection, git hooks, or scripts, the preview and the dashboard list them as **Not applied**, and none of them reach the agent. Scripts inside a skill directory are copied with the skill but never run by Overdeck.
+
+Extraction never downloads Git LFS objects. A skill directory that holds LFS pointer files shows `LFS objects (<n>)` under **Not applied**: the mounted skill gets the small pointer text, not the file content.
 
 MCP servers are the one exception: a `claude-plugin` pack's `https` `type: "http"` servers reach agents once you confirm an add or update preview that lists them (consent, stored as `mcp: true` on the registry entry). A `stdio` or `sse` server is never applied, whatever the adapter. See [Pack MCP servers](/configuration/mcp#pack-mcp-servers).
 
@@ -179,6 +211,20 @@ Never run `gh repo sync --force` on `eltmon/gstack` or `eltmon/ox`; it hard-rese
 Any url works, and pinning already protects you: the trusted commit does not move until you confirm an update. Registering `mattpocock` from `https://github.com/mattpocock/skills` or `pstack` from `https://github.com/cursor/plugins` works the same way. gstack and SageOx need their forks: upstream gstack commits fail the pack-mode check, and the `sageox` pack needs the fork's host-managed mode, which Overdeck builds into its own `ox`.
 
 ## Packs
+
+### Video production (remotion, hyperframes, openmontage, video-use)
+
+Four packs, one per upstream repository, make up the built-in `video` [pack group](#pack-groups). Each comes from an `eltmon/` fork pinned to one commit, and each keeps its own license.
+
+```bash
+pan skills pack add --group video                 # preview and trust each of the four packs
+pan skills set --group video on --project <key>   # turn all four on for one project
+```
+
+- **`remotion`**: the official Remotion skills. The repo has no license file, and Remotion itself needs a company license for some uses (the `remotion-license` skill explains when).
+- **`hyperframes`**: HeyGen's HyperFrames skills (HTML rendered to video), Apache-2.0. Overdeck extracts only `skills/` and `plugin.json`, because the repository also holds hundreds of megabytes of Git LFS test fixtures. `media-use` and `figma` call the HeyGen or Figma APIs only with keys you set.
+- **`openmontage`**: the 38 OpenMontage skills that work outside an OpenMontage checkout, AGPL-3.0. The pack excludes 54 skills: duplicates of the HyperFrames, Remotion, GSAP and three.js skills and of generic web skills, OpenMontage's own maintenance skills, and skills that run OpenMontage's code (`python tools/…`, `remotion-composer/…`). To use OpenMontage's full pipeline, open a conversation inside an OpenMontage checkout: the repository's own `.agents/skills` loads there. The provider skills call paid generation APIs (ElevenLabs, HeyGen, Kling, Seedance and others) only with keys you set.
+- **`video-use`**: conversation-driven video editing, MIT. Its main skill is the repository's root `SKILL.md`, mounted with its `helpers/`, `install.md` and `pyproject.toml`; `manim-video` is the second skill. It needs `ffmpeg` and `uv` on `PATH` and `ELEVENLABS_API_KEY` in the environment, and it sends audio to ElevenLabs Scribe for transcription. The mounted `SKILL.md` carries an Overdeck host notice: read the key from the environment (a managed agent asks with `request_secret` when it is missing, and never writes a `.env` file), run helpers with `uv run --no-project --with-requirements <skill dir>/requirements.txt python <skill dir>/helpers/<script>.py`, and never write into the skill directory. Overdeck writes that `requirements.txt` from `pyproject.toml` when it builds the mount.
 
 ### Matt Pocock's skills from a fork
 
@@ -719,6 +765,7 @@ In the dashboard, packs appear below the skill list on the Skills page, in proje
 | Launch prints `[launcher] WARNING: skill pack <id> not cached; run pan skills pack sync <id>` and the pack is missing | The trusted commit is not in the cache; launches never fetch | `pan skills pack sync <id>`, then relaunch |
 | A pack skill is not visible to the agent | The pack or skill is off at the level that decides, the skill is opt-in, the harness is not Claude Code or Codex, or the launch is remote (Fly) | `pan skills list --project <key> --issue <id>`; turn on the pack (`--pack`) or the opt-in skill (`<pack>/<skill>`); packs apply only to Overdeck-managed Claude Code and Codex launches |
 | A running agent did not pick up a change | Packs resolve at launch | Restart or resume the agent; the next launch applies it |
+| Skills appear twice (`video-edit` and `openmontage:video-edit`) | A copy of the skill is also installed in `~/.claude/skills` (for example a symlink into an OpenMontage clone, or an `npx skills` install), and that copy loads in every session | Remove the global copy, or keep the pack off |
 | The dashboard shows `also installed as a Claude plugin — skills will appear twice` | Claude Code also has the same upstream plugin installed | Uninstall the Claude Code plugin, or keep the pack off |
 | Launch prints `[launcher] WARNING: gstack browser runtime not built; run pan skills pack sync gstack` | Browser consent is recorded but the runtime for the trusted commit is missing | `pan skills pack sync gstack` |
 | `pack gstack needs bun on PATH (https://bun.sh)` | `bun` is not installed or not on `PATH` | Install bun, then repeat the command |
