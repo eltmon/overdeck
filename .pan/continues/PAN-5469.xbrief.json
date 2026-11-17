@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5469",
   "created": "2026-11-17T12:42:57.816Z",
-  "updated": "2026-11-17T12:57:16.757Z",
+  "updated": "2026-11-17T12:57:21.241Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,6 +84,11 @@
     "effort-link.ac2": {
       "status": "completed",
       "doneAt": "2026-11-17T12:57:16.756Z"
+    },
+    "state-model-fix": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5469",
+      "claimedAt": "2026-11-17T12:57:21.240Z"
     }
   }
 }
