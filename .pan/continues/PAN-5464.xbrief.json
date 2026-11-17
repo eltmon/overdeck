@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5464",
   "created": "2026-11-17T12:41:33.533Z",
-  "updated": "2026-11-17T12:41:33.534Z",
+  "updated": "2026-11-17T12:56:06.951Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,18 @@
   "sessionHistory": [],
   "items": {
     "lfs-skip": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5464",
-      "claimedAt": "2026-11-17T12:41:33.533Z"
+      "claimedAt": "2026-11-17T12:41:33.533Z",
+      "doneAt": "2026-11-17T12:56:06.951Z"
+    },
+    "lfs-skip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:56:06.951Z"
+    },
+    "lfs-skip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:56:06.951Z"
     }
   }
 }
