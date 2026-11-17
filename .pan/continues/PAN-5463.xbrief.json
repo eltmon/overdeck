@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5463",
   "created": "2026-11-17T12:31:36.411Z",
-  "updated": "2026-11-17T12:37:49.524Z",
+  "updated": "2026-11-17T12:37:51.185Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,6 +64,9 @@
       "status": "blocked"
     },
     "wi4-ci-smoke": {
+      "status": "blocked"
+    },
+    "wi5-route": {
       "status": "blocked"
     }
   }
