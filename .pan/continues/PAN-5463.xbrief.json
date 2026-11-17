@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5463",
   "created": "2026-11-17T12:31:36.411Z",
-  "updated": "2026-11-17T19:12:19.783Z",
+  "updated": "2026-11-17T19:12:21.087Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -49,7 +49,7 @@
       "status": "pending"
     },
     "wi3-install": {
-      "status": "blocked"
+      "status": "pending"
     },
     "wi3-protocol": {
       "status": "blocked"
