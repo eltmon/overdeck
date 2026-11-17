@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5463",
   "created": "2026-11-17T12:31:36.411Z",
-  "updated": "2026-11-17T12:37:39.699Z",
+  "updated": "2026-11-17T12:37:41.386Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,6 +46,9 @@
       "doneAt": "2026-11-17T12:35:37.845Z"
     },
     "seam-gate": {
+      "status": "blocked"
+    },
+    "wi3-install": {
       "status": "blocked"
     }
   }
