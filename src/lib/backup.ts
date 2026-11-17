@@ -8,6 +8,11 @@ export interface BackupInfo {
   targets: string[];
 }
 
+/** Sync and context backups are named by createBackupTimestamp(); anything else is a named dir. */
+const TIMESTAMP_DIR_RE = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}(-\d{3}Z)?$/;
+/** A timestamp dir holding this child is a context backup (backupFile) and is never auto-pruned. */
+const CONTEXT_BACKUP_CHILD = 'context';
+
 export function createBackupTimestamp(): string {
   return new Date().toISOString().replace(/[:.]/g, '-');
 }
@@ -67,24 +72,32 @@ export function backupFile(file: string, timestamp = createBackupTimestamp()): s
   return dest;
 }
 
+/**
+ * List sync/context backups under BACKUPS_DIR, newest first. Only directories whose
+ * name matches the timestamp format `createBackupTimestamp()` produces are returned —
+ * named dirs such as `dist-rollbacks/` or `pan-3783-native-context/` are never backups
+ * and are skipped.
+ */
 export function listBackups(): BackupInfo[] {
   if (!existsSync(BACKUPS_DIR)) return [];
 
   const entries = readdirSync(BACKUPS_DIR, { withFileTypes: true });
 
-  return entries
-    .filter((e) => e.isDirectory())
-    .map((e) => {
-      const backupPath = join(BACKUPS_DIR, e.name);
-      const contents = readdirSync(backupPath);
-
-      return {
-        timestamp: e.name,
-        path: backupPath,
-        targets: contents,
-      };
-    })
-    .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  const backups: BackupInfo[] = [];
+  for (const e of entries) {
+    if (!e.isDirectory() || !TIMESTAMP_DIR_RE.test(e.name)) continue;
+    const backupPath = join(BACKUPS_DIR, e.name);
+    let contents: string[];
+    try {
+      contents = readdirSync(backupPath);
+    } catch (error) {
+      // A concurrent prune removed it between the two reads.
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+      throw error;
+    }
+    backups.push({ timestamp: e.name, path: backupPath, targets: contents });
+  }
+  return backups.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 }
 
 export function restoreBackup(timestamp: string, targetDirs: Record<string, string>): void {
@@ -113,18 +126,23 @@ export function restoreBackup(timestamp: string, targetDirs: Record<string, stri
   }
 }
 
+/**
+ * Prune timestamp backups down to the newest `keepCount`, skipping named dirs (which
+ * `listBackups` already excludes) and context backups (a `context/` child), which never
+ * count toward `keepCount` and are never removed. Throws `RangeError` when `keepCount`
+ * is not a non-negative integer, without deleting anything.
+ */
 export function cleanOldBackups(keepCount: number = 10): number {
-  const backups = listBackups();
+  if (!Number.isInteger(keepCount) || keepCount < 0) {
+    throw new RangeError(`keep count must be a non-negative integer, got ${keepCount}`);
+  }
+  const prunable = listBackups().filter((b) => !b.targets.includes(CONTEXT_BACKUP_CHILD));
+  if (prunable.length <= keepCount) return 0;
 
-  if (backups.length <= keepCount) return 0;
-
-  const toRemove = backups.slice(keepCount);
   let removed = 0;
-
-  for (const backup of toRemove) {
-    rmSync(backup.path, { recursive: true });
+  for (const backup of prunable.slice(keepCount)) {
+    rmSync(backup.path, { recursive: true, force: true });
     removed++;
   }
-
   return removed;
 }

@@ -129,6 +129,20 @@ describe('backup', () => {
       expect(backups[0].targets).toContain('skills');
       expect(backups[0].targets).toContain('commands');
     });
+
+    it('excludes dist-rollbacks and other named dirs', async () => {
+      mkdirSync(join(mockBackupsDir, '2024-01-01T00-00-00', 'skills'), { recursive: true });
+      mkdirSync(join(mockBackupsDir, '2026-11-17T00-00-00-000Z', 'skills'), { recursive: true });
+      mkdirSync(join(mockBackupsDir, 'dist-rollbacks', 'dist.rollback.1'), { recursive: true });
+      mkdirSync(join(mockBackupsDir, 'pan-3783-native-context', 'history'), { recursive: true });
+      mkdirSync(join(mockBackupsDir, '2026-11-17Tnotes'), { recursive: true });
+      writeFileSync(join(mockBackupsDir, '2026-11-17Tnotes', 'a.md'), '');
+
+      const { listBackups } = await import('../../src/lib/backup.js');
+      const backups = listBackups();
+
+      expect(backups.map((b) => b.timestamp)).toEqual(['2026-11-17T00-00-00-000Z', '2024-01-01T00-00-00']);
+    });
   });
 
   describe('restoreBackup', () => {
@@ -192,6 +206,64 @@ describe('backup', () => {
       // Oldest 2 should be removed
       expect(existsSync(join(mockBackupsDir, '2024-01-02T00-00-00'))).toBe(false);
       expect(existsSync(join(mockBackupsDir, '2024-01-01T00-00-00'))).toBe(false);
+    });
+
+    it('never touches named dirs', async () => {
+      for (let i = 1; i <= 5; i++) {
+        mkdirSync(join(mockBackupsDir, `2024-01-0${i}T00-00-00`));
+      }
+      mkdirSync(join(mockBackupsDir, 'dist-rollbacks'));
+      mkdirSync(join(mockBackupsDir, '2020-01-01Tnotes'));
+
+      const { cleanOldBackups } = await import('../../src/lib/backup.js');
+      const removed = cleanOldBackups(2);
+
+      expect(removed).toBe(3);
+      expect(existsSync(join(mockBackupsDir, 'dist-rollbacks'))).toBe(true);
+      expect(existsSync(join(mockBackupsDir, '2020-01-01Tnotes'))).toBe(true);
+    });
+
+    it('never deletes a context backup and does not count it toward keep', async () => {
+      mkdirSync(join(mockBackupsDir, '2024-01-02T00-00-00', 'skills'), { recursive: true });
+      mkdirSync(join(mockBackupsDir, '2024-01-03T00-00-00', 'skills'), { recursive: true });
+      mkdirSync(join(mockBackupsDir, '2024-01-04T00-00-00', 'skills'), { recursive: true });
+      mkdirSync(join(mockBackupsDir, '2024-01-01T00-00-00', 'context'), { recursive: true });
+      writeFileSync(join(mockBackupsDir, '2024-01-01T00-00-00', 'context', 'x.md'), '');
+
+      const { cleanOldBackups } = await import('../../src/lib/backup.js');
+      const removed = cleanOldBackups(2);
+
+      expect(removed).toBe(1);
+      expect(existsSync(join(mockBackupsDir, '2024-01-02T00-00-00'))).toBe(false);
+      expect(existsSync(join(mockBackupsDir, '2024-01-03T00-00-00'))).toBe(true);
+      expect(existsSync(join(mockBackupsDir, '2024-01-04T00-00-00'))).toBe(true);
+      expect(existsSync(join(mockBackupsDir, '2024-01-01T00-00-00', 'context', 'x.md'))).toBe(true);
+    });
+
+    it('rejects NaN, negative and fractional keep counts and deletes nothing', async () => {
+      for (let i = 1; i <= 3; i++) {
+        mkdirSync(join(mockBackupsDir, `2024-01-0${i}T00-00-00`));
+      }
+
+      const { cleanOldBackups } = await import('../../src/lib/backup.js');
+
+      expect(() => cleanOldBackups(NaN)).toThrow(RangeError);
+      expect(() => cleanOldBackups(-1)).toThrow(RangeError);
+      expect(() => cleanOldBackups(2.5)).toThrow(RangeError);
+
+      for (let i = 1; i <= 3; i++) {
+        expect(existsSync(join(mockBackupsDir, `2024-01-0${i}T00-00-00`))).toBe(true);
+      }
+    });
+
+    it('is idempotent', async () => {
+      mkdirSync(join(mockBackupsDir, '2024-01-01T00-00-00'));
+      mkdirSync(join(mockBackupsDir, '2024-01-02T00-00-00'));
+
+      const { cleanOldBackups } = await import('../../src/lib/backup.js');
+
+      expect(cleanOldBackups(0)).toBe(2);
+      expect(cleanOldBackups(0)).toBe(0);
     });
   });
 });
