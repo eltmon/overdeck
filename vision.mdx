@@ -4,8 +4,8 @@ description: "The roadmap for the Overdeck Flywheel: a dev loop that builds Over
 ---
 
 **A living north-star document.** It explains *why* the Flywheel exists and what it is
-becoming. The operational *how* lives in [`roles/flywheel.md`](./roles/flywheel.md); the
-per-run *what* lives in [`docs/flywheel-brief.md`](./docs/flywheel-brief.md). When the role or
+becoming. The operational *how* lives in [`roles/flywheel.md`](https://github.com/eltmon/overdeck/blob/main/roles/flywheel.md); the
+per-run *what* lives in `docs/flywheel-brief.md`. When the role or
 the brief ever drifts from this doc, the vision wins — fix the role or the brief.
 
 ## TL;DR
@@ -114,8 +114,8 @@ regardless of any toggle, and has no relaxation flag.
   The gates that still apply are `vetoed` (absolute stop), `parked`/`needs-design`/
   `needs-discussion`, `objection` (an AI relevance hold), and the relevance-vet.
 
-A single predicate is the source of truth — `isAutoPickable` in
-[`src/lib/backlog/pickup.ts`](./src/lib/backlog/pickup.ts) — shared by the dashboard forecast
+A single predicate is the source of truth: `isAutoPickable` in
+[`src/lib/backlog/pickup.ts`](https://github.com/eltmon/overdeck/blob/main/src/lib/backlog/pickup.ts), shared by the dashboard forecast
 and the Flywheel so they can never disagree:
 
     ready && planned && (released || auto_pickup_backlog) && !parked && !vetoed && !objection && !inPipeline && !epic
@@ -146,13 +146,13 @@ days**:
 
 | # | Metric | Target | Anchor |
 |---|---|---|---|
-| 1 | [Substrate-bug discovery rate (per pipeline run)](./docs/FLYWHEEL.md#reading-the-stats-panel) | **< 2%** (≤ 1 per 50 runs) | Best-in-class defect escape rate (&lt;2%, Capers Jones) |
-| 2 | [Critical/P0 substrate bugs](./docs/FLYWHEEL.md#reading-the-stats-panel) | **0** in rolling 30-day window | DRE convention: zero critical escapes |
-| 3 | [Pipeline pass success rate (substrate-attributable failures only)](./docs/FLYWHEEL.md#reading-the-stats-panel) | **≥ 99%** | Google/Shopify CI SLO framing |
-| 4 | [MTTR for a filed substrate bug (filed → fix merged)](./docs/FLYWHEEL.md#reading-the-stats-panel) | **< 24h median, < 1 week p95** | DORA Elite (&lt;1hr) scaled for internal tooling |
-| 5 | [Operator intervention rate per pipeline run](./docs/FLYWHEEL.md#reading-the-stats-panel) | **< 5%** | Inverted from frontier agent autonomy on SWE-bench Verified |
-| 6 | [Time-in-pipeline consistency, per complexity bucket](./docs/FLYWHEEL.md#reading-the-stats-panel) | **p95 within 2× median** | Shopify CI p95 < 2.5× target |
-| 7 | [Flake rate on substrate-attributable failures](./docs/FLYWHEEL.md#reading-the-stats-panel) | **< 5%** | Tighter than Google's 16% / Microsoft's 13% |
+| 1 | [Substrate-bug discovery rate (per pipeline run)](https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md) | **< 2%** (≤ 1 per 50 runs) | Best-in-class defect escape rate (&lt;2%, Capers Jones) |
+| 2 | [Critical/P0 substrate bugs](https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md) | **0** in rolling 30-day window | DRE convention: zero critical escapes |
+| 3 | [Pipeline pass success rate (substrate-attributable failures only)](https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md) | **≥ 99%** | Google/Shopify CI SLO framing |
+| 4 | [MTTR for a filed substrate bug (filed → fix merged)](https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md) | **< 24h median, < 1 week p95** | DORA Elite (&lt;1hr) scaled for internal tooling |
+| 5 | [Operator intervention rate per pipeline run](https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md) | **< 5%** | Inverted from frontier agent autonomy on SWE-bench Verified |
+| 6 | [Time-in-pipeline consistency, per complexity bucket](https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md) | **p95 within 2× median** | Shopify CI p95 < 2.5× target |
+| 7 | [Flake rate on substrate-attributable failures](https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md) | **< 5%** | Tighter than Google's 16% / Microsoft's 13% |
 
 Why "all of the above" and not a weighted score: a single metric can be gamed (fewer runs →
 fewer bugs) or hidden (intervene constantly → success rate looks fine). The combination forces
@@ -221,14 +221,14 @@ Decisions we haven't made and don't need to make today, but should revisit befor
 
 ## Appendix: where this fits in the docs
 
-- [`roles/flywheel.md`](./roles/flywheel.md) — the **durable doctrine**: root-cause rules and
+- [`roles/flywheel.md`](https://github.com/eltmon/overdeck/blob/main/roles/flywheel.md): the **durable doctrine**, root-cause rules and
   the load-bearing rails (author/assignee gate, pickup gate, veto, saturation cap). The tick
   loop itself is the `pan-flywheel` skill.
-- [`docs/flywheel-brief.md`](./docs/flywheel-brief.md) — the **per-run scope contract**: scope
+- `docs/flywheel-brief.md`: the **per-run scope contract**, scope
   and this run's config. The *what-this-run*.
-- [`docs/FLYWHEEL.md`](./docs/FLYWHEEL.md) — technical reference for the contract, lifecycle, and
+- [`docs/FLYWHEEL.md`](https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md): technical reference for the contract, lifecycle, and
   dashboard surfaces.
-- [`docs/FLYWHEEL-STATE.md`](./docs/FLYWHEEL-STATE.md) — durable cumulative memory authored by the
+- `docs/FLYWHEEL-STATE.md`: durable cumulative memory authored by the
   orchestrator across runs.
-- [`packages/contracts/src/flywheel.ts`](./packages/contracts/src/flywheel.ts) — the
+- [`packages/contracts/src/flywheel.ts`](https://github.com/eltmon/overdeck/blob/main/packages/contracts/src/flywheel.ts): the
   `FlywheelStatus` schema the orchestrator emits each tick.
