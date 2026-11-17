@@ -174,6 +174,13 @@ above everything else and preserves the tier order within that. Use the
 **Newest first** toggle in the palette footer to switch to relevance-rank
 order; the choice persists per browser.
 
+Keyword and title matches still appear when semantic search is slow or the
+embedding provider fails: each slow part of the search has its own time budget,
+and the palette returns what finished. A search you replace by typing more stops
+on the server before its slow scan starts. If no answer arrives, the palette
+stops waiting after 10 seconds and shows "Search timed out after 10 s. Try
+again." instead of the spinner.
+
 Conversation search is enabled by default: indexing sends transcript chunks to the configured embedding provider (OpenAI `text-embedding-3-small` by default, small per-token cost) and requires an OpenAI API key. Toggle it or trigger a full reindex under **Settings → Conversation Search**. When it is off — or no key is configured — the palette still finds conversations by title, but shows no transcript matches.
 
 The palette is also accessible from the desktop app's **Overdeck** menu bar menu.
