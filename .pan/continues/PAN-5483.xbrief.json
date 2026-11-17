@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5483",
   "created": "2026-11-17T13:01:33.028Z",
-  "updated": "2026-11-17T15:11:35.485Z",
+  "updated": "2026-11-17T15:11:48.151Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -222,6 +222,11 @@
     "broken-links.ac3": {
       "status": "completed",
       "doneAt": "2026-11-17T15:11:35.485Z"
+    },
+    "docs-and-map": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5483",
+      "claimedAt": "2026-11-17T15:11:48.151Z"
     }
   }
 }
