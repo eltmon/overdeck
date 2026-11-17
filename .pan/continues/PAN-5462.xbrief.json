@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5462",
   "created": "2026-11-17T12:53:58.478Z",
-  "updated": "2026-11-17T19:25:32.409Z",
+  "updated": "2026-11-17T19:29:31.720Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,9 +56,10 @@
       "doneAt": "2026-11-17T19:25:28.366Z"
     },
     "wsl-doctor-rows": {
-      "status": "pending",
+      "status": "completed",
       "claimedBy": "agent-pan-5462",
-      "claimedAt": "2026-11-17T19:25:32.409Z"
+      "claimedAt": "2026-11-17T19:25:32.409Z",
+      "doneAt": "2026-11-17T19:29:31.720Z"
     },
     "wsl-capabilities": {
       "status": "pending"
@@ -166,6 +167,18 @@
     "wsl-provider.ac4": {
       "status": "completed",
       "doneAt": "2026-11-17T19:25:28.366Z"
+    },
+    "wsl-doctor-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:29:31.720Z"
+    },
+    "wsl-doctor-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:29:31.720Z"
+    },
+    "wsl-doctor-rows.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:29:31.720Z"
     }
   }
 }
