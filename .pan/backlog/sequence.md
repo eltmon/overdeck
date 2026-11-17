@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-17T11:42:03.296470Z · model: claude-opus-5-5 · open: 898_
+_Last sequenced: 2026-11-17T12:12:47.596119Z · model: claude-opus-5-5 · open: 901_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -258,6 +258,7 @@ _Last sequenced: 2026-11-17T11:42:03.296470Z · model: claude-opus-5-5 · open: 
 | 258 | PAN-3332 | S | high | ok |  |  | A detached slash-command spawn died in 150ms while the UI kept saying 'running in the background'; the activity must own its outcome. |
 | 259 | PAN-4426 | M | medium | ok |  |  | Dashboard controls for Deft Directive detection and managed mode over the PAN-3943 library; blocker has closed |
 | 260 | PAN-4345 | XS | medium | ok |  |  | Terse gate-integrity rule (fix the work, never the gate) plus a Rule Authority note in rule authoring |
+| 260 | PAN-5466 | S | medium | ok |  |  | Home Paused tile counts stale holds on closed issues and post-merge pauses (25 shown, ~5 real); filter + one-time flag cleanup. |
 | 261 | PAN-3013 | XS | high | ok |  |  | Role-spawn wrote 26 session-scoped hook paths into the durable ~/.claude/settings.json; they fail on every Linear tool call forever. |
 | 262 | PAN-3771 | M | high | ok |  |  | Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries. |
 | 263 | PAN-4530 | XS | medium | ok |  |  | Flywheel skill: define 'pipeline clear', go idle with conversation open, and never stop on a stuck pipeline |
@@ -480,7 +481,9 @@ _Last sequenced: 2026-11-17T11:42:03.296470Z · model: claude-opus-5-5 · open: 
 | 480 | PAN-1113 | S | medium | ok |  |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
 | 481 | PAN-1068 | S | medium | ok |  |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
 | 482 | PAN-3938 | M | medium | needs-refinement |  |  | Run Muse Spark under Claude Code via cliproxy — only the paid Zen model is routable; free tier is OpenCode-client gated; needs credit… |
+| 482 | PAN-5464 | L | medium | ok |  |  | Video skill set: Remotion, HyperFrames, OpenMontage, video-use packs + 'video' group; fixes LFS extraction. PRD on main. |
 | 483 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
+| 484 | PAN-5465 | L | medium | ok |  |  | Add skill packs to a live conversation: /reload-plugins hot apply, resume fallback, CLI, MCP tool, dashboard modal. PRD on main. |
 | 484 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
 | 485 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
 | 486 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
@@ -685,7 +688,7 @@ _Last sequenced: 2026-11-17T11:42:03.296470Z · model: claude-opus-5-5 · open: 
 | 685 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
 | 686 | PAN-4823 | XL | medium | ok | ✓ |  | Epic: Capacitor phone client for Anywhere without Tailscale; 15 children filed (#4828-4843); OD-1 settled; PAN-4774 done. |
 | 687 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
-| 688 | PAN-5463 | L | medium | needs-refinement |  | PAN-5461 | macOS computer use: port Orca Swift helper and permission setup; needs PAN-5461 seam first, PRD not written yet. |
+| 688 | PAN-5463 | L | medium | ok |  | PAN-5461 | macOS computer use: port Orca Swift helper and permission setup; needs PAN-5461 seam first, PRD not written yet. |
 | 689 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
 | 690 | PAN-5082 | XL | medium | ok |  |  | Move every MCP surface to SDK v2 for the 2026-07-28 spec while keeping 2025-11-25 clients; time it on PAN-5083 data. |
 | 691 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
@@ -902,7 +905,7 @@ _Last sequenced: 2026-11-17T11:42:03.296470Z · model: claude-opus-5-5 · open: 
 | 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
 | 903 | PAN-5444 | XS | low | ok |  |  | Two Minor CodeRabbit findings left on merged PR #5443: semgrep repo rules resolve from event cwd; hook tests not isolated from Docker. |
 | 904 | PAN-5405 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus. |
-| 905 | PAN-5462 | L | low | needs-refinement |  | PAN-5461 | Windows (WSL2) computer use via Orca PowerShell helper; needs PAN-5461 seam first, PRD not written yet. |
+| 905 | PAN-5462 | L | low | ok |  | PAN-5461 | Windows (WSL2) computer use via Orca PowerShell helper; needs PAN-5461 seam first, PRD not written yet. |
 
 ## Rationale detail
 
@@ -1233,10 +1236,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-17T11:42:03.296470Z",
+  "generatedAt": "2026-11-17T12:12:47.596119Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 898,
+  "openCount": 901,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -4466,6 +4469,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "auto"
     },
     {
+      "issue": "PAN-5466",
+      "rank": 260,
+      "size": "S",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Home Paused tile counts stale holds on closed issues and post-merge pauses (25 shown, ~5 real); filter + one-time flag cleanup.",
+      "rationale": "New issue. The Home Paused tile reported 25 parked agents when about five were real, because it counts every paused state.json with no check of issue state or pause source. The root cause and the fix (filter on derived state, exclude the post-merge close-out pause, clear stale flags once) are concrete and small, so it ranks with other medium operator-facing dashboard bugs.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3013",
       "rank": 261,
       "size": "XS",
@@ -7205,6 +7221,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "auto"
     },
     {
+      "issue": "PAN-5464",
+      "rank": 482,
+      "size": "L",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Video skill set: Remotion, HyperFrames, OpenMontage, video-use packs + 'video' group; fixes LFS extraction. PRD on main.",
+      "rationale": "New issue. Ships four known skill packs and a pack-group alias, and fixes two real skill-pack gaps on the way: the Git LFS smudge that breaks HyperFrames extraction, and repos whose only skill is a root SKILL.md. A full PRD with verified research, seven work items and acceptance criteria landed on main, so it is workable and ranks with mid-tier medium features.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-933",
       "rank": 483,
       "size": "S",
@@ -7213,6 +7242,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "condition": "ok",
       "dependsOn": [],
       "why": "Review poster cannot post to GitLab MRs (only supports GitHub PRs)",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5465",
+      "rank": 484,
+      "size": "L",
+      "importance": "medium",
+      "score": 47,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Add skill packs to a live conversation: /reload-plugins hot apply, resume fallback, CLI, MCP tool, dashboard modal. PRD on main.",
+      "rationale": "New issue. Lets an operator or agent add skill packs to a running conversation without losing context, proven by a 2026-11-17 spike that /reload-plugins rebuilds the skill list in place. The PRD on main covers the route, launcher change, CLI, MCP tool and dashboard modal (FR-1 to FR-9), so it is workable; it ranks just after PAN-5464 because its --group support waits on that issue.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9718,7 +9760,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "size": "L",
       "importance": "medium",
       "score": 36,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [
         "PAN-5461"
       ],
@@ -12397,7 +12439,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "size": "L",
       "importance": "low",
       "score": 30,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [
         "PAN-5461"
       ],
@@ -13524,15 +13566,22 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "from": "PAN-5461",
       "to": "PAN-5462",
       "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.95
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-5461",
       "to": "PAN-5463",
       "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5464",
+      "to": "PAN-5465",
+      "type": "informs",
       "source": "ai-inferred",
-      "confidence": 0.95
+      "confidence": 0.8
     },
     {
       "from": "PAN-750",
