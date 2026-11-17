@@ -4,17 +4,17 @@
     "created": "2026-11-17T12:49:22Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5483: docs: docs site SEO, branding and config (docs.json keys, site name, Discord, Install CTA, redirects, titles, descriptions)",
-    "updated": "2026-11-17T12:59:26.004Z"
+    "updated": "2026-11-17T13:00:52.295Z"
   },
   "plan": {
     "id": "pan-5483",
     "title": "docs: docs site SEO, branding and config (docs.json keys, site name, Discord, Install CTA, redirects, titles, descriptions)",
-    "status": "proposed",
+    "status": "running",
     "uid": "8d38ac10-6e01-4e43-bd03-82e5a7debc20",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-17T12:49:22Z",
-    "updated": "2026-11-17T12:59:26.004Z",
+    "updated": "2026-11-17T13:00:52.295Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5483",
@@ -1133,5 +1133,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
