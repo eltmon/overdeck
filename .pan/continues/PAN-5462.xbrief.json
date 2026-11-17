@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5462",
   "created": "2026-11-17T12:53:58.478Z",
-  "updated": "2026-11-17T19:11:29.122Z",
+  "updated": "2026-11-17T19:11:30.368Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,7 +38,7 @@
       "status": "pending"
     },
     "windows-blocked-keys": {
-      "status": "blocked"
+      "status": "pending"
     },
     "wsl-provider": {
       "status": "blocked"
