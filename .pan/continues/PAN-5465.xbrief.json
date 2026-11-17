@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5465",
   "created": "2026-11-17T12:56:05.449Z",
-  "updated": "2026-11-17T14:27:14.868Z",
+  "updated": "2026-11-17T14:29:16.561Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "empty-mount": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5465",
-      "claimedAt": "2026-11-17T12:56:05.449Z"
+      "claimedAt": "2026-11-17T12:56:05.449Z",
+      "doneAt": "2026-11-17T14:29:16.561Z"
     },
     "ui-add-skills-modal": {
       "status": "in_progress",
@@ -23,6 +24,22 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-5465",
       "claimedAt": "2026-11-17T14:27:14.867Z"
+    },
+    "empty-mount.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T14:29:16.561Z"
+    },
+    "empty-mount.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T14:29:16.561Z"
+    },
+    "empty-mount.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T14:29:16.561Z"
+    },
+    "empty-mount.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T14:29:16.561Z"
     }
   }
 }
