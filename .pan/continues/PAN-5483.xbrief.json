@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5483",
   "created": "2026-11-17T13:01:33.028Z",
-  "updated": "2026-11-17T14:51:57.681Z",
+  "updated": "2026-11-17T14:52:39.987Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,11 @@
     "docs-json-navigation.ac3": {
       "status": "completed",
       "doneAt": "2026-11-17T14:51:57.680Z"
+    },
+    "docs-json-redirects": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5483",
+      "claimedAt": "2026-11-17T14:52:39.987Z"
     }
   }
 }
