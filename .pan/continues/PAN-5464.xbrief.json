@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5464",
   "created": "2026-11-17T12:41:33.533Z",
-  "updated": "2026-11-17T14:43:17.079Z",
+  "updated": "2026-11-17T14:43:44.350Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,7 +26,7 @@
     "license-names": {
       "status": "in_progress",
       "claimedBy": "agent-pan-5464",
-      "claimedAt": "2026-11-17T14:43:00.293Z"
+      "claimedAt": "2026-11-17T14:43:44.349Z"
     },
     "groups-lib": {
       "status": "in_progress",
