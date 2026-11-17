@@ -419,6 +419,9 @@ pan skills set <skill> on|off|inherit [--project <key> | --issue <id>]
 pan skills set --pack <id> on|off|inherit [--project <key> | --issue <id>]
 pan skills set <pack>/<skill> on|off|inherit [--project <key> | --issue <id>]
 
+# Load pack skills into a running conversation (self = this one); Claude Code loads them in place
+pan skills add <conversation> [--pack <id>]... [--skill <pack>/<skill>]... [--off <pack>/<skill>]... [--restart]
+
 # Register, update, inspect, and cache skill packs pinned to a commit
 pan skills pack add <id> [url] [--ref <ref>] [--adapter plain|claude-plugin|deft-readonly|gstack-runtime] [--browser] [--yes]   # known packs default the url; pstack, sageox and atlassian also default the ref
 pan skills pack add gstack --ref main   # gstack runtime pack (needs bun)
