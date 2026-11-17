@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5462",
   "created": "2026-11-17T12:53:58.478Z",
-  "updated": "2026-11-17T19:11:37.603Z",
+  "updated": "2026-11-17T19:11:38.823Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -59,7 +59,7 @@
       "status": "pending"
     },
     "ci-wsl-e2e": {
-      "status": "blocked"
+      "status": "pending"
     },
     "ci-windows-native": {
       "status": "completed",
