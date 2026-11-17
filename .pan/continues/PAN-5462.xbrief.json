@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5462",
   "created": "2026-11-17T12:53:58.478Z",
-  "updated": "2026-11-17T19:39:26.406Z",
+  "updated": "2026-11-17T19:39:27.710Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,7 +74,9 @@
       "doneAt": "2026-11-17T19:39:26.405Z"
     },
     "skill-and-help-text": {
-      "status": "pending"
+      "status": "pending",
+      "claimedBy": "agent-pan-5462",
+      "claimedAt": "2026-11-17T19:39:27.710Z"
     },
     "config-docs-changelog": {
       "status": "pending"
