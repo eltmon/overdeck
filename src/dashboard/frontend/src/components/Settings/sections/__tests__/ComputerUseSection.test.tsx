@@ -1,0 +1,161 @@
+/**
+ * PAN-5461: Settings → Computer Use shows the host's computer-use status, sets it
+ * up in one click, and lets the operator take the desktop back from an agent.
+ */
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { installStrictFetchMock } from '../../../../test-utils/strictFetchMock';
+import type { ComputerUseStatusView } from '../../hooks/useComputerUseStatus';
+import { ComputerUseSection } from '../ComputerUseSection';
+
+vi.mock('../../../../lib/wsTransport', () => ({
+  ensureDashboardSession: vi.fn().mockResolvedValue(undefined),
+  dashboardMutationJsonHeaders: vi.fn().mockResolvedValue({ 'Content-Type': 'application/json' }),
+}));
+
+vi.mock('sonner', () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
+
+function renderSection() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <ComputerUseSection />
+    </QueryClientProvider>,
+  );
+}
+
+const OK_CHECKS: ComputerUseStatusView['checks'] = [
+  { id: 'session', label: 'Desktop session', status: 'ok', detail: 'x11 · display :1' },
+  { id: 'helper', label: 'Helper', status: 'ok', detail: 'Handshake ok' },
+];
+
+function view(overrides: Partial<ComputerUseStatusView> = {}): ComputerUseStatusView {
+  return {
+    platform: 'linux',
+    supported: true,
+    enabled: false,
+    hostname: 'desk',
+    session: { ok: true, label: 'x11 · display :1' },
+    checks: OK_CHECKS,
+    setupSteps: [
+      { id: 'enable-flag', label: 'Turn on Computer Use' },
+      { id: 'test-helper', label: 'Test the helper' },
+    ],
+    lease: null,
+    skill: { installed: true, locations: ['~/.claude/skills'] },
+    ...overrides,
+  };
+}
+
+function serveStatus(status: ComputerUseStatusView, extra?: Parameters<typeof installStrictFetchMock>[0]) {
+  return installStrictFetchMock((request) => {
+    if (request.method === 'GET' && request.url === '/api/computer-use/status') return Response.json(status);
+    return extra?.(request);
+  });
+}
+
+describe('ComputerUseSection (PAN-5461)', () => {
+  afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
+
+  it('shows Unavailable with the host message and no button', async () => {
+    serveStatus(view({ platform: 'wsl', supported: false, session: { ok: false, message: "Computer use isn't supported on this host (wsl) yet." }, checks: [], setupSteps: [] }));
+    renderSection();
+    expect(await screen.findByText('Not available on this machine')).toBeInTheDocument();
+    expect(screen.getByTestId('computer-use-badge')).toHaveTextContent('Unavailable');
+    expect(screen.getByText("Computer use isn't supported on this host (wsl) yet.")).toBeInTheDocument();
+    expect(screen.queryByTestId('computer-use-cta')).toBeNull();
+  });
+
+  it('offers Set up and turn on with the password note when packages are missing', async () => {
+    serveStatus(view({
+      setupSteps: [
+        { id: 'install-packages', label: 'Install xdotool xclip', needsPassword: true },
+        { id: 'enable-accessibility', label: 'Turn on GNOME accessibility' },
+        { id: 'enable-flag', label: 'Turn on Computer Use' },
+        { id: 'test-helper', label: 'Test the helper' },
+      ],
+    }));
+    renderSection();
+    expect(await screen.findByTestId('computer-use-cta')).toHaveTextContent('Set up and turn on');
+    expect(screen.getByTestId('computer-use-badge')).toHaveTextContent('Off');
+    expect(screen.getByTestId('computer-use-password-note')).toHaveTextContent('Your system will ask for your password once, to install packages.');
+    expect(screen.getByText('Setup installs xdotool xclip, turns on GNOME accessibility and tests everything.')).toBeInTheDocument();
+    expect(screen.getByText('desk', { exact: true })).toBeInTheDocument();
+  });
+
+  it('offers Turn on Computer Use with no password when nothing is missing', async () => {
+    serveStatus(view());
+    renderSection();
+    expect(await screen.findByTestId('computer-use-cta')).toHaveTextContent('Turn on Computer Use');
+    expect(screen.getByTestId('computer-use-password-note')).toHaveTextContent('No password needed.');
+    expect(screen.getByText('Everything it needs is already installed. One click turns it on.')).toBeInTheDocument();
+  });
+
+  it('shows a failed step with its command, a Copy button and Try again', async () => {
+    const status = view({ setupSteps: [{ id: 'install-packages', label: 'Install xdotool', needsPassword: true }, ...view().setupSteps] });
+    const { fetchMock } = serveStatus(status, ({ method, url }) => {
+      if (method === 'POST' && url === '/api/computer-use/setup') {
+        return Response.json({
+          ok: false,
+          steps: [{
+            id: 'install-packages',
+            label: 'Install xdotool',
+            status: 'failed',
+            message: 'The password prompt was cancelled. Try again, or run the command below in a terminal.',
+            command: 'sudo apt-get install -y xdotool',
+          }],
+          status,
+        });
+      }
+      return undefined;
+    });
+    renderSection();
+    const cta = await screen.findByTestId('computer-use-cta');
+    await act(async () => { fireEvent.click(cta); });
+
+    await waitFor(() => expect(screen.getByTestId('computer-use-cta')).toHaveTextContent('Try again'));
+    expect(fetchMock).toHaveBeenCalledWith('/api/computer-use/setup', expect.objectContaining({ method: 'POST' }));
+    expect(screen.getByTestId('computer-use-command')).toHaveTextContent('sudo apt-get install -y xdotool');
+    expect(screen.getByTestId('computer-use-copy-command')).toBeInTheDocument();
+    expect(screen.getByText(/password prompt was cancelled/)).toBeInTheDocument();
+  });
+
+  it('shows Ready, a checked switch and a disabled Take back control when on and free', async () => {
+    serveStatus(view({ enabled: true, setupSteps: [] }));
+    renderSection();
+    expect(await screen.findByText('Computer Use is on')).toBeInTheDocument();
+    expect(screen.getByTestId('computer-use-badge')).toHaveTextContent('Ready');
+    expect(screen.getByTestId('computer-use-enabled-switch')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByTestId('computer-use-lease-badge')).toHaveTextContent('Free');
+    expect(screen.getByTestId('computer-use-release')).toBeDisabled();
+  });
+
+  it('shows In use with the holder and an enabled Take back control while an agent holds the desktop', async () => {
+    const expiresAt = new Date(Date.now() + 60_000).toISOString();
+    const { fetchMock } = serveStatus(view({ enabled: true, setupSteps: [], lease: { holder: 'agent-pan-1', expiresAt } }), ({ method, url }) => {
+      if (method === 'POST' && url === '/api/computer-use/release') return Response.json(view({ enabled: true, setupSteps: [] }));
+      return undefined;
+    });
+    renderSection();
+    expect(await screen.findByTestId('computer-use-lease-badge')).toHaveTextContent('In use');
+    expect(screen.getByTestId('computer-use-lease-holder')).toHaveTextContent(/agent-pan-1 is driving the desktop · its turn ends in \d+s unless it acts again\./);
+    const release = screen.getByTestId('computer-use-release');
+    expect(release).toBeEnabled();
+    await act(async () => { fireEvent.click(release); });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/computer-use/release', expect.objectContaining({ method: 'POST' })));
+    await waitFor(() => expect(screen.getByTestId('computer-use-lease-badge')).toHaveTextContent('Free'));
+  });
+
+  it('lists the checks and where the skill is installed', async () => {
+    serveStatus(view({ checks: [...OK_CHECKS, { id: 'input', label: 'Mouse and keyboard input', status: 'missing', detail: 'xdotool not installed', fixCommand: 'sudo zypper install -y xdotool' }] }));
+    renderSection();
+    expect(await screen.findByText('What Overdeck checked')).toBeInTheDocument();
+    expect(screen.getByText('xdotool not installed')).toBeInTheDocument();
+    expect(screen.getByText('sudo zypper install -y xdotool')).toBeInTheDocument();
+    expect(screen.getByTestId('computer-use-skill')).toHaveTextContent('pan-computer-use skill — installed in ~/.claude/skills');
+  });
+
+});
