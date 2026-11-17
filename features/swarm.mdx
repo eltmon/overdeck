@@ -1,11 +1,10 @@
 ---
-title: Swarm
-description: Per-item DAG dispatch — many work agents on one issue, in parallel
+title: "Swarm: parallel agents on one issue"
+sidebarTitle: "Swarm"
+description: "Run one work agent per plan item on the same issue, in parallel, and dispatch each item in dependency order from the plan's blocks edges."
 ---
 
 import { ThemedImage } from "/snippets/themed-image.mdx";
-
-# Swarm: Per-Item DAG Dispatch
 
 A swarm runs one work agent per plan item, in parallel, on the same issue. Each agent gets its own git worktree and slot branch. The dispatcher uses the plan's `blocks` edges as a DAG: an item becomes dispatchable the moment every blocking parent has merged or completed, not when its wave does.
 
