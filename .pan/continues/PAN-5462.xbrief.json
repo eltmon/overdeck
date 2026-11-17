@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5462",
   "created": "2026-11-17T12:53:58.478Z",
-  "updated": "2026-11-17T19:11:30.368Z",
+  "updated": "2026-11-17T19:11:31.609Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -41,7 +41,7 @@
       "status": "pending"
     },
     "wsl-provider": {
-      "status": "blocked"
+      "status": "pending"
     },
     "wsl-doctor-rows": {
       "status": "blocked"
