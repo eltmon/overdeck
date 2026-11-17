@@ -1,0 +1,1137 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-17T12:49:22Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5483: docs: docs site SEO, branding and config (docs.json keys, site name, Discord, Install CTA, redirects, titles, descriptions)",
+    "updated": "2026-11-17T12:59:26.004Z"
+  },
+  "plan": {
+    "id": "pan-5483",
+    "title": "docs: docs site SEO, branding and config (docs.json keys, site name, Discord, Install CTA, redirects, titles, descriptions)",
+    "status": "proposed",
+    "uid": "8d38ac10-6e01-4e43-bd03-82e5a7debc20",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-17T12:49:22Z",
+    "updated": "2026-11-17T12:59:26.004Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5483",
+        "label": "PAN-5483",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5467",
+        "label": "Epic #5467",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4779",
+        "label": "PAN-4779",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5483.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "docs",
+      "mintlify",
+      "seo",
+      "docs-json",
+      "branding"
+    ],
+    "narratives": {
+      "Problem": "The docs site build config uses legacy mint.json keys the live site ignores (no GitHub link, no Install button, no footer socials, a generated og:image), names itself 'Overdeck — The IDE for the Agent Era', uses the retired tan palette, has no Discord link, hides shipped Anywhere pages under a Vision tab, and has generic titles, out-of-range or dashed descriptions and missing redirects. mint@4.3.49 validate and broken-links both fail on main.",
+      "Proposal": "Fix MDX parse and frontmatter errors so mint validate passes; replace the legacy docs.json keys with name, description, indigo colors, navbar, footer and seo (og:image https://overdeck.ai/assets/og-image.png); restructure navigation (Anywhere tab, Roadmap group, Features order) and add redirects; apply exact titles, sidebarTitles and descriptions from the PRD tables in six directory-clustered items; repoint 16 broken repo-file links at GitHub; document the rules; then paste clean validate and broken-links output into the PR body. Every check pins mint@4.3.49. Docs-only.",
+      "NonGoals": "- Primary Mintlify domain or panopticon-cli.com redirect (issue item 1, epic owner)\n- Publishing, rewriting or deleting configuration/meta-repos, progressive-polyrepo, setup-wizard and the links to them (item 17, #5482 G18)\n- Removing configuration/state-branch from navigation or redirecting it (#5472)\n- Rewriting stale page bodies (introduction, concepts, specialists, Cloister, mission-control: #5472) or merging configuration/workspaces.mdx (#5479)\n- New pages for issue pipeline, planning or Flywheel (#5468, #5469, #5470)\n- Deleting the remaining duplicate-h1 body headings site-wide or running mint validate --fix\n- Removing em or en dashes from body paragraphs this PR does not otherwise edit\n- New lint code in scripts/lint-docs.js, including PAN-4779's optional bare-tag check\n- Copying or designing an OG image file; changing background, logo or favicon\n- Any change under src/, scripts/, tests/, packages/ or apps/\n- A changelog.d entry"
+    },
+    "autoDecisions": [
+      {
+        "summary": "OG image references https://overdeck.ai/assets/og-image.png directly in seo.metatags",
+        "rationale": "The issue asks for the overdeck.ai card; the live URL returns a 1200x630 PNG and stays current with the site. Copying a binary would go stale, and the local landing repo holds an unpushed newer card."
+      },
+      {
+        "summary": "Install button points to /quickstart",
+        "rationale": "The issue names the quickstart as the better target; a relative path works on every docs domain and under mint dev."
+      },
+      {
+        "summary": "Colors primary #4f46e5, light #818cf8, dark #4f46e5; background unchanged",
+        "rationale": "Style guide section 19 brand mark colors; Mintlify uses light as the dark-mode primary and #818cf8 reads better on dark. The issue asks only for the palette."
+      },
+      {
+        "summary": "Vision tab renamed Anywhere with Overdeck Anywhere and Anywhere CLI groups; vision and template-conversations move to a Roadmap group in Reference",
+        "rationale": "Item 7 offers the rename; the Roadmap group also settles item 18 without deleting the proposal page."
+      },
+      {
+        "summary": "Features ordered now from existing pages; pipeline, planning and Flywheel pages are inserted by #5468, #5469, #5470",
+        "rationale": "Issue says do what you can now; those pages do not exist yet."
+      },
+      {
+        "summary": "state-branch: only the description dash is fixed here",
+        "rationale": "#5472 explicitly owns its nav removal and redirect; item 16's redirect is conditional on that."
+      },
+      {
+        "summary": "Item 17 deferred to #5482 G18",
+        "rationale": "G18 decides whether the three unpublished pages are published, rewritten or deleted; fixing the links first would pre-empt that."
+      },
+      {
+        "summary": "Body H1 deleted on every page whose frontmatter this PR edits, except state-branch; no site-wide mint validate --fix",
+        "rationale": "Retitled pages would show a contradicting second H1; a site-wide fix touches about 80 files that sibling issues edit in parallel."
+      },
+      {
+        "summary": "'Remove dashes from bodies you edit' applied to every line this PR adds or modifies, checked on the scoped diff",
+        "rationale": "About 549 dashes sit in untouched paragraphs of pages sibling issues are rewriting; whole-body de-dashing here would conflict with them."
+      },
+      {
+        "summary": "The 16 broken links are fixed here by pointing them at GitHub blob URLs",
+        "rationale": "The issue's new 'Every PR' section requires a clean mint broken-links result in the PR body; a probe showed this makes it exit 0."
+      },
+      {
+        "summary": "No new lint code; checks are one-line commands",
+        "rationale": "Keeps the PR docs-only; a probed bare-tag heuristic gave 16 false positives on wrapped inline code."
+      },
+      {
+        "summary": "All checks pin mint@4.3.49",
+        "rationale": "mint --version prints unknown and results differ across versions (PAN-4779 saw a different error set on mint@4)."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Docs-only frontmatter and config edits across about 40 small files. Each .mdx file changes 1 to 10 lines, and every file belongs to exactly one item. The projected-surface lint counts each dir/file.mdx as its own subsystem. The issue is already one child of epic #5467, so splitting it further would only add coordination over docs.json and the PR-evidence step.",
+      "canonicalFilename": "2026-11-17-PAN-5483-docs-docs-site-seo-branding-and-config-docs-json-keys-site-name-discord-install-cta-redirects-titles-descriptions.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "mint-validate-errors",
+        "title": "Make mint validate pass: escape bare tags, quote two descriptions, drop the react import",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:49:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5483",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/agent-commands.mdx",
+            "configuration/linked-machines.mdx",
+            "configuration/mcp.mdx",
+            "configuration/workspaces.mdx",
+            "cli/vault.mdx",
+            "snippets/themed-image.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx -y mint@4.3.49 validate --format json 2>/dev/null | node -e 'let s=\"\";process.stdin.on(\"data\",d=>s+=d).on(\"end\",()=>{const r=JSON.parse(s);if(!r.passed)throw new Error(JSON.stringify(r.summary));console.log(\"validate-ok\",JSON.stringify(r.summary))})'",
+            "node --input-type=module -e 'import {parse} from \"yaml\";import {readFileSync} from \"fs\";for(const f of [\"cli/vault.mdx\",\"configuration/mcp.mdx\"]){const d=parse(readFileSync(f,\"utf8\").match(/^---\\n([\\s\\S]*?)\\n---/)[1]);if(typeof d.description!==\"string\")throw new Error(f)}console.log(\"yaml-ok\")'",
+            "! grep -q 'from \"react\"' snippets/themed-image.mdx && grep -q 'export const ThemedImage' snippets/themed-image.mdx && echo snippet-ok",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "validate prints validate-ok with errors 0",
+            "yaml check prints yaml-ok",
+            "snippet check prints snippet-ok",
+            "lint:docs prints 'docs lint passed'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-15",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work item 1: replace each bare <word> tag in prose listed in the table with &lt;word&gt;, double-quote the description values in cli/vault.mdx and configuration/mcp.mdx, delete their body H1 lines, and delete the react import line from snippets/themed-image.mdx. Then loop mint validate until it passes, escaping any further bare tag it names."
+        },
+        "items": [
+          {
+            "id": "mint-validate-errors.ac1",
+            "title": "npx -y mint@4.3.49 validate --format json prints passed true with 0 errors on the item's commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mint-validate-errors.ac2",
+            "title": "The yaml package parses the frontmatter of cli/vault.mdx and configuration/mcp.mdx without error and returns each description as a string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mint-validate-errors.ac3",
+            "title": "snippets/themed-image.mdx contains no import line and still exports ThemedImage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mint-validate-errors.ac4",
+            "title": "npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-json-site-config",
+        "title": "Replace the legacy docs.json keys with name, description, colors, navbar, footer and seo",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:49:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5483",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e 'const d=require(\"./docs.json\");const ok=new Set([\"theme\",\"$schema\",\"name\",\"public\",\"description\",\"colors\",\"logo\",\"favicon\",\"api\",\"appearance\",\"background\",\"navbar\",\"navigation\",\"footer\",\"search\",\"seo\",\"fonts\",\"icons\",\"styling\",\"redirects\",\"integrations\",\"banner\",\"errors\",\"contextual\",\"thumbnails\",\"interaction\",\"metadata\",\"variables\",\"markdown\"]);const bad=Object.keys(d).filter(k=>!ok.has(k)||k===\"metadata\");if(bad.length)throw new Error(\"bad keys: \"+bad);console.log(\"keys-ok\")'",
+            "npx -y mint@4.3.49 validate --format json 2>/dev/null | node -e 'let s=\"\";process.stdin.on(\"data\",d=>s+=d).on(\"end\",()=>{const r=JSON.parse(s);if(!r.passed)throw new Error(JSON.stringify(r.summary));console.log(\"validate-ok\",JSON.stringify(r.summary))})'",
+            "OUT=\"${TMPDIR:-$HOME/.overdeck/tmp}/pan5483-quickstart.html\"; setsid npx -y mint@4.3.49 dev --port 3399 >/dev/null 2>&1 & PG=$!; for i in $(seq 1 60); do curl -sf -o /dev/null http://localhost:3399/quickstart && break; sleep 5; done; curl -s http://localhost:3399/quickstart > \"$OUT\"; kill -- -$PG; for s in '- Overdeck</title>' 'discord.gg/ZpHE2ZTv5P' 'github.com/eltmon/overdeck' 'overdeck.ai/support' 'href=\"/quickstart\"' 'property=\"og:image\" content=\"https://overdeck.ai/assets/og-image.png\"'; do grep -qF -- \"$s\" \"$OUT\" || { echo \"missing: $s\"; exit 1; }; done; echo dev-ok"
+          ],
+          "expected_outputs": [
+            "keys-ok",
+            "validate-ok",
+            "dev-ok"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work item 2: delete topbarLinks, topbarCtaButton, footerSocials, metadata, feedback and layout from docs.json, set name to Overdeck, add the description, set the indigo colors, and add the navbar, footer and seo objects exactly as the PRD After block shows. Then run the key check, mint validate and the mint dev rendered-HTML check."
+        },
+        "items": [
+          {
+            "id": "docs-json-site-config.ac1",
+            "title": "The PRD Work item 2 key-check one-liner prints ok, so docs.json contains no legacy key, no metadata key and only maple-schema top-level keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-json-site-config.ac2",
+            "title": "docs.json contains name Overdeck, the PRD description, colors primary #4f46e5 light #818cf8 dark #4f46e5, and the navbar, footer and seo values from the PRD After block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-json-site-config.ac3",
+            "title": "When npx -y mint@4.3.49 dev serves the site, the /quickstart HTML contains a title ending in '- Overdeck', discord.gg/ZpHE2ZTv5P, github.com/eltmon/overdeck, overdeck.ai/support, href=\"/quickstart\" and an og:image meta whose content is https://overdeck.ai/assets/og-image.png (the devcheck command prints dev-ok)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-json-site-config.ac4",
+            "title": "npx -y mint@4.3.49 validate --format json prints passed true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-json-navigation",
+        "title": "Restructure docs.json navigation: Anywhere tab, Roadmap group, Features order",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:49:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5483",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e 'const d=require(\"./docs.json\");const t=d.navigation.tabs.map(x=>x.tab).join(\"|\");if(t!==\"Getting Started|Anywhere|CLI Reference|Features|Configuration|Guides|Reference|Changelog\")throw new Error(t);const f=d.navigation.tabs.find(x=>x.tab===\"Features\").groups[0].pages;if(f[0]!==\"features/conversations\"||f.length!==14)throw new Error(f);const r=d.navigation.tabs.find(x=>x.tab===\"Reference\").groups;const last=r[r.length-1];if(last.group!==\"Roadmap\"||last.pages.join()!==\"vision,reference/template-conversations\")throw new Error(\"roadmap\");console.log(\"tabs-ok\")'",
+            "git fetch -q origin main && node --input-type=module -e 'import {collectPublishedPages} from \"./scripts/lint-docs.js\";import {readFileSync} from \"fs\";import {execSync} from \"child_process\";const base=execSync(\"git merge-base HEAD origin/main\").toString().trim();const now=collectPublishedPages(JSON.parse(readFileSync(\"docs.json\",\"utf8\")));const before=collectPublishedPages(JSON.parse(execSync(\"git show \"+base+\":docs.json\").toString()));if([...now].sort().join()!==[...before].sort().join())throw new Error(\"page set changed\");console.log(now.length,\"pageset-ok\")'",
+            "npx vitest run tests/unit/telemetry-docs.test.ts tests/unit/scripts/lint-docs.test.ts",
+            "npm run lint:docs",
+            "npx -y mint@4.3.49 validate --format json 2>/dev/null | node -e 'let s=\"\";process.stdin.on(\"data\",d=>s+=d).on(\"end\",()=>{const r=JSON.parse(s);if(!r.passed)throw new Error(JSON.stringify(r.summary));console.log(\"validate-ok\",JSON.stringify(r.summary))})'"
+          ],
+          "expected_outputs": [
+            "tabs-ok",
+            "<count> pageset-ok",
+            "both vitest files pass",
+            "docs lint passed",
+            "validate-ok"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work item 3: rename the Vision tab to Anywhere with the two groups named in the PRD, move vision and reference/template-conversations into a new last Roadmap group of the Reference tab, and set the Features group order exactly as listed. Keep every other tab and group unchanged."
+        },
+        "items": [
+          {
+            "id": "docs-json-navigation.ac1",
+            "title": "docs.json navigation.tabs contains the tab names Getting Started, Anywhere, CLI Reference, Features, Configuration, Guides, Reference, Changelog in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-json-navigation.ac2",
+            "title": "The Features group contains the 14 pages in the PRD Work item 3 order, starting with features/conversations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-json-navigation.ac3",
+            "title": "The Reference tab ends with a Roadmap group that contains vision and reference/template-conversations, and the Reference group no longer contains reference/template-conversations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-json-navigation.ac4",
+            "title": "The PRD page-set check prints the same published page count with ok, and npx vitest run tests/unit/telemetry-docs.test.ts tests/unit/scripts/lint-docs.test.ts passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-json-redirects",
+        "title": "Add redirects for the removed tldr and beads pages",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:49:22Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5483",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e 'const r=require(\"./docs.json\").redirects;const m=Object.fromEntries(r.map(x=>[x.source,x.destination]));if(m[\"/features/tldr\"]!==\"/changelog\"||m[\"/configuration/beads\"]!==\"/features/skills\"||m[\"/cli/convoy-commands\"]!==\"/cli/review-commands\"||m[\"/configuration/state-branch\"])throw new Error(\"redirects\");console.log(\"redirects-ok\")'",
+            "npx -y mint@4.3.49 validate --format json 2>/dev/null | node -e 'let s=\"\";process.stdin.on(\"data\",d=>s+=d).on(\"end\",()=>{const r=JSON.parse(s);if(!r.passed)throw new Error(JSON.stringify(r.summary));console.log(\"validate-ok\",JSON.stringify(r.summary))})'"
+          ],
+          "expected_outputs": [
+            "redirects-ok",
+            "validate-ok"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work item 4: append two entries to docs.json redirects, /features/tldr to /changelog and /configuration/beads to /features/skills, keeping the existing /cli/convoy-commands redirect first. Do not add a state-branch redirect; #5472 owns it."
+        },
+        "items": [
+          {
+            "id": "docs-json-redirects.ac1",
+            "title": "The PRD Work item 4 redirect check prints ok for /features/tldr, /configuration/beads and /cli/convoy-commands",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-json-redirects.ac2",
+            "title": "docs.json contains no redirect for /configuration/state-branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-json-redirects.ac3",
+            "title": "npx -y mint@4.3.49 validate --format json prints passed true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontmatter-getting-started",
+        "title": "Retitle and describe the Getting Started pages and vision.mdx, and link Discord from the introduction",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:49:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5483",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "introduction.mdx",
+            "quickstart.mdx",
+            "concepts.mdx",
+            "vision.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node --input-type=module -e 'import {parse} from \"yaml\";import {readFileSync} from \"fs\";for(const f of process.argv.slice(1)){const d=parse(readFileSync(f,\"utf8\").match(/^---\\n([\\s\\S]*?)\\n---/)[1]);const n=(d.description||\"\").length;if(n<50||n>160||/[\\u2013\\u2014]/.test([d.title,d.sidebarTitle,d.description].join(\" \")))throw new Error(f+\" len=\"+n);console.log(\"ok\",f,n)}' introduction.mdx quickstart.mdx concepts.mdx vision.mdx",
+            "npx -y mint@4.3.49 validate --no-build --files introduction.mdx quickstart.mdx concepts.mdx vision.mdx"
+          ],
+          "expected_outputs": [
+            "the frontmatter check prints one 'ok <file> <length>' line per file",
+            "mint validate lists no duplicate-h1 or parse-error for these files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "FR-12",
+            "FR-13",
+            "FR-15",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply the PRD Work item 5 table exactly: set title, sidebarTitle and description in each listed file's frontmatter as double-quoted strings, delete the listed body H1 line and one adjacent blank line, and change no other line except as the PRD Work item 5 text says. Read the PRD section 'Work item 5' and 'Frontmatter work items (5 to 10): shared procedure' first."
+        },
+        "items": [
+          {
+            "id": "frontmatter-getting-started.ac1",
+            "title": "Given the Work item 5 table in the PRD, when the per-item frontmatter check runs on these files, then it prints one ok line per file with a description length from 50 to 160 and throws on none",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontmatter-getting-started.ac2",
+            "title": "Each file in this item contains exactly the title, sidebarTitle and description strings from the PRD Work item 5 table, double-quoted, with no U+2014 or U+2013 character",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontmatter-getting-started.ac3",
+            "title": "npx -y mint@4.3.49 validate --no-build --files <these files> reports no duplicate-h1 and no parse-error for any file whose body H1 the table deletes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontmatter-getting-started.ac4",
+            "title": "introduction.mdx contains a Learn More bullet linking https://discord.gg/ZpHE2ZTv5P",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontmatter-cli",
+        "title": "Rewrite the six CLI page descriptions and drop their body H1s",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:49:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5483",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/machines.mdx",
+            "cli/token.mdx",
+            "cli/overview.mdx",
+            "cli/core-commands.mdx",
+            "cli/agent-commands.mdx",
+            "cli/workspace-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node --input-type=module -e 'import {parse} from \"yaml\";import {readFileSync} from \"fs\";for(const f of process.argv.slice(1)){const d=parse(readFileSync(f,\"utf8\").match(/^---\\n([\\s\\S]*?)\\n---/)[1]);const n=(d.description||\"\").length;if(n<50||n>160||/[\\u2013\\u2014]/.test([d.title,d.sidebarTitle,d.description].join(\" \")))throw new Error(f+\" len=\"+n);console.log(\"ok\",f,n)}' cli/machines.mdx cli/token.mdx cli/overview.mdx cli/core-commands.mdx cli/agent-commands.mdx cli/workspace-commands.mdx",
+            "npx -y mint@4.3.49 validate --no-build --files cli/machines.mdx cli/token.mdx cli/overview.mdx cli/core-commands.mdx cli/agent-commands.mdx cli/workspace-commands.mdx"
+          ],
+          "expected_outputs": [
+            "the frontmatter check prints one 'ok <file> <length>' line per file",
+            "mint validate lists no duplicate-h1 or parse-error for these files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "FR-13",
+            "FR-15",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply the PRD Work item 6 table exactly: set title, sidebarTitle and description in each listed file's frontmatter as double-quoted strings, delete the listed body H1 line and one adjacent blank line, and change no other line except as the PRD Work item 6 text says. Read the PRD section 'Work item 6' and 'Frontmatter work items (5 to 10): shared procedure' first."
+        },
+        "items": [
+          {
+            "id": "frontmatter-cli.ac1",
+            "title": "Given the Work item 6 table in the PRD, when the per-item frontmatter check runs on these files, then it prints one ok line per file with a description length from 50 to 160 and throws on none",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontmatter-cli.ac2",
+            "title": "Each file in this item contains exactly the title, sidebarTitle and description strings from the PRD Work item 6 table, double-quoted, with no U+2014 or U+2013 character",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontmatter-cli.ac3",
+            "title": "npx -y mint@4.3.49 validate --no-build --files <these files> reports no duplicate-h1 and no parse-error for any file whose body H1 the table deletes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontmatter-features-retitle",
+        "title": "Retitle the five Features pages the issue names as generic",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:49:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5483",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/swarm.mdx",
+            "features/convoys.mdx",
+            "features/cloister.mdx",
+            "features/mission-control.mdx",
+            "features/workspaces.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node --input-type=module -e 'import {parse} from \"yaml\";import {readFileSync} from \"fs\";for(const f of process.argv.slice(1)){const d=parse(readFileSync(f,\"utf8\").match(/^---\\n([\\s\\S]*?)\\n---/)[1]);const n=(d.description||\"\").length;if(n<50||n>160||/[\\u2013\\u2014]/.test([d.title,d.sidebarTitle,d.description].join(\" \")))throw new Error(f+\" len=\"+n);console.log(\"ok\",f,n)}' features/swarm.mdx features/convoys.mdx features/cloister.mdx features/mission-control.mdx features/workspaces.mdx",
+            "npx -y mint@4.3.49 validate --no-build --files features/swarm.mdx features/convoys.mdx features/cloister.mdx features/mission-control.mdx features/workspaces.mdx"
+          ],
+          "expected_outputs": [
+            "the frontmatter check prints one 'ok <file> <length>' line per file",
+            "mint validate lists no duplicate-h1 or parse-error for these files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "FR-13",
+            "FR-15",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply the PRD Work item 7 table exactly: set title, sidebarTitle and description in each listed file's frontmatter as double-quoted strings, delete the listed body H1 line and one adjacent blank line, and change no other line except as the PRD Work item 7 text says. Read the PRD section 'Work item 7' and 'Frontmatter work items (5 to 10): shared procedure' first."
+        },
+        "items": [
+          {
+            "id": "frontmatter-features-retitle.ac1",
+            "title": "Given the Work item 7 table in the PRD, when the per-item frontmatter check runs on these files, then it prints one ok line per file with a description length from 50 to 160 and throws on none",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontmatter-features-retitle.ac2",
+            "title": "Each file in this item contains exactly the title, sidebarTitle and description strings from the PRD Work item 7 table, double-quoted, with no U+2014 or U+2013 character",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontmatter-features-retitle.ac3",
+            "title": "npx -y mint@4.3.49 validate --no-build --files <these files> reports no duplicate-h1 and no parse-error for any file whose body H1 the table deletes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontmatter-features-descriptions",
+        "title": "Rewrite four Features page descriptions",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:49:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5483",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "features/specialists.mdx",
+            "features/skills.mdx",
+            "features/keyboard-shortcuts.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node --input-type=module -e 'import {parse} from \"yaml\";import {readFileSync} from \"fs\";for(const f of process.argv.slice(1)){const d=parse(readFileSync(f,\"utf8\").match(/^---\\n([\\s\\S]*?)\\n---/)[1]);const n=(d.description||\"\").length;if(n<50||n>160||/[\\u2013\\u2014]/.test([d.title,d.sidebarTitle,d.description].join(\" \")))throw new Error(f+\" len=\"+n);console.log(\"ok\",f,n)}' features/conversations.mdx features/specialists.mdx features/skills.mdx features/keyboard-shortcuts.mdx",
+            "npx -y mint@4.3.49 validate --no-build --files features/conversations.mdx features/specialists.mdx features/skills.mdx features/keyboard-shortcuts.mdx"
+          ],
+          "expected_outputs": [
+            "the frontmatter check prints one 'ok <file> <length>' line per file",
+            "mint validate lists no duplicate-h1 or parse-error for these files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "FR-13",
+            "FR-15",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply the PRD Work item 8 table exactly: set title, sidebarTitle and description in each listed file's frontmatter as double-quoted strings, delete the listed body H1 line and one adjacent blank line, and change no other line except as the PRD Work item 8 text says. Read the PRD section 'Work item 8' and 'Frontmatter work items (5 to 10): shared procedure' first."
+        },
+        "items": [
+          {
+            "id": "frontmatter-features-descriptions.ac1",
+            "title": "Given the Work item 8 table in the PRD, when the per-item frontmatter check runs on these files, then it prints one ok line per file with a description length from 50 to 160 and throws on none",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontmatter-features-descriptions.ac2",
+            "title": "Each file in this item contains exactly the title, sidebarTitle and description strings from the PRD Work item 8 table, double-quoted, with no U+2014 or U+2013 character",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontmatter-features-descriptions.ac3",
+            "title": "npx -y mint@4.3.49 validate --no-build --files <these files> reports no duplicate-h1 and no parse-error for any file whose body H1 the table deletes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontmatter-configuration",
+        "title": "Rewrite five Configuration page descriptions",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:49:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5483",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/projects.mdx",
+            "configuration/issue-trackers.mdx",
+            "configuration/polyrepo.mdx",
+            "configuration/appearance.mdx",
+            "configuration/state-branch.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node --input-type=module -e 'import {parse} from \"yaml\";import {readFileSync} from \"fs\";for(const f of process.argv.slice(1)){const d=parse(readFileSync(f,\"utf8\").match(/^---\\n([\\s\\S]*?)\\n---/)[1]);const n=(d.description||\"\").length;if(n<50||n>160||/[\\u2013\\u2014]/.test([d.title,d.sidebarTitle,d.description].join(\" \")))throw new Error(f+\" len=\"+n);console.log(\"ok\",f,n)}' configuration/projects.mdx configuration/issue-trackers.mdx configuration/polyrepo.mdx configuration/appearance.mdx configuration/state-branch.mdx",
+            "npx -y mint@4.3.49 validate --no-build --files configuration/projects.mdx configuration/issue-trackers.mdx configuration/polyrepo.mdx configuration/appearance.mdx configuration/state-branch.mdx"
+          ],
+          "expected_outputs": [
+            "the frontmatter check prints one 'ok <file> <length>' line per file",
+            "mint validate lists no duplicate-h1 or parse-error for these files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "FR-13",
+            "FR-15",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply the PRD Work item 9 table exactly: set title, sidebarTitle and description in each listed file's frontmatter as double-quoted strings, delete the listed body H1 line and one adjacent blank line, and change no other line except as the PRD Work item 9 text says. Read the PRD section 'Work item 9' and 'Frontmatter work items (5 to 10): shared procedure' first."
+        },
+        "items": [
+          {
+            "id": "frontmatter-configuration.ac1",
+            "title": "Given the Work item 9 table in the PRD, when the per-item frontmatter check runs on these files, then it prints one ok line per file with a description length from 50 to 160 and throws on none",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontmatter-configuration.ac2",
+            "title": "Each file in this item contains exactly the title, sidebarTitle and description strings from the PRD Work item 9 table, double-quoted, with no U+2014 or U+2013 character",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontmatter-configuration.ac3",
+            "title": "npx -y mint@4.3.49 validate --no-build --files <these files> reports no duplicate-h1 and no parse-error for any file whose body H1 the table deletes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontmatter-reference-guides",
+        "title": "Retitle and describe the Reference and Guides pages, and link Discord from troubleshooting",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:49:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5483",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/architecture.mdx",
+            "reference/troubleshooting.mdx",
+            "reference/workers.mdx",
+            "reference/lanes.mdx",
+            "reference/template-conversations.mdx",
+            "reference/prompts.mdx",
+            "guides/stitch-integration.mdx",
+            "guides/docker-setup.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node --input-type=module -e 'import {parse} from \"yaml\";import {readFileSync} from \"fs\";for(const f of process.argv.slice(1)){const d=parse(readFileSync(f,\"utf8\").match(/^---\\n([\\s\\S]*?)\\n---/)[1]);const n=(d.description||\"\").length;if(n<50||n>160||/[\\u2013\\u2014]/.test([d.title,d.sidebarTitle,d.description].join(\" \")))throw new Error(f+\" len=\"+n);console.log(\"ok\",f,n)}' reference/architecture.mdx reference/troubleshooting.mdx reference/workers.mdx reference/lanes.mdx reference/template-conversations.mdx reference/prompts.mdx guides/stitch-integration.mdx guides/docker-setup.mdx",
+            "npx -y mint@4.3.49 validate --no-build --files reference/architecture.mdx reference/troubleshooting.mdx reference/workers.mdx reference/lanes.mdx reference/template-conversations.mdx reference/prompts.mdx guides/stitch-integration.mdx guides/docker-setup.mdx"
+          ],
+          "expected_outputs": [
+            "the frontmatter check prints one 'ok <file> <length>' line per file",
+            "mint validate lists no duplicate-h1 or parse-error for these files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "FR-12",
+            "FR-13",
+            "FR-15",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply the PRD Work item 10 table exactly: set title, sidebarTitle and description in each listed file's frontmatter as double-quoted strings, delete the listed body H1 line and one adjacent blank line, and change no other line except as the PRD Work item 10 text says. Read the PRD section 'Work item 10' and 'Frontmatter work items (5 to 10): shared procedure' first."
+        },
+        "items": [
+          {
+            "id": "frontmatter-reference-guides.ac1",
+            "title": "Given the Work item 10 table in the PRD, when the per-item frontmatter check runs on these files, then it prints one ok line per file with a description length from 50 to 160 and throws on none",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontmatter-reference-guides.ac2",
+            "title": "Each file in this item contains exactly the title, sidebarTitle and description strings from the PRD Work item 10 table, double-quoted, with no U+2014 or U+2013 character",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontmatter-reference-guides.ac3",
+            "title": "npx -y mint@4.3.49 validate --no-build --files <these files> reports no duplicate-h1 and no parse-error for any file whose body H1 the table deletes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontmatter-reference-guides.ac4",
+            "title": "reference/troubleshooting.mdx contains a Resources bullet linking https://discord.gg/ZpHE2ZTv5P after the GitHub Issues bullet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "broken-links",
+        "title": "Point the 16 broken repo-file links at GitHub so mint broken-links passes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:49:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5483",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "vision.mdx",
+            "configuration/memory-governor.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx -y mint@4.3.49 broken-links 2>&1 | tail -1 | grep -F 'no broken links found'",
+            "! grep -q '](\\./' vision.mdx && ! grep -q '](\\.\\./docs/' configuration/memory-governor.mdx && echo links-ok"
+          ],
+          "expected_outputs": [
+            "prints the line ending 'no broken links found'",
+            "links-ok"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "FR-15",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work item 12: in vision.mdx and configuration/memory-governor.mdx replace each relative link to a repo file outside the docs site with its https://github.com/eltmon/overdeck/blob/main/<path> URL, drop the dead #reading-the-stats-panel anchor, unlink the two missing files, and replace any em or en dash on each edited line per D-13."
+        },
+        "items": [
+          {
+            "id": "broken-links.ac1",
+            "title": "npx -y mint@4.3.49 broken-links exits 0 and prints 'success no broken links found'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "broken-links.ac2",
+            "title": "The links check prints links-ok: vision.mdx contains no '](./' link and configuration/memory-governor.mdx contains no '](../docs/' link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "broken-links.ac3",
+            "title": "No line this item adds or modifies contains U+2014 or U+2013",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-map",
+        "title": "Document the docs-site rules and update the runbook and codebase concerns",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:49:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5483",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "CONTRIBUTING.md",
+            "docs/REBRAND-DEPLOYMENT-RUNBOOK.md",
+            ".overdeck/context/codebase/concerns.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -q '### 5. Docs site pages' CONTRIBUTING.md && grep -q 'mint@4.3.49 validate' CONTRIBUTING.md && grep -q 'broken-links' CONTRIBUTING.md && echo contributing-ok",
+            "grep -q '/quickstart' docs/REBRAND-DEPLOYMENT-RUNBOOK.md && ! grep -q 'npmjs.com/package/overdeck' docs/REBRAND-DEPLOYMENT-RUNBOOK.md && echo runbook-ok",
+            "test \"$(grep -c 'last-verified' .overdeck/context/codebase/concerns.md)\" = 1 && echo concerns-ok",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "contributing-ok",
+            "runbook-ok",
+            "concerns-ok",
+            "docs lint passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-14",
+            "FR-15",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work item 11: add a '### 5. Docs site pages' subsection to the Quality Gates section of CONTRIBUTING.md, replace Phase 2b step 4 in docs/REBRAND-DEPLOYMENT-RUNBOOK.md with the navbar.primary /quickstart text, and rewrite the mint entry in .overdeck/context/codebase/concerns.md to the post-fix state, leaving its last-verified line unchanged."
+        },
+        "items": [
+          {
+            "id": "docs-and-map.ac1",
+            "title": "CONTRIBUTING.md contains a '### 5. Docs site pages' subsection that states the 50 to 160 description rule, the no em or en dash rule, quoting values with ': ', escaping bare <word> tags, and running mint@4.3.49 validate and broken-links",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-map.ac2",
+            "title": "docs/REBRAND-DEPLOYMENT-RUNBOOK.md Phase 2b step 4 contains /quickstart and the file contains no npmjs.com/package/overdeck string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-map.ac3",
+            "title": "The concerns.md mint entry states that mint validate and mint broken-links pass on main and that mint validate never checks docs.json keys, and the file still contains exactly one last-verified line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-map.ac4",
+            "title": "npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pr-mint-evidence",
+        "title": "Run both Mintlify checks on the final commit and put the clean output in the PR body",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:49:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5483",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs.json"
+          ],
+          "files_scope_confidence": "low",
+          "verify_commands": [
+            "git fetch -q origin main && test \"$(git diff origin/main...HEAD -U0 -- '*.mdx' docs.json CONTRIBUTING.md docs/REBRAND-DEPLOYMENT-RUNBOOK.md .overdeck/context/codebase/concerns.md | grep '^+' | grep -v '^+++' | grep -c '[–—]')\" = 0 && echo dash-ok",
+            "node --input-type=module -e 'import {collectPublishedPages} from \"./scripts/lint-docs.js\";import {parse} from \"yaml\";import {readFileSync} from \"fs\";const pages=collectPublishedPages(JSON.parse(readFileSync(\"docs.json\",\"utf8\")));for(const p of pages){const d=parse(readFileSync(p+\".mdx\",\"utf8\").match(/^---\\n([\\s\\S]*?)\\n---/)[1]);const n=(d.description||\"\").length;if(n<50||n>160||/[\\u2013\\u2014]/.test([d.title,d.sidebarTitle,d.description].join(\" \")))throw new Error(p+\" \"+n)}console.log(pages.length,\"site-ok\")'",
+            "npx -y mint@4.3.49 validate --format json 2>/dev/null | node -e 'let s=\"\";process.stdin.on(\"data\",d=>s+=d).on(\"end\",()=>{const r=JSON.parse(s);if(!r.passed)throw new Error(JSON.stringify(r.summary));console.log(\"validate-ok\",JSON.stringify(r.summary))})'",
+            "npx -y mint@4.3.49 broken-links 2>&1 | tail -1 | grep -F 'no broken links found'",
+            "gh pr view feature/pan-5483 --json body -q .body | grep -qF '## Mintlify checks' && gh pr view feature/pan-5483 --json body -q .body | grep -qF 'no broken links found' && gh pr view feature/pan-5483 --json body -q .body | grep -qF 'Closes #5483' && echo prbody-ok"
+          ],
+          "expected_outputs": [
+            "dash-ok",
+            "<count> site-ok",
+            "validate-ok",
+            "prints the line ending 'no broken links found'",
+            "prbody-ok"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-13",
+            "FR-14",
+            "FR-15",
+            "FR-16",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "files_scope_note": "Normally changes no file: it lands as an allow-empty commit carrying its Item: trailers (roles/work.md line 61). docs.json is named only because the quality lint requires a files_scope; it is edited only if a check fails."
+        },
+        "narrative": {
+          "Action": "Follow PRD Work item 13 after every other item is done: make the allow-empty Item trailer commit and push it, run the scoped diff dash check, the whole-site frontmatter check, mint@4.3.49 validate and broken-links on that commit, write a PR body file with a summary, Closes #5483, Refs #4779 and a '## Mintlify checks' section holding both commands and their clean output, open the PR with gh pr create (or gh pr edit if one exists), run pan task done for the item and its ACs, then run pan done."
+        },
+        "items": [
+          {
+            "id": "pr-mint-evidence.ac1",
+            "title": "The scoped diff dash check prints dash-ok, and the whole-site frontmatter check prints '<count> site-ok' for every published page",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-mint-evidence.ac2",
+            "title": "npx -y mint@4.3.49 validate exits 0 and npx -y mint@4.3.49 broken-links exits 0 on the final commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-mint-evidence.ac3",
+            "title": "gh pr view feature/pan-5483 --json body returns a body that contains '## Mintlify checks', 'success passed', 'no broken links found' and 'Closes #5483' (the prbody check prints prbody-ok)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-mint-evidence.ac4",
+            "title": "The PR body contains Closes #5483 and names the short sha the checks ran on",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "mint-validate-errors",
+        "to": "docs-json-site-config",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-json-site-config",
+        "to": "docs-json-navigation",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-json-navigation",
+        "to": "docs-json-redirects",
+        "type": "blocks"
+      },
+      {
+        "from": "mint-validate-errors",
+        "to": "frontmatter-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "frontmatter-getting-started",
+        "to": "broken-links",
+        "type": "blocks"
+      },
+      {
+        "from": "mint-validate-errors",
+        "to": "docs-and-map",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-json-site-config",
+        "to": "docs-and-map",
+        "type": "blocks"
+      },
+      {
+        "from": "broken-links",
+        "to": "docs-and-map",
+        "type": "blocks"
+      },
+      {
+        "from": "mint-validate-errors",
+        "to": "pr-mint-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-json-site-config",
+        "to": "pr-mint-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-json-navigation",
+        "to": "pr-mint-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-json-redirects",
+        "to": "pr-mint-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "frontmatter-getting-started",
+        "to": "pr-mint-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "frontmatter-cli",
+        "to": "pr-mint-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "frontmatter-features-retitle",
+        "to": "pr-mint-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "frontmatter-features-descriptions",
+        "to": "pr-mint-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "frontmatter-configuration",
+        "to": "pr-mint-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "frontmatter-reference-guides",
+        "to": "pr-mint-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "broken-links",
+        "to": "pr-mint-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-and-map",
+        "to": "pr-mint-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-json-site-config",
+        "to": "docs-json-redirects",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
