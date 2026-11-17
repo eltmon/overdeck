@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5465",
   "created": "2026-11-17T12:56:05.449Z",
-  "updated": "2026-11-17T14:35:25.880Z",
+  "updated": "2026-11-17T14:35:30.092Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,11 @@
     "launch-exclude.ac3": {
       "status": "completed",
       "doneAt": "2026-11-17T14:35:25.880Z"
+    },
+    "hot-apply": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5465",
+      "claimedAt": "2026-11-17T14:35:30.092Z"
     }
   }
 }
