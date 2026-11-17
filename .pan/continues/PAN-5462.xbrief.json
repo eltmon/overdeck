@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5462",
   "created": "2026-11-17T12:53:58.478Z",
-  "updated": "2026-11-17T12:58:35.489Z",
+  "updated": "2026-11-17T19:11:27.898Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,7 +32,7 @@
       "doneAt": "2026-11-17T12:55:21.213Z"
     },
     "wsl-bridge": {
-      "status": "blocked"
+      "status": "pending"
     },
     "wsl-readiness": {
       "status": "blocked"
