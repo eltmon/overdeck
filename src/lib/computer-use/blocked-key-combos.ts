@@ -2,9 +2,9 @@
 // upstream: src/main/computer/action-contracts/computer-blocked-key-combos.ts @ c6b9ac9549b
 // Design ported from vercel-labs/agent-desktop's per-platform blocked_combo lists (Apache-2.0).
 //
-// Linux-only slice of Orca's blocked-shortcut port (PAN-5452 D-7). The platform
-// argument is back (PAN-5461 D-16), but only the Linux table exists so far;
-// 'windows' and 'mac' fail closed until PAN-5462/5463 add their tables.
+// Linux and Windows slices of Orca's blocked-shortcut port (PAN-5452 D-7,
+// PAN-5462 D-8). The platform argument selects the table (PAN-5461 D-16);
+// 'mac' fails closed until PAN-5463 adds its table.
 import { ComputerUseError } from './errors.js';
 import type { KeyPlatform } from './platform-types.js';
 
@@ -23,6 +23,30 @@ interface PlatformKeyRules {
 }
 
 const SHARED_KEY_ALIASES = { esc: 'escape' };
+
+const WINDOWS_RULES: PlatformKeyRules = {
+  modifierAliases: {
+    ctrl: 'ctrl',
+    control: 'ctrl',
+    cmdorctrl: 'ctrl',
+    commandorcontrol: 'ctrl',
+    meta: 'win',
+    super: 'win',
+    win: 'win',
+    cmd: 'win',
+    command: 'win',
+    alt: 'alt',
+    option: 'alt',
+    shift: 'shift',
+  },
+  keyAliases: SHARED_KEY_ALIASES,
+  // Ctrl+Alt+Delete is absent: Windows never honors a synthesized Secure Attention Sequence.
+  blocked: [
+    { modifiers: ['alt'], keys: ['f4'], effect: 'close the app' },
+    { modifiers: ['win'], keys: ['l'], effect: 'lock Windows' },
+    { modifiers: ['ctrl', 'shift'], keys: ['escape'], effect: 'open Task Manager' },
+  ],
+};
 
 const NUMERIC_KEYSYM = 'numeric keysym';
 
@@ -84,27 +108,34 @@ const LINUX_RULES: PlatformKeyRules = {
 };
 
 // Extra modifiers still match: Ctrl+Alt+Shift+Q quits the app just like Ctrl+Q.
-function findBlockedKeyCombo(key: string): BlockedKeyCombo | null {
+function findBlockedKeyCombo(key: string, rules: PlatformKeyRules): BlockedKeyCombo | null {
+  const isLinux = rules === LINUX_RULES;
   const parts = key === '+' ? ['+'] : key.split('+');
   const modifiers = new Set<string>();
   let keyName = '';
   for (const part of parts) {
     const normalized = part.trim().toLowerCase();
     // X11 keysym names such as Alt_L/Control_R carry a side suffix the alias table doesn't have.
-    const modifierName = normalized.replace(/_[lr]$/, '').replace(/[\s_-]/g, '');
-    const modifier = LINUX_RULES.modifierAliases[modifierName];
+    const modifierName = (isLinux ? normalized.replace(/_[lr]$/, '') : normalized).replace(/[\s_-]/g, '');
+    const modifier = rules.modifierAliases[modifierName];
     if (modifier) {
       modifiers.add(modifier);
     } else {
-      const aliased = LINUX_RULES.keyAliases[normalized] ?? normalized;
-      keyName = LINUX_RULES.canonicalKey ? LINUX_RULES.canonicalKey(aliased) : aliased;
+      const aliased = rules.keyAliases[normalized] ?? normalized;
+      keyName = rules.canonicalKey ? rules.canonicalKey(aliased) : aliased;
     }
   }
   return (
-    LINUX_RULES.blocked.find(
+    rules.blocked.find(
       (combo) => combo.keys.includes(keyName) && combo.modifiers.every((modifier) => modifiers.has(modifier)),
     ) ?? null
   );
+}
+
+function rulesFor(platform: KeyPlatform): PlatformKeyRules | null {
+  if (platform === 'linux') return LINUX_RULES;
+  if (platform === 'windows') return WINDOWS_RULES;
+  return null;
 }
 
 /**
@@ -112,11 +143,12 @@ function findBlockedKeyCombo(key: string): BlockedKeyCombo | null {
  * Platforms without a rule table throw `unsupported_platform`, even with allowSystemShortcut (D-16).
  */
 export function assertKeyComboAllowed(key: string, allowSystemShortcut: boolean, platform: KeyPlatform = 'linux'): void {
-  if (platform !== 'linux') {
+  const rules = rulesFor(platform);
+  if (!rules) {
     throw new ComputerUseError('unsupported_platform', `No blocked-shortcut rules for ${platform} yet.`);
   }
   if (allowSystemShortcut) return;
-  const blocked = findBlockedKeyCombo(key);
+  const blocked = findBlockedKeyCombo(key, rules);
   if (blocked) {
     throw new ComputerUseError(
       'system_shortcut_blocked',
