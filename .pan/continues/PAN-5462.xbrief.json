@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5462",
   "created": "2026-11-17T12:53:58.478Z",
-  "updated": "2026-11-17T12:57:51.163Z",
+  "updated": "2026-11-17T12:58:35.489Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,26 @@
     },
     "ci-wsl-e2e": {
       "status": "blocked"
+    },
+    "ci-windows-native": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:58:35.489Z"
+    },
+    "ci-windows-native.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:58:35.489Z"
+    },
+    "ci-windows-native.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:58:35.489Z"
+    },
+    "ci-windows-native.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:58:35.489Z"
+    },
+    "ci-windows-native.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:58:35.489Z"
     }
   }
 }
