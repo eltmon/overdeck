@@ -287,4 +287,65 @@ describe('backup', () => {
       expect(cleanOldBackups(0)).toBe(0);
     });
   });
+
+  describe('backupBeforeSync', () => {
+    it('with 12 existing backups leaves 10, including the new one', async () => {
+      for (let i = 1; i <= 12; i++) {
+        const dd = String(i).padStart(2, '0');
+        mkdirSync(join(mockBackupsDir, `2020-01-${dd}T00-00-00-000Z`, 'skills'), { recursive: true });
+      }
+      mkdirSync(join(mockBackupsDir, 'dist-rollbacks', 'dist.rollback.1'), { recursive: true });
+      mkdirSync(join(mockBackupsDir, 'pan-3783-native-context', 'manifest.json'), { recursive: true });
+      mkdirSync(join(mockBackupsDir, '2019-01-01T00-00-00-000Z', 'context'), { recursive: true });
+      writeFileSync(join(mockBackupsDir, '2019-01-01T00-00-00-000Z', 'context', 'home__u__CLAUDE.md'), '');
+
+      const sourceDir = join(tempDir, 'skills');
+      mkdirSync(sourceDir, { recursive: true });
+      writeFileSync(join(sourceDir, 'a.md'), '');
+
+      const { backupBeforeSync } = await import('../../src/lib/backup.js');
+      const result = backupBeforeSync([sourceDir], 10);
+
+      expect(result.pruned).toBe(3);
+      expect(existsSync(result.backup.path)).toBe(true);
+      expect(existsSync(join(mockBackupsDir, '2020-01-01T00-00-00-000Z'))).toBe(false);
+      expect(existsSync(join(mockBackupsDir, '2020-01-02T00-00-00-000Z'))).toBe(false);
+      expect(existsSync(join(mockBackupsDir, '2020-01-03T00-00-00-000Z'))).toBe(false);
+      expect(existsSync(join(mockBackupsDir, 'dist-rollbacks'))).toBe(true);
+      expect(existsSync(join(mockBackupsDir, 'pan-3783-native-context'))).toBe(true);
+      expect(existsSync(join(mockBackupsDir, '2019-01-01T00-00-00-000Z', 'context', 'home__u__CLAUDE.md'))).toBe(
+        true,
+      );
+    });
+
+    it('does not prune after an empty backup', async () => {
+      for (let i = 1; i <= 12; i++) {
+        const dd = String(i).padStart(2, '0');
+        mkdirSync(join(mockBackupsDir, `2020-01-${dd}T00-00-00-000Z`, 'skills'), { recursive: true });
+      }
+
+      const { backupBeforeSync } = await import('../../src/lib/backup.js');
+      const result = backupBeforeSync([join(tempDir, 'missing')], 10);
+
+      expect(result.pruned).toBe(0);
+      expect(result.backup.targets).toHaveLength(0);
+      for (let i = 1; i <= 12; i++) {
+        const dd = String(i).padStart(2, '0');
+        expect(existsSync(join(mockBackupsDir, `2020-01-${dd}T00-00-00-000Z`))).toBe(true);
+      }
+    });
+
+    it('returns a prune error instead of throwing', async () => {
+      const sourceDir = join(tempDir, 'skills');
+      mkdirSync(sourceDir, { recursive: true });
+      writeFileSync(join(sourceDir, 'a.md'), '');
+
+      const { backupBeforeSync } = await import('../../src/lib/backup.js');
+      const result = backupBeforeSync([sourceDir], -1);
+
+      expect(result.pruned).toBe(0);
+      expect(result.pruneError).toContain('non-negative integer');
+      expect(existsSync(result.backup.path)).toBe(true);
+    });
+  });
 });

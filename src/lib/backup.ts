@@ -155,3 +155,24 @@ export function cleanOldBackups(keepCount: number = 10): number {
   }
   return removed;
 }
+
+export interface SyncBackupResult {
+  backup: BackupInfo;
+  pruned: number;
+  pruneError?: string;
+}
+
+/**
+ * PAN-5484: create the pre-sync backup, then prune prunable backups down to `keep`.
+ * A create failure throws (sync fails as before); a prune failure is returned, never thrown.
+ */
+export function backupBeforeSync(sourceDirs: string[], keep: number): SyncBackupResult {
+  const backup = createBackup(sourceDirs);
+  // An empty backup (every source absent) must not evict older backups that hold content.
+  if (backup.targets.length === 0) return { backup, pruned: 0 };
+  try {
+    return { backup, pruned: cleanOldBackups(keep) };
+  } catch (error) {
+    return { backup, pruned: 0, pruneError: error instanceof Error ? error.message : String(error) };
+  }
+}
