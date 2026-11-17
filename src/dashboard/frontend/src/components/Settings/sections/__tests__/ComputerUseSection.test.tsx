@@ -295,6 +295,8 @@ describe('ComputerUseSection on macOS (PAN-5463)', () => {
     renderSection();
     await screen.findByTestId('computer-use-badge');
     expect(screen.queryByTestId('computer-use-mac-permissions')).toBeNull();
+  });
+});
 
 describe('ComputerUseSection under WSL2 (PAN-5462 FR-6)', () => {
   afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
