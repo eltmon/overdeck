@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-17T20:38:44.366983Z · model: claude-opus-5-5 · open: 938_
+_Last sequenced: 2026-11-17T21:36:52.298925Z · model: claude-opus-5-5 · open: 939_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -443,6 +443,7 @@ _Last sequenced: 2026-11-17T20:38:44.366983Z · model: claude-opus-5-5 · open: 
 | 424 | PAN-5028 | M | medium | ok |  |  | list_pending_input loses a conversation's AskUserQuestion after the PAN-1520 deny hook, contrary to the existing test's contract. |
 | 425 | PAN-5386 | XS | medium | ok |  |  | CodeRabbit follow-up for PAN-5361 (PR #5373): 1 Major finding, baseline burst can hide an idle regression in bare-host smoke |
 | 426 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
+| 426 | PAN-5515 | XS | medium | ok |  | PAN-5463 | CodeRabbit Major on PR #5513: release.yml may notarize an ad-hoc-signed macOS helper when the API key exists but no cert. |
 | 427 | PAN-5227 | S | medium | ok |  |  | Closed-issue reaper re-checks every issue's state every 60 s, spending ~25% of the GitHub App REST bucket while idle. |
 | 428 | PAN-5439 | L | medium | ok |  |  | React Compiler burn-down for explorer, God View, conversations, workspace, project: 40 skips, 132 memo sites. |
 | 429 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
@@ -1273,10 +1274,10 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-17T20:38:44.366983Z",
+  "generatedAt": "2026-11-17T21:36:52.298925Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 938,
+  "openCount": 939,
   "nodes": [
     {
       "issue": "PAN-5484",
@@ -6829,6 +6830,21 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "condition": "ok",
       "dependsOn": [],
       "why": "Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously)",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5515",
+      "rank": 426,
+      "size": "XS",
+      "importance": "medium",
+      "score": 46,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5463"
+      ],
+      "why": "CodeRabbit Major on PR #5513: release.yml may notarize an ad-hoc-signed macOS helper when the API key exists but no cert.",
+      "rationale": "New one-finding follow-up; ranked beside the comparable PAN-5386 follow-up because a bad secret mix could fail the macOS release job.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14212,6 +14228,13 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "from": "PAN-5461",
       "to": "PAN-5463",
       "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5463",
+      "to": "PAN-5515",
+      "type": "informs",
       "source": "github-ref",
       "confidence": 1
     },
