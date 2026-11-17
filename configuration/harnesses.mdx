@@ -1305,6 +1305,7 @@ name. Every field is required, so a harness cannot leave a decision undeclared.
 | `runsOnFlyMachine` | A conversation may be started on a Fly machine (`pan machines add-fly`). Only Claude Code declares it; other harnesses on Fly are #4296. |
 | `overdeckMcp` | Launches get the `overdeck` MCP server with a per-agent token. Claude Code, Codex, `acp` and `opencode` declare it. |
 | `skillSlashCommands` | The composer `/` menu lists installed skills as `/<skill-name>` under a Skills group, because this harness runs a typed `/<skill>` command. Only Claude Code declares it. |
+| `conversationSkillApply` | How pack skills added to a running conversation load (`pan skills add`, `add_skills`, **Add skills…**): `hot-reload` re-points the plugin dir and sends `/reload-plugins` (Claude Code); `restart` stores them and loads them on a resume (Codex); `null` means the harness gets no conversation packs, so the dashboard hides **Add skills…** and the route answers 409. |
 
 The rule for harness-specific code:
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type RefObject } from 'react';
 import { Archive, Copy, Download, ExternalLink, FileDiff, FileText, GitBranchPlus, Hash, Info, Loader2, MonitorSmartphone, PackagePlus, Share2, Sparkles, Square, Star, Users, Wrench } from 'lucide-react';
+import { getHarnessBehavior } from '@overdeck/contracts';
 import { toast } from 'sonner';
 import type { Conversation } from '../../CommandDeck/ConversationList';
 import type { useConversationMutations } from '../../CommandDeck/useConversationMutations';
@@ -284,7 +285,7 @@ export function ConversationHeaderMenu({
             Create summary fork
           </MenuItemButton>
         )}
-        {(!conversation.harness || conversation.harness === 'claude-code' || conversation.harness === 'codex') && (
+        {getHarnessBehavior(conversation.harness).capabilities.conversationSkillApply !== null && (
           <MenuItemButton
             onClick={() => { convMutations.openAddSkillsModal(conversation); onClose(); }}
           >

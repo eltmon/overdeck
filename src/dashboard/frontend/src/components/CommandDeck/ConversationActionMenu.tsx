@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Star, Pencil, Sparkles, Share2, GitBranchPlus, Download, Copy, Check, Square, Archive, X, FileText, ExternalLink, Loader2, Columns2, Rows2, FolderInput, PackagePlus } from 'lucide-react';
+import { getHarnessBehavior } from '@overdeck/contracts';
 import { toast } from 'sonner';
 import type { Conversation } from './ConversationList';
 import type { ConversationMutations } from './useConversationMutations';
@@ -287,7 +288,7 @@ export function ConversationActionMenu({ conversation, mutations, position, onCl
                 Create summary fork
               </MenuItemButton>
             )}
-            {(!conversation.harness || conversation.harness === 'claude-code' || conversation.harness === 'codex') && (
+            {getHarnessBehavior(conversation.harness).capabilities.conversationSkillApply !== null && (
               <MenuItemButton
                 onClick={() => { mutations.openAddSkillsModal(conversation); onClose(); }}
               >

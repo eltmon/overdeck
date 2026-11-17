@@ -13,6 +13,7 @@
  * `readConversationSkills` answers FR-7 for the dashboard dialog. Every effect
  * is injectable through `SkillApplyDeps`.
  */
+import { getHarnessBehavior } from '@overdeck/contracts';
 import type { LivenessVerdict } from '../agents/liveness.js';
 import type { PackCatalogEntry, SkillCatalogEntry } from '../skill-overrides/catalog.js';
 import {
@@ -176,9 +177,9 @@ async function applyToHead(
   opts: { self: boolean },
   deps: SkillApplyDeps,
 ): Promise<SkillApplyResponse> {
-  // d. FR-6.
-  const harness = head.harness ?? 'claude-code';
-  if (harness !== 'claude-code' && harness !== 'codex') return errorResponse(409, HARNESS_REFUSAL);
+  // d. FR-6: the harness declares how conversation packs load (Claude Code hot-reload, Codex restart), or that they don't.
+  const skillApply = getHarnessBehavior(head.harness).capabilities.conversationSkillApply;
+  if (skillApply === null) return errorResponse(409, HARNESS_REFUSAL);
 
   // e. Expand and validate against one catalog before anything is stored (D-13).
   let entries: Record<string, boolean>;
@@ -220,7 +221,7 @@ async function applyToHead(
 
   // g. D-1 / D-6: native skills and Codex load only at launch.
   const native = [...request.skills, ...request.off].some((id) => !isPackSkillId(id) && !isCoreSkill(id));
-  if (native || harness === 'codex') return restartOrAsk();
+  if (native || skillApply === 'restart') return restartOrAsk();
 
   // h. Claude Code hot apply.
   const link = skillPackLinkPath({ managedStateKey: head.tmuxSession, spawnMode: 'conversation', workingDir: head.cwd });
