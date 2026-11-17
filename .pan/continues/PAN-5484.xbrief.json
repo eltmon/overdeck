@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5484",
   "created": "2026-11-17T12:42:28.378Z",
-  "updated": "2026-11-17T15:44:08.587Z",
+  "updated": "2026-11-17T15:46:53.111Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -37,9 +37,22 @@
       "claimedAt": "2026-11-17T13:05:53.098Z"
     },
     "backup-retention-docs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5484",
-      "claimedAt": "2026-11-17T15:44:08.587Z"
+      "claimedAt": "2026-11-17T15:44:08.587Z",
+      "doneAt": "2026-11-17T15:46:53.111Z"
+    },
+    "backup-retention-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T15:46:53.111Z"
+    },
+    "backup-retention-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T15:46:53.111Z"
+    },
+    "backup-retention-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T15:46:53.111Z"
     }
   }
 }
