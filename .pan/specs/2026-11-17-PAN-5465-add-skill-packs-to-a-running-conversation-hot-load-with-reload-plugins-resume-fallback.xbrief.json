@@ -1,0 +1,870 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-17T12:42:47Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5465: Add skill packs to a running conversation (hot-load with /reload-plugins, resume fallback)",
+    "updated": "2026-11-17T12:53:16.649Z"
+  },
+  "plan": {
+    "id": "pan-5465",
+    "title": "Add skill packs to a running conversation (hot-load with /reload-plugins, resume fallback)",
+    "status": "proposed",
+    "uid": "f4020371-2226-46c0-b96a-3a6b23b4cfcc",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-17T12:42:47Z",
+    "updated": "2026-11-17T12:53:16.649Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5465",
+        "label": "PAN-5465",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5465/.pan/drafts/pan-5465.md",
+        "label": "PRD draft (.pan/drafts/pan-5465.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5464",
+        "label": "PAN-5464 (companion: video packs and pack groups)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5497",
+        "label": "PAN-5497 (deferred pack-group support, D-10)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "skill-packs",
+      "conversations",
+      "claude-code",
+      "codex",
+      "mcp",
+      "cli",
+      "dashboard"
+    ],
+    "metadata": {
+      "sizeJustification": "One feature with one service and four thin callers (route, CLI, MCP tool, dashboard dialog) that the issue body requires together. Every caller only posts to the same route, and shipping the service without its entry points gives the operator nothing (operator rule: every capability needs an entry point from the conversation tab). The subsystem count is inflated because the lint counts each top-level doc file (features/*.mdx, configuration/mcp.mdx, docs/SKILL-PACKS.md, changelog.d) as its own subsystem. Pack groups are already split out to PAN-5497.",
+      "canonicalFilename": "2026-11-17-PAN-5465-add-skill-packs-to-a-running-conversation-hot-load-with-reload-plugins-resume-fallback.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "A conversation's pack skills are fixed at launch: the conversation row's skill map is set only when the conversation is created (PAN-4486). The operator wants to pull a pack into a conversation that is already running, without losing its context, and an agent should be able to load a pack into itself.",
+      "Proposal": "Every Claude Code launch passes --plugin-dir, pointing at a fixed empty mount when no packs are on. A new apply service merges pack skills into the /clear chain head's skill map, then applies them: Claude Code conversations that run with --plugin-dir <their link> get a hot apply (rebuild the mount, re-point the link, deliver /reload-plugins, confirm by comparing skill counts before and after); Codex, native skills, launch-wired packs (deft, sageox, gstack-runtime, packs with MCP servers) and pre-change Claude sessions get needs-restart, or a resume apply with restart:true; stopped conversations get next-launch. A mid-turn conversation (always the case for the agent itself) gets queued: Claude Code runs the queued reload when the turn ends (spike 2). Three routes (GET/POST /api/conversations/:name/skills, POST /api/self/skills), pan skills add, the add_skills MCP tool and an Add skills… dialog in the conversation tab and header menus call it.",
+      "NonGoals": "- No pack groups anywhere (no `groups` field, no `--group`, no group checkboxes); a `groups` key gets 400 `Pack groups are not supported yet`. PAN-5497 adds them after PAN-5464 merges.\n- No hot apply for native (non-pack) skills, Codex, or launch-wired packs (deft, sageox, gstack-runtime, packs with MCP servers); they return needs-restart.\n- No skill changes for Pi, ohmypi, opencode or any harness other than Claude Code and Codex (409).\n- No Add skills… item in ConversationRow.tsx (sidebar row menu).\n- No removal of pack skills by clearing a value back to Inherit; only `off` writes false (add-only, D-1).\n- No remote (Fly) or linked-machine (`@machine/name`) conversations.\n- No keys-based delivery fallback for slash commands; the PRD checkpoint files a follow-up only with live evidence.\n- No change to handleConversationMessage; the hot apply delivers through deliverAgentMessage.\n- No raising of any file-size allowlist cap.",
+      "Verification": "Live checks for the test/UAT role (AC-10 in the PRD), on the host's default terminal backend against the deployed build, with an isolated Playwright profile for the dashboard: (a) a new Claude Code conversation with no packs has `--plugin-dir <OVERDECK_HOME>/launch/<key>/skill-packs` in `ps -eo args=` and the link resolves to mounts/empty/plugins; (b) `pan skills add <conv> --pack mattpocock` on an idle Claude Code conversation prints the hot sentence and the agent then runs /mattpocock:grilling; (c) the same on a Codex conversation prints the needs-restart sentence; (d) an agent calling add_skills with packs [mattpocock] gets queued and invokes a mattpocock skill in its next turn; (e) the Add skills… dialog opens from the conversation header menu and shows the conversation's current pack values."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Pack groups are deferred to a new follow-up issue (PAN-5497); this issue ships packs and pack skills only.",
+        "rationale": "PAN-5464's resolvePackGroup does not exist on main and PAN-5464 is still in planning; the PRD already allowed shipping without groups, and a conditional item would let two different diffs both look done."
+      },
+      {
+        "summary": "add_skills without `conversation` posts to a new self route, POST /api/self/skills, that takes the conversation from the agent token.",
+        "rationale": "McpToolContext carries no caller identity; the self routes already resolve it from the token (self-caller.ts), and conversation tokens carry the operate scope."
+      },
+      {
+        "summary": "A sixth outcome, `queued`, covers mid-turn conversations, and the self route never waits for a reload line.",
+        "rationale": "Spike 2 showed Claude Code queues a mid-turn /reload-plugins and runs it when the turn ends; an agent calling add_skills on itself is always mid-turn, so a blocking wait would always time out."
+      },
+      {
+        "summary": "The hot-capable check reads `ps -eo pid=,ppid=,args=` for `--plugin-dir <exact link>` instead of /proc/<runtimePid>/cmdline.",
+        "rationale": "isAlive returns no runtimePid on Herdr, the default backend; the ps table is the existing precedent in conversation-runtime.ts and also works on macOS."
+      },
+      {
+        "summary": "/reload-plugins is delivered with deliverAgentMessage after the message path's permission and input-target guards, not through handleConversationMessage.",
+        "rationale": "handleConversationMessage would retitle a default-titled conversation as /reload-plugins and start the PAN-1635 eaten-message watcher, which can redeliver a local command."
+      },
+      {
+        "summary": "Resume apply uses stopConversationRuntime + handleConversationResume(resumeCause 'system'), and a conversation cannot restart itself through the self route (400).",
+        "rationale": "This is the native-compaction precedent; handleConversationStop marks the row ended and records a deliberate stop. A self-restart would kill the in-flight tool call."
+      },
+      {
+        "summary": "Add skills… goes in the conversation tab menu and the conversation header menu, not the sidebar row menu.",
+        "rationale": "Those two cover the conversation surface the operator works from; ConversationRow.tsx is 920 lines and a third host adds risk without a new entry point."
+      },
+      {
+        "summary": "The skill map is written to the /clear chain head, after conversationWriteRefusal and shutdownDrainingRefusal.",
+        "rationale": "The launch reads the map through getSupervisedConversationByTmuxSession, which returns the chain head; writing the named row could be silently ignored."
+      }
+    ],
+    "items": [
+      {
+        "id": "empty-mount",
+        "title": "Point the Claude plugin link at a fixed empty mount instead of removing it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:42:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5465",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/mount.ts",
+            "src/lib/skill-packs/__tests__/mount.test.ts",
+            "src/cli/commands/skills.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/mount.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "mount.test.ts passes, including the new empty-mount and gc tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Add emptyMountPluginsDir() to mount.ts; make linkClaudeMount(link, null) symlink the link to mounts/empty/plugins (created on demand) with the same atomic tmp+rename; make gcMounts skip the entry named `empty`; replace the rm(link) fail-open in skillsLaunchSettingsCommand (skills.ts ~line 180) with linkClaudeMount(link, null). Update tests that asserted link removal."
+        },
+        "items": [
+          {
+            "id": "empty-mount.ac1",
+            "title": "Given no mount, when linkClaudeMount(link, null) runs, then link is a symlink that resolves to an existing empty <mountsDir>/empty/plugins directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "empty-mount.ac2",
+            "title": "Given a link already pointing at a real mount, when linkClaudeMount(link, null) runs, then the link re-points to the empty mount and is never absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "empty-mount.ac3",
+            "title": "Given mounts/empty is older than maxAgeMs and unreferenced, when gcMounts runs, then mounts/empty persists and is not in removedMounts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "empty-mount.ac4",
+            "title": "When applyClaudePacks throws during skillsLaunchSettingsCommand, then the fail-open calls linkClaudeMount(link, null) and no longer calls rm on the link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launch-exclude",
+        "title": "Extract launchPackExclude and add a conversationLayer override to the launch context",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:42:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-5465",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-overrides/launch.ts",
+            "src/cli/commands/skills.ts",
+            "src/lib/skill-overrides/__tests__/launch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-overrides/__tests__/launch.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "launch.test.ts passes with the new launchPackExclude and conversationLayer tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add exported launchPackExclude(ctx, harness) → { exclude, sageox } to launch.ts (lazy import of ../sageox/launch.js, type-only import of SageoxLaunch); make skillsLaunchSettingsCommand use it and drop its own resolveSageoxLaunch/SAGEOX_PACK_ID logic. Add optional conversationLayer to LaunchSkillContext and make loadLaunchLayers prefer it over reading the row."
+        },
+        "items": [
+          {
+            "id": "launch-exclude.ac1",
+            "title": "Given SageOx resolves inactive, when launchPackExclude runs, then it returns an exclude set containing `sageox`; given active, it returns an empty set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-exclude.ac2",
+            "title": "skillsLaunchSettingsCommand obtains exclude only from launchPackExclude and still prints each sageox warning to stderr",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-exclude.ac3",
+            "title": "Given ctx.conversationLayer is set, when resolveLaunchPackSelection runs, then it applies that map as the conversation layer and never reads the conversation row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hot-apply",
+        "title": "Hot apply module: plugin-dir check, launch-wired check, guarded /reload-plugins with before/after confirmation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:42:47Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5465",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/overdeck/conversation-skill-hot-apply.ts",
+            "src/lib/overdeck/__tests__/conversation-skill-hot-apply.test.ts",
+            "src/lib/overdeck/conversation-runtime.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-skill-hot-apply.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "conversation-skill-hot-apply.test.ts passes",
+            "typecheck completes without errors",
+            "file-size guard passes (conversation-runtime.ts gains no lines)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "New module plus an export keyword in conversation-runtime.ts; no other item touches either file, and it runs after launch-exclude.",
+          "foundationFor": [
+            "apply-service"
+          ],
+          "acJustification": "Six criteria: the pure helpers, both run paths, the prechecks and the delivery door are independent behaviors of one module."
+        },
+        "narrative": {
+          "Action": "PRD WI-3 with D-3, D-4, D-5, D-7, D-8, D-9. New module exporting hotApplyPrecheck, hotApplyRun and the pure helpers hasPluginDirArg, launchWiredChange, readReloadLines; all I/O injected through HotApplyDeps. Add `export` to readProcessTable and ProcessTableRow in conversation-runtime.ts (no new lines). Precheck order: plugin-dir in ps args → launch-wired change against the live mount (selection resolved with conversationLayer = merged map) → pending permission (409 permission-pending) → main input target (409 input-target-not-main). Run: assumeBusy → relink + one reload → queued; else baseline reload, busy fallback after 15 s → queued, relink with the same selection, second reload, compare S1−S0 with the mounted-skill delta → hot or sent. Deliver with deliverAgentMessage(conv.tmuxSession, '/reload-plugins', 'skill-reload', 'tmux') (forced tmux method so the text is pasted into the pane, never routed through Channels; on Herdr the herdr prompt path types it); never handleConversationMessage. hotApplyPrecheck returns { kind: ready, selection, mcp, mounted } on success and hotApplyRun takes that object, so one resolution feeds both the D-8 check and the mount. Build the mount before the baseline reload; in the busy fallback, after relinking read the pane once more and send a second reload if a new Reloaded: line appeared after the timeout. Default readProcessArgs lazily imports conversation-runtime.js."
+        },
+        "items": [
+          {
+            "id": "hot-apply.ac1",
+            "title": "hasPluginDirArg returns true for args containing `--plugin-dir <link>` followed by a space or the end, and false for a sibling session's link (conv-ab vs conv-a) or a missing flag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hot-apply.ac2",
+            "title": "launchWiredChange returns the pack id when a deft skill, a gstack-runtime pack or a pack listed in mcp[] changes against the mounted skill set, and returns [] for a plain pack or an unchanged deft pack",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hot-apply.ac3",
+            "title": "Given an idle conversation (fake timers), hotApplyRun delivers /reload-plugins, then relinks, then delivers again in that order, and returns hot when S1−S0 equals the skill delta and sent when it differs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hot-apply.ac4",
+            "title": "Given no new Reloaded: line within 15 s of the baseline reload, hotApplyRun relinks and returns queued, sending a second reload only when a new line appears on the read after the relink; given assumeBusy, it relinks, sends one reload, reads no pane and returns queued",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hot-apply.ac5",
+            "title": "hotApplyPrecheck returns not-hot/no-plugin-dir when ps args lack the link, not-hot/launch-wired for a D-8 change, and refused 409 with code permission-pending or input-target-not-main for the two guards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hot-apply.ac6",
+            "title": "The default deliver dependency sends through deliverAgentMessage(session, '/reload-plugins', 'skill-reload', 'tmux') and never calls handleConversationMessage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "apply-service",
+        "title": "Conversation skill apply service: validate, merge into the chain head, choose the outcome",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:42:47Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5465",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "skills-routes",
+            "cli-skills-add",
+            "mcp-add-skills",
+            "ui-add-skills-modal"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/conversations.ts",
+            "src/lib/overdeck/conversation-skill-apply.ts",
+            "src/lib/overdeck/__tests__/conversation-skill-apply.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-skill-apply.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "conversation-skill-apply.test.ts passes",
+            "typecheck completes without errors",
+            "file-size guard passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-8",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "New module plus one setter in src/lib/overdeck/conversations.ts, which no other item edits; it runs after hot-apply, whose exports it calls."
+        },
+        "narrative": {
+          "Action": "PRD WI-4 with D-1, D-6, D-10 to D-13. Add setConversationSkillOverrides to conversations.ts beside setConversationModel. New module exporting SkillApplyOutcome ('hot'|'sent'|'queued'|'needs-restart'|'restarted'|'next-launch'), parseSkillApplyBody (groups key → 400 'Pack groups are not supported yet'), applyConversationSkills(name, request, { self }, deps) and readConversationSkills. Steps: per-name in-flight lock (409 apply-in-progress) → empty lists 400 → self+restart 400 → row → chain head (resolveClearChainHead) → conversationWriteRefusal/shutdownDrainingRefusal → harness gate 409 → expand with resolveConversationSkillFlags and validate off (400, nothing stored) → isAlive (confirmed dead → write, next-launch; indeterminate → write, needs-restart) → native or codex → write, needs-restart or resume apply → claude: hotApplyPrecheck with conversationLayer=merged (refused → 409, nothing stored; not-hot → write, needs-restart/restarted) → write → hotApplyRun(assumeBusy = self). Resume apply = lazy import of conversation-runtime.js: stopConversationRuntime then handleConversationResume(name, { sendResumeContract: false }, { resolveSessionFile, resumeCause: 'system' }); non-200 → 502."
+        },
+        "items": [
+          {
+            "id": "apply-service.ac1",
+            "title": "Given a confirmed-stopped conversation the service returns next-launch; a running Codex one returns needs-restart; Codex with restart:true returns restarted; a native skill on Claude returns needs-restart; the hot path returns the hotApplyRun outcome",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "apply-service.ac2",
+            "title": "Merging preserves unrelated map entries, `off` persists false, and `added` lists only ids whose value changed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "apply-service.ac3",
+            "title": "A Pi conversation returns 409, an unknown pack returns 400, empty lists return 400, a precheck refusal returns 409, and in each case the stored skill map is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "apply-service.ac4",
+            "title": "Given a superseded /clear row, applyConversationSkills persists the map on the chain head's row, not the named row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "apply-service.ac5",
+            "title": "With self:true, restart:true returns 400 and a hot apply passes assumeBusy:true; a second call on the same chain head's tmuxSession while one is in flight returns 409 apply-in-progress; runtime-indeterminate with restart:true returns needs-restart without resuming",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skills-routes",
+        "title": "Routes GET/POST /api/conversations/:name/skills and POST /api/self/skills with scope and no-loss rows",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-17T12:42:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5465",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/conversation-skills.ts",
+            "src/dashboard/server/routes/conversations.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/routes/__tests__/conversation-skills-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/conversation-skills-route.test.ts src/dashboard/server/__tests__/route-scopes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "route, route-scopes and no-loss-matrix tests pass",
+            "typecheck completes without errors",
+            "file-size guard passes (routes/conversations.ts grows by at most two lines)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. New route file modeled on conversation-diffs.ts, exported as a Layer and added to the conversationsRouteLayer list in routes/conversations.ts (import + one list entry). POST /api/conversations/:name/skills: validateOrigin (403), JSON body, parseSkillApplyBody (400 on ConversationSkillFlagError), applyConversationSkills(name, req, { self: false }). GET /api/conversations/:name/skills: readConversationSkills. POST /api/self/skills: selfCallerFromCredential(resolveRequestCredential(request)) as self-lanes.ts does; non-conversation caller → 409 not-a-conversation; else applyConversationSkills(caller.agentId, req, { self: true }). Add the three route-scopes.ts rows (read:conversations, operate, operate) and the three no-loss-matrix.ts rows from the PRD."
+        },
+        "items": [
+          {
+            "id": "skills-routes.ac1",
+            "title": "route-scopes.ts maps GET /api/conversations/:name/skills to read:conversations and both POST routes to operate, and no-loss-matrix.ts has a row for each of the three surfaces",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-routes.ac2",
+            "title": "POST /api/conversations/:name/skills with a malformed packs value returns 400 Invalid packs, and GET of an unknown conversation returns 404",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-routes.ac3",
+            "title": "POST /api/self/skills with an agent-kind token returns 409 not-a-conversation, and with a conversation token calls applyConversationSkills with the token's conversation name and self:true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-routes.ac4",
+            "title": "routes/conversations.ts grows by at most two lines and bash scripts/lint-file-size.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-skills-add",
+        "title": "CLI pan skills add <conversation> with outcome sentences",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:42:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5465",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/skills-add.ts",
+            "src/cli/commands/skills.ts",
+            "src/cli/commands/__tests__/skills-add.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/skills-add.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "skills-add.test.ts passes for all six outcomes and the error paths",
+            "typecheck completes without errors",
+            "lint (including lint-skills) passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. New skills-add.ts exporting skillsAddCommand; register `skills add <conversation>` with repeatable --pack, --skill, --off (collect helper) and --restart in registerSkillsCommands (skills.ts line 652). `self` resolves with resolveCurrentConversation(). POST to `${dashboardBaseUrl()}/api/conversations/<encoded>/skills` with content-type and origin headers (pattern: fork-client.ts). Print the PRD's exact sentence per outcome, then warnings; unreachable dashboard or non-2xx → exit 1 with the message."
+        },
+        "items": [
+          {
+            "id": "cli-skills-add.ac1",
+            "title": "`pan skills add --help` prints the --pack, --skill, --off and --restart options",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-skills-add.ac2",
+            "title": "Given a mocked route answer for each of hot, sent, queued, needs-restart, restarted and next-launch, the command prints the PRD's sentence for that outcome followed by each warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-skills-add.ac3",
+            "title": "A non-2xx answer prints the body's error and exits 1; `self` outside a conversation exits 1 with `Not inside a conversation; name one`; `self --restart` exits 1 and sends no request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-skills-add.ac4",
+            "title": "The request body sends --pack values as packs, --skill as skills, --off as off and --restart as restart:true, with an origin header equal to the dashboard base URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-add-skills",
+        "title": "MCP tool add_skills (self route by default, named conversation route otherwise)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:42:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5465",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/tools-write.ts",
+            "tests/unit/lib/mcp/tools-write.test.ts",
+            "tests/unit/lib/mcp/tool-annotations.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/mcp/tools-write.test.ts tests/unit/lib/mcp/tool-annotations.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tools-write and tool-annotations tests pass with add_skills",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Add the addSkills OverdeckTool (scope operate, audience any) to tools-write.ts and WRITE_TOOLS; update the header comment. Without conversation → POST /api/self/skills; with conversation → POST /api/conversations/<encoded>/skills; body carries packs/skills/restart only when given; non-string-array lists → errorResult('<field> must be a list of ids'). Extend the exact tool-list assertion and add an annotation row; grep `resume_conversation` in tests, scripts and src/lib/mcp for any other exhaustive tool list and add add_skills there."
+        },
+        "items": [
+          {
+            "id": "mcp-add-skills.ac1",
+            "title": "WRITE_TOOLS contains add_skills with scope operate, and the tools-write tool-list assertion contains add_skills",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-add-skills.ac2",
+            "title": "Calling add_skills without conversation posts to /api/self/skills; with conversation 'conv-a' it posts to /api/conversations/conv-a/skills with the given packs and skills",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-add-skills.ac3",
+            "title": "add_skills with packs set to a non-array returns an error result `packs must be a list of ids` and sends no request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ui-add-skills-modal",
+        "title": "AddSkillsModal component: preselect current values, post only changes, offer Restart and load",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:42:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5465",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/AddSkillsModal.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/AddSkillsModal.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/AddSkillsModal.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "AddSkillsModal.test.tsx passes",
+            "typecheck (including typecheck:frontend) completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. New modal (structure copied from ForkModal.tsx, pan-style-guide rules) that loads GET /api/conversations/:name/skills with useQuery, renders ConversationSkillsField with the loaded skillOverrides as the initial value, posts only the diff (newly true → skills, newly false → off) to POST /api/conversations/:name/skills, shows the CLI sentence for the outcome plus warnings, and on needs-restart shows a Restart and load button that re-posts with restart:true. Add the test to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "ui-add-skills-modal.ac1",
+            "title": "Given a mocked GET returning skillOverrides {'p/a': true}, the modal renders p/a as On when it opens",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-add-skills-modal.ac2",
+            "title": "After turning p/b on and p/a off, submit sends exactly { skills: ['p/b'], off: ['p/a'] }, and the submit button renders disabled while nothing changed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-add-skills-modal.ac3",
+            "title": "A needs-restart answer renders a Restart and load button, and clicking it posts the same body with restart:true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-add-skills-modal.ac4",
+            "title": "scripts/frontend-test-subset.txt contains src/components/CommandDeck/__tests__/AddSkillsModal.test.tsx in sorted position",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ui-menu-entries",
+        "title": "Add skills… item in the conversation tab and header menus, modal hosted in Stage and ConversationPanel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:42:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5465",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/useConversationMutations.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationActionMenu.tsx",
+            "src/dashboard/frontend/src/components/chat/header/ConversationHeaderMenu.tsx",
+            "src/dashboard/frontend/src/components/Stage/index.tsx",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationActionMenu.addSkills.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/ConversationActionMenu.addSkills.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConversationActionMenu.addSkills.test.tsx passes",
+            "typecheck (including typecheck:frontend) completes without errors",
+            "a Playwright screenshot of the open dialog, inspected by the agent"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. In useConversationMutations add addSkillsTarget, openAddSkillsModal(conv), closeAddSkillsModal() beside openForkModal and in the returned object and its dependency list. Add an `Add skills…` item right after the Fork item in ConversationActionMenu.tsx (~line 284) and ConversationHeaderMenu.tsx (~line 281), visible only when harness is claude-code, codex or unset. Render AddSkillsModal next to ForkModal in Stage/index.tsx (~line 867) and ConversationPanel.tsx (~line 493). Do not touch ConversationRow.tsx. Take a Playwright screenshot of the open dialog with an isolated browser profile and inspect it. Add src/components/CommandDeck/__tests__/ConversationActionMenu.addSkills.test.tsx to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "ui-menu-entries.ac1",
+            "title": "ConversationActionMenu renders Add skills… for a Claude Code conversation and clicking it calls openAddSkillsModal with that conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-menu-entries.ac2",
+            "title": "ConversationActionMenu renders no Add skills… item for a Pi conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-menu-entries.ac3",
+            "title": "ConversationHeaderMenu renders Add skills… for Claude Code and Codex conversations, and Stage and ConversationPanel each render AddSkillsModal when addSkillsTarget is set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document live skill loading in skill-packs, conversations, MCP and developer docs, plus changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-17T12:42:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5465",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skill-packs.mdx",
+            "features/conversations.mdx",
+            "configuration/mcp.mdx",
+            "docs/SKILL-PACKS.md",
+            "changelog.d/pan-5465.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs passes, including changelog.d/pan-5465.md"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. features/skill-packs.mdx: rewrite 'For one conversation' (line 72) with pan skills add, add_skills, Add skills…, the six-outcome table, Claude Code vs Codex, the launch-wired packs and native skills that need a restart, and that an agent adding skills to itself gets them after its current turn; one sentence in 'When pack changes apply'; new Fix text for the Troubleshooting row 'A running agent did not pick up a change'. features/conversations.mdx: '### Adding skills to a running conversation' after '### Changing effort while a conversation runs'. configuration/mcp.mdx: add_skills row after resume_conversation in the Tools table. docs/SKILL-PACKS.md: '## Live apply (PAN-5465)' naming the two modules, the empty mount, the ps check, the two-reload confirmation and the launch-wired rule. changelog.d/pan-5465.md: '#### New' with one bullet."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "features/skill-packs.mdx 'For one conversation' names pan skills add, the add_skills tool and Add skills…, and contains a table listing hot, sent, queued, needs-restart, restarted and next-launch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "The Troubleshooting row 'A running agent did not pick up a change' shows `pan skills add <conversation> --pack <id>` and `--restart` for Codex as its fix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "configuration/mcp.mdx's Tools table contains an add_skills row with scope operate, and features/conversations.mdx contains an 'Adding skills to a running conversation' subsection linking to /features/skill-packs#for-one-conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "docs/SKILL-PACKS.md has a 'Live apply (PAN-5465)' section naming conversation-skill-apply.ts and conversation-skill-hot-apply.ts, and changelog.d/pan-5465.md passes npm run lint:docs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "empty-mount",
+        "to": "launch-exclude",
+        "type": "blocks"
+      },
+      {
+        "from": "launch-exclude",
+        "to": "hot-apply",
+        "type": "blocks"
+      },
+      {
+        "from": "launch-exclude",
+        "to": "cli-skills-add",
+        "type": "blocks"
+      },
+      {
+        "from": "hot-apply",
+        "to": "apply-service",
+        "type": "blocks"
+      },
+      {
+        "from": "apply-service",
+        "to": "skills-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "ui-add-skills-modal",
+        "to": "ui-menu-entries",
+        "type": "blocks"
+      },
+      {
+        "from": "empty-mount",
+        "to": "cli-skills-add",
+        "type": "blocks"
+      },
+      {
+        "from": "skills-routes",
+        "to": "mcp-add-skills",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
