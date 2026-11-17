@@ -11,14 +11,15 @@
 //   OVERDECK_COMPUTER_MACOS_BUNDLE_ID     bundle id (default com.overdeck.computer-use)
 //   OVERDECK_COMPUTER_MACOS_SIGN_IDENTITY codesign identity (default "-", ad-hoc)
 //   APPLE_API_KEY, APPLE_API_KEY_ID, APPLE_API_ISSUER_ID
-//                                         when all three are set, notarize and staple;
+//                                         when all three are set and the build is
+//                                         Developer ID signed, notarize and staple;
 //                                         APPLE_API_KEY is the path to the .p8 key file
 //
 // On any platform other than macOS it prints a skip line and exits 0.
 
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { chmod, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, copyFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 const repoRoot = path.resolve(import.meta.dirname, '..')
@@ -31,6 +32,7 @@ const appPath = path.join(distPath, `${displayName}.app`)
 const appExecutablePath = path.join(appPath, 'Contents', 'MacOS', executableName)
 const entitlementsPath = path.join(packagePath, '.build', 'entitlements.plist')
 const zipPath = path.join(distPath, `${executableName}.zip`)
+const stagingZipPath = path.join(packagePath, '.build', `${executableName}.zip`)
 const notarizeZipPath = path.join(packagePath, '.build', `${executableName}-notarize.zip`)
 const bundleId = process.env.OVERDECK_COMPUTER_MACOS_BUNDLE_ID || 'com.overdeck.computer-use'
 const signingIdentity = process.env.OVERDECK_COMPUTER_MACOS_SIGN_IDENTITY || '-'
@@ -45,8 +47,11 @@ await buildUniversalBinary()
 await createHelperApp()
 await sign()
 const credentials = notarizeCredentials()
-if (credentials) {
+if (credentials && signingIdentity !== '-') {
   await notarize(credentials)
+} else if (credentials) {
+  // Apple notarizes only Developer ID-signed apps; an ad-hoc build would be rejected.
+  console.log('build-computer-macos: notarization skipped (ad-hoc signed; set OVERDECK_COMPUTER_MACOS_SIGN_IDENTITY)')
 }
 await zipApp()
 console.log(`build-computer-macos: wrote ${path.relative(repoRoot, zipPath)}`)
@@ -117,11 +122,22 @@ async function notarize({ key, keyId, issuer }) {
   await rm(notarizeZipPath, { force: true })
 }
 
+// The zip appears in dist/ only after its checksum: macos-install.ts treats a zip
+// without a .sha256 as broken, and an interrupted build must not leave one.
 async function zipApp() {
   await rm(zipPath, { force: true })
-  await run('ditto', ['-c', '-k', '--keepParent', appPath, zipPath])
-  const digest = createHash('sha256').update(await readFile(zipPath)).digest('hex')
-  await writeFile(`${zipPath}.sha256`, `${digest}\n`, 'utf8')
+  await rm(`${zipPath}.sha256`, { force: true })
+  await rm(stagingZipPath, { force: true })
+  try {
+    await run('ditto', ['-c', '-k', '--keepParent', appPath, stagingZipPath])
+    const digest = createHash('sha256').update(await readFile(stagingZipPath)).digest('hex')
+    await writeFile(`${zipPath}.sha256`, `${digest}\n`, 'utf8')
+    await rename(stagingZipPath, zipPath)
+  } catch (error) {
+    await rm(stagingZipPath, { force: true })
+    await rm(`${zipPath}.sha256`, { force: true })
+    throw error
+  }
 }
 
 function run(command, args) {

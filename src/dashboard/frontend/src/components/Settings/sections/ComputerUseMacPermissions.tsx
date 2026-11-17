@@ -41,6 +41,7 @@ export function ComputerUseMacPermissions({
                 <button
                   type="button"
                   data-testid={`computer-use-open-${row.id}`}
+                  aria-label={`Open settings for ${row.label}`}
                   disabled={busy}
                   onClick={() => onOpen(row.id)}
                   className={SECONDARY_BUTTON}

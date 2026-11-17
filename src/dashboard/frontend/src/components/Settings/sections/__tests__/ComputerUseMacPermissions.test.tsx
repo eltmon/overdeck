@@ -34,9 +34,11 @@ describe('ComputerUseMacPermissions (PAN-5463)', () => {
     expect(screen.queryByTestId('computer-use-open-accessibility')).toBeNull();
   });
 
-  it('treats a missing or unavailable check as not allowed', () => {
+  it('treats a missing or unavailable check as not allowed, and names each button by its permission', () => {
     render(<ComputerUseMacPermissions checks={[]} busy={false} onOpen={vi.fn()} />);
     expect(screen.getAllByText('Not allowed')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Open settings for Accessibility' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open settings for Screen Recording' })).toBeInTheDocument();
   });
 
   it('disables Open settings while an action runs', () => {

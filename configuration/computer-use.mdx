@@ -114,8 +114,11 @@ page again. Overdeck re-checks when you come back to the dashboard window.
 The helper runs as one background process per user, shared by every `pan computer` call. It
 listens on `/tmp/overdeck-cu-<uid>/agent.sock`, only accepts callers running as your user with
 the token in `~/.overdeck/computer-use/macos/agent.token`, and exits after 10 minutes without a
-request. On macOS, actions run in the background: the target app is not brought forward and the
-pointer does not move.
+request. On macOS, actions run in the background by default: the target app is not brought
+forward, your frontmost window keeps focus and the pointer does not move. An agent that passes
+`--restore-window` brings the app forward and uses your screen, keyboard focus and pointer for
+that action; the skill tells agents to do this only when a background action can't work, and to
+tell you first.
 
 ### Updates and signing
 
@@ -126,8 +129,10 @@ attention**, and **Fix setup** reinstalls the helper and reopens the two System 
 where you switch Overdeck Computer Use off and on again. A helper signed with a Developer ID
 certificate keeps its permissions across updates.
 
-For maintainers: the release workflow signs with a Developer ID certificate and notarizes the
-helper when these GitHub Actions secrets exist, and signs ad-hoc otherwise:
+For maintainers: the release workflow signs with a Developer ID certificate when
+`MACOS_CERTIFICATE` exists, and signs ad-hoc otherwise. It notarizes the helper only when it is
+Developer ID signed and the App Store Connect API key secrets exist; an ad-hoc build skips
+notarization, because Apple notarizes only Developer ID-signed apps:
 
 | Secret | Holds |
 | --- | --- |

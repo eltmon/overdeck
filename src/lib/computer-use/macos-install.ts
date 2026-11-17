@@ -171,7 +171,9 @@ export async function installHelper(deps: MacosInstallDeps = {}): Promise<Instal
 
   const dir = installedHelperDir();
   await d.mkdir(dir, { recursive: true, mode: 0o700 });
-  const extractDir = join(dir, `.extract-${d.randomUUID()}`);
+  const uuid = d.randomUUID();
+  const extractDir = join(dir, `.extract-${uuid}`);
+  const backupPath = join(dir, `.previous-${uuid}.app`);
   try {
     try {
       await d.exec(DITTO, ['-x', '-k', zipPath, extractDir], { timeout: 120_000, maxBuffer: EXEC_MAX_BUFFER });
@@ -179,11 +181,23 @@ export async function installHelper(deps: MacosInstallDeps = {}): Promise<Instal
       const stderr = (error as { stderr?: string }).stderr ?? '';
       throw new ComputerUseError('helper_error', `ditto could not extract ${zipPath}: ${stderr.trim() || (error as Error).message}`);
     }
-    await d.rm(appPath, { recursive: true, force: true });
-    await d.rename(join(extractDir, HELPER_APP_NAME), appPath);
+    const stagedApp = join(extractDir, HELPER_APP_NAME);
+    if (!(await d.pathExists(stagedApp))) {
+      throw new ComputerUseError('helper_error', `${zipPath} does not contain ${HELPER_APP_NAME}`);
+    }
+    // Keep the working helper until the new one is in place.
+    const hadPrevious = await d.pathExists(appPath);
+    if (hadPrevious) await d.rename(appPath, backupPath);
+    try {
+      await d.rename(stagedApp, appPath);
+    } catch (error) {
+      if (hadPrevious) await d.rename(backupPath, appPath);
+      throw error;
+    }
     await d.writeFile(installedShaPath(), `${bundledSha}\n`, { mode: 0o600 });
   } finally {
     await d.rm(extractDir, { recursive: true, force: true });
+    await d.rm(backupPath, { recursive: true, force: true });
   }
   return { status: installedSha !== null && installedSha !== bundledSha ? 'updated' : 'installed' };
 }

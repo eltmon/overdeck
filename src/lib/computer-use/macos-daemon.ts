@@ -146,6 +146,15 @@ function connectSocket(path: string): Promise<Socket> {
 /** D-16: the helper's error codes, as pan computer error codes. */
 export function mapHelperError(code: unknown, message: unknown): ComputerUseError {
   const text = typeof message === 'string' && message.length > 0 ? message : 'the macOS helper reported an error';
+  if (code === 'permission_denied' && (text === 'invalid computer-use agent token' || text === 'computer-use agent peer is not authorized')) {
+    // One daemon per user serves every OVERDECK_HOME, but it holds the token of the home that
+    // launched it. Another home's token is refused; this is not a macOS permission problem.
+    return new ComputerUseError(
+      'helper_error',
+      `the running macOS helper refused this caller (${text}). It was started by another Overdeck home ` +
+        '(OVERDECK_HOME); it exits after 10 minutes without a request, or quit "Overdeck Computer Use" in Activity Monitor.',
+    );
+  }
   if (code === 'permission_denied') {
     // The helper's own Accessibility message already points at Settings → Computer Use.
     return new ComputerUseError('permission_denied', text.includes('Settings → Computer Use') ? text : `${text} ${SETUP_HINT}`);

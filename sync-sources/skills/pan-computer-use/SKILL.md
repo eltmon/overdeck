@@ -50,7 +50,7 @@ In a large window, look for one control with `get-app-state --query <text>`: it 
 pan computer get-app-state --app gnome-text-editor --query Downloads --json
 ```
 
-When a tree is truncated, read a hidden subtree by passing the nearest shown ancestor's index as `get-app-state --element-index <n>`. Indexes printed under that read are for the subtree only, numbered from 0 again; the next action returns the whole window again.
+When a tree is truncated, read a hidden subtree by passing the nearest shown ancestor's index as `get-app-state --element-index <n>`. On Linux, indexes printed under that read are for the subtree only, numbered from 0 again; the next action returns the whole window again. macOS numbers subtrees differently; see [macOS](#macos).
 
 ```text
 pan computer get-app-state --app gnome-text-editor --element-index 12 --json
@@ -133,6 +133,8 @@ Clicks, scrolling, drags and keyboard input bring the target window forward. Do 
 On macOS, `pan computer` drives native apps through the Overdeck Computer Use helper. The commands, flags and output are the same as on Linux, with these differences:
 
 - **Indexes stay stable.** An element keeps its index across reads while it exists, so you don't need a fresh `get-app-state` just because time passed. After a UI change, still use the returned state.
+- **Subtree reads keep the window's numbering.** `get-app-state --element-index <n>` prints the subtree with the same indexes the whole window uses (so they are not contiguous); act on a printed index directly. Ignore the "for this subtree only" note there.
+- **Scrolling:** `--pages` is at most 50.
 - **Actions run in the background.** The target app is not brought forward, the user's frontmost window stays put, and the pointer does not move. Each action result reports `action.delivery` as `background` or `foreground`, and the text output adds `delivery: <value>` to the `Action:` line.
 - **`--restore-window` only when needed.** Use it only when an action fails with `helper_error` naming `background_unavailable`, when a background action reports success but the UI does not change and `set-value` or `perform-secondary-action` cannot do the job, or for drags in Chromium or Electron apps. Tell the user first: it takes over their screen, keyboard focus and pointer.
 - **Popups and `<select>`:** set the option with `set-value` on the popup element. Background clicks on popup menus are refused.
@@ -175,7 +177,7 @@ When Overdeck runs in WSL2, `pan computer` drives the Windows desktop, not WSLg 
   | --- | --- |
   | `disabled` | Not retryable. Computer use is off. Ask the operator to turn it on in the dashboard under Settings → Computer Use. |
   | `unsupported_platform` | Not retryable. This host is not a Linux desktop, a Mac, or Windows through WSL2. |
-  | `no_desktop_session` | Not retryable. On Linux, no `DISPLAY`/`WAYLAND_DISPLAY` resolved; this host has no logged-in desktop. Under WSL2, Windows interop is off or `powershell.exe` was not found; the message says which. On macOS, the helper isn't installed or the Mac runs an older macOS than 14; the operator runs setup in Settings → Computer Use. |
+  | `no_desktop_session` | Not retryable. On Linux, no `DISPLAY`/`WAYLAND_DISPLAY` resolved; this host has no logged-in desktop. Under WSL2, Windows interop is off or `powershell.exe` was not found; the message says which. On macOS, either the Mac runs a macOS older than 14 (tell the operator computer use needs macOS 14 or newer; setup can't fix it), or the helper isn't installed (the operator runs setup in Settings → Computer Use); the message says which. |
   | `permission_denied` | macOS only. Not retryable. The helper lacks Accessibility or Screen Recording. Stop and ask the operator to finish setup in Settings → Computer Use. |
   | `helper_missing_dependency` | Install the package the message names, then retry once. |
   | `helper_timeout` | The helper did not respond in time. The input may already have been applied. For read-only commands, retry once; if it recurs, stop and report it. For `click`, `type-text`, `paste-text` or `press-key`, run `get-app-state` first and repeat the input only if the state shows it did not take effect. |

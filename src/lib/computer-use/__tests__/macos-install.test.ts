@@ -114,7 +114,9 @@ describe('macos-install (PAN-5463)', () => {
     const result = await installHelper({ ...fs.deps, execFile });
 
     expect(result).toEqual({ status: 'updated' });
-    expect(fs.deps.rm).toHaveBeenCalledWith(APP, { recursive: true, force: true });
+    expect(fs.deps.rename).toHaveBeenCalledWith(APP, `${DIR}/.previous-uuid-1.app`);
+    expect(fs.deps.rm).toHaveBeenCalledWith(`${DIR}/.previous-uuid-1.app`, { recursive: true, force: true });
+    expect(fs.present.has(APP)).toBe(true);
     expect(execFile).toHaveBeenCalledWith('/usr/bin/ditto', expect.any(Array), expect.any(Object));
     expect(fs.text.get(`${DIR}/installed.sha256`)).toBe('bbb\n');
   });
@@ -145,6 +147,34 @@ describe('macos-install (PAN-5463)', () => {
 
     expect(result).toEqual({ status: 'installed' });
     expect(execFile).toHaveBeenCalledWith('npm', ['run', 'build:computer-macos'], expect.objectContaining({ cwd: PKG }));
+  });
+
+  it('keeps the installed helper when the zip has no app in it', async () => {
+    const fs = makeFs({ [`${ZIP}.sha256`]: 'bbb', [`${DIR}/installed.sha256`]: 'aaa' }, [ZIP, APP]);
+    const execFile = vi.fn(async () => ({ stdout: '', stderr: '' })); // extracts nothing
+
+    const error = await installHelper({ ...fs.deps, execFile }).catch((e: unknown) => e);
+
+    expect(isComputerUseError(error) && error.code).toBe('helper_error');
+    expect((error as Error).message).toContain(`does not contain ${HELPER_APP_NAME}`);
+    expect(fs.present.has(APP)).toBe(true);
+    expect(fs.text.get(`${DIR}/installed.sha256`)).toBe('aaa');
+  });
+
+  it('restores the previous helper when moving the new one into place fails', async () => {
+    const fs = makeFs({ [`${ZIP}.sha256`]: 'bbb', [`${DIR}/installed.sha256`]: 'aaa' }, [ZIP, APP]);
+    const execFile = dittoInto(fs.present);
+    const realRename = fs.deps.rename;
+    const rename = vi.fn(async (from: string, to: string) => {
+      if (from.endsWith(`/.extract-uuid-1/${HELPER_APP_NAME}`)) throw new Error('EXDEV');
+      await realRename(from, to);
+    });
+
+    await expect(installHelper({ ...fs.deps, rename, execFile })).rejects.toThrow('EXDEV');
+
+    expect(rename).toHaveBeenCalledWith(`${DIR}/.previous-uuid-1.app`, APP);
+    expect(fs.present.has(APP)).toBe(true);
+    expect(fs.text.get(`${DIR}/installed.sha256`)).toBe('aaa');
   });
 
   it('removes the temp dir and reports helper_error when ditto fails', async () => {

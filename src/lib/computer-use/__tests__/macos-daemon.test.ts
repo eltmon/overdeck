@@ -288,6 +288,15 @@ describe('ensureToken (PAN-5463 D-5)', () => {
 });
 
 describe('mapHelperError (PAN-5463 D-16)', () => {
+  it.each(['invalid computer-use agent token', 'computer-use agent peer is not authorized'])(
+    'reports a daemon started by another OVERDECK_HOME as helper_error, not a permission problem (%s)',
+    (message) => {
+      const error = mapHelperError('permission_denied', message);
+      expect(error.code).toBe('helper_error');
+      expect(error.message).toContain('started by another Overdeck home (OVERDECK_HOME)');
+    },
+  );
+
   it('does not repeat the setup hint when the helper message already names Settings → Computer Use', () => {
     const message =
       'Accessibility permission is required for Overdeck Computer Use. Open Settings → Computer Use in the Overdeck dashboard, allow Overdeck Computer Use, then retry.';
