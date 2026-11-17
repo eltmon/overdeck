@@ -20,6 +20,39 @@ programmatic path (shell, files, git, HTTP, an existing CLI) can reach the same 
 
 ## Turn it on
 
+### From Settings
+
+Open **Settings → Computer Use** in the dashboard (or run **Open Computer Use settings** from the
+command palette) and press **Set up and turn on**. One click does the whole setup on the machine
+running Overdeck:
+
+1. **Installs missing system packages.** Overdeck runs your package manager through `pkexec`, so your
+   desktop asks for your password once. Overdeck never sees the password and never runs
+   `apt-get update`. The package names are fixed on the server:
+
+   | Needed for | `apt-get` | `dnf` | `pacman` |
+   | --- | --- | --- | --- |
+   | Accessibility bindings | `python3-gi gir1.2-atspi-2.0` | `python3-gobject at-spi2-core` | `python-gobject at-spi2-core` |
+   | Mouse and keyboard input (X11) | `xdotool` | `xdotool` | `xdotool` |
+   | Clipboard | `xclip` | `xclip` | `xclip` |
+   | Screenshots (Wayland) | `grim` | `grim` | `grim` |
+
+   When the desktop has no password-prompt agent, Overdeck opens a terminal window that runs the
+   `sudo` install command instead; enter your password there, then press **Try again**. With
+   `zypper`, `apk` or no detected package manager, setup shows the command to run yourself and stops
+   before turning anything on.
+2. **Turns on GNOME accessibility** (`toolkit-accessibility`), without a password. Apps opened
+   before this need a restart to show their contents.
+3. **Turns `computer_use.enabled` on** in `~/.overdeck/config.yaml`.
+4. **Tests the helper** with a handshake.
+
+When nothing is missing, the button reads **Turn on Computer Use** and needs no password. Once it is
+on, the **Allow agents to use the desktop** switch turns it off again without uninstalling anything.
+**Take back control** releases the desktop from the agent that holds it. The collapsed **What
+Overdeck checked** list shows every readiness check, whether or not the feature is on.
+
+### In config.yaml
+
 Add a `computer_use:` block to `~/.overdeck/config.yaml`:
 
 ```yaml
@@ -31,6 +64,13 @@ This is a **global-layer-only** setting: a project's `.pan.yaml` can never set i
 agent committing to its own feature branch can't switch on desktop control for the operator. With
 it off, every `pan computer` command except `capabilities` and `release` refuses with `disabled`.
 
+### Dashboard routes
+
+The Settings page uses four admin-only routes: `GET /api/computer-use/status`,
+`POST /api/computer-use/setup`, `PUT /api/computer-use/settings` and
+`POST /api/computer-use/release`. No scoped access token can call them, so an agent can't turn
+computer use on for itself.
+
 ## Requirements
 
 - A Linux desktop with a logged-in session (X11 or Wayland). A headless host or a linked machine
@@ -38,6 +78,8 @@ it off, every `pan computer` command except `capabilities` and `release` refuses
 - System packages: `python3-gi`, `gir1.2-atspi-2.0`, `xdotool` (X11 hotkeys/clicks), optionally
   `xclip` or `xsel` (clipboard paste; `wl-copy` on Wayland), and `grim` on Wayland (screenshots).
 - GNOME accessibility on: `gsettings set org.gnome.desktop.interface toolkit-accessibility true`.
+- Not WSL2. A Linux host running under WSL2 is refused with `unsupported_platform` until Windows
+  support ships, because the Linux helper would drive WSLg windows instead of the Windows desktop.
 
 ## Commands
 
