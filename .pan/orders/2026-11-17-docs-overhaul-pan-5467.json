@@ -89,6 +89,33 @@
       "addedBy": "conv-20261113-6031"
     },
     {
+      "issue": "PAN-5500",
+      "lane": "A",
+      "order": 10,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-17T12:43:39.040Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5502",
+      "lane": "A",
+      "order": 11,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-17T12:43:39.040Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5504",
+      "lane": "A",
+      "order": 12,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-17T12:43:39.040Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
       "issue": "PAN-5469",
       "lane": "B",
       "order": 1,
@@ -153,5 +180,5 @@
     }
   ],
   "createdAt": "2026-11-17T12:08:16.980Z",
-  "updatedAt": "2026-11-17T12:10:03.336Z"
+  "updatedAt": "2026-11-17T12:43:39.040Z"
 }
