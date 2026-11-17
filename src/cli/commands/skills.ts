@@ -178,8 +178,8 @@ export async function skillsLaunchSettingsCommand(options: LaunchSettingsOptions
     if (link) {
       // Fail open (NFR-1): a pack error drops the packs, never the launch or the settings JSON.
       await applyPacksFailOpen(() => launch.applyClaudePacks(ctx, link, exclude), async () => {
-        const { rm } = await import('node:fs/promises');
-        await rm(link, { force: true });
+        const { linkClaudeMount } = await import('../../lib/skill-packs/mount.js');
+        await linkClaudeMount(link, null);
       });
     }
     // Stdout carries only the settings JSON; the launcher parses it.
