@@ -147,20 +147,13 @@ vi.mock('../../../lib/skill-packs/mount.js', () => ({
   renderRootsUsedBy: mocks.renderRootsUsedBy,
 }));
 
-// PAN-5464: groups resolve through mocks; the video packs are known even before KNOWN_PACKS lists them.
+// PAN-5464: groups resolve through mocks; the video packs come from the real KNOWN_PACKS.
 vi.mock('../../../lib/skill-packs/groups.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../../../lib/skill-packs/groups.js')>()),
   resolvePackGroup: mocks.resolvePackGroup,
   listPackGroups: mocks.listPackGroups,
 }));
-vi.mock('../../../lib/skill-packs/adapters.js', async importOriginal => {
-  const original = await importOriginal<typeof import('../../../lib/skill-packs/adapters.js')>();
-  const video = Object.fromEntries(['remotion', 'hyperframes', 'openmontage', 'video-use'].map(id => [
-    id, { id, url: `https://github.com/eltmon/${id}`, ref: 'f'.repeat(40), adapter: 'plain' as const },
-  ]));
-  return { ...original, KNOWN_PACKS: { ...video, ...original.KNOWN_PACKS } };
-});
-
+import { KNOWN_PACKS } from '../../../lib/skill-packs/adapters.js';
 import { PackGroupError } from '../../../lib/skill-packs/groups.js';
 import { registerSkillsCommands } from '../skills.js';
 
@@ -359,7 +352,7 @@ describe('pan skills pack add --group (PAN-5464)', () => {
     await run('pack', 'add', '--group', 'video', '--yes');
     expect(mocks.addPack.mock.calls.map(([input]) => (input as { id: string }).id)).toEqual(VIDEO);
     expect(mocks.addPack).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'hyperframes', url: 'https://github.com/eltmon/hyperframes', ref: 'f'.repeat(40) }),
+      expect.objectContaining({ id: 'hyperframes', url: KNOWN_PACKS['hyperframes']?.url, ref: KNOWN_PACKS['hyperframes']?.ref }),
       expect.any(Function),
     );
     expect(logs).toContain('remotion: already added');

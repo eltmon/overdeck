@@ -537,12 +537,11 @@ describe('handoffCommand', () => {
         'source-conv',
         expect.objectContaining({ packs: ['mattpocock', 'remotion'] }),
       );
-      const lines = logSpy.mock.calls.map((call) => call.join(' '));
-      expect(lines.filter((line) => line.includes('skipped '))).toEqual([
-        'skipped hyperframes: not added (pan skills pack add --group video)',
-        'skipped openmontage: not added (pan skills pack add --group video)',
-        'skipped video-use: not added (pan skills pack add --group video)',
-      ]);
+      const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+      expect(output.split('skipped ')).toHaveLength(4);
+      for (const id of ['hyperframes', 'openmontage', 'video-use']) {
+        expect(output).toContain(`skipped ${id}: not added (pan skills pack add --group video)`);
+      }
     });
 
     it('sends one pack when only remotion is cached', async () => {
