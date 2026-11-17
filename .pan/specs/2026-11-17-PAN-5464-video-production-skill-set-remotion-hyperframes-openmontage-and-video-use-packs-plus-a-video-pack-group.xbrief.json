@@ -4,17 +4,17 @@
     "created": "2026-11-17T12:36:47Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5464: Video production skill set: Remotion, HyperFrames, OpenMontage and video-use packs, plus a 'video' pack group",
-    "updated": "2026-11-17T12:39:49.803Z"
+    "updated": "2026-11-17T12:41:23.292Z"
   },
   "plan": {
     "id": "pan-5464",
     "title": "Video production skill set: Remotion, HyperFrames, OpenMontage and video-use packs, plus a 'video' pack group",
-    "status": "proposed",
+    "status": "running",
     "uid": "d700e162-56df-4789-8337-a77f1c5a8729",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-17T12:36:47Z",
-    "updated": "2026-11-17T12:39:49.803Z",
+    "updated": "2026-11-17T12:41:23.292Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5464",
@@ -851,5 +851,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
