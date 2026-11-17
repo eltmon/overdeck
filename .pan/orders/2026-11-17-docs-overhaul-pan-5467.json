@@ -6,7 +6,89 @@
     "laneAConcurrency": 1,
     "posture": "open"
   },
-  "items": [],
+  "items": [
+    {
+      "issue": "PAN-5483",
+      "lane": "A",
+      "order": 1,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-17T12:08:56.719Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5472",
+      "lane": "A",
+      "order": 2,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-17T12:08:56.719Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5468",
+      "lane": "A",
+      "order": 3,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-17T12:08:56.719Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5470",
+      "lane": "A",
+      "order": 4,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-17T12:08:56.719Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5473",
+      "lane": "A",
+      "order": 5,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-17T12:08:56.719Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5475",
+      "lane": "A",
+      "order": 6,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-17T12:08:56.719Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5477",
+      "lane": "A",
+      "order": 7,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-17T12:08:56.719Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5479",
+      "lane": "A",
+      "order": 8,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-17T12:08:56.719Z",
+      "addedBy": "conv-20261113-6031"
+    },
+    {
+      "issue": "PAN-5481",
+      "lane": "A",
+      "order": 9,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-11-17T12:08:56.719Z",
+      "addedBy": "conv-20261113-6031"
+    }
+  ],
   "createdAt": "2026-11-17T12:08:16.980Z",
-  "updatedAt": "2026-11-17T12:08:16.980Z"
+  "updatedAt": "2026-11-17T12:08:56.719Z"
 }
