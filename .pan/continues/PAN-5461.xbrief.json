@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5461",
   "created": "2026-11-17T12:13:42.164Z",
-  "updated": "2026-11-17T12:21:37.748Z",
+  "updated": "2026-11-17T12:21:46.646Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,11 @@
     "readiness-linux.ac4": {
       "status": "completed",
       "doneAt": "2026-11-17T12:21:37.748Z"
+    },
+    "setup-linux": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5461",
+      "claimedAt": "2026-11-17T12:21:46.646Z"
     }
   }
 }
