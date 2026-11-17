@@ -39,6 +39,9 @@ interface SageoxUploadOptions { project: string }
 
 type PackPreview = import('../../lib/skill-packs/sources.js').PackPreview;
 type NotAppliedLabels = (capabilities: PackPreview['manifest']['capabilities']) => string[];
+type PackAdapterId = import('../../lib/skill-packs/adapters.js').PackAdapterId;
+/** PackAddOptions once skillsPackAddCommand has validated `--adapter`. */
+type AddOneOptions = Omit<PackAddOptions, 'adapter'> & { adapter?: PackAdapterId };
 
 const STATES = { on: true, off: false, inherit: null } as const;
 const SET_USAGE =
@@ -386,11 +389,13 @@ export async function skillsPackAddCommand(id: string | undefined, url: string |
     console.error(chalk.red('--adapter must be plain, claude-plugin, deft-readonly, or gstack-runtime'));
     process.exit(1);
   }
-  if (options.group) return addGroupPacks(options.group, options);
+  // The check above narrowed options.adapter to a PackAdapterId.
+  const validated: AddOneOptions = { ...options, adapter: options.adapter };
+  if (options.group) return addGroupPacks(options.group, validated);
   const packId = id as string;
   let outcome;
   try {
-    outcome = await addOnePack(packId, url, options);
+    outcome = await addOnePack(packId, url, validated);
   } catch (error) {
     if (error instanceof PackAddUsageError) {
       console.error(chalk.red(error.message));
@@ -404,7 +409,7 @@ export async function skillsPackAddCommand(id: string | undefined, url: string |
 }
 
 /** PAN-5464 D-11: add every member in order; a registered member is skipped, and any decline or failure exits 1 at the end. */
-async function addGroupPacks(group: string, options: PackAddOptions): Promise<void> {
+async function addGroupPacks(group: string, options: AddOneOptions): Promise<void> {
   const members = await groupMembers(group);
   const { PackSourceError } = await import('../../lib/skill-packs/sources.js');
   let failed = false;
@@ -424,7 +429,7 @@ async function addGroupPacks(group: string, options: PackAddOptions): Promise<vo
 }
 
 /** Add one pack; 'declined' when its preview is not trusted. Throws PackSourceError (code 'exists' when registered) and PackAddUsageError. */
-async function addOnePack(id: string, url: string | undefined, options: PackAddOptions): Promise<'added' | 'declined'> {
+async function addOnePack(id: string, url: string | undefined, options: AddOneOptions): Promise<'added' | 'declined'> {
   const [{ addPack }, { CORE_SKILLS }, { KNOWN_PACKS }] = await Promise.all([
     import('../../lib/skill-packs/sources.js'),
     import('../../lib/skill-overrides/resolve.js'),
