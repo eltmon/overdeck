@@ -27,6 +27,7 @@ import { useQuery } from '@tanstack/react-query';
 import { GitFork, TriangleAlert, AlertCircle, Wrench, ChevronDown, Copy } from 'lucide-react';
 
 import { ConversationPanel } from '../chat/ConversationPanel';
+import { PendingAgentRequestCards } from '../chat/PendingAgentRequestCard';
 import { StartAgentCta } from '../issue-view/StartAgentCta';
 import { XTerminal } from '../XTerminal';
 import { useConversationUiState } from '../../hooks/useConversationUiState';
@@ -382,6 +383,7 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent, onCha
           </div>
         ) : null}
         {belowHeader}
+        <PendingAgentRequestCards owner={{ kind: 'agent', id: agent.id }} />
         <div data-section="SessionPanel" className="contents">
           <div className="min-h-0 flex-1 overflow-hidden">
             {sessionBody}
@@ -417,6 +419,7 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent, onCha
         {branchChip}
         {toolsButton('ml-auto ')}
       </div>
+      <PendingAgentRequestCards owner={{ kind: 'agent', id: agent.id }} />
       <div className="min-h-0 flex-1 overflow-hidden rounded-[var(--radius)] border border-border">
         {sessionBody}
       </div>

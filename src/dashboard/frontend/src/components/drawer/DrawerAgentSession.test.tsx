@@ -10,6 +10,7 @@ import { agentDisplayName } from '../../lib/agentConversation';
 const useQueryMock = vi.fn(() => ({ data: null }));
 vi.mock('@tanstack/react-query', () => ({
   useQuery: (...args: unknown[]) => useQueryMock(...args),
+  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
 vi.mock('../chat/ConversationPanel', () => ({
@@ -498,5 +499,62 @@ describe('DrawerAgentSession conversation-header layout', () => {
 
     expect(screen.getByTestId('drawer-agent-branch-chip')).toBeInTheDocument();
     expect(screen.queryByTestId('drawer-agent-branch-copy')).toBeNull();
+  });
+});
+
+describe('DrawerAgentSession pinned agent-request card (PAN-5541 WI-6b)', () => {
+  const secretRow = {
+    id: 'req-1',
+    kind: 'secret' as const,
+    agentId: 'agent-pan-1',
+    agentKind: 'agent' as const,
+    issueId: 'PAN-1',
+    label: 'agent-pan-1 · PAN-1',
+    name: 'OPENAI_API_KEY',
+    prompt: 'The key for the eval run',
+    createdAt: '2026-11-04T00:00:00.000Z',
+    expiresAt: '2026-11-04T00:10:00.000Z',
+  };
+
+  afterEach(() => {
+    useQueryMock.mockReturnValue({ data: null });
+  });
+
+  function seedPendingRequest() {
+    useQueryMock.mockImplementation((opts: { queryKey?: readonly unknown[] }) => {
+      const key = opts?.queryKey?.[0];
+      if (key === 'anywhere-status') {
+        return { data: { machine: { environmentId: 'env-1', label: 'desk' }, viewer: { kind: 'root-session' } } };
+      }
+      if (key === 'agent-requests') return { data: [secretRow], isFetched: true };
+      return { data: null };
+    });
+  }
+
+  it('renders the password input in the terminal view (AC1)', () => {
+    seedPendingRequest();
+    render(
+      <DrawerAgentSession
+        view="terminal"
+        agents={[agent({ id: 'agent-pan-1', role: 'work' })]}
+        agentId="agent-pan-1"
+        onSelectAgent={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId('xterminal')).toBeInTheDocument();
+    expect(screen.getByLabelText('Value for OPENAI_API_KEY')).toHaveAttribute('type', 'password');
+  });
+
+  it('renders the pinned card exactly once in the conversation view', () => {
+    seedPendingRequest();
+    render(
+      <DrawerAgentSession
+        view="conversation"
+        agents={[agent({ id: 'agent-pan-1', role: 'work' })]}
+        agentId="agent-pan-1"
+        onSelectAgent={vi.fn()}
+      />,
+    );
+    expect(screen.getAllByTestId('pinned-agent-requests')).toHaveLength(1);
   });
 });
