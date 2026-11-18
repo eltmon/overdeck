@@ -110,3 +110,13 @@ Clicking one reopens that question, plan or permission dialog, or brings the das
 On the first launch, a dialog asks whether to start Overdeck automatically, with an option to enable it or skip for now. If you skip it, a reminder toast appears on the next few launches with a button to enable it; after five reminders, or once you enable it, the reminders stop. **Reset reminder** in the Auto-start card starts that sequence again.
 
 Desktop settings, including this one, save to `desktop-settings.json` in the app's user data folder: `~/.config/Overdeck/` on Linux, `~/Library/Application Support/Overdeck/` on macOS, and `%APPDATA%\Overdeck\` on Windows.
+
+## Updates
+
+The app checks GitHub Releases 5 seconds after launch and every 4 hours after that, but it never downloads an update on its own. Use **Help → Check for Updates...**, or click the version number at the bottom of the left column, to open the updater, download the update, and restart into it. Once a download finishes, **Install Update and Restart** appears in the Help menu too.
+
+A canary build (a version ending in `-canary`) only offers canary releases; a stable build only offers stable releases.
+
+If an update cannot install, download the new installer from [GitHub Releases](https://github.com/eltmon/overdeck/releases/latest) and install it over the old one. This is the only way to update on macOS today, since the app is not notarized (see [Download and install](#download-and-install)).
+
+Installed the app through npm instead? See [Run it from npm](#run-it-from-npm) to update it with `npm`.
