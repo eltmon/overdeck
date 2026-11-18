@@ -89,3 +89,16 @@ Clicking the tray icon opens the dashboard window. Its menu has:
 The tray icon's color, its tooltip counts and the macOS dock badge do not change with agent activity yet, so **Settings → Desktop App → System Tray** has no visible effect ([#5556](https://github.com/eltmon/overdeck/issues/5556)).
 
 The app's own menu (the **Overdeck** menu on every platform) has **Start Cloister**, **Stop Cloister**, **Emergency Stop All Agents**, **Connect to a Machine…**, **Use This Computer** and **Settings...**. While another machine's dashboard is shown, it starts with a disabled row naming that machine. A **Help** menu has **Check for Updates...**, **Flywheel Documentation**, **Overdeck on GitHub**, **Report an Issue**, and, once an update has downloaded, **Install Update and Restart**.
+
+## Notifications
+
+The app shows the dashboard's own notifications as native system notifications, the same ones a browser tab would show:
+
+- an agent or conversation is waiting on a decision from you;
+- a plan is waiting for your approval;
+- a conversation hit a permission prompt: **Permission needed**, repeated 5 and 30 minutes later if it is still waiting;
+- memory or disk pressure warnings.
+
+Clicking one reopens that question, plan or permission dialog, or brings the dashboard to the front.
+
+**Settings → Desktop App → Notifications** has six switches (**Input Needed**, **Stuck Agents**, **Merge Failures**, **Work Complete**, **Planning Done**, **Merge Ready**), but none of them controls these notifications yet ([#5556](https://github.com/eltmon/overdeck/issues/5556)). To silence them, use your operating system's notification settings for Overdeck.
