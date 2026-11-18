@@ -23,3 +23,19 @@ and the `cost_events` table in `~/.overdeck/overdeck.db`. If history is missing 
 `pan cost backfill` can reconstruct events from the stored Claude Code, Pi and Codex transcripts.
 Run on its own, it is a dry run that only prints what it would import; add `--write` to persist
 the events it finds that are not already recorded.
+
+## API prices, not your plan bill
+
+Every dollar figure is tokens multiplied by the published API price for the model, from
+Overdeck's own price table. The same table prices Claude Code, Codex, Kimi, Grok and Muse
+sessions. Pi is the exception: a Pi session uses the cost Pi itself reports for a message when Pi
+reports one, and falls back to Overdeck's price table only when it does not.
+
+This matters most on a subscription plan, such as Claude Max or a ChatGPT plan: Overdeck does not
+know what your plan covers, so it has no way to subtract that from the total. Every figure on this
+page and in `pan cost` is what the same tokens would cost at list API prices, not what you
+actually pay, and there is no separate plan-cost view.
+
+A model with no row in the price table records no cost: the Claude Code hook skips the event
+entirely, and Pi and Muse record it with a cost of `0` and (for Pi) an `unpriced-model` warning.
+Mis-priced models are tracked in [#4844](https://github.com/eltmon/overdeck/issues/4844).
