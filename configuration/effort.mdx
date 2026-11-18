@@ -39,6 +39,8 @@ that supplies a valid level, plus which layer won:
 | 7 | Project | `projects.yaml` project entry's `effort` |
 | 8 (lowest) | Default | `high` |
 
+Tiers come from tiered execution; see [Model routing](/configuration/model-routing#tiered-execution) for how an item gets its tier.
+
 An invalid **explicit** value throws `InvalidEffortError`. An invalid item,
 plan, or project value is skipped silently (a project value also adds a
 warning) and resolution falls through to the next layer — configuration typos
