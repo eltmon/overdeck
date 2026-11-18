@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5473",
   "created": "2026-11-18T22:01:31.208Z",
-  "updated": "2026-11-18T22:16:08.963Z",
+  "updated": "2026-11-18T22:16:13.680Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -172,6 +172,11 @@
     "cross-links.ac3": {
       "status": "completed",
       "doneAt": "2026-11-18T22:16:08.963Z"
+    },
+    "dev-doc-fixes": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5473",
+      "claimedAt": "2026-11-18T22:16:13.680Z"
     }
   }
 }
