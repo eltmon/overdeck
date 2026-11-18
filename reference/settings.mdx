@@ -1,0 +1,45 @@
+---
+title: "Settings reference: every section of the Overdeck Settings page"
+sidebarTitle: "Settings reference"
+description: "What each of the 29 Settings page sections controls, where it saves, and which page documents it in full."
+---
+
+Settings is one scrolling page at `/settings`, with every section listed in a left-hand nav in a fixed order. There are no per-section URLs. Most controls save automatically as you make them; most sections write to `~/.overdeck/config.yaml`, and a few write elsewhere, named in the table below. The Conversation Search part of Conversations is the one exception to autosave: it marks itself unsaved as you edit it and only writes when you click its own **Save embeddings** button. The Experimental switch, in the last section, hides eight dashboard views from the More menu; it does not hide any Settings section, and every section below stays visible and usable regardless of that switch.
+
+| Section | What it controls | Where it is saved | More |
+| --- | --- | --- | --- |
+| Model Routing | Presets, Workhorse Models, Role Models | `workhorses`, `roles` in `config.yaml` | [Model routing](/configuration/model-routing), [Model presets](/configuration/model-presets) |
+| Providers | Provider API keys, "Show all harness/model permutations", "Default harness" | `models.providers`, `api_keys` in `config.yaml` | [Model routing](/configuration/model-routing), [Harnesses](/configuration/harnesses) |
+| Permissions | Claude Code's Auto or Bypass mode; Codex's Read-only, Workspace, Auto-review or Full access mode | `claude.permissionMode`, `codex.permissionMode` in `config.yaml` | [Harnesses](/configuration/harnesses) |
+| Security | Semgrep switches | `security.semgrep` in `config.yaml` | [Semgrep](/configuration/semgrep) |
+| Computer Use | "Allow agents to use the desktop" | `computer_use.enabled` in `config.yaml` | [Computer use](/configuration/computer-use) |
+| Coding Agents | "Keep coding-agent CLIs up to date automatically" | `harnesses.auto_update` in `config.yaml` | [Harnesses](/configuration/harnesses) |
+| Tiered Execution | "Route work by difficulty" and the tier crews | `tiered_execution` in `config.yaml` | [Model routing](/configuration/model-routing#tiered-execution) |
+| Swarming | "Automatic selection", "Maximum slots per issue", "Advance waves automatically" | `swarm.*` in `config.yaml` | [Swarm](/features/swarm) |
+| Cloister | "Max work agents" (default 6), "Reserved advancing slots" (default 3) | `~/.overdeck/cloister.toml` | [Cloister](/features/cloister) |
+| Close-out | "Remove the workspace when an issue is closed out", "Delete the feature branch at close-out" | `cloister.toml` | [Workspaces](/configuration/workspaces) |
+| Merge Train | "Batch size", "Batch wait (minutes)" | Overdeck database | [Merge batches](/features/merge-batches) |
+| Session Vault | Cross-machine conversation backup | `~/.overdeck/vault/config.json` | [Session Vault](/configuration/session-vault) |
+| Anywhere | Account, Status, Devices, Machines, Directory, Fleet versions, Bots, Triggers, Public MCP, Push, Tailscale peers | Split across the account service and local device and link state | [Anywhere](/anywhere) |
+| Remote | "Resiliency tier" (Ephemeral or Durable), "Max concurrent remote agents" | `remote.*` in `config.yaml` | [Linked machines](/configuration/linked-machines) |
+| Access Tokens | Token table, "Require a token to sign in" | `dashboard.require_token_mint` in `config.yaml` | [Remote access](/configuration/remote-access) |
+| Voice | "STT provider", "AutoPreso provider", "AutoPreso model", devices and volume | `~/.overdeck/voice-settings.json`; device and volume choice stays in the browser | Not documented yet; see [AutoPreso](/features/dashboard-views#autopreso) |
+| Conversations | Compaction, title and handoff models, "/compact handling", "Rich summaries", "Auto-settle on merge", Conversation Search | `conversations.*` in `config.yaml`; Conversation Search needs its own **Save embeddings** click | [Conversations](/features/conversations) |
+| Memory | Extraction provider and model, "Daily cost cap", "Disable observations", "Prompt-time injection" | `memory.*` in `config.yaml` | [Memory](/configuration/memory) |
+| Background AI | "Low-cost mode", per-feature rows, "TypeSafe API key (Jev)" | `background_ai.*` in `config.yaml` | [Jev](/configuration/jev) |
+| Terminal | "tmux configuration" (Managed or Inherit user) | `tmux.config_mode` in `config.yaml` | No page documents this setting |
+| TTS | "Enable TTS", "Daemon", "Volume", "Rate" | `tts.*` in `config.yaml` | Not documented yet |
+| Tracker Keys | Linear, GitHub, GitLab, Rally and Jira keys | `tracker_keys.*` in `config.yaml`, overriding the environment variables | [Issue trackers](/configuration/issue-trackers) |
+| GitHub Identities | Read-only table: Owner, Project, Repository, Acts as, Why | Nothing; this section only displays existing state | [Issue trackers](/configuration/issue-trackers) |
+| Appearance | "Overdeck Theme", "Color theme", "Ready to Merge shimmer" | "Overdeck Theme" in `ui.theme` and "Color theme" in `ui.color_theme` in `config.yaml` (theme files live in `~/.overdeck/themes/`); "Ready to Merge shimmer" in this browser's `localStorage` only | [Appearance](/configuration/appearance) |
+| Diff | "Diff style", "Line wrapping" and other diff display options | This browser only | No page |
+| Desktop App | Tray badge, notifications, launch at login (desktop app only) | Desktop app local settings | Not documented yet |
+| Maintenance | "Issue cache" clear | Not persisted; it clears a runtime cache | No page |
+| Telemetry | "Share anonymous usage data", "Group my installs (pseudonymous)" | `telemetry.*` in `config.yaml` | [Telemetry](/configuration/telemetry) |
+| Experimental | "Experimental features", "RTK Bash compression", "Claude Code Channels", "Streamdown renderer" | `experimental.*` in `config.yaml` (RTK writes `agents.rtk.enabled`) | [Experimental features](/features/dashboard-views#experimental-features) |
+
+Diff preferences and the Ready to Merge shimmer toggle are the exceptions to the `config.yaml` pattern above: they live only in this browser and are never synced or backed up.
+
+## Get help
+
+Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file an issue on [GitHub Issues](https://github.com/eltmon/overdeck/issues).

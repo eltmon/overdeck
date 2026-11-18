@@ -146,13 +146,21 @@
               "configuration/semgrep",
               "configuration/computer-use",
               "configuration/context-layers",
+              "configuration/docs-rag",
               "configuration/skills",
               "configuration/memory",
               "configuration/appearance",
               "configuration/issue-trackers",
               "configuration/polyrepo",
+              "configuration/progressive-polyrepo",
               "configuration/auto-merge",
               "configuration/order-books"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/ci"
             ]
           }
         ]
@@ -163,6 +171,7 @@
           {
             "group": "Guides",
             "pages": [
+              "guides/operating",
               "guides/legacy-codebases",
               "guides/skill-pack-authoring",
               "guides/stitch-integration",
@@ -178,6 +187,7 @@
             "group": "Reference",
             "pages": [
               "reference/architecture",
+              "reference/settings",
               "reference/god-view",
               "reference/agents-directory",
               "reference/workers",
@@ -272,6 +282,18 @@
     {
       "source": "/configuration/state-branch",
       "destination": "/reference/state-model"
+    },
+    {
+      "source": "/configuration/setup-wizard",
+      "destination": "/configuration/projects"
+    },
+    {
+      "source": "/configuration/meta-repos",
+      "destination": "/configuration/polyrepo"
+    },
+    {
+      "source": "/blog/standing-crew",
+      "destination": "/configuration/model-routing"
     }
   ]
 }

@@ -1,0 +1,380 @@
+{
+  "version": "1",
+  "issueId": "PAN-5482",
+  "created": "2026-11-18T21:37:14.666Z",
+  "updated": "2026-11-18T22:41:42.650Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-18T22:21Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-11-18T22:21:35.191Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-18T22:24Z] coderabbit → FINDINGS — seq 2",
+      "timestamp": "2026-11-18T22:24:37.049Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-18T22:37:15.382Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-18T22:41Z] review-agent → CHANGES-REQUESTED — seq 3",
+      "timestamp": "2026-11-18T22:41:42.649Z"
+    }
+  ],
+  "items": {
+    "operating-guide": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5482",
+      "claimedAt": "2026-11-18T21:37:14.666Z",
+      "doneAt": "2026-11-18T21:40:25.908Z"
+    },
+    "operating-guide.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:40:25.908Z"
+    },
+    "operating-guide.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:40:25.908Z"
+    },
+    "operating-guide.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:40:25.908Z"
+    },
+    "operating-guide.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:40:25.908Z"
+    },
+    "operating-links": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5482",
+      "claimedAt": "2026-11-18T21:40:38.923Z",
+      "doneAt": "2026-11-18T21:41:39.935Z"
+    },
+    "operating-links.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:41:39.935Z"
+    },
+    "ci-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5482",
+      "claimedAt": "2026-11-18T21:41:46.683Z",
+      "doneAt": "2026-11-18T21:44:36.402Z"
+    },
+    "ci-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:44:36.402Z"
+    },
+    "ci-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:44:36.402Z"
+    },
+    "ci-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:44:36.402Z"
+    },
+    "ci-page.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:44:36.402Z"
+    },
+    "ci-links": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5482",
+      "claimedAt": "2026-11-18T21:44:42.990Z",
+      "doneAt": "2026-11-18T21:47:37.452Z"
+    },
+    "ci-links.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:47:37.452Z"
+    },
+    "ci-links.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:47:37.452Z"
+    },
+    "ci-links.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:47:37.452Z"
+    },
+    "swarm-rewrite": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5482",
+      "claimedAt": "2026-11-18T21:47:57.041Z",
+      "doneAt": "2026-11-18T21:49:25.480Z"
+    },
+    "swarm-rewrite.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:49:25.480Z"
+    },
+    "swarm-rewrite.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:49:25.480Z"
+    },
+    "swarm-rewrite.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:49:25.480Z"
+    },
+    "swarm-rewrite.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:49:25.480Z"
+    },
+    "progressive-polyrepo": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5482",
+      "claimedAt": "2026-11-18T21:49:29.903Z",
+      "doneAt": "2026-11-18T21:52:01.700Z"
+    },
+    "progressive-polyrepo.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:52:01.700Z"
+    },
+    "progressive-polyrepo.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:52:01.700Z"
+    },
+    "progressive-polyrepo.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:52:01.700Z"
+    },
+    "progressive-polyrepo.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:52:01.700Z"
+    },
+    "delete-wizard-meta": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5482",
+      "claimedAt": "2026-11-18T21:52:06.716Z",
+      "doneAt": "2026-11-18T21:52:44.545Z"
+    },
+    "delete-wizard-meta.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:52:44.545Z"
+    },
+    "delete-wizard-meta.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:52:44.545Z"
+    },
+    "polyrepo-inbound-links": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5482",
+      "claimedAt": "2026-11-18T21:52:49.138Z",
+      "doneAt": "2026-11-18T21:53:48.781Z"
+    },
+    "polyrepo-inbound-links.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:53:48.781Z"
+    },
+    "polyrepo-inbound-links.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:53:48.781Z"
+    },
+    "polyrepo-inbound-links.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:53:48.781Z"
+    },
+    "blog-delete": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5482",
+      "claimedAt": "2026-11-18T21:53:53.188Z",
+      "doneAt": "2026-11-18T21:54:29.336Z"
+    },
+    "blog-delete.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:54:29.336Z"
+    },
+    "blog-delete.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:54:29.336Z"
+    },
+    "autopreso-section": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5482",
+      "claimedAt": "2026-11-18T21:54:34.310Z",
+      "doneAt": "2026-11-18T21:55:41.658Z"
+    },
+    "autopreso-section.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:55:41.658Z"
+    },
+    "autopreso-section.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:55:41.658Z"
+    },
+    "settings-reference": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5482",
+      "claimedAt": "2026-11-18T21:55:45.976Z",
+      "doneAt": "2026-11-18T21:57:52.100Z"
+    },
+    "settings-reference.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:57:52.100Z"
+    },
+    "settings-reference.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:57:52.100Z"
+    },
+    "settings-reference.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:57:52.100Z"
+    },
+    "settings-reference.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:57:52.100Z"
+    },
+    "settings-link": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5482",
+      "claimedAt": "2026-11-18T21:57:56.482Z",
+      "doneAt": "2026-11-18T21:58:31.470Z"
+    },
+    "settings-link.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:58:31.470Z"
+    },
+    "settings-link.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:58:31.470Z"
+    },
+    "markdown-preview": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5482",
+      "claimedAt": "2026-11-18T21:58:35.836Z",
+      "doneAt": "2026-11-18T21:59:50.244Z"
+    },
+    "markdown-preview.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:59:50.244Z"
+    },
+    "markdown-preview.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:59:50.244Z"
+    },
+    "markdown-preview.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:59:50.244Z"
+    },
+    "docs-rag-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5482",
+      "claimedAt": "2026-11-18T21:59:54.470Z",
+      "doneAt": "2026-11-18T22:01:24.059Z"
+    },
+    "docs-rag-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:01:24.059Z"
+    },
+    "docs-rag-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:01:24.059Z"
+    },
+    "docs-rag-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:01:24.059Z"
+    },
+    "docs-rag-links": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5482",
+      "claimedAt": "2026-11-18T22:01:29.190Z",
+      "doneAt": "2026-11-18T22:02:34.621Z"
+    },
+    "docs-rag-links.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:02:34.621Z"
+    },
+    "docs-rag-links.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:02:34.621Z"
+    },
+    "docs-rag-links.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:02:34.621Z"
+    },
+    "nav-redirects": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5482",
+      "claimedAt": "2026-11-18T22:02:39.892Z",
+      "doneAt": "2026-11-18T22:04:05.662Z"
+    },
+    "nav-redirects.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:04:05.662Z"
+    },
+    "nav-redirects.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:04:05.662Z"
+    },
+    "nav-redirects.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:04:05.662Z"
+    },
+    "nav-redirects.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:04:05.662Z"
+    },
+    "validate-and-record": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5482",
+      "claimedAt": "2026-11-18T22:04:10.521Z",
+      "doneAt": "2026-11-18T22:08:43.764Z"
+    },
+    "validate-and-record.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:08:43.764Z"
+    },
+    "validate-and-record.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:08:43.764Z"
+    },
+    "validate-and-record.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:08:43.764Z"
+    },
+    "validate-and-record.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:08:43.764Z"
+    },
+    "operating-links.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:10:26.961Z"
+    },
+    "operating-links.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:10:26.961Z"
+    },
+    "autopreso-section.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:10:26.961Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-18T22:21:35Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-5482\n\n# Review — PAN-5482\n## Verdict: CHANGES REQUESTED — guides/operating.mdx omits the emergency-stop CLI verb (FR-2) and implies `pan restore` brings back agents, which PAN-5549 says it does not\n\n## Context\n- Run ID: agent-pan-5482-review-07647eb9\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5482/.pan/review/agent-pan-5482-review-07647eb9/context.json\n- Branch / workspace: feature/pan-5482 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-5482\n- PR: https://github.com/eltmon/overdeck/pull/5558\n- HEAD reviewed: 07647eb932d90869542c3e4a6c4d0fa74680a026\n- Base: merge-base 5cbd3edcbd5d (origin/main); prior cycle: none\n\nThe change is docs only (22 docs files plus `.pan/` plan artifacts). Most of it is accurate and well sourced: I re-traced\nevery high-value claim on the CI, Settings, Docs RAG, swarm and progressive-polyrepo pages to source and found them\ncorrect. The two blockers are small, explicit requirement misses on the operating guide; each is a one or two\nsentence fix.\n\n## Blocking Findings\n\n### [requirements] Operating guide does not name the emergency-stop CLI verb — `guides/operating.mdx:13`\n- Severity: !\n- Classification / requirement scope: implementation defect; in_pr_scope (FR-2, item `operating-guide`)\n- Trigger and changed-code connection: FR-2 reads \"It documents emergency stop: the CLI verb, the hotkey and the three\n  dashboard entry points\". The PRD background (G15) names the verb `pan admin cloister emergency-stop`. The new\n  `## Stop every agent now` section lists the hotkey and the three dashboard entry points only. Note the spec\n  conflict: W1 says \"emergency stop, its four entry points\", and the page implements exactly four (hotkey plus three\n  dashboard entry points). FR-2 lists five and is the requirement the `operating-guide` item traces, so FR-2 governs;\n  W1's \"four\" counts the dashboard-side entry points and does not exempt the CLI verb, which G15 documents first.\n- Expected / observed / impact: expected the CLI verb; `grep -n 'emergency-stop\\|cloister' guides/operating.mdx` matches\n  only line 64 (\"the emergency-stop freeze\"). A terminal-only operator has no way to find the command from this page.\n- Evidence: `pan admin cloister --help` prints `emergency-stop    Emergency stop - kill ALL agents immediately`\n  (registered in `src/cli/commands/cloister/index.ts`, `.command('emergency-stop')`).\n- Fix: add the verb to the section, for example a fifth bullet: \"From a terminal, run `pan admin cloister emergency-stop`.\n  It prints the agents it stopped and warns about any it could not confirm stopped.\" Paraphrase the help text; it\n  contains a hyphen-dash only, no em dash. Update the intro count (\"four ways\") to match.\n\n### [correctness] Backups section implies `pan restore` restores agents, contrary to the PAN-5549 re-check rule — `guides/operating.mdx:72`\n- Severity: !\n- Classification / requirement scope: implementation defect; in_pr_scope (FR-7; xBRIEF `operating-guide` Action:\n  \"Describe pan restore per the PAN-5549 re-check rule\"; PRD rule 6 \"Filed bugs (do not document as working)\")\n- Trigger and changed-code connection: the section says backups cover `~/.claude/skills`, `~/.claude/commands` and\n  `~/.claude/agents`, then presents `pan restore` as \"pick a backup to restore from\" and \"replacing the target folder\"\n  with no scope limit. PAN-5549 is not fixed: `src/cli/commands/restore.ts` maps only `claude-skills`/`skills` and\n  `claude-commands`/`commands` targets (lines 65 to 68); there is no agents target.\n- Expected / observed / impact: the PRD says \"Today it restores skills and commands only, not agents\" and requires the\n  page to state today's behavior. An operator who restores after losing `~/.claude/agents` will expect agents back and\n  will not get them.\n- Evidence: static trace of `restore.ts` at HEAD; PRD `.pan/drafts/PAN-5482.md` line 204 and rule 6 (lines 74 to 81).\n- Fix: say plainly that `pan restore` restores the skills and commands folders from a backup; the agents folder is\n  backed up but not restored by `pan restore` today. Use no \"known bug\" wording (rule 6).\n\n## Non-blocking Findings\n\nFix the first three in the same cycle; each is a one-line change.\n\n- `~` [requirements] `integrations/ci.mdx:57`: the Get help section links Discord and Troubleshooting, not GitHub\n  Issues. NFR-6 (traced by `ci-page`) reads \"Each new page ends with the Get help section linking Discord and GitHub\n  Issues\", and the four other new pages use the shared sentence with both links. Use the same sentence as\n  `guides/operating.mdx`. Kept non-blocking because the impact is negligible and no xBRIEF AC checks it.\n- `~` [spec mismatch] PR #5558's body lacks `## Mintlify checks` and `## Found, not fixed`. PRD W17 asks for both in the\n  PR body, but the xBRIEF `validate-and-record` ACs (ac1 to ac4) only require the checks to pass, and the work agent\n  recorded the results in commit `2f4559e31e6`'s message. This is a PRD/xBRIEF inconsistency, not an implementation\n  defect. The body looks generated by `pan done` (title \"PAN-5482\", checklist only), so a hand edit may be overwritten\n  on the next `pan done`; add the two sections after the final `pan done`, or have the merger read the commit message.\n- `~` [spec mismatch] `integrations/ci.mdx` does not contain the literal string `verification:` (PRD W3 AC lists it; the\n  xBRIEF `ci-page.ac1` dropped it). The page uses `verification.tests` and `verification.tests: ci`, so the meaning is\n  there. A two-line YAML example (`verification:` / `  tests: ci`) under `## Run tests on CI` would satisfy the PRD\n  literally and help readers.\n- `≉` `configuration/progressive-polyrepo.mdx:6` keeps a body H1 (`# Progressive polyrepo workspaces`) under the\n  frontmatter `title`. The page is now published, so Mintlify will likely show a doubled heading. Several existing\n  pages do the same (`configuration/auto-merge.mdx`, the `guides/` pages), and the recorded `mint validate` run reports\n  51 pre-existing duplicate-h1 warnings; whether this file is among them was not verified. Dropping the line is a safe\n  cleanup.\n- `~` `cli/memory-commands.mdx` `## pan docs` table still lists `--scope session|project|global` (default `session`) for\n  `disable`/`enable`. Those scopes are broken (PAN-5552) and NonGoal 4 says not to document them. The table is\n  pre-existing and W15 only asked to fix the examples, so this is pre_existing; consider trimming the table to\n  `--scope global` when PAN-5552 lands or in PAN-5503.\n- `?` `features/swarm.mdx:7` says which mechanism an issue gets \"depends on how it was started\". The PRD decision says\n  not to say which one a given issue gets, and no source was cited for this claim. Consider removing the clause.\n- `≉` `configuration/progressive-polyrepo.mdx:84` says block-list groups and hyphenated names are \"not read correctly\n  today\", and line 132 keeps the pre-existing phrase \"evidence-blind workflow\". Rule 6 asks for today's behavior with\n  no known-bug framing; \"Write each group on one line\" already gives the instruction. \"evidence-blind\" is internal\n  jargon.\n- `~` `configuration/docs-rag.mdx` \"What it indexes\" omits `.claude/rules/*.md`, which `src/lib/docs/corpus.ts:81` also\n  indexes (and the PRD lists).\n- `?` `integrations/ci.mdx` lists test check names but omits the underscore form (`test_...`), which the matcher\n  `/^tests?(?:\\s*\\(.*\\)|[-_:].*|\\s+\\/\\s+.*)?$/i` also accepts. Completeness only.\n\n## Coverage\n\n### Changed-file ledger\n| File | Status | Notes |\n| --- | --- | --- |\n| guides/operating.mdx (new) | reviewed | 2 blockers (FR-2 CLI verb, restore scope); all other claims traced to G15 anchors and CLI registrations (`restart --now`/`approve`/`hold`/`release` in `dashboard-lifecycle-commands.ts`, `restore [timestamp]`, `backup list/clean`, `sync --backup-only`) |\n| integrations/ci.mdx (new) | reviewed | Claims verified: `isCiTestCheckName`, `selectLocalVerificationGates`, `BATCH_CI_WORKFLOW = 'CI'`, `BATCH_CI_APPEAR_TIMEOUT_MS` 10 min, webhook `case` list in `routes/webhooks.ts`; no `eltmon`; NFR-6 advisory |\n| features/swarm.mdx | reviewed | No removed-design strings; `## CLI` once; anchors `#pan-swarm`/`#pan-spawn` exist in `cli/pipeline-commands.mdx` (lines 304, 330); one advisory |\n| configuration/progressive-polyrepo.mdx | reviewed | Every `add-repo` example has `--project`; groups example inline-only; `--new <gitUrl>` matches `workspace.ts:194`; `issue_prefixes` is a real key (`projects.ts:458`); precedence list matches PRD |\n| configuration/setup-wizard.mdx (deleted) | reviewed | Deleted; redirect added |\n| configuration/meta-repos.mdx (deleted) | reviewed | Deleted; redirect added |\n| blog/standing-crew.mdx (deleted) | reviewed | Deleted; redirect added |\n| configuration/projects.mdx | reviewed | Field row fixed; two dead Related links removed; no other change |\n| configuration/polyrepo.mdx | reviewed | Single line replaced, no dash |\n| reference/settings.mdx (new) | reviewed | 29 body rows in `SETTINGS_NAV_ITEMS` order per PRD list; \"eight dashboard views\" matches `EXPERIMENTAL_TAB_IDS` (8 entries); no screenshot |\n| configuration/docs-rag.mdx (new) | reviewed | snake_case keys only; defaults 5 chunks / 3000 tokens / 10-turn window match `config-yaml/defaults.ts:115-134`; only `--scope global`; one advisory |\n| cli/memory-commands.mdx | reviewed | PRD wording fixed, examples use `--scope global`, link added; pre-existing table advisory |\n| features/dashboard-views.mdx | reviewed | `## AutoPreso` added between Experimental and Get help; Settings reference link added |\n| features/file-explorer.mdx | reviewed | `## Markdown preview` once; front matter paragraph moved, not duplicated (count 1 before and after) |\n| features/safe-shutdown.mdx | reviewed | One link sentence |\n| reference/troubleshooting.mdx | reviewed | Approval-wait sentence plus link |\n| configuration/semgrep.mdx, features/merge-batches.mdx, configuration/auto-merge.mdx, features/issue-pipeline.mdx | reviewed | One `/integrations/ci` link each; merge-batches anchor matches the CI page heading |\n| docs.json | reviewed | Single-line inserts only; new Integrations group; 3 redirects; Roadmap still lists `reference/template-conversations` |\n| .mintignore | reviewed | Header comment only |\n| .pan/drafts, .pan/specs, .pan/continues | not applicable | Plan artifacts; read for requirements only |\n\n### Dimensions\n- Correctness: claims traced to source as listed above; restore-scope blocker.\n- Security: not applicable beyond content: no secrets, tokens or private identifiers added; the only `eltmon` strings are the\n  existing GitHub Issues links used across the docs site.\n- Performance: not applicable (docs only).\n- Requirements and UX: FR/AC matrix below.\n\n### Requirement / AC matrix\n| Req | Status | Evidence |\n| --- | --- | --- |\n| FR-1 | met | first in Guides group; title and 137-char description |\n| FR-2 | **unmet** | CLI verb missing (blocker 1) |\n| FR-3 | met | keys, 30 s check, push, Needs you card, no hold, 10 GiB floor, `pan lane disk-check`; defaults (5, 2) are reached through the link to `configuration/memory-governor.mdx:171-172`, as the PRD instructs (\"link it, do not copy the table\") |\n| FR-4 | met | reload builds `origin/main`; restart never builds |\n| FR-5 | met | three approval paths; hold, status, release, non-blocked scopes |\n| FR-6 | met | conditions, `--no-resume`, failure message, conversations not auto-resumed |\n| FR-7 | partially met | scope and \"not backed up\" stated; restore scope wrong (blocker 2) |\n| FR-8 | met | one `/guides/operating` link in each file; approval wait mentioned |\n| FR-9 to FR-13 | met | CI page sections; `Issues: Read and write`; no assignee named |\n| FR-14 | met | four files link `/integrations/ci` |\n| FR-15, FR-16 | met | foreman + gated slot swarm; `## CLI` kept; CLI links |\n| FR-17 | met | rewritten, in nav, examples carry `--project` |\n| FR-18 | met | deleted and redirected |\n| FR-19 | met | repo-wide grep for deleted pages prints nothing |\n| FR-20 | met | deleted, redirect to `/configuration/model-routing` |\n| FR-21 | met | 29 rows, in nav |\n| FR-22 | met | one `## Markdown preview` section |\n| FR-23 | met | page, snake_case keys, in nav, linked from CLI page |\n| FR-24 | met | `## AutoPreso` names Go live, Start mic, STT provider |\n| FR-25 | met | node check: all five pages, three redirects, Roadmap intact |\n| NFR-1 | met | added-line dash grep and whole-file grep on new/rewritten pages print nothing |\n| NFR-2 | met (lint:docs at HEAD); mint recorded pre-merge | `npm run lint:docs` passed at HEAD; mint validate/broken-links exit 0 recorded in `2f4559e31e6` |\n| NFR-3 | met | scope grep prints nothing |\n| NFR-4 | met except blocker 2 | spot-traced claims match HEAD source |\n| NFR-5 | met | script at HEAD over all added/modified `.mdx` files plus the three redirect destinations: 117 internal links, every target file and `#anchor` exists; \"Not documented yet\" used for absent pages |\n| NFR-6 | unmet for `integrations/ci.mdx` (advisory) | other four new pages comply |\n| xBRIEF ACs (all 17 items) | met | every `.acN` re-checked by grep/node/read; `ci-page.ac1` met (it omits `verification:`); `validate-and-record.ac1/ac2` reused from the recorded run |\n| PRD W17 (PR body sections) | unmet, spec mismatch (advisory) | xBRIEF does not require it |\n\n## Verification\n- `npm run lint:docs` at HEAD 07647eb9: `docs lint passed (88 docs files, 96 published pages, 2 changelog entries)`, exit 0.\n- Mechanical W1 to W16 grep/node checks from the PRD run at HEAD: all pass except the literal `verification:` string (advisory).\n- `pan admin cloister --help`: confirms `emergency-stop` verb.\n- Internal link/anchor script over changed `.mdx` files and redirect destinations at HEAD: 117 links, 0 broken.\n- Non-goal grep (`--force`, `globally_paused`, `DeaconPauseBanner`, `pan artifacts`) across all changed `.mdx` files:\n  only pre-existing lines about `pan start --force`, `pan done --force`, `pan reopen --force` and\n  `pan shutdown --force`; none about `pan reload --force`, and no `pan artifacts`.\n- `gh pr checks 5558`: CI for this HEAD still pending (build, lint groups, test shards, e2e); `overdeck/verification`\n  (\"overdeck/test\") passed with typecheck+lint. Test jobs unverified, but this change touches no code or tests.\n- `npm run lint:effect-diagnostics`: not applicable (docs-only, no TypeScript or dependency change).\n- `mint validate` / `mint broken-links`: not re-run; reused the work agent's recorded exit-0 results from `2f4559e31e6`\n  (recorded before the later main merge; not re-run at HEAD, but the HEAD link script above covers broken links).\n- Full test suite: not run (by policy).\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5482/.pan/review/agent-pan-5482-review-07647eb9/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-5482 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-18T22:24:37Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5482 (PR #5558)\n\nCodeRabbit posted 11 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4621695294 · configuration/docs-rag.mdx:11 [Major]: Pass the loaded docs corpus configuration to `pan docs reindex`.\n  https://github.com/eltmon/overdeck/pull/5558#discussion_r4621695294\n- Thread 4621695310 · configuration/docs-rag.mdx:17 [Minor]: Describe trigger patterns as substring matches.\n  https://github.com/eltmon/overdeck/pull/5558#discussion_r4621695310\n- Thread 4621695318 · configuration/docs-rag.mdx:32 [Major]: Reindex on an installed package can replace the user index with a partial corpus.\n  https://github.com/eltmon/overdeck/pull/5558#discussion_r4621695318\n- Thread 4621695335 · configuration/progressive-polyrepo.mdx:103 [Minor]: State the prerequisites for `--group all`.\n  https://github.com/eltmon/overdeck/pull/5558#discussion_r4621695335\n- Thread 4621695347 · features/swarm.mdx:21 [Minor]: Document the shared-workspace exception.\n  https://github.com/eltmon/overdeck/pull/5558#discussion_r4621695347\n- Thread 4621695362 · features/swarm.mdx:37 [Minor]: Include the dispatchability requirement in plan eligibility.\n  https://github.com/eltmon/overdeck/pull/5558#discussion_r4621695362\n- Thread 4621695377 · guides/operating.mdx:34 [Minor]: Limit the \"old dashboard keeps running\" claim to build failures.\n  https://github.com/eltmon/overdeck/pull/5558#discussion_r4621695377\n- Thread 4621695420 · guides/operating.mdx:72 [Minor]: Include `pan context detach --apply` backups in the backup scope.\n  https://github.com/eltmon/overdeck/pull/5558#discussion_r4621695420\n- Thread 4621695446 · integrations/ci.mdx:15 [Minor]: Limit the test-check requirement to GitHub.\n  https://github.com/eltmon/overdeck/pull/5558#discussion_r4621695446\n- Thread 4621695457 · reference/settings.mdx:7 [Minor]: Document the explicit-save exception.\n  https://github.com/eltmon/overdeck/pull/5558#discussion_r4621695457\n- Thread 4621695466 · reference/settings.mdx:34 [Minor]: Identify the browser-local Appearance preference.\n  https://github.com/eltmon/overdeck/pull/5558#discussion_r4621695466\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5558/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5482 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5558 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    },
+    {
+      "seq": 3,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-18T22:41:42Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-5482\n\n# Review — PAN-5482\n## Verdict: CHANGES REQUESTED — reference/settings.mdx now says the Color theme is saved only in browser localStorage, but it is saved to `ui.color_theme.<mode>` in config.yaml\n\n## Context\n- Run ID: agent-pan-5482-review-442bcb4f\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5482/.pan/review/agent-pan-5482-review-442bcb4f/context.json\n- Branch / workspace: feature/pan-5482 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-5482\n- PR: https://github.com/eltmon/overdeck/pull/5558\n- HEAD reviewed: 442bcb4fcb9e87047206dbeb7d1313da0531b69d\n- Base: merge-base 0f6716f8e34 (origin/main); prior cycle SHA: 07647eb932d (run agent-pan-5482-review-07647eb9, CHANGES REQUESTED)\n\nCycle 2. Both cycle-1 blockers are fixed. The fix commits (`621cebfbe1b` for review findings, `2537a8be81f` for 11\nCodeRabbit findings) changed 6 pages, and I verified every new behavioral claim against source. All but one are\ncorrect. The one that is wrong was introduced in this cycle: a CodeRabbit note about the Ready to Merge shimmer was\nalso applied to the Color theme, which is not browser-only.\n\n## Prior-cycle findings\n| Cycle-1 finding | Status | Evidence |\n| --- | --- | --- |\n| Blocker: operating guide omits the emergency-stop CLI verb (FR-2) | fixed | `guides/operating.mdx:19` adds `pan admin cloister emergency-stop`; intro says \"five ways\" |\n| Blocker: `pan restore` implied to restore agents (PAN-5549 rule) | fixed | `guides/operating.mdx:84`: \"Today it restores the skills and commands folders only...\"; matches `src/cli/commands/restore.ts` targets |\n| Advisory: CI page Get help lacks GitHub Issues (NFR-6) | not fixed; stays advisory | `integrations/ci.mdx` last line |\n| Advisory: `verification:` literal | fixed | YAML block added at `integrations/ci.mdx:13` |\n| Advisory: swarm \"depends on how it was started\" | fixed | clause removed |\n| Advisory: progressive known-bug wording, \"evidence-blind\" jargon, body H1 | fixed | lines rewritten; H1 removed |\n| Advisory: Docs RAG omits `.claude/rules/` | fixed | `configuration/docs-rag.mdx:11` |\n| Advisory: CI test-name list omits `test_...` | fixed | `integrations/ci.mdx:20` |\n| Advisory: PR body sections (PRD/xBRIEF mismatch) | not changed; stays advisory | |\n\n## Blocking Findings\n\n### [correctness] Settings reference says the Color theme is browser-only — `reference/settings.mdx:34` and `:41`\n- Severity: !\n- Classification / requirement scope: implementation defect introduced in this cycle; in_pr_scope (FR-21: the\n  Settings reference states \"where it is saved\" for each section; NFR-4: every claim re-verified against code)\n- Trigger and changed-code connection: commit `2537a8be81f` changed the Appearance row to \"'Overdeck Theme' in\n  `ui.theme` in `config.yaml`; 'Color theme' and 'Ready to Merge shimmer' in this browser's `localStorage` only\", and\n  the closing note to \"Diff preferences, the color theme selection and the Ready to Merge shimmer toggle ... live only\n  in this browser and are never synced or backed up\". CodeRabbit's finding named only the shimmer toggle.\n- Expected / observed / impact: the Color theme pickers call `useColorTheme().select`, which sends\n  `PUT /api/color-themes/selection` (`src/dashboard/frontend/src/hooks/useColorTheme.ts:119-127`). The server route's PUT handler\n  calls `await saveColorThemeSelection(mode, id)` (`src/dashboard/server/routes/color-themes.ts:65`), whose header says it edits only\n  `ui.color_theme.<mode>` in the global `config.yaml` (`src/lib/color-themes/selection-write.ts:2-3`, write path from\n  `getGlobalConfigPath()`). `localStorage` holds only a mirror for first paint (`storeActive`). Theme files themselves\n  live in `~/.overdeck/themes/`. So the page now tells operators a setting is browser-only and never synced when it is\n  in `config.yaml`. The shimmer part is correct: `useUIPreferences.ts` stores it in `localStorage` only.\n- Evidence: static trace above at HEAD 442bcb4f.\n- Fix: Appearance row \"Where it is saved\": \"'Overdeck Theme' in `ui.theme` and 'Color theme' in `ui.color_theme` in\n  `config.yaml` (theme files in `~/.overdeck/themes/`); 'Ready to Merge shimmer' in this browser only\". Closing note:\n  \"Diff preferences and the Ready to Merge shimmer toggle are the exceptions ...\". (`ui.theme` is confirmed as the\n  Overdeck Theme key: `src/lib/config-yaml/merge.ts:917-920`.)\n\n## Non-blocking Findings\n\nFix these in the same pass where you agree; none changes the verdict on its own.\n\n- `~` `configuration/docs-rag.mdx:11` and the `docs.corpus.*` table row: the page says \"PRDs are indexed only when\n  `docs.corpus.prds` is turned on\" and that `docs.corpus.*` controls \"Which sources are indexed\", but the new reindex\n  paragraph (correctly) says reindex ignores every `docs.corpus.*` key. No index build reads them: the only callers of\n  `buildDocsIndex` are `pan docs reindex` (`src/cli/commands/docs.ts:47`, no config passed in production) and\n  `scripts/build-docs-index.mjs` (prebuilt index, no config), and `resolveBuildConfig` falls back to the defaults\n  (`src/lib/docs/index-builder.ts:77-82`). So turning `docs.corpus.prds` on indexes nothing new anywhere. This is\n  pre-existing in cycle 1's text (I missed that the key is dead; the new paragraph exposed it). Reword to \"PRDs are not\n  indexed. The `docs.corpus.*` keys are accepted in `config.yaml`, but no index build reads them today\", and adjust the\n  table row the same way. The code defect (CodeRabbit: pass the loaded corpus config to reindex) belongs in a filed\n  issue, not this PR (NonGoal 1).\n\n- `~` `integrations/ci.mdx:22`: the GitLab rewrite dropped the fact that a red test job is not relayed to the work agent\n  on GitLab (`docs/PIPELINE-GATES.md:483-485`: \"The CI-failure relay is GitHub-webhook-driven\"). The sentence before it\n  (\"A red test job is relayed back to the work agent...\") now reads as applying to GitLab too. Add: \"On GitLab, a red\n  pipeline is not relayed to the work agent automatically.\"\n- `~` `integrations/ci.mdx:65`: Get help still links Troubleshooting instead of GitHub Issues (NFR-6; carried from\n  cycle 1).\n- `?` `features/swarm.mdx:21`: \"only one `--shared` worker runs at a time\" reads as an enforced guarantee. The code only\n  documents serial use (`--shared` help: \"serial use\"; `spawn.ts` header \"for strictly serial use\") and refuses\n  `--shared` only when called from an item worker (`OVERDECK_ITEM_ID`). Nothing stops two. Suggest \"run at most one\n  `--shared` worker at a time; nothing enforces it\".\n- `~` PR body still lacks `## Mintlify checks` / `## Found, not fixed` (PRD W17; xBRIEF does not require it). Carried\n  from cycle 1.\n\n## Coverage\n\n### New claims added this cycle, each traced\n| Page | Claim | Verdict | Evidence |\n| --- | --- | --- | --- |\n| guides/operating.mdx | `pan admin cloister emergency-stop` | correct | `pan admin cloister --help` |\n| guides/operating.mdx | reload: old dashboard stops before the new one starts; on a failed startup health check the old one is not restored; the new one is gone or left running | correct | `reload.ts:496-519` (`leavesDashboardRunning` commits; otherwise bundle record rolled back, no process restart) |\n| guides/operating.mdx | `pan context detach --apply` backs up native CLAUDE.md/AGENTS.md | correct | `pan context detach --help`: \"--apply  Back up each file and remove only an unambiguous managed block\"; `context-layers.ts:313` prints the backup path. The page now drops FR-7's literal \"only\"; that deviation follows the code (NFR-4 wins) |\n| guides/operating.mdx | restore covers skills and commands only | correct | `restore.ts:65-68` |\n| configuration/docs-rag.mdx | trigger patterns are substring, case-insensitive | correct | `DEFAULT_DOCS_TRIGGER_REGEXES` plain words, `new RegExp(pattern, flags).test(prompt)` (`docs/state.ts:209`), `caseSensitive: false` |\n| configuration/docs-rag.mdx | reindex ignores `docs.corpus.*`; on an installed copy rebuilds silently from what exists | correct | CLI passes no config (`docs.ts:46-54` with `commandOptions.reindex` unset) → `resolveBuildConfig` defaults; `corpus.ts:307-317` returns empty on ENOENT |\n| configuration/progressive-polyrepo.mdx | every `--group` form needs `groups_file` set and the file to exist | correct | `workspace-maintenance.ts:284-297` (checks precede the `all` branch) |\n| features/swarm.mdx | `--shared` runs in the issue workspace, foreman/operator only | correct (see `?` on \"only one at a time\") | `spawn.ts:104-106, 154, 208` |\n| features/swarm.mdx | slot swarm needs a dispatchable slot-eligible item | correct | `swarm.ts:924-933` (\"no dispatchable item is slot-eligible\") |\n| integrations/ci.mdx | test-check merge requirement is GitHub only; GitLab uses the MR pipeline verdict | consistent with developer docs; code not traced | `PIPELINE-GATES.md:1210-1212` (\"GitHub only: a GitLab pipeline is judged by its one verdict\") |\n| reference/settings.mdx | Conversation Search saves only via **Save embeddings**, the one autosave exception | label verified; \"one exception\" partially verified | `ConversationSearchSection.tsx` contains the button; a grep of Settings `.tsx` for literal `Save`/`Apply` button text found only a mock in `ColorThemeEditorPreview.tsx`. Buttons whose label comes from a variable would not show in that grep |\n| reference/settings.mdx | Ready to Merge shimmer is browser-only | correct | `useUIPreferences.ts` localStorage |\n| reference/settings.mdx | Color theme is browser-only | **wrong** | blocker above |\n\n### Changed-file ledger (whole PR)\nAll 22 docs files and `docs.json` were reviewed in cycle 1 at 07647eb9 (ledger in that run's report). Files changed\nsince: `configuration/docs-rag.mdx`, `configuration/progressive-polyrepo.mdx`, `features/swarm.mdx`,\n`guides/operating.mdx`, `integrations/ci.mdx`, `reference/settings.mdx` — all re-reviewed above. The remaining 16\ndocs files, `docs.json` and `.mintignore` are unchanged since cycle 1 (`git diff 07647eb932d..HEAD` lists only the six\npages plus `.pan/`). `.pan/` plan artifacts: not applicable.\n\n### Dimensions\n- Correctness: one introduced wrong claim (blocker); all other new claims verified.\n- Security: not applicable beyond content; no secrets or private identifiers added.\n- Performance: not applicable (docs only).\n- Requirements: FR-1 to FR-20 and FR-22 to FR-25 met (cycle 1 matrix, plus FR-2 and FR-7 now met); FR-21 unmet for\n  the Appearance row; NFR-1, NFR-2 (lint:docs), NFR-3, NFR-5 met; NFR-4 unmet for the Color theme claim; NFR-6 unmet for\n  `integrations/ci.mdx` (advisory).\n\n## Verification\n- `npm run lint:docs` at HEAD: `docs lint passed (88 docs files, 96 published pages, 2 changelog entries)`.\n- Internal link/anchor script over all added/modified `.mdx` files at HEAD: 114 links, 0 broken.\n- Dash check on added lines (`*.mdx`, `docs.json`): prints nothing. Scope check (`src|scripts|tests|packages|apps|roles|changelog.d`): prints nothing.\n- Mechanical ACs re-run: operating guide 7 `## ` headings, no `globally_paused`/`--force`/`DeaconPauseBanner`; swarm\n  removed-design grep and `default` grep print nothing; settings table 29 body rows.\n- `gh pr checks 5558`: CodeRabbit, integrations, lint-group (state), clean install smoke test pass; build, other lint\n  groups, test shards and e2e pending for this HEAD (unverified; docs-only change). `overdeck/test` (the verification\n  gate status) is not yet posted for this HEAD: unverified.\n- `npm run lint:effect-diagnostics`: not applicable (no TypeScript change).\n- `mint validate` / `broken-links`: not re-run; link script covers internal links at HEAD.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5482/.pan/review/agent-pan-5482-review-442bcb4f/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-5482 -m \"Fixed review issues\"`"
+    }
+  ],
+  "agentModel": "claude-opus-5-5"
+}
