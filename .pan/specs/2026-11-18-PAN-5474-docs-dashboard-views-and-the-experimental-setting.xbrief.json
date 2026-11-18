@@ -4,17 +4,17 @@
     "created": "2026-11-18T16:25:57Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5474: docs: dashboard views and the Experimental setting",
-    "updated": "2026-11-18T16:28:21.778Z"
+    "updated": "2026-11-18T16:29:20.933Z"
   },
   "plan": {
     "id": "pan-5474",
     "title": "docs: dashboard views and the Experimental setting",
-    "status": "proposed",
+    "status": "running",
     "uid": "47f0d2bd-4ad0-4588-8a3b-8dcca9164969",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-18T16:25:57Z",
-    "updated": "2026-11-18T16:28:21.778Z",
+    "updated": "2026-11-18T16:29:20.933Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5474",
@@ -1039,5 +1039,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
