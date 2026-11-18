@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5503",
   "created": "2026-11-18T23:39:30.709Z",
-  "updated": "2026-11-18T23:51:19.914Z",
+  "updated": "2026-11-18T23:51:21.369Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -280,6 +280,9 @@
     "audit-memory-governor.ac4": {
       "status": "completed",
       "doneAt": "2026-11-18T23:51:19.914Z"
+    },
+    "audit-memory-governor.ac1": {
+      "status": "cancelled"
     }
   }
 }
