@@ -92,6 +92,14 @@ As of this writing, the test role does not start automatically the moment review
 
 `pan sync-main <id>` merges the latest `main` into the feature branch; it does not push. A conflict confined to `.pan/` resolves in favor of `main`, and any other conflict aborts the merge for you to resolve by hand in the workspace.
 
+## Needs you and pan ask
+
+Needs you is the one list of things a person must act on, shown as the top bar's `Needs you · N` button and in the project Home and Board panels. It covers several different kinds of attention: pending agent questions and permission prompts, plans waiting for your approval, `pan ask` decisions, a work agent paused after verification got stuck, a review loop that stopped converging, and a conflict-repair timeout.
+
+An agent asks you a blocking decision with `pan ask`: `--option <label>` offers 2 to 4 choices, `--context <text>` carries what it already tried or knows, and `--withdraw` closes a request that is no longer needed. The question appears in the dashboard as a Decision dialog; whatever you pick or type arrives back in the agent's own session as a message, and the agent resumes from there.
+
+Two related commands cover other kinds of pending input: `pan answer` shows a pending pane choice, or answers its numbered option; `pan parked` lists every issue parked in a stall orbit, oldest first, with why and how to release it.
+
 ## Get help
 
 Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file an issue on [GitHub Issues](https://github.com/eltmon/overdeck/issues).
