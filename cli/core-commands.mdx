@@ -337,6 +337,57 @@ pan update --force     # reinstall even when already on the latest version
 An Overdeck source checkout uses `pan reload` instead; `pan update` installs the published npm
 package.
 
+## pan cost
+
+Track and report Overdeck's own recorded AI usage costs across agents, issues, and budgets.
+
+```bash
+pan cost today --detail
+pan cost issue PAN-1148 --days 7
+pan cost budget create team-monthly --limit 200 --type monthly
+pan cost budget check team-monthly
+```
+
+| Command | What it does | Options |
+| --- | --- | --- |
+| `pan cost today` | Shows today's cost summary | `-d, --detail` (shows individual entries) |
+| `pan cost week` | Shows the weekly cost summary | none |
+| `pan cost month` | Shows the monthly cost summary | none |
+| `pan cost report` | Generates a cost report | `-s, --start <date>` (`YYYY-MM-DD`), `-e, --end <date>` (`YYYY-MM-DD`) |
+| `pan cost issue <issueId>` | Shows costs for a specific issue | `-d, --days <n>` (default 30) |
+| `pan cost effort` | Shows costs grouped by reasoning effort | `-i, --issue <issueId>`, `--json` |
+| `pan cost budget create <name>` | Creates a cost budget | `-l, --limit <amount>` (in USD, default 100), `-t, --type daily\|monthly\|project\|issue\|feature` (default `monthly`), `-a, --alert <threshold>` (0 to 1, default 0.8) |
+| `pan cost budget list` | Lists all budgets | none |
+| `pan cost budget check <id>` | Checks budget status | none |
+| `pan cost budget delete <id>` | Deletes a budget | none |
+| `pan cost sync` | Imports cost events from per-project WAL files into the local database | none |
+| `pan cost backfill` | Reconstructs cost events from stored harness session transcripts | `--write` (persists non-duplicate reconstructed events) |
+
+`pan cost` reports Overdeck's own recorded agent cost events; `pan conv cost` instead estimates
+API spend across the Claude Code sessions `pan conv scan` has discovered on this machine. Budget
+limits are in &#36;; a budget's alert threshold is a fraction of its limit, not a dollar amount.
+
+## pan models
+
+Apply eval-backed provider model presets to `config.yaml`. A preset writes explicit values once;
+it never auto-applies and never watches for drift.
+
+```bash
+pan models preset list
+pan models preset show anthropic
+pan models preset apply anthropic --dry-run
+pan models preset undo
+```
+
+| Command | What it does | Options |
+| --- | --- | --- |
+| `pan models preset list` | Lists presets, their versions, and what was last applied | `--json` |
+| `pan models preset show <id>` | Shows the per-setting diff a preset would make to `config.yaml` | `--json` |
+| `pan models preset apply <id>` | Applies a preset: prints the diff, confirms, then writes only the changed settings | `--dry-run` (prints the diff, writes nothing), `--yes` (skips the confirmation prompt), `--json` |
+| `pan models preset undo` | Restores the values the last preset apply replaced | `--json` |
+
+See [Apply a preset](/configuration/model-presets#apply-a-preset).
+
 ## pan health
 
 Check the health of all Overdeck services.
