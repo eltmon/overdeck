@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5541",
   "created": "2026-11-18T20:13:04.612Z",
-  "updated": "2026-11-18T22:14:08.737Z",
+  "updated": "2026-11-18T22:15:11.545Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -242,6 +242,14 @@
     "docs-changelog.ac4": {
       "status": "completed",
       "doneAt": "2026-11-18T22:14:08.737Z"
+    },
+    "needs-you-open-dialog.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:15:11.545Z"
+    },
+    "agent-session-pinned-card.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:15:11.545Z"
     }
   }
 }
