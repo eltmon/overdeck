@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5482",
   "created": "2026-11-18T21:37:14.666Z",
-  "updated": "2026-11-18T21:53:48.781Z",
+  "updated": "2026-11-18T21:53:53.188Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,11 @@
     "polyrepo-inbound-links.ac3": {
       "status": "completed",
       "doneAt": "2026-11-18T21:53:48.781Z"
+    },
+    "blog-delete": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5482",
+      "claimedAt": "2026-11-18T21:53:53.188Z"
     }
   }
 }
