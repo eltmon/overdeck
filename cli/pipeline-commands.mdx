@@ -137,6 +137,40 @@ pan parked --json
 | --- | --- |
 | `--json` | Prints the raw parked rows as JSON |
 
+## pan ask
+
+Run by a work agent to ask the operator a blocking decision. It records the question in the
+issue's pipeline journal, the dashboard shows it under Needs you, and the operator's answer
+arrives as a message in the agent's own session.
+
+```bash
+pan ask PAN-1148 "Keep the old endpoint or remove it?" --option "Keep it" --option "Remove it"
+pan ask PAN-1148 "..." --context "Tried X, got Y; removing breaks the legacy client"
+pan ask PAN-1148 --withdraw
+```
+
+| Option | What it does |
+| --- | --- |
+| `--option <label>` | A choice the operator can pick (repeatable, 2 to 4 times) |
+| `--context <text>` | What the agent already tried or knows, shown with the question |
+| `--withdraw` | Closes the agent's open decision request (answered another way, or no longer needed) |
+
+## pan answer
+
+Shows a numbered choice menu that is on screen in an agent's terminal pane, or picks option `n`
+from it. `pan answer` does not answer a `pan ask` request; the operator answers that from Needs
+you in the dashboard, not with this command.
+
+```bash
+pan answer PAN-1148            # show the pending menu
+pan answer PAN-1148 2          # pick option 2
+```
+
+The `<id>` may be an issue id, an agent session name, or a named singleton session. It prints one
+of three outcomes: the menu, a confirmation that option `n` was selected, or an error that the
+menu is gone, the menu changed (run `pan answer` again), or delivery is unconfirmed (check the
+terminal).
+
 ## Get help
 
 - [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P)
