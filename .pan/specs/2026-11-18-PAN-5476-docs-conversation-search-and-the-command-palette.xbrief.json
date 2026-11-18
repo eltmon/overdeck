@@ -1,0 +1,605 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-18T17:36:11Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5476: docs: conversation search and the command palette",
+    "updated": "2026-11-18T17:43:56.954Z"
+  },
+  "plan": {
+    "id": "pan-5476",
+    "title": "docs: conversation search and the command palette",
+    "status": "proposed",
+    "uid": "a429536f-60b6-4f5d-bc0e-eb8c84d834e0",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-18T17:36:11Z",
+    "updated": "2026-11-18T17:43:56.954Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5476",
+        "label": "PAN-5476",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5467",
+        "label": "PAN-5467 docs overhaul epic",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docs",
+      "mintlify",
+      "command-palette",
+      "conversation-search"
+    ],
+    "narratives": {
+      "Problem": "No user page explains the Ctrl+K command palette or conversation search. The facts sit in code, the Settings card, CLI help and changelog entries v0.65.0 (#4375), v0.71.0 and v0.89.0 (#5447). Users cannot learn the scopes, the title-first ranking, that semantic search needs an OpenAI key (without one the palette finds titles only), or that pan conv search uses a separate catalog.",
+      "Proposal": "Add a '## Command palette' section to features/keyboard-shortcuts.mdx and a '## Search your conversations' section with four subsections (Find a conversation, Set up semantic search, When search is not working, Search from the command line) to features/conversations.mdx, plus cross-links in the See also list and cli/overview.mdx. Every claim comes from the PRD fact sheet (F-1 to F-40), re-verified against code and pan conv --help. Finish with the pinned Mintlify checks and a dash check.",
+      "NonGoals": "- No new docs page and no docs.json change.\n- No creation of cli/conversation-commands.mdx (owned by #5478).\n- No line-by-line audit or em dash cleanup of existing text in the touched pages (owned by #5502); existing See also bullets stay as they are.\n- No code, UI string or behavior change, even for stale strings such as the desktop-menu comment in CommandPalette.tsx or 'port 3010' in the palette command catalog.\n- No screenshots; images/ has none of the palette or the Conversation Search card.\n- No claim that keyword transcript search works without an OpenAI key.\n- No changelog.d entry."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Add sections to the two named pages instead of creating a new page; no docs.json change",
+        "rationale": "The issue body names exactly these two files ('Add sections to features/conversations.mdx or features/keyboard-shortcuts.mdx'). The palette is a keyboard feature and conversation search is a conversation feature, so each part goes where a reader of that page looks."
+      },
+      {
+        "summary": "Settings path is Settings → Conversations → Conversation Search, with the key in Settings → Providers → OpenAI",
+        "rationale": "settingsPageConstants.ts and ConversationSearchSection.tsx show the card under the Conversations section; the issue's 'Settings → Conversation Search' is shorthand. Code wins."
+      },
+      {
+        "summary": "State that without an OpenAI key the palette finds conversations by title only",
+        "rationale": "conversation-search-service.ts returns no chunk hits at all, BM25 included, when the provider is unavailable; title search runs separately."
+      },
+      {
+        "summary": "Document pan conv embed/search --semantic as a separate catalog that does not feed the palette",
+        "rationale": "The palette reads ~/.overdeck/conversations/embeddings.db (conversationSearch config); pan conv reads discovered sessions in overdeck.db with conversations.embedding* config. Conflating them would send users to the wrong command."
+      },
+      {
+        "summary": "Link cli/conversation-commands.mdx only if it exists when the work runs",
+        "rationale": "#5478 creates that page in parallel; a link to a missing page fails mint broken-links."
+      },
+      {
+        "summary": "Keep edits additive and leave existing em dashes in untouched lines",
+        "rationale": "The issue requires dash-free added lines and frontmatter; #5502 audits the whole pages, and rewriting 1,200 lines here would conflict with it."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Docs-only: three Mintlify files, all items additive sections; items editing features/conversations.mdx are serialized by blocks edges.",
+      "canonicalFilename": "2026-11-18-PAN-5476-docs-conversation-search-and-the-command-palette.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "palette-section",
+        "title": "Add the Command palette section to keyboard-shortcuts.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T17:36:11Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5476",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/keyboard-shortcuts.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Command palette$/,/^## Where shortcuts work$/' features/keyboard-shortcuts.mdx",
+            "grep -c '^## Command palette$' features/keyboard-shortcuts.mdx"
+          ],
+          "expected_outputs": [
+            "the section prints with the chip table and the open keys",
+            "grep prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-5",
+            "NFR-6",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 1. Insert '## Command palette' in features/keyboard-shortcuts.mdx directly after the line 'For every view these shortcuts reach, see [Dashboard views](/features/dashboard-views).' and before '## Where shortcuts work' (PRD D-3). Write it from PRD facts F-1, F-2, F-4 and F-6 to F-17 only: open and close keys, what it lists before typing, the two-character search start and the 10 second timeout, the scope chip table and when chips show, what choosing each row type does (commands copy, they do not run), keys inside the palette and the Newest first button. Link conversation results to /features/conversations#find-a-conversation. Re-grep every anchor first; make no desktop-menu claim (F-5); keep every added line free of U+2013 and U+2014."
+        },
+        "items": [
+          {
+            "id": "palette-section.ac1",
+            "title": "Given features/keyboard-shortcuts.mdx, when `grep -c '^## Command palette$'` runs, then it prints 1 and the heading sits between the Dashboard views link line and `## Where shortcuts work`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-section.ac2",
+            "title": "The section contains `⌘K`, `Ctrl+K`, `⌘J` and `Ctrl+J`, and states that `⌘J`/`Ctrl+J` opens the palette with Conversations selected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-section.ac3",
+            "title": "The section contains a table that covers the chips All, Actions, Files, Commands, Issues, Workspaces, Conversations and Memory, and states that the Files chip lists files only where a work dock is mounted (the Command Deck)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-section.ac4",
+            "title": "The section contains a sentence stating that choosing a command row copies the command to the clipboard and does not run it, and a sentence stating that `/` opens issue search instead of the palette",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-section.ac5",
+            "title": "The section contains a link to `/features/conversations#find-a-conversation` and contains no mention of a desktop app menu entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conv-find",
+        "title": "Add Search your conversations with the Find a conversation subsection",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T17:36:11Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5476",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Search your conversations$/,/^### Set up semantic search$/' features/conversations.mdx",
+            "grep -n '^## Search your conversations$\\|^## See also$' features/conversations.mdx"
+          ],
+          "expected_outputs": [
+            "the subsection prints with the three ranking tiers in order",
+            "the Search your conversations line number is lower than the See also line number"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-6",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-5",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 2. Insert '## Search your conversations' in features/conversations.mdx directly above '## See also' (PRD D-2), with a two-sentence intro saying the palette searches titles and transcript text while the CLI searches a separate catalog. Then write '### Find a conversation' from F-18 to F-25: open with ⌘J/Ctrl+J linking /features/keyboard-shortcuts#command-palette, one row per conversation, the row chips, the title then text then path ranking as a numbered list, Newest first sorting inside each tier, what opening a row does, archived and On <machine> results, and that only Claude Code transcripts are indexed for text so other harnesses match by title only."
+        },
+        "items": [
+          {
+            "id": "conv-find.ac1",
+            "title": "Given features/conversations.mdx, when `grep -n` runs for `^## Search your conversations$` and `^## See also$`, then both print once and the Search heading line number is lower",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-find.ac2",
+            "title": "The Find a conversation subsection contains a numbered list that ranks title matches first, prose matches second and code or path only matches last",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-find.ac3",
+            "title": "The subsection contains a sentence stating that Newest first sorts results inside each tier and that the browser remembers the choice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-find.ac4",
+            "title": "The subsection contains a link to `/features/keyboard-shortcuts#command-palette` and a sentence stating that text search covers Claude Code transcripts while other conversations match by title",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conv-setup",
+        "title": "Add the Set up semantic search subsection",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T17:36:11Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5476",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^### Set up semantic search$/,/^### When search is not working$/' features/conversations.mdx"
+          ],
+          "expected_outputs": [
+            "the subsection prints with the setup steps, the conversationSearch YAML block and the titles-only sentence"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 3. Add '### Set up semantic search' after Find a conversation, from F-26 to F-30: on by default with OpenAI text-embedding-3-small; a numbered setup list (key in Settings → Providers → OpenAI or OPENAI_API_KEY, then Settings → Conversations → Conversation Search, pick a model, run Estimate & reindex all conversations for older transcripts); the rule that without a key the palette finds conversations by title only (keyword hits too are off); model change runs a full reindex; per-model price from F-30 paraphrased without dashes, with every dollar written as &#36; (NFR-7); the conversationSearch YAML snippet from the PRD; and how to turn it off."
+        },
+        "items": [
+          {
+            "id": "conv-setup.ac1",
+            "title": "The subsection contains `Settings → Providers → OpenAI` and `Settings → Conversations → Conversation Search`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-setup.ac2",
+            "title": "The subsection contains a fenced yaml block that starts with `conversationSearch:` and covers `enabled`, `provider` and `model` with `text-embedding-3-small`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-setup.ac3",
+            "title": "The subsection contains a sentence stating that without an OpenAI key the palette returns title matches only, with no transcript text matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-setup.ac4",
+            "title": "The subsection contains the button label `Estimate & reindex all conversations` and a sentence stating that changing the model runs a full reindex",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conv-troubleshoot",
+        "title": "Add the When search is not working subsection with help links",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T17:36:11Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5476",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^### When search is not working$/,/^### Search from the command line$/' features/conversations.mdx"
+          ],
+          "expected_outputs": [
+            "the subsection prints with the three banner cases, the palette error states and both help links"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 4. Add '### When search is not working' after Set up semantic search, from F-31 and F-10: the three banner cases (missing key with the Add OpenAI key button, embedding failures with the OpenAI billing link, transcript indexing paused and its restart or save fix), the palette's timeout and Search unavailable states, and a closing getting-help sentence linking the Overdeck Discord https://discord.gg/ZpHE2ZTv5P and GitHub Issues https://github.com/eltmon/overdeck/issues. Paraphrase banner text; it contains em dashes."
+        },
+        "items": [
+          {
+            "id": "conv-troubleshoot.ac1",
+            "title": "The subsection contains the labels `Add OpenAI key` and `Transcript indexing is paused` and a fix for each banner case",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-troubleshoot.ac2",
+            "title": "The subsection contains `https://discord.gg/ZpHE2ZTv5P` and `https://github.com/eltmon/overdeck/issues`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-troubleshoot.ac3",
+            "title": "The subsection contains a sentence stating that the palette shows a timeout message after 10 seconds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conv-cli",
+        "title": "Add the Search from the command line subsection for pan conv",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T17:36:11Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5476",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^### Search from the command line$/,/^## See also$/' features/conversations.mdx",
+            "pan conv search --help",
+            "pan conv embed --help",
+            "pan conv enrich --help",
+            "pan conv scan --help",
+            "test -f cli/conversation-commands.mdx && echo exists || echo absent"
+          ],
+          "expected_outputs": [
+            "the subsection prints with scan, enrich, search and embed and the two-catalog sentence",
+            "each help output lists the options the subsection names",
+            "each help output lists the options the subsection names",
+            "each help output lists the options the subsection names",
+            "each help output lists the options the subsection names",
+            "prints exists or absent; the subsection links cli/conversation-commands only when it prints exists"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-7",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 5. Add '### Search from the command line' after When search is not working, from F-32 to F-40: open with the two-catalog sentence (pan conv uses discovered sessions in overdeck.db, so pan conv embed does not change palette results); a numbered workflow pan conv scan, pan conv enrich, pan conv search, then pan conv embed and pan conv search --semantic or --similar; a command table with main options checked against pan conv <verb> --help; the Semantic embeddings settings rows and the conversations.embeddings, embedding_provider, embedding_model and embedding_auto_on_deep keys with what embeddings gates (F-38); key sources (F-39; Voyage uses VOYAGE_API_KEY, Settings → Providers has no Voyage row). Put any <word> placeholder in backticks (NFR-7). Link /cli/conversation-commands only if that file exists (FR-7)."
+        },
+        "items": [
+          {
+            "id": "conv-cli.ac1",
+            "title": "The subsection contains `pan conv scan`, `pan conv enrich`, `pan conv search` and `pan conv embed`, and contains `--semantic` and `--similar`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-cli.ac2",
+            "title": "The subsection contains a sentence stating that `pan conv embed` does not change Ctrl+K palette results because the CLI uses a separate session catalog",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-cli.ac3",
+            "title": "The subsection contains the keys `embedding_provider` and `embedding_auto_on_deep` and states that `conversations.embeddings` defaults to false and turns on automatic embedding after tier 2 or 3 enrichment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-cli.ac4",
+            "title": "Given `test -f cli/conversation-commands.mdx`, when it prints absent, then the page contains no link to `/cli/conversation-commands`; when it prints exists, then the subsection contains that link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cross-links",
+        "title": "Add the palette See also bullet and the pan conv search link in cli/overview.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T17:36:11Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5476",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "cli/overview.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'keyboard-shortcuts#command-palette' features/conversations.mdx",
+            "grep -c 'conversations#search-from-the-command-line' cli/overview.mdx"
+          ],
+          "expected_outputs": [
+            "grep prints 2 or more",
+            "grep prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 6. Append one bullet to the existing '## See also' list in features/conversations.mdx: '- [Command palette](/features/keyboard-shortcuts#command-palette): find actions, issues, files and conversations with Ctrl+K'. Do not edit the existing bullets. In cli/overview.mdx, in the row starting '| **Conversations** |', insert `pan conv search` ([searching](/features/conversations#search-from-the-command-line)), after `pan conv list`, and change nothing else in the row."
+        },
+        "items": [
+          {
+            "id": "cross-links.ac1",
+            "title": "Given features/conversations.mdx, when `grep -c 'keyboard-shortcuts#command-palette'` runs, then it prints 2 or more and the See also list contains a Command palette bullet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cross-links.ac2",
+            "title": "Given cli/overview.mdx, when `grep -c 'conversations#search-from-the-command-line'` runs, then it prints 1 and the Conversations row still contains `pan conv list`, `pan conv move`, `pan conv link-pr` and `pan conv schedule add`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "validate-and-record",
+        "title": "Run the Mintlify checks and the dash check and record the results in the PR body",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T17:36:11Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5476",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/keyboard-shortcuts.mdx",
+            "features/conversations.mdx",
+            "cli/overview.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx -y mint@4.3.49 validate",
+            "npx -y mint@4.3.49 broken-links",
+            "npm run lint:docs",
+            "! git diff \"$(git merge-base origin/main HEAD)\" -- features/keyboard-shortcuts.mdx features/conversations.mdx cli/overview.mdx | grep '^+' | grep -P '[\\x{2013}\\x{2014}]'",
+            "! head -4 features/keyboard-shortcuts.mdx features/conversations.mdx | grep -P '[\\x{2013}\\x{2014}]'",
+            "grep -cE '^### (Find a conversation|Set up semantic search|When search is not working|Search from the command line)$' features/conversations.mdx"
+          ],
+          "expected_outputs": [
+            "validate prints 'build passed'",
+            "broken-links prints 'no broken links found'",
+            "lint:docs exits 0",
+            "the command exits 0 with no output",
+            "the command exits 0 with no output",
+            "grep prints 4"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2",
+            "NFR-4",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 7. Run npx -y mint@4.3.49 validate and npx -y mint@4.3.49 broken-links from the workspace root (never --fix), then npm run lint:docs, the two dash checks (diffed against the merge base) and the heading check from the PRD. Fix any finding in the lines this issue added. Paste the clean validate and broken-links output into the PR body under a 'Mintlify checks' heading."
+        },
+        "items": [
+          {
+            "id": "validate-and-record.ac1",
+            "title": "Given the finished branch, when `npx -y mint@4.3.49 broken-links` runs, then it prints `no broken links found` and `npx -y mint@4.3.49 validate` prints `build passed`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-record.ac2",
+            "title": "Given the branch diff against the merge base with origin/main, when the PRD dash checks run on added lines and on both pages' frontmatter, then each exits 0 with no output, and `npm run lint:docs` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-record.ac3",
+            "title": "Given features/conversations.mdx, when the PRD heading check runs, then it prints 4 for the headings Find a conversation, Set up semantic search, When search is not working and Search from the command line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-record.ac4",
+            "title": "The PR body contains the validate and broken-links output under a 'Mintlify checks' heading",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "conv-find",
+        "to": "conv-setup",
+        "type": "blocks"
+      },
+      {
+        "from": "conv-setup",
+        "to": "conv-troubleshoot",
+        "type": "blocks"
+      },
+      {
+        "from": "conv-troubleshoot",
+        "to": "conv-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "conv-cli",
+        "to": "cross-links",
+        "type": "blocks"
+      },
+      {
+        "from": "palette-section",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "cross-links",
+        "to": "validate-and-record",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
