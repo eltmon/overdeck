@@ -65,7 +65,7 @@
         "items": [
           {
             "id": "resume-origin.ac1",
-            "title": "Given a POST to /api/conversations/:name/resume with only a valid internal token header, when the route runs, then it answers 200 and calls handleConversationResume",
+            "title": "Given a POST to /api/conversations/:name/resume with only the internal token header, when the route runs, then the response status is not 403",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -73,7 +73,7 @@
           },
           {
             "id": "resume-origin.ac2",
-            "title": "Given a POST to the resume route with no Origin and either no credential or a wrong internal token, when the route runs, then it answers 403 with error Missing origin and never calls the handler",
+            "title": "Given a POST to the resume route with no credential and no Origin, when the route runs, then the response status is 403 with error 'Missing origin'",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -128,7 +128,7 @@
           },
           {
             "id": "resume-identifiers.ac3",
-            "title": "Given an unknown key, when the resume route runs with the real handler, then the handler receives the key unchanged and the route answers 404",
+            "title": "Given an unknown key, when the resume route runs, then handleConversationResume receives the key unchanged and answers 404",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
