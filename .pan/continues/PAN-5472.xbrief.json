@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5472",
   "created": "2026-11-18T16:42:03.966Z",
-  "updated": "2026-11-18T16:42:03.967Z",
+  "updated": "2026-11-18T16:43:54.858Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,26 @@
   "sessionHistory": [],
   "items": {
     "state-branch-retire": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5472",
-      "claimedAt": "2026-11-18T16:42:03.966Z"
+      "claimedAt": "2026-11-18T16:42:03.966Z",
+      "doneAt": "2026-11-18T16:43:54.858Z"
+    },
+    "state-branch-retire.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:43:54.858Z"
+    },
+    "state-branch-retire.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:43:54.858Z"
+    },
+    "state-branch-retire.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:43:54.858Z"
+    },
+    "state-branch-retire.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:43:54.858Z"
     }
   }
 }
