@@ -16,7 +16,7 @@ vi.mock('../../lib/wsTransport', async (importOriginal) => ({
   dashboardMutationJsonHeaders: vi.fn(async () => ({ 'Content-Type': 'application/json', 'x-overdeck-csrf-token': 'csrf' })),
 }));
 
-import { AgentRequestCard } from '../AgentRequestCard';
+import { agentRequestElsewhereText, AgentRequestAnswer, AgentRequestCard } from '../AgentRequestCard';
 import { DecisionsPanel } from '../DecisionsPanel';
 import { ANYWHERE_STATUS_QUERY_KEY } from '../Settings/anywhere/anywhereApi';
 import { useAnywhereDialogStore } from '../Settings/anywhere/anywhereDialogStore';
@@ -38,6 +38,8 @@ const decision: Decision = {
     name: 'OPENAI_API_KEY',
     prompt: 'The key for the eval run',
     agentId: 'agent-pan-1',
+    agentKind: 'agent',
+    issueId: 'PAN-1',
     expiresAt: '2026-11-04T00:10:00.000Z',
   },
 };
@@ -109,12 +111,36 @@ describe('AgentRequestCard', () => {
     expect(fetchMock).toHaveBeenCalledWith(`/api/agent-requests/${REQUEST_ID}/decline`, expect.objectContaining({ method: 'POST', body: '{}' }));
   });
 
-  it('tells any other viewer to answer on the machine and offers no input', () => {
+  it('tells any other viewer to answer on the machine and offers no input (D10)', () => {
     renderAs('device');
-    expect(screen.getByText("Answer this on desk's own dashboard")).toBeInTheDocument();
+    expect(screen.getByText(
+      "Answer this on desk's own dashboard. A secret can be typed only in a browser on desk itself, so it never crosses the network.",
+    )).toBeInTheDocument();
     expect(screen.queryByLabelText('Value for OPENAI_API_KEY')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Send' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Decline' })).toBeNull();
+  });
+
+  it('tells a device viewer to answer in a browser when the machine label is unknown (D10)', () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    client.setQueryData(ANYWHERE_STATUS_QUERY_KEY, { machine: null, viewer: { kind: 'device' } });
+    client.setQueryData(['agent-requests'], []);
+    render(<QueryClientProvider client={client}><AgentRequestCard decision={decision} /></QueryClientProvider>);
+    expect(screen.getByText(
+      'Answer this in a browser on the machine that runs this dashboard. A secret can be typed only there, so it never crosses the network.',
+    )).toBeInTheDocument();
+  });
+
+  it('onAnswered("sent") fires after a 200 Send', async () => {
+    mockFetch(200, { requestId: REQUEST_ID, status: 'delivered' });
+    const onAnswered = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    client.setQueryData(ANYWHERE_STATUS_QUERY_KEY, { machine: { environmentId: 'env-1', label: 'desk' }, viewer: { kind: 'root-session' } });
+    client.setQueryData(['agent-requests'], []);
+    render(<QueryClientProvider client={client}><AgentRequestAnswer decision={decision} onAnswered={onAnswered} /></QueryClientProvider>);
+    await userEvent.type(screen.getByLabelText('Value for OPENAI_API_KEY'), 'canary-value');
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(onAnswered).toHaveBeenCalledWith('sent'));
   });
 
   it('is what the Decisions panel shows for a secret request, with no Answer button', () => {
@@ -134,7 +160,15 @@ describe('AgentRequestCard for a machine-link request (PAN-4942)', () => {
     kinds: ['machineLink'],
     since: '2026-11-04T00:00:00.000Z',
     blocking: true,
-    agentRequest: { id: REQUEST_ID, kind: 'machine-link', hint: 'my desk Mac', agentId: 'agent-pan-1', expiresAt: '2026-11-05T00:00:00.000Z' },
+    agentRequest: {
+      id: REQUEST_ID,
+      kind: 'machine-link',
+      hint: 'my desk Mac',
+      agentId: 'agent-pan-1',
+      agentKind: 'agent',
+      issueId: 'PAN-1',
+      expiresAt: '2026-11-05T00:00:00.000Z',
+    },
   };
 
   beforeEach(() => {
@@ -164,6 +198,16 @@ describe('AgentRequestCard for a machine-link request (PAN-4942)', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('onLinkOpened fires after Link a machine…', async () => {
+    const onLinkOpened = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    client.setQueryData(ANYWHERE_STATUS_QUERY_KEY, { machine: { environmentId: 'env-1', label: 'desk' }, viewer: { kind: 'root-session' } });
+    client.setQueryData(['agent-requests'], []);
+    render(<QueryClientProvider client={client}><AgentRequestAnswer decision={linkDecision} onLinkOpened={onLinkOpened} /></QueryClientProvider>);
+    await userEvent.click(screen.getByRole('button', { name: 'Link a machine…' }));
+    expect(onLinkOpened).toHaveBeenCalledTimes(1);
+  });
+
   it('posts an empty object to the decline route on Dismiss', async () => {
     const fetchMock = mockFetch(200, { requestId: REQUEST_ID, status: 'declined' });
     renderAs('root-session', <AgentRequestCard decision={linkDecision} />);
@@ -172,20 +216,42 @@ describe('AgentRequestCard for a machine-link request (PAN-4942)', () => {
     expect(fetchMock).toHaveBeenCalledWith(`/api/agent-requests/${REQUEST_ID}/decline`, expect.objectContaining({ method: 'POST', body: '{}' }));
   });
 
-  it('tells any other viewer to answer on the machine and offers no buttons', () => {
+  it('tells any other viewer to answer on the machine and offers no buttons (D10)', () => {
     renderAs('device', <AgentRequestCard decision={linkDecision} />);
-    expect(screen.getByText("Answer this on desk's own dashboard")).toBeInTheDocument();
+    expect(screen.getByText(
+      "Answer this on desk's own dashboard. Machines can be linked only from a browser on desk itself.",
+    )).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Link a machine…' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull();
   });
 
   it('maps a machine-link row to one blocking decision with the hint, and a secret row as before', () => {
-    const base = { id: REQUEST_ID, agentId: 'agent-pan-1', agentKind: 'agent' as const, label: 'agent-pan-1 · PAN-1', createdAt: '2026-11-04T00:00:00.000Z' };
+    const base = { id: REQUEST_ID, agentId: 'agent-pan-1', agentKind: 'agent' as const, issueId: 'PAN-1', label: 'agent-pan-1 · PAN-1', createdAt: '2026-11-04T00:00:00.000Z' };
     expect(useDecisionsModule.agentRequestDecisions([
       { ...base, kind: 'machine-link', hint: 'my desk Mac', expiresAt: '2026-11-05T00:00:00.000Z' },
     ])).toEqual([linkDecision]);
     expect(useDecisionsModule.agentRequestDecisions([
       { ...base, kind: 'secret', name: 'OPENAI_API_KEY', prompt: 'The key for the eval run', expiresAt: '2026-11-04T00:10:00.000Z' },
     ])).toEqual([decision]);
+  });
+});
+
+describe('agentRequestElsewhereText (D10)', () => {
+  it('names the machine for a known label', () => {
+    expect(agentRequestElsewhereText('secret', 'desk')).toBe(
+      "Answer this on desk's own dashboard. A secret can be typed only in a browser on desk itself, so it never crosses the network.",
+    );
+    expect(agentRequestElsewhereText('machine-link', 'desk')).toBe(
+      "Answer this on desk's own dashboard. Machines can be linked only from a browser on desk itself.",
+    );
+  });
+
+  it('falls back to a generic phrase when the label is unknown', () => {
+    expect(agentRequestElsewhereText('secret', null)).toBe(
+      'Answer this in a browser on the machine that runs this dashboard. A secret can be typed only there, so it never crosses the network.',
+    );
+    expect(agentRequestElsewhereText('machine-link', undefined)).toBe(
+      'Answer this in a browser on the machine that runs this dashboard. Machines can be linked only from there.',
+    );
   });
 });
