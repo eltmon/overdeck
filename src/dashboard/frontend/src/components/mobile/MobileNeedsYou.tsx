@@ -10,6 +10,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDecisions, type Decision } from '../../lib/useDecisions';
+import { AgentRequestAnswer } from '../AgentRequestCard';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import { buildPendingAnswerRequest, postPendingAnswer, type PendingAnswerTarget } from '../../lib/pendingInputAnswer';
 import { describePendingInput } from '../../lib/pendingInput';
@@ -172,8 +173,10 @@ function ReadOnlyAction({ decision }: { decision: Decision }) {
   if (decision.connectorNotice) return <p className="px-4 pb-3 text-xs text-muted-foreground">Connected. Revoke it under Settings → Anywhere → Bots.</p>;
   // PAN-4946 — an MCP sign-in is approved or denied only on this machine's own desktop dashboard.
   if (decision.mcpSignIn) return <p className="px-4 pb-3 text-xs text-muted-foreground">Approve on the desktop</p>;
-  // PAN-4941 — a secret request is answered only on this machine's own desktop dashboard.
-  if (decision.agentRequest) return <p className="px-4 pb-3 text-xs text-muted-foreground">Answer on the desktop</p>;
+  // PAN-4941, PAN-5541 WI-8 — the shared answer body: a root-session viewer
+  // (this machine's own desktop browser) gets the input; any other viewer
+  // gets the D10 text naming where to answer.
+  if (decision.agentRequest) return <div className="px-4 pb-3"><AgentRequestAnswer decision={decision} /></div>;
   if (decision.source === 'conversation') {
     return (
       <div className="px-4 pb-3">
