@@ -146,6 +146,23 @@ Once an issue is closed and its branch merged, Overdeck's closed-issue reaper de
 
 Default output also prints the last few entries from the pipeline journal, an append-only log at `<workspace>/.overdeck/pipeline.jsonl` of actions Overdeck has taken on the issue. It is never authority: when the journal disagrees with the PR, the PR wins and the journal is simply stale. It lives only in the workspace and is deleted along with it.
 
+## Restart, rerun or reopen
+
+| Situation | Command |
+| --- | --- |
+| Agent stopped or crashed | `pan recover [id]` |
+| Resume the saved session | `pan resume <id>` |
+| Start over with a new session | `pan start <id> --fresh` |
+| Paused or troubled agent | `pan unpause <id>`, `pan untroubled <id>`, or `pan start <id> --force` |
+| Re-run review after a fix | `pan review request <id> -m "..."` |
+| Review stuck on missing reviewers | `pan review restart <id> [--role ...]` |
+| Stop reviewers | `pan review abort <id>` |
+| Issue already closed, completed or cancelled | `pan reopen <id> [--reason]` |
+
+`pan kill <id>` stops agents but keeps the workspace; it is the safe way to pause work without losing anything. Avoid `pan wipe`, which is destructive and not a restart tool.
+
+`pan reopen` is for an issue that is closed, completed or cancelled, not one already in progress; use `pan review restart` for that case instead. Reopening re-enters the pipeline, adds the `in-progress` label and posts a comment, and refuses an already-open issue unless you pass `--force`. Its help text claims it clears old specialist fields, but there is nothing left to clear: that state was never stored in the first place, so the pipeline simply picks the issue back up from its branch and PR.
+
 ## Get help
 
 Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file an issue on [GitHub Issues](https://github.com/eltmon/overdeck/issues).
