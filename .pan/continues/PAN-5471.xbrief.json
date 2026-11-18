@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5471",
   "created": "2026-11-18T14:58:50.204Z",
-  "updated": "2026-11-18T15:08:09.491Z",
+  "updated": "2026-11-18T15:08:13.697Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,11 @@
     "docs-nav-entry.ac2": {
       "status": "completed",
       "doneAt": "2026-11-18T15:08:09.491Z"
+    },
+    "cloister-routing-section": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5471",
+      "claimedAt": "2026-11-18T15:08:13.697Z"
     }
   }
 }
