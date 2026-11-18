@@ -47,8 +47,10 @@ const haiku55 = {
 };
 
 // GPT-6 Sol/Luna (2026-09-22), GPT-6.1 Sol (2026-09-29), GPT-6.1 Terra (2026-10-26), and
-// GPT-6 Rosalind / GPT-6 Astra for Law (2026-11-02) are additions after the fixture was captured.
+// GPT-6 Rosalind / GPT-6 Astra for Law (2026-11-02), and GPT-6.2 Astra / Sol (2026-11-18) are additions after the fixture was captured.
 const gpt6Additions = [
+  { id: 'gpt-6.2-astra', name: 'GPT-6.2 Astra (272K context)', contextWindow: 272000, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], costPer1MTokens: 24 },
+  { id: 'gpt-6.2-sol', name: 'GPT-6.2 Sol (272K context)', contextWindow: 272000, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], costPer1MTokens: 6 },
   { id: 'gpt-6.1-sol', name: 'GPT-6.1 Sol (272K context)', contextWindow: 272000, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], costPer1MTokens: 6 },
   { id: 'gpt-6.1-terra', name: 'GPT-6.1 Terra (272K context)', contextWindow: 272000, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], costPer1MTokens: 3 },
   { id: 'gpt-6-sol', name: 'GPT-6 Sol (272K context)', contextWindow: 272000, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], costPer1MTokens: 6 },
@@ -143,7 +145,7 @@ describe('model catalog no-loss audit', () => {
     expect(existing.anthropic.findIndex((model) => model.id === sonnet55.id)).toBeLessThan(existing.anthropic.findIndex((model) => model.id === 'claude-sonnet-5'));
     expect(existing.anthropic.find((model) => model.id === haiku55.id)).toEqual(haiku55);
     expect(existing.anthropic.findIndex((model) => model.id === haiku55.id)).toBeLessThan(existing.anthropic.findIndex((model) => model.id === 'claude-haiku-4-5'));
-    expect(existing.openai.slice(0, 5).map((model) => model.id)).toEqual(['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-sol', 'gpt-6-luna']);
+    expect(existing.openai.slice(0, 7).map((model) => model.id)).toEqual(['gpt-6.2-astra', 'gpt-6.2-sol', 'gpt-6-astra', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-sol', 'gpt-6-luna']);
     expect(existing.openai.filter((model) => gpt6AdditionIds.has(model.id))).toEqual(gpt6Additions);
     expect(existing.google[0]).toEqual(geminiArgon);
     expect(withoutOpus55(existing)).toEqual(expectedPreviousCatalog);
