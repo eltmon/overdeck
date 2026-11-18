@@ -1,10 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-18T19:27:03.268351Z · model: claude-opus-5-5 · open: 935_
+_Last sequenced: 2026-11-18T19:57:03.401452Z · model: claude-opus-5-5 · open: 937_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
+| 1 | PAN-5541 | M | high | ok |  |  | Needs-you click on a request_secret lands on a conversation with no secret input; parked agents can't get secrets answered. |
+| 2 | PAN-5540 | L | high | ok |  |  | Known skill packs (video group etc.) have no dashboard add route or agent guidance; fresh machines can't find or install them. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
 | 6 | PAN-5489 | S | high | ok |  |  | pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause. |
@@ -943,6 +945,14 @@ _Last sequenced: 2026-11-18T19:27:03.268351Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
+### PAN-5541 (rank 1)
+
+New in-pipeline substrate bug: the only secret/machine-link input (AgentRequestCard) lives in a sidebar tab no Needs-you path opens, so any agent parked on request_secret or link_machine stays blocked until the operator finds it. In pipeline, so it is pinned in a free top slot rather than ranked against the queue.
+
+### PAN-5540 (rank 2)
+
+New in-pipeline follow-up to merged PAN-5464: KNOWN_PACKS are invisible outside the CLI, so the video packs read as missing on a second machine and agents cannot offer the install. Substrate-labelled, so high importance; pinned in a free top slot because it is already in planning.
+
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
@@ -1255,14 +1265,6 @@ New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's
 
 New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
 
-### PAN-3543 (rank 79)
-
-New this pass. A completed-handoff agent owed rework after a blocked verdict cannot be started at all: pan start refuses and recommends --fresh, --fresh gives the identical refusal, and reset-session is refused too because the durable plane reconstructs the session pointer. The refusal message names an action the operator cannot take, which is the self-contradictory-deadlock family PAN-3526 opened.
-
-### PAN-3522 (rank 80)
-
-New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts through a new generation's 138-second boot warm phase and killed it anyway, producing four restarts in ten minutes, racing spawns on port 3012, and a WATCHDOG GIVING UP. Each restart re-triggered docker stack rebuilds, feeding the storm. The probe budget has to know the difference between starved and starting.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1270,11 +1272,37 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-18T19:27:03.268351Z",
+  "generatedAt": "2026-11-18T19:57:03.401452Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 935,
+  "openCount": 937,
   "nodes": [
+    {
+      "issue": "PAN-5541",
+      "rank": 1,
+      "size": "M",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Needs-you click on a request_secret lands on a conversation with no secret input; parked agents can't get secrets answered.",
+      "rationale": "New in-pipeline substrate bug: the only secret/machine-link input (AgentRequestCard) lives in a sidebar tab no Needs-you path opens, so any agent parked on request_secret or link_machine stays blocked until the operator finds it. In pipeline, so it is pinned in a free top slot rather than ranked against the queue.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5540",
+      "rank": 2,
+      "size": "L",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Known skill packs (video group etc.) have no dashboard add route or agent guidance; fresh machines can't find or install them.",
+      "rationale": "New in-pipeline follow-up to merged PAN-5464: KNOWN_PACKS are invisible outside the CLI, so the video packs read as missing on a second machine and agents cannot offer the install. Substrate-labelled, so high importance; pinned in a free top slot because it is already in planning.",
+      "gate": "auto",
+      "planning": "auto"
+    },
     {
       "issue": "PAN-5013",
       "rank": 3,
@@ -14143,6 +14171,13 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-5464",
+      "to": "PAN-5540",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
     },
     {
       "from": "PAN-5465",
