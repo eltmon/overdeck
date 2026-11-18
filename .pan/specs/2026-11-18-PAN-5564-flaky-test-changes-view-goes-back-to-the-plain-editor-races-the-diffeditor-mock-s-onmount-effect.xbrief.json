@@ -1,0 +1,140 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-18T23:29:16Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5564: Flaky test: changes-view 'goes back to the plain editor' races the DiffEditor mock's onMount effect",
+    "updated": "2026-11-18T23:33:03.781Z"
+  },
+  "plan": {
+    "id": "pan-5564",
+    "title": "Flaky test: changes-view 'goes back to the plain editor' races the DiffEditor mock's onMount effect",
+    "status": "proposed",
+    "uid": "120d3a95-58bb-4712-aec2-0ccd2c77cb36",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-18T23:29:16Z",
+    "updated": "2026-11-18T23:33:03.781Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5564",
+        "label": "PAN-5564",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5564.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "flaky-test",
+      "frontend",
+      "test-only",
+      "vitest"
+    ],
+    "metadata": {
+      "docsJustification": "Test-only change: it edits one vi.mock factory in changes-view.test.tsx that no doc, changelog, CLAUDE.md or rule describes, and it changes no product behavior, so no documented surface changes and no changelog.d entry is due.",
+      "canonicalFilename": "2026-11-18-PAN-5564-flaky-test-changes-view-goes-back-to-the-plain-editor-races-the-diffeditor-mock-s-onmount-effect.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "changes-view.test.tsx is flaky (CI run 44414111727 failed at line 154 with expected 'my draft\\n' to be 'edited in diff\\n'). The @monaco-editor/react DiffEditor mock calls props.onMount from a passive useEffect. The diff element is rendered by an un-act'ed promise (the HEAD readFile), so screen.findByTestId('diff') in openChanges() can resolve before that passive effect runs. ChangesView.handleMount then has not registered its onDidChangeModelContent listener or called setPosition. Assertions at lines 140, 146 and 154/156 are all exposed.",
+      "Proposal": "Change the DiffEditor mock's React.useEffect (test line 63) to React.useLayoutEffect, with a one-line PAN-5564 comment. A layout effect runs synchronously in the commit that inserts the diff element, so handleMount has always run before any findBy observer sees the element. Confirm the diagnosis with an uncommitted negative control (setTimeout-delayed onMount reproduces the CI signature). Then prove stability with 30 consecutive runs. The test is the only file that changes.",
+      "NonGoals": "- No change to ChangesView.tsx, CodePane.tsx or any product source under src/\n- No change to the MonacoCodeEditor mock in changes-view.test.tsx (its mount is flushed by the act-wrapped fireEvent.change that follows it)\n- No change to CodePane.test.tsx or CodePane.markdown-links.test.tsx, even though they share the passive-effect onMount mock pattern\n- No timeout increase, retry, quarantine, skip, skipIf, .only or repeats option\n- No removed or weakened expect() assertion\n- No changelog.d entry and no doc edits\n- No change to scripts/frontend-test-subset.txt"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix the race by switching the DiffEditor mock's onMount effect from React.useEffect to React.useLayoutEffect, not by adding waitFor(diffSetPosition) to openChanges().",
+        "rationale": "The issue lists both options without naming one as recommended. useLayoutEffect removes the race outright (the mount happens in the same commit that inserts the element), fixes every openChanges() caller plus the second findByTestId('diff') at line 164, and has no timeout. The waitFor option depends on handleMount's conditional setPosition (ChangesView.tsx lines 92-96, if (position)); if initialPosition were ever null, the test would time out with an error that does not explain the cause."
+      },
+      {
+        "summary": "Leave the MonacoCodeEditor (plain editor) mock on useEffect.",
+        "rationale": "Its passive mount is always flushed before it matters. The act-wrapped fireEvent.change at line 123 updates the useCodeDrafts store, CodePane re-renders inside act, and React flushes pending passive effects first. The switch back to File at line 152 renders inside act too. Changing it would be an edit no failure calls for."
+      },
+      {
+        "summary": "Single plan item, no docs item, docsJustification set.",
+        "rationale": "A one-file test-mock edit is indivisible, and the change alters no documented surface."
+      }
+    ],
+    "items": [
+      {
+        "id": "fix-diff-mock-mount",
+        "title": "Mount the changes-view DiffEditor mock in a layout effect",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T23:29:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5564",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/explorer/code/__tests__/changes-view.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/explorer/code/__tests__/changes-view.test.tsx",
+            "cd src/dashboard/frontend && for i in $(seq 1 30); do npx vitest run --configLoader runner src/components/explorer/code/__tests__/changes-view.test.tsx >/dev/null 2>&1 || { echo \"FAILED on run $i\"; exit 1; }; done; echo \"30/30 passed\"",
+            "git diff --name-only origin/main...HEAD -- src",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest reports Test Files 1 passed (1) and Tests 4 passed (4) for changes-view.test.tsx",
+            "the 30-run loop prints 30/30 passed",
+            "git diff --name-only lists only src/dashboard/frontend/src/components/explorer/code/__tests__/changes-view.test.tsx",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-5564.md WI-1 exactly. (1) Implementation checkpoint, never committed: on the unfixed file, wrap the DiffEditor mock's props.onMount(...) call (inside the React.useEffect at test line 63) in setTimeout(() => {...}, 20). Run the file once and confirm failures at line 140, line 146 and line 154 (expected 'my draft\\n' to be 'edited in diff\\n'). Then revert with git restore on the test file. If the control does not reproduce that signature, stop and pan tell flywheel-orchestrator with the output; do not continue. (2) In src/dashboard/frontend/src/components/explorer/code/__tests__/changes-view.test.tsx, replace the single match of `React.useEffect(() => {` (line 63, inside the vi.mock('@monaco-editor/react') DiffEditor factory) with `React.useLayoutEffect(() => {`. Add the three-line PAN-5564 comment from the PRD directly above it. Change nothing else; the MonacoCodeEditor mock at line 34 stays on useEffect. (3) Run the file once, then run the 30-run loop with run_in_background or a Bash timeout of at least 600000 ms (each run waits in the gate-admission queue, about 10 s or more per run). (4) Run npm run typecheck and npm run lint from the workspace root. (5) Commit with trailer Item: fix-diff-mock-mount."
+        },
+        "items": [
+          {
+            "id": "fix-diff-mock-mount.ac1",
+            "title": "Given changes-view.test.tsx, when grepping for useLayoutEffect and `React.useEffect(() => {`, then the DiffEditor mock contains exactly one React.useLayoutEffect( call and no `React.useEffect(() => {` line remains",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-diff-mock-mount.ac2",
+            "title": "When the 30-run loop from src/dashboard/frontend runs changes-view.test.tsx 30 times, then every run passes and the loop prints 30/30 passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-diff-mock-mount.ac3",
+            "title": "Given the branch, when running git diff --name-only origin/main...HEAD -- src, then it prints only src/dashboard/frontend/src/components/explorer/code/__tests__/changes-view.test.tsx (no product source changes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-diff-mock-mount.ac4",
+            "title": "Given the diff of changes-view.test.tsx against origin/main, then it removes no expect( line and adds no .only, .skip, skipIf, retry, repeats or timeout option; all four existing tests and their assertions are preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "proposed"
+}
