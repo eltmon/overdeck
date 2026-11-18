@@ -2,9 +2,15 @@
   "version": "1",
   "issueId": "PAN-5468",
   "created": "2026-11-18T19:13:53.395Z",
-  "updated": "2026-11-18T19:33:40.787Z",
+  "updated": "2026-11-18T19:35:08.666Z",
   "gitState": {},
-  "decisions": [],
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Docs-only issue (PAN-5468): the issue body mentions tests and UAT because that is one of the pipeline stages this page documents, not a code change requiring test coverage. No src/, scripts/, tests/, packages/ or apps/ files changed; see D-1 non-goals in .pan/drafts/PAN-5468.md. No existing test SHA applies.",
+      "recordedAt": "2026-11-18T19:35:08.666Z"
+    }
+  ],
   "hazards": [],
   "resumePoint": null,
   "sessionHistory": [],
