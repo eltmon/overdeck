@@ -188,6 +188,57 @@ pan fork source-conv --model claude-opus-5-5 --effort high
 | `--project <key>` | Project for the new conversation; defaults to the source conversation's project |
 | `--plain` | Skips summary generation and copies the raw conversation history |
 
+## pan tell
+
+Send a message to a running agent's pane, or to a conversation on a linked machine addressed as
+`@<machine>/<conv>`.
+
+```bash
+pan tell PAN-1148 "Please also add tests"
+pan tell conv-20261101-1234 "Rebase on main" --steer
+pan tell @desk/conv-20261101-1234 "Rebase on main before you push." --message-id rebase-1
+```
+
+| Option | What it does |
+| --- | --- |
+| `--force` | Delivers even to a critic or verifier lane that already filed its verdict |
+| `--steer` | Interrupts the running turn and sends now |
+| `--when-limit-resets` | Queues the message on the server; it sends once the conversation's usage limit resets (conversations only) |
+| `--message-id <id>` | Idempotency key: a repeat with the same id is delivered once |
+
+See [pan tell](/cli/agent-commands#pan-tell) for targeting rules (issue id, agent id, conversation,
+bare number) and linked-machine addressing.
+
+## pan resume
+
+Resume a stopped **work agent**, not a conversation: `pan resume <id>` restarts the saved harness
+session of an issue's work agent, named by issue id or agent id. To resume a dashboard
+conversation instead, use `pan conv resume <name>`.
+
+```bash
+pan resume PAN-1148                  # resume an issue's stopped work agent
+pan resume PAN-1148 --compact        # summarize the saved session and start fresh from it
+pan resume PAN-1148 --host --yes     # bypass the workspace Docker health gate
+```
+
+| Option | What it does |
+| --- | --- |
+| `--host` | Bypasses the workspace Docker stack-health gate and resumes on the host |
+| `--yes` | Confirms `--host` in a non-interactive context |
+| `--compact` | Summarizes the saved session out-of-band and respawns a fresh session seeded with that summary, to recover a context-wedged agent |
+
+A paused, troubled, or session-less agent is refused with the reason; with no saved session it
+suggests `pan start <id>`.
+
+## pan unarchive-conversation
+
+Restore an archived conversation, found by its exact name first and then by a matching title.
+
+```bash
+pan unarchive-conversation conv-20261030-4471
+pan unarchive-conversation "fix the webhook retry"
+```
+
 ## Get help
 
 - [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P)
