@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5522",
   "created": "2026-11-18T16:10:47.412Z",
-  "updated": "2026-11-18T16:12:27.151Z",
+  "updated": "2026-11-18T16:12:51.812Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -59,6 +59,18 @@
     "codex-floor.ac2": {
       "status": "completed",
       "doneAt": "2026-11-18T16:12:27.151Z"
+    },
+    "cliproxy-route": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:12:51.812Z"
+    },
+    "cliproxy-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:12:51.812Z"
+    },
+    "cliproxy-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:12:51.812Z"
     }
   }
 }
