@@ -4,17 +4,17 @@
     "created": "2026-11-18T20:24:06Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5480: docs: quickstart install paths",
-    "updated": "2026-11-18T20:28:41.787Z"
+    "updated": "2026-11-18T20:29:16.267Z"
   },
   "plan": {
     "id": "pan-5480",
     "title": "docs: quickstart install paths",
-    "status": "proposed",
+    "status": "running",
     "uid": "5b8d5159-da86-405d-93fa-4a70cda88185",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-18T20:24:06Z",
-    "updated": "2026-11-18T20:28:41.787Z",
+    "updated": "2026-11-18T20:29:16.267Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5480",
@@ -230,5 +230,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
