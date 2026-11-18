@@ -60,7 +60,10 @@ vi.mock('@monaco-editor/react', async () => {
     }) => {
       const listeners = React.useRef<Array<() => void>>([])
       const value = React.useRef(props.modified)
-      React.useEffect(() => {
+      // PAN-5564: mount in the commit that inserts the diff element, so
+      // findByTestId('diff') never resolves before ChangesView registers its
+      // change listener (a passive effect can run after the findBy observer).
+      React.useLayoutEffect(() => {
         const modifiedEditor = {
           onDidChangeModelContent: (listener: () => void) => listeners.current.push(listener),
           onDidBlurEditorText: () => {},
