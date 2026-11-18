@@ -89,8 +89,9 @@ Vercel). Move them to `docs.overdeck.ai`.
 3. **Verify.** `curl -sI https://docs.overdeck.ai` should return 308 → `/introduction`
    (Mintlify's entry redirect), matching the current `panopticon-cli.com` behavior.
 
-4. **Update the docs homepage CTA** (already done in `docs.json`): the "Install" button
-   points to `npmjs.com/package/overdeck`, GitHub links to `eltmon/overdeck`. No further
+4. **Update the docs homepage CTA** (already done in `docs.json`): the Install button
+   (`navbar.primary`) points to `/quickstart`, the navbar links to the Overdeck Discord and
+   GitHub, and the footer links to overdeck.ai, its blog and support page. No further
    `docs.json` changes needed.
 
 ---

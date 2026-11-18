@@ -1,12 +1,10 @@
 ---
-title: Cloister
-description: "Cloister, the lifecycle manager that monitors the health of Overdeck's pipeline agents"
+title: "Cloister lifecycle manager"
+sidebarTitle: "Cloister"
+description: "Cloister watches every running agent, detects stuck or crashed sessions, resumes them, and starts the review and test roles when work is done."
 ---
 
 import { ThemedImage } from "/snippets/themed-image.mdx";
-
-
-# Cloister: AI Lifecycle Manager
 
 Cloister is Overdeck's intelligent agent lifecycle manager. It monitors all running agents and automatically handles:
 
@@ -53,7 +51,7 @@ Cloister manages five specialized agents that handle specific phases of the deve
 
 | Specialist | Purpose | Trigger |
 |------------|---------|---------|
-| **review-agent** | Code review before merge | Human clicks "Review" |
+| **review-agent** | Code review before merge | `pan done` (automatic) or a human clicks "Review" |
 | **test-agent** | Runs test suite after review | After review passes |
 | **inspect-agent** | Per-step verification during implementation | After each bead completion |
 | **uat-agent** | Browser-based requirement verification | After tests pass |
@@ -100,7 +98,8 @@ Human clicks "Review"
 Additionally, **inspect-agent** runs during implementation (between beads), not as part of this post-implementation pipeline.
 
 **Key Points:**
-- **Human-initiated start** - A human must click "Review" to start the pipeline
+- **Completion-initiated start** - Running `pan done` starts the review pipeline automatically. If the dashboard is unreachable, `pan done` still finishes and prints `run pan review request <issue-id>` to start the review by hand
+- **Manual start** - A human can also click "Review" to start the pipeline
 - **Automatic handoffs** - review-agent → test-agent → uat-agent happens automatically
 - **Human approval for merge** - Merge is NOT automatic; human clicks "Approve & Merge"
 - **Feedback loops** - Failed reviews/tests/UAT send feedback back to the work-agent

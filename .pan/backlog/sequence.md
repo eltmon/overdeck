@@ -1,13 +1,15 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-18T15:02:18.873480Z · model: claude-opus-5-5 · open: 937_
+_Last sequenced: 2026-11-18T15:32:45.289286Z · model: claude-opus-5-5 · open: 939_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
+| 1 | PAN-5520 | S | critical | ok |  |  | CPU-pressure admission holds every quality gate forever (no bound like PAN-5285 memory bypass); outside load stalls the pipeline. |
 | 2 | PAN-5483 | M | high | ok |  |  | Docs canonicalize to panopticon-cli.com and docs.json uses legacy keys the site ignores. In pipeline; lane A first. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
+| 5 | PAN-5519 | S | high | ok |  |  | Review convoy relaunches reviewers into a stale already-approved run (old head); wastes tokens and can't unblock merge. |
 | 6 | PAN-5489 | S | high | ok |  |  | pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause. |
 | 7 | PAN-5498 | S | critical | ok |  |  | pan start --plan auto --host loses the host override at the planning→work handoff; no work agent starts. Hit twice 11-17. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
@@ -945,6 +947,10 @@ _Last sequenced: 2026-11-18T15:02:18.873480Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
+### PAN-5520 (rank 1)
+
+New substrate bug that is stalling the pipeline right now: sustained CPU PSI from operator workloads kept every verification gate, vitest run and tsc lane waiting 45+ minutes with 44 GB free. The fix is small and well specified (CPU head bypass mirroring memoryBlockedSince, configurable PSI threshold, fake-timer tests), so it ranks first as a pipeline blocker.
+
 ### PAN-5483 (rank 2)
 
 New and in the pipeline; the docs order book runs it first in lane A because every other docs page adds itself to the docs.json navigation it restructures.
@@ -956,6 +962,10 @@ Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat 
 ### PAN-5430 (rank 4)
 
 New issue, sibling of the just-merged front-matter fix PAN-5427, and already queued in the active workflow-redesign order book, so it takes free rank 4 behind critical PAN-5013. It is a small, well-specified MarkdownTab change with named tests, a sanitising allow-list and a concrete acceptance check on the README preview; its parent epic PAN-5284 is closed, so it carries no contains edge.
+
+### PAN-5519 (rank 5)
+
+New substrate bug seen on PAN-5483: resolveReviewParentRunState returns a saved run id without checking headSha or an existing verdict, so recovery paths dispatch reviewers against an old head. Root cause, fix and test are stated, and stale reviews burn tokens while never producing a mergeable approval, so it sits in the top tier beside the other review-pipeline correctness bugs.
 
 ### PAN-5489 (rank 6)
 
@@ -1257,14 +1267,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
 
 New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts through a new generation's 138-second boot warm phase and killed it anyway, producing four restarts in ten minutes, racing spawns on port 3012, and a WATCHDOG GIVING UP. Each restart re-triggered docker stack rebuilds, feeding the storm. The probe budget has to know the difference between starved and starting.
 
-### PAN-3314 (rank 81)
-
-New this pass. Every agent pane is a child of one transient tmux-server unit, so agent memory is the unit's memory and systemd-oomd's kill decision is all-or-nothing: one hungry agent takes the entire fleet with it. That has now happened twice, the second time killing seven work agents, four strikes and a live review convoy. Blast-radius containment is a different fix from choosing a better victim.
-
-### PAN-3278 (rank 82)
-
-Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1272,11 +1274,24 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-18T15:02:18.873480Z",
+  "generatedAt": "2026-11-18T15:32:45.289286Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 937,
+  "openCount": 939,
   "nodes": [
+    {
+      "issue": "PAN-5520",
+      "rank": 1,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CPU-pressure admission holds every quality gate forever (no bound like PAN-5285 memory bypass); outside load stalls the pipeline.",
+      "rationale": "New substrate bug that is stalling the pipeline right now: sustained CPU PSI from operator workloads kept every verification gate, vitest run and tsc lane waiting 45+ minutes with 44 GB free. The fix is small and well specified (CPU head bypass mirroring memoryBlockedSince, configurable PSI threshold, fake-timer tests), so it ranks first as a pipeline blocker.",
+      "gate": "auto",
+      "planning": "auto"
+    },
     {
       "issue": "PAN-5483",
       "rank": 2,
@@ -1313,6 +1328,19 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "dependsOn": [],
       "why": "Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews.",
       "rationale": "New issue, sibling of the just-merged front-matter fix PAN-5427, and already queued in the active workflow-redesign order book, so it takes free rank 4 behind critical PAN-5013. It is a small, well-specified MarkdownTab change with named tests, a sanitising allow-list and a concrete acceptance check on the README preview; its parent epic PAN-5284 is closed, so it carries no contains edge.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5519",
+      "rank": 5,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Review convoy relaunches reviewers into a stale already-approved run (old head); wastes tokens and can't unblock merge.",
+      "rationale": "New substrate bug seen on PAN-5483: resolveReviewParentRunState returns a saved run id without checking headSha or an existing verdict, so recovery paths dispatch reviewers against an old head. Root cause, fix and test are stated, and stale reviews burn tokens while never producing a mergeable approval, so it sits in the top tier beside the other review-pipeline correctness bugs.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13682,6 +13710,13 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "confidence": 1
     },
     {
+      "from": "PAN-3946",
+      "to": "PAN-5519",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
       "from": "PAN-3952",
       "to": "PAN-3234",
       "type": "informs",
@@ -13964,6 +13999,13 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
     {
       "from": "PAN-4705",
       "to": "PAN-4746",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-4705",
+      "to": "PAN-5520",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
