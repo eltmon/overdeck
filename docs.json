@@ -103,6 +103,7 @@
           {
             "group": "Features",
             "pages": [
+              "features/issue-pipeline",
               "features/planning",
               "features/conversations",
               "features/file-explorer",
