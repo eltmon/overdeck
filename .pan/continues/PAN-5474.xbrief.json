@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5474",
   "created": "2026-11-18T16:29:35.527Z",
-  "updated": "2026-11-18T16:41:59.862Z",
+  "updated": "2026-11-18T16:42:07.000Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -232,6 +232,11 @@
     "xlink-config.ac3": {
       "status": "completed",
       "doneAt": "2026-11-18T16:41:59.862Z"
+    },
+    "intro-link": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5474",
+      "claimedAt": "2026-11-18T16:42:06.999Z"
     }
   }
 }
