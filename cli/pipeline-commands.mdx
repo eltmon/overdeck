@@ -91,6 +91,52 @@ pan scope approve PAN-1148
 Every `--project <path>` defaults to the project resolved from the issue. See
 [Change lifecycle status with pan scope](/features/planning#change-lifecycle-status-with-pan-scope).
 
+## pan show
+
+Print a unified view of one issue: derived state, CV (agent work history), context engineering
+state, and health. With no option it prints a compact summary built from derived issue state, the
+last few pipeline journal entries, health, and recent CV entries; each option narrows the output
+to that one view in full detail.
+
+```bash
+pan show PAN-1148               # compact summary
+pan show PAN-1148 --cv          # agent work history only
+pan show PAN-1148 --health      # health and heartbeat only
+pan show PAN-1148 --json
+```
+
+| Option | What it does |
+| --- | --- |
+| `--cv` | Shows agent work history only |
+| `--context` | Shows context engineering state only |
+| `--health` | Shows health and heartbeat only |
+| `--json` | Outputs as JSON |
+
+## pan staffing
+
+Show the work model and swarm policy currently in effect for an issue. It is read-only: it
+resolves the model from `config.yaml` and the project's `projects.yaml` entry and has no
+`--model` or `--swarm` override. Pass a one-off model at spawn time instead, with
+`pan start --model`.
+
+```bash
+pan staffing PAN-1148
+```
+
+## pan parked
+
+List every issue parked in a stall orbit (an operator gate, a zombie session, an idle but
+running agent), oldest first, with why each is parked and what would release it.
+
+```bash
+pan parked
+pan parked --json
+```
+
+| Option | What it does |
+| --- | --- |
+| `--json` | Prints the raw parked rows as JSON |
+
 ## Get help
 
 - [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P)
