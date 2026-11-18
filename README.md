@@ -110,18 +110,19 @@ The sidebar has Project home, Flywheel, Order books and More. More holds Backlog
  Issue         PRD           Agent         Review        Test          Merge
 ┌──────┐    ┌──────┐    ┌──────────┐    ┌──────┐    ┌──────┐    ┌──────────┐
 │ Task │ ─► │ Plan │ ─► │ Write    │ ─► │ Code │ ─► │ Run  │ ─► │ Merge    │
-│ from │    │ with │    │ code in  │    │ rev. │    │ test │    │ train    │
-│ any  │    │xBRIEF│    │ isolated │    │ conv-│    │ +    │    │ keeps    │
-│track-│    │ beads│    │ worktree │    │ oy ×4│    │ UAT  │    │ main     │
-│ er   │    │      │    │          │    │      │    │      │    │ green    │
+│ from │    │ with │    │ code in  │    │ rev- │    │ test │    │ when     │
+│ any  │    │xBRIEF│    │ isolated │    │ iew  │    │ +    │    │ green    │
+│track-│    │      │    │ worktree │    │      │    │ UAT  │    │          │
+│ er   │    │      │    │          │    │      │    │      │    │          │
 └──────┘    └──────┘    └──────────┘    └──────┘    └──────┘    └──────────┘
  GitHub
- Linear      Every stage is model-routed — frontier models plan and review,
- GitLab      fast models grind — and every stage can be overridden per agent.
+ Linear      Every role runs on the model you choose, and you can
+ GitLab      override it per agent.
  Rally
+ Jira
 ```
 
-You can drive any stage from the dashboard, the CLI, or a webhook. Engage as much or as little as you want — from hands-on pair programming with a single agent to launching a fully autonomous pipeline across dozens of issues.
+You can drive any stage from the dashboard, the CLI, or a webhook. Engage as much or as little as you want: from hands-on pair programming with a single agent to launching a fully autonomous pipeline across dozens of issues.
 
 ---
 
@@ -130,30 +131,28 @@ You can drive any stage from the dashboard, the CLI, or a webhook. Engage as muc
 | Feature | Description |
 |:--------|:------------|
 | **Command Deck** | A live workspace where you watch agents code, review diffs inline, send messages, and manage everything from one surface |
-| **Fix-All Flywheel** | The outermost loop — an autonomous orchestrator that runs revolutions across the backlog: plan, implement, verify, merge, file what it finds, go again |
-| **Inline Diff Review** | See what changed file-by-file as the agent works, compare any turn against main — no waiting for a PR to review code |
-| **Model Hot-Swap** | Switch an agent between providers mid-conversation. Six providers, automatic routing, or manual override |
-| **Multi-Harness** | Agents run on Claude Code or Pi, with Codex support for GPT work agents — pick per role, per spawn |
-| **Conversation Forking** | Branch a conversation to try a different approach. Keep the original, compare both, go with what works |
-| **Automatic Checkpoints** | Agent state is snapshotted as it progresses — roll back to any earlier point if something goes wrong |
+| **Fix-All Flywheel** | The outermost loop: an autonomous orchestrator that runs revolutions across the backlog: plan, implement, verify, merge, file what it finds, go again |
+| **Inline Diff Review** | See what changed file-by-file as the agent works, compare any turn against main: no waiting for a PR to review code |
+| **Multi-Harness** | Agents run on Claude Code, Codex, Pi, OpenCode, Kimi Code, Grok Build and other harnesses. Pick one per role or per spawn |
+| **Conversation Forking** | Fork a conversation into a new one from a summary of the work, or hand off to another model |
 | **Visual Plans** | Work plans render as interactive DAGs so you can see dependencies, track acceptance criteria, and know what's done |
-| **Specialist Pipeline** | Review convoy (correctness, security, performance, requirements), tests, per-bead inspection, browser UAT, and merge — you just click Merge |
+| **Specialist Pipeline** | Quality gates, review (one reviewer or a four-lens convoy), tests and browser UAT on the pull request. You click Merge, or turn on auto-merge |
 | **Merge Trains** | Approved work queues onto main in order, each rebase re-verified, so a busy day of merges never breaks the build |
-| **Failsafe Controls** | Pause gates, troubled-agent backoff, boot-scoped no-resume, and a global freeze — autonomy you can always stop |
-| **Cloister** | Lifecycle manager that routes models, detects stuck agents, tracks costs, and orchestrates specialist handoffs |
-| **PRD-Driven Workflow** | A frontier model writes a detailed plan before any code is written — agents can't start without one |
-| **70+ Universal Skills** | Pre-built skills synced on every `overdeck up` — one SKILL.md works across Claude Code, Codex, Cursor, and Gemini CLI |
-| **Context Layers** | One set of rules rendered for every harness — universal, per-project, and per-machine context that agents actually receive |
-| **Multi-Tracker Support** | GitHub Issues, Linear, GitLab, Rally — all visible in one unified kanban board |
+| **Failsafe Controls** | Pause gates, troubled-agent backoff, boot-scoped no-resume, and a global freeze: autonomy you can always stop |
+| **Cloister** | The agent watchdog: checks agent health, nudges stuck agents, restarts crashed ones and recovers stalled reviews |
+| **PRD-Driven Workflow** | `pan start` plans each issue before work starts: a PRD and an xBRIEF plan committed to your repo. Skip planning with `--plan skip` |
+| **Skills** | More than 120 skills in the SKILL.md format, installed by `pan sync` for Claude Code, Codex and Pi |
+| **Context Layers** | One set of rules rendered for every harness: universal, per-project, and per-machine context that agents actually receive |
+| **Multi-Tracker Support** | GitHub Issues, Linear, GitLab, Rally and Jira, in one board |
 | **Workspaces** | Isolated git worktrees per issue with optional Docker environments, local or remote via Fly.io |
-| **Convoys** | Run parallel agents on related issues with automatic result synthesis |
+| **Convoys** | Full review mode: four reviewers check one pull request in parallel and a review parent writes the verdict |
 | **Cost Tracking** | Per-issue, per-stage token costs with model attribution and daily rollups |
 
 ---
 
 ## Architecture at a Glance
 
-Overdeck started as a CLI and grew into **Command Deck**, a desktop-class development environment. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch with `npx @overdeck/core`; keep `pan` for headless and CI, or use `@overdeck/desktop` for the packaged desktop app.
+Overdeck started as a CLI and grew into **Command Deck**, a desktop-class development environment. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface: spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch with `npx @overdeck/core`; keep `pan` for headless and CI, or use `@overdeck/desktop` for the packaged desktop app.
 
 ---
 
