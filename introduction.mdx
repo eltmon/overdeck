@@ -6,170 +6,78 @@ description: "Overdeck is the open source control plane for AI coding agents. Ru
 
 import { ThemedImage } from "/snippets/themed-image.mdx";
 
-> *"The Overdeck had six sides, one for each of the Founders of Gallifrey..."*
->
-> — Classic Doctor Who. The Overdeck was the great hall at the heart of the Time Lord Citadel, where all could be observed. We liked the metaphor.
+Overdeck is the open source control plane for AI coding agents. Code editors were built for people who type code. Overdeck is built for people who direct it.
 
-```bash
-npx @overdeck/core
-```
+With Overdeck you can:
 
-No install step required — `npx @overdeck/core` starts Command Deck and opens the dashboard in your browser. Missing tools are prompted and installed inline the first time you use a feature that needs them.
-
-A 74-second tour: install, `pan start`, the live dashboard, the review convoy, and the merge train.
-
-<video
-  controls
-  playsInline
-  preload="none"
-  poster="/images/intro-video/overdeck-intro-poster.jpg"
-  src="/images/intro-video/overdeck-intro.mp4"
-  className="w-full aspect-video rounded-xl"
-></video>
-
-IDEs were built for humans who type code. Overdeck is built for humans who **direct** code. Command Deck is a live development environment where you spawn agents, watch them work, and stay in control. You see every file change as it lands, review diffs without leaving the conversation, talk to agents to course-correct, hot-swap the model behind them when the task shifts, and branch a conversation to try a different approach without losing the original. When you like where things are headed, the built-in specialist pipeline picks it up — automated code review, tests, and merge — so you never context-switch to a separate CI tab.
+- Run and direct many coding agents at once, across harnesses, models and machines.
+- Carry work from a conversation or an issue to a merged pull request.
+- See what every agent is doing and what it changed.
 
 <ThemedImage
   light="/images/dashboard/command-deck-hero-light.png"
   dark="/images/dashboard/command-deck-hero-dark.png"
-  alt="Overdeck Command Deck — live conversation with an agent, the project's conversations and issues, and the agent's tool calls"
+  alt="The Overdeck dashboard: a live conversation with an agent beside the project's conversations and issues"
 />
 
-## Command Deck
+## Get started
 
-Command Deck is the live development surface where you and your agents work together. The left column's project switcher picks the project. The left column then lists that project's conversations, issues and workspaces on every page, and the deck shows that project's work. Everything updates in real time — no refresh buttons, no polling. Every domain event triggers small, informative UI motion: cost increments animate, tool names fade in and out, status dots pulse. You can watch agents work.
-
-| Region | What You See |
-|:-------|:-------------|
-| **Left column** | Project switcher, navigation, a **New conversation** button, and the project's conversations, issues and workspaces (collapse it with `[`) |
-| **App bar** | The Overdeck brand (opens Home), project crumb, project-scoped search, and status pills — Deacon health, running-agent count, stopped agents |
-| **Tab strip** | One tab per issue / agent / conversation; scroll, pop out, close, or split the view side by side |
-| **Pane body** | The project's Home cockpit, an issue view (the same view the issue drawer shows: a title row with state, cost and next actions, a pipeline strip, a needs-you banner when you must act, and the Conversation, Tasks, Plan, Changes, Activity, Discussion, Skills and Details tabs), or an agent's live conversation + terminal |
-
-### What You Can Do
-
-<CardGroup cols={2}>
-  <Card title="Live Diffs as Agents Code" icon="code-compare">
-    Every file change appears inline as the agent works. Open the diff panel to review changes turn by turn, or hit "vs main" to see the full picture — no waiting for a PR.
-  </Card>
-  <Card title="Talk to Your Agents" icon="comments">
-    Type in the composer to steer an agent mid-task. Correct its approach, point it at the right file, or tell it to stop and rethink — the same way you'd pair-program with a colleague.
-  </Card>
-  <Card title="Hot-Swap Models" icon="shuffle">
-    Agent struggling? Open the model picker and switch from Sonnet to Opus (or Kimi, GPT, Gemini) without losing the conversation. The right model for each phase of the work.
-  </Card>
-  <Card title="Branch to Explore" icon="code-branch">
-    Fork any conversation to try an alternative approach. Keep the original intact, compare both, merge the one you like. Cheaper than restarting from scratch.
-  </Card>
-  <Card title="Automatic Checkpoints" icon="camera">
-    Command Deck snapshots agent state as work progresses. If an agent goes sideways, roll back to any earlier checkpoint instead of starting over.
-  </Card>
-  <Card title="Ship Without Switching Tabs" icon="rocket">
-    When the code looks right, the specialist pipeline picks it up — automated review, tests, and merge. You click Merge when you're satisfied. No CI dashboard to babysit.
-  </Card>
-</CardGroup>
-
-Open the model picker in any conversation's composer and the harness and every routed provider are one click away — Claude Code, Pi, or Codex up top, then Anthropic, and the rest, each with live per-million pricing:
-
-<ThemedImage
-  light="/images/dashboard/model-picker-light.png"
-  dark="/images/dashboard/model-picker-dark.png"
-  alt="The composer model and harness picker — Claude Code / Pi / Codex harnesses over routed provider models with per-million pricing"
-/>
-
-## Why Overdeck?
-
-- **You stay in the loop without being in the way.** Watch agents code, review their diffs live, send a message when they drift. You're pair-programming, not babysitting a terminal.
-- **The right model for every phase.** Opus plans the architecture, Kimi or Sonnet writes the code, Haiku handles quick commands. Overdeck routes automatically — or you override with two clicks when you know better.
-- **Context that outlasts the conversation.** PRDs, plans, checkpoints, beads, and skills carry forward across sessions. Agents pick up where the last one left off, not from a blank slate.
-- **One skill format, every tool.** Write a SKILL.md once and it works across Claude Code, Codex, Cursor, and Gemini CLI. 70+ ship out of the box.
-- **A pipeline that ships while you move on.** When the implementation looks right, hand it to the specialist pipeline — automated code review, tests, and merge. You click Merge when you're satisfied, or keep working on the next issue.
-
-## How It Works
-
-```mermaid
-flowchart LR
-    Issue["Issue\nGitHub · Linear\nGitLab · Rally · Jira"]
-    PRD["PRD\nPlan with Opus"]
-    Agent["Agent\nWrite code in\nisolated worktree\n(Kimi/Sonnet — routed)"]
-    Review["Review\nCode review\nby specialist"]
-    Test["Test\nRun tests\nby specialist"]
-    Merge["Merge\nPR merged\nby specialist"]
-
-    Issue --> PRD --> Agent --> Review --> Test --> Merge
-```
-
-You can drive any stage from the dashboard, the CLI, or a webhook. Engage as much or as little as you want — from hands-on pair programming with a single agent to launching a fully autonomous pipeline across dozens of issues.
-
-## Key Features
-
-| Feature | Description |
-|:--------|:------------|
-| **Command Deck** | A live workspace where you watch agents code, review diffs inline, send messages, and manage everything from one surface |
-| **Inline Diff Review** | See what changed file-by-file as the agent works, compare any turn against main — no waiting for a PR |
-| **Model Hot-Swap** | Switch an agent from Sonnet to Opus to Kimi mid-conversation. Six providers, auto-routing, or manual override |
-| **Conversation Forking** | Branch a conversation to try a different approach. Keep the original, compare both, go with what works |
-| **Automatic Checkpoints** | Agent state is snapshotted as it progresses — roll back to any earlier point if something goes wrong |
-| **Visual Plans** | Work plans render as interactive DAGs with dependencies, acceptance criteria, and live status |
-| **Specialist Pipeline** | Five agents handle code review, testing, inspection, UAT, and merge automatically |
-| **Cloister** | Lifecycle manager that routes models, detects stuck agents, tracks costs, and orchestrates handoffs |
-| **70+ Universal Skills** | Pre-built skills synced via `pan sync` — one SKILL.md works across Claude Code, Codex, Cursor, Gemini CLI |
-| **Multi-Tracker Support** | GitHub Issues, Linear, GitLab, Rally, Jira — all visible in one unified kanban board |
-| **Workspaces** | Isolated git worktrees per issue with optional Docker environments, local or remote |
-| **Convoys** | Run parallel agents on related issues with automatic result synthesis |
-| **Cost Tracking** | Per-issue, per-stage token costs with model attribution and daily rollups |
-
-## Supported Tools
-
-| Tool | Support |
-|:-----|:--------|
-| **Claude Code** | Full support — agent runtime, hooks, skills |
-| **Codex** | Skills sync and OpenAI subscription login for GPT work agents |
-| **Cursor** | Skills sync |
-| **Gemini CLI** | Skills sync |
-| **Google Antigravity** | Skills sync |
-
-## Dashboard Views
-
-Command Deck at `https://overdeck.localhost` provides 13 views:
-
-| View | Purpose |
-|------|---------|
-| **Mission Control** | Project tree + activity timeline — see the full pipeline for any feature |
-| **Board** | Kanban board with cost badges, agent status, and workspace controls |
-| **Agents** | Cloister Deacon, specialist agents, and issue agents with token/cost tracking |
-| **Resources** | System resource monitoring and allocation |
-| **Convoys** | Parallel agent runs with synthesis status |
-| **Handoffs** | Specialist handoff queue and history |
-| **Activity** | The activity feed: Needs you, Project and Global scopes |
-| **Metrics** | Runtime comparison and performance analytics |
-| **Costs** | Per-issue, per-stage cost breakdown with daily totals |
-| **Skills** | All available skills with descriptions and sync status |
-| **Health** | System health checks and diagnostics |
-| **God View** | Aggregate cross-project view of all agent activity |
-| **Settings** | Model routing, tracker API keys, and project configuration |
-
-<ThemedImage
-  light="/docs/dashboard-overview-light.png"
-  dark="/docs/dashboard-overview-dark.png"
-  alt="Overdeck Command Deck dashboard overview"
-/>
-
-## Quick Start
+Try Overdeck without installing anything. This starts Overdeck and opens the dashboard in your browser:
 
 ```bash
 npx @overdeck/core
 ```
 
-`npx @overdeck/core` starts Command Deck immediately. Install it globally (`npm install -g @overdeck/core`) to get the `overdeck` command — `overdeck up`, `overdeck dev`, `overdeck work <id>`. (`pan` is a built-in short alias for `overdeck`, handy for headless and CI.) For the packaged desktop app, use `@overdeck/desktop`.
+To install the `overdeck` and `pan` commands, run the install script. It needs Node.js 22 or later, installs with npm into `~/.local`, and does not use sudo:
 
-Dashboard runs at `https://overdeck.localhost` (or `http://localhost:3011` if you skip HTTPS setup).
+```bash
+curl -fsSL https://overdeck.ai/install | sh
+```
 
-## Learn More
+`pan` is the short name for `overdeck`. Both run the same CLI. Next, follow the [Quickstart](/quickstart) to add a project and start your first agent.
 
-- [Quick Start Guide](/quickstart) - Installation and setup
-- [Core Concepts](/concepts) - Understanding Overdeck's architecture
-- [CLI Commands](/cli/overview) - All available commands
-- [Features](/features/mission-control) - Deep dive into key features
-- [Guides](/guides/legacy-codebases) - Step-by-step guides
-- [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) - Ask questions and get help from the community
+## What Overdeck does
+
+### Conversations with your code
+
+Start a conversation with an agent in any project and steer it while it works. Each turn shows the files it changed, and the diffs, files and commits sit beside the chat. See [Conversations](/features/conversations) and [the file explorer](/features/file-explorer).
+
+### The issue pipeline
+
+`pan start <issue>` plans the issue, makes an isolated workspace for it, and starts a work agent. Review agents and a test agent check the work, and the pull request waits for you to click Merge unless you turn on auto-merge. Issues come from GitHub, Linear, GitLab, Rally or Jira. See [Planning](/features/planning), [the review convoy](/features/convoys), [merge batches](/features/merge-batches), [auto-merge](/configuration/auto-merge) and [issue trackers](/configuration/issue-trackers).
+
+### Order books and the Flywheel (early)
+
+The Flywheel is a loop that runs in one conversation. It picks the next issue from your order books and backlog, starts work on it, watches the pull request until it lands, and parks what it cannot decide for you. The Flywheel is early. See [order books](/configuration/order-books) and [the Flywheel vision](/vision).
+
+### Harnesses and models
+
+Agents run on the coding-agent CLI you choose: Claude Code, Codex, Pi, OpenCode, Kimi Code, Grok Build and others. You pick the model for each role in the pipeline. See [harnesses](/configuration/harnesses) and [model presets](/configuration/model-presets).
+
+### Overdeck Anywhere
+
+Every machine runs its own Overdeck. Link your machines to see all of their conversations in one list, move a conversation to another machine, and answer agents from your phone. overdeck.ai accounts are invite-only for now. See [Overdeck Anywhere](/anywhere).
+
+### Seeing the work
+
+Needs you collects every question, plan and permission prompt that waits on you. The Board shows every issue by its state. Each conversation and issue shows its cost at API rates, so the cost on a subscription plan can differ. See [Command Deck](/features/mission-control).
+
+### Skills, memory and rules
+
+`pan sync` gives every supported harness the bundled skills, and you can turn each skill on or off per project, issue or conversation. Project memory keeps curated facts in your repo, and context layers deliver your rules to each agent when it starts. See [skills](/features/skills), [memory](/configuration/memory) and [context layers](/configuration/context-layers).
+
+For the full list, see the [features page on overdeck.ai](https://overdeck.ai/features/) and the [CLI reference](/cli/overview).
+
+## A short history
+
+Overdeck started in January 2026 as **Panopticon**. The name came from the Panopticon in Doctor Who, the great hall of the Capitol on Gallifrey where the Time Lords gather. The command was `pan` and the npm package was `panopticon-cli`.
+
+In April 2026 the zero-install launcher shipped as `@panctl/cli`. In June 2026 the project was renamed **Overdeck**, and on June 20, 2026 the package became `@overdeck/core`. The new name has no Doctor Who meaning. `pan` stayed as the short command and `overdeck` is the long one. That is also why planning files in your repo live under `.pan/`.
+
+## Get help
+
+- Ask questions on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P).
+- Report bugs and request features in [GitHub Issues](https://github.com/eltmon/overdeck/issues).
+- See the [support page](https://overdeck.ai/support/) on overdeck.ai.
+
+For a tour of the product, visit [overdeck.ai](https://overdeck.ai/).

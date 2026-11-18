@@ -1,0 +1,69 @@
+{
+  "version": "1",
+  "issueId": "PAN-5505",
+  "created": "2026-11-18T15:55:14.402Z",
+  "updated": "2026-11-18T16:02:18.985Z",
+  "gitState": {},
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Docs-only change (.pan/drafts/PAN-5505.md: 'Kind: docs only. No code, no changelog.d entry'); the gate's 'test' match is the PRD's own pipeline-stage prose ('plan, work, review, test, merge'), not a test request. Coverage is the grep/lint/mint checks already run and pasted into the PR body.",
+      "recordedAt": "2026-11-18T16:02:18.985Z"
+    }
+  ],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "rewrite-introduction": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5505",
+      "claimedAt": "2026-11-18T15:55:14.402Z",
+      "doneAt": "2026-11-18T15:57:10.953Z"
+    },
+    "rewrite-introduction.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T15:57:10.953Z"
+    },
+    "rewrite-introduction.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T15:57:10.953Z"
+    },
+    "rewrite-introduction.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T15:57:10.953Z"
+    },
+    "rewrite-introduction.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T15:57:10.953Z"
+    },
+    "remove-intro-video-assets": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5505",
+      "claimedAt": "2026-11-18T15:57:20.516Z",
+      "doneAt": "2026-11-18T15:58:34.488Z"
+    },
+    "remove-intro-video-assets.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T15:58:34.488Z"
+    },
+    "remove-intro-video-assets.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T15:58:34.488Z"
+    },
+    "validate-docs-site": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5505",
+      "claimedAt": "2026-11-18T15:58:42.578Z",
+      "doneAt": "2026-11-18T16:00:49.112Z"
+    },
+    "validate-docs-site.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:00:49.112Z"
+    },
+    "validate-docs-site.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:00:49.112Z"
+    }
+  }
+}
