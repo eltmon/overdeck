@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5522",
   "created": "2026-11-18T16:10:47.412Z",
-  "updated": "2026-11-18T16:12:06.025Z",
+  "updated": "2026-11-18T16:12:27.151Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -47,6 +47,18 @@
     "cost-rows.ac2": {
       "status": "completed",
       "doneAt": "2026-11-18T16:12:06.025Z"
+    },
+    "codex-floor": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:12:27.151Z"
+    },
+    "codex-floor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:12:27.151Z"
+    },
+    "codex-floor.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:12:27.151Z"
     }
   }
 }
