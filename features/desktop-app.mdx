@@ -102,3 +102,11 @@ The app shows the dashboard's own notifications as native system notifications, 
 Clicking one reopens that question, plan or permission dialog, or brings the dashboard to the front.
 
 **Settings → Desktop App → Notifications** has six switches (**Input Needed**, **Stuck Agents**, **Merge Failures**, **Work Complete**, **Planning Done**, **Merge Ready**), but none of them controls these notifications yet ([#5556](https://github.com/eltmon/overdeck/issues/5556)). To silence them, use your operating system's notification settings for Overdeck.
+
+## Start at login
+
+**Settings → Desktop App → Auto-start → Launch at login** starts the app automatically when you log in. It works on macOS and Windows; on Linux it has no effect yet ([#5556](https://github.com/eltmon/overdeck/issues/5556)).
+
+On the first launch, a dialog asks whether to start Overdeck automatically, with an option to enable it or skip for now. If you skip it, a reminder toast appears on the next few launches with a button to enable it; after five reminders, or once you enable it, the reminders stop. **Reset reminder** in the Auto-start card starts that sequence again.
+
+Desktop settings, including this one, save to `desktop-settings.json` in the app's user data folder: `~/.config/Overdeck/` on Linux, `~/Library/Application Support/Overdeck/` on macOS, and `%APPDATA%\Overdeck\` on Windows.
