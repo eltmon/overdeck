@@ -2387,7 +2387,11 @@ PAN-3939 wedge this routine exists to clear.
 It then relaunches the missing lanes against the existing run
 (`recoverMissingConvoyReviewers`), which reuses the parent's own `state.json` and
 so re-verifies nothing; only a parent with no run state at all falls back to the
-full review door. That fallback goes through the guarded review route
+full review door. The recovery first checks that the saved run is current
+(PAN-5519): its run id must match the run id for today's workspace head, and the
+journal must hold no `review.verdict` for it. A stale run gets no reviewers. The
+routine logs it, starts the cooldown, journals nothing, and leaves the next run
+to the review request door. The no-run-state fallback goes through the guarded review route
 (`requestReviewThroughRoute`, source `deacon-lite`), never the in-process
 review starter, which the deacon child never registers (PAN-4623). Its
 cooldown starts before the request, so a refused or unreachable route is not
