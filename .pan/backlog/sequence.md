@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-18T21:13:47.151866Z · model: claude-opus-5-5 · open: 936_
+_Last sequenced: 2026-11-18T21:27:34.321081Z · model: claude-opus-5-5 · open: 943_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -211,6 +211,7 @@ _Last sequenced: 2026-11-18T21:13:47.151866Z · model: claude-opus-5-5 · open: 
 | 200 | PAN-5488 | S | high | ok |  |  | Plan dialog header Stop completes planning while footer Stop aborts to Todo; same label, opposite outcomes. |
 | 200 | PAN-5544 | S | high | ok |  |  | Flywheel author/assignee rail hardcodes login eltmon in skill, role and vision; non-maintainer installs skip or ungate issues. |
 | 201 | PAN-3261 | S | high | ok |  |  | The tmux delivery fallback answered a live session-resume menu because its own paste hid the menu from the detector — silent /compact. |
+| 201 | PAN-5548 | XS | high | ok |  |  | CodeRabbit follow-up issues hard-code assignee eltmon; other operators' Flywheel gate never passes them. Sibling of PAN-5544. |
 | 202 | PAN-3256 | S | high | ok |  |  | glab mr list runs with a polyrepo wrapper root as cwd, which is not a git repo, so MYN membership fails forge_unavailable every cycle. |
 | 203 | PAN-4342 | M | medium | ok |  |  | Re-review rounds resume every lane on its own round-1 findings; give each round one fresh critic lane (Deft method) |
 | 204 | PAN-3174 | S | high | ok |  |  | Polyrepo UAT stacks 504: Traefik labels carry the old myn- prefix, Traefik isn't on the overdeck-* devnet, and the fe port is wrong. |
@@ -239,10 +240,15 @@ _Last sequenced: 2026-11-18T21:13:47.151866Z · model: claude-opus-5-5 · open: 
 | 226 | PAN-5532 | S | medium | ok |  |  | Six dashboard UI bugs where text or filters disagree with code: Experimental copy, Cycle filter, No PR chip, Merging label, palette. |
 | 227 | PAN-4242 | M | high | ok |  |  | pan handoff --cwd skips the folder-trust pre-trust pan start does; successor sits at the trust prompt for hours while shown live |
 | 228 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
+| 228 | PAN-5551 | S | medium | ok |  |  | Emergency stop writes a flywheel pause nothing reads and its toast names a missing control; no CLI clears the Deacon freeze. |
 | 229 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
+| 229 | PAN-5555 | S | medium | ok |  |  | add-repo parses repo-groups.yaml by regex: block lists and hyphenated groups fail; auto-detect needs workspaces_dir. |
 | 230 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
+| 230 | PAN-5552 | S | medium | ok |  |  | pan docs disable/enable: default session scope does nothing and project scope acts global; DOCS-RAG.md names wrong keys. |
 | 231 | PAN-5454 | S | medium | ok |  |  | Clients read welcome.tier and gate on capabilities; Account card and pan account status show the paid plan. PAN-4294 merged. |
+| 231 | PAN-5553 | M | medium | ok |  |  | pan artifacts share is a stub, printed /s/ wrapper URL has no route, and the briefing names an invalid command. |
 | 232 | PAN-5116 | S | high | ok |  |  | restart-all closes the pane but the launcher ignores SIGHUP, so the old ACP host and agent child keep running; stop runtime first. |
+| 232 | PAN-5549 | XS | medium | ok |  |  | pan restore never restores the agents folder that pan sync backs up; backups list it but restore skips it. |
 | 233 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 234 | PAN-4909 | S | high | ok |  |  | Mac set up with connect: Safari on localhost:3011 gets HTTP 401 from the loopback session mint, so the Mac's own dashboard won't load. |
 | 235 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
@@ -738,6 +744,7 @@ _Last sequenced: 2026-11-18T21:13:47.151866Z · model: claude-opus-5-5 · open: 
 | 700 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
 | 700 | PAN-5487 | XS | low | ok |  |  | pan scope --help says it moves xBRIEF files; the code rewrites status fields in place. Reword 5 descriptions. |
 | 701 | PAN-3919 | S | low | needs-refinement |  |  | Review the universal effort-high default and supervisor effort discretion; explicitly an operator decision, no work authorized |
+| 701 | PAN-5550 | XS | low | ok |  |  | pan reload --force is a no-op and help plus core-commands.mdx still claim a deploy-window bypass; remove or define it. |
 | 702 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
 | 703 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
 | 704 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
@@ -1271,10 +1278,10 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-18T21:13:47.151866Z",
+  "generatedAt": "2026-11-18T21:27:34.321081Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 936,
+  "openCount": 943,
   "nodes": [
     {
       "issue": "PAN-5541",
@@ -3933,6 +3940,19 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "planning": "auto"
     },
     {
+      "issue": "PAN-5548",
+      "rank": 201,
+      "size": "XS",
+      "importance": "high",
+      "score": 66,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CodeRabbit follow-up issues hard-code assignee eltmon; other operators' Flywheel gate never passes them. Sibling of PAN-5544.",
+      "rationale": "New: same hard-coded-operator defect as PAN-5544 (rank 200) in advisory-followup.ts; small fix that makes CodeRabbit follow-ups work for non-maintainer installs, so it sits right after its sibling.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3256",
       "rank": 202,
       "size": "S",
@@ -4278,6 +4298,19 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "planning": "auto"
     },
     {
+      "issue": "PAN-5551",
+      "rank": 228,
+      "size": "S",
+      "importance": "medium",
+      "score": 54,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Emergency stop writes a flywheel pause nothing reads and its toast names a missing control; no CLI clears the Deacon freeze.",
+      "rationale": "New: dead state plus a missing CLI clear path in the emergency-stop recovery flow; operator-facing safety control, ranked with the other medium dashboard-behaviour bugs.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3778",
       "rank": 229,
       "size": "S",
@@ -4287,6 +4320,19 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "dependsOn": [],
       "why": "Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked.",
       "rationale": "Rank held at 223. PAN-4558 closed as completed on 2026-10-20, so the server-side snapshot cap this issue depended on has landed and the dependency edge is removed. The remaining resume-from-offset work is now unblocked, but its impact is unchanged, so the rank and score stay where they were.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5555",
+      "rank": 229,
+      "size": "S",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "add-repo parses repo-groups.yaml by regex: block lists and hyphenated groups fail; auto-detect needs workspaces_dir.",
+      "rationale": "New: progressive-polyrepo add-repo fails on the documented YAML shape and default workspaces folder; contained fix (use the yaml package), blocks accurate PAN-5482 docs.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4304,6 +4350,19 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "planning": "auto"
     },
     {
+      "issue": "PAN-5552",
+      "rank": 230,
+      "size": "S",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan docs disable/enable: default session scope does nothing and project scope acts global; DOCS-RAG.md names wrong keys.",
+      "rationale": "New: scope plumbing bug where the default flag silently no-ops and project scope disables docs everywhere; small, self-contained.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-5454",
       "rank": 231,
       "size": "S",
@@ -4317,6 +4376,19 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "planning": "auto"
     },
     {
+      "issue": "PAN-5553",
+      "rank": 231,
+      "size": "M",
+      "importance": "medium",
+      "score": 46,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan artifacts share is a stub, printed /s/ wrapper URL has no route, and the briefing names an invalid command.",
+      "rationale": "New: three artifact-command gaps (stub share, dead wrapper URL, wrong briefing line); the briefing fix is trivial, the rest needs an implement-or-hide decision.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-5116",
       "rank": 232,
       "size": "S",
@@ -4326,6 +4398,19 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "dependsOn": [],
       "why": "restart-all closes the pane but the launcher ignores SIGHUP, so the old ACP host and agent child keep running; stop runtime first.",
       "rationale": "New bug found during PAN-5078 verification: a process leak on every ACP conversation restart-all. Clear root cause and fix; ranked beside other ACP and leaked-process bugs (PAN-4575, PAN-3510).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5549",
+      "rank": 232,
+      "size": "XS",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan restore never restores the agents folder that pan sync backs up; backups list it but restore skips it.",
+      "rationale": "New: one-line mapping gap in restore.ts; cheap fix that makes the sync backup round-trip complete.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -10468,6 +10553,19 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "planning": "auto"
     },
     {
+      "issue": "PAN-5550",
+      "rank": 701,
+      "size": "XS",
+      "importance": "low",
+      "score": 34,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan reload --force is a no-op and help plus core-commands.mdx still claim a deploy-window bypass; remove or define it.",
+      "rationale": "New: dead flag and stale help text left from the deploy-window removal; cosmetic, ranked with other low help-text fixes.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2005",
       "rank": 702,
       "size": "M",
@@ -14383,6 +14481,62 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-5544",
+      "to": "PAN-5548",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-5548",
+      "to": "PAN-5482",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-5549",
+      "to": "PAN-5482",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-5550",
+      "to": "PAN-5482",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-5551",
+      "to": "PAN-5482",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-5552",
+      "to": "PAN-5482",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-5553",
+      "to": "PAN-5482",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-5555",
+      "to": "PAN-5482",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
     },
     {
       "from": "PAN-750",
