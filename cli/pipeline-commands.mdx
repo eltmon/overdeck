@@ -1,0 +1,347 @@
+---
+title: "Issue pipeline commands: plan, task, show, close and the Flywheel"
+sidebarTitle: "Pipeline Commands"
+description: "Reference for the pan commands that plan issues, track checklists, inspect and close issues, and run the Flywheel, swarms and strikes."
+---
+
+An Overdeck issue moves through plan, work, review, test and merge before it ships. These
+commands drive and inspect that pipeline from a shell; see [Review convoy](/features/convoys) for
+more on how a change moves through review on its way to merge.
+
+## pan plan
+
+Run or inspect an issue's planning lifecycle: generate the PRD and xBRIEF, then finalize and
+promote the plan to canonical state.
+
+```bash
+pan plan PAN-1148                       # interactive planning for an issue
+pan plan PAN-1148 --auto                # non-interactive planning
+pan plan finalize                       # promote the workspace plan to canonical state
+pan plan done PAN-1148                  # complete planning and transition the issue to Planned
+```
+
+| Option | What it does |
+| --- | --- |
+| `--auto` | Runs non-interactive planning; inferred choices are recorded in `plan.autoDecisions[]` |
+| `--auto-start` | Deprecated: use `pan start <id>` instead. After planning completes, it used to start the work agent automatically |
+| `--probe` | Adds an adversarial pre-finalize probe pass to the planning prompt |
+| `--model <model>` | Model to use for the planning role |
+| `--harness <harness>` | Coding-agent harness for planning (defaults to role or provider settings) |
+| `--effort <level>` | Planning effort: `low`, `medium`, `high`, `xhigh` or `max` |
+| `--remote` | Uses a remote planning workspace (Fly.io) |
+| `--local` | Uses a local planning workspace |
+
+| Command | What it does |
+| --- | --- |
+| `pan plan finalize` | Marks the workspace plan as proposed and promotes it to canonical state; `-w, --workspace <path>`, `--json`, `--no-promote` (leaves the spec at `status=proposed` for a manual Done), `--no-quality-lint`, `--no-prd`, `--critic` (requires an independent plan critique before promotion) |
+| `pan plan done <id>` | Completes planning: promotes the xBRIEF and transitions the issue to Planned; `--no-prd` |
+
+See [Planning](/features/planning) for what planning produces and when to skip it.
+
+## pan task
+
+Read and update xBRIEF item state for one issue: claim an item, mark it done, or change its
+lifecycle.
+
+```bash
+pan task next PAN-1148                               # find the next unblocked item
+pan task claim PAN-1148 conv-page                     # claim it
+pan task done PAN-1148 conv-page conv-page.ac1        # record the item and its ACs as done
+pan task block PAN-1148 conv-page --on PAN-1200        # wait on another issue
+```
+
+| Command | What it does |
+| --- | --- |
+| `pan task next <issue>` | Prints the next unblocked item; `--json` |
+| `pan task show <issue> <item>` | Shows one item's detail; `--json` |
+| `pan task claim <issue> <item>` | Claims an item; `--json`, `--steal` (claims even when a running agent holds this item or an overlapping one; foreman or operator only) |
+| `pan task done <issue> <items...>` | Records one or more items as done in one continue commit; `--json` |
+| `pan task block <issue> <item>` | Marks an item blocked; `--json`, `--on <refs...>` (issues or PRs it waits on; Overdeck wakes the agent once they all merge) |
+| `pan task unblock <issue> <item>` | Clears a block; `--json` |
+| `pan task reopen <issue> <item>` | Reopens a terminal item; `--json` |
+| `pan task cancel <issue> <item>` | Cancels an item; `--json` |
+
+`pan task done` only records an item once every id passed to it has a commit on the pushed branch
+carrying the body line `Item: <id>`; if any id lacks one, nothing is written. See
+[Work through the checklist with pan task](/features/planning#work-through-the-checklist-with-pan-task).
+
+## pan scope
+
+Move an xBRIEF plan's lifecycle status. Every subcommand rewrites status fields on the spec file
+in place; none of them moves the file between directories, even though some help text still
+describes it that way.
+
+```bash
+pan scope list                     # list every registered project's xBRIEFs
+pan scope show PAN-1148            # plan, items and continue-state summary
+pan scope propose PAN-1148
+pan scope approve PAN-1148
+```
+
+| Command | What it does |
+| --- | --- |
+| `pan scope list` | Lists every scope xBRIEF across registered projects; `--project <path>` |
+| `pan scope show <issueId>` | Displays the xBRIEF plan, items and continue-state summary; `--project <path>` |
+| `pan scope propose <issueId>` | Sets the xBRIEF status to proposed; `--project <path>` |
+| `pan scope approve <issueId>` | Sets the xBRIEF status to approved; `--project <path>` |
+| `pan scope complete <issueId>` | Sets the xBRIEF status to completed; `--project <path>` |
+| `pan scope cancel <issueId>` | Sets the xBRIEF status to cancelled; `--project <path>` |
+| `pan scope restore <issueId>` | Restores a completed or cancelled xBRIEF back to active; `--project <path>` |
+
+Every `--project <path>` defaults to the project resolved from the issue. See
+[Change lifecycle status with pan scope](/features/planning#change-lifecycle-status-with-pan-scope).
+
+## pan show
+
+Print a unified view of one issue: derived state, CV (agent work history), context engineering
+state, and health. With no option it prints a compact summary built from derived issue state, the
+last few pipeline journal entries, health, and recent CV entries; each option narrows the output
+to that one view in full detail.
+
+```bash
+pan show PAN-1148               # compact summary
+pan show PAN-1148 --cv          # agent work history only
+pan show PAN-1148 --health      # health and heartbeat only
+pan show PAN-1148 --json
+```
+
+| Option | What it does |
+| --- | --- |
+| `--cv` | Shows agent work history only |
+| `--context` | Shows context engineering state only |
+| `--health` | Shows health and heartbeat only |
+| `--json` | Outputs as JSON |
+
+## pan staffing
+
+Show the work model and swarm policy currently in effect for an issue. It is read-only: it
+resolves the model from `config.yaml` and the project's `projects.yaml` entry and takes no
+override of its own. Pass a one-off model at spawn time instead, with `pan start --model`.
+
+```bash
+pan staffing PAN-1148
+```
+
+## pan parked
+
+List every issue parked in a stall orbit (an operator gate, a zombie session, an idle but
+running agent), oldest first, with why each is parked and what would release it.
+
+```bash
+pan parked
+pan parked --json
+```
+
+| Option | What it does |
+| --- | --- |
+| `--json` | Prints the raw parked rows as JSON |
+
+## pan ask
+
+Run by a work agent to ask the operator a blocking decision. It records the question in the
+issue's pipeline journal, the dashboard shows it under Needs you, and the operator's answer
+arrives as a message in the agent's own session.
+
+```bash
+pan ask PAN-1148 "Keep the old endpoint or remove it?" --option "Keep it" --option "Remove it"
+pan ask PAN-1148 "..." --context "Tried X, got Y; removing breaks the legacy client"
+pan ask PAN-1148 --withdraw
+```
+
+| Option | What it does |
+| --- | --- |
+| `--option <label>` | A choice the operator can pick (repeatable, 2 to 4 times) |
+| `--context <text>` | What the agent already tried or knows, shown with the question |
+| `--withdraw` | Closes the agent's open decision request (answered another way, or no longer needed) |
+
+## pan answer
+
+Shows a numbered choice menu that is on screen in an agent's terminal pane, or picks option `n`
+from it. `pan answer` does not answer a `pan ask` request; the operator answers that from Needs
+you in the dashboard, not with this command.
+
+```bash
+pan answer PAN-1148            # show the pending menu
+pan answer PAN-1148 2          # pick option 2
+```
+
+The `<id>` may be an issue id, an agent session name, or a named singleton session. It prints one
+of three outcomes: the menu, a confirmation that option `n` was selected, or an error that the
+menu is gone, the menu changed (run `pan answer` again), or delivery is unconfirmed (check the
+terminal).
+
+## pan close
+
+Verify an issue's Definition of Done, clean up its workspace residue, and close the issue on the
+tracker. It checks eight rows, in order: Review passed, Tests passed, Verification green on the
+branch, Merged to main, Post-merge lifecycle ran, Verified on main, Version strings propagated,
+and Deployed.
+
+```bash
+pan close PAN-1148
+pan close PAN-1148 --accept-deploy    # accept a missed row and record the override
+pan close PAN-1148 --abandon "superseded by PAN-1200"
+```
+
+| Option | What it does |
+| --- | --- |
+| `--force` | Skips the confirmation prompt |
+| `--json` | Outputs as JSON |
+| `--accept-review` | Accepts a missed Definition of Done row 1 (Review passed) as an explicit override, recorded in the close-out record |
+| `--accept-tests` | Accepts a missed row 2 (Tests passed) as an explicit override |
+| `--accept-verification` | Accepts a missed row 3 (Verification green on the branch) as an explicit override |
+| `--accept-merged` | Accepts a missed row 4 (Merged to main) as an explicit override |
+| `--accept-post-merge` | Accepts a missed row 5 (Post-merge lifecycle ran) as an explicit override |
+| `--accept-main-verify` | Accepts a missed row 6 (Verified on main) as an explicit override |
+| `--accept-ship` | Accepts a missed row 7 (Version strings propagated) as an explicit override |
+| `--accept-deploy` | Accepts a missed row 8 (Deployed) as an explicit override |
+| `--abandon <reason>` | Records an abandoned disposition: skips the Definition of Done gate and closes without landing evidence |
+| `--residue <reason>` | Records a residue disposition: closes a stale convention PR or MR, skips the gate with verified evidence, and marks the issue terminal without a merge claim |
+
+`--abandon` and `--residue` are operator-conversation only, and neither combines with each other
+or with any `--accept-*` flag.
+
+## pan strike
+
+Spawn a strike agent that implements a fix on a strike branch and opens a pull request against
+main for the operator to merge. A strike bypasses plan, review, test and ship.
+
+```bash
+pan strike PAN-1148
+pan strike PAN-1148 PAN-1200 --effort high
+pan strike PAN-1148 --dry-run
+```
+
+| Option | What it does |
+| --- | --- |
+| `--model <model>` | Model override (defaults to `roles.strike.model` in config) |
+| `--harness <harness>` | Coding-agent harness (defaults to role or provider settings) |
+| `--effort <level>` | Strike effort: `low`, `medium`, `high`, `xhigh` or `max` (default `high`) |
+| `--dry-run` | Prints what would happen without spawning |
+
+## pan flywheel
+
+Start, stop, pause, resume, or inspect the Flywheel conversation, the loop that drives issues
+through the pipeline autonomously.
+
+```bash
+pan flywheel start
+pan flywheel start --orders my-order-book
+pan flywheel status --json
+pan flywheel stop
+```
+
+| Command | What it does | Options |
+| --- | --- | --- |
+| `pan flywheel start` | Launches a conversation running `/pan-flywheel` | `--model`, `--harness`, `--cwd <path>`, `--orders <book-id>`, `--fresh` (replaces a paused flywheel instead of refusing) |
+| `pan flywheel stop` | Asks the loop to write its report, waits for it, then pauses | `--timeout <ms>` (default 120000) |
+| `pan flywheel abort` | Stops the flywheel conversation without a report | none |
+| `pan flywheel pause` | Stops the flywheel session, keeping its conversation and transcript | none |
+| `pan flywheel resume` | Respawns a paused flywheel and re-sends `/pan-flywheel` | none |
+| `pan flywheel report` | Asks a running loop for its report, or prints the saved one | none |
+| `pan flywheel status` | Shows the derived status: run, last tick, policies, in-flight issues, order book | `--json` |
+| `pan flywheel stats` | Shows the substrate-bug discovery rate and P0 count, computed from the tracker and forge | `--json`, `--window <days>` (default 30) |
+
+See [Use the CLI](/configuration/order-books#use-the-cli) for how `pan flywheel` and `pan orders`
+work together.
+
+## pan orders
+
+Create and manage Flywheel order books: named, lane-ordered lists of issues a Flywheel run works
+from.
+
+```bash
+pan orders create my-order-book
+pan orders add my-order-book PAN-1148 PAN-1200 --lane A
+pan orders queue my-order-book
+pan orders start my-order-book
+```
+
+| Command | What it does | Options |
+| --- | --- | --- |
+| `pan orders create <name>` | Creates a draft order book | `--project <key>` |
+| `pan orders list` | Lists order books | `--project <key>` |
+| `pan orders show <id>` | Shows an order book | `--project <key>` |
+| `pan orders add <id> <issues...>` | Adds issues to an order book | `--lane A\|B` (default `A`), `--after <issue>`, `--reverify` (requires PRD re-verification before pickup), `--project <key>` |
+| `pan orders remove <id> <issue>` | Removes an issue from an order book | `--project <key>` |
+| `pan orders move <id> <issue>` | Moves an issue within or between lanes | `--lane A\|B`, `--order <n>` (one-based position in the target lane), `--project <key>` |
+| `pan orders queue <id>` | Marks a draft order book ready for dispatch | `--project <key>` |
+| `pan orders start <id>` | Starts a Flywheel run bound to an order book | `--project <key>` |
+
+See [Use the CLI](/configuration/order-books#use-the-cli).
+
+## pan backlog
+
+Manage the backlog sequencer that ranks and pins issue work.
+
+```bash
+pan backlog write-sequence sequence.json
+```
+
+| Command | What it does | Options |
+| --- | --- | --- |
+| `pan backlog write-sequence <file>` | Validates a SequenceDoc JSON file, writes it to `.pan/backlog/sequence.md`, and commits it | `--project-root <path>` (default cwd) |
+
+## pan merge
+
+Cancel a pending Flywheel auto-merge.
+
+```bash
+pan merge cancel PAN-1148
+```
+
+| Command | What it does | Options |
+| --- | --- | --- |
+| `pan merge cancel <id>` | Cancels a pending Flywheel auto-merge during its cooldown window | none |
+
+See [Cancelling](/configuration/auto-merge#cancelling) for what the cooldown window is and what
+cancelling changes.
+
+## pan swarm
+
+Start, dispatch, recover, or inspect parallel swarm slots for a planned issue, when the xBRIEF has
+independent items that can run at once.
+
+```bash
+pan swarm dispatch PAN-1148
+pan swarm status PAN-1148 --json
+pan swarm wait PAN-1148 --timeout 540
+pan swarm merge PAN-1148 2
+```
+
+| Command | What it does | Options |
+| --- | --- | --- |
+| `pan swarm dispatch <id>` | Runs one gated swarm dispatch pass | `--json` |
+| `pan swarm merge <id> <slotIndex>` | Verifies and merges one completed swarm slot | `--json` |
+| `pan swarm recover <id> <slotIndex>` | Recovers a failed swarm slot | `--action retry\|drop\|handoff\|reclaim` (default `retry`), `--operator` (overrides the three-intervention limit for this failure class) |
+| `pan swarm freeze <id>` | Freezes swarm coordination for an issue; the Deacon skips it until resumed | `--reason <text>` |
+| `pan swarm resume <id>` | Resumes swarm coordination for a frozen issue on the next Deacon patrol | none |
+| `pan swarm status <id>` | Reads reconciled swarm state: per-slot rows, hold state, and capacity | `--json` |
+| `pan swarm wait <id>` | Waits for a slot, foreman, or hold state transition | `--timeout <seconds>` (default 300), `--json` |
+| `pan swarm stop <id>` | Freezes coordination, then stops all live slot agents; branches and worktrees are kept | `--reason <text>` |
+| `pan swarm reset <id>` | Work-preserving reset: stops slots, pushes unmerged slot branches to origin, removes slot worktrees and branches, clears recorded slot state (the hold stays set) | `--force` (keeps deleting even when a push fails), `--reason <text>` |
+
+See [CLI](/features/swarm#cli) for the gated dispatch protocol these commands drive.
+
+## pan spawn
+
+Create a worker pane for one xBRIEF item, in its own item worktree.
+
+```bash
+pan spawn --issue PAN-1148 --item conv-page
+pan spawn --issue PAN-1148 --item conv-page --model claude-opus-5-5
+```
+
+| Option | What it does |
+| --- | --- |
+| `--issue <id>` | Issue the worker belongs to |
+| `--item <item>` | xBRIEF item the worker takes |
+| `--model <model>` | Model the worker runs on |
+| `--harness <harness>` | Coding-agent harness (default `claude-code`) |
+| `--effort <level>` | Reasoning effort: `low`, `medium`, `high`, `xhigh` or `max` (defaults to the item or plan metadata, then `roles.worker.effort`) |
+| `--shared` | Runs the worker in the issue workspace instead of its own item worktree; foreman or operator only, serial use |
+
+## Get help
+
+- [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P)
+- [GitHub Issues](https://github.com/eltmon/overdeck/issues)

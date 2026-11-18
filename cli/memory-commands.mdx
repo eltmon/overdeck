@@ -1,0 +1,256 @@
+---
+title: "Memory and context commands: pan memory, context and knowledge"
+sidebarTitle: "Memory Commands"
+description: "Reference for the pan commands that manage memory facts, observation memory, context layers, the OKF knowledge bundle and the docs index."
+---
+
+Overdeck carries three kinds of memory into an agent's context: curated facts you write and
+review, observation memory Overdeck gathers automatically from agent activity, and pinned docs
+injected at prompt time. These commands manage all three, plus the context layers that assemble
+them and the OKF knowledge bundle.
+
+## pan memory
+
+Search and inspect Overdeck memory: curated facts, observation memory, and pinned docs.
+
+```bash
+pan memory search "merge train" --issue PAN-1148
+pan memory add closed-issue-reaper --type feedback --description "..." --user
+pan memory list --type feedback
+pan memory sync --status
+```
+
+**Facts**
+
+| Command | What it does |
+| --- | --- |
+| `pan memory add <id>` | Adds a curated memory fact |
+| `pan memory list` | Lists curated memory facts |
+| `pan memory show <id>` | Prints a curated memory fact |
+| `pan memory edit <id>` | Edits a curated memory fact |
+| `pan memory retire <id>` | Removes a curated memory fact (git history is the archive) |
+| `pan memory lint` | Reports duplicate, contradicting and badly linked memory facts; advisory, never edits |
+| `pan memory sync` | Syncs the operator memory store with your private git remote |
+| `pan memory reindex` | Refreshes the fact vector cache for the project, operator and machine stores |
+
+**Observations**
+
+| Command | What it does |
+| --- | --- |
+| `pan memory search <query>` | Searches memory observations |
+| `pan memory status [issue]` | Shows current memory status for an issue, a workspace, or the current directory |
+| `pan memory timeline` | Prints chronological observations for a workspace or the current directory |
+| `pan memory summary [issue]` | Generates a daily markdown memory summary for an issue, a workspace, or the current directory |
+| `pan memory reset <scope> <scopeId>` | Creates a memory reset marker |
+| `pan memory backfill` | Backfills memory observations from historical Claude Code JSONL transcripts |
+| `pan memory doctor` | Prints memory health, pending counts, and provider configuration |
+| `pan memory config` | Shows memory provider and rollup configuration |
+| `pan memory read <path>` | Prints a file from a workspace's memory home (relative to that home) |
+
+**Pins**
+
+| Command | What it does |
+| --- | --- |
+| `pan memory pin <doc-path>` | Pins a doc for prompt-time memory injection |
+| `pan memory unpin <doc-path>` | Removes a pinned doc |
+| `pan memory pins` | Lists pinned docs for a project or workspace |
+
+Run `pan memory <subcommand> --help` for its options. The subcommands below also take an options
+table.
+
+### pan memory search
+
+| Option | What it does |
+| --- | --- |
+| `--project <id>` | Project ID |
+| `--workspace <id-or-name>` | Workspace id or name |
+| `--issue <id>` | Issue ID |
+| `--tag <tag>` | Filters by tag |
+| `--sibling` | Searches same-project sibling issues instead of the selected issue |
+| `--global` | Searches across every registered project instead of just one |
+| `--target [path]` | Searches every workspace whose path targets a directory (bare flag means cwd); mutually exclusive with `--workspace`, `--issue` and `--global` |
+| `--include-archived` | Includes observations hidden by reset markers |
+| `--limit <n>` | Maximum results |
+| `--facts` | With `--json`: also returns matching curated facts from this checkout, the operator and the machine store, scoped to the current project |
+| `--json` | Outputs JSON |
+
+### pan memory add
+
+| Option | What it does |
+| --- | --- |
+| `--type <type>` | Fact type: `feedback`, `project`, `reference` or `user` |
+| `--description <text>` | One-line index description, 200 characters or fewer |
+| `--title <text>` | Fact title (defaults to the id, dashes turned to spaces and capitalized) |
+| `--body <text>` | Fact body |
+| `--body-file <path>` | Reads the fact body from a file |
+| `--tags <a,b>` | Comma-separated tags |
+| `--always` | Lists this fact first in every launch index, and leaves it out of prompt-time retrieval |
+| `--source <text>` | Who or what made this rule, and when |
+| `--supersedes <ids>` | Comma-separated ids of facts this one replaces; marks them superseded in the same store |
+| `--project <key>` | Project key (defaults to the project owning the cwd) |
+| `--user` | Writes to the operator store, which travels with you and syncs once set up |
+| `--machine` | Writes to the machine store (this machine only) |
+| `--json` | Outputs JSON |
+
+### pan memory list
+
+| Option | What it does |
+| --- | --- |
+| `--type <type>` | Filters by fact type: `feedback`, `project`, `reference` or `user` |
+| `--query <q>` | Filters by a fact-matching query (see `pan memory search`) |
+| `--review` | Shows only facts carrying a review marker (default is active facts only) |
+| `--all` | Lists every fact, including superseded and retired ones |
+| `--project <key>` | Project key (defaults to the project owning the cwd) |
+| `--user` | Lists the operator store |
+| `--machine` | Lists the machine store (this machine only) |
+| `--here` | Lists the cwd checkout's store instead of the primary checkout |
+| `--json` | Outputs JSON |
+
+### pan memory show
+
+| Option | What it does |
+| --- | --- |
+| `--project <key>` | Project key (defaults to the project owning the cwd) |
+| `--user` | Reads from the operator store |
+| `--machine` | Reads from the machine store (this machine only) |
+| `--here` | Reads from the cwd checkout's store instead of the primary checkout |
+
+### pan memory edit
+
+| Option | What it does |
+| --- | --- |
+| `--type <type>` | Fact type: `feedback`, `project`, `reference` or `user` |
+| `--title <text>` | Fact title |
+| `--description <text>` | One-line index description, 200 characters or fewer |
+| `--body <text>` | Fact body |
+| `--body-file <path>` | Reads the fact body from a file |
+| `--tags <a,b>` | Comma-separated tags |
+| `--source <text>` | Replaces who or what made this rule, and when |
+| `--supersedes <ids>` | Comma-separated ids of facts this one replaces; marks them superseded in the same store |
+| `--clear-review` | Removes the review marker, re-activating the fact |
+| `--always` | Lists this fact first in every launch index, and leaves it out of prompt-time retrieval |
+| `--no-always` | Clears the always flag |
+| `--project <key>` | Project key (defaults to the project owning the cwd) |
+| `--user` | Edits the operator store |
+| `--machine` | Edits the machine store (this machine only) |
+| `--json` | Outputs JSON |
+
+### pan memory retire
+
+| Option | What it does |
+| --- | --- |
+| `--project <key>` | Project key (defaults to the project owning the cwd) |
+| `--user` | Retires from the operator store |
+| `--machine` | Retires from the machine store (this machine only) |
+| `--json` | Outputs JSON |
+
+### pan memory lint
+
+| Option | What it does |
+| --- | --- |
+| `--threshold <n>` | Duplicate similarity threshold from 0 to 1 (default depends on the method) |
+| `--no-llm` | Skips the LLM contradiction pass |
+| `--project <key>` | Project key (defaults to the project owning the cwd) |
+| `--user` | Lints the operator store |
+| `--machine` | Lints the machine store (this machine only) |
+| `--here` | Lints the cwd checkout's store instead of the primary checkout |
+| `--json` | Outputs JSON |
+
+### pan memory sync
+
+| Option | What it does |
+| --- | --- |
+| `--setup <git-url>` | Turns on sync: uses this private git repository as the remote, then syncs |
+| `--status` | Shows sync state without touching the network |
+| `--json` | Outputs JSON |
+
+See [Adding and curating facts](/configuration/memory#adding-and-curating-facts),
+[Linting facts](/configuration/memory#linting-facts) and
+[Syncing operator memory](/configuration/memory#syncing-operator-memory).
+
+## pan context
+
+Manage the layered context model: global, project, and workspace layers that assemble into each
+harness's effective prompt.
+
+```bash
+pan context list
+pan context diff --harness claude
+pan context edit --layer project
+pan context validate
+```
+
+| Command | What it does | Options |
+| --- | --- | --- |
+| `pan context list` | Shows all three layers' files | `--layer global\|project\|workspace`, `--json` |
+| `pan context edit` | Opens a context layer in `$EDITOR` | `--layer global\|project\|workspace` (default `global`) |
+| `pan context sync` | Refreshes Overdeck-managed session context artifacts | none |
+| `pan context diff` | Shows what each harness would receive after templating | `--harness claude\|pi` |
+| `pan context validate` | Lints layer templates for unclosed or unknown harness blocks | none |
+| `pan context migrate` | One-shot migration from the deprecated `sync.devroot` model | `--yes` (registers every discovered project without prompting) |
+| `pan context detach` | Explicitly removes historical Overdeck managed regions from native instruction files | `--dry-run` (previews the files and blocks without changing anything), `--apply` (backs up each file and removes only an unambiguous managed block) |
+
+See [CLI](/configuration/context-layers#cli).
+
+## pan knowledge
+
+Run a knowledge maintenance agent for an issue, or open the project's OKF knowledge bundle in the
+local viewer.
+
+```bash
+pan knowledge PAN-1148
+pan knowledge PAN-1148 --focus "swarm recovery"
+pan knowledge open
+```
+
+| Option | What it does |
+| --- | --- |
+| `--focus <topic>` | Runs `/okf study` for a focused topic before syncing |
+| `--retro` | Runs `/okf retro` before syncing |
+| `--model <model>` | Model override (defaults to `roles.knowledge.model` in config) |
+| `--effort <level>` | Knowledge effort: `low`, `medium`, `high`, `xhigh` or `max` |
+
+| Command | What it does | Options |
+| --- | --- | --- |
+| `pan knowledge open` | Opens the project OKF bundle in the local knowledge viewer | `--no-install` (skips installing `@inkeep/open-knowledge` when the `ok` binary is missing), `--no-browser` (starts or reuses the viewer without opening a browser) |
+
+See [Knowledge](/configuration/knowledge).
+
+## pan docs
+
+Query and maintain Overdeck's own documentation retrieval index, which chunks `docs/`, skills,
+rules, `CLAUDE.md` files and PRDs so agents can pull relevant snippets into their context.
+Disabling injection stops that automatic retrieval without touching the index itself.
+
+```bash
+pan docs query "how does the merge train work"
+pan docs reindex
+pan docs disable --scope project --reason "debugging a stale snippet"
+pan docs enable --scope project
+```
+
+| Command | What it does | Options |
+| --- | --- | --- |
+| `pan docs query <text>` | Queries the docs index for relevant snippets | `--top <n>` (default 5), `--format markdown\|json\|text` (default `markdown`), `--index-path <path>`, `--kind docs\|skill\|rule\|claude-md\|prd` |
+| `pan docs reindex` | Regenerates the docs index from the current `docs/`, skills, and related sources | none |
+| `pan docs disable` | Disables docs RAG injection | `--scope session\|project\|global` (default `session`), `--reason <text>` |
+| `pan docs enable` | Re-enables docs RAG injection | `--scope session\|project\|global` (default `session`) |
+
+## pan briefing
+
+Print the live Overdeck session briefing markdown: the same context a managed session receives at
+launch.
+
+```bash
+pan briefing
+pan briefing --cwd ../other-workspace
+```
+
+| Option | What it does |
+| --- | --- |
+| `--cwd <path>` | Resolves workspace context from this directory |
+
+## Get help
+
+- [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P)
+- [GitHub Issues](https://github.com/eltmon/overdeck/issues)

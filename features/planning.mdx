@@ -52,6 +52,8 @@ pan plan <id> --model <model> --harness <harness> --effort <level>
 pan plan <id> --remote        # Plan on a Fly.io workspace
 ```
 
+See [Pipeline Commands](/cli/pipeline-commands) for the full `pan plan`, `pan task` and `pan scope` reference.
+
 In `--auto` mode the planning agent asks no questions. It picks the most defensible default for each one, records it in the xBRIEF `plan.autoDecisions[]` as a summary and rationale, and stops only when the issue and a linked PRD genuinely contradict each other. The probe pass runs when `--probe` is passed, or when the planning effort is `high` or above.
 
 `pan start <id>` plans first when the issue has no plan yet. Its `--plan <mode>` flag picks the depth:
