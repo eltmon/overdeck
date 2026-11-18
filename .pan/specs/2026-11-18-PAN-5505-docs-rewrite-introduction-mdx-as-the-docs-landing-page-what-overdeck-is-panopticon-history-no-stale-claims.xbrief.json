@@ -4,17 +4,17 @@
     "created": "2026-11-18T15:52:43Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5505: docs: rewrite introduction.mdx as the docs landing page (what Overdeck is, Panopticon history, no stale claims)",
-    "updated": "2026-11-18T15:53:49.644Z"
+    "updated": "2026-11-18T15:54:57.753Z"
   },
   "plan": {
     "id": "pan-5505",
     "title": "docs: rewrite introduction.mdx as the docs landing page (what Overdeck is, Panopticon history, no stale claims)",
-    "status": "proposed",
+    "status": "running",
     "uid": "a44377c2-9f22-4b28-8d23-754431fb4840",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-18T15:52:43Z",
-    "updated": "2026-11-18T15:53:49.644Z",
+    "updated": "2026-11-18T15:54:57.753Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5505",
@@ -280,5 +280,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
