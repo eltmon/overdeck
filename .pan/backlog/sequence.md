@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-18T22:33:09.757824Z · model: claude-opus-5-5 · open: 942_
+_Last sequenced: 2026-11-18T23:04:31.511409Z · model: claude-opus-5-5 · open: 944_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -470,6 +470,7 @@ _Last sequenced: 2026-11-18T22:33:09.757824Z · model: claude-opus-5-5 · open: 
 | 445 | PAN-1449 | S | medium | ok |  |  | Memory extraction still failing; the live symptom PAN-4370 closed and PAN-4374 adds a working provider; layout half remains |
 | 446 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
 | 447 | PAN-5180 | M | medium | ok |  |  | Tab-open REST burst (~45 requests) delays every client 1.0-1.4 s; uncached prerequisite and status probes. |
+| 447 | PAN-5562 | M | medium | ok |  |  | pan cost today/week/month/report read dead per-day files and print $0; budgets never accrue; Costs page Event Count wrong. |
 | 448 | PAN-5264 | M | medium | ok |  |  | Attribute the app-rest GitHub caller (1,422 untraced App REST calls/hour), then cut the largest path. |
 | 449 | PAN-5340 | S | medium | ok |  |  | A Preview link to another Markdown file should open it in Preview, not Edit. Follows PAN-5337. |
 | 450 | PAN-5440 | L | medium | ok |  |  | React Compiler burn-down for all remaining components: 78 skips in 42 files, 288 memo sites. Largest group; do last. |
@@ -485,6 +486,7 @@ _Last sequenced: 2026-11-18T22:33:09.757824Z · model: claude-opus-5-5 · open: 
 | 455 | PAN-5317 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5127: route live Codex app-server sends correctly; no replayable mail for keyed sends. |
 | 456 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
 | 456 | PAN-5479 | S | medium | ok |  |  | Docs P2: merge the unpublished workspaces config page into features/workspaces and memory pages. Lane A item 9. |
+| 456 | PAN-5560 | S | medium | ok |  |  | pan docs reindex ignores docs.* config and, from an npm install, silently overwrites a full index with a partial corpus. |
 | 457 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
 | 458 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
 | 458 | PAN-5481 | S | medium | ok |  |  | Docs P2: configuration/voice.mdx, dictation, tts.enabled, local Qwen3-TTS daemon, sidecars. Lane A item 10. |
@@ -1277,10 +1279,10 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-18T22:33:09.757824Z",
+  "generatedAt": "2026-11-18T23:04:31.511409Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 942,
+  "openCount": 944,
   "nodes": [
     {
       "issue": "PAN-5541",
@@ -7166,6 +7168,19 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "planning": "auto"
     },
     {
+      "issue": "PAN-5562",
+      "rank": 447,
+      "size": "M",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan cost today/week/month/report read dead per-day files and print $0; budgets never accrue; Costs page Event Count wrong.",
+      "rationale": "New bug found while planning the costs docs (PAN-5475): four concrete defects with code paths and expected fixes; banded with medium dashboard fixes.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-5264",
       "rank": 448,
       "size": "M",
@@ -7350,6 +7365,19 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "dependsOn": [],
       "why": "Docs P2: merge the unpublished workspaces config page into features/workspaces and memory pages. Lane A item 9.",
       "rationale": "Rank unchanged; PAN-5483 closed, so that dependency is removed.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5560",
+      "rank": 456,
+      "size": "S",
+      "importance": "medium",
+      "score": 46,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan docs reindex ignores docs.* config and, from an npm install, silently overwrites a full index with a partial corpus.",
+      "rationale": "New bug found while writing PAN-5482 docs; self-contained CLI fix with clear expected behavior, banded with docs-adjacent medium work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14500,6 +14528,27 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-5560",
+      "to": "PAN-5482",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-5560",
+      "to": "PAN-5552",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-5562",
+      "to": "PAN-5475",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
     },
     {
       "from": "PAN-750",
