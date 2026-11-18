@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5478",
   "created": "2026-11-18T19:16:06.870Z",
-  "updated": "2026-11-18T19:34:52.501Z",
+  "updated": "2026-11-18T19:34:59.902Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -250,6 +250,11 @@
     "core-restart-reload.ac4": {
       "status": "completed",
       "doneAt": "2026-11-18T19:34:52.500Z"
+    },
+    "core-shutdown-update": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5478",
+      "claimedAt": "2026-11-18T19:34:59.902Z"
     }
   }
 }
