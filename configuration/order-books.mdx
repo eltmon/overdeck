@@ -62,11 +62,11 @@ These are narrow add actions. Editing, validation, settings, ordering, and lifec
 
 ### Pickup posture
 
-**OPEN** permits eligible book items to dispatch and renders blue-tinted — dispatch is live, machine working.
+**OPEN** permits eligible book items to dispatch and renders blue-tinted: dispatch is live, machine working.
 
-**DRAIN** blocks every new book dispatch and renders amber — a human paused pickup. Work already in the pipeline continues toward a terminal state.
+**DRAIN** blocks every new book dispatch and renders amber: a human paused pickup. Work already in the pipeline continues toward a terminal state.
 
-Run settings always show posture attribution — who set it, when, and why — beneath the posture control, regardless of which posture is active. If the recorded reason predates the current posture (for example, a leftover "Operator paused new pickup." reason after reopening), an amber stale-reason flag calls that out.
+Run settings always show posture attribution (who set it, when, and why) beneath the posture control, regardless of which posture is active. If the recorded reason predates the current posture (for example, a leftover "Operator paused new pickup." reason after reopening), an amber stale-reason flag calls that out.
 
 ### Lane A
 
@@ -108,7 +108,7 @@ The Flywheel page and issue tree also show read-only order-book projections. Tho
 
 ### Pick the project
 
-Order books are per-project state, and the page header carries a **Project** picker listing every project Overdeck has registered. It opens on the project the server resolved for you, and choosing another one reloads the page against that project's books — every read and write the page makes is scoped to the selection, so you cannot edit one project's book while looking at another's.
+Order books are per-project state, and the page header carries a **Project** picker listing every project Overdeck has registered. It opens on the project the server resolved for you, and choosing another one reloads the page against that project's books: every read and write the page makes is scoped to the selection, so you cannot edit one project's book while looking at another's.
 
 The selection is mirrored into the URL as `/orders?project=mind-your-now`, which makes it a shareable deep link: opening that URL selects the project before the first load. Without the parameter the page shows the project containing the dashboard server's own working directory, exactly as it did before.
 
@@ -137,7 +137,7 @@ pan orders start 2026-07-18-refactor-p3-remainder
 pan flywheel start --orders 2026-07-18-refactor-p3-remainder
 ```
 
-`queue` is the CLI form of the dashboard's **Queue book** action — it moves a draft to `ready` so the Flywheel can pick the book up from the ready queue. It refuses a book that is not a draft rather than re-queueing a running or completed campaign.
+`queue` is the CLI form of the dashboard's **Queue book** action: it moves a draft to `ready` so the Flywheel can pick the book up from the ready queue. It refuses a book that is not a draft rather than re-queueing a running or completed campaign.
 
 `pan orders start <id>` and `pan flywheel start --orders <id>` both open the one `conv-flywheel` conversation with the book named in its `/pan-flywheel` prompt. They differ when a flywheel is already running: `pan orders start` leaves it running and returns without naming the new book to it, while `pan flywheel start --orders` refuses with "already running" (`pan flywheel stop` first). A paused flywheel makes both refuse; resume it (`pan flywheel resume`) or replace it (`pan flywheel start --fresh --orders <id>`).
 
@@ -161,7 +161,7 @@ A book is drained only when every item is terminal. For order-book progress, ter
 
 The server derives this result from canonical issue state. The orchestrator cannot declare a book drained through prose or a status message.
 
-A book completes when its items are terminal — there is no completion verb. Check it with:
+A book completes when its items are terminal; there is no completion verb. Check it with:
 
 ```bash
 pan orders show 2026-07-18-refactor-p3-remainder
@@ -186,5 +186,5 @@ Overdeck records every accepted exception in the run's `orders-overrides.jsonl`.
 ## Related
 
 - [Auto-Merge](/configuration/auto-merge) controls how eligible PRs ship after review and tests.
-- [The State Branch](/configuration/state-branch) explains where order-book files persist.
+- [State model](/reference/state-model) explains where order-book files live: under `.pan/orders/` in your repo.
 - [`pan orders`](/cli/overview) provides the terminal management surface.

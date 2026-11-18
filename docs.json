@@ -143,7 +143,6 @@
               "configuration/skills",
               "configuration/memory",
               "configuration/appearance",
-              "configuration/state-branch",
               "configuration/issue-trackers",
               "configuration/polyrepo",
               "configuration/auto-merge",
@@ -263,6 +262,10 @@
     {
       "source": "/configuration/beads",
       "destination": "/features/skills"
+    },
+    {
+      "source": "/configuration/state-branch",
+      "destination": "/reference/state-model"
     }
   ]
 }
