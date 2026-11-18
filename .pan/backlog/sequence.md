@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-18T20:27:29.662253Z · model: claude-opus-5-5 · open: 938_
+_Last sequenced: 2026-11-18T20:43:30.733839Z · model: claude-opus-5-5 · open: 938_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -209,6 +209,7 @@ _Last sequenced: 2026-11-18T20:27:29.662253Z · model: claude-opus-5-5 · open: 
 | 199 | PAN-3274 | S | high | needs-refinement |  |  | A test-role agent spawned and never ran a turn, holding an approved CI-green issue out of the merge gate behind a stale failed verdict. |
 | 200 | PAN-3267 | S | high | ok |  |  | GitLab merged-head oracle spawns one glab subprocess per repo × head, so pipeline membership refresh fails on every cycle. |
 | 200 | PAN-5488 | S | high | ok |  |  | Plan dialog header Stop completes planning while footer Stop aborts to Todo; same label, opposite outcomes. |
+| 200 | PAN-5544 | S | high | ok |  |  | Flywheel author/assignee rail hardcodes login eltmon in skill, role and vision; non-maintainer installs skip or ungate issues. |
 | 201 | PAN-3261 | S | high | ok |  |  | The tmux delivery fallback answered a live session-resume menu because its own paste hid the menu from the detector — silent /compact. |
 | 202 | PAN-3256 | S | high | ok |  |  | glab mr list runs with a polyrepo wrapper root as cwd, which is not a git repo, so MYN membership fails forge_unavailable every cycle. |
 | 203 | PAN-4342 | M | medium | ok |  |  | Re-review rounds resume every lane on its own round-1 findings; give each round one fresh critic lane (Deft method) |
@@ -369,7 +370,6 @@ _Last sequenced: 2026-11-18T20:27:29.662253Z · model: claude-opus-5-5 · open: 
 | 350 | PAN-5468 | M | medium | ok |  |  | Docs P1: features/issue-pipeline.mdx, the pipeline from pan start through merge and close-out. Lane A item 4. |
 | 350 | PAN-578 | M | high | ok |  |  | Security: Comment mediation layer to prevent prompt injection via tracker comments |
 | 351 | PAN-2921 | S | medium | ok |  |  | Strike merge door can report fetch failure after merge and land the same head twice |
-| 351 | PAN-5470 | M | medium | ok |  |  | Docs P1: features/flywheel.mdx, the loop, lane board, switches and backlog sequencer. Supersedes PAN-2070. Lane A item 5. |
 | 352 | PAN-4195 | M | medium | ok |  |  | Every pan call costs ~0.5s/230MB from eager command imports; lazy-load command modules, target --version <100ms |
 | 353 | PAN-2839 | S | medium | ok |  |  | plan→work autoSpawn now 500s with a duplicated workspace prep |
 | 354 | PAN-2824 | S | medium | ok |  |  | pan review pending dies when one project's lens gather fails (non-degrading caller; PAN-2820 class) |
@@ -650,7 +650,7 @@ _Last sequenced: 2026-11-18T20:27:29.662253Z · model: claude-opus-5-5 · open: 
 | 612 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
 | 612 | PAN-5501 | M | medium | ok |  | PAN-5478 | Docs audit: line-by-line accuracy check of the 7 CLI Reference pages; waits on PAN-5478. Lane B item 9. |
 | 613 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
-| 613 | PAN-5499 | S | medium | ok |  | PAN-5480, PAN-5470 | Docs audit: Getting Started, Vision, Changelog intro (5 pages); waits on PAN-5480/5470. |
+| 613 | PAN-5499 | S | medium | ok |  | PAN-5480 | Docs audit: Getting Started, Vision, Changelog intro (5 pages); waits on PAN-5480. |
 | 614 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
 | 615 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
 | 616 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
@@ -912,7 +912,7 @@ _Last sequenced: 2026-11-18T20:27:29.662253Z · model: claude-opus-5-5 · open: 
 | 871 | PAN-146 | M | low | stale |  |  | PAN-146: Refine light mode theming across all dashboard pages |
 | 872 | PAN-55 | M | low | stale |  |  | Track specialist costs with time period filtering |
 | 873 | PAN-44 | M | low | stale |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
-| 874 | PAN-2070 | XS | low | needs-refinement |  |  | docs: user-facing Flywheel page should target the pan-flywheel v2 loop skill, not a CLI daemon with a dashboard toggle |
+| 874 | PAN-2070 | XS | low | needs-refinement |  |  | Likely done: PAN-5470 shipped features/flywheel.mdx for the loop skill; verify and close. |
 | 875 | PAN-3536 | S | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): pan tell can not reach ohmypi conversations; fix dies with the harness |
 | 876 | PAN-2027 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): routing kimi-k2 through ohmypi needs a different home once OMP is gone |
 | 877 | PAN-2035 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): Copilot provider routing via omp |
@@ -1273,7 +1273,7 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-18T20:27:29.662253Z",
+  "generatedAt": "2026-11-18T20:43:30.733839Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 938,
@@ -3912,6 +3912,19 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "planning": "auto"
     },
     {
+      "issue": "PAN-5544",
+      "rank": 200,
+      "size": "S",
+      "importance": "high",
+      "score": 68,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Flywheel author/assignee rail hardcodes login eltmon in skill, role and vision; non-maintainer installs skip or ungate issues.",
+      "rationale": "New issue. The Flywheel's default-deny security rail only holds for the maintainer, so every other operator's loop either skips their own issues or acts ungated; the fix (render the operator's forge login at sync or read it from flywheel status) is small and well-scoped, so it ranks with the other Flywheel correctness work near PAN-4365.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3261",
       "rank": 201,
       "size": "S",
@@ -5917,19 +5930,6 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "condition": "ok",
       "dependsOn": [],
       "why": "Strike merge door can report fetch failure after merge and land the same head twice",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5470",
-      "rank": 351,
-      "size": "M",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Docs P1: features/flywheel.mdx, the loop, lane board, switches and backlog sequencer. Supersedes PAN-2070. Lane A item 5.",
-      "rationale": "Rank unchanged; PAN-5483 closed, so that dependency is removed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9397,11 +9397,10 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "score": 41,
       "condition": "ok",
       "dependsOn": [
-        "PAN-5480",
-        "PAN-5470"
+        "PAN-5480"
       ],
-      "why": "Docs audit: Getting Started, Vision, Changelog intro (5 pages); waits on PAN-5480/5470.",
-      "rationale": "Rank unchanged; PAN-5472 merged (#5535), so that dependency is removed and only PAN-5480/5470 remain.",
+      "why": "Docs audit: Getting Started, Vision, Changelog intro (5 pages); waits on PAN-5480.",
+      "rationale": "Rank unchanged; PAN-5470 (the Flywheel docs page) closed, so that dependency is removed and only PAN-5480 remains.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12607,8 +12606,8 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "score": 9,
       "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "docs: user-facing Flywheel page should target the pan-flywheel v2 loop skill, not a CLI daemon with a dashboard toggle",
-      "rationale": "Triage: the flywheel is now a loop skill; the docs page target changes. Rank held.",
+      "why": "Likely done: PAN-5470 shipped features/flywheel.mdx for the loop skill; verify and close.",
+      "rationale": "Rank held; PAN-5470, which superseded this issue, closed, so this is a close candidate once the page is confirmed on main.",
       "gate": "auto",
       "planning": "skip"
     },
@@ -14209,13 +14208,6 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
     },
     {
       "from": "PAN-5467",
-      "to": "PAN-5470",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5467",
       "to": "PAN-5473",
       "type": "contains",
       "source": "github-ref",
@@ -14309,20 +14301,6 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "from": "PAN-5467",
       "to": "PAN-5504",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5470",
-      "to": "PAN-2070",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.85
-    },
-    {
-      "from": "PAN-5470",
-      "to": "PAN-5499",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
