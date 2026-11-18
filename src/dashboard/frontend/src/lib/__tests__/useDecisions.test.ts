@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { renderHook } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { BackendRestartRecoverySnapshot, DiskAlertSnapshot, HarnessAutoUpdateSnapshot } from '@overdeck/contracts';
 import { useDashboardStore } from '../store';
@@ -9,7 +9,16 @@ import { describePendingInput } from '../pendingInput';
 import { DISK_ALERT_QUERY_KEY } from '../diskAlert';
 import { HARNESS_AUTO_UPDATE_QUERY_KEY } from '../harnessAutoUpdate';
 import { BACKEND_RESTART_RECOVERY_QUERY_KEY } from '../backendRestartRecovery';
-import { type AgentRequestRow, backendRestartDecisions, diskAlertDecisions, harnessUpdateDecisions, isBlockingDecision, useDecisions } from '../useDecisions';
+import {
+  type AgentRequestRow,
+  backendRestartDecisions,
+  diskAlertDecisions,
+  fetchAgentRequests,
+  harnessUpdateDecisions,
+  isBlockingDecision,
+  useDecisions,
+  usePendingAgentRequestDecisions,
+} from '../useDecisions';
 import type { McpSignInApproval } from '../../components/Settings/anywhere/anywhereApi';
 import type { ConnectorNoticeRow } from '../../components/Settings/anywhere/botsApi';
 
@@ -157,6 +166,7 @@ describe('useDecisions secret requests (PAN-4941)', () => {
     kind: 'secret',
     agentId: 'agent-pan-1',
     agentKind: 'agent',
+    issueId: 'PAN-1',
     label: 'agent-pan-1 · PAN-1',
     name: 'OPENAI_API_KEY',
     prompt: 'The key for the eval run',
@@ -179,14 +189,21 @@ describe('useDecisions secret requests (PAN-4941)', () => {
         name: 'OPENAI_API_KEY',
         prompt: 'The key for the eval run',
         agentId: 'agent-pan-1',
+        agentKind: 'agent',
+        issueId: 'PAN-1',
         expiresAt: '2026-11-04T00:10:00.000Z',
       },
     }]);
   });
 
+  it('PAN-5541: a row with no issueId maps to agentRequest.issueId null', () => {
+    const { result } = renderDecisions([], [{ ...secretRow, issueId: undefined }]);
+    expect(result.current[0]).toMatchObject({ agentRequest: { issueId: null } });
+  });
+
   it('gives a conversation requester the conversation source', () => {
     const { result } = renderDecisions([], [{ ...secretRow, agentId: 'abc', agentKind: 'conversation', label: 'abc' }]);
-    expect(result.current[0]).toMatchObject({ source: 'conversation', label: 'abc', agentRequest: { agentId: 'abc' } });
+    expect(result.current[0]).toMatchObject({ source: 'conversation', label: 'abc', agentRequest: { agentId: 'abc', agentKind: 'conversation' } });
   });
 
   it('labels the kind "Secret requested"', () => {
@@ -209,9 +226,23 @@ describe('useDecisions secret requests (PAN-4941)', () => {
       kinds: ['machineLink'],
       since: '2026-11-04T00:00:00.000Z',
       blocking: true,
-      agentRequest: { id: secretRow.id, kind: 'machine-link', hint: 'my desk Mac', agentId: 'agent-pan-1', expiresAt: '2026-11-05T00:00:00.000Z' },
+      agentRequest: {
+        id: secretRow.id,
+        kind: 'machine-link',
+        hint: 'my desk Mac',
+        agentId: 'agent-pan-1',
+        agentKind: 'agent',
+        issueId: 'PAN-1',
+        expiresAt: '2026-11-05T00:00:00.000Z',
+      },
     }]);
     expect(describePendingInput(['machineLink'])).toBe('Machine link requested');
+  });
+
+  it('PAN-5541: Decision.id is the request id, not the owner id', () => {
+    const { result } = renderDecisions([], [{ ...secretRow, agentId: 'abc', agentKind: 'conversation', label: 'abc' }]);
+    expect(result.current[0]?.id).toBe(secretRow.id);
+    expect(result.current[0]?.id).not.toBe('abc');
   });
 });
 
@@ -487,5 +518,52 @@ describe('backendRestartDecisions (PAN-5091)', () => {
   it('reaches useDecisions from the cached snapshot', () => {
     const { result } = renderDecisions([], [], { backendRestart: offer() });
     expect(result.current.filter((d) => d.backendRestart).map((d) => d.id)).toEqual(['backend-restart']);
+  });
+});
+
+describe('fetchAgentRequests (PAN-5541 D12)', () => {
+  const originalFetch = global.fetch;
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('rejects on an HTTP 500 response', async () => {
+    global.fetch = vi.fn(async () => new Response('', { status: 500 })) as unknown as typeof fetch;
+    await expect(fetchAgentRequests()).rejects.toThrow();
+  });
+
+  it('rejects when the 200 body has no requests array', async () => {
+    global.fetch = vi.fn(async () => new Response(JSON.stringify({}), { status: 200 })) as unknown as typeof fetch;
+    await expect(fetchAgentRequests()).rejects.toThrow();
+  });
+});
+
+describe('usePendingAgentRequestDecisions (PAN-5541 NFR-2)', () => {
+  const originalFetch = global.fetch;
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('shares one fetch of /api/agent-requests with useDecisions via the common query key', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ requests: [] }), { status: 200 }));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(['conv-ask-user-question'], []);
+    queryClient.setQueryData(['fleet-needs-you'], { machines: [], unreachable: [] });
+    queryClient.setQueryData(['anywhere-status'], { viewer: { kind: 'root-session' } });
+    queryClient.setQueryData(['mcp-oauth-approvals'], []);
+    queryClient.setQueryData(['anywhere-connector-notices'], []);
+    queryClient.setQueryData(DISK_ALERT_QUERY_KEY, null);
+    queryClient.setQueryData(HARNESS_AUTO_UPDATE_QUERY_KEY, null);
+    queryClient.setQueryData(BACKEND_RESTART_RECOVERY_QUERY_KEY, null);
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: queryClient }, children);
+
+    const decisionsHook = renderHook(() => useDecisions(), { wrapper });
+    const pendingHook = renderHook(() => usePendingAgentRequestDecisions(), { wrapper });
+
+    await waitFor(() => expect(pendingHook.result.current.isFetched).toBe(true));
+    expect(decisionsHook.result.current).toEqual([]);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/agent-requests'))).toHaveLength(1);
   });
 });

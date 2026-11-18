@@ -140,8 +140,8 @@ export interface Decision {
   remote?: boolean;
   /** PAN-4941, PAN-4942 — set on an agent request row; DecisionsPanel renders AgentRequestCard for it. */
   agentRequest?:
-    | { id: string; kind: 'secret'; name: string; prompt: string; agentId: string; expiresAt: string }
-    | { id: string; kind: 'machine-link'; hint: string; agentId: string; expiresAt: string };
+    | { id: string; kind: 'secret'; name: string; prompt: string; agentId: string; agentKind: 'agent' | 'conversation'; issueId: string | null; expiresAt: string }
+    | { id: string; kind: 'machine-link'; hint: string; agentId: string; agentKind: 'agent' | 'conversation'; issueId: string | null; expiresAt: string };
   /** PAN-4946 — set on an MCP OAuth sign-in waiting for a decision. */
   mcpSignIn?: McpSignInApproval;
   /** PAN-5093 — set on the disk alert decision; the card ignores `source`. */
@@ -206,6 +206,8 @@ export interface AgentRequestRow {
   kind: 'secret' | 'machine-link';
   agentId: string;
   agentKind: 'agent' | 'conversation';
+  /** The caller's issue id, or null. */
+  issueId?: string | null;
   label: string;
   /** Secret requests only. */
   name?: string;
@@ -217,11 +219,14 @@ export interface AgentRequestRow {
   expiresAt: string;
 }
 
+/** PAN-5541 D12: a non-OK response, a timeout, a network error, or a 200 body whose `requests` is not an array all throw, so react-query keeps the last good rows instead of answering []. */
 export function fetchAgentRequests(signal?: AbortSignal): Promise<AgentRequestRow[]> {
-  return fetchWithTimeout('/api/agent-requests', { signal })
-    .then((res) => (res.ok ? res.json() : { requests: [] }))
-    .then((body: { requests?: unknown }) => (Array.isArray(body?.requests) ? body.requests as AgentRequestRow[] : []))
-    .catch(() => []);
+  return fetchWithTimeout('/api/agent-requests', { signal }).then(async (res) => {
+    if (!res.ok) throw new Error(`agent-requests fetch failed: ${res.status}`);
+    const body: { requests?: unknown } = await res.json();
+    if (!Array.isArray(body?.requests)) throw new Error('agent-requests fetch: malformed body');
+    return body.requests as AgentRequestRow[];
+  });
 }
 
 /** Pending secret and machine-link requests as blocking decisions, one row per request (D-9). Other kinds are skipped. */
@@ -239,17 +244,46 @@ export function agentRequestDecisions(rows: ReadonlyArray<AgentRequestRow>): Dec
       out.push({
         ...common,
         kinds: ['secretRequest'],
-        agentRequest: { id: row.id, kind: 'secret', name: row.name ?? '', prompt: row.prompt ?? '', agentId: row.agentId, expiresAt: row.expiresAt },
+        agentRequest: {
+          id: row.id,
+          kind: 'secret',
+          name: row.name ?? '',
+          prompt: row.prompt ?? '',
+          agentId: row.agentId,
+          agentKind: row.agentKind,
+          issueId: row.issueId ?? null,
+          expiresAt: row.expiresAt,
+        },
       });
     } else if (row.kind === 'machine-link') {
       out.push({
         ...common,
         kinds: ['machineLink'],
-        agentRequest: { id: row.id, kind: 'machine-link', hint: row.hint ?? '', agentId: row.agentId, expiresAt: row.expiresAt },
+        agentRequest: {
+          id: row.id,
+          kind: 'machine-link',
+          hint: row.hint ?? '',
+          agentId: row.agentId,
+          agentKind: row.agentKind,
+          issueId: row.issueId ?? null,
+          expiresAt: row.expiresAt,
+        },
       });
     }
   }
   return out;
+}
+
+/** PAN-5541: pending agent requests as decisions, from the shared ['agent-requests'] query. */
+export function usePendingAgentRequestDecisions(): { decisions: Decision[]; isFetched: boolean } {
+  const { data: rows = [], isFetched } = useQuery({
+    queryKey: ['agent-requests'],
+    queryFn: ({ signal }) => fetchAgentRequests(signal),
+    refetchInterval: 5000,
+    retry: false,
+  });
+  const decisions = useMemo(() => agentRequestDecisions(Array.isArray(rows) ? rows : []), [rows]);
+  return { decisions, isFetched };
 }
 
 /** PAN-4946 — pending MCP OAuth sign-ins as blocking decisions, one row per approval. */
@@ -497,10 +531,13 @@ export function useDecisions(): Decision[] {
   });
 
   // PAN-4941 — pending agent requests (secret requests), never a value.
+  // PAN-5541 D12: retry false, so a failed refetch keeps the last good rows
+  // rather than retrying into a visible gap.
   const { data: agentRequestRows = [] } = useQuery({
     queryKey: ['agent-requests'],
     queryFn: ({ signal }) => fetchAgentRequests(signal),
     refetchInterval: 5000,
+    retry: false,
   });
 
   // PAN-5093 — fetchDiskAlert throws on failure, so a rejected refetch keeps
