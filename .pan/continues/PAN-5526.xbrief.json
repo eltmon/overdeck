@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5526",
   "created": "2026-11-18T19:12:30.887Z",
-  "updated": "2026-11-18T19:30:54.873Z",
+  "updated": "2026-11-18T19:31:01.586Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,11 @@
     "promotion-failure-message.ac4": {
       "status": "completed",
       "doneAt": "2026-11-18T19:30:54.873Z"
+    },
+    "docs-manual-promotion-recovery": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5526",
+      "claimedAt": "2026-11-18T19:31:01.586Z"
     }
   }
 }
