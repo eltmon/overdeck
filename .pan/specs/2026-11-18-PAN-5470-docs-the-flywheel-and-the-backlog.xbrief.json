@@ -1,0 +1,1132 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-18T20:31:51Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5470: docs: the Flywheel and the backlog",
+    "updated": "2026-11-18T20:41:27.808Z"
+  },
+  "plan": {
+    "id": "pan-5470",
+    "title": "docs: the Flywheel and the backlog",
+    "status": "proposed",
+    "uid": "91d47fdd-91a9-49a8-a4e5-f74e3af0376b",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-18T20:31:51Z",
+    "updated": "2026-11-18T20:41:27.808Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5470",
+        "label": "PAN-5470",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5467",
+        "label": "Epic #5467 docs overhaul",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5544",
+        "label": "#5544 Flywheel author gate hardcodes eltmon",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docs",
+      "flywheel",
+      "backlog",
+      "mintlify"
+    ],
+    "metadata": {
+      "sizeJustification": "Docs-only change: one new page, its docs.json nav entry, link edits in eight existing user pages across features/, configuration/, cli/ and the repo root, and a two-line pointer fix in docs/FLYWHEEL.md. The 'subsystems' are Mintlify doc directories, not code subsystems. The links are meaningless without the page and the page is unfindable without them, so sibling issues would ship orphaned or broken docs. Items that edit the page are serialized by blocks edges.",
+      "canonicalFilename": "2026-11-18-PAN-5470-docs-the-flywheel-and-the-backlog.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The Flywheel, its /flywheel page, its three switches, Needs-you items, parking, pan parked and the backlog sequencer have no user page. Users find only vision.mdx (a roadmap with stale claims), the order-books page and scattered mentions, so the feature is hard to find and easy to misread.",
+      "Proposal": "Write features/flywheel.mdx, labeled early, covering the loop, its CLI and page controls, pickup rule, switches, page anatomy, Needs-you items, parking versus pan parked, the backlog sequencer page and its files, and known limits. Every fact is verified against code on main (PRD .pan/drafts/PAN-5470.md). Add it to docs.json after features/planning and link it from eight related pages and docs/FLYWHEEL.md.",
+      "NonGoals": "- No code, prompt, skill, role or changelog changes\n- No fix for #5544 (the hardcoded author gate) or for stale UI tooltips\n- No rewrite of vision.mdx, order-books.mdx, auto-merge.mdx, cloister.mdx or any page beyond the D-7 link edits\n- No description of what roles.flywheel.scope does (no consumer exists)\n- No full SequenceDoc schema reference\n- No screenshots\n- Never run mint validate --fix"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Page path features/flywheel.mdx, placed in the Features nav group directly after features/planning",
+        "rationale": "The issue names the path; the Flywheel drives issues through the pipeline and planning pages that precede it."
+      },
+      {
+        "summary": "Label it early with sidebarTitle 'Flywheel (early)', a Warning callout linking /vision, and a Known limits section",
+        "rationale": "The issue says 'Label it early'; introduction.mdx already uses '(early)'; concrete verified limits are more useful than a bare label."
+      },
+      {
+        "summary": "Filed #5544 for the hardcoded eltmon author gate and cite it as a known limit instead of hiding it",
+        "rationale": "Every claim must match code; the skill's security rail names the maintainer's login, which matters to any other operator."
+      },
+      {
+        "summary": "Require UAT is described as the merge-policy fallback that holds ready PRs for a Merge click, not as 'requires a passed UAT'",
+        "rationale": "Code wins over tooltips: shouldHoldForUat in auto-merge-policy.ts; the merge gate never requires a passed UAT verdict."
+      },
+      {
+        "summary": "Document the two meanings of parked separately and state that pan parked does not list label-parked issues",
+        "rationale": "pan parked reads classifyParked (paused, troubled, stopped, pan ask, zombie, 6-hour idle); the loop parks by label or .pan/parked.md."
+      },
+      {
+        "summary": "No screenshots",
+        "rationale": "The only Flywheel images date from 2026-06-04, before the lane board, and the issue forbids inventing UI."
+      },
+      {
+        "summary": "Cross-link edits limited to one or a few lines per page, plus a correction of the dashboard-views Order books row and the docs/FLYWHEEL.md Needs-you row",
+        "rationale": "Follows the PAN-5468 precedent; open accuracy audits #5499, #5502 and #5503 own the rest of those pages; the two corrected rows are wrong about this feature."
+      },
+      {
+        "summary": "No changelog.d entry",
+        "rationale": "The issue states docs-only changes need none."
+      }
+    ],
+    "items": [
+      {
+        "id": "page-skeleton",
+        "title": "Create features/flywheel.mdx with frontmatter, early warning, Known limits, Related, Get help and the docs.json entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T20:31:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5470",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/flywheel.mdx",
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'features/planning\\|features/flywheel' docs.json",
+            "head -12 features/flywheel.mdx",
+            "awk '/^## Known limits$/{f=1;print;next} /^## /{f=0} f' features/flywheel.mdx",
+            "grep -c '^# ' features/flywheel.mdx || true"
+          ],
+          "expected_outputs": [
+            "features/flywheel directly after features/planning; frontmatter and Warning print; grep -c '^# ' prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-12",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create features/flywheel.mdx with the D-1 frontmatter (quoted title, sidebarTitle 'Flywheel (early)', description), no body H1, a two or three sentence intro, a <Warning> callout that labels the Flywheel early and links /vision, '## Known limits' with the D-3 limits (first run `gh issue view 5544 --json state` and follow D-3 if it is closed), '## Related' with the six D-5 links, and '## Get help' linking the Overdeck Discord and GitHub Issues. In docs.json insert \"features/flywheel\" in the Features group directly after \"features/planning\". [Decisions: D-1, D-2, D-3, D-5, D-8]"
+        },
+        "items": [
+          {
+            "id": "page-skeleton.ac1",
+            "title": "docs.json contains \"features/flywheel\" exactly once, directly after \"features/planning\" in the Features group",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-skeleton.ac2",
+            "title": "The page frontmatter contains the D-1 title, sidebarTitle \"Flywheel (early)\" and a quoted description of 50 to 160 characters with no U+2013 or U+2014",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-skeleton.ac3",
+            "title": "The page body contains no line starting with '# ' and a <Warning> block before the first '## ' heading that links /vision",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-skeleton.ac4",
+            "title": "The Known limits section contains the author-gate limit with a link to #5544 (or the D-3 closed-issue fallback) and states that the Backlog page reads the sequence from the dashboard server's working directory with no project picker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-skeleton.ac5",
+            "title": "The page ends with a Get help section that contains https://discord.gg/ZpHE2ZTv5P and https://github.com/eltmon/overdeck/issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-loop",
+        "title": "Add the What the loop does section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T20:31:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5470",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/flywheel.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## What the loop does$/{f=1;print;next} /^## /{f=0} f' features/flywheel.mdx"
+          ],
+          "expected_outputs": [
+            "the section prints and contains pan start, 450, 1000, maxAgents and flywheel-tick:"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Write '## What the loop does': the conv-flywheel conversation running /pan-flywheel; a numbered list of the tick phases (orient, drain in-flight work, pick, launch with pan start, watch to landing, park); the 450-second and 1000-second cadence; the rails (writes no code, keeps to roles.flywheel.maxAgents default 30, never merges or deep-wipes, never sets the operator-only labels, vetoed is absolute, one Flywheel per Overdeck install); and the tick marker with one example line in a code block. Status is derived, never stored. Facts, anchors and wording rules are in .pan/drafts/PAN-5470.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and the MDX rule (placeholders like `<id>` only inside backticks). Insert the section after the previous section and before `## Known limits`. [Background: What the loop is and does]"
+        },
+        "items": [
+          {
+            "id": "section-loop.ac1",
+            "title": "The section contains `pan start` as the loop's only launcher and the numbers 450 and 1000 for the tick cadence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-loop.ac2",
+            "title": "The section contains `roles.flywheel.maxAgents` with its default 30 and states the cap is followed by the loop's instructions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-loop.ac3",
+            "title": "The section contains a code block with a `flywheel-tick:` example line naming the keys tick, pick, phase, in-flight and needs-you",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-loop.ac4",
+            "title": "The section contains sentences stating the loop never merges, never adds or removes the `released`, `vetoed`, `auto-merge` or `hold-for-uat` labels, and never picks up a vetoed issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-control",
+        "title": "Add the Start and control the loop section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T20:31:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5470",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/flywheel.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Start and control the loop$/{f=1;print;next} /^## /{f=0} f' features/flywheel.mdx",
+            "pan flywheel --help",
+            "pan flywheel start --help",
+            "pan flywheel stats --help"
+          ],
+          "expected_outputs": [
+            "the section prints; every flag it names appears in the help output"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Write '## Start and control the loop': a table of all eight pan flywheel subcommands (start, stop, abort, pause, resume, report, status, stats) with verified behavior and flags; start refuses a running or paused flywheel unless --fresh; stop pauses even when no report arrives within --timeout; the page buttons per run state (Start, Start fresh, Resume, Pause, Report, Stop, Abort, Pop out) and the Conversation/Terminal toggle; the Run config footer and Settings → Roles → Flywheel (Flywheel effort, Flywheel max agents); model default claude-opus-5-5 and effort high with a link to /configuration/effort; pan orders start with a link to /configuration/order-books (do not repeat its comparison); how to open the page (left column Flywheel, palette Open Flywheel, /flywheel). Never describe what Flywheel scope does. Facts, anchors and wording rules are in .pan/drafts/PAN-5470.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and the MDX rule (placeholders like `<id>` only inside backticks). Insert the section after the previous section and before `## Known limits`. [Background: Start and control the loop]"
+        },
+        "items": [
+          {
+            "id": "section-control.ac1",
+            "title": "The section contains `pan flywheel start`, `stop`, `abort`, `pause`, `resume`, `report`, `status` and `stats`, each with the flags that `pan flywheel <verb> --help` prints",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-control.ac2",
+            "title": "The section states that start refuses a running flywheel and refuses a paused one unless `--fresh` is passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-control.ac3",
+            "title": "The section contains the dashboard buttons Start, Resume, Pause, Report, Stop and Abort and links /configuration/order-books for `pan orders start`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-control.ac4",
+            "title": "The section contains no sentence that describes what the Flywheel scope setting changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-pickup",
+        "title": "Add the What the loop picks up section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T20:31:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5470",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/flywheel.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## What the loop picks up$/{f=1;print;next} /^## /{f=0} f' features/flywheel.mdx"
+          ],
+          "expected_outputs": [
+            "the section prints and contains released, objection, epic, Promote and Vetoed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Write '## What the loop picks up': the pickup rule as a bulleted list (ready, planned, released or Auto-pickup on or in the active order book; not parked, not vetoed, no objection, not already in the pipeline, not an epic); that the loop applies the rule before it runs pan start, which itself does not check it, that Overdeck's automatic work dispatch checks the same release conditions in code (one sentence), and that the Forecast view shows the same rule; order book items first, then .pan/backlog/sequence.md rank order; Promote jumps ahead of rank; the loop drains in-flight work before it picks anything new (two or three sentences, no stall table). Facts, anchors and wording rules are in .pan/drafts/PAN-5470.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and the MDX rule (placeholders like `<id>` only inside backticks). Insert the section after the previous section and before `## Known limits`. [Background: What the loop picks up]"
+        },
+        "items": [
+          {
+            "id": "section-pickup.ac1",
+            "title": "The section contains the terms ready, planned, `released`, Auto-pickup, `objection`, epic and in pipeline in its pickup rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-pickup.ac2",
+            "title": "The section contains a sentence stating that active order-book items come first and a link to /configuration/order-books",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-pickup.ac3",
+            "title": "The section contains Promote and Vetoed and states that a vetoed issue is never picked up",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-switches",
+        "title": "Add The three switches section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T20:31:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5470",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/flywheel.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## The three switches$/{f=1;print;next} /^## /{f=0} f' features/flywheel.mdx",
+            "grep -c 'until UAT has passed' features/flywheel.mdx || true"
+          ],
+          "expected_outputs": [
+            "the section prints; the grep for 'until UAT has passed' prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Write '## The three switches': a table of Auto-pickup (default off), Require UAT (default on) and Merge train (default off) with what each does per code; the switches are global, not per project; Require UAT per D-4 is the merge-policy fallback that holds a ready PR for your Merge click unless the issue's Auto/Hold toggle or the project's auto_merge_default says otherwise, and it never requires a passed UAT verdict; do not list the merge-train priority labels; Settings → Merge Train for batch size and wait; link /configuration/auto-merge and /features/merge-batches. Facts, anchors and wording rules are in .pan/drafts/PAN-5470.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and the MDX rule (placeholders like `<id>` only inside backticks). Insert the section after the previous section and before `## Known limits`. [Background: The three switches; D-4]"
+        },
+        "items": [
+          {
+            "id": "section-switches.ac1",
+            "title": "The section contains a table with rows Auto-pickup, Require UAT and Merge train and the defaults off, on and off",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-switches.ac2",
+            "title": "The section contains `auto_merge_default` and states that Require UAT holds a ready PR for your Merge click",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-switches.ac3",
+            "title": "The page contains neither the phrase `until UAT has passed` nor a list of the merge-train priority labels",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-switches.ac4",
+            "title": "The section contains links to /configuration/auto-merge and /features/merge-batches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-page",
+        "title": "Add the Read the Flywheel page section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T20:31:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5470",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/flywheel.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Read the Flywheel page$/{f=1;print;next} /^## /{f=0} f' features/flywheel.mdx"
+          ],
+          "expected_outputs": [
+            "the section prints and contains the seven lane names and the three freshness words"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Write '## Read the Flywheel page': the header (run chip running/paused/idle/unreachable, the page never shows idle for a failed read, freshness live up to 60 seconds, breathing up to 20 minutes, stalled after, the running duration, the in-flight count, the switches); the left rail (merge train card, order book card, the Flywheel card with Status, State, Report and Stats tabs); the Status tab (headline strip, health strip facts, the lane board with the seven lanes Plan, Build, Checks, Review, Merge, Deploy, Done today and the card fields, Shipped today); the right column conversation and terminal. Use subheadings (###) for header, rail, lane board. Facts, anchors and wording rules are in .pan/drafts/PAN-5470.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and the MDX rule (placeholders like `<id>` only inside backticks). Insert the section after the previous section and before `## Known limits`. [Background: Read the Flywheel page]"
+        },
+        "items": [
+          {
+            "id": "section-page.ac1",
+            "title": "The section contains live, breathing and stalled with the thresholds 60 seconds and 20 minutes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-page.ac2",
+            "title": "The section contains all seven lane names Plan, Build, Checks, Review, Merge, Deploy and Done today in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-page.ac3",
+            "title": "The section contains the four tab names Status, State, Report and Stats and the heading text Shipped today",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-page.ac4",
+            "title": "The section states that a failed status read shows unreachable, never idle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-needs-you",
+        "title": "Add the Needs-you items section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T20:31:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5470",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/flywheel.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Needs-you items$/{f=1;print;next} /^## /{f=0} f' features/flywheel.mdx"
+          ],
+          "expected_outputs": [
+            "the section prints and contains Needs you · N and Show where this was raised"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Write '## Needs-you items': items come from the tick marker's needs-you field, one per '; ' part, with stable wording; each card shows the question, why and since; issue ids open the issue, `owner/repo#<n>` links to GitHub, an item ending in a URL in angle brackets renders as a link (write that form only in backticks); Show where this was raised opens conv-flywheel at the message, or reopens a pending question; controls appear only where one applies (test-removal waiver, Start then Confirm start, Open); the top bar `Needs you · N` includes Flywheel items and is always shown; link /features/issue-pipeline for Needs you in general. Facts, anchors and wording rules are in .pan/drafts/PAN-5470.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and the MDX rule (placeholders like `<id>` only inside backticks). Insert the section after the previous section and before `## Known limits`. [Background: Needs-you items]"
+        },
+        "items": [
+          {
+            "id": "section-needs-you.ac1",
+            "title": "The section contains `Needs you · N` and states that Flywheel items are part of that count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-needs-you.ac2",
+            "title": "The section contains Show where this was raised and states that it opens the flywheel conversation at the message that raised the item",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-needs-you.ac3",
+            "title": "The section contains `owner/repo#` inside backticks and links /features/issue-pipeline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-parked",
+        "title": "Add the Parked issues and pan parked section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T20:31:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5470",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/flywheel.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Parked issues and pan parked$/{f=1;print;next} /^## /{f=0} f' features/flywheel.mdx",
+            "pan parked --help"
+          ],
+          "expected_outputs": [
+            "the section prints and contains the three orbit names and .pan/parked.md"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Write '## Parked issues and pan parked' per D-9: the loop parks what it cannot decide by listing it in .pan/parked.md with a reason; it skips issues with the `parked` label or a .pan/parked.md listing; the Park toggle in the pickup controls sets the label; such an issue shows state `parked` in pan show; how to unpark. Then pan parked: three stall orbits (operator-gate with pan unpause, pan untroubled, pan start, or answering a pan ask decision; zombie-session; idle-running after 6 hours idle), oldest first, --json; and a plain sentence that pan parked does not list label-parked or .pan/parked.md issues. Facts, anchors and wording rules are in .pan/drafts/PAN-5470.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and the MDX rule (placeholders like `<id>` only inside backticks). Insert the section after the previous section and before `## Known limits`. [Background: Parked issues (two meanings); D-9]"
+        },
+        "items": [
+          {
+            "id": "section-parked.ac1",
+            "title": "The section contains `.pan/parked.md`, the `parked` label and the Park toggle as the ways an issue is parked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-parked.ac2",
+            "title": "The section contains `pan parked` with the orbits `operator-gate`, `zombie-session` and `idle-running` and the 6 hours idle threshold",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-parked.ac3",
+            "title": "The section contains a sentence stating that `pan parked` does not list issues parked by label or by .pan/parked.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-sequencer",
+        "title": "Add The backlog sequencer section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T20:31:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5470",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/flywheel.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## The backlog sequencer$/{f=1;print;next} /^## /{f=0} f' features/flywheel.mdx"
+          ],
+          "expected_outputs": [
+            "the section prints and contains /backlog, Forecast, Update changed, Re-rank all, Clear and 30 minutes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Write '## The backlog sequencer': the /backlog page (heading Backlog Sequencer, More → Operations → Backlog), the List, DAG and Forecast views with the list columns and the Forecast Waves and Lanes sub-tabs; the filters; the passes Run creation pass, Update changed, Re-rank all and Clear with what each does; one pass at a time; the automatic incremental pass at most every 30 minutes when the backlog changes; the sequencer-runner agent on roles.sequencer.model with a link to /configuration/model-routing; row actions (detail panel, + Order book with Lane A or Lane B); the pickup controls (Plan (Auto), Release, Re-plan, Recall, objection override, Ready, Blocks main, Park, planning Skip/Auto/Interactive, gate Auto/Promote/Vetoed, where the controls also appear). Describe tooltips; never quote one that contains an em dash. Facts, anchors and wording rules are in .pan/drafts/PAN-5470.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and the MDX rule (placeholders like `<id>` only inside backticks). Insert the section after the previous section and before `## Known limits`. [Background: The backlog sequencer]"
+        },
+        "items": [
+          {
+            "id": "section-sequencer.ac1",
+            "title": "The section contains `/backlog`, List, DAG and Forecast",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-sequencer.ac2",
+            "title": "The section contains Run creation pass, Update changed, Re-rank all and Clear, each with one sentence on what it does",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-sequencer.ac3",
+            "title": "The section states that the dashboard starts an automatic incremental pass at most once every 30 minutes when the backlog changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-sequencer.ac4",
+            "title": "The section contains + Order book, Release, Recall, Promote and Vetoed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-files",
+        "title": "Add the Files the loop and the sequencer keep section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T20:31:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5470",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/flywheel.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Files the loop and the sequencer keep$/{f=1;print;next} /^## /{f=0} f' features/flywheel.mdx",
+            "pan backlog write-sequence --help"
+          ],
+          "expected_outputs": [
+            "the section prints and contains state.md, report.md, sequence.md and pan backlog write-sequence"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Write '## Files the loop and the sequencer keep': .pan/flywheel/state.md (memory across runs, appended, committed and pushed), .pan/flywheel/report.md (written on stop or report, replaces the previous one, committed and pushed), both under the plan home; .pan/backlog/sequence.md (human table, rationale for the top 80, machine-readable JSON below the do-not-hand-edit marker, committed on main as 'chore(workspace): backlog sequence'); pan backlog write-sequence <file> (validates the JSON, skips a timestamp-only rewrite, commits and pushes, exits 1 with 'Validation error' on bad input; name the node fields, no full schema; link /cli/pipeline-commands). Facts, anchors and wording rules are in .pan/drafts/PAN-5470.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and the MDX rule (placeholders like `<id>` only inside backticks). Insert the section after the previous section and before `## Known limits`. [Background: .pan/flywheel/ files; The backlog sequencer, the file]"
+        },
+        "items": [
+          {
+            "id": "section-files.ac1",
+            "title": "The section contains `.pan/flywheel/state.md`, `.pan/flywheel/report.md` and `.pan/backlog/sequence.md`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-files.ac2",
+            "title": "The section contains `pan backlog write-sequence` and states it validates the file, commits it and pushes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-files.ac3",
+            "title": "The section contains the words do not hand-edit for the machine-readable block of sequence.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "xlinks-features",
+        "title": "Link the Flywheel page from issue-pipeline, dashboard-views and merge-batches",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T20:31:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5470",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/issue-pipeline.mdx",
+            "features/dashboard-views.mdx",
+            "features/merge-batches.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c /features/flywheel features/issue-pipeline.mdx features/dashboard-views.mdx features/merge-batches.mdx",
+            "git diff --numstat origin/main...HEAD -- features/issue-pipeline.mdx features/dashboard-views.mdx features/merge-batches.mdx"
+          ],
+          "expected_outputs": [
+            "each grep count is at least 1; numstat within the stated limits"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "NFR-1",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Make exactly the D-7 edits: one added sentence line at the end of '## Start an issue' in features/issue-pipeline.mdx; the Flywheel, Order books and Backlog table rows in features/dashboard-views.mdx rewritten per the WI-11 before/after in the PRD; and in the <Note> near the top of features/merge-batches.mdx the words 'the Flywheel page header' turned into a link to /features/flywheel. Change nothing else in those files. [Decisions: D-7; Work items: WI-11]"
+        },
+        "items": [
+          {
+            "id": "xlinks-features.ac1",
+            "title": "Each of features/issue-pipeline.mdx, features/dashboard-views.mdx and features/merge-batches.mdx contains a link to /features/flywheel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xlinks-features.ac2",
+            "title": "git diff --numstat origin/main...HEAD shows at most 1 added and 0 deleted lines for issue-pipeline, at most 3 added and 3 deleted for dashboard-views, and at most 1 added and 1 deleted for merge-batches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xlinks-features.ac3",
+            "title": "The dashboard-views Order books row contains a link to /configuration/order-books and no longer contains the words backlog sequence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "xlinks-config-cli",
+        "title": "Link the Flywheel page from order-books, auto-merge and pipeline-commands",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T20:31:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5470",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/order-books.mdx",
+            "configuration/auto-merge.mdx",
+            "cli/pipeline-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c /features/flywheel configuration/order-books.mdx configuration/auto-merge.mdx cli/pipeline-commands.mdx",
+            "git diff --numstat origin/main...HEAD -- configuration/order-books.mdx configuration/auto-merge.mdx cli/pipeline-commands.mdx"
+          ],
+          "expected_outputs": [
+            "counts 1, 1 and at least 2; numstat deleted column 0 for all three"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "NFR-1",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Make exactly the D-7 edits: one bullet under '## Related' in configuration/order-books.mdx and in configuration/auto-merge.mdx, and one sentence line at the end of '## pan flywheel' and one at the end of '## pan backlog' in cli/pipeline-commands.mdx (suggested lines are in the PRD WI-12). Change nothing else. [Decisions: D-7; Work items: WI-12]"
+        },
+        "items": [
+          {
+            "id": "xlinks-config-cli.ac1",
+            "title": "Each of configuration/order-books.mdx and configuration/auto-merge.mdx contains a Related bullet with a link to /features/flywheel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xlinks-config-cli.ac2",
+            "title": "cli/pipeline-commands.mdx contains /features/flywheel at least twice: once in the pan flywheel section and once in the pan backlog section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xlinks-config-cli.ac3",
+            "title": "git diff --numstat origin/main...HEAD shows 0 deleted lines in each of the three files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "xlinks-intro-vision",
+        "title": "Link the Flywheel page from introduction and vision",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T20:31:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5470",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "introduction.mdx",
+            "vision.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c /features/flywheel introduction.mdx vision.mdx",
+            "git diff --numstat origin/main...HEAD -- introduction.mdx vision.mdx"
+          ],
+          "expected_outputs": [
+            "both counts at least 1; numstat within the stated limits"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "NFR-1",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Make exactly the D-7 edits: in introduction.mdx the 'See ...' sentence of '### Order books and the Flywheel (early)' gains a link to /features/flywheel; in vision.mdx add one line after the paragraph that ends 'fix the role or the brief.' pointing to /features/flywheel for running the Flywheel today. Do not fix any other vision.mdx claim (audit #5499 owns it). [Decisions: D-7; Work items: WI-13]"
+        },
+        "items": [
+          {
+            "id": "xlinks-intro-vision.ac1",
+            "title": "Each of introduction.mdx and vision.mdx contains a link to /features/flywheel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xlinks-intro-vision.ac2",
+            "title": "git diff --numstat origin/main...HEAD shows at most 1 added and 1 deleted line for introduction.mdx and 0 deleted lines for vision.mdx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "devdoc-pointer",
+        "title": "Point docs/FLYWHEEL.md at the user page and correct its Needs-you indicator row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T20:31:51Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5470",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/FLYWHEEL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'features/flywheel.mdx\\|Hidden at zero\\|useNeedsYouItems' docs/FLYWHEEL.md"
+          ],
+          "expected_outputs": [
+            "the link and useNeedsYouItems lines print; no Hidden at zero line prints"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs/FLYWHEEL.md add one line after the first paragraph: 'User guide: [features/flywheel.mdx](../features/flywheel.mdx).' Then re-read src/dashboard/frontend/src/components/flywheel/NeedsYouIndicator.tsx and rewrite the 'Needs-you indicator' table row: the top bar's `Needs you · N` button counts the one shared needs-you list (useNeedsYouItems()), which includes the loop's tick items; it is always shown and neutral at zero. Change nothing else. [Stale docs; Decisions: D-7; Work items: WI-14]"
+        },
+        "items": [
+          {
+            "id": "devdoc-pointer.ac1",
+            "title": "docs/FLYWHEEL.md contains a link to ../features/flywheel.mdx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "devdoc-pointer.ac2",
+            "title": "docs/FLYWHEEL.md no longer contains the words Hidden at zero, and its Needs-you indicator row contains useNeedsYouItems",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-checks",
+        "title": "Run the Mint, dash and scope checks and record them in the PR body",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T20:31:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5470",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/flywheel.mdx",
+            "docs.json",
+            "features/issue-pipeline.mdx",
+            "features/dashboard-views.mdx",
+            "features/merge-batches.mdx",
+            "configuration/order-books.mdx",
+            "configuration/auto-merge.mdx",
+            "cli/pipeline-commands.mdx",
+            "introduction.mdx",
+            "vision.mdx",
+            "docs/FLYWHEEL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx -y mint@4.3.49 validate",
+            "npx -y mint@4.3.49 broken-links",
+            "git diff origin/main...HEAD -U0 -- '*.mdx' '*.md' docs.json ':!.pan' | grep '^+' | grep -P '[\\x{2013}\\x{2014}]' || true",
+            "git diff --name-only origin/main...HEAD"
+          ],
+          "expected_outputs": [
+            "validate exits 0 with no features/flywheel.mdx finding; broken-links prints no broken links; dash grep prints nothing; name-only lists only the eleven files plus .pan/ files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "This is the documentation verification item. The docs files touched are exactly features/flywheel.mdx, docs.json, features/issue-pipeline.mdx, features/dashboard-views.mdx, features/merge-batches.mdx, configuration/order-books.mdx, configuration/auto-merge.mdx, cli/pipeline-commands.mdx, introduction.mdx, vision.mdx and docs/FLYWHEEL.md. Run `npx -y mint@4.3.49 validate` and `npx -y mint@4.3.49 broken-links` (never --fix), the dash check and the scope check from the PRD WI-15, fix anything they report in the owning file, and paste both Mint outputs in the PR body under a 'Mintlify checks' heading. [Work items: WI-15; Glossary: Mint check, Dash rule]"
+        },
+        "items": [
+          {
+            "id": "docs-checks.ac1",
+            "title": "npx -y mint@4.3.49 validate exits 0 and its output contains no warning or error that names features/flywheel.mdx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-checks.ac2",
+            "title": "npx -y mint@4.3.49 broken-links exits 0 and prints no broken link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-checks.ac3",
+            "title": "The dash check prints nothing and `git diff --name-only origin/main...HEAD` prints only the eleven listed files plus .pan/ planning files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-checks.ac4",
+            "title": "The PR body contains a Mintlify checks section with the final lines of both commands",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "page-skeleton",
+        "to": "section-loop",
+        "type": "blocks"
+      },
+      {
+        "from": "section-loop",
+        "to": "section-control",
+        "type": "blocks"
+      },
+      {
+        "from": "section-control",
+        "to": "section-pickup",
+        "type": "blocks"
+      },
+      {
+        "from": "section-pickup",
+        "to": "section-switches",
+        "type": "blocks"
+      },
+      {
+        "from": "section-switches",
+        "to": "section-page",
+        "type": "blocks"
+      },
+      {
+        "from": "section-page",
+        "to": "section-needs-you",
+        "type": "blocks"
+      },
+      {
+        "from": "section-needs-you",
+        "to": "section-parked",
+        "type": "blocks"
+      },
+      {
+        "from": "section-parked",
+        "to": "section-sequencer",
+        "type": "blocks"
+      },
+      {
+        "from": "section-sequencer",
+        "to": "section-files",
+        "type": "blocks"
+      },
+      {
+        "from": "page-skeleton",
+        "to": "xlinks-features",
+        "type": "blocks"
+      },
+      {
+        "from": "page-skeleton",
+        "to": "xlinks-config-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "page-skeleton",
+        "to": "xlinks-intro-vision",
+        "type": "blocks"
+      },
+      {
+        "from": "page-skeleton",
+        "to": "devdoc-pointer",
+        "type": "blocks"
+      },
+      {
+        "from": "section-files",
+        "to": "docs-checks",
+        "type": "blocks"
+      },
+      {
+        "from": "xlinks-features",
+        "to": "docs-checks",
+        "type": "blocks"
+      },
+      {
+        "from": "xlinks-config-cli",
+        "to": "docs-checks",
+        "type": "blocks"
+      },
+      {
+        "from": "xlinks-intro-vision",
+        "to": "docs-checks",
+        "type": "blocks"
+      },
+      {
+        "from": "devdoc-pointer",
+        "to": "docs-checks",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
