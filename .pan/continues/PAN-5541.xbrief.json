@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5541",
   "created": "2026-11-18T20:13:04.612Z",
-  "updated": "2026-11-18T22:12:30.310Z",
+  "updated": "2026-11-18T22:12:43.131Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -220,6 +220,11 @@
     "mobile-answer-body.ac3": {
       "status": "completed",
       "doneAt": "2026-11-18T22:12:30.309Z"
+    },
+    "docs-changelog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5541",
+      "claimedAt": "2026-11-18T22:12:43.131Z"
     }
   }
 }
