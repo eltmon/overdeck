@@ -1,0 +1,25 @@
+---
+title: "Costs and spend: how Overdeck tracks what agents cost"
+description: "See what agents and conversations spend, how Overdeck attributes cost to issues and projects, and how to read it with pan cost and the Costs page."
+---
+
+# Costs and spend
+
+Overdeck records what every agent and conversation spends, down to the request. It prices every
+token with its own built-in price table, so the figures are an estimate of API cost, not a bill
+from your subscription. This page explains how Overdeck counts cost, how it attributes spend to
+issues and projects, and where to read it from the dashboard and the terminal.
+
+## How Overdeck counts cost
+
+Claude Code sessions record a cost event after each tool call: a `PostToolUse` hook
+(`heartbeat-hook`) reads new assistant messages from the session transcript and prices their
+tokens. Pi and Codex sessions do not run this hook, so Overdeck sweeps their transcripts instead,
+once when the dashboard starts and then every 5 minutes while it keeps running; their spend can
+lag the sweep by up to five minutes, and nothing is swept while the dashboard is down.
+
+Every event is written to two places: the append-only archive `~/.overdeck/costs/events.jsonl`
+and the `cost_events` table in `~/.overdeck/overdeck.db`. If history is missing from either one,
+`pan cost backfill` can reconstruct events from the stored Claude Code, Pi and Codex transcripts.
+Run on its own, it is a dry run that only prints what it would import; add `--write` to persist
+the events it finds that are not already recorded.
