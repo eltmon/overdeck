@@ -388,6 +388,67 @@ pan models preset undo
 
 See [Apply a preset](/configuration/model-presets#apply-a-preset).
 
+## pan integrate
+
+Add Overdeck to other tools on this machine.
+
+```bash
+pan integrate file-manager
+pan integrate file-manager --dry-run
+pan integrate file-manager --remove
+```
+
+| Command | What it does | Options |
+| --- | --- | --- |
+| `pan integrate file-manager` | Adds "Open in Overdeck" to the file manager's right-click menu | `--remove` (removes the entries this command added), `--dry-run` (prints what would be written, deleted or run, and changes nothing) |
+
+See [Open in Overdeck](/features/open-in-overdeck).
+
+## pan tts
+
+Manage the local Qwen text-to-speech daemon and its saved voices.
+
+```bash
+pan tts start --detach
+pan tts status
+pan tts test "deployment finished"
+```
+
+| Command | What it does | Options |
+| --- | --- | --- |
+| `pan tts voices` | Lists and inspects saved TTS voices (own subcommands: `list`, `show <name>`, `play <name> [text]`, `delete <name>`, `set-default <name>`, `map <event> <name>`) | none |
+| `pan tts start` | Starts the local Qwen TTS daemon | `--detach` (runs detached in the background), `--foreground` (runs in the foreground), `--no-wait-for-health` (returns without waiting for the health check), `--timeout-ms <ms>` |
+| `pan tts stop` | Stops the local Qwen TTS daemon | none |
+| `pan tts status` | Shows the local Qwen TTS daemon status | none |
+| `pan tts restart` | Restarts the local Qwen TTS daemon | `--no-wait-for-health`, `--timeout-ms <ms>` |
+| `pan tts install-systemd` | Installs a user systemd unit for the local Qwen TTS daemon | none |
+| `pan tts test [text]` | Speaks a test phrase using the configured system (priority) voice | `--status` (uses the status voice instead) |
+
+## pan backup
+
+`pan sync` backs up the synced skill and command directories before each sync and prunes old
+backups automatically; backups live in `~/.overdeck/backups/`.
+
+```bash
+pan backup list
+pan backup clean --keep 5
+```
+
+| Command | What it does | Options |
+| --- | --- | --- |
+| `pan backup list` | Lists all backups | `--json` |
+| `pan backup clean` | Removes old backups | `--keep <count>` (default 10) |
+
+## pan restore
+
+Restore a backup into the Claude Code skill and command directories. With no timestamp, pick
+from the 10 newest.
+
+```bash
+pan restore
+pan restore 2026-11-01T04-52-00
+```
+
 ## pan health
 
 Check the health of all Overdeck services.
@@ -418,3 +479,6 @@ Useful for:
 - [Agent Commands](/cli/agent-commands) - Spawn and manage agents
 - [Workspace Commands](/cli/workspace-commands) - Manage workspaces
 - [CLI Overview](/cli/overview) - Learn more about the CLI
+- [Conversation Commands](/cli/conversation-commands) - Find, hand off, fork and resume conversations
+- [Pipeline Commands](/cli/pipeline-commands) - Plan, track and close issues, and run the Flywheel
+- [Memory Commands](/cli/memory-commands) - Manage memory facts, context layers and the knowledge bundle
