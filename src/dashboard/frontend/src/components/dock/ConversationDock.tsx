@@ -12,7 +12,7 @@ import { useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { useConvoDock } from '../../lib/convoDock';
 import { useDashboardStore } from '../../lib/store';
-import { usePendingInputSubjects } from '../../lib/useDecisions';
+import { usePendingAgentRequestDecisions, usePendingInputSubjects } from '../../lib/useDecisions';
 import type { Issue } from '../../types';
 import type { Agent } from '../../types';
 import { DrawerAgentSession, pickDefaultDrawerAgent } from '../drawer/DrawerAgentSession';
@@ -83,13 +83,19 @@ export type DockItem = { type: 'issue'; issueId: string; agents: Agent[] } | { t
 export function useLiveDockItems(): { items: DockItem[]; needsYouIds: Set<string> } {
   const { items } = useConvoDock();
   const pendingSubjects = usePendingInputSubjects();
+  const { decisions: agentRequests } = usePendingAgentRequestDecisions();
   const agentsById = useDashboardStore((s) => s.agentsById);
   const issuesRaw = useDashboardStore((s) => s.issuesRaw);
 
-  const needsYouIds = useMemo(
-    () => new Set((pendingSubjects ?? []).map((s) => s.issueId?.toLowerCase()).filter((id): id is string => Boolean(id))),
-    [pendingSubjects],
-  );
+  const needsYouIds = useMemo(() => {
+    const ids = (pendingSubjects ?? []).map((s) => s.issueId?.toLowerCase());
+    // PAN-5541 D9: an agent request's issue also needs the operator.
+    for (const decision of agentRequests) {
+      const issueId = decision.agentRequest?.issueId;
+      if (issueId) ids.push(issueId.toLowerCase());
+    }
+    return new Set(ids.filter((id): id is string => Boolean(id)));
+  }, [pendingSubjects, agentRequests]);
 
   const allDockItems = useMemo(() => {
     const issues = (issuesRaw as Issue[]) ?? [];

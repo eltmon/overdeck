@@ -25,6 +25,7 @@ vi.mock('../lib/store', () => ({
 
 vi.mock('../lib/useDecisions', () => ({
   usePendingInputSubjects: vi.fn(),
+  usePendingAgentRequestDecisions: vi.fn(() => ({ decisions: [], isFetched: true })),
 }));
 
 vi.mock('../lib/simple/useSimpleActions', () => ({
