@@ -158,6 +158,16 @@ Hovering a row shows **+ Order book**, which adds the issue to the active order 
 
 The sequence lives at `.pan/backlog/sequence.md` in the plan home, committed on `main`. `pan backlog write-sequence <file>` is how the sequencer agent writes it: it validates the file's fields (`issue`, `rank`, `size`, `importance`, `score`, `condition`, `dependsOn`, `why`, `gate`, `planning`), commits and pushes; see [Pipeline commands](/cli/pipeline-commands) for the full command. Never hand-edit the file.
 
+## Files the loop and the sequencer keep
+
+The loop and the sequencer each keep their state in a few plain files under the plan home, never in a database:
+
+- `.pan/flywheel/state.md`: the loop's memory across runs, substrate fixes and learnings it wants to carry forward. It is appended to, then committed and pushed.
+- `.pan/flywheel/report.md`: what shipped, what is in flight, what is parked, and substrate fixes found. It is written on `pan flywheel stop` or `pan flywheel report`, replacing the previous report, then committed and pushed. The Flywheel page's State and Report tabs render these two files.
+- `.pan/backlog/sequence.md`: a human-readable table and rationale for the top of the backlog, followed by a machine-readable JSON block below a marker line. Do not hand-edit anything below that marker; it is committed on `main` as `chore(workspace): backlog sequence`.
+
+`pan backlog write-sequence <file>` is the only way the sequence file should be written: it validates the JSON (naming fields like `issue`, `rank`, `size`, `importance`, `score`, `condition`, `dependsOn`, `why`, `gate` and `planning`), skips the commit when only the timestamp would change, then commits and pushes. A validation error prints `Validation error: ...` and exits 1. See [Pipeline commands](/cli/pipeline-commands) for the full command reference.
+
 ## Known limits
 
 - The loop's author gate names fixed GitHub logins: it acts only on issues whose author is `eltmon` (the Overdeck maintainer) or `panopticon-agent[bot]`, or that are assigned to `eltmon`. On any other repo or account the loop skips your issues, and the current GitHub App bot (`overdeck-agent[bot]`) does not pass it either. See [issue #5544](https://github.com/eltmon/overdeck/issues/5544).
