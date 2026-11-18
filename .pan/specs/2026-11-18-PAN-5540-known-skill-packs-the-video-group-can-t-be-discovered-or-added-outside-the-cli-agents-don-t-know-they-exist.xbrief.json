@@ -4,17 +4,17 @@
     "created": "2026-11-18T19:58:01Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5540: Known skill packs (the video group) can't be discovered or added outside the CLI; agents don't know they exist",
-    "updated": "2026-11-18T20:12:37.394Z"
+    "updated": "2026-11-18T20:13:10.385Z"
   },
   "plan": {
     "id": "pan-5540",
     "title": "Known skill packs (the video group) can't be discovered or added outside the CLI; agents don't know they exist",
-    "status": "proposed",
+    "status": "running",
     "uid": "9a20df01-d715-464d-8d1c-69f09df59e43",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-18T19:58:01Z",
-    "updated": "2026-11-18T20:12:37.394Z",
+    "updated": "2026-11-18T20:13:10.385Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5540",
@@ -904,5 +904,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
