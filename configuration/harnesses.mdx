@@ -780,8 +780,8 @@ environment; the turn is billed to your Grok Build sign-in, never to an API key.
 `grok/grok-4.7`, `grok/grok-4.7-build-fast`, `grok/grok-4.6` and
 `grok/grok-4.5`. They run only on the `grok` harness, and the `grok` harness
 runs only these IDs; any other combination fails before launch. The bare
-`grok-4.7` ID still belongs to the `xai` provider (an xAI API key routed through
-Claude Code). The pickers list the four models only when the CLI is installed
+`grok-4.7` ID still belongs to the `xai` provider (an xAI API key; it launches
+on pi by default). The pickers list the four models only when the CLI is installed
 and signed in. Every Grok launch needs an explicit model; there is no fallback.
 
 ```yaml
@@ -844,7 +844,7 @@ npm install -g prime-agent@0.8
 prime-agent --version
 ```
 
-Overdeck supports Prime Agent **0.8.0 – &lt;0.9.0** (daemon protocol 7). A launch
+Overdeck supports Prime Agent **0.8.0 up to, but not including, 0.9.0** (daemon protocol 7). A launch
 with a version outside that range fails before any pane opens, and the error
 names the found version and the supported range. `pan doctor` reports the
 installed version, and it warns (it does not fail) when Prime Agent is not
@@ -852,15 +852,18 @@ installed.
 
 #### Choosing Prime Agent
 
-Set `harness: prime-agent` for a role, or pick **Prime Agent** as a provider's
-harness under **Settings → Providers**. The settings offer it for the providers
-it can reach:
+Pick **Prime Agent** as a provider's harness under **Settings → Providers** (or
+set `models.providers.<provider>.harness: prime-agent`), or pass
+`--harness prime-agent` to `pan start`. Settings → Providers offers it for
+Anthropic, OpenAI, Google, Kimi, MiniMax, OpenRouter, Z.AI and MiMo. Prime Agent
+also maps xAI, Groq, Cerebras and Mistral; use those with
+`--harness prime-agent`. The full provider map:
 
 | Overdeck provider | Prime provider | API-key env var | `auth.json` key |
 | --- | --- | --- | --- |
 | `anthropic` | `anthropic` | `ANTHROPIC_API_KEY` | `anthropic` |
 | `openai` | `openai` | `OPENAI_API_KEY` | `openai` |
-| `openai` (subscription) | `openai-codex` | — | `openai-codex` |
+| `openai` (subscription) | `openai-codex` | none | `openai-codex` |
 | `google` | `google` | `GEMINI_API_KEY` | `google` |
 | `kimi` | `kimi-coding` | `KIMI_API_KEY` | `kimi-coding` |
 | `minimax` | `minimax` | `MINIMAX_API_KEY` | `minimax` |
@@ -966,13 +969,15 @@ orphaned Prime Agent daemons.
 
 ## Semgrep in sessions
 
-With `security.semgrep` turned on, agents can get a `semgrep` MCP server and a post-edit scan
-hook mid-session, not just the managed CLI install:
+With `security.semgrep.enabled` and `security.semgrep.mcp` turned on (and
+`security.semgrep.edit_hook` for the hook), agents can get a `semgrep` MCP server
+and a post-edit scan hook mid-session, not just the managed CLI install. All
+three keys default to off, and Docker workspaces and Windows get neither:
 
 | Harness | MCP server | Edit hook |
 | --- | --- | --- |
 | Claude Code | Yes | Yes |
-| Codex | Yes | No (#5434) |
+| Codex | Yes | No ([#5434](https://github.com/eltmon/overdeck/issues/5434)) |
 | ACP host (Kimi over ACP, OpenCode, Grok Build) | Yes | No |
 | pi, oh-my-pi, Kimi Code native, Muse, Prime Agent | No (one launch warning) | No |
 
@@ -1008,21 +1013,17 @@ oh-my-pi is **not** auto-installed. Install it once, then run `pan doctor` to co
 ```bash
 npm install -g @oh-my-pi/pi-coding-agent
 
-pan doctor                 # confirms `omp` is on PATH and reports the version
+pan doctor                 # confirms `omp` is on PATH and reports the version (>= 16.1.0)
 pan doctor --strict        # exits non-zero if omp is missing (good for CI)
 ```
 
-`pan doctor` also checks that `packages/ohmypi-extension/dist/index.js` exists in the
-Overdeck workspace. If it doesn't, run:
+`pan doctor` also checks that the oh-my-pi extension bundle
+(`packages/ohmypi-extension/dist/index.js`, shipped as
+`dist/extensions/ohmypi.js`) exists. If it doesn't, run
+`npm run build:ohmypi-extension && npm run build` (or, in a checkout,
+`cd packages/ohmypi-extension && npm run build`).
 
-```bash
-cd packages/ohmypi-extension && npm run build
-```
-
-After installing omp, run `pan sync` once. Overdeck writes
-`~/.omp/agent/settings.json` with a `skills` array pointing at `~/.claude/skills`
-so omp loads the same skill tree Claude Code does. Existing keys in
-`settings.json` are preserved.
+`pan sync` does not configure omp's skills.
 
 ### Provider authentication
 
@@ -1030,14 +1031,14 @@ Overdeck bridges configured API keys into omp's environment at launch time,
 so you do **not** need to configure auth separately in omp for most providers.
 When you spawn an ohmypi agent with a Kimi, MiniMax, Z.AI, MiMo, OpenRouter, Nous,
 or DashScope model, Overdeck injects the native provider env var
-(`KIMI_API_KEY`, `MINIMAX_API_KEY`, `QUANTUMLLAMA_API_KEY`, etc.) automatically from your dashboard
-Settings or `~/.overdeck.env`. (`QUANTUMLLAMA_API_KEY` belongs to QuantumLlama,
-a fictional benchmark provider with no live endpoint.)
+(`KIMI_API_KEY`, `MINIMAX_API_KEY`, `ZAI_API_KEY`, `OPENROUTER_API_KEY`,
+`DASHSCOPE_API_KEY`, etc.) automatically from your dashboard Settings or
+`~/.overdeck.env`.
 
-Providers that rely on OAuth / subscription auth (Anthropic, OpenAI Codex)
-still require you to log in through omp directly (`/login` inside an omp session)
-or via Overdeck's dedicated subscription flows (Claude Code OAuth, Codex
-CLIProxy auth). Use `pan ohmypi-auth` to manage omp credentials from the CLI.
+OpenAI subscription (ChatGPT/Codex) models need omp's own `openai-codex` login:
+run `pan ohmypi-auth login` (or `/login` inside omp). Anthropic models on
+oh-my-pi need Anthropic API-key auth; subscription auth is blocked (see
+[ToS rules](#tos-rules)).
 
 ## Where you pick the harness
 
@@ -1046,23 +1047,15 @@ The harness is chosen **per spawn** at four user-initiated surfaces:
 | Surface | How |
 | --- | --- |
 | Plan kickoff (start-planning) | Harness/model picker in the kickoff dialog. |
-| Work agent start (CLI) | `pan start <ISSUE> --harness pi --model <id>`. With no `--harness`, the model's provider default applies (`pi` for non-Anthropic, non-OpenAI providers). |
-| Work agent start (Dashboard) | "Start" button menu lets you pick harness + model before launch. |
-| Conversation panel | Harness/model selector at the top of the panel. |
+| Work agent start (CLI) | `pan start <ISSUE> --harness pi --model <id>`. With no `--harness`, the provider's harness from Settings → Providers applies, else its built-in default (`pi` for Google, xAI, MiniMax, Z.AI, MiMo, OpenRouter, Nous, DashScope, Groq, Cerebras and Mistral). |
+| Work agent start (Dashboard) | **Start agent → Overrides → Override default harness and model** reveals the harness and model picker. |
+| Conversation panel | Harness and model selector, usable until the first message is sent. |
 
-There is **no per-issue lock** — an issue planned with ohmypi can have a Claude Code
+There is **no per-issue lock**: an issue planned with ohmypi can have a Claude Code
 review agent on the same PR, and vice versa.
 
-### Switching harness on a live conversation (experimental)
-
-Changing harnesses on an already-running conversation is best-effort. Overdeck
-attempts to convert the transcript into the new harness format, but that
-converter is intentionally unsupported and may lose fidelity. If conversion or
-resume fails, Overdeck falls back to starting a fresh session with the selected
-harness and model.
-
-Use this as an escape hatch, not a support promise. If the converted transcript
-looks wrong, report the case and continue in the fresh fallback session.
+A conversation's harness is fixed once it has started; the server refuses a
+change with 409. A pi conversation can still switch models while it runs.
 
 ### Role runs (plan / work / review / test / ship)
 
@@ -1077,12 +1070,12 @@ are each resolved.
 <ThemedImage
   light="/images/dashboard/settings-light.png"
   dark="/images/dashboard/settings-dark.png"
-  alt="Overdeck Settings page showing per-role model routing, tracker API keys, and project configuration"
+  alt="Overdeck Settings page showing per-role model routing and tracker API keys"
 />
 
-The Settings page is also where you wire up tracker API keys and project
-configuration, so model and harness routing for autonomous role runs lives
-alongside the rest of the orchestrator's defaults.
+The Settings page is also where you wire up tracker API keys, so model and
+harness routing for autonomous role runs lives alongside the rest of the
+orchestrator's defaults. Per-project settings live in `projects.yaml`.
 
 ## Use Overdeck workers instead of harness plugins
 
@@ -1097,7 +1090,7 @@ agents the same. See [Workers](/reference/workers) for the commands.
 | Transcript | On the agent transcript route, like any agent | Codex-plugin jobs: the Codex rollout, read-only on the agent transcript route |
 | Cost | Attributed to the issue | Not attributed |
 | Control | `pan tell`, `pan kill`, restart | None from Overdeck |
-| Harness and model | Any harness through role routing (`roles.worker`), or `--harness` / `--model` | The plugin's own |
+| Harness and model | The model from `roles.worker.model` (harness routed from its provider), or `--model` / `--harness` (claude-code, codex, acp, kimi-code, opencode, muse, prime-agent, grok) | The plugin's own |
 | Result | The report comes back to the caller on stdout | The plugin returns its result as a tool result |
 | Sandbox | None. `--read-only` adds a PATH shim against accidental git writes to the issue's repository; it restricts no file or network writes | The plugin's file-system and network sandbox |
 | Setup | Needs the issue's workspace (`pan start` first) | None |
@@ -1105,12 +1098,14 @@ agents the same. See [Workers](/reference/workers) for the commands.
 Codex-plugin jobs are registered automatically the first time the dashboard
 sees them, so they are visible, but they stay read-only: Overdeck cannot tell,
 stop or restart them, and their cost is not attributed. See
-[Workers — Externally spawned agents](/reference/workers#externally-spawned-agents).
+[Workers: Externally spawned agents](/reference/workers#externally-spawned-agents).
 
 ## ToS rules
 
-There are exactly **three blocked combinations**, gated by
-`canUseHarness(harness, model, authMode)` in `src/lib/harness-policy.ts`:
+Exactly **three combinations are blocked by the Claude Code subscription
+terms** (three ToS blocks), gated by `canUseHarness(harness, model, authMode)`
+in `src/lib/harness-policy.ts`. The same gate also enforces the model-pinning
+rules below:
 
 <Warning>
 **Blocked:** `pi` + Anthropic model + Anthropic auth = `subscription`
@@ -1120,13 +1115,14 @@ There are exactly **three blocked combinations**, gated by
 **Blocked:** `prime-agent` + Anthropic model + Anthropic auth = `subscription`
 </Warning>
 
-This is required by the Claude Code subscription terms — only the `claude-code`
+This is required by the Claude Code subscription terms: only the `claude-code`
 binary may invoke Anthropic models when you're authenticated via the Claude Code
-OAuth subscription. Everything else is allowed:
+OAuth subscription. Within the provider pairs the pinning rules below allow,
+everything else is allowed:
 
 | Harness | Model provider | Anthropic auth mode | Allowed? |
 | --- | --- | --- | --- |
-| claude-code | any | any | ✅ |
+| claude-code | any except `grok/*`, `opencode/*`, `opencode-go/*` and Muse | any | ✅ |
 | pi | non-Anthropic (Google/xAI/OpenRouter/MiniMax/DashScope/...) | any | ✅ |
 | pi | Anthropic | API key | ✅ |
 | pi | Anthropic | subscription | 🚫 |
@@ -1138,11 +1134,13 @@ OAuth subscription. Everything else is allowed:
 | prime-agent | non-Anthropic (see the Prime provider table) | any | ✅ |
 | prime-agent | Anthropic | API key | ✅ |
 | prime-agent | Anthropic | subscription | 🚫 |
+| prime-agent | Anthropic | unset (no Anthropic auth) | ✅ |
 
 The gate is evaluated at every spawn entry point and at every picker UI so a
 stale Settings selection cannot bypass it. When the pipeline routes a role run
-into the blocked cell, it falls back to `claude-code` and emits a `console.warn`
-rather than failing the whole pipeline.
+into the blocked cell from the provider default with an Anthropic model, it
+falls back to `claude-code` and emits a `console.warn` rather than failing the
+whole pipeline. An explicit `--harness` pick that the gate blocks fails instead.
 
 The gate is exhaustive over harnesses. Every runtime needs an explicit rule in
 `canUseHarness`, and the decision map served to the pickers is typed over every
@@ -1152,9 +1150,13 @@ has its own rule (PAN-5212): like oh-my-pi it is a third-party client, so the
 Claude Code subscription terms bar it from Anthropic models on subscription
 auth.
 
-Grok Build has no gate: it is xAI's own CLI running xAI models on your xAI
+Grok Build has no ToS gate: it is xAI's own CLI running xAI models on your xAI
 sign-in, and its documentation describes ACP mode for automation tools. The
-gate only pins `grok/*` models to the `grok` harness and back.
+gate only pins `grok/*` models to the `grok` harness and back. In the same way
+it pins OpenCode Go and Zen models to `opencode`, Muse models to `muse`, and
+Kimi models to the harnesses that can run them, and keeps Ollama models on
+`claude-code`. Subscription-only OpenAI models are refused under API-key auth
+on every harness.
 
 The same gate enforces Kimi id-space correctness: a `kimi-code/*`
 native-catalog id is blocked on every harness except `kimi-code` and `acp`, so
@@ -1172,7 +1174,7 @@ the spawn entry points, so the blocked combination is caught before you click
   is disabled (locked) and its tooltip shows the reason.
 - **Harness list:** when the current model is blocked for a harness, the harness
   option is `disabled` (non-clickable) and renders the decision reason as
-  visible inline text — not only in the tooltip — so the block is readable
+  visible inline text, not only in the tooltip, so the block is readable
   without hover.
 
 Once a model's decisions have loaded, a harness missing from them is disabled
@@ -1181,18 +1183,17 @@ options stay selectable and the server gate decides at spawn.
 
 The inline reason names the restriction as a **Claude Code subscription Terms of
 Service** rule, and tells you how to proceed: switch Anthropic to API-key auth,
-or pick a non-Anthropic model for pi or ohmypi.
+or pick a non-Anthropic model for pi, oh-my-pi or Prime Agent.
 
-This behavior applies in the plan kickoff dialog, work-agent start menu,
-conversation panel, and Settings per-role harness selectors. Blocked clicks are
-inert — they do not fire `onChange` / `onHarnessChange` and do not auto-flip the
-model.
+This behavior applies in the plan kickoff dialog, the Start agent overrides,
+the fork dialog, and the conversation panel. Blocked clicks are inert: they do
+not fire `onChange` / `onHarnessChange` and do not auto-flip the model.
 
 ### Auth mode is exclusive
 
-Anthropic auth is exclusively subscription **or** API key, never both. If you log
-into the Claude Code subscription, Overdeck ignores any `ANTHROPIC_API_KEY` in
-the environment. Set one or the other, not both.
+Overdeck treats Anthropic auth as one mode. If `ANTHROPIC_API_KEY` is set in
+the dashboard's environment, Overdeck uses API-key mode even when you are also
+signed in to the Claude Code subscription. Set one or the other, not both.
 
 ## Troubleshooting
 
