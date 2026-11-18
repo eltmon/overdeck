@@ -104,6 +104,7 @@
               "features/conversations",
               "features/file-explorer",
               "features/mission-control",
+              "features/dashboard-views",
               "features/convoys",
               "features/specialists",
               "features/merge-batches",
