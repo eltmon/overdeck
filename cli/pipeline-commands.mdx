@@ -298,6 +298,50 @@ pan merge cancel PAN-1148
 See [Cancelling](/configuration/auto-merge#cancelling) for what the cooldown window is and what
 cancelling changes.
 
+## pan swarm
+
+Start, dispatch, recover, or inspect parallel swarm slots for a planned issue, when the xBRIEF has
+independent items that can run at once.
+
+```bash
+pan swarm dispatch PAN-1148
+pan swarm status PAN-1148 --json
+pan swarm wait PAN-1148 --timeout 540
+pan swarm merge PAN-1148 2
+```
+
+| Command | What it does | Options |
+| --- | --- | --- |
+| `pan swarm dispatch <id>` | Runs one gated swarm dispatch pass | `--json` |
+| `pan swarm merge <id> <slotIndex>` | Verifies and merges one completed swarm slot | `--json` |
+| `pan swarm recover <id> <slotIndex>` | Recovers a failed swarm slot | `--action retry\|drop\|handoff\|reclaim` (default `retry`), `--operator` (overrides the three-intervention limit for this failure class) |
+| `pan swarm freeze <id>` | Freezes swarm coordination for an issue; the Deacon skips it until resumed | `--reason <text>` |
+| `pan swarm resume <id>` | Resumes swarm coordination for a frozen issue on the next Deacon patrol | none |
+| `pan swarm status <id>` | Reads reconciled swarm state: per-slot rows, hold state, and capacity | `--json` |
+| `pan swarm wait <id>` | Waits for a slot, foreman, or hold state transition | `--timeout <seconds>` (default 300), `--json` |
+| `pan swarm stop <id>` | Freezes coordination, then stops all live slot agents; branches and worktrees are kept | `--reason <text>` |
+| `pan swarm reset <id>` | Work-preserving reset: stops slots, pushes unmerged slot branches to origin, removes slot worktrees and branches, clears recorded slot state (the hold stays set) | `--force` (keeps deleting even when a push fails), `--reason <text>` |
+
+See [CLI](/features/swarm#cli) for the gated dispatch protocol these commands drive.
+
+## pan spawn
+
+Create a worker pane for one xBRIEF item, in its own item worktree.
+
+```bash
+pan spawn --issue PAN-1148 --item conv-page
+pan spawn --issue PAN-1148 --item conv-page --model claude-opus-5-5
+```
+
+| Option | What it does |
+| --- | --- |
+| `--issue <id>` | Issue the worker belongs to |
+| `--item <item>` | xBRIEF item the worker takes |
+| `--model <model>` | Model the worker runs on |
+| `--harness <harness>` | Coding-agent harness (default `claude-code`) |
+| `--effort <level>` | Reasoning effort: `low`, `medium`, `high`, `xhigh` or `max` (defaults to the item or plan metadata, then `roles.worker.effort`) |
+| `--shared` | Runs the worker in the issue workspace instead of its own item worktree; foreman or operator only, serial use |
+
 ## Get help
 
 - [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P)
