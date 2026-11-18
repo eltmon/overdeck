@@ -295,6 +295,48 @@ pan reload --health-timeout 60s
 
 A hold from `pan restart hold` also blocks `pan reload` until released.
 
+## pan shutdown
+
+Drain Overdeck safely: let every agent finish its current tool call, stop everything, then
+report that the machine is safe to reboot.
+
+```bash
+pan shutdown
+pan shutdown --reboot --deadline 300
+pan shutdown --status
+pan shutdown --cancel
+```
+
+| Option | What it does |
+| --- | --- |
+| `--deadline <seconds>` | Seconds before stragglers are listed (default 120, from 10 to 3600) |
+| `--reboot` | Reboots the machine once the drain completes (Linux) |
+| `--force` | At the deadline, stops stragglers mid-tool call; on an already-running drain, stops them now |
+| `--cancel` | Cancels a running drain; stopped sessions are offered for resume |
+| `--status` | Prints the current drain and exits |
+| `--no-wait` | Starts the drain and exits without following it |
+
+See [Safe shutdown](/features/safe-shutdown) for what happens phase by phase.
+
+## pan update
+
+Check npm for the latest `@overdeck/core`, install it globally, run an automatic sync, then tell
+you to restart the dashboard and running agents.
+
+```bash
+pan update
+pan update --check     # only check, don't install
+pan update --force     # reinstall even when already on the latest version
+```
+
+| Option | What it does |
+| --- | --- |
+| `--check` | Only checks for updates; does not install |
+| `--force` | Updates even when already on the latest version |
+
+An Overdeck source checkout uses `pan reload` instead; `pan update` installs the published npm
+package.
+
 ## pan health
 
 Check the health of all Overdeck services.
