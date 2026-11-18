@@ -1400,6 +1400,105 @@ describe('convoy orchestration', () => {
     expect(result.launched).toBeUndefined();
     expect(mockSpawnRun).not.toHaveBeenCalled();
   });
+
+  // PAN-5519: recovery once relaunched reviewers into a run approved for an
+  // earlier head, so they reviewed a commit the PR had moved past.
+  describe('stale saved run (PAN-5519)', () => {
+    const ANCHOR = 'pan-1059-current-heads';
+    const CURRENT_RUN_ID = `agent-pan-1059-review-${createHash('sha1').update(ANCHOR).digest('hex').substring(0, 8)}`;
+
+    function withSavedRun(runId: string): string {
+      const manifestPath = `${REVIEW_AGENT_DEFAULT_WORKSPACE}/.pan/review/${runId}/context.json`;
+      mkdirSync(dirname(manifestPath), { recursive: true });
+      writeFileSync(manifestPath, JSON.stringify(minimalReviewContextManifest(manifestPath)), 'utf-8');
+      mockGetAgentState.mockImplementation((agentId: string) => agentId === 'agent-pan-1059-review'
+        ? { id: agentId, workspace: REVIEW_AGENT_DEFAULT_WORKSPACE, reviewRunId: runId, reviewContextManifestPath: manifestPath }
+        : null);
+      return dirname(manifestPath);
+    }
+
+    function pinHead(): void {
+      mockResolveWorkspaceRepoRoots.mockReturnValue([{ isPolyrepo: true }]);
+      mockSnapshotWorkspaceHeads.mockResolvedValue(ANCHOR);
+    }
+
+    afterEach(() => {
+      mockResolveWorkspaceRepoRoots.mockReset();
+      mockSnapshotWorkspaceHeads.mockReset();
+    });
+
+    it('relaunches no reviewer into a run whose head is not the workspace head', async () => {
+      pinHead();
+      withSavedRun(REVIEW_AGENT_RUN_ID);
+
+      const result = await recoverMissingConvoyReviewers('PAN-1059', { source: 'test recovery' });
+
+      expect(result).toMatchObject({ success: true, stale: true });
+      expect(result.message).toContain(`${REVIEW_AGENT_RUN_ID} for PAN-1059 is stale`);
+      expect(result.launched).toBeUndefined();
+      expect(result.runId).toBeUndefined();
+      expect(mockSpawnRun).not.toHaveBeenCalled();
+    });
+
+    it('relaunches no reviewer into a run whose verdict is already journalled', async () => {
+      pinHead();
+      withSavedRun(CURRENT_RUN_ID);
+      appendPipelineEntry(REVIEW_AGENT_DEFAULT_WORKSPACE, {
+        type: 'review.verdict',
+        issueId: 'PAN-1059',
+        source: 'pan-specialists-done',
+        data: { verdict: 'APPROVED', runId: CURRENT_RUN_ID },
+      });
+
+      const result = await recoverMissingConvoyReviewers('PAN-1059', { source: 'test recovery' });
+
+      expect(result).toMatchObject({ success: true, stale: true });
+      expect(result.message).toContain('verdict is already in the pipeline journal');
+      expect(mockSpawnRun).not.toHaveBeenCalled();
+    });
+
+    it('relaunches missing reviewers when the review door reopens a verdicted run on the same head', async () => {
+      pinHead();
+      const reviewDir = withSavedRun(CURRENT_RUN_ID);
+      for (const role of ['security', 'performance', 'requirements']) {
+        writeFileSync(`${reviewDir}/${role}.md`, `${role} complete`, 'utf-8');
+      }
+      appendPipelineEntry(REVIEW_AGENT_DEFAULT_WORKSPACE, {
+        type: 'review.verdict',
+        issueId: 'PAN-1059',
+        data: { verdict: 'APPROVED', runId: CURRENT_RUN_ID },
+      });
+      mockSpawnRun.mockImplementation(async (issueId: string, _role: string, options: { subRole?: string }) => ({
+        id: `agent-${issueId.toLowerCase()}-review-${options.subRole}`,
+      }));
+
+      const result = await recoverMissingConvoyReviewers('PAN-1059', { source: 'test recovery', reopenedByRequest: true });
+
+      expect(result).toMatchObject({ success: true, launched: 1, runId: CURRENT_RUN_ID });
+      expect(result.stale).toBeUndefined();
+    });
+
+    it('still relaunches missing reviewers into a current run with no verdict', async () => {
+      pinHead();
+      const reviewDir = withSavedRun(CURRENT_RUN_ID);
+      for (const role of ['security', 'performance', 'requirements']) {
+        writeFileSync(`${reviewDir}/${role}.md`, `${role} complete`, 'utf-8');
+      }
+      mockSpawnRun.mockImplementation(async (issueId: string, _role: string, options: { subRole?: string }) => ({
+        id: `agent-${issueId.toLowerCase()}-review-${options.subRole}`,
+      }));
+
+      const result = await recoverMissingConvoyReviewers('PAN-1059', { source: 'test recovery' });
+
+      expect(result).toMatchObject({ success: true, launched: 1, runId: CURRENT_RUN_ID });
+      expect(result.stale).toBeUndefined();
+      expect(mockSpawnRun).toHaveBeenCalledTimes(1);
+      expect(mockSpawnRun).toHaveBeenCalledWith('PAN-1059', 'review', expect.objectContaining({
+        subRole: 'correctness',
+        reviewOutputPath: `${reviewDir}/correctness.md`,
+      }));
+    });
+  });
 });
 
 // #4134: re-running the synthesis step of a convoy whose lanes all reported.

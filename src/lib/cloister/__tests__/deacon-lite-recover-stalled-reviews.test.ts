@@ -230,6 +230,30 @@ describe('recoverStalledReviews', () => {
     expect(mocks.recoverMissingConvoyReviewers).toHaveBeenCalledTimes(1);
   });
 
+  // PAN-5519: a request on a new head, while its verification still runs, left
+  // the parent pointing at an approved run for an earlier head. Recovery found
+  // that run stale; deacon-lite must neither journal a re-dispatch, ask the
+  // route for a review, nor warn about a dead synthesis parent.
+  it('dispatches nothing for a stale saved run and cools down', async () => {
+    journal([{ type: 'review.requested', minutesAgo: 16 }]);
+    mocks.recoverMissingConvoyReviewers.mockResolvedValue({
+      success: true,
+      stale: true,
+      message: 'Review run agent-pan-3705-review-a7a87747 for PAN-3705 is stale (it reviews an earlier head, and the workspace head is now 00f3bd9b): no reviewers relaunched',
+    });
+    mocks.isAlive.mockResolvedValue({ alive: false, reason: 'no-session' });
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    expect(await recoverStalledReviews(NOW)).toEqual([]);
+    expect(readPipelineJournal(workspace).map((entry) => entry.type)).toEqual(['review.requested']);
+    expect(mocks.requestReviewThroughRoute).not.toHaveBeenCalled();
+    expect(mocks.isAlive).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('PAN-3705: stalled review not re-dispatched'));
+
+    expect(await recoverStalledReviews(NOW + 30 * MINUTE)).toEqual([]);
+    expect(mocks.recoverMissingConvoyReviewers).toHaveBeenCalledTimes(1);
+  });
+
   // Synthesis recovery (#4134) acts only once every lane has its report on disk.
   // Until then the no-op branch must at least make a dead parent visible —
   // without an hourly false alarm on a parent still waiting on its lanes.

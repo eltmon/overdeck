@@ -36,12 +36,9 @@
  *                                     (pan down), on tmux and Herdr
  */
 
-import { exec } from 'child_process';
-import { createHash } from 'node:crypto';
 import { existsSync } from 'fs';
 import { mkdir, readFile, rm, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
-import { promisify } from 'util';
 import { Effect } from 'effect';
 import { listSessionNames } from '../tmux.js';
 import { isAlive, isConfirmedDead, type LivenessVerdict } from '../agents/liveness.js';
@@ -69,8 +66,10 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { withReviewLifecycleGuard } from '../review-lifecycle-guard.js';
 import { isKickoffRejection } from '../agents/kickoff-rejection.js';
 import { recordReviewDispatchFailure } from './review-dispatch-failure.js';
+import { deriveReviewRunHead8 } from './review-run-head.js';
 
-const execAsync = promisify(exec);
+export { deriveReviewRunHead8 };
+
 // PAN-1531: review-temp stash helpers removed.
 
 // PAN-2584: liveness budget for the review PARENT (discovery + convoy + synthesis).
@@ -83,33 +82,6 @@ export const PARENT_REVIEW_TIMEOUT_MS = 45 * 60 * 1000;
 
 const reviewSynthesisPath = (reviewDir: string): string => join(reviewDir, 'synthesis.md');
 const selfReviewReportPath = (reviewDir: string): string => join(reviewDir, 'review.md');
-
-export async function deriveReviewRunHead8(issueId: string, workspace: string): Promise<string> {
-  try {
-    const { resolvePrimaryWorkspaceRepoDir, resolveWorkspaceRepoRoots } = await import('../project-repos.js');
-    const roots = resolveWorkspaceRepoRoots(issueId, workspace);
-    if (roots.some(root => root.isPolyrepo)) {
-      const { snapshotWorkspaceHeads } = await import('../git-utils.js');
-      const anchor = await snapshotWorkspaceHeads(issueId, workspace);
-      return anchor
-        ? createHash('sha1').update(anchor).digest('hex').substring(0, 8)
-        : 'unknown';
-    }
-
-    // PAN-3037: the primary code repo is resolved through the shared helper —
-    // the polyrepo wrapper's HEAD never moves, so a wrapper-derived runId would
-    // mismatch every live run and kill a healthy convoy on each dispatch.
-    const probeDir = resolvePrimaryWorkspaceRepoDir(issueId, workspace);
-    const { stdout } = await execAsync(['git', 'rev-parse', '--short=8', 'HEAD'].join(' '), {
-      cwd: probeDir,
-      encoding: 'utf-8',
-      timeout: 10_000,
-    });
-    return stdout.trim() || 'unknown';
-  } catch {
-    return 'unknown';
-  }
-}
 
 export function buildReviewRolePrompt(opts: {
   issueId: string;
@@ -579,6 +551,7 @@ async function spawnReviewRoleForIssueBody(
             // siblings stay intact and the synthesis parent can proceed immediately.
             const recovery = await recoverMissingConvoyReviewers(opts.issueId, {
               source: 'same-run parent resume',
+              reopenedByRequest: true,
               ...(opts.model ? { model: opts.model } : {}),
               ...(opts.harness ? { harness: opts.harness } : {}),
             });
