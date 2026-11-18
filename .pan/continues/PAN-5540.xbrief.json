@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5540",
+  "created": "2026-11-18T20:13:27.480Z",
+  "updated": "2026-11-18T20:13:27.480Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "known-listing-core": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5540",
+      "claimedAt": "2026-11-18T20:13:27.480Z"
+    }
+  }
+}
