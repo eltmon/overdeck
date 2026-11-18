@@ -127,3 +127,38 @@ spend ([#5562](https://github.com/eltmon/overdeck/issues/5562)); do not rely on 
 discovered, not the recorded cost ledger; see
 [Conversation commands](/cli/conversation-commands). See
 [Core commands](/cli/core-commands#pan-cost) for the full `pan cost` option table.
+
+## Cost limits
+
+Cost limits are opt-in and warn only. Add a `[cost_limits]` table to `~/.overdeck/cloister.toml`:
+
+```toml
+[cost_limits]
+per_agent_usd = 50
+per_issue_usd = 100
+daily_total_usd = 300
+alert_threshold = 0.8
+```
+
+The numbers above are examples, not defaults: `per_agent_usd`, `per_issue_usd` and
+`daily_total_usd` each check today's spend and are unchecked when unset or `0`, and there is no
+built-in default for any of them. `alert_threshold` is the fraction of a limit (default `0.8`)
+at which Overdeck starts warning before the limit itself is reached.
+
+Crossing a limit writes a single warning line to the dashboard's log. Nothing in the dashboard UI
+surfaces it, and a limit never stops or pauses an agent; it exists for visibility only.
+
+## Get help
+
+Ask in the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P), or file an issue at
+[github.com/eltmon/overdeck/issues](https://github.com/eltmon/overdeck/issues).
+
+## See also
+
+- [Dashboard views](/features/dashboard-views)
+- [Command Deck](/features/mission-control)
+- [Reasoning effort](/configuration/effort)
+- [Linked machines](/configuration/linked-machines)
+- [Core commands](/cli/core-commands)
+- [Conversation commands](/cli/conversation-commands)
+- [Token spend report](/reference/token-spend-report)
