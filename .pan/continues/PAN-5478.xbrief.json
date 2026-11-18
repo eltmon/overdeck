@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5478",
   "created": "2026-11-18T19:16:06.870Z",
-  "updated": "2026-11-18T19:27:33.807Z",
+  "updated": "2026-11-18T19:27:40.164Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,11 @@
     "pipe-close-strike.ac3": {
       "status": "completed",
       "doneAt": "2026-11-18T19:27:33.807Z"
+    },
+    "pipe-flywheel": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5478",
+      "claimedAt": "2026-11-18T19:27:40.163Z"
     }
   }
 }
