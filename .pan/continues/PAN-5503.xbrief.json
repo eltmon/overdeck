@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5503",
   "created": "2026-11-18T23:39:30.709Z",
-  "updated": "2026-11-18T23:40:57.627Z",
+  "updated": "2026-11-18T23:43:24.074Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "harnesses-intro-to-pi.ac4": {
       "status": "completed",
       "doneAt": "2026-11-18T23:40:57.626Z"
+    },
+    "harnesses-ohmypi-to-opencode": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5503",
+      "claimedAt": "2026-11-18T23:43:24.073Z"
     }
   }
 }
