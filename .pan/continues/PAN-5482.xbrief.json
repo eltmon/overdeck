@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5482",
   "created": "2026-11-18T21:37:14.666Z",
-  "updated": "2026-11-18T21:52:44.545Z",
+  "updated": "2026-11-18T21:52:49.138Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,11 @@
     "delete-wizard-meta.ac2": {
       "status": "completed",
       "doneAt": "2026-11-18T21:52:44.545Z"
+    },
+    "polyrepo-inbound-links": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5482",
+      "claimedAt": "2026-11-18T21:52:49.138Z"
     }
   }
 }
