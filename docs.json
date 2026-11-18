@@ -120,6 +120,7 @@
               "features/cloister",
               "features/safe-shutdown",
               "features/open-in-overdeck",
+              "features/desktop-app",
               "features/keyboard-shortcuts"
             ]
           }

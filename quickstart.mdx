@@ -106,6 +106,8 @@ Prefer a standalone app? Download the latest release for your platform from [Git
 - **macOS**: `.dmg` for Apple silicon (arm64)
 - **Windows**: `.exe` installer
 
+See [Desktop app](/features/desktop-app) for setup on each system, the tray, notifications and opening another machine.
+
 ## Architecture at a glance
 
 Overdeck started as a CLI and grew into **Command Deck**, a desktop-class development environment. The CLI, the GUI and any script that can make an HTTP request all drive the same REST surface, so you can start an agent from a kanban card, a terminal or a webhook without switching tools. Under the hood: an Effect.js and TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch with `npx @overdeck/core` or the `overdeck` command (`pan` is its short alias); use `@overdeck/desktop` for the packaged desktop app.
