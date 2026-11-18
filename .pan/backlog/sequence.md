@@ -1,18 +1,17 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-17T21:36:52.298925Z · model: claude-opus-5-5 · open: 939_
+_Last sequenced: 2026-11-18T15:02:18.873480Z · model: claude-opus-5-5 · open: 937_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-5484 | S | high | ok |  |  | pan sync writes a ~92 MB skills backup each run and never prunes; 9 GB filled a 99% disk. In pipeline. |
 | 2 | PAN-5483 | M | high | ok |  |  | Docs canonicalize to panopticon-cli.com and docs.json uses legacy keys the site ignores. In pipeline; lane A first. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
-| 5 | PAN-5469 | M | medium | ok |  |  | New features/planning.mdx page: Plan dialog, pan plan, PRDs, xBRIEF checklist, critic, finalize. In pipeline, lane B first. |
 | 6 | PAN-5489 | S | high | ok |  |  | pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause. |
 | 7 | PAN-5498 | S | critical | ok |  |  | pan start --plan auto --host loses the host override at the planning→work handoff; no work agent starts. Hit twice 11-17. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
+| 9 | PAN-5516 | S | high | ok |  |  | pan conversations resume always fails locally with 'Missing origin': origin check does not exempt the internal token. Fix named. |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
 | 12 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
@@ -225,7 +224,7 @@ _Last sequenced: 2026-11-17T21:36:52.298925Z · model: claude-opus-5-5 · open: 
 | 216 | PAN-3196 | S | high | ok |  |  | Root-owned container residue makes close-out die on EACCES after passing every DoD row; same family as PAN-3570. |
 | 217 | PAN-3186 | XS | high | ok |  |  | One configured non-git member (auricle/infra) blanks pipeline membership for the whole project the resolver claims it can answer. |
 | 218 | PAN-3185 | XS | high | ok |  |  | Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail. |
-| 219 | PAN-5461 | M | medium | ok |  |  | Settings → Computer Use one-click setup plus the platform provider seam; operator-approved mockup, PRD drafted. |
+| 219 | PAN-5517 | M | medium | ok |  |  | Tiered Execution settings save supervisor, call-out and replay options nothing acts on; PlanCard toggle hits a route deleted in PAN-3917. |
 | 220 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time with no production-reach check, so members read shipped while prod serves the old build. |
 | 221 | PAN-3130 | S | high | ok |  |  | Identifier-joined write paths have no containment assertion, so a crafted issue or agent id could redirect a canonical write. |
 | 222 | PAN-3047 | XS | high | ok |  |  | Strike-branch teardown uses --is-ancestor, which cannot see a squash merge, so all 96 strike/* branches survive as residue. |
@@ -443,7 +442,7 @@ _Last sequenced: 2026-11-17T21:36:52.298925Z · model: claude-opus-5-5 · open: 
 | 424 | PAN-5028 | M | medium | ok |  |  | list_pending_input loses a conversation's AskUserQuestion after the PAN-1520 deny hook, contrary to the existing test's contract. |
 | 425 | PAN-5386 | XS | medium | ok |  |  | CodeRabbit follow-up for PAN-5361 (PR #5373): 1 Major finding, baseline burst can hide an idle regression in bare-host smoke |
 | 426 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
-| 426 | PAN-5515 | XS | medium | ok |  | PAN-5463 | CodeRabbit Major on PR #5513: release.yml may notarize an ad-hoc-signed macOS helper when the API key exists but no cert. |
+| 426 | PAN-5515 | XS | medium | ok |  |  | CodeRabbit Major on PR #5513: release.yml may notarize an ad-hoc-signed macOS helper when the API key exists but no cert. |
 | 427 | PAN-5227 | S | medium | ok |  |  | Closed-issue reaper re-checks every issue's state every 60 s, spending ~25% of the GitHub App REST bucket while idle. |
 | 428 | PAN-5439 | L | medium | ok |  |  | React Compiler burn-down for explorer, God View, conversations, workspace, project: 40 skips, 132 memo sites. |
 | 429 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
@@ -725,7 +724,7 @@ _Last sequenced: 2026-11-17T21:36:52.298925Z · model: claude-opus-5-5 · open: 
 | 685 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
 | 686 | PAN-4823 | XL | medium | ok | ✓ |  | Epic: Capacitor phone client for Anywhere without Tailscale; 15 children filed (#4828-4843); OD-1 settled; PAN-4774 done. |
 | 687 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
-| 688 | PAN-5463 | L | medium | ok |  | PAN-5461 | macOS computer use: port Orca Swift helper and permission setup; needs PAN-5461 seam first, PRD not written yet. |
+| 688 | PAN-5518 | S | medium | needs-refinement |  |  | roles.<role>.harness validates but no pipeline spawn reads it; CLI help says it is a default. Needs honor-or-retire decision first. |
 | 689 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
 | 690 | PAN-5082 | XL | medium | ok |  |  | Move every MCP surface to SDK v2 for the 2026-07-28 spec while keeping 2025-11-25 clients; time it on PAN-5083 data. |
 | 691 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
@@ -943,13 +942,8 @@ _Last sequenced: 2026-11-17T21:36:52.298925Z · model: claude-opus-5-5 · open: 
 | 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
 | 903 | PAN-5444 | XS | low | ok |  |  | Two Minor CodeRabbit findings left on merged PR #5443: semgrep repo rules resolve from event cwd; hook tests not isolated from Docker. |
 | 904 | PAN-5405 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus. |
-| 905 | PAN-5462 | L | low | ok |  | PAN-5461 | Windows (WSL2) computer use via Orca PowerShell helper; needs PAN-5461 seam first, PRD not written yet. |
 
 ## Rationale detail
-
-### PAN-5484 (rank 1)
-
-New and already in the pipeline, so it takes a free top slot; unbounded backup growth filled the root disk on 2026-11-17, which stalls every agent.
 
 ### PAN-5483 (rank 2)
 
@@ -963,10 +957,6 @@ Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat 
 
 New issue, sibling of the just-merged front-matter fix PAN-5427, and already queued in the active workflow-redesign order book, so it takes free rank 4 behind critical PAN-5013. It is a small, well-specified MarkdownTab change with named tests, a sanitising allow-list and a concrete acceptance check on the README preview; its parent epic PAN-5284 is closed, so it carries no contains edge.
 
-### PAN-5469 (rank 5)
-
-New and in the pipeline as lane B's first docs item, so it takes a free top slot.
-
 ### PAN-5489 (rank 6)
 
 New pipeline-path bug: the CLI result depends on the caller's environment, so Flywheel-launched planning can fail and strand workspaces; it outranks routine work.
@@ -978,6 +968,10 @@ New substrate-improvement issue in the free rank-7 slot. The paved road promises
 ### PAN-5385 (rank 8)
 
 New issue. Phones (iOS, Android) and the connector cannot reach the machine at all, directly or through the relay, because RtcTransport.accept awaits ICE servers before registering the signalling session and drops trickle candidates that arrive in that window. The root cause and the fix (buffer candidates from offer acceptance) are stated in the body and touch only the dashboard server, so this is a small, well-defined fix for a full outage of a shipped feature. It takes the open rank-8 slot ahead of the remaining pipeline-substrate bugs.
+
+### PAN-5516 (rank 9)
+
+New substrate bug: a core CLI verb is broken on every local run. The fix is small and precise (reuse crossSiteWriteRefusal's internal-token rule), so it takes the free top-tier slot.
 
 ### PAN-4636 (rank 10)
 
@@ -1267,6 +1261,10 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
 
 New this pass. Every agent pane is a child of one transient tmux-server unit, so agent memory is the unit's memory and systemd-oomd's kill decision is all-or-nothing: one hungry agent takes the entire fleet with it. That has now happened twice, the second time killing seven work agents, four strikes and a live review convoy. Blast-radius containment is a different fix from choosing a better victim.
 
+### PAN-3278 (rank 82)
+
+Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1274,24 +1272,11 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-17T21:36:52.298925Z",
+  "generatedAt": "2026-11-18T15:02:18.873480Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 939,
+  "openCount": 937,
   "nodes": [
-    {
-      "issue": "PAN-5484",
-      "rank": 1,
-      "size": "S",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan sync writes a ~92 MB skills backup each run and never prunes; 9 GB filled a 99% disk. In pipeline.",
-      "rationale": "New and already in the pipeline, so it takes a free top slot; unbounded backup growth filled the root disk on 2026-11-17, which stalls every agent.",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-5483",
       "rank": 2,
@@ -1332,19 +1317,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-5469",
-      "rank": 5,
-      "size": "M",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "New features/planning.mdx page: Plan dialog, pan plan, PRDs, xBRIEF checklist, critic, finalize. In pipeline, lane B first.",
-      "rationale": "New and in the pipeline as lane B's first docs item, so it takes a free top slot.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-5489",
       "rank": 6,
       "size": "S",
@@ -1380,6 +1352,19 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "dependsOn": [],
       "why": "Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix",
       "rationale": "New issue. Phones (iOS, Android) and the connector cannot reach the machine at all, directly or through the relay, because RtcTransport.accept awaits ICE servers before registering the signalling session and drops trickle candidates that arrive in that window. The root cause and the fix (buffer candidates from offer acceptance) are stated in the body and touch only the dashboard server, so this is a small, well-defined fix for a full outage of a shipped feature. It takes the open rank-8 slot ahead of the remaining pipeline-substrate bugs.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5516",
+      "rank": 9,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan conversations resume always fails locally with 'Missing origin': origin check does not exempt the internal token. Fix named.",
+      "rationale": "New substrate bug: a core CLI verb is broken on every local run. The fix is small and precise (reuse crossSiteWriteRefusal's internal-token rule), so it takes the free top-tier slot.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4107,15 +4092,15 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-5461",
+      "issue": "PAN-5517",
       "rank": 219,
       "size": "M",
       "importance": "medium",
-      "score": 58,
+      "score": 56,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Settings → Computer Use one-click setup plus the platform provider seam; operator-approved mockup, PRD drafted.",
-      "rationale": "New issue. Follow-up to the closed PAN-5452 computer-use launch: one-click Linux setup on the Settings page and the platform provider seam that the Windows and macOS ports plug into. The operator approved the mockup on 2026-11-17 and a detailed PRD is already drafted, so it is workable now; it ranks with other medium dashboard feature work and ahead of its two siblings, which it unblocks.",
+      "why": "Tiered Execution settings save supervisor, call-out and replay options nothing acts on; PlanCard toggle hits a route deleted in PAN-3917.",
+      "rationale": "New: Settings promise behavior that does not run and a per-issue toggle calls a deleted route. The ask (wire or remove each setting) is concrete, so it sits beside comparable medium Settings work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6840,11 +6825,9 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "importance": "medium",
       "score": 46,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5463"
-      ],
+      "dependsOn": [],
       "why": "CodeRabbit Major on PR #5513: release.yml may notarize an ad-hoc-signed macOS helper when the API key exists but no cert.",
-      "rationale": "New one-finding follow-up; ranked beside the comparable PAN-5386 follow-up because a bad secret mix could fail the macOS release job.",
+      "rationale": "Rank kept; its context PR (PAN-5463, macOS computer-use helper) merged, so the dependency is dropped and the fix is now unblocked.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -10341,16 +10324,15 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "planning": "skip"
     },
     {
-      "issue": "PAN-5463",
+      "issue": "PAN-5518",
       "rank": 688,
-      "size": "L",
+      "size": "S",
       "importance": "medium",
-      "score": 36,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-5461"
-      ],
-      "why": "macOS computer use: port Orca Swift helper and permission setup; needs PAN-5461 seam first, PRD not written yet.",
+      "score": 50,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "roles.<role>.harness validates but no pipeline spawn reads it; CLI help says it is a default. Needs honor-or-retire decision first.",
+      "rationale": "New: misleading config and help text, but the body leaves open whether to honor or retire the key, so it is needs-refinement and ranked with decision-first work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13031,20 +13013,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "rationale": "New CodeRabbit follow-up from the merged PAN-5295 PR; one Major and four Minor frontend findings, ranked with comparable follow-ups.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-5462",
-      "rank": 905,
-      "size": "L",
-      "importance": "low",
-      "score": 30,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-5461"
-      ],
-      "why": "Windows (WSL2) computer use via Orca PowerShell helper; needs PAN-5461 seam first, PRD not written yet.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -13917,6 +13885,13 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 0.8
     },
     {
+      "from": "PAN-4512",
+      "to": "PAN-5517",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
       "from": "PAN-4544",
       "to": "PAN-5381",
       "type": "informs",
@@ -14218,27 +14193,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 0.4
     },
     {
-      "from": "PAN-5461",
-      "to": "PAN-5462",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5461",
-      "to": "PAN-5463",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5463",
-      "to": "PAN-5515",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-5464",
       "to": "PAN-5465",
       "type": "informs",
@@ -14262,13 +14216,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
     {
       "from": "PAN-5467",
       "to": "PAN-5468",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5467",
-      "to": "PAN-5469",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
@@ -14624,20 +14571,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 0.8
     },
     {
-      "from": "PAN-5487",
-      "to": "PAN-5469",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-5488",
-      "to": "PAN-5469",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
       "from": "PAN-5490",
       "to": "PAN-5491",
       "type": "unblocks",
@@ -14706,6 +14639,20 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.8
+    },
+    {
+      "from": "PAN-5517",
+      "to": "PAN-5471",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-5518",
+      "to": "PAN-5471",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     },
     {
       "from": "PAN-750",
