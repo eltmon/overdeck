@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5472",
   "created": "2026-11-18T16:42:03.966Z",
-  "updated": "2026-11-18T16:46:07.539Z",
+  "updated": "2026-11-18T16:46:12.257Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,11 @@
     "state-model-pan.ac4": {
       "status": "completed",
       "doneAt": "2026-11-18T16:46:07.538Z"
+    },
+    "cloister-page": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5472",
+      "claimedAt": "2026-11-18T16:46:12.257Z"
     }
   }
 }
