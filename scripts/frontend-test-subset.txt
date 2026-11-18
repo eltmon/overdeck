@@ -31,7 +31,9 @@ src/components/CommandDeck/ProjectTree/ProjectNode.test.tsx
 src/components/CommandDeck/ProjectTree/featureStateBadge.test.ts
 src/components/CommandDeck/SessionView/SessionPanel.test.tsx
 src/components/CommandDeck/ZoneCOverviewTabs/__tests__/MarkdownTab.test.tsx
+src/components/CommandDeck/__tests__/AddSkillsModal.test.tsx
 src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx
+src/components/CommandDeck/__tests__/ConversationActionMenu.addSkills.test.tsx
 src/components/CommandDeck/__tests__/ConversationList.render-count.test.tsx
 src/components/CommandDeck/__tests__/ConversationList.sort.test.ts
 src/components/CommandDeck/__tests__/ConversationList.test.tsx
@@ -158,6 +160,8 @@ src/components/Settings/sections/__tests__/AutoSettleIdleRow.test.tsx
 src/components/Settings/sections/__tests__/AutoSettleOnMergeRow.test.tsx
 src/components/Settings/sections/__tests__/CliproxyAccountsPanel.test.tsx
 src/components/Settings/sections/__tests__/CloseOutSection.test.tsx
+src/components/Settings/sections/__tests__/ComputerUseMacPermissions.test.tsx
+src/components/Settings/sections/__tests__/ComputerUseSection.test.tsx
 src/components/Settings/sections/__tests__/GitHubIdentitiesSection.test.tsx
 src/components/Settings/sections/__tests__/MergeTrainBatchingSection.test.tsx
 src/components/Settings/sections/__tests__/ProviderManagementSection.test.tsx
@@ -564,3 +568,5 @@ src/test-utils/renderCounter.test.tsx
 src/vite-build-commit.test.ts
 src/components/chat/messagesTimeline/__tests__/toolBodyLoader.test.tsx
 src/components/chat/__tests__/MessagesTimeline.test.tsx
+src/components/Settings/sections/__tests__/ComputerUseSection.test.tsx
+src/components/__tests__/palette-computer-use-actions.test.ts

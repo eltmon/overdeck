@@ -198,6 +198,18 @@ click:
   alt="The composer model and harness picker, showing Claude Code / Pi / Codex harnesses over Anthropic and other provider models with per-million pricing"
 />
 
+### Adding skills to a running conversation
+
+To give a running conversation more pack skills, open **Add skills…** in the
+conversation tab menu or the conversation header menu, or run
+`pan skills add <conversation> --pack <id>`. A Claude Code conversation loads
+them in place and keeps its context. A Codex conversation, and some packs on
+Claude Code, must restart to load them; **Restart and load** (or `--restart`)
+resumes the conversation with its history. An agent can add skills to itself
+with the `add_skills` MCP tool; they arrive after its current turn. See
+[Adding skills to a running conversation](/features/skill-packs#for-one-conversation)
+for the outcomes and which packs need a restart.
+
 ### New conversation with options
 
 **New conversation** in the left column is a split button:

@@ -75,7 +75,9 @@ A conversation value for a pack skill wins first. Whole-pack toggles have no con
 
 ### For one conversation
 
-A conversation can carry its own pack values, the narrowest level of all. In the dashboard, open **New conversation with options…**; its **Skills** section shows a summary (`{on} of {total} skills on`) with a **Customize** button. Customizing lists pack skills grouped by pack, each with **Inherit / On / Off** — there is no whole-pack toggle at this level, only per-skill values.
+A conversation can carry its own pack values, the narrowest level of all. You can set them when you create the conversation, and you can add more while it runs.
+
+When you create one in the dashboard, open **New conversation with options…**; its **Skills** section shows a summary (`{on} of {total} skills on`) with a **Customize** button. Customizing lists pack skills grouped by pack, each with **Inherit / On / Off** — there is no whole-pack toggle at this level, only per-skill values.
 
 From the CLI, `pan handoff` has the same reach:
 
@@ -89,6 +91,31 @@ pan handoff self --skill mattpocock/grilling "<focus>"  # turn on one pack skill
 `--pack` is a snapshot taken at creation: it writes one explicit `on` value per non-opt-in skill the pack has at that moment. A skill a later `pan skills pack update` adds to the pack is not in that snapshot, and falls back to the normal chain (pack toggles, then off).
 
 Conversation pack values apply only to Claude Code and Codex. Pi stores the values on the conversation row like any other harness, but a Pi launch never reads them.
+
+#### Adding skills to a running conversation
+
+You can add pack skills to a conversation that is already running, without losing its context. There are three ways:
+
+- **CLI:** `pan skills add <conversation> --pack <id>` adds every non-opt-in skill of a pack, `--skill <pack/skill>` adds one skill, and `--off <pack/skill>` turns one off. Use `self` as the conversation name to mean the conversation you run the command in.
+- **MCP tool:** an agent calls `add_skills` with `packs` or `skills`. Without `conversation` it adds them to its own conversation.
+- **Dashboard:** **Add skills…** in the conversation tab menu and the conversation header menu opens the skill list with the conversation's current values selected. It sends only what you changed.
+
+Each way stores the new values on the conversation and then tries to load them. The answer is one of six outcomes:
+
+| Outcome | What it means |
+|---|---|
+| `hot` | Claude Code reloaded its plugins and the skill count rose as expected. The skills are available now. |
+| `sent` | Overdeck re-pointed the plugin dir and sent `/reload-plugins`, but could not confirm the new skill count. Check the conversation. |
+| `queued` | The conversation was mid-turn. Claude Code runs the queued `/reload-plugins` when the turn ends, and the skills arrive then. |
+| `needs-restart` | The values are saved, but this conversation cannot load them in place. Run the command again with `--restart` (or click **Restart and load**), which resumes it with its history. |
+| `restarted` | Overdeck stopped the conversation and resumed it on the same transcript, so the new launch loaded the skills. |
+| `next-launch` | The conversation is not running. The values load when it resumes. |
+
+**Claude Code** loads pack skills in place: Overdeck rebuilds the conversation's pack mount, re-points its plugin dir, and sends `/reload-plugins`, which costs no model tokens. **Codex** has no reload command, so it always answers `needs-restart`. A Claude Code conversation that started before live skill loading also needs one restart.
+
+Some changes always need a restart, because they take effect only through launch-time settings: the `deft` and `sageox` packs, gstack-runtime packs, packs that bring MCP servers, and native (non-pack) skills.
+
+An agent that adds skills to itself is mid-turn when it asks, so it gets `queued`, and the skills are available from its next turn. An agent cannot restart its own conversation; `--restart` with `self` is refused.
 
 ### Pack groups
 
@@ -754,7 +781,7 @@ The cache lives in `~/.overdeck/packs/` and can be rebuilt at any time, except t
 
 ### When pack changes apply
 
-Packs apply to Overdeck-managed **Claude Code** and **Codex** sessions at their next launch, like other skill changes. Claude Code receives the pack as `--plugin-dir`; Codex gets a local `overdeck-packs` plugin marketplace in the agent's own `$CODEX_HOME`. Remote (Fly) launches and other harnesses get no packs. Pi gets no packs: it accepts `pan handoff --pack` and the dialog's Skills choices, but never applies them. A launch never touches the network: if the trusted commit is not cached, the launch skips that pack and prints `run pan skills pack sync <id>`. If Claude Code also has the same upstream plugin installed, the dashboard warns that its skills will appear twice. See [Authoring a skill pack](/guides/skill-pack-authoring) for what a mount contains.
+Packs apply to Overdeck-managed **Claude Code** and **Codex** sessions at their next launch, like other skill changes. A running Claude Code conversation can also load packs in place with `pan skills add` (see [Adding skills to a running conversation](#adding-skills-to-a-running-conversation)). Claude Code receives the pack as `--plugin-dir`; Codex gets a local `overdeck-packs` plugin marketplace in the agent's own `$CODEX_HOME`. Remote (Fly) launches and other harnesses get no packs. Pi gets no packs: it accepts `pan handoff --pack` and the dialog's Skills choices, but never applies them. A launch never touches the network: if the trusted commit is not cached, the launch skips that pack and prints `run pan skills pack sync <id>`. If Claude Code also has the same upstream plugin installed, the dashboard warns that its skills will appear twice. See [Authoring a skill pack](/guides/skill-pack-authoring) for what a mount contains.
 
 In the dashboard, packs appear below the skill list on the Skills page, in project settings, and in the issue view. The dashboard can turn packs on and off but not add them; it shows the `pan skills pack add` command instead. At project and issue level a pack and its skills keep the **Inherit / On / Off** control.
 
@@ -764,7 +791,7 @@ In the dashboard, packs appear below the skill list on the Skills page, in proje
 |---|---|---|
 | Launch prints `[launcher] WARNING: skill pack <id> not cached; run pan skills pack sync <id>` and the pack is missing | The trusted commit is not in the cache; launches never fetch | `pan skills pack sync <id>`, then relaunch |
 | A pack skill is not visible to the agent | The pack or skill is off at the level that decides, the skill is opt-in, the harness is not Claude Code or Codex, or the launch is remote (Fly) | `pan skills list --project <key> --issue <id>`; turn on the pack (`--pack`) or the opt-in skill (`<pack>/<skill>`); packs apply only to Overdeck-managed Claude Code and Codex launches |
-| A running agent did not pick up a change | Packs resolve at launch | Restart or resume the agent; the next launch applies it |
+| A running agent did not pick up a change | Packs resolve at launch | `pan skills add <conversation> --pack <id>` loads them into a running Claude Code conversation in place; for Codex, or for packs that need launch-time settings, add `--restart` |
 | Skills appear twice (`video-edit` and `openmontage:video-edit`) | A copy of the skill is also installed in `~/.claude/skills` (for example a symlink into an OpenMontage clone, or an `npx skills` install), and that copy loads in every session | Remove the global copy, or keep the pack off |
 | The dashboard shows `also installed as a Claude plugin — skills will appear twice` | Claude Code also has the same upstream plugin installed | Uninstall the Claude Code plugin, or keep the pack off |
 | Launch prints `[launcher] WARNING: gstack browser runtime not built; run pan skills pack sync gstack` | Browser consent is recorded but the runtime for the trusted commit is missing | `pan skills pack sync gstack` |

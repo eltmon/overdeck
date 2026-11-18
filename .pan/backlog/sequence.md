@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-17T13:12:01.061839Z · model: claude-opus-5-5 · open: 938_
+_Last sequenced: 2026-11-17T21:36:52.298925Z · model: claude-opus-5-5 · open: 939_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -443,6 +443,7 @@ _Last sequenced: 2026-11-17T13:12:01.061839Z · model: claude-opus-5-5 · open: 
 | 424 | PAN-5028 | M | medium | ok |  |  | list_pending_input loses a conversation's AskUserQuestion after the PAN-1520 deny hook, contrary to the existing test's contract. |
 | 425 | PAN-5386 | XS | medium | ok |  |  | CodeRabbit follow-up for PAN-5361 (PR #5373): 1 Major finding, baseline burst can hide an idle regression in bare-host smoke |
 | 426 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
+| 426 | PAN-5515 | XS | medium | ok |  | PAN-5463 | CodeRabbit Major on PR #5513: release.yml may notarize an ad-hoc-signed macOS helper when the API key exists but no cert. |
 | 427 | PAN-5227 | S | medium | ok |  |  | Closed-issue reaper re-checks every issue's state every 60 s, spending ~25% of the GitHub App REST bucket while idle. |
 | 428 | PAN-5439 | L | medium | ok |  |  | React Compiler burn-down for explorer, God View, conversations, workspace, project: 40 skips, 132 memo sites. |
 | 429 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
@@ -516,7 +517,7 @@ _Last sequenced: 2026-11-17T13:12:01.061839Z · model: claude-opus-5-5 · open: 
 | 483 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
 | 484 | PAN-5465 | L | medium | ok |  |  | Add skill packs to a live conversation: /reload-plugins hot apply, resume fallback, CLI, MCP tool, dashboard modal. PRD on main. |
 | 484 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
-| 485 | PAN-5497 | S | medium | ok |  | PAN-5464, PAN-5465 | Follow-up: accept pack groups in pan skills add, add_skills and the Add skills dialog; starts after PAN-5464 and PAN-5465 merge. |
+| 485 | PAN-5497 | S | medium | ok |  | PAN-5464, PAN-5465 | Follow-up: accept pack groups in pan skills add, add_skills and the Add skills dialog; PAN-5464 and PAN-5465 merged. |
 | 485 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
 | 486 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
 | 487 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
@@ -1273,10 +1274,10 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-17T13:12:01.061839Z",
+  "generatedAt": "2026-11-17T21:36:52.298925Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 938,
+  "openCount": 939,
   "nodes": [
     {
       "issue": "PAN-5484",
@@ -6833,6 +6834,21 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "planning": "auto"
     },
     {
+      "issue": "PAN-5515",
+      "rank": 426,
+      "size": "XS",
+      "importance": "medium",
+      "score": 46,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5463"
+      ],
+      "why": "CodeRabbit Major on PR #5513: release.yml may notarize an ad-hoc-signed macOS helper when the API key exists but no cert.",
+      "rationale": "New one-finding follow-up; ranked beside the comparable PAN-5386 follow-up because a bad secret mix could fail the macOS release job.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-5227",
       "rank": 427,
       "size": "S",
@@ -7773,8 +7789,8 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
         "PAN-5464",
         "PAN-5465"
       ],
-      "why": "Follow-up: accept pack groups in pan skills add, add_skills and the Add skills dialog; starts after PAN-5464 and PAN-5465 merge.",
-      "rationale": "New follow-up to PAN-5465 (PRD decision D-10); it can only start once both PAN-5464 and PAN-5465 merge, so it ranks right behind them.",
+      "why": "Follow-up: accept pack groups in pan skills add, add_skills and the Add skills dialog; PAN-5464 and PAN-5465 merged.",
+      "rationale": "Unblocked: PAN-5464 (#5507) and PAN-5465 (#5509) both merged on 2026-11-17, so it can start; rank and score hold, since the merge changes readiness, not impact.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14212,6 +14228,13 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "from": "PAN-5461",
       "to": "PAN-5463",
       "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5463",
+      "to": "PAN-5515",
+      "type": "informs",
       "source": "github-ref",
       "confidence": 1
     },

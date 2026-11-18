@@ -503,4 +503,58 @@ describe('palette conversation search', () => {
     expect(result.conversations.map((c) => c.conversationId)).toEqual(['session-text', 'session-path']);
     expect(result.conversations[1]).toMatchObject({ matchTier: 'path' });
   });
+
+  describe('request signal and concurrency (PAN-5447)', () => {
+    function enableSearch(embed: ConversationEmbeddingProvider['embed']): ConversationEmbeddingProvider {
+      const config: NormalizedConversationSearchConfig = {
+        enabled: true,
+        provider: 'openai',
+        model: 'text-embedding-3-small',
+        apiKeyRef: undefined,
+        dbPath: join(tmpDir!, 'embeddings.db'),
+      };
+      const provider: ConversationEmbeddingProvider = { ...fakeProvider(dimensionsForModel(config.model)), embed: vi.fn(embed) };
+      vi.mocked(getConversationSearchConfig).mockReturnValue(config);
+      vi.mocked(createConversationEmbeddingProvider).mockReturnValue(provider);
+      return provider;
+    }
+
+    it('aborting the signal mid-search rejects runPaletteSearch and logs no [palette] search failed', async () => {
+      const errorSpy = vi.spyOn(console, 'error');
+      const provider = enableSearch((_texts, options) => new Promise((_resolve, reject) => {
+        options?.signal?.addEventListener('abort', () => reject(options.signal?.reason), { once: true });
+      }));
+      const controller = new AbortController();
+      const reason = new Error('client left');
+
+      const search = runPaletteSearch('needle', 5, controller.signal);
+      await vi.waitFor(() => expect(provider.embed).toHaveBeenCalled());
+      controller.abort(reason);
+
+      await expect(search).rejects.toBe(reason);
+      expect(errorSpy.mock.calls.some((call) => String(call[0]).includes('[palette] search failed'))).toBe(false);
+    });
+
+    it('starts memory FTS and conversation search concurrently', async () => {
+      const provider = enableSearch(async (texts) => ({
+        embeddings: texts.map(() => new Float32Array(dimensionsForModel('text-embedding-3-small'))),
+        model: 'text-embedding-3-small',
+      }));
+      vi.mocked(listProjectsSync).mockReturnValue([{
+        key: 'overdeck-key',
+        config: { name: 'Overdeck', path: 'overdeck' },
+      } as ReturnType<typeof listProjectsSync>[number]]);
+      let releaseMemory!: () => void;
+      vi.mocked(runMemoryFtsStatement).mockImplementation(() => new Promise((resolve) => {
+        releaseMemory = () => resolve([] as never);
+      }));
+
+      const search = runPaletteSearch('needle', 5);
+      await vi.waitFor(() => expect(provider.embed).toHaveBeenCalled());
+      expect(runMemoryFtsStatement).toHaveBeenCalled();
+
+      releaseMemory();
+      await expect(search).resolves.toMatchObject({ memory: [], conversations: [] });
+    });
+  });
 });

@@ -23,6 +23,7 @@
 import chalk from 'chalk';
 import type { Command } from 'commander';
 import type { DeftLaunchResult } from '../../lib/skill-overrides/launch.js';
+import type { SkillsAddOptions } from './skills-add.js';
 import { registerSkillsDeftCommands } from './skills-deft.js';
 import { registerSkillsSageoxCommands } from './skills-sageox.js';
 
@@ -191,18 +192,16 @@ export async function skillsLaunchSettingsCommand(options: LaunchSettingsOptions
     console.error('--codex-home is required for --harness codex');
     process.exit(1);
   }
-  const [launch, { resolveSageoxLaunch, SAGEOX_PACK_ID }, { dirname, join }, { resolveSemgrepLaunchSettings, mergeClaudeHookMaps }] = await Promise.all([
+  const [launch, { dirname, join }, { resolveSemgrepLaunchSettings, mergeClaudeHookMaps }] = await Promise.all([
     import('../../lib/skill-overrides/launch.js'),
-    import('../../lib/sageox/launch.js'),
     import('node:path'),
     import('../../lib/semgrep/in-session.js'),
   ]);
   const ctx = { cwd: options.cwd, issueId: options.issue, conversation: options.conversation };
   const disabled = await launch.resolveLaunchDisabledSkills(ctx);
   // PAN-2444: SageOx wiring fails closed; when it is off, its skills are not mounted either.
-  const sageox = await resolveSageoxLaunch(ctx, options.harness);
+  const { exclude, sageox } = await launch.launchPackExclude(ctx, options.harness);
   for (const warning of sageox.warnings) console.error(warning);
-  const exclude = new Set(sageox.active ? [] : [SAGEOX_PACK_ID]);
   const semgrep = await resolveSemgrepLaunchSettings({ harness: options.harness, conversation: options.conversation });
   if (options.harness === 'claude-code') {
     const link = options.pluginLink;
@@ -219,8 +218,8 @@ export async function skillsLaunchSettingsCommand(options: LaunchSettingsOptions
     if (link) {
       // Fail open (NFR-1): a pack error drops the packs, never the launch or the settings JSON.
       await applyPacksFailOpen(() => launch.applyClaudePacks(ctx, link, exclude), async () => {
-        const { rm } = await import('node:fs/promises');
-        await rm(link, { force: true });
+        const { linkClaudeMount } = await import('../../lib/skill-packs/mount.js');
+        await linkClaudeMount(link, null);
       });
     }
     // Stdout carries only the settings JSON; the launcher parses it.
@@ -744,6 +743,12 @@ export function registerSkillsCommands(program: Command): void {
     .option('--pack <id>', 'Set a whole skill pack instead of one skill')
     .option('--group <name>', 'Set every pack in a pack group (e.g. video)')
     .action(skillsSetCommand);
+  const collect = (value: string, previous: string[]) => [...previous, value];
+  skills.command('add <conversation>').description('Load skill packs or pack skills into a conversation (self = this one); Claude Code loads them in place')
+    .option('--pack <id>', 'Pack to add (every non-opt-in skill)', collect, []).option('--skill <id>', 'pack/skill or skill to add', collect, [])
+    .option('--off <id>', 'pack/skill or skill to turn off', collect, []).option('--restart', 'Restart the conversation when it cannot load them in place')
+    .action(async (conversation: string, options: SkillsAddOptions) =>
+      (await import('./skills-add.js')).skillsAddCommand(conversation, options));
   skills.command('launch-settings', { hidden: true }).description('Resolve skill overrides for a managed launch (used by launchers)')
     .requiredOption('--harness <harness>', 'claude-code or codex').requiredOption('--cwd <dir>', 'Launch working directory')
     .option('--issue <id>', 'Issue id').option('--codex-home <dir>', 'CODEX_HOME to write (codex)')

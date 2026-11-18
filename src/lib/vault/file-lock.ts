@@ -19,6 +19,16 @@ export interface FileLockOptions {
   maxAttempts?: number;
   /** Names the process family in the timeout message (PAN-5452); defaults to 'pan vault'. */
   label?: string;
+  /** Give up after this long, measured with Date.now() (PAN-5461). */
+  timeoutMs?: number;
+}
+
+/** Thrown when the lock could not be acquired within the attempt or time budget. */
+export class FileLockTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'FileLockTimeoutError';
+  }
 }
 
 export const DEFAULT_LOCK_STALE_MS = 30_000;
@@ -29,6 +39,7 @@ async function acquire(lockPath: string, options: FileLockOptions): Promise<void
   const staleMs = options.staleMs ?? DEFAULT_LOCK_STALE_MS;
   const retryMs = options.retryMs ?? DEFAULT_RETRY_MS;
   const maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+  const deadline = options.timeoutMs === undefined ? Infinity : Date.now() + options.timeoutMs;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       const handle = await open(lockPath, 'wx');
@@ -42,10 +53,11 @@ async function acquire(lockPath: string, options: FileLockOptions): Promise<void
         await rm(lockPath, { force: true });
         continue;
       }
+      if (Date.now() >= deadline) break;
       await new Promise((resolve) => setTimeout(resolve, retryMs));
     }
   }
-  throw new Error(`Could not acquire lock ${lockPath}; another ${options.label ?? 'pan vault'} process may be stuck`);
+  throw new FileLockTimeoutError(`Could not acquire lock ${lockPath}; another ${options.label ?? 'pan vault'} process may be stuck`);
 }
 
 /** Run `fn` while holding the O_EXCL lock at `lockPath`. Not reentrant. */

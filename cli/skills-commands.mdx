@@ -72,6 +72,38 @@ It also exits 1 on any of these store errors, each with its own message:
 
 With `--issue`, `set` writes `<planHome>/.pan/skill-overrides/<ISSUE>.yaml`, committed in the plan home on its checked-out branch (normally `main`) and pushed to that branch's upstream, and prints `(committed <sha>, pushed)` or `(committed <sha>, push pending: <reason>)`.
 
+## pan skills add
+
+```bash
+pan skills add <conversation> [--pack <id>]... [--skill <id>]... [--off <id>]... [--restart]
+```
+
+Adds pack skills to a conversation that is already running, and loads them.
+A Claude Code conversation loads them in place with `/reload-plugins` and
+keeps its context; Codex, native skills and launch-wired packs (`deft`,
+`sageox`, gstack-runtime packs, packs with MCP servers) need a restart.
+`<conversation>` is a conversation name, or `self` for the conversation the
+command runs in.
+
+| Flag | Effect |
+| --- | --- |
+| `--pack <id>` | Add every non-opt-in skill of the pack (repeatable) |
+| `--skill <id>` | Add one skill, `<pack>/<skill>` or a native name (repeatable) |
+| `--off <id>` | Turn one skill off for this conversation (repeatable) |
+| `--restart` | Restart and resume the conversation when it cannot load them in place |
+
+```bash
+pan skills add conv-20261117-ab12 --pack mattpocock
+```
+
+Prints one sentence for the outcome (`hot`, `sent`, `queued`,
+`needs-restart`, `restarted` or `next-launch`; see
+[Adding skills to a running conversation](/features/skill-packs#adding-skills-to-a-running-conversation)),
+then each warning on its own line. It exits 1 when the dashboard is not
+reachable, when the dashboard refuses the request (the message is printed),
+for `self` outside a conversation, and for `self --restart`, which a
+conversation cannot do to itself.
+
 ## pan skills pack add
 
 ```bash

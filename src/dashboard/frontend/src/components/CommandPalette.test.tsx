@@ -1124,3 +1124,97 @@ describe('CommandPalette Files scope (PAN-5289)', () => {
     expect(explorerRpc.searchFiles).not.toHaveBeenCalled();
   });
 });
+
+describe('CommandPalette search timeout (PAN-5447)', () => {
+  /** A palette search that never answers; it rejects with an AbortError once its signal aborts. */
+  function hangingSearch(init?: RequestInit): Promise<Response> {
+    return new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true });
+    });
+  }
+
+  function installSearchMock(answer: (url: string, init?: RequestInit) => Promise<Response> | Response) {
+    fetchControl = installPaletteFetchMock(({ method, url, init }) => {
+      if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      if (method === 'GET' && url.startsWith('/api/palette/search')) return answer(url, init);
+      return undefined;
+    });
+  }
+
+  function typeQuery(value: string) {
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value } });
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    useDashboardStore.setState({ issuesRaw: [], agentsById: {} } as Parameters<typeof useDashboardStore.setState>[0]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it('shows "Search timed out after 10 s. Try again." when the search request does not settle within 10 s', async () => {
+    const searchSignals: AbortSignal[] = [];
+    installSearchMock((_url, init) => {
+      if (init?.signal) searchSignals.push(init.signal);
+      return hangingSearch(init);
+    });
+    render(<CommandPalette isOpen onClose={vi.fn()} onNavigate={vi.fn()} initialScope="conversations" />);
+
+    typeQuery('needle');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+    expect(screen.getByText('Searching conversations…')).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+
+    expect(screen.getByText('Search timed out after 10 s. Try again.')).toBeInTheDocument();
+    expect(screen.queryByText('Searching conversations…')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Search unavailable/)).not.toBeInTheDocument();
+    expect(searchSignals).toHaveLength(1);
+    expect(searchSignals[0]?.aborted).toBe(true);
+  });
+
+  it('a superseded search does not show the timeout message', async () => {
+    installSearchMock((url, init) => (url.includes('q=needle&')
+      ? hangingSearch(init)
+      : Response.json({ observations: [], conversations: [], memory: [], summaries: [] })));
+    render(<CommandPalette isOpen onClose={vi.fn()} onNavigate={vi.fn()} initialScope="conversations" />);
+
+    typeQuery('needle');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    typeQuery('needles');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+
+    expect(screen.queryByText('Search timed out after 10 s. Try again.')).not.toBeInTheDocument();
+    expect(screen.getByText('No results for "needles"')).toBeInTheDocument();
+  });
+
+  it('shows the timeout notice even when other rows match the query', async () => {
+    installSearchMock((_url, init) => hangingSearch(init));
+    renderCommandPalette();
+
+    typeQuery('new');
+    // Debounce first: the request (and its 10 s timer) starts only after this act flushes the effect.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+
+    expect(screen.getByText('Search timed out after 10 s. Try again.')).toBeInTheDocument();
+    // A static action row that also matches "new" stays visible next to the notice.
+    expect(getOptionByValue('new-conversation-with-options')).toBeInTheDocument();
+  });
+});

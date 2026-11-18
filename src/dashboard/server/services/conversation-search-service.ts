@@ -1,19 +1,47 @@
-import { stat } from 'node:fs/promises';
-
+/**
+ * Palette conversation chunk search (PAN-5447).
+ *
+ * The BM25 scan, the sqlite-vec vector scan and the live-transcript filter run
+ * on the dashboard DB worker's serial `conversation-text` and
+ * `conversation-vector` lanes, never on the main thread. The query embedding
+ * stays here (async network I/O) and runs alongside BM25. Every slow leg has a
+ * deadline counted from submission; a leg that misses it contributes nothing
+ * and the search returns what the other legs found. The request signal aborts
+ * the whole search: waiting jobs are dropped and no health outcome is recorded.
+ */
 import { getConversationSearchConfig, type NormalizedConversationSearchConfig } from '../../../lib/config-yaml.js';
+import { closeChunkSearchHandles, type ChunkSearchJobResult } from '../../../lib/conversation-search/chunk-search-jobs.js';
 import { createConversationEmbeddingProvider, type ConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
 import { recordConversationSearchFailure, recordConversationSearchSuccess } from '../../../lib/conversation-search/health.js';
-import { rankConversationSearch, type ConversationSearchHit } from '../../../lib/conversation-search/ranker.js';
-import { sessionIdFromPath } from '../../../lib/conversation-search/indexer.js';
-import { dimensionsForModel, openEmbeddingsDb, type EmbeddingsDbHandle } from '../../../lib/overdeck/conversations-search.js';
+import { rankConversationSearch, type ConversationSearchHit, type RankedChunkRow } from '../../../lib/conversation-search/ranker.js';
+import { runDashboardDbJob, type DashboardDbOperation } from './dashboard-db-task.js';
+
+/** Budget for each BM25 / vector leg, counted from submission so queue wait counts. */
+export const CHUNK_SCAN_DEADLINE_MS = 4_000;
+/** Budget for the live-transcript filter; on a miss the hits are returned unfiltered. */
+export const LIVE_FILTER_DEADLINE_MS = 2_000;
 
 interface ConversationSearchServiceHandle {
   signature: string;
-  db: EmbeddingsDbHandle;
   provider: ConversationEmbeddingProvider;
 }
 
 let activeHandle: ConversationSearchServiceHandle | null = null;
+
+class ChunkLegDeadlineError extends Error {
+  constructor(readonly operation: DashboardDbOperation, readonly deadlineMs: number) {
+    super(`${operation} exceeded ${deadlineMs} ms`);
+    this.name = 'ChunkLegDeadlineError';
+  }
+}
+
+/** Marker: the embeddings DB cannot open; the search returns [] and records nothing. */
+class EmbeddingsDbUnavailable extends Error {
+  constructor(reason: string) {
+    super(reason);
+    this.name = 'EmbeddingsDbUnavailable';
+  }
+}
 
 function signatureForConfig(config: NormalizedConversationSearchConfig): string {
   return JSON.stringify({
@@ -38,23 +66,72 @@ function getHandle(config: NormalizedConversationSearchConfig): ConversationSear
   const provider = createConversationEmbeddingProvider({ config });
   if (!provider.enabled) return null;
 
-  const db = openEmbeddingsDb(config.dbPath, dimensionsForModel(config.model));
-  if (!db.available) {
-    db.close();
-    return null;
-  }
-
-  activeHandle = {
-    signature,
-    db,
-    provider,
-  };
+  activeHandle = { signature, provider };
   return activeHandle;
 }
 
 export function closeConversationSearchService(): void {
-  activeHandle?.db.close();
   activeHandle = null;
+  // Closes the Vitest inline cache; production worker handles die with the process.
+  closeChunkSearchHandles();
+}
+
+/**
+ * Run one leg on the DB worker under a deadline. Returns `{ deadline: true }`
+ * when the deadline fires first; rethrows everything else, including the
+ * request signal's abort reason.
+ */
+async function runLeg<T>(
+  operation: DashboardDbOperation,
+  payload: unknown,
+  deadlineMs: number,
+  signal: AbortSignal | undefined,
+): Promise<ChunkSearchJobResult<T> | { deadline: true }> {
+  const deadline = new AbortController();
+  const timer = setTimeout(() => deadline.abort(new ChunkLegDeadlineError(operation, deadlineMs)), deadlineMs);
+  const combined = signal ? AbortSignal.any([signal, deadline.signal]) : deadline.signal;
+  try {
+    return await runDashboardDbJob<ChunkSearchJobResult<T>>(operation, payload, undefined, { signal: combined });
+  } catch (error) {
+    if (error instanceof ChunkLegDeadlineError && !signal?.aborted) {
+      console.warn(`[conversation-search] ${operation} exceeded ${deadlineMs} ms; continuing without it`);
+      return { deadline: true };
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function runScanLeg(
+  operation: 'searchConversationBm25' | 'searchConversationVector',
+  payload: unknown,
+  signal: AbortSignal | undefined,
+): Promise<RankedChunkRow[]> {
+  const result = await runLeg<RankedChunkRow[]>(operation, payload, CHUNK_SCAN_DEADLINE_MS, signal);
+  if ('deadline' in result) return [];
+  if (!result.available) throw new EmbeddingsDbUnavailable(result.reason);
+  return result.value;
+}
+
+/** Keep hits whose transcript still exists; on a deadline keep them all. */
+async function filterLiveHits(
+  config: NormalizedConversationSearchConfig,
+  hits: ConversationSearchHit[],
+  signal: AbortSignal | undefined,
+): Promise<ConversationSearchHit[]> {
+  if (hits.length === 0) return hits;
+  const sessionIds = [...new Set(hits.map((hit) => hit.sessionId))];
+  const result = await runLeg<string[]>(
+    'filterLiveConversationSessions',
+    { dbPath: config.dbPath, model: config.model, sessionIds },
+    LIVE_FILTER_DEADLINE_MS,
+    signal,
+  );
+  if ('deadline' in result) return hits;
+  if (!result.available) throw new EmbeddingsDbUnavailable(result.reason);
+  const live = new Set(result.value);
+  return hits.filter((hit) => live.has(hit.sessionId));
 }
 
 export async function searchConversationChunks(input: {
@@ -63,66 +140,46 @@ export async function searchConversationChunks(input: {
   limit: number;
   candidateLimit?: number;
   config?: NormalizedConversationSearchConfig;
+  signal?: AbortSignal;
 }): Promise<ConversationSearchHit[]> {
+  const { signal } = input;
+  signal?.throwIfAborted();
   const config = input.config ?? getConversationSearchConfig();
   const handle = getHandle(config);
   if (!handle) return [];
+  const dbRef = { dbPath: config.dbPath, model: config.model };
 
-  return new Promise((resolve) => {
-    setImmediate(() => {
-      rankConversationSearch({
-        query: input.rawQuery,
-        limit: input.limit,
-        candidateLimit: input.candidateLimit,
-        store: {
-          searchBm25: (_query, candidateLimit) => handle.db.searchBm25(input.matchQuery, candidateLimit),
-          searchVector: (embedding, candidateLimit) => handle.db.searchVector(embedding, candidateLimit),
-        },
-        provider: handle.provider,
-      })
-        .then((hits) => filterLiveHits(handle.db, hits))
-        .then(
-          (hits) => {
-            recordConversationSearchSuccess();
-            resolve(hits);
-          },
-          (error: unknown) => {
-            // PAN-3771: a failed search used to be indistinguishable from "no
-            // results". Record it so the dashboard banner can surface the
-            // reason (exhausted credits, quota, network, …).
-            recordConversationSearchFailure(error);
-            console.error('[conversation-search] service search failed:', error);
-            resolve([]);
-          },
-        );
+  try {
+    const hits = await rankConversationSearch({
+      query: input.rawQuery,
+      limit: input.limit,
+      candidateLimit: input.candidateLimit,
+      store: {
+        searchBm25: (_query, candidateLimit) => runScanLeg(
+          'searchConversationBm25',
+          { ...dbRef, matchQuery: input.matchQuery, limit: candidateLimit },
+          signal,
+        ),
+        searchVector: (embedding, candidateLimit) => runScanLeg(
+          'searchConversationVector',
+          { ...dbRef, embedding, limit: candidateLimit },
+          signal,
+        ),
+      },
+      provider: handle.provider,
+      signal,
+      // PAN-3771: a failed query embedding must not read as "no results"; the
+      // banner shows the reason while BM25 + title rows still return.
+      onEmbedFailure: recordConversationSearchFailure,
+      onEmbedSuccess: recordConversationSearchSuccess,
     });
-  });
-}
-
-/**
- * Drop hits whose transcript no longer exists on disk. Index pruning lags behind
- * file deletion (and only runs on full passes), so without this the palette can
- * surface a session whose JSONL is already gone — opening it 404s. Cursor paths
- * are the absolute paths the indexer wrote, so the stat is exact.
- */
-async function filterLiveHits(db: EmbeddingsDbHandle, hits: ConversationSearchHit[]): Promise<ConversationSearchHit[]> {
-  if (hits.length === 0) return hits;
-  const pathBySessionId = new Map<string, string>();
-  for (const filePath of db.listFileCursors()) {
-    pathBySessionId.set(sessionIdFromPath(filePath), filePath);
+    return await filterLiveHits(config, hits, signal);
+  } catch (error) {
+    if (signal?.aborted) throw signal.reason;
+    if (error instanceof EmbeddingsDbUnavailable) return [];
+    // PAN-3771: record any other failure so the dashboard banner can surface it.
+    recordConversationSearchFailure(error);
+    console.error('[conversation-search] service search failed:', error);
+    return [];
   }
-  const liveByPath = new Map<string, Promise<boolean>>();
-  const live = await Promise.all(
-    hits.map((hit) => {
-      const filePath = pathBySessionId.get(hit.sessionId);
-      if (!filePath) return false;
-      let pending = liveByPath.get(filePath);
-      if (!pending) {
-        pending = stat(filePath).then(() => true, () => false);
-        liveByPath.set(filePath, pending);
-      }
-      return pending;
-    }),
-  );
-  return hits.filter((_, index) => live[index]);
 }

@@ -1,0 +1,360 @@
+{
+  "version": "1",
+  "issueId": "PAN-5461",
+  "created": "2026-11-17T12:13:42.164Z",
+  "updated": "2026-11-17T18:49:44.605Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-17T18:39Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-17T18:39:43.052Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-17T18:41Z] ci-monitor → FAILED — seq 2",
+      "timestamp": "2026-11-17T18:41:28.237Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-17T18:41Z] ci-monitor → FAILED — seq 3",
+      "timestamp": "2026-11-17T18:41:35.997Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-17T18:44:13.085Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-17T18:49Z] ci-monitor → FAILED — seq 4",
+      "timestamp": "2026-11-17T18:49:44.604Z"
+    }
+  ],
+  "items": {
+    "platform-types": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5461",
+      "claimedAt": "2026-11-17T12:13:42.164Z",
+      "doneAt": "2026-11-17T12:15:41.739Z"
+    },
+    "platform-types.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:15:41.739Z"
+    },
+    "platform-types.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:15:41.739Z"
+    },
+    "platform-types.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:15:41.739Z"
+    },
+    "lock-additions": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5461",
+      "claimedAt": "2026-11-17T12:15:48.259Z",
+      "doneAt": "2026-11-17T12:17:22.338Z"
+    },
+    "lock-additions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:17:22.338Z"
+    },
+    "lock-additions.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:17:22.338Z"
+    },
+    "lock-additions.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:17:22.338Z"
+    },
+    "readiness-linux": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5461",
+      "claimedAt": "2026-11-17T12:17:29.029Z",
+      "doneAt": "2026-11-17T12:21:37.748Z"
+    },
+    "readiness-linux.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:21:37.748Z"
+    },
+    "readiness-linux.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:21:37.748Z"
+    },
+    "readiness-linux.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:21:37.748Z"
+    },
+    "readiness-linux.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:21:37.748Z"
+    },
+    "setup-linux": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5461",
+      "claimedAt": "2026-11-17T12:21:46.646Z",
+      "doneAt": "2026-11-17T12:23:43.666Z"
+    },
+    "setup-linux.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:23:43.666Z"
+    },
+    "setup-linux.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:23:43.666Z"
+    },
+    "setup-linux.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:23:43.666Z"
+    },
+    "setup-linux.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:23:43.666Z"
+    },
+    "setup-linux.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:23:43.666Z"
+    },
+    "linux-provider": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5461",
+      "claimedAt": "2026-11-17T12:23:54.856Z",
+      "doneAt": "2026-11-17T12:35:10.284Z"
+    },
+    "linux-provider.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:35:10.284Z"
+    },
+    "linux-provider.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:35:10.284Z"
+    },
+    "linux-provider.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:35:10.284Z"
+    },
+    "linux-provider.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:35:10.284Z"
+    },
+    "key-platform": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5461",
+      "claimedAt": "2026-11-17T12:35:29.818Z",
+      "doneAt": "2026-11-17T17:25:14.976Z"
+    },
+    "disabled-message": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:23:27.135Z"
+    },
+    "disabled-message.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:23:27.135Z"
+    },
+    "disabled-message.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:23:27.135Z"
+    },
+    "routes": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:26:35.764Z"
+    },
+    "routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:26:35.764Z"
+    },
+    "routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:26:35.764Z"
+    },
+    "routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:26:35.764Z"
+    },
+    "routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:26:35.764Z"
+    },
+    "key-platform.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:25:14.976Z"
+    },
+    "key-platform.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:25:14.976Z"
+    },
+    "settings-door": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:25:35.454Z"
+    },
+    "settings-door.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:25:35.454Z"
+    },
+    "settings-door.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:25:35.454Z"
+    },
+    "settings-door.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:25:35.454Z"
+    },
+    "status-view": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:25:55.635Z"
+    },
+    "status-view.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:25:55.635Z"
+    },
+    "status-view.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:25:55.635Z"
+    },
+    "status-view.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:25:55.635Z"
+    },
+    "status-view.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:25:55.635Z"
+    },
+    "setup-orchestrator": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:26:15.694Z"
+    },
+    "setup-orchestrator.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:26:15.694Z"
+    },
+    "setup-orchestrator.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:26:15.694Z"
+    },
+    "setup-orchestrator.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:26:15.694Z"
+    },
+    "setup-orchestrator.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:26:15.694Z"
+    },
+    "ui-section": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:34:48.697Z"
+    },
+    "ui-section.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:34:48.697Z"
+    },
+    "ui-section.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:34:48.697Z"
+    },
+    "ui-section.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:34:48.697Z"
+    },
+    "ui-section.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:34:48.697Z"
+    },
+    "ui-mount": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:35:23.350Z"
+    },
+    "ui-mount.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:35:23.350Z"
+    },
+    "ui-mount.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:35:23.350Z"
+    },
+    "palette": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:35:46.234Z"
+    },
+    "palette.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:35:46.234Z"
+    },
+    "palette.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:35:46.234Z"
+    },
+    "palette.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:35:46.234Z"
+    },
+    "docs": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:36:08.624Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:36:08.624Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:36:08.624Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:36:08.624Z"
+    },
+    "live-verify": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5461",
+      "claimedAt": "2026-11-17T17:38:03.308Z",
+      "doneAt": "2026-11-17T17:40:07.706Z"
+    },
+    "live-verify.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:40:07.706Z"
+    },
+    "live-verify.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:40:07.706Z"
+    },
+    "live-verify.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T17:40:07.706Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-17T18:39:43Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5461\n\nPull request: https://github.com/eltmon/overdeck/pull/5512 (head `2c32ad2a`)\n\nSource: check_run:test-e2e\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-e2e\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/134272439767/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/44149176067/job/134272439767  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/__tests__/reactCompilerCoverage.test.ts\u001b[2m > \u001b[22mReact Compiler skip coverage\u001b[2m > \u001b[22mthe frontend tree matches scripts/react-compiler-skip-baseline.txt\n\u001b[31m\u001b[1mAssertionError\u001b[22m: React Compiler skip baseline mismatch:\n  src/dashboard/frontend/src/components/Settings/hooks/useComputerUseStatus.ts: 2 skip(s), baseline none ((BuildHIR::lowerStatement) Handle TryStatement with a finalizer ('finally') clause)\nA new skip: fix the component (docs/DASHBOARD-ARCHITECTURE.md, React Compiler). A stale row: run npx tsx src/dashboard/frontend/scripts/reactCompilerCoverage.ts --update.: expected { …(3) } to deeply equal { added: [], raised: [], stale: [] }\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[2m  {\u001b[22m\n\u001b[32m-   \"added\": [],\u001b[39m\n\u001b[31m+   \"added\": [\u001b[39m\n\u001b[31m+     \"src/dashboard/frontend/src/components/Settings/hooks/useComputerUseStatus.ts\",\u001b[39m\n\u001b[31m+   ],\u001b[39m\n\u001b[2m    \"raised\": [],\u001b[22m\n\u001b[2m    \"stale\": [],\u001b[22m\n\u001b[2m  }\u001b[22m\n\n\u001b[36m \u001b[2m❯\u001b[22m src/__tests__/reactCompilerCoverage.test.ts:\u001b[2m83:29\u001b[22m\u001b[39m\n    \u001b[90m 81|\u001b[39m       'A new skip: fix the component (docs/DASHBOARD-ARCHITECTURE.md, …\n    \u001b[90m 82|\u001b[39m     ]\u001b[33m.\u001b[39m\u001b[34mjoin\u001b[39m(\u001b[32m'\\n'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m 83|\u001b[39m     expect(result, message).toEqual({ added: [], raised: [], stale: []…\n    \u001b[90m   |\u001b[39m                             \u001b[31m^\u001b[39m\n    \u001b[90m 84|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m 85|\u001b[39m })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m561 passed\u001b[39m\u001b[22m\u001b[90m (562)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-17T18:41:28Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5461\n\nPull request: https://github.com/eltmon/overdeck/pull/5512 (head `2bc0157a`)\n\nSource: check_run:test\n\n## Failing checks (1)\n\n### test\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/134277325579/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/44150431146/job/134277325579  \n```\n2026-11-17T18:41:24.2931067Z Current runner version: '2.338.2'\n##[group]Runner Image Provisioner\nHosted Compute Agent\nVersion: 20261103.629\nCommit: 15dbd9ccb5dbf34fae002b6ed1a2670f52df37bc\nBuild Date: 2026-11-03T17:26:59Z\nWorker ID: {f21c9b06-16e6-44a1-aa4f-ae0c443c1bb1}\nRegion: centralus\nCloud: Azure\n##[endgroup]\n##[group]Operating System\nUbuntu\n26.04.1\nLTS\n##[endgroup]\n##[group]Runner Image\nImage: ubuntu-26.04\nVersion: 20261111.196.1\nIncluded Software: https://github.com/actions/runner-images/blob/ubuntu26/20261111.196/images/ubuntu/Ubuntu2604-Readme.md\nImage Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261111.196\n##[endgroup]\n##[group]GITHUB_TOKEN Permissions\nContents: read\nMetadata: read\nPackages: read\n##[endgroup]\nSecret source: Actions\nCache mode: write\nPrepare workflow directory\nPrepare all required actions\nComplete job name: test\n##[group]Run echo \"test-shard:     cancelled\"\n\u001b[36;1mecho \"test-shard:     cancelled\"\u001b[0m\n\u001b[36;1mecho \"test-e2e:       cancelled\"\u001b[0m\n\u001b[36;1mecho \"mobile-android: cancelled\"\u001b[0m\n\u001b[36;1mecho \"integrations:   cancelled\"\u001b[0m\n\u001b[36;1mtest \"cancelled\" = success\u001b[0m\n\u001b[36;1mtest \"cancelled\" = success\u001b[0m\n\u001b[36;1mtest \"cancelled\" = success\u001b[0m\n\u001b[36;1mtest \"cancelled\" = success\u001b[0m\nshell: /usr/bin/bash -e {0}\nenv:\n  SKIP_DOCS_INDEX: 1\n  OVERDECK_TELEMETRY: 0\n##[endgroup]\ntest-shard:     cancelled\ntest-e2e:       cancelled\nmobile-android: cancelled\nintegrations:   cancelled\n##[error]Process completed with exit code 1.\nCleaning up orphan processes\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 3,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-17T18:41:35Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5461\n\nPull request: https://github.com/eltmon/overdeck/pull/5512 (head `2bc0157a`)\n\nSource: check_run:bare-host-macos\n\nThis file names only checks that failed after earlier feedback for this head. Still failing from that earlier feedback: test.\n\n## Failing checks (1)\n\n### lint\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/134277323153/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/44150431146/job/134277323153  \n```\n2026-11-17T18:41:24.7470268Z Current runner version: '2.338.2'\n##[group]Runner Image Provisioner\nHosted Compute Agent\nVersion: 20261103.629\nCommit: 15dbd9ccb5dbf34fae002b6ed1a2670f52df37bc\nBuild Date: 2026-11-03T17:26:59Z\nWorker ID: {f8bf096b-c4c3-4fc6-bf3d-b88b3cc28b58}\nRegion: westus\nCloud: Azure\n##[endgroup]\n##[group]Operating System\nUbuntu\n26.04.1\nLTS\n##[endgroup]\n##[group]Runner Image\nImage: ubuntu-26.04\nVersion: 20261111.196.1\nIncluded Software: https://github.com/actions/runner-images/blob/ubuntu26/20261111.196/images/ubuntu/Ubuntu2604-Readme.md\nImage Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261111.196\n##[endgroup]\n##[group]GITHUB_TOKEN Permissions\nContents: read\nMetadata: read\nPackages: read\n##[endgroup]\nSecret source: Actions\nCache mode: write\nPrepare workflow directory\nPrepare all required actions\nComplete job name: lint\n##[group]Run echo \"lint-group: cancelled\"\n\u001b[36;1mecho \"lint-group: cancelled\"\u001b[0m\n\u001b[36;1mtest \"cancelled\" = success\u001b[0m\nshell: /usr/bin/bash -e {0}\nenv:\n  SKIP_DOCS_INDEX: 1\n  OVERDECK_TELEMETRY: 0\n##[endgroup]\nlint-group: cancelled\n##[error]Process completed with exit code 1.\nCleaning up orphan processes\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 4,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-17T18:49:44Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5461\n\nPull request: https://github.com/eltmon/overdeck/pull/5512 (head `a7283559`)\n\nSource: check_run:test-shard (3/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (3/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/134279359962/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/44151035290/job/134279359962  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/contracts/telemetry-client-route.test.ts\u001b[2m > \u001b[22mclientRouteOf\u001b[2m > \u001b[22mhas every non-DELETE NO_LOSS_MATRIX /api/ surface in client_route_area\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/contracts/telemetry-client-route.test.ts\u001b[2m > \u001b[22mclientRouteOf\u001b[2m > \u001b[22mhas every non-DELETE NO_LOSS_MATRIX /api/ surface in client_route_area\n\u001b[31m\u001b[1mAssertionError\u001b[22m: GET /api/computer-use/status first segment \"computer-use\" missing from client_route_area: expected [ 'access-tokens', 'account', …(120) ] to include 'computer-use'\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m tests/unit/contracts/telemetry-client-route.test.ts:\u001b[2m50:99\u001b[22m\u001b[39m\n    \u001b[90m 48|\u001b[39m       \u001b[35mconst\u001b[39m segment \u001b[33m=\u001b[39m pathPart\u001b[33m.\u001b[39m\u001b[34mslice\u001b[39m(\u001b[32m'/api/'\u001b[39m\u001b[33m.\u001b[39mlength)\u001b[33m.\u001b[39m\u001b[34msplit\u001b[39m(\u001b[32m'/'\u001b[39m)[\u001b[34m0\u001b[39m]\u001b[33m;\u001b[39m\n    \u001b[90m 49|\u001b[39m       \u001b[35mif\u001b[39m (\u001b[33m!\u001b[39msegment) \u001b[35mcontinue\u001b[39m\u001b[33m;\u001b[39m\n    \u001b[90m 50|\u001b[39m       expect(areas, `${entry.surface} first segment \"${segment}\" missi…\n    \u001b[90m   |\u001b[39m                                                                                                   \u001b[31m^\u001b[39m\n    \u001b[90m 51|\u001b[39m     }\n    \u001b[90m 52|\u001b[39m   })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m697 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m1 skipped\u001b[39m\u001b[90m (699)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ],
+  "agentModel": "claude-opus-5-5"
+}

@@ -273,3 +273,8 @@ dist.rollback.*/
 
 # Signed phone-app store builds (apps/mobile/scripts/build-android.sh)
 apps/mobile/release/
+
+# macOS computer-use helper build output (scripts/build-computer-macos.mjs, PAN-5463).
+# Root only: a nested .gitignore would drop the zip from the npm tarball.
+native/computer-use-macos/dist/
+native/computer-use-macos/.build/

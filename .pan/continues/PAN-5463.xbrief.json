@@ -1,0 +1,388 @@
+{
+  "version": "1",
+  "issueId": "PAN-5463",
+  "created": "2026-11-17T12:31:36.411Z",
+  "updated": "2026-11-17T20:24:01.758Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-17T20:24Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-17T20:24:01.758Z"
+    }
+  ],
+  "items": {
+    "wi1-vendor": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5463",
+      "claimedAt": "2026-11-17T12:31:36.411Z",
+      "doneAt": "2026-11-17T12:33:22.426Z"
+    },
+    "wi1-vendor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:33:22.426Z"
+    },
+    "wi1-vendor.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:33:22.426Z"
+    },
+    "wi1-vendor.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:33:22.426Z"
+    },
+    "wi2-build-script": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5463",
+      "claimedAt": "2026-11-17T12:33:36.243Z",
+      "doneAt": "2026-11-17T12:35:37.845Z"
+    },
+    "wi2-build-script.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:35:37.845Z"
+    },
+    "wi2-build-script.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:35:37.845Z"
+    },
+    "wi2-build-script.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:35:37.845Z"
+    },
+    "seam-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5463",
+      "claimedAt": "2026-11-17T19:12:40.449Z",
+      "doneAt": "2026-11-17T19:13:01.475Z"
+    },
+    "wi3-install": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5463",
+      "claimedAt": "2026-11-17T19:13:33.987Z",
+      "doneAt": "2026-11-17T19:18:26.928Z"
+    },
+    "wi3-protocol": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5463",
+      "claimedAt": "2026-11-17T19:16:57.668Z",
+      "doneAt": "2026-11-17T19:18:51.259Z"
+    },
+    "wi3-daemon": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5463",
+      "claimedAt": "2026-11-17T19:21:01.071Z",
+      "doneAt": "2026-11-17T19:23:44.017Z"
+    },
+    "wi3-blocked-keys": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5463",
+      "claimedAt": "2026-11-17T19:19:14.400Z",
+      "doneAt": "2026-11-17T19:20:10.655Z"
+    },
+    "wi3-provider": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5463",
+      "claimedAt": "2026-11-17T19:24:10.303Z",
+      "doneAt": "2026-11-17T19:27:32.685Z"
+    },
+    "wi4-ci-smoke": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5463",
+      "claimedAt": "2026-11-17T19:28:08.184Z",
+      "doneAt": "2026-11-17T19:35:25.536Z"
+    },
+    "wi5-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5463",
+      "claimedAt": "2026-11-17T19:29:24.102Z",
+      "doneAt": "2026-11-17T19:32:21.032Z"
+    },
+    "wi5-ui": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5463",
+      "claimedAt": "2026-11-17T19:32:47.884Z",
+      "doneAt": "2026-11-17T19:35:49.389Z"
+    },
+    "wi6-skill": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5463",
+      "claimedAt": "2026-11-17T19:38:27.612Z",
+      "doneAt": "2026-11-17T19:38:49.212Z"
+    },
+    "wi6-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5463",
+      "claimedAt": "2026-11-17T19:39:11.458Z",
+      "doneAt": "2026-11-17T19:40:17.827Z"
+    },
+    "wi4-ci-workflow": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:41:14.157Z"
+    },
+    "wi4-ci-workflow.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:41:14.157Z"
+    },
+    "wi4-ci-workflow.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:41:14.157Z"
+    },
+    "wi4-ci-workflow.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:41:14.157Z"
+    },
+    "wi4-release-job": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5463",
+      "claimedAt": "2026-11-17T12:41:20.011Z",
+      "doneAt": "2026-11-17T12:42:03.366Z"
+    },
+    "wi4-release-job.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:42:03.366Z"
+    },
+    "wi4-release-job.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:42:03.366Z"
+    },
+    "wi4-release-job.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:42:03.366Z"
+    },
+    "wi1-trust": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5463",
+      "claimedAt": "2026-11-17T12:42:12.983Z",
+      "doneAt": "2026-11-17T12:46:45.999Z"
+    },
+    "wi1-trust.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:46:45.999Z"
+    },
+    "wi1-trust.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:46:45.999Z"
+    },
+    "wi1-trust.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:46:45.999Z"
+    },
+    "wi1-lifetime": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5463",
+      "claimedAt": "2026-11-17T12:46:48.004Z",
+      "doneAt": "2026-11-17T12:49:32.986Z"
+    },
+    "wi1-lifetime.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:49:32.986Z"
+    },
+    "wi1-lifetime.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:49:32.986Z"
+    },
+    "wi1-lifetime.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:49:32.986Z"
+    },
+    "wi1-strings": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5463",
+      "claimedAt": "2026-11-17T12:49:35.444Z",
+      "doneAt": "2026-11-17T12:53:05.238Z"
+    },
+    "wi1-strings.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:53:05.238Z"
+    },
+    "wi1-strings.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:53:05.238Z"
+    },
+    "wi1-strings.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T12:53:05.238Z"
+    },
+    "wi7-live-verify": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5463",
+      "claimedAt": "2026-11-17T19:42:10.774Z",
+      "doneAt": "2026-11-17T19:42:31.380Z"
+    },
+    "seam-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:13:01.475Z"
+    },
+    "seam-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:13:01.475Z"
+    },
+    "wi3-install.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:26.928Z"
+    },
+    "wi3-install.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:26.928Z"
+    },
+    "wi3-install.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:26.928Z"
+    },
+    "wi3-install.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:26.928Z"
+    },
+    "wi3-protocol.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:51.259Z"
+    },
+    "wi3-protocol.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:51.259Z"
+    },
+    "wi3-protocol.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:51.259Z"
+    },
+    "wi3-protocol.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:18:51.259Z"
+    },
+    "wi3-blocked-keys.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:20:10.655Z"
+    },
+    "wi3-blocked-keys.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:20:10.655Z"
+    },
+    "wi3-blocked-keys.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:20:10.655Z"
+    },
+    "wi3-daemon.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:23:44.017Z"
+    },
+    "wi3-daemon.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:23:44.017Z"
+    },
+    "wi3-daemon.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:23:44.017Z"
+    },
+    "wi3-daemon.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:23:44.017Z"
+    },
+    "wi3-daemon.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:23:44.017Z"
+    },
+    "wi3-provider.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:27:32.685Z"
+    },
+    "wi3-provider.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:27:32.685Z"
+    },
+    "wi3-provider.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:27:32.685Z"
+    },
+    "wi3-provider.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:27:32.685Z"
+    },
+    "wi5-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:32:21.032Z"
+    },
+    "wi5-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:32:21.032Z"
+    },
+    "wi5-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:32:21.032Z"
+    },
+    "wi5-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:32:21.032Z"
+    },
+    "wi4-ci-smoke.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:35:25.536Z"
+    },
+    "wi4-ci-smoke.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:35:25.536Z"
+    },
+    "wi4-ci-smoke.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:35:25.536Z"
+    },
+    "wi5-ui.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:35:49.389Z"
+    },
+    "wi5-ui.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:35:49.389Z"
+    },
+    "wi5-ui.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:35:49.389Z"
+    },
+    "wi5-ui.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:35:49.389Z"
+    },
+    "wi6-skill.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:38:49.212Z"
+    },
+    "wi6-skill.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:38:49.212Z"
+    },
+    "wi6-skill.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:38:49.212Z"
+    },
+    "wi6-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:40:17.827Z"
+    },
+    "wi6-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:40:17.827Z"
+    },
+    "wi6-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:40:17.827Z"
+    },
+    "wi7-live-verify.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:42:31.380Z"
+    },
+    "wi7-live-verify.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-17T19:42:31.380Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-17T20:24:01Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5463 (PR #5513)\n\nCodeRabbit posted 14 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4605304981 · .github/workflows/release.yml:203 [Major]: Do not notarize an ad-hoc-signed helper.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605304981\n- Thread 4605304995 · .pan/specs/2026-11-17-PAN-5463-computer-use-on-macos-port-orca-s-swift-helper-with-accessibility-and-screen-recording-setup.xbrief.json:773 [Minor]: Define the behavior when a live helper socket belongs to another `OVERDECK_HOME`.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605304995\n- Thread 4605305005 · configuration/computer-use.mdx:115 [Minor]: Document the foreground-input exception.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305005\n- Thread 4605305009 · native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift:1148 [Minor]: Bound `pages` before the accessibility scroll loop.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305009\n- Thread 4605305022 · native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift:1895 [Major]: Check the CF type before each forced AX cast.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305022\n- Thread 4605305069 · native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift:4729 [Minor]: Reschedule the idle timer when a request starts, not only after it ends.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305069\n- Thread 4605305077 · native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/ActionArgumentValidation.swift:30 [Minor]: Reject fractional values before integer conversion.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305077\n- Thread 4605305086 · native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/PermissionStatusSnapshot.swift:77 [Minor]: Keep one pending permission refresh.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305086\n- Thread 4605305098 · native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/SyntheticMouseClickDelivery.swift:127 [Minor]: Fence the recipient before the initial `.move` event in `deliver`.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305098\n- Thread 4605305125 · scripts/build-computer-macos.mjs:122 [Minor]: Publish the final ZIP only after the checksum is ready.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305125\n- Thread 4605305145 · src/dashboard/frontend/src/components/Settings/sections/ComputerUseMacPermissions.tsx:48 [Minor]: Include the permission in each button's accessible name.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305145\n- Thread 4605305163 · src/lib/computer-use/macos-install.ts:183 [Major]: Preserve the installed helper until replacement succeeds.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305163\n- Thread 4605305171 · sync-sources/skills/pan-computer-use/SKILL.md:135 [Minor]: Scope the subtree index rule to Linux, and state the macOS rule where it applies.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305171\n- Thread 4605305178 · sync-sources/skills/pan-computer-use/SKILL.md:167 [Minor]: Give a separate recovery step for older macOS.\n  https://github.com/eltmon/overdeck/pull/5513#discussion_r4605305178\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5513/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5463 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5513 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    }
+  ]
+}

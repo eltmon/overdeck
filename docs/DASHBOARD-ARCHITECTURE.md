@@ -292,7 +292,7 @@ so neither reaches `feedback`, `scopeDrift`, `sessionHistory`, or
 door that does not exist; a real record read door would be a separate change.
 
 **DB job worker lanes:**
-- Five lanes. The `read` lane handles interactive point lookups only (e.g.
+- The `read` lane handles interactive point lookups only (e.g.
   `getConversationByName`). The `poll` lane runs the four polling aggregates —
   `getCostsByIssueSnapshot`, `getConversationSearchStats`, `getConversationLedgerCosts`,
   and `getAgentCostStats` — so their multi-second refreshes never queue behind, or ahead
@@ -303,6 +303,23 @@ door that does not exist; a real record read door would be a separate change.
   or scan never shares a lane with a lookup that sits on an interactive path (PAN-4312 —
   before this, the polling aggregates shared `read` with `getConversationByName`, so a
   live conversation subscribe could wait behind a 13-second search-stats refresh).
+- Seven lanes, counting the two conversation-search lanes (PAN-5447). The
+  `conversation-text` lane runs the palette's BM25 scan (`searchConversationBm25`) and
+  its live-transcript filter (`filterLiveConversationSessions`). The
+  `conversation-vector` lane runs the sqlite-vec brute-force scan
+  (`searchConversationVector`), which takes over a second on a large index. Two lanes
+  keep a vector scan that cannot be stopped from delaying the next query's BM25 scan.
+  Each worker keeps one `embeddings.db` read handle
+  (`src/lib/conversation-search/chunk-search-jobs.ts`).
+- Both conversation lanes are **serial lanes**: `runDashboardDbJob` posts one job at a
+  time to the lane's worker and keeps the rest in a main-thread FIFO. Callers pass an
+  abort signal as the fourth parameter, `runDashboardDbJob(op, payload, onProgress,
+  { signal })`. An abort removes a waiting job from the FIFO before the worker sees it
+  and rejects with the signal's reason. A job the worker already started runs to
+  completion, because node:sqlite cannot interrupt a running query, and its result is
+  discarded; the lane posts its next waiter only when the worker answers. The worker is
+  never terminated to cancel a job: termination cannot stop a native SQLite call, and a
+  replacement worker would reopen the multi-gigabyte DB and scan alongside the dying one.
 - Worker implementations live in `src/dashboard/server/services/dashboard-db-worker.ts`.
   Add each new operation to both `dashboard-db-task.ts` and the worker dispatch table so
   the main thread and worker remain type-safe.

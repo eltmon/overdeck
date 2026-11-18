@@ -4,8 +4,8 @@ description: >-
   Read and operate a visible local desktop app (native apps, external browser windows) through
   `pan computer`: accessibility tree, clicks, typing, keys, scrolling, dragging and screenshots.
   Prefer a programmatic path (shell, files, git, HTTP, an existing CLI) whenever one can do the
-  job; use this only when a visible window needs GUI control. Linux desktops only; needs
-  computer_use.enabled.
+  job; use this only when a visible window needs GUI control. Works on Linux desktops, macOS, and
+  Windows through WSL2; needs computer_use.enabled.
 triggers:
   - pan computer
   - computer use
@@ -50,7 +50,7 @@ In a large window, look for one control with `get-app-state --query <text>`: it 
 pan computer get-app-state --app gnome-text-editor --query Downloads --json
 ```
 
-When a tree is truncated, read a hidden subtree by passing the nearest shown ancestor's index as `get-app-state --element-index <n>`. Indexes printed under that read are for the subtree only, numbered from 0 again; the next action returns the whole window again.
+When a tree is truncated, read a hidden subtree by passing the nearest shown ancestor's index as `get-app-state --element-index <n>`. On Linux, indexes printed under that read are for the subtree only, numbered from 0 again; the next action returns the whole window again. macOS numbers subtrees differently; see [macOS](#macos).
 
 ```text
 pan computer get-app-state --app gnome-text-editor --element-index 12 --json
@@ -128,6 +128,20 @@ printf '%s' "$SECRET" | pan computer set-value --app <app> --element-index <n> -
 
 Clicks, scrolling, drags and keyboard input bring the target window forward. Do not pass `--restore-window` by default — tell the user first, since it takes over their screen, keyboard focus and pointer — and use it only when the window is not already in front or an action fails because it is not focused.
 
+## macOS
+
+On macOS, `pan computer` drives native apps through the Overdeck Computer Use helper. The commands, flags and output are the same as on Linux, with these differences:
+
+- **Indexes stay stable.** An element keeps its index across reads while it exists, so you don't need a fresh `get-app-state` just because time passed. After a UI change, still use the returned state.
+- **Subtree reads keep the window's numbering.** `get-app-state --element-index <n>` prints the subtree with the same indexes the whole window uses (so they are not contiguous); act on a printed index directly. Ignore the "for this subtree only" note there.
+- **Scrolling:** `--pages` is at most 50.
+- **Actions run in the background.** The target app is not brought forward, the user's frontmost window stays put, and the pointer does not move. Each action result reports `action.delivery` as `background` or `foreground`, and the text output adds `delivery: <value>` to the `Action:` line.
+- **`--restore-window` only when needed.** Use it only when an action fails with `helper_error` naming `background_unavailable`, when a background action reports success but the UI does not change and `set-value` or `perform-secondary-action` cannot do the job, or for drags in Chromium or Electron apps. Tell the user first: it takes over their screen, keyboard focus and pointer.
+- **Popups and `<select>`:** set the option with `set-value` on the popup element. Background clicks on popup menus are refused.
+- **Select all with `cmd+a`** (not `ctrl+a`).
+- **Blocked shortcuts:** `cmd+q` (quit the app), `cmd+shift+q` (log out), `cmd+ctrl+q` (lock the screen), `cmd+alt+escape` (Force Quit) and `cmd+shift+backspace` (empty the Trash) are refused with `system_shortcut_blocked` unless you pass `--allow-system-shortcut`, which you do only when the user asked for that exact shortcut.
+- **Permissions:** the helper needs Accessibility and Screen Recording. On `permission_denied`, stop: do not retry. Ask the operator to finish setup in Settings → Computer Use, where they switch on Overdeck Computer Use in the two System Settings pages. A `Screenshot: failed:` line (`result.snapshot` still present) that names Screen Recording means only screenshots are blocked; the tree still works, so pass `--no-screenshot` if the tree is enough.
+
 ## Screenshots
 
 `get-app-state` and actions request screenshots by default unless `--no-screenshot` is passed. A successful `--json` capture is saved as a PNG file; read it at `result.screenshot.path` with your file-reading or image tool. Coordinates passed to `click`, `scroll` and `drag` are window-local action coordinates, which may differ from screenshot pixels when `screenshot.scale` is not 1.
@@ -140,6 +154,17 @@ Browsers: for Chromium, Firefox and similar browser windows, set the address/sea
 
 For browser-hosted forms, verify the focused element after each field action. If a click or `set-value` does not change the focused receiver, use `press-key --key Tab` from a known focused field, or window-local coordinates from a fresh screenshot. Prefer `paste-text` into the verified focused field for longer text, then inspect the returned state before continuing.
 
+## Windows (WSL2)
+
+When Overdeck runs in WSL2, `pan computer` drives the Windows desktop, not WSLg windows. The same commands and flags apply, with these differences:
+
+- `list-windows` returns only the app's main window (index 0). To wait for a dialog, use `pan computer wait --app <app> --text "<dialog text>" --json`, not `--window-title`.
+- A `helper_error` whose message starts with `window_not_focused:` means the window was not in front. Retry once with `--restore-window`; tell the user first, since it takes over their screen. Browsers (Edge, Chrome) usually need `--restore-window`.
+- A `helper_error` whose message starts with `target_elevated:` means the app runs as administrator and refuses input. Stop and tell the user; do not retry.
+- Screenshots may show whatever covers the window. Trust the tree over the pixels when they disagree.
+- Select all with `ctrl+a`. Alt+F4, Win+L and Ctrl+Shift+Escape are blocked (`system_shortcut_blocked`).
+- Each command takes 1–3 s, because every call starts one Windows PowerShell process. Batch your reading: one `get-app-state` with `--query` beats several narrow calls.
+
 ## Overdeck
 
 - **`desktop_busy`:** another agent or the operator holds the desktop. Don't retry in a loop. Report it and wait for the time named in the message, or ask the operator to run `pan computer release --force`.
@@ -150,12 +175,13 @@ For browser-hosted forms, verify the focused element after each field action. If
 
   | Code | What to do |
   | --- | --- |
-  | `disabled` | Not retryable. `computer_use.enabled` is off in `~/.overdeck/config.yaml`; only the operator can turn it on. |
-  | `unsupported_platform` | Not retryable. This host is not Linux; computer use only works on Linux desktops. |
-  | `no_desktop_session` | Not retryable. No `DISPLAY`/`WAYLAND_DISPLAY` resolved; this host has no logged-in desktop. |
+  | `disabled` | Not retryable. Computer use is off. Ask the operator to turn it on in the dashboard under Settings → Computer Use. |
+  | `unsupported_platform` | Not retryable. This host is not a Linux desktop, a Mac, or Windows through WSL2. |
+  | `no_desktop_session` | Not retryable. On Linux, no `DISPLAY`/`WAYLAND_DISPLAY` resolved; this host has no logged-in desktop. Under WSL2, Windows interop is off or `powershell.exe` was not found; the message says which. On macOS, either the Mac runs a macOS older than 14 (tell the operator computer use needs macOS 14 or newer; setup can't fix it), or the helper isn't installed (the operator runs setup in Settings → Computer Use); the message says which. |
+  | `permission_denied` | macOS only. Not retryable. The helper lacks Accessibility or Screen Recording. Stop and ask the operator to finish setup in Settings → Computer Use. |
   | `helper_missing_dependency` | Install the package the message names, then retry once. |
   | `helper_timeout` | The helper did not respond in time. The input may already have been applied. For read-only commands, retry once; if it recurs, stop and report it. For `click`, `type-text`, `paste-text` or `press-key`, run `get-app-state` first and repeat the input only if the state shows it did not take effect. |
-  | `helper_error` | The helper reported a specific failure (read its message). Adjust your command; do not retry unchanged. |
+  | `helper_error` | The helper reported a specific failure (read its message; on macOS it starts with the helper's own code, such as `window_stale:` or `background_unavailable:`). Adjust your command; do not retry unchanged. |
   | `desktop_busy` | Another holder has the desktop. Don't retry in a loop; report it and wait for the time in the message. |
   | `element_not_found` | The cached index is stale. Run `get-app-state` again and use a fresh index. |
   | `system_shortcut_blocked` | The chord would quit, lock, log out or switch VTs. Reach the goal another way, or pass `--allow-system-shortcut` only if the user asked for that exact shortcut. |

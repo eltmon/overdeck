@@ -10,7 +10,9 @@ export type ComputerUseErrorCode =
   | 'element_not_found'
   | 'system_shortcut_blocked'
   | 'invalid_argument'
-  | 'wait_timeout';
+  | 'wait_timeout'
+  /** macOS (PAN-5463 D-16): the helper lacks Accessibility or Screen Recording. */
+  | 'permission_denied';
 
 export class ComputerUseError extends Error {
   constructor(

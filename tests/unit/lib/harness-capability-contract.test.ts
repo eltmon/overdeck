@@ -173,6 +173,17 @@ describe('composer skill commands (PAN-5347)', () => {
   });
 });
 
+describe('conversation skill apply (PAN-5465)', () => {
+  it('claude-code hot-reloads, codex restarts, and every other harness gets no conversation packs', () => {
+    const value = (harness: string) => contracts.getRuntimeBehavior(harness as never).capabilities.conversationSkillApply;
+    expect(value('claude-code')).toBe('hot-reload');
+    expect(value('codex')).toBe('restart');
+    for (const harness of ['pi', 'ohmypi', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent', 'grok']) {
+      expect(value(harness), harness).toBeNull();
+    }
+  });
+});
+
 describe('harness update data (PAN-4654 D-6)', () => {
   it('update data: claude, codex, kimi and opencode declare an update argv; muse, prime-agent and ohmypi declare none', () => {
     const update = (harness: string) => {
