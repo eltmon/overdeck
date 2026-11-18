@@ -789,7 +789,8 @@ export async function generateAiTitle(
 
 const MAX_TITLE_LENGTH = 200;
 
-function resolveConversationKey(key: string): Conversation | null {
+/** A conversation by numeric id, stored name, or `conv-` session name (PAN-5516: the resume route uses it too). */
+export function resolveConversationKey(key: string): Conversation | null {
   const numericId = Number(key);
   if (!Number.isNaN(numericId) && /^\d+$/.test(key)) {
     return getConversationById(numericId);

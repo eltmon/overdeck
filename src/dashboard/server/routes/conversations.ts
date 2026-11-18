@@ -13,6 +13,7 @@ import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 import { validateOrigin, validateOriginHeaders, getHeaderFromMap, type HeaderMap } from './origin-validation.js';
 import * as self from './conversations.js';
+import { crossSiteWriteRefusal } from '../linked-conversation-proxy.js';
 import { withConversationMessageReceipt } from '../services/conversation-message-receipts.js';
 import {
   backfillConversationModels,
@@ -52,6 +53,7 @@ import {
   patchConversationTitle,
   handleConversationMove,
   retitleConversation,
+  resolveConversationKey,
   resolveSessionFile,
   type ConversationMessagesReadOptions,
 } from '../../../lib/overdeck/conversation-reads.js';
@@ -359,12 +361,13 @@ const postConversationResumeRoute = HttpRouter.add(
   '/api/conversations/:name/resume',
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const originCheck = validateOrigin(request);
-    if (!originCheck.ok) {
-      return jsonResponse({ error: originCheck.error }, { status: 403 });
-    }
+    // PAN-5516: `pan conversations resume` sends the internal token and no Origin.
+    const refused = crossSiteWriteRefusal(request.headers as HeaderMap, request.method);
+    if (refused) return refused;
     const params = yield* HttpRouter.params;
-    const name = params['name'] ?? '';
+    // Accept the numeric id and the `conv-` session name as well as the stored name.
+    const key = params['name'] ?? '';
+    const name = resolveConversationKey(key)?.name ?? key;
     const body = yield* readJsonBody;
     return yield* Effect.promise(async () => handleConversationResume(name, body, { resolveSessionFile }));
   }),
