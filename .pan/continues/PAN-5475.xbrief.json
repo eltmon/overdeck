@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5475",
   "created": "2026-11-18T22:55:50.465Z",
-  "updated": "2026-11-18T23:07:25.258Z",
+  "updated": "2026-11-18T23:07:30.605Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -174,6 +174,11 @@
     "cross-links.ac3": {
       "status": "completed",
       "doneAt": "2026-11-18T23:07:25.258Z"
+    },
+    "validate": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5475",
+      "claimedAt": "2026-11-18T23:07:30.605Z"
     }
   }
 }
