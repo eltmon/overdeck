@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5471",
   "created": "2026-11-18T14:58:50.204Z",
-  "updated": "2026-11-18T15:15:04.133Z",
+  "updated": "2026-11-18T15:15:08.713Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,6 +130,11 @@
     "effort-link.ac2": {
       "status": "completed",
       "doneAt": "2026-11-18T15:15:04.132Z"
+    },
+    "model-routing-dev-banner": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5471",
+      "claimedAt": "2026-11-18T15:15:08.712Z"
     }
   }
 }
