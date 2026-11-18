@@ -1,7 +1,7 @@
 ---
-title: "Install Overdeck"
+title: "Install Overdeck and start your first agent"
 sidebarTitle: "Quickstart"
-description: "Install Overdeck with one npx command, open the Command Deck dashboard, add a project and start your first agent conversation."
+description: "Install Overdeck with npx, the install script, npm or the desktop app, then open the dashboard, add a project and start your first agent."
 ---
 
 import { ThemedImage } from "/snippets/themed-image.mdx";
@@ -12,33 +12,58 @@ import { ThemedImage } from "/snippets/themed-image.mdx";
   alt="Command Deck showing a live agent conversation: the project's conversations and issues, and the agent's turn-by-turn tool calls and reasoning."
 />
 
-## One Command
+## Try Overdeck without installing
 
 ```bash
 npx @overdeck/core
 ```
 
-That's it. `npx @overdeck/core` starts Command Deck and opens the dashboard in your browser. No global install step required.
+This starts the dashboard on port 3011 and opens it in your browser. Nothing is installed globally.
 
-Missing tools (tmux, gh, mkcert, etc.) are prompted and installed inline the first time you use a feature that needs them.
+## Install the overdeck command
+
+On macOS and Linux, run the install script:
+
+```bash
+curl -fsSL https://overdeck.ai/install | sh
+```
+
+The script installs the `overdeck` command and its short alias `pan`. You need Node.js 22.16 or later first. The script never uses sudo. It:
+
+- Installs `@overdeck/core` with npm into `~/.local`, so both commands land in `~/.local/bin`.
+- Adds `~/.local/bin` to your PATH in `~/.profile`, and in `~/.bashrc` or `~/.zshrc` if your shell is bash or zsh.
+- Installs `jq` into `~/.local/bin` if it is missing, after it checks the download's SHA-256 checksum.
+- Removes old Overdeck packages (`panopticon-cli`, `@panctl/cli` and `@overdeck/cli`) from `~/.local`, because they would shadow `pan`.
+
+Run the script again at any time to upgrade to the latest release. To install somewhere else, set `OVERDECK_INSTALL_PREFIX` before you run it. The script then leaves your shell profile alone, so add that prefix's `bin` directory to your PATH yourself.
+
+Open a new terminal so the PATH change applies, then start the dashboard:
+
+```bash
+overdeck up
+```
+
+`overdeck up` starts the dashboard and opens it in your browser. `pan up` does the same thing. Add `--detach` to run it in the background, and stop it later with `overdeck down`. See [pan up](/cli/core-commands#pan-up) for every option.
+
+Agents run in the Herdr terminal backend, and `overdeck up` does not install it. Run `overdeck install` once to install Herdr and the other tools Overdeck uses. If the **Get set up** card on Home shows **Finish setup so agents can start**, run the command it gives.
 
 ### Requirements
 
-- **Node.js 22+** and **Claude Code** (signed in) are required.
-- **git** is required.
-- **Herdr** — the default terminal backend — is installed by `pan install`.
-- **tmux** is needed only for plain terminals in the dashboard (and for agents when `terminal.backend: tmux`).
-- **Docker**, **gh**, and **ast-grep** are optional; `pan install` warns instead of failing when they are missing.
+- **Node.js 22.16 or later** and **git** are required.
+- **Claude Code**, signed in, runs the agents in the default setup. The **Get set up** card checks the sign-in. Overdeck can also run agents on other coding-agent CLIs; see [Harnesses](/configuration/harnesses).
+- **Herdr**, the default terminal backend, is installed by `overdeck install`.
+- **tmux** is needed only for plain terminals in the dashboard, and for agents when `terminal.backend: tmux`.
+- **Docker** and the **GitHub CLI** (`gh`) are optional. Without Docker, workspace containers are unavailable.
 
-The dashboard's Home page shows a **Get set up** card with what is still missing and the command to fix it.
+The **Get set up** card on Home lists what is still missing and shows the command that fixes each item. It never installs anything for you.
 
-## What Happens Next
+## What happens next
 
-1. **The dashboard opens on Home, in Simple mode** — no project required to start
-2. **Type what you want** and press Enter to ask an agent, or Ctrl+Enter to run it in a terminal — still no project needed
-3. **Add a project** — from the composer's project chip, or **Add a project** in the left column's project switcher, when you want an agent working in a repo
-4. **Pick an issue and start work** — select an open issue from the kanban board and Overdeck creates an isolated workspace for the agent
-5. **Stay in control** — watch diffs land as the agent works, send messages to steer it, swap models if the task shifts, fork the conversation to explore alternatives
+1. **The dashboard opens on Home, in Simple mode.** No project is required to start.
+2. **Type what you want.** Press Enter to ask an agent, or Ctrl+Enter to run it in a terminal. You still need no project.
+3. **Add a project** from the composer's project chip, or from **Add a project** in the left column's project switcher, when you want an agent working in a repo.
+4. **Pick an issue and start work.** Select an open issue on the kanban board, and Overdeck creates an isolated workspace for the agent.
+5. **Stay in control.** Watch diffs land as the agent works, send messages to steer it, and fork the conversation to explore alternatives. A conversation keeps its model once it starts. To use another model, [hand off to a new conversation](/features/conversations#why-hand-off).
 
 <ThemedImage
   light="/images/dashboard/board-light.png"
@@ -46,41 +71,46 @@ The dashboard's Home page shows a **Get set up** card with what is still missing
   alt="The kanban board: issue columns with per-issue cost badges, agent status dots, and inline workspace controls."
 />
 
-The board is the usual place to pick an issue: each card carries a cost badge, a live agent status dot, and workspace controls, so you can spawn or check in on an agent without leaving the column it lives in.
+The board is the usual place to pick an issue. Each card carries a cost badge, a live agent status dot and workspace controls, so you can start or check in on an agent without leaving the column it lives in.
 
-Work at whatever level of involvement you want. Pair-program hands-on with a single agent in the conversation view above, or let the specialist pipeline take issues from plan to merged PR while you focus elsewhere — Command Deck is built to manage both the agents and the workflow they move through.
+Work at whatever level of involvement you want. Pair-program hands-on with a single agent in the conversation view above, or let the specialist pipeline take issues from plan to merged PR while you focus elsewhere. Command Deck is built to manage both the agents and the workflow they move through.
 
-## Headless / CI
+## Install with npm
 
-For terminals, scripts, and CI where you don't need the GUI:
-
-```bash
-npm install -g @overdeck/core
-overdeck up        # start dashboard server
-overdeck work PAN-123   # spawn agent for an issue
-```
-
-**`pan` is a built-in short alias for `overdeck`** — every `overdeck <verb>` also works as `pan <verb>` (same binary). Use whichever you like; `pan` is handy for headless, CI, and existing muscle memory.
-
-## Power-User Path: Install Everything Up Front
-
-If you prefer to set up all tools at once (useful for shared dev machines or CI images):
+For servers, scripts and CI where you don't need the GUI, install the package with npm and start an agent from the command line. `overdeck start` needs a registered project with an issue tracker, and Herdr from `overdeck install`:
 
 ```bash
 npm install -g @overdeck/core
-overdeck install   # installs tmux, ttyd, mkcert, gh, glab, claudish, ox
-overdeck sync      # sync skills/agents/rules to ~/.overdeck/
-overdeck up        # start Traefik + dashboard
+overdeck up --detach --no-open   # start the dashboard in the background, open nothing
+overdeck start PAN-123           # plan the issue if it has no plan, then start a work agent
 ```
 
-## Direct Desktop Downloads
+If npm's global directory needs sudo on your machine, use the install script above instead.
 
-Prefer a standalone app? Download the latest release for your platform:
+To set up every tool at once, for example on a shared dev machine:
 
-- **Linux** — `.AppImage` from [GitHub Releases](https://github.com/eltmon/overdeck/releases)
-- **macOS** — `.dmg` (universal, arm64 + x64)
-- **Windows** — `.exe` (NSIS installer)
+```bash
+npm install -g @overdeck/core
+overdeck install   # check prerequisites; install Herdr, mkcert, ttyd and ast-grep
+overdeck sync      # sync skills and render managed launch context
+overdeck up        # start the dashboard (and Traefik if enabled)
+```
 
-## Architecture at a Glance
+`pan` is a built-in short alias for `overdeck`. Every `overdeck <verb>` also works as `pan <verb>`, because both names run the same CLI.
 
-Overdeck started as a CLI and grew into **Command Deck**, a desktop-class development environment. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch with `npx @overdeck/core` or the `overdeck` command (`pan` is its short alias); use `@overdeck/desktop` for the packaged desktop app.
+## Desktop app
+
+Prefer a standalone app? Download the latest release for your platform from [GitHub Releases](https://github.com/eltmon/overdeck/releases):
+
+- **Linux**: `.AppImage`
+- **macOS**: `.dmg` for Apple silicon (arm64)
+- **Windows**: `.exe` installer
+
+## Architecture at a glance
+
+Overdeck started as a CLI and grew into **Command Deck**, a desktop-class development environment. The CLI, the GUI and any script that can make an HTTP request all drive the same REST surface, so you can start an agent from a kanban card, a terminal or a webhook without switching tools. Under the hood: an Effect.js and TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch with `npx @overdeck/core` or the `overdeck` command (`pan` is its short alias); use `@overdeck/desktop` for the packaged desktop app.
+
+## Get help
+
+- Ask questions on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P).
+- Report bugs and request features in [GitHub Issues](https://github.com/eltmon/overdeck/issues).
