@@ -32,6 +32,7 @@ every config key, see
 | `groups.ts` | `KNOWN_PACK_GROUPS`, `PackGroupError`, `resolvePackGroup`, `listPackGroups`: pack groups (built-in `video`, plus `skills.pack_groups` in `config.yaml`, which overrides built-ins by name); a group is an alias with no state (PAN-5464) |
 | `openmontage.ts` | `OPENMONTAGE_EXCLUDED_NAMES`, `OPENMONTAGE_EXCLUDE`, `OPENMONTAGE_DISCLOSURE`: the `openmontage` known pack's curation, frozen at `2e003e6` (PAN-5464) |
 | `video-use.ts` | `VIDEO_USE_NOTICE_VERSION`, `VIDEO_USE_HOST_NOTICE`, `applyVideoUseHostNotice`, `requirementsFromPyproject`: the `video-use` mount transform (PAN-5464) |
+| `known.ts` | `listAvailablePacks`, `notAddableReason`, `packAddCommand`, `formatAvailablePackLines`, `knownPackSource`, `previewKnownPack`, `addKnownPack`, `serializePackPreview`, `KnownPackError`: the known-pack listing (`pan skills pack list`, `GET /api/skills/packs/available`) and the dashboard add core, which calls `addPack` with the known url and ref; one git operation per pack id at a time in the server process (PAN-5540) |
 | `atlassian.ts` | `ATLASSIAN_PACK_ID`, `ATLASSIAN_PACK_URL`, `ATLASSIAN_PACK_COMMIT`, `ATLASSIAN_MCP_HOST`, `ATLASSIAN_MCP_URL`, `ATLASSIAN_OPT_IN_SKILLS`, `ATLASSIAN_DISCLOSURE`, `atlassianBasicAuth`, `withAtlassianAuth`, `atlassianNeedsInteractiveAuth`: the `atlassian` known pack's constants and its Jira Basic auth header (PAN-5165). Leaf: imports nothing from `skill-overrides/`, `projects/` or `mcp/`. |
 
 ### `src/lib/skill-overrides/`
@@ -153,13 +154,20 @@ Fork contract and ledger: [docs/SAGEOX-FORK.md](SAGEOX-FORK.md). User guide:
 `src/cli/commands/skills.ts`, `src/cli/commands/skills-deft.ts`, `src/cli/commands/skills-deft-pipeline.ts`,
 `src/cli/commands/skills-sageox.ts`, `src/cli/commands/doctor-sageox.ts`,
 `src/dashboard/server/routes/misc/skill-overrides.ts`,
+`src/dashboard/server/routes/misc/skill-packs.ts` (`GET /api/skills/packs/available`,
+`POST /api/skills/packs/preview`, `POST /api/skills/packs`; admin-only for remote credentials),
 `src/dashboard/frontend/src/components/skills/SkillPacksSection.tsx`,
+`src/dashboard/frontend/src/components/skills/AvailablePacksSection.tsx`,
+`src/dashboard/frontend/src/components/skills/AddPacksDialog.tsx`,
+`src/dashboard/frontend/src/components/skills/availablePacks.ts`,
 `src/lib/sageox/`, `src/lib/deft/`.
 
 ## Data flow
 
 1. `pan skills pack add <id> [url]` calls `fetchPackSource` and `resolveRef`
-   (git, CLI only).
+   (git; from the CLI or the dashboard's `POST /api/skills/packs/preview` and
+   `POST /api/skills/packs`, which call `addPack` with a confirm that compares
+   the previewed commit).
 2. `extractCommit` extracts the trusted commit into
    `~/.overdeck/packs/<id>/<commit>/`, honoring the known pack's `pluginRoot`.
 3. The adapter reads the manifest (`readPackManifest`).
@@ -267,15 +275,16 @@ instead.
 4. Set `ref` only when a fixed commit is the right default.
 5. Set `pluginRoot`, `skillsRoot`, or `mountExtras` as needed.
 6. Add a `disclosure` if anything leaves the machine.
-7. The dashboard's empty state shows one hard-coded example command,
-   `ADD_COMMAND` in
-   `src/dashboard/frontend/src/components/skills/SkillPacksSection.tsx`;
-   change it only if the example should name the new pack.
-8. Add tests in `src/lib/skill-packs/__tests__/adapters.test.ts` and
+7. The dashboard lists the new pack under Available packs automatically.
+   Decide whether it is dashboard-addable: it needs a default `ref` and no
+   build step (`notAddableReason` in `known.ts`).
+8. Add the id to the Known packs table in
+   `sync-sources/skills/pan-skills/SKILL.md` (a test fails otherwise).
+9. Add tests in `src/lib/skill-packs/__tests__/adapters.test.ts` and
    `sources.test.ts`.
-9. Add a catalog row and a `### <pack>` section to
+10. Add a catalog row and a `### <pack>` section to
    [features/skill-packs.mdx](../features/skill-packs.mdx).
-10. Add a row to the fork table if the pack comes from a fork.
+11. Add a row to the fork table if the pack comes from a fork.
 
 ## Writing a new adapter
 
@@ -385,8 +394,11 @@ skill map and then apply it. The CLI (`pan skills add`), the MCP tool
 | Pack adapters, sources, browser sources, mount, render, browser, gstack, Deft, the `ox` build | `src/lib/skill-packs/__tests__/{adapters,sources,sources-browser,sources-sageox,mount,render,browser,gstack,deft,ox-build}.test.ts` |
 | Skill override resolution, store, launch, pack MCP server resolution, conversation flags | `src/lib/skill-overrides/__tests__/{resolve,store,launch,launch-pack-mcp,conversation-flags}.test.ts` |
 | CLI: skills, pack browser, SageOx doctor check, Atlassian MCP doctor check | `src/cli/commands/__tests__/{skills,skills-pack-browser,doctor-sageox,doctor-atlassian}.test.ts` |
+| Known-pack listing and dashboard add core | `src/lib/skill-packs/__tests__/known.test.ts` |
 | Dashboard skill-overrides route | `src/dashboard/server/routes/__tests__/skill-overrides-route.test.ts` |
-| Dashboard skill packs UI | `src/dashboard/frontend/src/components/skills/SkillPacksSection.test.tsx` |
+| Dashboard known-pack routes | `src/dashboard/server/routes/__tests__/skill-packs-route.test.ts` |
+| Dashboard skill packs UI, add dialog | `src/dashboard/frontend/src/components/skills/{SkillPacksSection,AddPacksDialog}.test.tsx` |
+| `pan-skills` skill names every known pack | `tests/unit/skills/pan-skills-skill.test.ts` |
 | SageOx (binary, binding, placement, launch, Codex hooks, link, commit, merge guard, config, probe) | `src/lib/sageox/__tests__/*.test.ts` |
 | Shared hide | `src/lib/git/__tests__/worktree-exclude.test.ts` |
 | Repo merge guards | `src/lib/cloister/__tests__/repo-merge-guards.test.ts` |

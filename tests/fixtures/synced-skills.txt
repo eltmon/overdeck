@@ -82,6 +82,7 @@ pan-semgrep
 pan-share
 pan-show
 pan-skill-creator
+pan-skills
 pan-start
 pan-status
 pan-stop-all-agents

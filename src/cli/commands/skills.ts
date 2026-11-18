@@ -366,9 +366,6 @@ async function packConfirm(
   };
 }
 
-/** A pack add that cannot start (no default url or ref); the single-id path prints it and exits 1. */
-class PackAddUsageError extends Error {}
-
 export async function skillsPackAddCommand(id: string | undefined, url: string | undefined, options: PackAddOptions): Promise<void> {
   if (!id === !options.group) {
     console.error(chalk.red('provide a pack id or --group <name>'));
@@ -392,11 +389,13 @@ export async function skillsPackAddCommand(id: string | undefined, url: string |
   const validated: AddOneOptions = { ...options, adapter: options.adapter };
   if (options.group) return addGroupPacks(options.group, validated);
   const packId = id as string;
+  const { KnownPackError } = await import('../../lib/skill-packs/known.js');
   let outcome;
   try {
     outcome = await addOnePack(packId, url, validated);
   } catch (error) {
-    if (error instanceof PackAddUsageError) {
+    // A pack add that cannot start (no default url or ref): print it and exit 1.
+    if (error instanceof KnownPackError) {
       console.error(chalk.red(error.message));
       process.exit(1);
     }
@@ -427,18 +426,16 @@ async function addGroupPacks(group: string, options: AddOneOptions): Promise<voi
   if (failed) process.exit(1);
 }
 
-/** Add one pack; 'declined' when its preview is not trusted. Throws PackSourceError (code 'exists' when registered) and PackAddUsageError. */
+/** Add one pack; 'declined' when its preview is not trusted. Throws PackSourceError (code 'exists' when registered) and KnownPackError (no default url or ref). */
 async function addOnePack(id: string, url: string | undefined, options: AddOneOptions): Promise<'added' | 'declined'> {
-  const [{ addPack }, { CORE_SKILLS }, { KNOWN_PACKS }] = await Promise.all([
+  const [{ addPack }, { CORE_SKILLS }, { KNOWN_PACKS }, { knownPackSource }] = await Promise.all([
     import('../../lib/skill-packs/sources.js'),
     import('../../lib/skill-overrides/resolve.js'),
     import('../../lib/skill-packs/adapters.js'),
+    import('../../lib/skill-packs/known.js'),
   ]);
   const known = KNOWN_PACKS[id];
-  const resolvedUrl = url ?? known?.url;
-  const ref = options.ref ?? known?.ref;
-  if (!resolvedUrl) throw new PackAddUsageError(`pack ${id} has no default url; pass one: pan skills pack add ${id} <url> --ref <ref>`);
-  if (!ref) throw new PackAddUsageError(`pack ${id} has no default ref; pass --ref <tag-or-branch>`);
+  const { url: resolvedUrl, ref } = knownPackSource(id, { url, ref: options.ref });
   const runtimeNote =
     (options.adapter ?? known?.adapter) === 'gstack-runtime'
       ? '\nTrusting runs the command above once now; skills run the listed scripts when you invoke them.'
@@ -512,7 +509,7 @@ export async function skillsPackUpdateCommand(id: string, options: PackUpdateOpt
 }
 
 export async function skillsPackListCommand(options: PackListOptions): Promise<void> {
-  const [{ packUpdateAvailable }, { listPackCatalog }, { notAppliedLabels, KNOWN_PACKS }] = await Promise.all([
+  const [{ packUpdateAvailable }, { listPackCatalog }, { notAppliedLabels }] = await Promise.all([
     import('../../lib/skill-packs/sources.js'),
     import('../../lib/skill-overrides/catalog.js'),
     import('../../lib/skill-packs/adapters.js'),
@@ -537,8 +534,7 @@ export async function skillsPackListCommand(options: PackListOptions): Promise<v
     return;
   }
   if (rows.length === 0) {
-    const url = KNOWN_PACKS['mattpocock']?.url;
-    console.log(`No skill packs. Add one with: pan skills pack add mattpocock ${url} --ref v1.2.3`);
+    console.log('No skill packs added.');
   } else {
     console.log(chalk.bold(`\nSkill packs (${rows.length})\n`));
     for (const row of rows) {
@@ -549,10 +545,10 @@ export async function skillsPackListCommand(options: PackListOptions): Promise<v
       ));
     }
   }
-  // PAN-5464 D-2: groups are aliases, listed only in the text output so the --json rows stay unchanged.
-  const { listPackGroups } = await import('../../lib/skill-packs/groups.js');
-  console.log(chalk.bold('\nGroups\n'));
-  for (const group of await listPackGroups()) console.log(`${group.name}  ${group.packs.join(', ')}  (${group.source})`);
+  // PAN-5540: known packs not added and group add commands, text output only (--json rows unchanged, D-10).
+  const { listAvailablePacks, formatAvailablePackLines } = await import('../../lib/skill-packs/known.js');
+  console.log('');
+  for (const line of formatAvailablePackLines(await listAvailablePacks())) console.log(line);
 }
 
 /** gstack skills write `.gstack/` and `.gstack-worktrees/` in the projects they run in (PAN-4727 D9); remove never deletes them. */

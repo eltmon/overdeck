@@ -5,13 +5,15 @@
  * skill (`pack/skill`) with its own control. Pack skills are off unless a
  * pack toggle or a per-skill value turns them on, and opt-in skills ignore
  * the pack toggle. At global both controls are two-state switches; at
- * project and issue they are Inherit | On | Off. Adding a pack needs the
- * CLI's consent flow, so the dashboard only shows the command.
+ * project and issue they are Inherit | On | Off. At the global level,
+ * Available packs lists known packs not yet added (PAN-5540).
  */
 import { useState, type RefObject } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { cn } from '../../lib/utils';
+import { AddPacksDialog } from './AddPacksDialog';
+import { AvailablePacksSection, type AddPacksRequest } from './AvailablePacksSection';
 import { GroupHeader, LevelChoice, RowError as SaveError, SkillSwitch } from './SkillControls';
 
 // Declared here rather than imported: SkillOverridesPanel imports this module.
@@ -71,7 +73,6 @@ export interface SkillPacksSectionProps {
 }
 
 const ENDPOINT = '/api/skills/overrides';
-const ADD_COMMAND = 'pan skills pack add mattpocock https://github.com/eltmon/skills --ref v1.2.3';
 const short = (commit: string) => commit.slice(0, 7);
 
 const SOURCE_LABELS: Record<PackSkillSource, string> = {
@@ -83,6 +84,12 @@ const SOURCE_LABELS: Record<PackSkillSource, string> = {
   'project-pack': 'pack at project',
   'issue-pack': 'pack at issue',
 };
+
+/** D-7: the Skills page holds the global pack registry; go there through the URL door App owns. */
+function openSkillsPage(): void {
+  window.history.pushState({}, '', '/skills');
+  window.dispatchEvent(new PopStateEvent('popstate'));
+}
 
 function belowNote(entry: { projects: string[]; issues: string[] } | undefined): string | null {
   if (!entry) return null;
@@ -107,6 +114,12 @@ export function SkillPacksSection({ level, projectKey, issueId, packs, packOverr
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [rowErrors, setRowErrors] = useState<Record<string, { message: string; target: SaveTarget; enabled: boolean | null }>>({});
+  // The add dialog lives here, at a fixed place in both returns below, so it stays open while an add
+  // changes which branch renders and removes rows from the Available list.
+  const [addRequest, setAddRequest] = useState<AddPacksRequest | null>(null);
+  const addDialog = addRequest && (
+    <AddPacksDialog title={addRequest.title} packIds={addRequest.packIds} onClose={() => setAddRequest(null)} />
+  );
 
   // The update check runs `git ls-remote`, so only the global page asks, separately from the main list.
   const updates = useQuery({
@@ -143,9 +156,17 @@ export function SkillPacksSection({ level, projectKey, issueId, packs, packOverr
   const shown = packs
     .map(pack => ({ pack, skills: pack.skills.filter(matches) }))
     .filter(({ pack, skills }) => !search || skills.length > 0 || pack.id.toLowerCase().includes(search));
-  if (search && shown.length === 0) return null;
+  if (search && shown.length === 0) {
+    return level === 'global' ? (
+      <>
+        <AvailablePacksSection search={search} onAdd={setAddRequest} />
+        {addDialog}
+      </>
+    ) : null;
+  }
 
   return (
+    <>
     <section ref={sectionRef} tabIndex={-1} aria-label="Skill packs" className="scroll-mt-4 space-y-2 pt-2 focus:outline-none" data-testid={`skill-packs-${level}`}>
       <div>
         <h3 className="text-[13px] font-medium text-foreground">Skill packs</h3>
@@ -155,8 +176,17 @@ export function SkillPacksSection({ level, projectKey, issueId, packs, packOverr
       </div>
       {packs.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border px-3 py-3 text-sm text-muted-foreground">
-          No skill packs. Add one from the CLI:
-          <code className="mt-1 block font-mono text-xs text-foreground">{ADD_COMMAND}</code>
+          {level === 'global' ? (
+            'No skill packs added yet.'
+          ) : (
+            <>
+              No skill packs added. Add packs on the{' '}
+              <button type="button" className="text-foreground underline underline-offset-2" onClick={openSkillsPage}>
+                Skills page
+              </button>
+              .
+            </>
+          )}
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-border bg-card">
@@ -268,7 +298,10 @@ export function SkillPacksSection({ level, projectKey, issueId, packs, packOverr
           })}
         </div>
       )}
+      {level === 'global' && <AvailablePacksSection search={search} onAdd={setAddRequest} />}
     </section>
+    {addDialog}
+    </>
   );
 }
 

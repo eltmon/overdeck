@@ -1,0 +1,256 @@
+{
+  "version": "1",
+  "issueId": "PAN-5540",
+  "created": "2026-11-18T20:13:27.480Z",
+  "updated": "2026-11-18T21:18:16.382Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-18T21:18Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-18T21:18:16.382Z"
+    }
+  ],
+  "items": {
+    "known-listing-core": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5540",
+      "claimedAt": "2026-11-18T20:13:27.480Z",
+      "doneAt": "2026-11-18T20:17:43.998Z"
+    },
+    "known-listing-core.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:17:43.998Z"
+    },
+    "known-listing-core.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:17:43.998Z"
+    },
+    "known-listing-core.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:17:43.998Z"
+    },
+    "known-listing-core.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:17:43.998Z"
+    },
+    "known-listing-core.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:17:43.998Z"
+    },
+    "cli-list-known": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5540",
+      "claimedAt": "2026-11-18T20:17:48.817Z",
+      "doneAt": "2026-11-18T20:20:45.280Z"
+    },
+    "cli-list-known.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:20:45.280Z"
+    },
+    "cli-list-known.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:20:45.280Z"
+    },
+    "cli-list-known.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:20:45.280Z"
+    },
+    "available-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5540",
+      "claimedAt": "2026-11-18T20:20:46.453Z",
+      "doneAt": "2026-11-18T20:24:37.600Z"
+    },
+    "available-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:24:37.600Z"
+    },
+    "available-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:24:37.600Z"
+    },
+    "available-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:24:37.600Z"
+    },
+    "known-add-core": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5540",
+      "claimedAt": "2026-11-18T20:24:43.233Z",
+      "doneAt": "2026-11-18T20:29:30.471Z"
+    },
+    "known-add-core.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:29:30.471Z"
+    },
+    "known-add-core.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:29:30.471Z"
+    },
+    "known-add-core.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:29:30.471Z"
+    },
+    "known-add-core.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:29:30.471Z"
+    },
+    "known-add-core.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:29:30.471Z"
+    },
+    "add-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5540",
+      "claimedAt": "2026-11-18T20:29:36.102Z",
+      "doneAt": "2026-11-18T20:33:35.857Z"
+    },
+    "add-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:33:35.857Z"
+    },
+    "add-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:33:35.857Z"
+    },
+    "add-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:33:35.857Z"
+    },
+    "add-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:33:35.857Z"
+    },
+    "skills-page-available-list": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5540",
+      "claimedAt": "2026-11-18T20:33:41.345Z",
+      "doneAt": "2026-11-18T20:37:33.890Z"
+    },
+    "skills-page-available-list.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:37:33.890Z"
+    },
+    "skills-page-available-list.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:37:33.890Z"
+    },
+    "skills-page-available-list.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:37:33.890Z"
+    },
+    "skills-page-available-list.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:37:33.890Z"
+    },
+    "skills-page-available-list.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:37:33.890Z"
+    },
+    "skills-page-available-list.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:37:33.890Z"
+    },
+    "add-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5540",
+      "claimedAt": "2026-11-18T20:37:39.527Z",
+      "doneAt": "2026-11-18T20:42:41.409Z"
+    },
+    "add-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:42:41.409Z"
+    },
+    "add-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:42:41.409Z"
+    },
+    "add-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:42:41.409Z"
+    },
+    "add-dialog.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:42:41.409Z"
+    },
+    "add-dialog.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:42:41.409Z"
+    },
+    "conversation-field-groups": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5540",
+      "claimedAt": "2026-11-18T20:42:47.585Z",
+      "doneAt": "2026-11-18T20:45:44.749Z"
+    },
+    "conversation-field-groups.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:45:44.749Z"
+    },
+    "conversation-field-groups.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:45:44.749Z"
+    },
+    "conversation-field-groups.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:45:44.749Z"
+    },
+    "pan-skills-skill": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5540",
+      "claimedAt": "2026-11-18T20:45:50.113Z",
+      "doneAt": "2026-11-18T20:53:33.476Z"
+    },
+    "pan-skills-skill.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:53:33.476Z"
+    },
+    "pan-skills-skill.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:53:33.476Z"
+    },
+    "pan-skills-skill.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:53:33.476Z"
+    },
+    "docs-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5540",
+      "claimedAt": "2026-11-18T20:53:38.837Z",
+      "doneAt": "2026-11-18T20:54:52.373Z"
+    },
+    "docs-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:54:52.373Z"
+    },
+    "docs-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:54:52.373Z"
+    },
+    "docs-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:54:52.373Z"
+    },
+    "docs-changelog.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:54:52.373Z"
+    },
+    "docs-changelog.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:54:52.373Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-18T21:18:16Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5540\n\nPull request: https://github.com/eltmon/overdeck/pull/5547 (head `3c65114c`)\n\nSource: check_run:test-e2e\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-e2e\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/135136531092/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/44398989195/job/135136531092  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/__tests__/reactCompilerCoverage.test.ts\u001b[2m > \u001b[22mReact Compiler skip coverage\u001b[2m > \u001b[22mthe frontend tree matches scripts/react-compiler-skip-baseline.txt\n\u001b[31m\u001b[1mAssertionError\u001b[22m: React Compiler skip baseline mismatch:\n  src/dashboard/frontend/src/components/skills/AddPacksDialog.tsx: 2 skip(s), baseline none (`try`/`finally` without `catch` is not supported by React Compiler)\nA new skip: fix the component (docs/DASHBOARD-ARCHITECTURE.md, React Compiler). A stale row: run npx tsx src/dashboard/frontend/scripts/reactCompilerCoverage.ts --update.: expected { …(3) } to deeply equal { added: [], raised: [], stale: [] }\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[2m  {\u001b[22m\n\u001b[32m-   \"added\": [],\u001b[39m\n\u001b[31m+   \"added\": [\u001b[39m\n\u001b[31m+     \"src/dashboard/frontend/src/components/skills/AddPacksDialog.tsx\",\u001b[39m\n\u001b[31m+   ],\u001b[39m\n\u001b[2m    \"raised\": [],\u001b[22m\n\u001b[2m    \"stale\": [],\u001b[22m\n\u001b[2m  }\u001b[22m\n\n\u001b[36m \u001b[2m❯\u001b[22m src/__tests__/reactCompilerCoverage.test.ts:\u001b[2m83:29\u001b[22m\u001b[39m\n\n    \u001b[90m 81|\u001b[39m       'A new skip: fix the component (docs/DASHBOARD-ARCHITECTURE.md, …\n    \u001b[90m 82|\u001b[39m     ]\u001b[33m.\u001b[39m\u001b[34mjoin\u001b[39m(\u001b[32m'\\n'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m 83|\u001b[39m     expect(result, message).toEqual({ added: [], raised: [], stale: []…\n    \u001b[90m   |\u001b[39m                             \u001b[31m^\u001b[39m\n    \u001b[90m 84|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m 85|\u001b[39m })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m565 passed\u001b[39m\u001b[22m\u001b[90m (566)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
+}

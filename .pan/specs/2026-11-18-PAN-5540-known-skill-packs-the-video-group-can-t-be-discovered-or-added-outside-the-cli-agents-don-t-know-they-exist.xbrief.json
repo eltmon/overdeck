@@ -1,0 +1,908 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-18T19:58:01Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5540: Known skill packs (the video group) can't be discovered or added outside the CLI; agents don't know they exist",
+    "updated": "2026-11-18T20:13:10.385Z"
+  },
+  "plan": {
+    "id": "pan-5540",
+    "title": "Known skill packs (the video group) can't be discovered or added outside the CLI; agents don't know they exist",
+    "status": "running",
+    "uid": "9a20df01-d715-464d-8d1c-69f09df59e43",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-18T19:58:01Z",
+    "updated": "2026-11-18T20:13:10.385Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5540",
+        "label": "PAN-5540",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "skill-packs",
+      "dashboard",
+      "cli",
+      "agent-guidance",
+      "docs"
+    ],
+    "narratives": {
+      "Problem": "Known skill packs (the video group from PAN-5464, plus pstack, sageox, atlassian, gstack, mattpocock, deft) ship with URLs and pinned commits in KNOWN_PACKS, but nothing outside the CLI verb lists or adds them: the Skills page shows one hard-coded mattpocock command, the new-conversation skills field lists only registered packs, pan skills pack list never says what is not added, no shipped skill tells agents, and the docs omit the video packs' default refs.",
+      "Proposal": "Add a known-pack listing core (src/lib/skill-packs/known.ts) used by pan skills pack list and GET /api/skills/packs/available; add a two-step preview/add core over the existing addPack(input, confirm) (confirm compares the previewed commit) behind POST /api/skills/packs/preview and POST /api/skills/packs (id-only bodies, admin scope, per-id in-process lock); render an Available packs list with an AddPacksDialog trust flow on the Skills page and a not-added-groups row in the new-conversation skills field; ship a pan-skills bundled skill for agents; update docs and changelog. Full detail in .pan/drafts/PAN-5540.md.",
+      "NonGoals": "- Adding custom (non-known) packs, choosing a ref, or choosing an adapter from the dashboard\n- Adding mattpocock, deft, gstack or sageox from the dashboard (they stay CLI-only: no default ref or a build step)\n- Updating, removing or syncing packs, or toggling gstack's browser runtime, from the dashboard\n- Turning packs on from the add dialog\n- An MCP tool for adding packs\n- A cross-process lock between the CLI and the dashboard\n- A license field on KnownPack\n- Any change to pan skills pack list --json output\n- A universal rule for pack discovery\n- Cleaning up the clone/extraction a declined or abandoned preview leaves on disk\n- Accepting url, ref or adapter in any new HTTP request body"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Dashboard Add is offered only for known packs with a default url and ref and no build step (pstack, atlassian, remotion, hyperframes, openmontage, video-use); mattpocock, deft, gstack and sageox are listed with their CLI command. This narrows the issue acceptance sentence 'each known pack with an Add action': all ten are listed, six get Add; the video group is fully addable.",
+        "rationale": "Packs without a default ref need an operator choice the issue does not define a UI for, and gstack/sageox run bash setup or go build at add time, which can take minutes and download toolchains inside an HTTP request."
+      },
+      {
+        "summary": "Trust over HTTP is two requests: preview returns the PackPreview; add re-runs addPack with confirm = preview.commit === previewed commit, else 409 commit-changed.",
+        "rationale": "Keeps one registration path (addPack), needs no server-side preview session, and guarantees the operator trusts exactly the commit they saw."
+      },
+      {
+        "summary": "New request bodies accept only a known pack id (plus commit); any url/ref/adapter key is rejected.",
+        "rationale": "Otherwise the dashboard becomes an arbitrary git clone endpoint."
+      },
+      {
+        "summary": "License is shown only in the preview (from the fetched manifest); KnownPack gets no license field.",
+        "rationale": "License is derived from the repo at the commit; a static copy would drift."
+      },
+      {
+        "summary": "A group add is one dialog with all member previews and one Trust button, then one add request per member, skipping registered members and continuing past failures.",
+        "rationale": "Matches the CLI's addGroupPacks semantics and keeps each HTTP request short."
+      },
+      {
+        "summary": "The Available packs list renders only at the global level of the skill overrides panel; project/issue levels link to the Skills page.",
+        "rationale": "The pack registry is global; showing the list in issue drawers would add noise."
+      },
+      {
+        "summary": "The new-conversation field shows only groups (not single packs) and opens AddPacksDialog nested in place.",
+        "rationale": "The issue asks for groups there; navigating to /skills would drop the open dialog's state, and Modal supports nesting."
+      },
+      {
+        "summary": "Agent guidance ships as a new pan-skills CLI-wrapper bundled skill, not a universal rule.",
+        "rationale": "A rule costs context in every session; a skill costs only its description line, which carries the trigger words. No pan skills wrapper existed."
+      },
+      {
+        "summary": "pan skills pack list --json stays unchanged; the known-pack section is text-only.",
+        "rationale": "PAN-5464 D-2 kept groups text-only to avoid changing the JSON row contract."
+      },
+      {
+        "summary": "The per-id guard is in-process only: a second preview of the same id shares the running preview; an add while anything for that id runs returns 409 busy.",
+        "rationale": "Sharing previews keeps a reopened dialog and React StrictMode double effects from erroring; the CLI already races with itself on the same clone, so a cross-process lock is out of scope."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One user-facing capability (discover and add known packs) that must land across lib, CLI, server routes, frontend, a bundled skill and docs to be useful; the subsystem count is inflated because the lint counts each top-level doc file (docs/USAGE.md, docs/SKILL-PACKS.md, configuration/skills.mdx, features/skill-packs.mdx, changelog.d) as its own subsystem. Items are vertical slices with explicit edges.",
+      "canonicalFilename": "2026-11-18-PAN-5540-known-skill-packs-the-video-group-can-t-be-discovered-or-added-outside-the-cli-agents-don-t-know-they-exist.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "known-listing-core",
+        "title": "Add the known-pack listing core in src/lib/skill-packs/known.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:58:01Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5540",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/known.ts",
+            "src/lib/skill-packs/__tests__/known.test.ts",
+            "src/lib/skill-packs/sources.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/known.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "known.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "cli-list-known",
+            "available-route",
+            "known-add-core"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-5540.md). Export buildsOx from sources.ts. Create known.ts exporting NotAddableReason, AvailablePack, AvailableGroup, AvailablePackListing, notAddableReason(id), packAddCommand(id), listAvailablePacks(), formatAvailablePackLines(listing) exactly as the PRD specifies (output line formats included). known.ts must not import src/lib/skill-overrides/. Write the listed known.test.ts cases."
+        },
+        "items": [
+          {
+            "id": "known-listing-core.ac1",
+            "title": "Given no registered packs, when listAvailablePacks() runs, then it returns all 10 KNOWN_PACKS ids with added=false and the video group with missing = [remotion, hyperframes, openmontage, video-use] and dashboardAddable=true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "known-listing-core.ac2",
+            "title": "notAddableReason returns null for remotion, hyperframes, openmontage, video-use, pstack and atlassian; 'needs-ref' for mattpocock, deft, gstack and an unknown id; 'runs-build' for sageox",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "known-listing-core.ac3",
+            "title": "packAddCommand('remotion') returns 'pan skills pack add remotion' and packAddCommand('gstack') returns 'pan skills pack add gstack --ref <ref>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "known-listing-core.ac4",
+            "title": "Given a config group listing an id outside KNOWN_PACKS, listAvailablePacks reports it in unknown[] and sets that group's dashboardAddable=false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "known-listing-core.ac5",
+            "title": "formatAvailablePackLines emits a 'Known packs not added (<n>)' header plus one '<id>  <addCommand>' line per not-added pack, and for a group with missing members the line '  not added: <ids>; run pan skills pack add --group <name>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-list-known",
+        "title": "Make pan skills pack list print not-added known packs and group add commands",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:58:01Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5540",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/skills.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run build:cli && mkdir -p .tmp/pan-5540-home && OVERDECK_HOME=$PWD/.tmp/pan-5540-home node dist/cli/index.js skills pack list --offline"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "output contains 'Known packs not added' and 'run pan skills pack add --group video' when the video packs are not registered"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In skillsPackListCommand replace the mattpocock empty-state line with 'No skill packs added.' and replace the Groups printing loop with the formatAvailablePackLines(await listAvailablePacks()) output. Leave the --json branch unchanged."
+        },
+        "items": [
+          {
+            "id": "cli-list-known.ac1",
+            "title": "Given no registered packs, when pan skills pack list --offline runs, then it prints 'No skill packs added.' and no longer prints 'pan skills pack add mattpocock'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-list-known.ac2",
+            "title": "Given the video packs are not registered, the text output prints 'not added: remotion, hyperframes, openmontage, video-use; run pan skills pack add --group video'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-list-known.ac3",
+            "title": "pan skills pack list --json produces rows with the same keys as before (id, url, ref, commit, adapter, cached, license, skills, notApplied, updateAvailable) and no known-pack section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "available-route",
+        "title": "Add GET /api/skills/packs/available with scope and no-loss rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:58:01Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5540",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc/skill-packs.ts",
+            "src/dashboard/server/routes/misc.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/routes/__tests__/skill-packs-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/skill-packs-route.test.ts src/dashboard/server/__tests__/route-scopes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Create routes/misc/skill-packs.ts exporting skillPacksRouteLayer with GET /api/skills/packs/available returning listAvailablePacks(); merge it into miscRouteLayer and list it in misc.ts's header comment; add a READ no-loss-matrix row; add NO ROUTE_SCOPES row (unlisted = admin; a listed path would also need a telemetry client route, PRD D-12); write the route test."
+        },
+        "items": [
+          {
+            "id": "available-route.ac1",
+            "title": "GET /api/skills/packs/available returns 200 with the { packs, groups } body listAvailablePacks produces",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "available-route.ac2",
+            "title": "requiredScopeFor('GET', '/api/skills/packs/available') returns 'admin'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "available-route.ac3",
+            "title": "NO_LOSS_MATRIX contains the 'GET /api/skills/packs/available' surface, route-scopes.ts is unchanged, and route-scopes.test.ts and no-loss-matrix.test.ts pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skills-page-available-list",
+        "title": "Render the read-only Available packs list on the Skills page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:58:01Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5540",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/skills/availablePacks.ts",
+            "src/dashboard/frontend/src/components/skills/AvailablePacksSection.tsx",
+            "src/dashboard/frontend/src/components/skills/SkillPacksSection.tsx",
+            "src/dashboard/frontend/src/components/skills/SkillPacksSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/skills/SkillPacksSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SkillPacksSection.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-7"
+          ],
+          "acJustification": "Six distinct observable states of one component (empty global, removed hint, project-level link, tolerant body, full listing, search) — the search case was added by the plan critique and splitting the component across items would only add shared-file edges."
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add availablePacks.ts (types, AVAILABLE_PACKS_QUERY_KEY ['skill-packs-available'], tolerant fetchAvailablePacks, useAvailablePacks). Add AvailablePacksSection (groups with missing members, not-added known packs, disclosure, reason text and CLI command; null while loading or on error). In SkillPacksSection delete ADD_COMMAND, update the header comment, change the empty states per D-7, render AvailablePacksSection at level global only, and change the line-146 early exit so a search matching no registered pack still renders AvailablePacksSection at global."
+        },
+        "items": [
+          {
+            "id": "skills-page-available-list.ac1",
+            "title": "Given no registered packs at level global, the panel renders 'No skill packs added yet.', a [data-available-group=\"video\"] row containing '4 packs not added', and a [data-available-pack=\"gstack\"] row containing 'pan skills pack add gstack --ref <ref>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-page-available-list.ac2",
+            "title": "The rendered page no longer contains 'pan skills pack add mattpocock https://github.com/eltmon/skills --ref v1.2.3' and SkillPacksSection.tsx no longer defines ADD_COMMAND",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-page-available-list.ac3",
+            "title": "At level project with no packs, the panel renders a 'Skills page' control that navigates to /skills and renders no [data-testid=\"available-packs\"] section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-page-available-list.ac4",
+            "title": "Given /api/skills/packs/available answers a body without packs/groups arrays, the section renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-page-available-list.ac5",
+            "title": "Given all 10 known packs are unregistered, the section renders 10 [data-available-pack] rows, one per KNOWN_PACKS id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-page-available-list.ac6",
+            "title": "Given no registered packs at level global and search 'remotion', the panel renders [data-available-pack=\"remotion\"] and no [data-available-pack=\"gstack\"] instead of returning null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "known-add-core",
+        "title": "Add the known-pack preview/add core and route the CLI add through knownPackSource",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:58:01Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5540",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/known.ts",
+            "src/lib/skill-packs/__tests__/known.test.ts",
+            "src/cli/commands/skills.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/known.test.ts src/lib/skill-packs/__tests__/sources.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "Its files (known.ts, known.test.ts, skills.ts) are touched by no item that can run concurrently; the edges from known-listing-core and cli-list-known serialize the shared files.",
+          "foundationFor": [
+            "add-routes",
+            "add-dialog"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Add KnownPackError, knownPackSource, the in-process withPackLock, requireDashboardAddable, previewKnownPack (addPack with confirm=false), addKnownPack (confirm compares the previewed commit; written=false -> commit-changed), PackPreviewDto and serializePackPreview to known.ts. Callers pass reservedIds; known.ts never imports src/lib/skill-overrides/. In the CLI delete PackAddUsageError, resolve url/ref through knownPackSource, and catch KnownPackError the same way; CLI messages stay byte-identical."
+        },
+        "items": [
+          {
+            "id": "known-add-core.ac1",
+            "title": "previewKnownPack('remotion', []) calls addPack once with the KNOWN_PACKS url and 40-hex ref and a confirm that resolves false, so no registry entry is written",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "known-add-core.ac2",
+            "title": "addKnownPack registers only when the resolved commit equals the expected commit; when addPack reports written=false it rejects with KnownPackError code 'commit-changed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "known-add-core.ac3",
+            "title": "previewKnownPack rejects with code 'not-addable' for sageox and 'unknown-pack' for an id outside KNOWN_PACKS without calling addPack",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "known-add-core.ac4",
+            "title": "Given a preview of remotion is in flight, a second previewKnownPack('remotion') resolves to the same preview with addPack called once, and addKnownPack('remotion', ...) rejects with code 'busy' until that preview settles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "known-add-core.ac5",
+            "title": "pan skills pack add gstack without --ref still exits 1 and prints 'pack gstack has no default ref; pass --ref <tag-or-branch>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "add-routes",
+        "title": "Add POST /api/skills/packs/preview and POST /api/skills/packs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:58:01Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5540",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc/skill-packs.ts",
+            "src/dashboard/server/routes/misc.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/routes/__tests__/skill-packs-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/skill-packs-route.test.ts src/dashboard/server/__tests__/route-scopes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "add-dialog",
+            "conversation-field-groups"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Add the two POST handlers to skillPacksRouteLayer: id-only bodies (any url/ref/adapter key is 400 bad-request), 40-hex commit for add, CORE_SKILLS passed as reservedIds, the documented status mapping for KnownPackError and PackSourceError codes, no ROUTE_SCOPES rows (admin by the fail-closed default, PRD D-12), READ/WRITE no-loss-matrix rows, misc.ts header comment, route tests."
+        },
+        "items": [
+          {
+            "id": "add-routes.ac1",
+            "title": "POST /api/skills/packs/preview with { id: 'remotion' } returns 200 with preview.commit, and with a url key present returns 400 code 'bad-request' without calling previewKnownPack",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-routes.ac2",
+            "title": "POST /api/skills/packs with a 40-hex commit returns 201 { added: true }, and with commit 'abc' returns 400",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-routes.ac3",
+            "title": "When the core throws KnownPackError 'commit-changed' or PackSourceError 'exists' the route returns 409, and for KnownPackError 'not-addable' it returns 422, each with a { error, code } body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-routes.ac4",
+            "title": "requiredScopeFor returns 'admin' for POST /api/skills/packs and POST /api/skills/packs/preview while route-scopes.ts stays unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "add-dialog",
+        "title": "Add the AddPacksDialog trust flow and Add buttons on the Skills page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:58:01Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5540",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/skills/AddPacksDialog.tsx",
+            "src/dashboard/frontend/src/components/skills/AddPacksDialog.test.tsx",
+            "src/dashboard/frontend/src/components/skills/availablePacks.ts",
+            "src/dashboard/frontend/src/components/skills/AvailablePacksSection.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/skills/AddPacksDialog.test.tsx src/components/skills/SkillPacksSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both frontend test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "NFR-7"
+          ],
+          "parallelSafeReason": "Its files are under components/skills/ and are shared only with skills-page-available-list, which blocks it; conversation-field-groups waits on it."
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Build AddPacksDialog on components/shared/Modal: sequential previews in packIds order, per-pack rows with source, commit, license, skills, opt-ins, Not applied, executables, MCP servers and disclosure; 'Trust and add <n> pack(s)' enabled only when every preview settled; sequential adds with the previewed commit; exists -> already added, commit-changed -> message and re-preview; invalidate ['skill-overrides'], ['skill-packs-available'] and ['new-conversation-skills'] after adding. Add the Add... buttons for dashboard-addable packs and groups in AvailablePacksSection."
+        },
+        "items": [
+          {
+            "id": "add-dialog.ac1",
+            "title": "Given packIds [remotion, hyperframes], the dialog sends the hyperframes preview POST only after the remotion preview resolves and renders each row's 'License' and 7-character commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-dialog.ac2",
+            "title": "The 'Trust and add 2 packs' button is disabled until both previews settle; clicking it sends POST /api/skills/packs with {\"id\":\"remotion\",\"commit\":\"<40hex>\"} and then hyperframes, and the dialog renders 'Added 2 packs.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-dialog.ac3",
+            "title": "A 409 exists preview answer renders 'already added' and the trust button counts only the remaining pack",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-dialog.ac4",
+            "title": "A 409 commit-changed add answer renders 'The pack changed since the preview.' and sends a new preview request for that pack",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-dialog.ac5",
+            "title": "On the Skills page, the video group row shows a button named 'Add the video group' that opens the dialog with the group's missing members, while gstack shows its CLI command and no button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-field-groups",
+        "title": "Show not-added pack groups with Add... in the new-conversation skills field",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:58:01Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5540",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/newConversation/ConversationSkillsField.tsx",
+            "src/dashboard/frontend/src/components/newConversation/ConversationSkillsField.module.css",
+            "src/dashboard/frontend/src/components/newConversation/__tests__/ConversationSkillsField.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/newConversation/__tests__/ConversationSkillsField.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConversationSkillsField.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Use useAvailablePacks in ConversationSkillsField; after the group list render one row per group with missing members ('<name> · <n> packs not added' or '<n> of <m> packs not added'), with an 'Add the <name> group' button opening AddPacksDialog nested in place when dashboard-addable, else the CLI command. Hide rows while filtering unless the group name matches. Switch the test's fetch stub to a URL router."
+        },
+        "items": [
+          {
+            "id": "conversation-field-groups.ac1",
+            "title": "Given the video group misses all 4 members, the field renders [data-not-added-group=\"video\"] containing '4 packs not added' and a button named 'Add the video group'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-field-groups.ac2",
+            "title": "Clicking 'Add the video group' renders a dialog titled 'Add the video packs' over the field without closing the parent dialog",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-field-groups.ac3",
+            "title": "Given /api/skills/packs/available returns { packs: [], groups: [] }, the field renders no [data-not-added-group] element and still calls /api/skills/overrides?project=tst",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-skills-skill",
+        "title": "Ship the pan-skills bundled skill that tells agents how to add known packs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:58:01Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5540",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-skills/SKILL.md",
+            "tests/unit/skills/pan-skills-skill.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/skills/pan-skills-skill.test.ts",
+            "npm run lint:skills"
+          ],
+          "expected_outputs": [
+            "pan-skills-skill.test.ts passes",
+            "'skill CLI lint passed' is printed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Create sync-sources/skills/pan-skills/SKILL.md with the PRD's frontmatter (description starts 'pan skills —' and names the video group members and the other known packs) and body: when a requested skill is missing run 'pan skills pack list --offline' and offer the install; known packs table (all 10 ids, group video); the three add/enable/load commands; ref and build caveats; the dashboard path. Add the drift test reading SKILL.md (not a .ts file)."
+        },
+        "items": [
+          {
+            "id": "pan-skills-skill.ac1",
+            "title": "sync-sources/skills/pan-skills/SKILL.md contains a frontmatter description beginning 'pan skills' that names remotion, hyperframes, openmontage and video-use",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-skills-skill.ac2",
+            "title": "The drift test fails when a KNOWN_PACKS id or KNOWN_PACK_GROUPS name is absent from SKILL.md and passes on the shipped file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-skills-skill.ac3",
+            "title": "SKILL.md contains 'pan skills pack add --group video --yes', 'pan skills set --group video on' and 'pan skills add self --pack', and npm run lint:skills accepts every pan skills command in it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-changelog",
+        "title": "Update skill-pack docs for video packs, groups and the dashboard add flow; add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:58:01Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5540",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/USAGE.md",
+            "configuration/skills.mdx",
+            "features/skill-packs.mdx",
+            "features/skills.mdx",
+            "docs/SKILL-PACKS.md",
+            "changelog.d/pan-5540.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'pstack, sageox and atlassian also default' docs/USAGE.md || echo none",
+            "grep -n 'ADD_COMMAND' docs/SKILL-PACKS.md || echo none"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "both greps print 'none'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10: make the exact edits listed there to docs/USAGE.md, configuration/skills.mdx, features/skill-packs.mdx (two 'only pan skills pack add can' sentences, new 'Adding packs from the dashboard' subsection, pack-list comment), docs/SKILL-PACKS.md (module row for known.ts, other files, data flow step 1, 'Adding a known pack' step 7 and the new pan-skills step, test table) add the pan-skills row to the skills table in features/skills.mdx, and create changelog.d/pan-5540.md with the PRD's New bullet."
+        },
+        "items": [
+          {
+            "id": "docs-changelog.ac1",
+            "title": "docs/USAGE.md and configuration/skills.mdx state that the four video packs (remotion, hyperframes, openmontage, video-use) default their ref, and docs/USAGE.md shows 'pan skills pack add --group video'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac2",
+            "title": "features/skill-packs.mdx contains an 'Adding packs from the dashboard' subsection that names the six dashboard-addable packs, the Trust and add step, and the CLI-only packs (mattpocock, deft, gstack, sageox)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac3",
+            "title": "docs/SKILL-PACKS.md contains a known.ts module row and POST /api/skills/packs, and grep for ADD_COMMAND or '(git, CLI only)' in it returns nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac4",
+            "title": "features/skills.mdx contains a `pan-skills` row in its skills table",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac5",
+            "title": "changelog.d/pan-5540.md contains one '#### New' bullet linking issue #5540, and npm run lint:docs passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "known-listing-core",
+        "to": "cli-list-known",
+        "type": "blocks"
+      },
+      {
+        "from": "known-listing-core",
+        "to": "available-route",
+        "type": "blocks"
+      },
+      {
+        "from": "known-listing-core",
+        "to": "known-add-core",
+        "type": "blocks"
+      },
+      {
+        "from": "available-route",
+        "to": "skills-page-available-list",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-list-known",
+        "to": "known-add-core",
+        "type": "blocks"
+      },
+      {
+        "from": "known-add-core",
+        "to": "add-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "available-route",
+        "to": "add-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "add-routes",
+        "to": "add-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "skills-page-available-list",
+        "to": "add-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "add-dialog",
+        "to": "conversation-field-groups",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-list-known",
+        "to": "pan-skills-skill",
+        "type": "informs"
+      },
+      {
+        "from": "cli-list-known",
+        "to": "docs-changelog",
+        "type": "blocks"
+      },
+      {
+        "from": "add-dialog",
+        "to": "docs-changelog",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-field-groups",
+        "to": "docs-changelog",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-skills-skill",
+        "to": "docs-changelog",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
