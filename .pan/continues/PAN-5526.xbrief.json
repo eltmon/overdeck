@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5526",
+  "created": "2026-11-18T19:12:30.887Z",
+  "updated": "2026-11-18T19:12:30.887Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "cli-stops-sending-autospawn": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5526",
+      "claimedAt": "2026-11-18T19:12:30.887Z"
+    }
+  }
+}
