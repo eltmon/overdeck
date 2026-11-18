@@ -1,0 +1,198 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-18T15:50:38Z",
+    "author": "overdeck/0.89.0",
+    "description": "Plan for PAN-5516: pan conversations resume always fails locally with 'Missing origin'",
+    "updated": "2026-11-18T15:53:30.175Z"
+  },
+  "plan": {
+    "id": "pan-5516",
+    "title": "pan conversations resume always fails locally with 'Missing origin' (internal token not exempt from origin check)",
+    "status": "proposed",
+    "uid": "56e29f33-9d42-443d-80fb-bd1c9db82e7d",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-18T15:50:38Z",
+    "updated": "2026-11-18T15:53:30.175Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5516",
+        "label": "PAN-5516",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "conversations",
+      "dashboard",
+      "cli",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "pan conversations resume posts to POST /api/conversations/:name/resume through callDashboard, which sends the internal token and no Origin. The route ran validateOrigin, which refuses such a POST with 'Missing origin'. The route also matched only the stored conversation name, so the numeric id and the conv- session name answered 'Conversation not found'.",
+      "Proposal": "Use crossSiteWriteRefusal (the linked-conversation proxy rule: a valid internal token or access token skips the Origin check) on the resume route, and resolve the route key with the existing resolveConversationKey (numeric id, stored name, conv- session name) before calling handleConversationResume with the stored name.",
+      "NonGoals": "- No change to validateOriginHeaders or to any other route's origin check\n- No change to pan conversations move or heal (tracked in PAN-5523)\n- No new credential check beyond crossSiteWriteRefusal"
+    },
+    "autoDecisions": [],
+    "items": [
+      {
+        "id": "resume-origin",
+        "title": "Resume route accepts the internal token without an Origin",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T15:50:38Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5516",
+          "files_scope": [
+            "src/dashboard/server/routes/conversations.ts",
+            "src/dashboard/server/routes/__tests__/conversations-resume-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/conversations-resume-route.test.ts"
+          ],
+          "expected_outputs": [
+            "conversations-resume-route.test.ts passes"
+          ],
+          "readiness": "ready",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Replace validateOrigin with crossSiteWriteRefusal in postConversationResumeRoute and add route tests for the internal-token and no-credential cases."
+        },
+        "items": [
+          {
+            "id": "resume-origin.ac1",
+            "title": "Given a POST to /api/conversations/:name/resume with only the internal token header, when the route runs, then the response status is not 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-origin.ac2",
+            "title": "Given a POST to the resume route with no credential and no Origin, when the route runs, then the response status is 403 with error 'Missing origin'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resume-identifiers",
+        "title": "Resume route resolves numeric id and conv- session name",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T15:50:38Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5516",
+          "files_scope": [
+            "src/dashboard/server/routes/conversations.ts",
+            "src/lib/overdeck/conversation-reads.ts",
+            "src/dashboard/server/routes/__tests__/conversations-resume-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/conversations-resume-route.test.ts"
+          ],
+          "expected_outputs": [
+            "conversations-resume-route.test.ts passes"
+          ],
+          "readiness": "ready",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Export resolveConversationKey and use it in the resume route to map the key to the stored name before calling handleConversationResume."
+        },
+        "items": [
+          {
+            "id": "resume-identifiers.ac1",
+            "title": "Given a stored conversation, when the resume route receives its numeric id, then handleConversationResume is called with the stored name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-identifiers.ac2",
+            "title": "Given a stored conversation, when the resume route receives its conv- session name, then handleConversationResume is called with the stored name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-identifiers.ac3",
+            "title": "Given an unknown key, when the resume route runs, then handleConversationResume receives the key unchanged and answers 404",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "changelog",
+        "title": "Add the changelog.d entry for PAN-5516",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T15:50:38Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5516",
+          "files_scope": [
+            "changelog.d/pan-5516.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "docs lint passed"
+          ],
+          "readiness": "ready",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Write changelog.d/pan-5516.md with one Fixed bullet and no em dashes. No other documented surface changes: the route path, scope and CLI verb are unchanged."
+        },
+        "items": [
+          {
+            "id": "changelog.ac1",
+            "title": "Given changelog.d/pan-5516.md, when npm run lint:docs runs, then it passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changelog.ac2",
+            "title": "Given changelog.d/pan-5516.md, when it is searched for em dashes, then none are found",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "resume-origin",
+        "to": "resume-identifiers",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-18-PAN-5516-pan-conversations-resume-always-fails-locally-with-missing-origin-internal-token-not-exempt-from-origin-check.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
