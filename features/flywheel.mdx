@@ -137,6 +137,27 @@ These are two different things, and the page keeps them apart.
 
 `--json` prints the raw rows. `pan parked` does not list issues parked by the `parked` label or by a `.pan/parked.md` listing; those only ever show up on this page.
 
+## The backlog sequencer
+
+The Backlog Sequencer page, at `/backlog` (open it from **More → Operations → Backlog**), ranks the open backlog in pickup order with dependency context and the gates that control pickup and planning.
+
+It has three views: **List**, **DAG** and **Forecast**. The List view's columns are rank, importance, the issue with status markers, a one-line why, size, condition, gate and a 0 to 100 score. The DAG view draws the dependency graph, collapsing to the top issues plus their neighbors once the backlog gets large. The Forecast view shows a stat bar of counts (in flight, ready, planned, pickable, and more) and two sub-tabs: **Waves**, which groups pickable work into the order it would run, and **Lanes**, which shows the same work spread across a modeled number of parallel agents.
+
+Filters narrow by importance, condition, pipeline membership, release status, having a PRD, free text, and a stale toggle.
+
+Four buttons run a sequencing pass, one at a time:
+
+- **Run creation pass** ranks the open backlog from scratch; it shows only when there is no sequence yet.
+- **Update changed** re-reads only the issues that changed since the last pass and keeps every other rank.
+- **Re-rank all** re-ranks the whole open backlog; slower and more expensive than an incremental pass.
+- **Clear** deletes the sequence file and its cache so a creation pass can rebuild it.
+
+The dashboard also starts an automatic incremental pass on its own, at most once every 30 minutes, whenever the backlog changes. Each pass runs a `sequencer-runner` agent on `roles.sequencer.model`; see [Model routing](/configuration/model-routing) for what that role resolves to.
+
+Hovering a row shows **+ Order book**, which adds the issue to the active order book's Lane A or Lane B; a row already in a book shows **Open order book** instead. Clicking a row opens its detail panel, with the same pickup controls also found in the issue cockpit and the issue drawer: **Release** moves a planned issue to released, **Recall** undoes it, **Promote** jumps an issue ahead of its rank, and **Vetoed** keeps it out of pickup, planning and the sequence's own ranking entirely.
+
+The sequence lives at `.pan/backlog/sequence.md` in the plan home, committed on `main`. `pan backlog write-sequence <file>` is how the sequencer agent writes it: it validates the file's fields (`issue`, `rank`, `size`, `importance`, `score`, `condition`, `dependsOn`, `why`, `gate`, `planning`), commits and pushes; see [Pipeline commands](/cli/pipeline-commands) for the full command. Never hand-edit the file.
+
 ## Known limits
 
 - The loop's author gate names fixed GitHub logins: it acts only on issues whose author is `eltmon` (the Overdeck maintainer) or `panopticon-agent[bot]`, or that are assigned to `eltmon`. On any other repo or account the loop skips your issues, and the current GitHub App bot (`overdeck-agent[bot]`) does not pass it either. See [issue #5544](https://github.com/eltmon/overdeck/issues/5544).
