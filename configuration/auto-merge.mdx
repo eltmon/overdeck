@@ -1,23 +1,25 @@
 ---
-title: Auto-Merge
+title: "Auto-merge: scheduled merges without UAT"
+sidebarTitle: "Auto-Merge"
 description: Opt-in scheduled auto-merge for solo Overdeck workflows
 ---
 
 # Auto-Merge
 
-When the Flywheel orchestrator is trusted to ship work without a human clicking
-MERGE, you can flip a single toggle and Overdeck will schedule eligible PRs
-for merge with a short cooldown window. During the cooldown an audible
-announcement fires, a cancellable banner appears in the dashboard, and the
-merge runs through the exact same code path as the MERGE button when the
-cooldown expires.
+Auto-merge lets Overdeck merge eligible PRs without a human clicking MERGE.
+Turn off **Require UAT** and the dashboard's reconciler tick schedules each
+eligible PR for merge after a short cooldown window; no Flywheel run is needed.
+During the cooldown an audible announcement fires and the PR shows as a car in
+the **Merge train** section of the Flywheel page, with a **Cancel** button.
+When the cooldown expires, the merge runs through the exact same code path as
+the MERGE button.
 
 <Warning>
 **Solo Overdeck workflows only.** Auto-merge moves the merge-consent decision
 from per-PR click to a configuration toggle. That trade is appropriate when the
 operator is the only human in the loop. In a shared Overdeck instance it
-shifts consent away from the person who would normally click MERGE — not
-appropriate for team workflows.
+shifts consent away from the person who would normally click MERGE, which is
+not appropriate for team workflows.
 </Warning>
 
 ## Enabling
@@ -57,15 +59,18 @@ curl -X POST http://localhost:3011/api/merge-train/config \
 the keys in the body; the first three must be booleans, the last two whole
 numbers in range.
 
-The same toggle is exposed in the dashboard's Flywheel header as a checkbox.
-The default is `true` (auto-merge OFF — operator UAT required before merge).
+The same setting is the **Require UAT** switch in the Flywheel header. Turn it
+off to turn auto-merge on. The default is `true` (auto-merge OFF: operator UAT
+required before merge).
 
 When the toggle is `false`, the dashboard schedules auto-merge for any issue
 that satisfies the eligibility predicate. No flywheel run is needed: every
 60 seconds, on the UAT batch-train reconciler tick, the primary dashboard walks
 each project and takes its open PRs with green checks
-on a `feature/<id>` branch. A strike PR (`strike/<id>`) is never scheduled: the
-operator merges it (PAN-3973). For each one it checks, in order:
+on a `feature/<id>` branch. Strike PRs (`strike/<id>`) are scheduled once
+their expedited review approves the head, ahead of feature PRs, with the same
+cooldown. A UAT hold leaves a strike for its Merge button. For each PR it
+checks, in order:
 
 1. the issue is open in the tracker (the cached tracker row) and opted in to
    auto-merge: its `auto-merge` / `hold-for-uat` label, then the project
@@ -114,7 +119,8 @@ entry if the issue was closed, and blocks it if the PR head moved. An entry
 with no recorded head is blocked, never merged unpinned. The merge is bound to
 the approved head and to the PR the gate judged:
 
-- the final gate check reads the `feature/<id>` PR fresh (no facts cache), and
+- the final gate check reads the issue's `feature/<id>` (or `strike/<id>`) PR
+  fresh (no facts cache), and
   the merge refuses when the PR it would land is not that PR;
 - a clean PR merges directly only when its live head is the approved head,
   pinned to it (`gh pr merge --match-head-commit`, the App merge's `sha`,
@@ -151,12 +157,16 @@ applies only to issues without an explicit per-issue auto-merge setting.
 Changes are saved through `POST /api/projects/:key/auto-merge-default` and stored
 in `~/.overdeck/projects.yaml`.
 
+The same panel has a per-project **Merge train** setting
+(`merge_train: enabled | disabled`); set it to **Disabled** to opt the project
+out of the train.
+
 <Note>
 **Auto-merge vs. batches (PAN-4970, PAN-4753).** This toggle controls *per-issue*
-scheduled auto-merge — Overdeck merging one eligible PR at a time without a
+scheduled auto-merge: Overdeck merging one eligible PR at a time without a
 human click. The **Merge train** switch on the Flywheel header
 (`merge_train_enabled`) turns on [batches](/features/merge-batches). Each ready
-feature has exactly one of these two merge paths — a feature auto-merge will
+feature has exactly one of these two merge paths: a feature auto-merge will
 merge never also joins a batch.
 
 - **Merge train off:** every ready PR is auto-merged on its own. Nothing batches.
@@ -178,7 +188,7 @@ merge, its auto-merge was cancelled by the operator, or its last auto-merge
 failed at the PR head it still has. These features get their own batch, which
 waits for you to test and promote it; they never join an automatic batch and
 never hold back the other PRs' batch. A GitLab project, a project spanning several repos, and any host
-with `OVERDECK_DISABLE_AUTO_MERGE=1` set batch every ready feature —
+with `OVERDECK_DISABLE_AUTO_MERGE=1` set batch every ready feature;
 auto-merge never schedules there, and only you promote their batches.
 Leave `require_uat_before_merge` at its default (`true`, auto-merge OFF) when you
 want a human to UAT each batch before promoting it.
@@ -203,10 +213,11 @@ Only you set these labels. Overdeck agents and the Flywheel cannot add or
 remove `auto-merge`, `hold-for-uat`, `released` or `vetoed`: their `gh` refuses the write
 and tells them to ask you.
 
-The dashboard's auto-merge indicator (the ⚡ Auto / 🔒 Hold control on an
+The dashboard's auto-merge toggle (the ⚡ Auto / 🔒 Hold control on an
 in-flight issue) shows the result of this resolution: issue label, then project
-default, then global setting. It is read-only. Change the policy at the tier you
-mean, not by clicking the indicator.
+default, then global setting. Clicking **Auto** or **Hold** sets that label on
+the issue; clicking the pressed option clears it. The toggle is read-only when
+the tracker cannot carry labels.
 
 ## Eligibility
 
@@ -248,7 +259,7 @@ merged.
 
 Cooldown is fixed at **5 minutes** of wall-clock time from when the
 scheduler schedules the merge to when the executor fires. The countdown is
-persisted in SQLite, so it survives dashboard restarts — if the dashboard
+persisted in SQLite, so it survives dashboard restarts. If the dashboard
 sleeps through the deadline, the executor still picks the entry up on the
 next tick and re-validates eligibility before firing.
 
@@ -259,8 +270,8 @@ that gives the operator a predictable cancel window.
 
 Three ways to cancel an in-flight auto-merge during its cooldown:
 
-1. The Pending auto-merges card on the dashboard's Flywheel page has a
-   Cancel button.
+1. The **Merge train** section on the Flywheel page lists each car; a car in
+   its cooldown has **Cancel**, a failed car has **Retry**.
 2. `DELETE /api/merge-train/auto-merge/:id` against the dashboard. The route
    needs the dashboard's internal token (the `x-overdeck-internal-token`
    header) or a dashboard session.
@@ -277,7 +288,7 @@ Three ways to cancel an in-flight auto-merge during its cooldown:
 
 Cancellation only succeeds during the cooldown window, before the executor
 has transitioned the row to `merging`. Once the executor has started running
-the merge there is nothing to cancel — at that point it's the same code path
+the merge there is nothing to cancel: at that point it's the same code path
 as clicking MERGE.
 
 ## Queue interaction
@@ -302,9 +313,9 @@ curl http://localhost:3011/api/merge-train/auto-merge/pending
 curl http://localhost:3011/api/merge-train/auto-merge/problems
 ```
 
-The Pending auto-merges card on the dashboard's Flywheel page shows the pending
-list with a countdown and a Cancel button. The dashboard does not show the
-problems list; read it from the endpoint.
+The **Merge train** section on the Flywheel page lists each car; a car in its
+cooldown has **Cancel**, a failed car has **Retry**. Failed and blocked entries
+show as cars with their reason; the endpoint returns the same list as JSON.
 
 ## Failure handling
 
@@ -314,10 +325,8 @@ reason captured. `failed` means a merge command ran, or the refusal needs the
 operator (a closed PR, a polyrepo merge set, `.planning/` files). A refusal the
 merge gate re-checks (the gate itself, failing required checks, a conflict)
 leaves the row `blocked` instead. For a failed
-row, a TTS announcement plays, and the orchestrator surfaces the
-entry as an `investigate` suggestion in its next tick snapshot. The operator
-can then either fix the underlying problem and reschedule, or cancel the
-failed entry to clear it.
+row, a TTS announcement plays and the car shows as failed. Fix the cause, then
+Retry or cancel.
 
 ## Related
 
@@ -326,9 +335,6 @@ failed entry to clear it.
   `require_uat_before_merge`, `merge_train_enabled`, `auto_pickup_backlog`,
   `batch_size`, and `batch_wait_minutes` (no CLI; the dashboard has the
   Flywheel header switches and **Settings → Merge Train**)
-- `pan merge cancel <id>` — cancel a pending auto-merge
-- `roles/flywheel.md` — the orchestrator's contract; references the toggle
-  when deciding whether to call the scheduler vs. emitting a `merge`
-  suggestion for human action.
+- `pan merge cancel <id>`: cancel a pending auto-merge
 - [Flywheel](/features/flywheel): the Auto-pickup, Require UAT and Merge train switches in the page header
 - [CI integrations](/integrations/ci): CI test mode, Dagger Cloud, CodeRabbit and the batch workflow
