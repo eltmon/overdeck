@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5503",
   "created": "2026-11-18T23:39:30.709Z",
-  "updated": "2026-11-18T23:45:42.316Z",
+  "updated": "2026-11-18T23:46:08.448Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,22 @@
     "audit-progressive-polyrepo.ac3": {
       "status": "completed",
       "doneAt": "2026-11-18T23:45:42.316Z"
+    },
+    "audit-model-routing": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:46:08.448Z"
+    },
+    "audit-model-routing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:46:08.448Z"
+    },
+    "audit-model-routing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:46:08.448Z"
+    },
+    "audit-model-routing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:46:08.448Z"
     }
   }
 }
