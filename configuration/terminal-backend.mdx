@@ -1,5 +1,6 @@
 ---
-title: Terminal backend
+title: "Terminal backend: Herdr and tmux"
+sidebarTitle: "Terminal backend"
 description: Herdr is the default terminal backend; how it is installed, verified, and opted out of
 ---
 
@@ -19,6 +20,8 @@ Overdeck never falls back to tmux silently.
 Overdeck picks the backend from these sources, in order:
 
 1. The `OVERDECK_TERMINAL_BACKEND` environment variable (`herdr` or `tmux`).
+   Any other value is ignored with a warning, and selection falls through to
+   the next source.
 2. `terminal.backend` in `~/.overdeck/config.yaml`:
 
    ```yaml
@@ -29,7 +32,7 @@ Overdeck picks the backend from these sources, in order:
 3. Otherwise `herdr`.
 
 Selection is a policy, not a probe: a missing `herdr` binary does not change
-it. Availability is checked separately, every time an agent launches — the
+it. Availability is checked separately, every time an agent launches: the
 `herdr` binary on `PATH` or in `~/.local/bin`, and the session socket for this
 Overdeck home (`~/.config/herdr/sessions/<session>/herdr.sock`, where
 `<session>` is `overdeck` for the default `~/.overdeck` home).
@@ -43,8 +46,9 @@ The dashboard logs the result once at boot:
 [terminal] backend=herdr source=default session=overdeck socket=/home/you/.config/herdr/sessions/overdeck/herdr.sock binary=/home/you/.local/bin/herdr
 ```
 
-When Herdr is selected but unavailable, that line is an error that starts with
-`UNAVAILABLE:` and says what is missing.
+When Herdr is selected but unavailable, the line is logged as an error that
+contains `UNAVAILABLE:`, the missing piece, and the fix (`pan install`, or set
+`terminal.backend: tmux`).
 
 ## What `pan install` and `pan sync` do
 
@@ -69,17 +73,18 @@ Both commands run the same Herdr setup:
   `herdr config check`, and a running server reloads it with
   `herdr server reload-config`.
 - **Session server.** One headless `herdr --session <session> server` per
-  Overdeck home. On a systemd host it runs as the user unit
-  `<session>-herdr.service` — `overdeck-herdr.service` for the default home.
-  The unit sets `OOMPolicy=continue`: when the kernel kills one process in a
-  pane for lack of memory, only that process dies, and the server and every
-  other agent keep running. Elsewhere it is started detached, logging to
-  `~/.overdeck/logs/herdr-<session>.log`. `pan up` also makes sure this server
+  Overdeck home. On a systemd host the default home's server runs as the user
+  unit `overdeck-herdr.service`. Another Overdeck home gets
+  `<session>-herdr.service` only with `OVERDECK_HERDR_PERSISTENT_UNIT=1`;
+  otherwise its server starts detached. The unit sets `OOMPolicy=continue`:
+  when the kernel kills one process in a pane for lack of memory, only that
+  process dies, and the server and every other agent keep running. A detached
+  server logs to `~/.overdeck/logs/herdr-<session>.log`. `pan up` also makes sure this server
   is running.
 - **Integrations.** Herdr integrations report an agent's lifecycle to Herdr
-  directly instead of Herdr reading the screen. Overdeck installs the pilot set
-  — `pi`, `omp`, `kimi` (Kimi Code 0.14.0 or later) and `opencode` — for each
-  harness whose binary is installed. `claude`, `codex` and `hermes` only report
+  directly instead of Herdr reading the screen. For each harness whose binary is
+  installed, Overdeck installs its pilot from the set `pi`, `omp`, `kimi`
+  (Kimi Code 0.14.0 or later) and `opencode`. `claude`, `codex` and `hermes` only report
   session identity, which Overdeck does not use yet, so Overdeck neither
   installs nor removes them.
 
@@ -90,7 +95,7 @@ is safe: with everything in place it installs nothing and writes nothing.
 Under Herdr, tmux is optional: `pan up` warns and keeps starting when it is
 missing, `pan install`'s prerequisite gate warns instead of failing, and `pan
 doctor` reports it as a warning, not an error. Only plain terminals in the
-dashboard terminal drawer need tmux under Herdr — agents don't.
+dashboard terminal drawer need tmux under Herdr; agents don't.
 
 ## Updates
 
@@ -100,6 +105,8 @@ Overdeck compares the installed version with `https://herdr.dev/latest.json`
 - `pan install` runs `herdr update` when a newer stable release exists.
 - `pan sync` runs `herdr update` only when no session server is running for
   this home. When one is running, it prints the manual steps instead.
+- The binary is shared, so only the default home updates it. A `pan sync`
+  started by the dashboard skips the update and the integration installs.
 - `pan up` never updates.
 
 **Nothing ever restarts the session server automatically.** A restart closes
@@ -111,11 +118,11 @@ every agent pane, so it is always your call: run
 
 | Row | ok | warn | error |
 | --- | --- | --- | --- |
-| `Terminal backend` | Herdr selected and available, or tmux selected explicitly | — | Herdr selected but unavailable (fix: `pan install`) |
+| `Terminal backend` | Herdr selected and available, or tmux selected explicitly | None | Herdr selected but unavailable (fix: `pan install`) |
 | `Herdr binary` | Version, path and channel | Channel is not stable; `~/.local/bin` is not on `PATH` | Not found |
 | `Herdr server` | Running, endpoint compatible, unit active | Needs a restart; running outside its unit on a systemd host | Not running; not endpoint compatible |
-| `Herdr config` | `resume_agents_on_restore = false` | — | Missing, unset, or `true` (fix: `pan sync`) |
-| `Herdr integration: <target>` | Pilot installed; pilot harness not installed; `claude`/`codex`/`hermes` not installed | Pilot outdated; unrecognized status; `claude` installed but Overdeck's `SessionStart` hook missing | Pilot harness installed but its integration is not (fix: `pan sync`) |
+| `Herdr config` | `resume_agents_on_restore = false` | Overdeck cannot parse the file but its `resume_agents_on_restore` line reads `false` (confirm with `herdr config check`) | Missing, unset, `true`, or unparseable with no `false` line (fix: `pan sync`) |
+| `Herdr integration: <target>` | Pilot installed; pilot harness not installed; `claude`/`codex`/`hermes` not installed | Pilot outdated or needs repair; pilot status unknown; Kimi Code older than 0.14.0 or its version unreadable; unrecognized status; `claude` installed but Overdeck's `SessionStart` hook missing | Pilot harness installed but its integration is not (fix: `pan sync`) |
 
 Under an explicit tmux backend, only the `Terminal backend` row is shown.
 
@@ -134,7 +141,7 @@ socket.
 
 ## Tabs, sizing, and idle shells
 
-Each agent and each operator conversation opens in its own tab (PAN-4582) —
+Each agent and each operator conversation opens in its own tab (PAN-4582),
 never split into a shared one, which would halve the remaining rows on
 every launch. A new tab's PTY is sized to the tab's own layout rect right
 after it opens, since a brand-new PTY otherwise copies the size of whichever
@@ -142,20 +149,24 @@ pane in the session happens to be focused.
 
 After a Herdr restart, the agent panes it restores lose their tokens and come
 back as plain idle shells. Overdeck's hygiene scheduler closes them in its
-own workspaces — never the operator's own panes — within about 20 minutes
+own workspaces (never the operator's own panes) within about 20 minutes
 (a pane has to be seen idle on two separate 10-minute sweeps before it is
-closed), and never while the Deacon is paused or frozen.
+closed), and never while the Deacon is paused, including during a shutdown
+drain.
 
 ## Reaching an agent from a shell
 
-`pan start` (including when the agent is already running), `pan strike` and
-`pan recover` end with a `Commands:` block. Its `Backend:` line says where the
-agent's pane lives, and its `Attach:` line is the command that opens it:
+A fresh `pan start`, `pan strike` and `pan recover` end with a `Commands:`
+block. Its `Backend:` line says where the agent's pane lives, and its `Attach:`
+line is the command that opens it:
 
 ```text
   Backend:  herdr (pane wG:p2)
   Attach:   herdr --session overdeck terminal attach <terminal-id>
 ```
+
+When the agent is already running, `pan start` prints its pane, a `pan tell`
+line and the same `Attach:` command instead of a `Commands:` block.
 
 The command depends on the backend the agent was launched on:
 
@@ -176,7 +187,7 @@ agent started on tmux before a switch to Herdr still gets the tmux form. An
 agent with no recorded backend gets the host's current selection.
 
 The dashboard's own terminal viewer takes control of a Herdr terminal at
-attach — only a control attach resizes the PTY, and only control frames
+attach: only a control attach resizes the PTY, and only control frames
 follow a later resize, so the viewer and the PTY stay in sync. Herdr allows
 one controller per terminal: if the dashboard is already showing a terminal,
 `herdr --session <session> terminal attach <terminal-id>` from a shell needs
@@ -189,7 +200,8 @@ If you install Herdr's `claude` integration yourself, it adds a
 `SessionStart` hook to `~/.claude/settings.json`. Overdeck registers its own
 `SessionStart` hook in the same list. Claude Code runs all matching hooks for
 an event **in parallel**, and the two are independent: Herdr's reports the
-session to Herdr; Overdeck's injects context and starts the heartbeat. `pan sync`
+session to Herdr; Overdeck's hook reports the agent idle with its model and
+injects context. `pan sync`
 never removes Herdr's entry, and Herdr's installer does not remove Overdeck's.
 `pan doctor` warns if Herdr's `claude` integration is installed while
 Overdeck's `SessionStart` hook is missing.
