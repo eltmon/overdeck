@@ -64,6 +64,19 @@ A **Run config** footer shows the Harness, Model, Effort, Max agents and Scope t
 
 Open the page from the left column's **Flywheel** entry, the command palette's **Open Flywheel** action, or directly at `/flywheel`.
 
+## What the loop picks up
+
+An issue is pickable when all of these hold:
+
+- It is ready (the `ready` label).
+- It is planned: it has an xBRIEF with tasks.
+- It is released: the `released` label is set, or Auto-pickup is on, or it is a member of the active order book.
+- It is not parked, not vetoed, not under an `objection`, not already in pipeline, and not an epic.
+
+The loop applies this rule itself before it runs `pan start`, which does not check it on its own. Overdeck's automatic work dispatch, which can start work agents outside the loop, checks the same release conditions in code. The Forecast view on `/backlog` shows the same rule.
+
+Order matters too: a bound or running order book's items come first (see [Order books](/configuration/order-books)); otherwise the loop walks `.pan/backlog/sequence.md` in rank order. A **Promote** gate jumps an issue ahead of its rank; a **Vetoed** issue is never picked up. Before picking anything new, the loop drains every issue already in flight, making the first move each one needs.
+
 ## Known limits
 
 - The loop's author gate names fixed GitHub logins: it acts only on issues whose author is `eltmon` (the Overdeck maintainer) or `panopticon-agent[bot]`, or that are assigned to `eltmon`. On any other repo or account the loop skips your issues, and the current GitHub App bot (`overdeck-agent[bot]`) does not pass it either. See [issue #5544](https://github.com/eltmon/overdeck/issues/5544).
