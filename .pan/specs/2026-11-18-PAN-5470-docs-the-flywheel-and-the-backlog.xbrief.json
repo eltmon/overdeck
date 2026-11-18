@@ -4,17 +4,17 @@
     "created": "2026-11-18T20:31:51Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5470: docs: the Flywheel and the backlog",
-    "updated": "2026-11-18T20:41:27.808Z"
+    "updated": "2026-11-18T20:57:45.631Z"
   },
   "plan": {
     "id": "pan-5470",
     "title": "docs: the Flywheel and the backlog",
-    "status": "proposed",
+    "status": "running",
     "uid": "91d47fdd-91a9-49a8-a4e5-f74e3af0376b",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-18T20:31:51Z",
-    "updated": "2026-11-18T20:41:27.808Z",
+    "updated": "2026-11-18T20:57:45.631Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5470",
@@ -1128,5 +1128,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
