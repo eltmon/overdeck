@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5541",
   "created": "2026-11-18T20:13:04.612Z",
-  "updated": "2026-11-18T20:56:14.948Z",
+  "updated": "2026-11-18T20:56:39.522Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,11 @@
     "request-dialog-host.ac5": {
       "status": "completed",
       "doneAt": "2026-11-18T20:56:14.947Z"
+    },
+    "needs-you-open-dialog": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5541",
+      "claimedAt": "2026-11-18T20:56:39.522Z"
     }
   }
 }
