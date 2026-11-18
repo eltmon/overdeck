@@ -42,6 +42,14 @@ A few more `pan start` flags worth knowing: `--plan-model` sets the planning mod
 
 Planning writes a PRD, an xBRIEF plan and a continue file, then finalizes the plan. A planning agent never writes code. See [Planning: PRDs, xBRIEF plans and the plan critic](/features/planning) for the Plan dialog, `pan plan`, the PRD draft, the xBRIEF schema, finalize and the plan critic.
 
+## Work and pan done
+
+The work agent works through the xBRIEF plan one item at a time: `pan task next` finds the next unblocked item, `pan task claim` claims it, the agent implements and commits with an `Item: <id>` trailer, pushes, then `pan task done` marks it done. The agent runs only the tests the item touched; it never runs the full suite itself.
+
+When every item is done, the agent runs `pan done`, which refuses to proceed on three preflight checks: open plan items or acceptance criteria, uncommitted changes in the workspace, or code changes with no covering tests. `--test-waived <reason>` skips only the test-requirement check, and `--force` skips all three.
+
+Once preflight passes, `pan done` rebases the branch onto the target branch and pushes, opens or updates the pull request and marks it ready, moves the tracker issue to In Review, and starts verification and review.
+
 ## Get help
 
 Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file an issue on [GitHub Issues](https://github.com/eltmon/overdeck/issues).
