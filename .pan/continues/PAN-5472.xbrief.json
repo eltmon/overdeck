@@ -1,0 +1,276 @@
+{
+  "version": "1",
+  "issueId": "PAN-5472",
+  "created": "2026-11-18T16:42:03.966Z",
+  "updated": "2026-11-18T17:21:09.684Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-18T17:21Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-18T17:21:09.684Z"
+    }
+  ],
+  "items": {
+    "state-branch-retire": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5472",
+      "claimedAt": "2026-11-18T16:42:03.966Z",
+      "doneAt": "2026-11-18T16:43:54.858Z"
+    },
+    "state-branch-retire.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:43:54.858Z"
+    },
+    "state-branch-retire.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:43:54.858Z"
+    },
+    "state-branch-retire.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:43:54.858Z"
+    },
+    "state-branch-retire.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:43:54.858Z"
+    },
+    "state-model-pan": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5472",
+      "claimedAt": "2026-11-18T16:44:01.235Z",
+      "doneAt": "2026-11-18T16:46:07.538Z"
+    },
+    "state-model-pan.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:46:07.538Z"
+    },
+    "state-model-pan.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:46:07.538Z"
+    },
+    "state-model-pan.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:46:07.538Z"
+    },
+    "state-model-pan.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:46:07.538Z"
+    },
+    "cloister-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5472",
+      "claimedAt": "2026-11-18T16:46:12.257Z",
+      "doneAt": "2026-11-18T16:47:51.011Z"
+    },
+    "cloister-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:47:51.011Z"
+    },
+    "cloister-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:47:51.011Z"
+    },
+    "cloister-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:47:51.011Z"
+    },
+    "cloister-page.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:47:51.011Z"
+    },
+    "specialists-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5472",
+      "claimedAt": "2026-11-18T16:47:55.329Z",
+      "doneAt": "2026-11-18T16:49:21.829Z"
+    },
+    "specialists-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:49:21.829Z"
+    },
+    "specialists-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:49:21.829Z"
+    },
+    "specialists-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:49:21.829Z"
+    },
+    "specialists-page.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:49:21.829Z"
+    },
+    "concepts-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5472",
+      "claimedAt": "2026-11-18T16:49:26.068Z",
+      "doneAt": "2026-11-18T16:51:54.434Z"
+    },
+    "concepts-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:51:54.434Z"
+    },
+    "concepts-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:51:54.434Z"
+    },
+    "concepts-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:51:54.434Z"
+    },
+    "concepts-page.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:51:54.434Z"
+    },
+    "phone-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5472",
+      "claimedAt": "2026-11-18T16:52:00.761Z",
+      "doneAt": "2026-11-18T16:53:10.992Z"
+    },
+    "phone-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:53:10.992Z"
+    },
+    "phone-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:53:10.992Z"
+    },
+    "phone-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:53:10.992Z"
+    },
+    "god-view-experimental": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5472",
+      "claimedAt": "2026-11-18T16:53:15.645Z",
+      "doneAt": "2026-11-18T16:54:40.899Z"
+    },
+    "god-view-experimental.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:54:40.899Z"
+    },
+    "god-view-experimental.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:54:40.899Z"
+    },
+    "god-view-experimental.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:54:40.899Z"
+    },
+    "mission-control-fix": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5472",
+      "claimedAt": "2026-11-18T16:54:46.171Z",
+      "doneAt": "2026-11-18T16:56:28.665Z"
+    },
+    "mission-control-fix.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:56:28.665Z"
+    },
+    "mission-control-fix.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:56:28.665Z"
+    },
+    "mission-control-fix.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:56:28.665Z"
+    },
+    "mission-control-fix.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:56:28.665Z"
+    },
+    "readme-loops-views": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5472",
+      "claimedAt": "2026-11-18T16:56:33.744Z",
+      "doneAt": "2026-11-18T16:58:46.106Z"
+    },
+    "readme-loops-views.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:58:46.106Z"
+    },
+    "readme-loops-views.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:58:46.106Z"
+    },
+    "readme-loops-views.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:58:46.106Z"
+    },
+    "readme-features": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5472",
+      "claimedAt": "2026-11-18T16:58:53.613Z",
+      "doneAt": "2026-11-18T17:01:55.374Z"
+    },
+    "readme-features.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T17:01:55.374Z"
+    },
+    "readme-features.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T17:01:55.374Z"
+    },
+    "readme-features.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T17:01:55.374Z"
+    },
+    "readme-tools-maturity": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5472",
+      "claimedAt": "2026-11-18T17:01:59.905Z",
+      "doneAt": "2026-11-18T17:04:17.924Z"
+    },
+    "readme-tools-maturity.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T17:04:17.924Z"
+    },
+    "readme-tools-maturity.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T17:04:17.924Z"
+    },
+    "readme-tools-maturity.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T17:04:17.924Z"
+    },
+    "readme-tools-maturity.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T17:04:17.924Z"
+    },
+    "pr-mint-evidence": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5472",
+      "claimedAt": "2026-11-18T17:04:22.942Z",
+      "doneAt": "2026-11-18T17:07:55.915Z"
+    },
+    "pr-mint-evidence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T17:07:55.915Z"
+    },
+    "pr-mint-evidence.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T17:07:55.915Z"
+    },
+    "pr-mint-evidence.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T17:07:55.915Z"
+    },
+    "pr-mint-evidence.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T17:07:55.915Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-18T17:21:09Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5472 (PR #5535)\n\nCodeRabbit posted 4 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4618079202 · concepts.mdx:62 [Minor]: Include the issue identifier in the skip command.\n  https://github.com/eltmon/overdeck/pull/5535#discussion_r4618079202\n- Thread 4618079209 · features/cloister.mdx:27 [Minor]: The restart limit and backoff waits do not apply to automatic resumes.\n  https://github.com/eltmon/overdeck/pull/5535#discussion_r4618079209\n- Thread 4618079219 · README.md:87 [Minor]: Qualify the model lock by harness.\n  https://github.com/eltmon/overdeck/pull/5535#discussion_r4618079219\n- Thread 4618079229 · reference/state-model.mdx:66 [Minor]: Correct the database-loss claim at line 66. Pinned-document selections and workspace origin are also lost.\n  https://github.com/eltmon/overdeck/pull/5535#discussion_r4618079229\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5535/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5472 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5535 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    }
+  ]
+}

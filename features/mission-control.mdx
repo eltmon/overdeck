@@ -5,11 +5,11 @@ description: "Command Deck is the dashboard's main view: the project sidebar, th
 
 import { ThemedImage } from "/snippets/themed-image.mdx";
 
-Mission Control is Overdeck's default landing view — a unified monitoring interface for all active projects, features, and AI agent activity. It includes **Shadow Engineering**, a companion mode for teams adopting AI-assisted development incrementally.
+Command Deck is where you work with a project's agents: the project's conversations, issues and workspaces on the left, and live agent panes in tabs on the right. Home (`/`) is the landing page. **Project home** in the sidebar opens the selected project's Command Deck on its Home pane.
 
 ## Layout
 
-The top bar spans the full window width. It starts with the Overdeck brand, which opens Home. Below it, Mission Control uses a two-panel layout:
+The top bar spans the full window width. It starts with the Overdeck brand, which opens Home. Below it, Command Deck uses a two-panel layout:
 
 - **Left column**: the project switcher, navigation, and the selected project's conversations, issues and workspaces
 - **Main panel (right)**: Feature activity view, planning artifacts, and status reviews
@@ -19,7 +19,7 @@ The top bar spans the full window width. It starts with the Overdeck brand, whic
 The left column is the same on every page. On the Flywheel page, in Settings or anywhere else, it still lists the selected project's conversations, issues and workspaces. Clicking a row opens it in the Command Deck. From top to bottom:
 
 - **Project switcher.** It shows a colored initials mark, the project's name and its path (such as `~/Projects/overdeck`); every project row in the menu carries its own colored mark too. Its menu starts with **All projects** (a ✱ mark and "N projects · M active"), which opens the All projects deck described below. It then lists every project, grouped by owner, each with a status word: "2 working", "1 in review" or "idle". Below the projects are **No project**, projects on your other machines, **Add a project**, and **New workspace in** the selected project. With more than 8 projects, a filter box appears at the top of the menu. The dashboard remembers the last project you picked and restores it on a fresh load of a page that isn't already project-scoped (e.g. Activity).
-- **Navigation.** **Project home** (shown only when a project is selected; it is the only one of the two current on a Command Deck tab, and only while the Home pane is active) and **Flywheel** (reads "running" during a run), **Order books**, and **More**. **More** holds every other view, grouped as Operations, Infrastructure, Observability and System — it no longer lists Command Deck, since Project home already opens the deck. Experimental views appear there only when experimental features are on.
+- **Navigation.** **Project home** (shown only when a project is selected; it is the only one of the two current on a Command Deck tab, and only while the Home pane is active) and **Flywheel** (reads "running" during a run), **Order books**, and **More**. **More** holds every other view, grouped as Operations, Infrastructure, Observability and System: it no longer lists Command Deck, since Project home already opens the deck. Experimental views appear there only when experimental features are on.
 - **New conversation.** The main part of the button starts a conversation in the selected project (key `N`). A second line under it names the default model, the harness when it is not Claude Code, and the effort it will spawn with. The caret opens a menu with the model and harness picker, the effort picker, the Retrospective button and **New conversation with options…**. See [Conversations](/features/conversations#new-conversation-with-options).
 - **Conversations.** **Active** shows Needs you and Inbox. **All N** adds Snoozed and Settled. Each row has a meta line in words: its state, its changes (`+12 −3`, then "2 not committed"), the harness when it is not Claude Code, and its cost (never clipped mid-number). A conversation's successors and lanes are grouped under a toggle that starts collapsed unless one of them needs you; a collapsed group still shows the selected conversation's row.
 - **Issues.** The header shows the issue count, the project's CI, deploy and identity chips, and a **Filter** menu: All, Alive or Failed, plus **Planned**. A collapsed issue row reads stage · model · progress, for example "Building · opus-4-6 · 3 of 7 items". Expand the row to see its badges, merge controls and sessions.
@@ -78,7 +78,7 @@ The **Home** tab of a project deck opens with what you can do, then the facts ab
 
 **Header and metadata line.** The title is the registered project name, with a pencil to rename it and the GitHub (or GitLab) repository beside it. **Settings** opens the project settings in a dialog. Under the title, one line names the checkout path, the branch, the latest release, the default branch's CI state and, while they apply, an in-flight deploy and the GitHub identity the project acts as. The release word reads `v1.2.0 released 2h ago`, `releasing v1.2.0…`, `v1.2.0 release failed`, `no release runs yet` or `no releases`; click it to open the release detail (the workflow run, the GitHub Release, each npm package's `latest` dist-tag, and any partial failure with links to the failing jobs). The CI word reads `CI passing`, `CI failing`, `CI running 2/5` or `CI unknown`, and opens the run on GitHub.
 
-Per-project release resolution lives in `projects.yaml` under `publish` (`npm_packages`, `release_workflow`), with inference fallbacks: the project root `package.json` name (when not `private`) and `.github/workflows/release.yml` (when present in the checkout). Projects with no publish pipeline say `no releases`. The surface is read-only — cutting a release stays in the CLI (`pan release stable`).
+Per-project release resolution lives in `projects.yaml` under `publish` (`npm_packages`, `release_workflow`), with inference fallbacks: the project root `package.json` name (when not `private`) and `.github/workflows/release.yml` (when present in the checkout). Projects with no publish pipeline say `no releases`. The surface is read-only; cutting a release stays in the CLI (`pan release stable`).
 
 **Action row.** In order:
 
@@ -138,8 +138,8 @@ place that lists all of them, whether they come from a pipeline agent, a
 conversation, or the flywheel.
 
 Anything waiting on you is marked wherever it appears. A node awaiting your reply
-carries a pulsing amber indicator — click it to bring the dialog back, including
-one you dismissed with `Esc` — and the whole issue row is shaded so you can spot
+carries a pulsing amber indicator; click it to bring the dialog back, including
+one you dismissed with `Esc`, and the whole issue row is shaded so you can spot
 it without opening the tree.
 
 The list separates **Blocking work** from **Waiting**. Blocking means the agent
@@ -149,7 +149,7 @@ oldest is first, since that is the one costing the most. Each row shows the
 actual question rather than just its kind, so you can often decide without
 opening anything. **Answer** re-opens the dialog for that subject.
 
-Dismissing a dialog never removes its entry here — that is the point of the
+Dismissing a dialog never removes its entry here: that is the point of the
 surface. A dismissed question is still an open one.
 
 The top bar's **Needs you · N** button counts the same things once each: every
@@ -191,7 +191,6 @@ Quick-access badges appear below the feature header:
 | STATE | Renders STATE.md from the workspace's `.planning/` directory |
 | PRD | Renders PRD.md (grayed out if not generated) |
 | Status | AI-generated progress review comparing code against PRD |
-| Inference | Shadow Engineering inference document (only for shadow workspaces) |
 | Discussions | Synced issue tracker discussions |
 | Transcripts | Uploaded meeting transcripts |
 | Upload | Attach transcripts or notes to the feature |
@@ -209,45 +208,6 @@ If no API key is configured, a static template with raw data is shown as fallbac
 
 Any configured provider (Anthropic, OpenAI, Google, Kimi, Z.AI) can be used for status reviews.
 
-## Shadow Engineering
-
-### Concept
-
-Shadow Engineering is for teams that want AI assistance without replacing their existing workflow. Instead of AI *doing* the work, AI *observes, documents, and assists*.
-
-| Standard Mode | Shadow Engineering |
-|--------------|-------------------|
-| Planning agent creates PRD | Monitoring agent infers plan from artifacts |
-| Work agent implements features | Observer watches human PRs and comments |
-| AI drives the work | AI shadows the work |
-| PRD.md generated | Inference Document produced |
-
-### How It Works
-
-1. **Enable Shadow Mode**: When creating a feature workspace, toggle "Shadow Engineering" on
-2. **Monitoring Agent**: Analyzes available artifacts (issue description, tracker comments, meeting transcripts, PR descriptions) and produces an **Inference Document** — the AI's working understanding of what the team is building
-3. **Inference Document**: Not a prescriptive PRD but an inferred understanding. Surfaces gaps, ambiguities, and risks. Updates as new artifacts arrive
-4. **Observer Agent**: Watches the team's actual development. Comments on PRs with observations and suggestions. Only commits code when explicitly asked
-
-### Value Proposition
-
-> **AI that learns your team before it leads.**
-
-Shadow Engineering lets existing engineers keep working their way while Overdeck's AI observes, documents, and assists. It learns the codebase, patterns, and team approach — so when you're ready to go further, the AI already understands how you build.
-
-**Ideal for**:
-- Teams wanting to adopt AI-assisted development gradually
-- Organizations that need to maintain existing workflows during transition
-- Leaders who want AI oversight and documentation without AI-driven changes
-- Teams evaluating AI coding tools who need a low-risk entry point
-
-### Shadow Workspaces in the UI
-
-Shadow workspaces are visually distinct in Mission Control:
-- Marked with a shadow indicator in the project tree
-- Show the **Inference** badge instead of generating PRDs
-- Inference modal includes an explanation of what the document represents
-
 ## Planning Artifacts
 
 Each feature workspace has a `.planning/` directory:
@@ -256,7 +216,6 @@ Each feature workspace has a `.planning/` directory:
 feature-pan-XXX/.planning/
 ├── PRD.md                    # Product requirements (generated or manual)
 ├── STATE.md                  # Current progress notes
-├── INFERENCE.md              # Shadow Engineering inference document
 ├── STATUS_REVIEW.md          # Latest AI-generated status review
 ├── transcripts/              # Uploaded meeting transcripts
 ├── discussions/              # Synced tracker discussions
@@ -273,7 +232,7 @@ Click **Sync** to pull the latest comments from GitHub Issues or Linear. Discuss
 
 ## Pipeline View
 
-Where the project tree organizes work by project and feature, the **Pipeline** page reorganizes the same issues by lifecycle phase. A metric strip — Active issues, Work running, Review queue, Ship, and Spend — sits above phase-grouped rows (Ship, Review, Verifying), with a live activity feed on the right.
+Where the project tree organizes work by project and feature, the **Pipeline** page reorganizes the same issues by lifecycle phase. A metric strip (Active issues, Work running, Review queue, Ship, and Spend) sits above phase-grouped rows (Ship, Review, Verifying), with a live activity feed on the right.
 
 <ThemedImage
   light="/images/dashboard/pipeline-light.png"
@@ -289,7 +248,7 @@ Where the project tree organizes work by project and feature, the **Pipeline** p
 
 ### Adding Projects
 
-Projects are configured in `~/.overdeck/config.yaml`. Any project with active workspaces appears in Mission Control's project tree.
+Projects are configured in `~/.overdeck/config.yaml`. Any project with active workspaces appears in the project switcher.
 
 ### Model Selection
 

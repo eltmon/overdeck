@@ -1,0 +1,1030 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-18T16:45:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5472: docs: fix published pages that contradict the product (state branch, Cloister routing, Inspect, phone apps, introduction)",
+    "updated": "2026-11-18T16:41:47.265Z"
+  },
+  "plan": {
+    "id": "pan-5472",
+    "title": "docs: fix published pages that contradict the product (state branch, Cloister routing, Inspect, phone apps, introduction)",
+    "status": "running",
+    "uid": "74c99744-f267-4dde-b277-293d47877fdd",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-18T16:45:00Z",
+    "updated": "2026-11-18T16:41:47.265Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5472",
+        "label": "PAN-5472",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5472.md",
+        "label": "PAN-5472 PRD draft",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "docs",
+      "mintlify",
+      "readme",
+      "accuracy"
+    ],
+    "metadata": {
+      "sizeJustification": "Eleven doc files only. lintProjectedSurface counts each root-level doc path (README.md, concepts.mdx, docs.json) and each docs folder (configuration, features, reference) as its own subsystem; the real surface is one docs site plus the README.",
+      "prd": ".pan/drafts/PAN-5472.md",
+      "canonicalFilename": "2026-11-18-PAN-5472-docs-fix-published-pages-that-contradict-the-product-state-branch-cloister-routing-inspect-phone-apps-introduction.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Eight published docs pages and README.md describe removed or unreleased features: the overdeck-state branch, Cloister model routing and five specialists including an inspect agent and a merge agent, Approve & Merge, beads, mid-conversation model swaps, checkpoint rollback, Cursor/Gemini/Antigravity skill sync, Shadow Engineering, public phone apps, Mission Control as the landing view, and a God View that is really experimental. New users read these pages first.",
+      "Proposal": "Fix each claim in place against verified code (PRD .pan/drafts/PAN-5472.md, Background table): delete configuration/state-branch.mdx with a redirect to /reference/state-model and give that page a .pan/ section; rewrite features/cloister.mdx and features/specialists.mdx from the PRD outlines; make targeted edits to concepts.mdx, configuration/phone.mdx, reference/god-view.mdx, features/mission-control.mdx and README.md (three serialized README items); then run mint validate, mint broken-links and lint:docs and paste the results in the PR body. Every touched page loses its en and em dashes.",
+      "NonGoals": "- Editing introduction.mdx (moved to #5505, already merged).\n- Editing configuration/setup-wizard.mdx or configuration/meta-repos.mdx (#5482 G18 owns delete-or-rewrite).\n- A full line-by-line audit of the touched pages (#5499, #5502, #5503, #5504 run after this PR).\n- Changing features/mission-control.mdx beyond the intro, Mission Control wording, Shadow Engineering and dashes (#5474, #5502).\n- Renaming features/mission-control.mdx or removing its \"All projects and side-by-side conversations\" heading.\n- Any code change: the PlanDialog Shadow Engineering checkbox, the unrendered BadgeBar.tsx, the stuck_escalation model literals, the phone dialog store buttons, or the stale Experimental switch description.\n- Deleting image files, deleting the overdeck-state branch, or telling readers to delete it.\n- Writing new pages such as features/issue-pipeline.mdx (#5468) or features/dashboard-views.mdx (#5474).\n- Reformatting or reordering docs.json beyond the one nav line and one redirect.\n- A changelog.d entry (docs-only change)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Delete configuration/state-branch.mdx and add a docs.json redirect to /reference/state-model.",
+        "rationale": "The issue asks for removal from navigation plus a redirect; deleting the file follows the /configuration/beads precedent and keeps the old page from rendering at its URL."
+      },
+      {
+        "summary": "Add a .pan/ layout section and a retired-branch section to reference/state-model.mdx and remove its record-plane claims.",
+        "rationale": "The redirect target itself cited a nonexistent lint-state-writes.sh and a deleted per-issue record, and order-books.mdx links there for where order books live."
+      },
+      {
+        "summary": "Leave setup-wizard.mdx and meta-repos.mdx to #5482 G18.",
+        "rationale": "Both are unpublished and #5482 explicitly owns deleting or rewriting them; partial fixes here would be thrown away."
+      },
+      {
+        "summary": "Delete Shadow Engineering from concepts.mdx and mission-control.mdx rather than redescribe it.",
+        "rationale": "Only a checkbox that writes a placeholder INFERENCE.md remains; no monitoring agent exists and BadgeBar.tsx is not rendered, so there is no working feature to document."
+      },
+      {
+        "summary": "Do not document the stuck_escalation model handoff on the Cloister page.",
+        "rationale": "triggers.ts compares model ids to the literals haiku and sonnet, which current model ids never equal, so the trigger does not fire."
+      },
+      {
+        "summary": "Limit mission-control.mdx edits to the intro, Mission Control wording, Shadow Engineering and dashes.",
+        "rationale": "The issue lists only those claims for that page; #5474 and #5502 own the rest."
+      },
+      {
+        "summary": "Fix README claims in place without changing its tagline or structure, split into three serialized items by line range.",
+        "rationale": "The issue asks to fix the same claims; three items keep each diff reviewable, and they share one file so they must run in order."
+      },
+      {
+        "summary": "Say \"more than 120 skills\" instead of an exact count.",
+        "rationale": "sync-sources/skills holds 126 folders including _template and 4 redirects; an exact count drifts with every skill change."
+      },
+      {
+        "summary": "Phone page states the TestFlight and Play internal testing status and points to the browser phone view; no join instructions.",
+        "rationale": "changelog v0.74.0 and apps/mobile/RELEASE.md show only operator tester groups, so inventing a join path would be another false claim."
+      },
+      {
+        "summary": "Link sibling pages (issue-pipeline, dashboard-views) only if the file exists at work time.",
+        "rationale": "Those pages belong to unmerged sibling issues; a link to a missing page fails mint broken-links."
+      }
+    ],
+    "items": [
+      {
+        "id": "state-branch-retire",
+        "title": "Delete configuration/state-branch.mdx and redirect it to /reference/state-model",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T16:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5472",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/state-branch.mdx",
+            "docs.json",
+            "configuration/order-books.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test ! -f configuration/state-branch.mdx && echo deleted",
+            "node -e \"const d=require('./docs.json');console.log(JSON.stringify(d.redirects.filter(r=>r.source==='/configuration/state-branch')))\"",
+            "grep -c state-branch docs.json",
+            "grep -n \"reference/state-model\" configuration/order-books.mdx",
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/order-books.mdx",
+            "git diff --stat main -- docs.json"
+          ],
+          "expected_outputs": [
+            "prints deleted",
+            "prints one redirect object with destination /reference/state-model",
+            "prints 1",
+            "prints the line-189 link",
+            "dash grep prints nothing (exit 1)",
+            "docs.json shows a small diff (about 4 insertions, 1 deletion)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly: git rm configuration/state-branch.mdx, remove its one docs.json navigation line, append one redirect object (/configuration/state-branch to /reference/state-model) after the /configuration/beads redirect, change configuration/order-books.mdx line 189 to link [State model](/reference/state-model) with the .pan/orders/ wording from the PRD, and remove every en and em dash from configuration/order-books.mdx. Touch nothing else in docs.json (PRD D-11)."
+        },
+        "items": [
+          {
+            "id": "state-branch-retire.ac1",
+            "title": "Given the branch, when test -f configuration/state-branch.mdx runs, then it fails because the page file is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-branch-retire.ac2",
+            "title": "docs.json contains exactly one redirect whose source is /configuration/state-branch and destination is /reference/state-model, and grep -c state-branch docs.json prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-branch-retire.ac3",
+            "title": "configuration/order-books.mdx contains a link to /reference/state-model in place of the /configuration/state-branch link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-branch-retire.ac4",
+            "title": "When grep -nP for U+2013/U+2014 runs on configuration/order-books.mdx, it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "state-model-pan",
+        "title": "Add the .pan/ layout and retired overdeck-state branch to reference/state-model.mdx",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T16:45:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5472",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/state-model.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -niE \"lint-state-writes|per-issue (git )?record|record writer\" reference/state-model.mdx",
+            "grep -nE \"^## \" reference/state-model.mdx",
+            "grep -nP '[\\x{2013}\\x{2014}]' reference/state-model.mdx",
+            "node --input-type=module -e \"import {findMdxProblems} from './scripts/lint-docs.js'; import {readFileSync} from 'node:fs'; console.log(findMdxProblems(readFileSync('reference/state-model.mdx','utf8')).length)\"",
+            "node -e \"const t=require('fs').readFileSync('reference/state-model.mdx','utf8');const m=t.match(/^description:\\s*\\\"?(.*?)\\\"?$/m);console.log(m[1].length)\""
+          ],
+          "expected_outputs": [
+            "prints nothing (exit 1)",
+            "heading list contains \"Planning artifacts under `.pan/`\" and \"The retired `overdeck-state` branch\"",
+            "dash grep prints nothing (exit 1)",
+            "prints 0",
+            "prints a number from 50 to 160"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2: in reference/state-model.mdx replace the per-issue record claims in the sources-of-truth and what-lives-where tables, add the four new table rows, add the two new sections \"Planning artifacts under `.pan/`\" and \"The retired `overdeck-state` branch\" with the PRD prose, replace the lint-state-writes.sh, record-writer and per-issue-record bullets with the PRD text, fix the last Why-it-matters bullet, and remove every en and em dash on the page."
+        },
+        "items": [
+          {
+            "id": "state-model-pan.ac1",
+            "title": "When grep -niE \"lint-state-writes|per-issue (git )?record|record writer\" runs on reference/state-model.mdx, it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-model-pan.ac2",
+            "title": "reference/state-model.mdx contains an H2 \"Planning artifacts under `.pan/`\" with a table that covers drafts, specs, continues, orders, notes and backlog/sequence.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-model-pan.ac3",
+            "title": "reference/state-model.mdx contains an H2 \"The retired `overdeck-state` branch\" that names the state-final tag and tells readers to keep the branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-model-pan.ac4",
+            "title": "When grep -nP for U+2013/U+2014 runs on reference/state-model.mdx, it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cloister-page",
+        "title": "Rewrite features/cloister.mdx as the agent watchdog page",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T16:45:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5472",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/cloister.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -niE \"inspect|handoffs|uat-agent|merge-agent|beads|hook\\.json|FPP|heartbeats|cloister/config\\.json|STATE\\.md|stuck_escalation|complexity\" features/cloister.mdx",
+            "grep -nF \"pan admin cloister emergency-stop\" features/cloister.mdx",
+            "grep -nF \"cloister.toml\" features/cloister.mdx",
+            "grep -nE \"^## \" features/cloister.mdx",
+            "grep -nP '[\\x{2013}\\x{2014}]' features/cloister.mdx",
+            "node --input-type=module -e \"import {findMdxProblems} from './scripts/lint-docs.js'; import {readFileSync} from 'node:fs'; console.log(findMdxProblems(readFileSync('features/cloister.mdx','utf8')).length)\"",
+            "node -e \"const t=require('fs').readFileSync('features/cloister.mdx','utf8');const m=t.match(/^description:\\s*\\\"?(.*?)\\\"?$/m);console.log(m[1].length)\""
+          ],
+          "expected_outputs": [
+            "prints nothing (exit 1)",
+            "prints at least one line",
+            "prints at least one line",
+            "prints the PRD WI-3 H2 headings in order",
+            "dash grep prints nothing (exit 1)",
+            "prints 0",
+            "prints a number from 50 to 160"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3: keep the title and sidebarTitle, set the new description, and replace the body with the eight PRD sections in order (intro, start/stop/status/emergency-stop, agent health with the verified cloister.toml defaults, the patrol loop bullets, the unchanged Flywheel note and image, where agent health shows up with the experimental label, the existing Model routing section, Related). Verify the label strings, TOML section names and deacon.log path at the cited source lines before writing, and delete every other section the PRD lists. Replace the Flywheel Note first sentence as PRD WI-3 step 5 says, since the handoffs section it refers to is deleted."
+        },
+        "items": [
+          {
+            "id": "cloister-page.ac1",
+            "title": "When the removed-machinery grep (inspect, handoffs, uat-agent, merge-agent, beads, hook.json, FPP, heartbeats, cloister/config.json, STATE.md, stuck_escalation, complexity) runs on features/cloister.mdx, it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cloister-page.ac2",
+            "title": "features/cloister.mdx contains pan admin cloister status, start, stop and emergency-stop, and names ~/.overdeck/cloister.toml as the config file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cloister-page.ac3",
+            "title": "features/cloister.mdx shows the health defaults stale 5, warning 15, stuck 30 minutes and labels the Agents and Health pages as experimental",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cloister-page.ac4",
+            "title": "When grep -nP for U+2013/U+2014 runs on features/cloister.mdx, it prints nothing and the description length prints 50 to 160",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "specialists-page",
+        "title": "Rewrite features/specialists.mdx around the review and test roles and the Merge button",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T16:45:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5472",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/specialists.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -niE \"inspect|merge-agent|Approve & Merge|Five Specialists|hook\\.json|MAX_AUTO_REQUEUE = 7|images/specialists\" features/specialists.mdx",
+            "grep -nE \"25|roles.review.mode: full|/configuration/auto-merge\" features/specialists.mdx",
+            "grep -nE \"^## \" features/specialists.mdx",
+            "grep -nP '[\\x{2013}\\x{2014}]' features/specialists.mdx",
+            "node --input-type=module -e \"import {findMdxProblems} from './scripts/lint-docs.js'; import {readFileSync} from 'node:fs'; console.log(findMdxProblems(readFileSync('features/specialists.mdx','utf8')).length)\"",
+            "node -e \"const t=require('fs').readFileSync('features/specialists.mdx','utf8');const m=t.match(/^description:\\s*\\\"?(.*?)\\\"?$/m);console.log(m[1].length)\""
+          ],
+          "expected_outputs": [
+            "prints nothing (exit 1)",
+            "prints lines for the cap of 25, the full review mode and the auto-merge link",
+            "prints the PRD WI-4 H2 headings in order",
+            "dash grep prints nothing (exit 1)",
+            "prints 0",
+            "prints a number from 50 to 160"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4: set the new frontmatter, replace the body with the PRD sections (intro, what happens after pan done as a four-step list, when a check fails, start or rerun a review with the 25-request cap, agents stay warm, choose their models, check status, related), keep only the awaiting-merge image, and delete every section and image the PRD lists. Apply the D-10 checkpoint for features/issue-pipeline.mdx. Use the corrected wording: verdicts are posted to the pull request (not PR checks), and quick mode is one reviewer doing a combined pass."
+        },
+        "items": [
+          {
+            "id": "specialists-page.ac1",
+            "title": "When the stale-claim grep (inspect, merge-agent, Approve & Merge, Five Specialists, hook.json, MAX_AUTO_REQUEUE = 7, images/specialists) runs on features/specialists.mdx, it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "specialists-page.ac2",
+            "title": "features/specialists.mdx contains the cap of 25 automatic re-review requests with HTTP 429, and roles.review.mode: full for the convoy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "specialists-page.ac3",
+            "title": "features/specialists.mdx contains the sentence that a person clicks Merge, and links /configuration/auto-merge and /features/merge-batches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "specialists-page.ac4",
+            "title": "When grep -nP for U+2013/U+2014 runs on features/specialists.mdx, it prints nothing and the description length prints 50 to 160",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "concepts-page",
+        "title": "Remove removed-feature claims from concepts.mdx",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T16:45:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5472",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "concepts.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -niE \"hot-swap|roll back|beads|inspect|\\.planning|Cursor|Gemini CLI|Antigravity|70\\+|Shadow|blocked from starting|Mission Control\" concepts.mdx",
+            "grep -nE \"^## \" concepts.mdx",
+            "grep -nP '[\\x{2013}\\x{2014}]' concepts.mdx",
+            "node --input-type=module -e \"import {findMdxProblems} from './scripts/lint-docs.js'; import {readFileSync} from 'node:fs'; console.log(findMdxProblems(readFileSync('concepts.mdx','utf8')).length)\"",
+            "node -e \"const t=require('fs').readFileSync('concepts.mdx','utf8');const m=t.match(/^description:\\s*\\\"?(.*?)\\\"?$/m);console.log(m[1].length)\""
+          ],
+          "expected_outputs": [
+            "prints nothing (exit 1)",
+            "heading list has Planning and no Beads or Shadow Engineering",
+            "dash grep prints nothing (exit 1)",
+            "prints 0",
+            "prints a number from 50 to 160"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5 steps 1 to 13 in concepts.mdx: new description, fork or hand off bullet instead of hot-swap and rollback, new agent types, Cloister paragraph, Planning section instead of PRD-Driven Workflow, .overdeck/.pan workspace bullet, new Specialists paragraph, new Skills sentence, delete Beads and Shadow Engineering, new Convoys body, Command Deck link text, and remove every en and em dash. Leave Cost Tracking and Issue Tracker sections alone except dashes."
+        },
+        "items": [
+          {
+            "id": "concepts-page.ac1",
+            "title": "When the stale-claim grep (hot-swap, roll back, beads, inspect, .planning, Cursor, Gemini CLI, Antigravity, 70+, Shadow, blocked from starting, Mission Control) runs on concepts.mdx, it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "concepts-page.ac2",
+            "title": "concepts.mdx contains a Convoys section that defines a convoy as roles.review.mode: full with four reviewers on one pull request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "concepts-page.ac3",
+            "title": "concepts.mdx contains a Planning section that mentions pan start --plan skip and .pan/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "concepts-page.ac4",
+            "title": "When grep -nP for U+2013/U+2014 runs on concepts.mdx, it prints nothing and the description length prints 50 to 160",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "phone-page",
+        "title": "State the TestFlight and Play internal testing status on configuration/phone.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T16:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5472",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/phone.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -niE \"from Google Play or the App Store|installed from an app store|through the app store\" configuration/phone.mdx",
+            "grep -n \"TestFlight\" configuration/phone.mdx",
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/phone.mdx",
+            "node --input-type=module -e \"import {findMdxProblems} from './scripts/lint-docs.js'; import {readFileSync} from 'node:fs'; console.log(findMdxProblems(readFileSync('configuration/phone.mdx','utf8')).length)\""
+          ],
+          "expected_outputs": [
+            "prints nothing (exit 1)",
+            "prints the new testing-status line",
+            "dash grep prints nothing (exit 1)",
+            "prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6: replace the Install-from-store sentence at line 37 with the PRD paragraph about TestFlight and Google Play internal testing and the browser phone view, reword lines 126-127, 157 and 183 so no sentence says the app comes from an app store, and remove the one dash on the page. Do not change any dashboard code."
+        },
+        "items": [
+          {
+            "id": "phone-page.ac1",
+            "title": "When grep -niE for \"from Google Play or the App Store|installed from an app store|through the app store\" runs on configuration/phone.mdx, it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-page.ac2",
+            "title": "configuration/phone.mdx contains a sentence that says the apps are in TestFlight and Google Play internal testing and not in the public stores",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-page.ac3",
+            "title": "When grep -nP for U+2013/U+2014 runs on configuration/phone.mdx, it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "god-view-experimental",
+        "title": "Label God View experimental on reference/god-view.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T16:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5472",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/god-view.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"Experimental features\" reference/god-view.mdx",
+            "grep -ci \"experimental\" reference/god-view.mdx",
+            "grep -nP '[\\x{2013}\\x{2014}]' reference/god-view.mdx",
+            "node --input-type=module -e \"import {findMdxProblems} from './scripts/lint-docs.js'; import {readFileSync} from 'node:fs'; console.log(findMdxProblems(readFileSync('reference/god-view.mdx','utf8')).length)\"",
+            "node -e \"const t=require('fs').readFileSync('reference/god-view.mdx','utf8');const m=t.match(/^description:\\s*\\\"?(.*?)\\\"?$/m);console.log(m[1].length)\""
+          ],
+          "expected_outputs": [
+            "prints the Note line",
+            "prints 2 or more",
+            "dash grep prints nothing (exit 1)",
+            "prints 0",
+            "prints a number from 50 to 160"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7: set the new description, insert the Note after the H1 that says God View is experimental, how to turn on Settings → Experimental → Experimental features, where it appears (More → System) and that /god-view opens Home with the switch off, and remove the dashes on the page."
+        },
+        "items": [
+          {
+            "id": "god-view-experimental.ac1",
+            "title": "reference/god-view.mdx contains a Note before the first section that says God View is experimental and names Settings → Experimental → Experimental features",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "god-view-experimental.ac2",
+            "title": "The Note says that with the switch off /god-view opens Home",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "god-view-experimental.ac3",
+            "title": "When grep -nP for U+2013/U+2014 runs on reference/god-view.mdx, it prints nothing and the description length prints 50 to 160",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mission-control-fix",
+        "title": "Remove Mission Control naming and Shadow Engineering from features/mission-control.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T16:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5472",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/mission-control.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"Mission Control\\|Shadow\\|INFERENCE\\|Inference\" features/mission-control.mdx",
+            "grep -n \"### All projects and side-by-side conversations\" features/mission-control.mdx",
+            "grep -nP '[\\x{2013}\\x{2014}]' features/mission-control.mdx",
+            "node --input-type=module -e \"import {findMdxProblems} from './scripts/lint-docs.js'; import {readFileSync} from 'node:fs'; console.log(findMdxProblems(readFileSync('features/mission-control.mdx','utf8')).length)\""
+          ],
+          "expected_outputs": [
+            "prints nothing (exit 1)",
+            "prints the heading line",
+            "dash grep prints nothing (exit 1)",
+            "prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-8: replace the intro at line 8, change line 12 and line 292 wording, delete the Inference badge row, the whole Shadow Engineering section and the INFERENCE.md tree line, keep the file name and the All projects and side-by-side conversations heading, and remove every en and em dash on the page. Leave every other section as it is."
+        },
+        "items": [
+          {
+            "id": "mission-control-fix.ac1",
+            "title": "When grep -n \"Mission Control|Shadow|INFERENCE|Inference\" runs on features/mission-control.mdx, it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mission-control-fix.ac2",
+            "title": "features/mission-control.mdx preserves the heading ### All projects and side-by-side conversations that features/conversations.mdx links to",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mission-control-fix.ac3",
+            "title": "The intro of features/mission-control.mdx says Home (/) is the landing page and Project home opens the Command Deck",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mission-control-fix.ac4",
+            "title": "When grep -nP for U+2013/U+2014 runs on features/mission-control.mdx, it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "readme-loops-views",
+        "title": "README.md lines 45-105: fix loops, Command Deck bullets and the views list",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T16:45:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5472",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "README.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "sed -n '45,105p' README.md | grep -niE 'bead|hot-swap|swap models|checkpoint|13 Dashboard|Cursor|Gemini CLI|70\\+|convoy status|specialist handoffs|routes automatically'",
+            "sed -n '45,105p' README.md | grep -nP '[\\x{2013}\\x{2014}]'",
+            "grep -n \"### Dashboard views\" README.md"
+          ],
+          "expected_outputs": [
+            "prints nothing (exit 1)",
+            "prints nothing (exit 1)",
+            "prints the new heading"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-9 steps 1 to 11 on README.md lines 45 to 105 only: rewrite the pipeline loop cell and autonomy rows, delete the hot-swap and checkpoint bullets, add the fork or hand off bullet, replace the 13 Dashboard Views block with the Dashboard views paragraph, fix the model, context, skills and pipeline bullets in Why Overdeck, and remove every en and em dash in that range."
+        },
+        "items": [
+          {
+            "id": "readme-loops-views.ac1",
+            "title": "When the stale-claim grep runs on README.md lines 45 to 105, it prints nothing for bead, hot-swap, swap models, checkpoint, 13 Dashboard, Cursor, Gemini CLI, 70+, convoy status and specialist handoffs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readme-loops-views.ac2",
+            "title": "README.md contains a Dashboard views paragraph that marks Agents, AutoPreso, Resources, Sessions, Metrics, Costs, Health and God View as experimental",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readme-loops-views.ac3",
+            "title": "When grep -nP for U+2013/U+2014 runs on README.md lines 45 to 105, it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "readme-features",
+        "title": "README.md lines 109-160: fix the How It Works diagram and Key Features table",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T16:45:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5472",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "README.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "sed -n '105,165p' README.md | grep -niE 'bead|hot-swap|checkpoint|Cursor|Gemini CLI|70\\+|Six providers|can.t start without|related issues'",
+            "sed -n '105,165p' README.md | grep -n 'Jira'",
+            "sed -n '105,165p' README.md | grep -nP '[\\x{2013}\\x{2014}]'"
+          ],
+          "expected_outputs": [
+            "prints nothing (exit 1)",
+            "prints the tracker list and Multi-Tracker lines containing Jira",
+            "prints nothing (exit 1)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-10 on README.md lines 109 to 160 only: drop beads and the convoy x4 and train wording from the ASCII diagram while keeping box widths aligned, add Jira to the tracker list, replace the caption, delete the Model Hot-Swap and Automatic Checkpoints rows, rewrite the Multi-Harness, Conversation Forking, Specialist Pipeline, Cloister, PRD-Driven Workflow, Skills, Multi-Tracker and Convoys rows with the PRD text, and remove every en and em dash in that range."
+        },
+        "items": [
+          {
+            "id": "readme-features.ac1",
+            "title": "When the stale-claim grep runs on the How It Works and Key Features range of README.md, it prints nothing for bead, hot-swap, checkpoint, Cursor, Gemini CLI, 70+, Six providers, can't start without and related issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readme-features.ac2",
+            "title": "The Key Features table contains a Multi-Tracker Support row that lists GitHub Issues, Linear, GitLab, Rally and Jira, and the diagram tracker list contains Jira",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readme-features.ac3",
+            "title": "When grep -nP for U+2013/U+2014 runs on that README.md range, it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "readme-tools-maturity",
+        "title": "README.md lines 186-245: fix supported harnesses, requirements and maturity, and clear the remaining dashes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T16:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5472",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "README.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -niE 'bead|hot-swap|swap models|checkpoint|13 Dashboard|Cursor|Gemini CLI|Antigravity|70\\+|4 tracker|Six providers|convoy status|specialist handoffs|can.t start without' README.md",
+            "grep -nP \"[\\x{2013}\\x{2014}]\" README.md",
+            "grep -n \"## Supported harnesses\\|5 tracker integrations\" README.md"
+          ],
+          "expected_outputs": [
+            "prints nothing (exit 1) for the whole file",
+            "prints nothing (exit 1) for the whole file",
+            "prints both lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-11: on README.md lines 186 to 245 replace the Supported Tools table with the Supported harnesses table (no Cursor, Gemini CLI or Antigravity rows, skills claim verified per harness), rewrite Requirements as required, installed by pan install and optional (no Beads CLI, tmux only with terminal.backend: tmux), rewrite the maturity bullets with 5 trackers, more than 120 skills and named harnesses without a count, adjust the Features docs row text, then remove every en and em dash left anywhere in README.md (including lines 19 and 37)."
+        },
+        "items": [
+          {
+            "id": "readme-tools-maturity.ac1",
+            "title": "When the full stale-claim grep (bead, hot-swap, checkpoint, 13 Dashboard, Cursor, Gemini CLI, Antigravity, 70+, 4 tracker, Six providers, convoy status, specialist handoffs, can't start without) runs on README.md, it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readme-tools-maturity.ac2",
+            "title": "README.md contains a Supported harnesses section and a Requirements section that lists Node.js 22.16+ and marks tmux as optional",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readme-tools-maturity.ac3",
+            "title": "README.md maturity list contains 5 tracker integrations including Jira",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readme-tools-maturity.ac4",
+            "title": "When grep -nP for U+2013/U+2014 runs on the whole README.md, it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pr-mint-evidence",
+        "title": "Run Mintlify validate, broken-links and lint:docs and paste the results in the PR body",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T16:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5472",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/cloister.mdx",
+            "features/specialists.mdx",
+            "concepts.mdx",
+            "configuration/phone.mdx",
+            "reference/god-view.mdx",
+            "features/mission-control.mdx",
+            "README.md",
+            "reference/state-model.mdx",
+            "configuration/order-books.mdx",
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx -y mint@4.3.49 validate",
+            "npx -y mint@4.3.49 broken-links",
+            "npm run lint:docs",
+            "grep -nP '[\\x{2013}\\x{2014}]' features/cloister.mdx features/specialists.mdx concepts.mdx configuration/phone.mdx reference/god-view.mdx features/mission-control.mdx README.md reference/state-model.mdx configuration/order-books.mdx"
+          ],
+          "expected_outputs": [
+            "prints success build passed and exits 0 (warnings accepted)",
+            "prints success no broken links found and exits 0",
+            "exits 0",
+            "prints nothing (exit 1)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-12 after every other item is done: make an allow-empty commit with the Item: pr-mint-evidence trailer and push it, run npx -y mint@4.3.49 validate, npx -y mint@4.3.49 broken-links and npm run lint:docs on it, fix any error in the page that caused it, run the dash grep across all touched files, then put both mint outputs under a Mintlify checks heading in the PR body with Closes #5472, the short sha, a one-line per-page change note for the audit issues #5499 to #5504, and the follow-up candidates from the PRD Non-goals."
+        },
+        "items": [
+          {
+            "id": "pr-mint-evidence.ac1",
+            "title": "When npx -y mint@4.3.49 validate runs on the branch, it exits 0 with no errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-mint-evidence.ac2",
+            "title": "When npx -y mint@4.3.49 broken-links runs on the branch, it prints no broken links found and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-mint-evidence.ac3",
+            "title": "npm run lint:docs exits 0 and the dash grep across all nine touched pages prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-mint-evidence.ac4",
+            "title": "The PR body contains a Mintlify checks section with both command outputs and a per-page change note",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "readme-loops-views",
+        "to": "readme-features",
+        "type": "blocks"
+      },
+      {
+        "from": "readme-features",
+        "to": "readme-tools-maturity",
+        "type": "blocks"
+      },
+      {
+        "from": "state-branch-retire",
+        "to": "pr-mint-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "state-model-pan",
+        "to": "pr-mint-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "cloister-page",
+        "to": "pr-mint-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "specialists-page",
+        "to": "pr-mint-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "concepts-page",
+        "to": "pr-mint-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "phone-page",
+        "to": "pr-mint-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "god-view-experimental",
+        "to": "pr-mint-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "mission-control-fix",
+        "to": "pr-mint-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "readme-loops-views",
+        "to": "pr-mint-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "readme-features",
+        "to": "pr-mint-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "readme-tools-maturity",
+        "to": "pr-mint-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "readme-loops-views",
+        "to": "readme-tools-maturity",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
