@@ -1279,6 +1279,44 @@ If none of this explains what you are seeing, ask in the
 [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a
 [GitHub issue](https://github.com/eltmon/overdeck/issues).
 
+### Search from the command line
+
+`pan conv` works on a separate catalog from the palette: a **discovered sessions** table in
+Overdeck's own database, built by scanning your Claude Code transcripts. Because of that,
+`pan conv embed` does not change what `⌘K` / `Ctrl+K` finds, and the palette's own index does not
+help `pan conv search --semantic` or `--similar`.
+
+The usual workflow:
+
+1. `pan conv scan` finds sessions and records them.
+2. `pan conv enrich` writes an AI summary and tags for each one.
+3. `pan conv search "<words>"` searches those summaries, tags and touched files.
+4. `pan conv embed`, then `pan conv search --semantic "<text>"` or `--similar <id>`, for
+   meaning-based search.
+
+| Command | What it does | Main options |
+| --- | --- | --- |
+| `pan conv scan [dirs...]` | Scans `~/.claude/projects/` (default) and records sessions | `--watched`, `--system`, `--dry-run`, `--max-parallel <n>` |
+| `pan conv enrich [ids...]` | Writes AI summaries and tags | `--tier <n>` (1 quick, 2 detailed, 3 deep), `--deep`, `--upgrade`, `--full`, `--with <model>`, `--prompt <text>`, `--limit <n>`, `--workspace <path>`, `--since <time>`, `--yes` |
+| `pan conv search [query]` | Keyword search over summaries, tags and files; add `--semantic` or `--similar` for meaning-based search | `--workspace`, `--model`, `--since`/`--after`/`--before`, `--tag`, `--tool`, `--file`, `--issue`, `--semantic <query>`, `--similar <id>`, `--format table\|json\|brief\|ids` |
+| `pan conv embed [ids...]` | Generates one vector per enriched session, needed for `--semantic` and `--similar` | `--status`, `--regenerate`, `--provider openai\|voyage\|ollama`, `--model <name>` |
+
+`pan conv enrich` asks for confirmation when the estimated cost passes a threshold (&#36;1 by
+default); pass `--yes` to skip the prompt.
+
+The Settings → Conversations card also has a **Semantic embeddings** switch, off by default, with
+**Embedding provider** (OpenAI, Voyage AI or Ollama), **Embedding model**, **Auto-embed after deep
+enrichment** and **Test connection**. `conversations.embeddings` turns this on; with
+`embedding_auto_on_deep` also on, it embeds a session right after a tier 2 or 3 `pan conv enrich`
+run. In `~/.overdeck/config.yaml` under `conversations:`, the matching keys are `embeddings`
+(defaults to `false`), `embedding_provider` (`openai`, `voyage` or `ollama`), `embedding_model` and
+`embedding_auto_on_deep`.
+
+For keys: OpenAI uses the key saved in Settings → Providers → OpenAI, or the `OPENAI_API_KEY`
+environment variable. Voyage has no Providers row; set `VOYAGE_API_KEY` in the environment instead.
+Ollama needs no key. `pan` loads `~/.overdeck.env` before anything else, so a key stored there works
+for every `pan conv` command too.
+
 ## See also
 
 - [Mission Control](/features/mission-control) — the project tree and activity timeline around your conversations
