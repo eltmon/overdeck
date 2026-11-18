@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5482",
   "created": "2026-11-18T21:37:14.666Z",
-  "updated": "2026-11-18T22:08:43.764Z",
+  "updated": "2026-11-18T22:10:26.962Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -318,6 +318,18 @@
     "validate-and-record.ac4": {
       "status": "completed",
       "doneAt": "2026-11-18T22:08:43.764Z"
+    },
+    "operating-links.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:10:26.961Z"
+    },
+    "operating-links.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:10:26.961Z"
+    },
+    "autopreso-section.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:10:26.961Z"
     }
   }
 }
