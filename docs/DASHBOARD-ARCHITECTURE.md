@@ -1600,7 +1600,9 @@ three scopes, Needs you, Project and Global; with no project selected,
 two columns) and a stored `project` preference reads as Global without ever
 rewriting `overdeck.ui.awarenessScope` — Project comes back once a project is
 selected again. Needs you is the `DecisionsPanel`, so its inline cards (MCP
-sign-in, held kickoff, agent requests) have a production mount here. Project
+sign-in, held kickoff, agent requests) have a production mount here. The
+same agent-request card (`components/chat/PendingAgentRequestCard.tsx`)
+pins to the top of the owner's `ConversationPanel` (PAN-5541 WI-6). Project
 and Global show one merged feed with three tabs: All, Chats and Activity. The
 Git, Files and Comments tabs are gone because no source ever wrote rows for
 them; a stored hidden tab falls back to All. The Command Deck has no feed
@@ -1952,7 +1954,10 @@ issue id folds into `issue:<ID>`; (d) every other decision (fleet rows,
 unreachable machines, disk alert, harness updates, restart recovery, MCP
 sign-ins, connector notices, agent requests). Items dedupe by key
 (`issue:<ID>`, `conversation:<name>`, `agent:<id>`, `flywheel:<key>`,
-`decision:<id>`) and sort oldest first.
+`decision:<id>`) and sort oldest first. An agent-request item carries a
+project key (PAN-5541 D4) and its `open()` calls `openAgentRequestDialog`
+(`lib/agentRequestDialogStore.ts`, rendered by
+`components/AgentRequestDialogHost.tsx`) instead of navigating.
 
 `useAgentsWorking({ projectKey? })` (`lib/selectors/agentsWorking.ts`) counts
 agents with a running status and conversations with `isWorking`. An agent id

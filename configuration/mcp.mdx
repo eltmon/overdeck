@@ -111,10 +111,14 @@ is not an agent token.
 An agent that needs an API key or a password calls `request_secret` instead
 of asking in chat, so the value never enters its transcript.
 
-- The request appears as a **Secret requested** card in the Decisions panel.
-  Only this machine's own dashboard, opened in a browser on this machine, can
-  answer it. A phone, a paired device or another machine's browser shows
-  "Answer this on &lt;machine&gt;'s own dashboard".
+- The request shows in **Needs you** (top bar, project Home, Activity → Needs
+  you); clicking it opens a dialog with the masked input. The owning
+  conversation (or the agent's session panel) also shows the same card at the
+  top. Only this machine's own dashboard, opened in a browser on this
+  machine, can answer it. A non-root viewer (a phone, a paired device or
+  another machine's browser) sees "Answer this on &lt;machine&gt;'s own
+  dashboard. A secret can be typed only in a browser on &lt;machine&gt;
+  itself, so it never crosses the network."
 - The operator types the value into the masked input and chooses **Send**, or
   chooses **Decline**.
 - The value lands in a file: `~/.overdeck/agents/<agentId>/secrets/<NAME>` for
@@ -137,10 +141,14 @@ An agent told to work on a machine that is not linked yet calls
 never asks for a pairing link in chat, so no pairing code enters its
 transcript.
 
-- The request appears as a **Machine link requested** card in the Decisions
-  panel. Only this machine's own dashboard, opened in a browser on this
-  machine, can answer it. A phone, a paired device or another machine's
-  browser shows "Answer this on &lt;machine&gt;'s own dashboard".
+- The request shows in **Needs you** (top bar, project Home, Activity → Needs
+  you); clicking it opens a dialog with **Link a machine…** and **Dismiss**.
+  The owning conversation (or the agent's session panel) also shows the same
+  card at the top. Only this machine's own dashboard, opened in a browser on
+  this machine, can answer it. A non-root viewer (a phone, a paired device or
+  another machine's browser) sees "Answer this on &lt;machine&gt;'s own
+  dashboard. Machines can be linked only from a browser on &lt;machine&gt;
+  itself."
 - **Link a machine…** opens the usual Link a machine dialog. After the link
   succeeds, the agent's `link_machine_wait` answers `linked` with the new
   machine's `environmentId` and `label`. The agent passes that label as
