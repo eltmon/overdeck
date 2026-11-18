@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5472",
   "created": "2026-11-18T16:42:03.966Z",
-  "updated": "2026-11-18T17:04:17.925Z",
+  "updated": "2026-11-18T17:04:22.942Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -234,6 +234,11 @@
     "readme-tools-maturity.ac4": {
       "status": "completed",
       "doneAt": "2026-11-18T17:04:17.924Z"
+    },
+    "pr-mint-evidence": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5472",
+      "claimedAt": "2026-11-18T17:04:22.942Z"
     }
   }
 }
