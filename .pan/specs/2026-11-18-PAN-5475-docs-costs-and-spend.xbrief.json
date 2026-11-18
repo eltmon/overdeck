@@ -1,0 +1,776 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-18T22:53:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5475: docs: costs and spend",
+    "updated": "2026-11-18T22:54:39.100Z"
+  },
+  "plan": {
+    "id": "pan-5475",
+    "title": "docs: costs and spend",
+    "status": "proposed",
+    "uid": "d6c33e19-2df7-468d-b3bd-89ae1d6783c9",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-18T22:53:00Z",
+    "updated": "2026-11-18T22:54:39.100Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5475",
+        "label": "PAN-5475",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5467",
+        "label": "Docs overhaul epic",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5562",
+        "label": "Broken cost surfaces bug",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docs",
+      "costs",
+      "mintlify"
+    ],
+    "narratives": {
+      "Problem": "Overdeck has no user page about cost. Facts are scattered across cli/core-commands.mdx, features/dashboard-views.mdx, features/mission-control.mdx, configuration/linked-machines.mdx and a token spend report with a v0.21.0 screenshot. Planning also found that pan cost today/week/month/report and budgets always report zero, and that two Costs page cards and the Project Home Spend link do not work (filed as #5562).",
+      "Proposal": "Add features/costs.mdx with sections on how cost is counted, API prices versus plan bills, attribution (issues, conversations, Flywheel, unattributed, project spend and windows), where spend shows in the dashboard, the experimental Costs page, pan cost from the terminal, opt-in cost limits, and getting help, every fact taken from code per PRD facts F-1 to F-32. Document only working behavior and link #5562 where a command or card reports nothing. Add the page to docs.json after dashboard-views, add one link sentence in five related pages, and validate with mint@4.3.49 and lint:docs.",
+      "NonGoals": "- No code change: the dead pan cost subcommands, budgets, Costs page cards and Spend link (#5562) and mis-priced models (#4844) are fixed in their own issues\n- No screenshots and no change to images/ (the existing costs screenshots are from v0.21.0)\n- No API route reference, token spend report regeneration steps, cockpit CostCard, Resources burn rate or model picker cost badges\n- No recommendation to create budgets or use pan cost today/week/month/report while #5562 is open\n- No sentence changes in the five linking pages beyond one added sentence or link each\n- No changelog.d entry\n- No claim that Overdeck knows plan or subscription costs"
+    },
+    "autoDecisions": [
+      {
+        "summary": "One new page features/costs.mdx placed right after features/dashboard-views in the Features group",
+        "rationale": "The Costs page is one of the dashboard views, and the issue names features/costs.mdx as the page."
+      },
+      {
+        "summary": "Document only working behavior and name each broken cost surface once with a link to #5562",
+        "rationale": "Same pattern as the merged desktop-app page (#5556); readers should not follow instructions for budgets or daily summaries that always print zero."
+      },
+      {
+        "summary": "Answer 'API-rate vs plan costs' as: every figure is tokens times published API prices, so it is an API-price equivalent, and no view shows plan cost",
+        "rationale": "No code writes the subscription-covered marker; the only accurate statement is that Overdeck does not know what a plan covers."
+      },
+      {
+        "summary": "Cover pan cost report, sync and backfill briefly in addition to the six subcommands the issue names",
+        "rationale": "They appear in pan cost --help; one line each keeps the page complete without describing unverified multi-developer sync."
+      },
+      {
+        "summary": "Linking pages get one additive sentence or link each, including a #5562 caveat in cli/core-commands.mdx and features/mission-control.mdx",
+        "rationale": "Those pages currently present broken commands and a gated click as working; the per-page accuracy audits own any rewrite."
+      }
+    ],
+    "items": [
+      {
+        "id": "page-counting",
+        "title": "Create features/costs.mdx with frontmatter, intro and How Overdeck counts cost",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T22:53:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5475",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/costs.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## How Overdeck counts cost$' features/costs.mdx",
+            "head -4 features/costs.mdx | grep -cP '[\\x{2013}\\x{2014}]'",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 1",
+            "the dash grep prints 0",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5475.md work item 1, decisions D-1 and D-2, and facts F-1 to F-4. Create features/costs.mdx with the exact quoted title and description from D-1, an H1 'Costs and spend', a 2 to 4 sentence intro (FR-1), and '## How Overdeck counts cost': Claude Code records after each tool call (F-1), Pi and Codex are swept at dashboard start and every 5 minutes (F-2), events go to ~/.overdeck/costs/events.jsonl and the cost_events table in ~/.overdeck/overdeck.db (F-4), and pan cost backfill is a dry run unless --write (F-3). Re-grep every cited anchor in .pan/drafts/PAN-5475.md before writing the sentence that depends on it; never copy from other docs pages. Obey NFR-2 (no U+2013/U+2014) and NFR-5 (no bare $ in prose: write &#36; or use backticks; placeholders like <id> in backticks; a bare < before a digit or $ as &lt;)."
+        },
+        "items": [
+          {
+            "id": "page-counting.ac1",
+            "title": "features/costs.mdx frontmatter contains the D-1 quoted title and a quoted description of 50 to 160 characters with no U+2013 or U+2014",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-counting.ac2",
+            "title": "The '## How Overdeck counts cost' section contains the phrase 'after each tool call' for Claude Code and contains '5 minutes' for Pi and Codex sweeps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-counting.ac3",
+            "title": "The '## How Overdeck counts cost' section contains events.jsonl and the command pan cost backfill --write, and says backfill without --write only reports what it would import",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-pricing",
+        "title": "Add the API prices, not your plan bill section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T22:53:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5475",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/costs.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## API prices, not your plan bill$' features/costs.mdx",
+            "grep -c 'issues/4844' features/costs.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 1",
+            "the 4844 grep prints at least 1",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5475.md work item 2, decision D-4 and facts F-5 to F-8. Add '## API prices, not your plan bill' after the counting section: dollar figures are tokens times published API prices from Overdeck's price table (F-5); Pi uses its own reported cost when present (F-6); on a subscription plan the figures are an API-price equivalent, not the bill, and no view shows plan cost (F-7); unpriced models record nothing (Claude Code) or 0 (Pi, Muse), with a link to issue 4844 (F-8). Do not invent savings or hypothetical-cost features. Re-grep every cited anchor in .pan/drafts/PAN-5475.md before writing the sentence that depends on it; never copy from other docs pages. Obey NFR-2 (no U+2013/U+2014) and NFR-5 (no bare $ in prose: write &#36; or use backticks; placeholders like <id> in backticks; a bare < before a digit or $ as &lt;)."
+        },
+        "items": [
+          {
+            "id": "page-pricing.ac1",
+            "title": "The section states that a subscription plan user does not pay the shown figures and that Overdeck shows no separate plan cost",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-pricing.ac2",
+            "title": "The section contains a link to https://github.com/eltmon/overdeck/issues/4844 and a sentence that a model missing from the price table records zero or no cost",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-pricing.ac3",
+            "title": "The section contains a sentence that Pi sessions use the cost Pi reports",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-attribution",
+        "title": "Add the How spend is attributed section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T22:53:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5475",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/costs.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## How spend is attributed$' features/costs.mdx",
+            "grep -c 'local midnight' features/costs.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 1",
+            "the local midnight grep prints at least 1",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5475.md work item 3 and facts F-9 to F-13. Add '## How spend is attributed': issue from the agent Overdeck launched, plus the Claude Code branch fallback limited to the five prefixes pan, min, aud, krux, cli (F-9); the buckets with their Costs page labels, paraphrasing the unattributed label because the UI string has an em dash (F-10); stage with a few examples, not a complete list (F-11); project spend counts the project's issues and its conversations (F-12); today starts at local midnight, week at the start of the day seven days ago, month is the last 30 days, and Project Home and the Costs page read different stores (F-13). Re-grep every cited anchor in .pan/drafts/PAN-5475.md before writing the sentence that depends on it; never copy from other docs pages. Obey NFR-2 (no U+2013/U+2014) and NFR-5 (no bare $ in prose: write &#36; or use backticks; placeholders like <id> in backticks; a bare < before a digit or $ as &lt;)."
+        },
+        "items": [
+          {
+            "id": "page-attribution.ac1",
+            "title": "The section contains Conversations, Flywheel orchestration and unattributed, and contains no em dash",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-attribution.ac2",
+            "title": "The section contains a sentence that a project's spend includes its conversations and contains 'local midnight'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-attribution.ac3",
+            "title": "The section says month covers the last 30 days and names at least two stage examples such as work and review.security",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-where",
+        "title": "Add the Where to see spend section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T22:53:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5475",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/costs.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## Where to see spend$' features/costs.mdx",
+            "grep -c 'Cost breakdown' features/costs.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 1",
+            "the Cost breakdown grep prints at least 1",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5475.md work item 4, decision D-3 and facts F-14 to F-16. First run gh issue view 5562 --json state; if closed, document the fixed behavior instead of the caveat. Add '## Where to see spend': Project Home Spend this week (needs an issue prefix, unavailable after 20 seconds, click opens the Costs page only with Experimental features on, link #5562, link /features/mission-control#project-home); the issue drawer Details tab Pipeline costs, Total and Cost breakdown with By stage and By model (link /features/dashboard-views#issue-drawer-and-full-issue-view); Board card cost badge on hover. Do not document the cockpit CostCard (F-17). Re-grep every cited anchor in .pan/drafts/PAN-5475.md before writing the sentence that depends on it; never copy from other docs pages. Obey NFR-2 (no U+2013/U+2014) and NFR-5 (no bare $ in prose: write &#36; or use backticks; placeholders like <id> in backticks; a bare < before a digit or $ as &lt;)."
+        },
+        "items": [
+          {
+            "id": "page-where.ac1",
+            "title": "The section contains Spend this week, needs an issue prefix and a link to https://github.com/eltmon/overdeck/issues/5562",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-where.ac2",
+            "title": "The section contains Cost breakdown, By stage and By model and links /features/dashboard-views#issue-drawer-and-full-issue-view",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-where.ac3",
+            "title": "The section contains the Board card cost badge, and grep -c 'CostCard' features/costs.mdx prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-costs-view",
+        "title": "Add The Costs page section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T22:53:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5475",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/costs.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## The Costs page$' features/costs.mdx",
+            "grep -c 'images/dashboard/costs' features/costs.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 1",
+            "the screenshot grep prints 0",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5475.md work item 5 and facts F-18 to F-22 and F-32. Add '## The Costs page': experimental only (link /features/dashboard-views#experimental-features); header Cost Tracking and the Issues, Experiments and Machines tabs; Issues tab cards, 30-Day Cost Trend, Costs by Issue list, detail panel and Full detail dialog; one sentence that Event Count shows the number of issues and Budget Warnings and Over Budget always show 0, linking #5562; Experiments tab in one or two sentences (agents.caveman.enabled, agents.caveman.ab_test); Machines tab in one sentence linking /configuration/linked-machines#fleet-usage. No screenshots. Re-grep every cited anchor in .pan/drafts/PAN-5475.md before writing the sentence that depends on it; never copy from other docs pages. Obey NFR-2 (no U+2013/U+2014) and NFR-5 (no bare $ in prose: write &#36; or use backticks; placeholders like <id> in backticks; a bare < before a digit or $ as &lt;)."
+        },
+        "items": [
+          {
+            "id": "page-costs-view.ac1",
+            "title": "The section contains links to /features/dashboard-views#experimental-features and /configuration/linked-machines#fleet-usage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-costs-view.ac2",
+            "title": "The section contains Issues, Experiments, Machines and 30-Day Cost Trend",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-costs-view.ac3",
+            "title": "The section contains a sentence that Event Count, Budget Warnings and Over Budget do not show real values yet, with a link to issue 5562",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-costs-view.ac4",
+            "title": "Given features/costs.mdx after this item, grep -c 'images/dashboard/costs' features/costs.mdx prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-cli",
+        "title": "Add the pan cost from the terminal section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T22:53:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5475",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/costs.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## pan cost from the terminal$' features/costs.mdx",
+            "grep -c 'pan cost budget create' features/costs.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 1",
+            "the budget create grep prints 0",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5475.md work item 6, decision D-3 and facts F-23 to F-29. Add '## pan cost from the terminal' with a bash block containing pan cost issue PAN-123 and pan cost effort --issue PAN-123; describe the pan cost issue output (Total Cost, API Calls, Tokens, By Model, By Review Role, By Agent) and that it prints the all-time total so --days has no effect (F-24); pan cost effort with --issue and --json and the unrecorded row, linking /configuration/effort (F-25); one paragraph that today, week, month, report and the budget commands currently report zero spend, linking #5562 (F-26, F-27); pan cost sync in one sentence (F-28); pan conv cost as a separate estimate linking /cli/conversation-commands (F-29); link /cli/core-commands#pan-cost for all options. Never show pan cost budget create as a recommended command. Re-grep every cited anchor in .pan/drafts/PAN-5475.md before writing the sentence that depends on it; never copy from other docs pages. Obey NFR-2 (no U+2013/U+2014) and NFR-5 (no bare $ in prose: write &#36; or use backticks; placeholders like <id> in backticks; a bare < before a digit or $ as &lt;)."
+        },
+        "items": [
+          {
+            "id": "page-cli.ac1",
+            "title": "The section contains pan cost issue, pan cost effort, --json and pan conv cost",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-cli.ac2",
+            "title": "The section contains a sentence that pan cost today, week, month, report and the budget commands report zero spend, with a link to issue 5562",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-cli.ac3",
+            "title": "Given features/costs.mdx after this item, grep -c 'pan cost budget create' features/costs.mdx prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-cli.ac4",
+            "title": "The section contains links to /cli/core-commands#pan-cost and /configuration/effort",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-limits-help",
+        "title": "Add Cost limits, Get help and See also sections",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T22:53:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5475",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/costs.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## Cost limits$' features/costs.mdx",
+            "grep -c '^## Get help$' features/costs.mdx",
+            "grep -c 'discord.gg/ZpHE2ZTv5P' features/costs.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the Cost limits heading grep prints 1",
+            "the Get help heading grep prints 1",
+            "the Discord grep prints at least 1",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5475.md work items 7 and 8 and facts F-30 and F-31. Add '## Cost limits' with the TOML block from work item 7 (say the numbers are examples), the file ~/.overdeck/cloister.toml, the four keys, no defaults, and that a crossing writes one warning line to the dashboard log, is not shown in the dashboard and never stops or pauses an agent. Then '## Get help' linking https://discord.gg/ZpHE2ZTv5P and https://github.com/eltmon/overdeck/issues, and '## See also' with the seven links from work item 8. Re-grep every cited anchor in .pan/drafts/PAN-5475.md before writing the sentence that depends on it; never copy from other docs pages. Obey NFR-2 (no U+2013/U+2014) and NFR-5 (no bare $ in prose: write &#36; or use backticks; placeholders like <id> in backticks; a bare < before a digit or $ as &lt;)."
+        },
+        "items": [
+          {
+            "id": "page-limits-help.ac1",
+            "title": "The Cost limits section contains cloister.toml, [cost_limits], per_agent_usd, per_issue_usd, daily_total_usd and alert_threshold",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-limits-help.ac2",
+            "title": "The Cost limits section contains a sentence that limits never stop or pause an agent and that warnings go only to the dashboard log",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-limits-help.ac3",
+            "title": "The Get help section contains https://discord.gg/ZpHE2ZTv5P and https://github.com/eltmon/overdeck/issues and See also links /reference/token-spend-report",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "nav-entry",
+        "title": "Add features/costs to docs.json Features navigation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T22:53:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5475",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '\"features/costs\"' docs.json",
+            "grep -A1 '\"features/dashboard-views\"' docs.json",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "prints 1",
+            "the line after features/dashboard-views is \"features/costs\",",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5475.md work item 9. Run pan sync-main first (commit item work before it, it auto-commits a dirty tree). In docs.json, in the Features group pages list, insert \"features/costs\" on its own line directly after \"features/dashboard-views\". Change no other line."
+        },
+        "items": [
+          {
+            "id": "nav-entry.ac1",
+            "title": "docs.json contains \"features/costs\" exactly once, on the line directly after \"features/dashboard-views\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "nav-entry.ac2",
+            "title": "git diff of docs.json against the merge base prints exactly one added line and no removed line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cross-links",
+        "title": "Link the new page from five related pages",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T22:53:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5475",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/dashboard-views.mdx",
+            "features/mission-control.mdx",
+            "cli/core-commands.mdx",
+            "configuration/linked-machines.mdx",
+            "reference/token-spend-report.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '/features/costs' features/dashboard-views.mdx features/mission-control.mdx cli/core-commands.mdx configuration/linked-machines.mdx reference/token-spend-report.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "every file prints at least 1",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5475.md work item 10 and decision D-6, NFR-7. Make exactly one additive edit per file: features/dashboard-views.mdx (link the word Costs in both Costs table rows to /features/costs), features/mission-control.mdx (one sentence after the Spend this week bullet), cli/core-commands.mdx (one sentence at the end of ## pan cost with the #5562 link), configuration/linked-machines.mdx (one sentence at the end of ## Fleet usage), reference/token-spend-report.mdx (one sentence after the What's Inside paragraph that mentions Cost Tracking). Change no other sentence. Obey NFR-2 and NFR-5 on added lines."
+        },
+        "items": [
+          {
+            "id": "cross-links.ac1",
+            "title": "Each of features/dashboard-views.mdx, features/mission-control.mdx, cli/core-commands.mdx, configuration/linked-machines.mdx and reference/token-spend-report.mdx contains /features/costs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cross-links.ac2",
+            "title": "The ## pan cost section of cli/core-commands.mdx contains a link to https://github.com/eltmon/overdeck/issues/5562",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cross-links.ac3",
+            "title": "git diff of the five files against the merge base prints no removed line other than the two link-wrapped Costs table rows in features/dashboard-views.mdx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "validate",
+        "title": "Run the Mintlify validator, link check, docs lint and dash checks",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T22:53:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5475",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/costs.mdx",
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx -y mint@4.3.49 validate",
+            "npx -y mint@4.3.49 broken-links",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "build passed",
+            "no broken links found",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5475.md work item 11. Run the commands listed there (mint pinned to 4.3.49, never --fix), fix anything they report in files this issue touched, and paste the clean validate and broken-links output in the PR body."
+        },
+        "items": [
+          {
+            "id": "validate.ac1",
+            "title": "npx -y mint@4.3.49 validate prints build passed with no errors and npx -y mint@4.3.49 broken-links prints no broken links found",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate.ac2",
+            "title": "npm run lint:docs exits 0 and both dash checks from work item 11 exit 0 with no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate.ac3",
+            "title": "The section heading check from work item 11 prints 8, and the PR body contains both mint outputs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "page-counting",
+        "to": "page-pricing",
+        "type": "blocks"
+      },
+      {
+        "from": "page-pricing",
+        "to": "page-attribution",
+        "type": "blocks"
+      },
+      {
+        "from": "page-attribution",
+        "to": "page-where",
+        "type": "blocks"
+      },
+      {
+        "from": "page-where",
+        "to": "page-costs-view",
+        "type": "blocks"
+      },
+      {
+        "from": "page-costs-view",
+        "to": "page-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "page-cli",
+        "to": "page-limits-help",
+        "type": "blocks"
+      },
+      {
+        "from": "page-counting",
+        "to": "nav-entry",
+        "type": "blocks"
+      },
+      {
+        "from": "page-counting",
+        "to": "cross-links",
+        "type": "blocks"
+      },
+      {
+        "from": "page-limits-help",
+        "to": "validate",
+        "type": "blocks"
+      },
+      {
+        "from": "nav-entry",
+        "to": "validate",
+        "type": "blocks"
+      },
+      {
+        "from": "cross-links",
+        "to": "validate",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Docs-only: one new page plus one-line links in five pages and docs.json; 7 files, every one a docs file.",
+      "canonicalFilename": "2026-11-18-PAN-5475-docs-costs-and-spend.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
