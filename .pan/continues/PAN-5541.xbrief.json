@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5541",
   "created": "2026-11-18T20:13:04.612Z",
-  "updated": "2026-11-18T21:47:16.846Z",
+  "updated": "2026-11-18T22:06:51.700Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -190,9 +190,18 @@
       "doneAt": "2026-11-18T21:47:02.226Z"
     },
     "dock-needs-you-flag": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5541",
-      "claimedAt": "2026-11-18T21:47:16.846Z"
+      "claimedAt": "2026-11-18T21:47:16.846Z",
+      "doneAt": "2026-11-18T22:06:51.700Z"
+    },
+    "dock-needs-you-flag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:06:51.700Z"
+    },
+    "dock-needs-you-flag.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:06:51.700Z"
     }
   }
 }
