@@ -74,7 +74,7 @@ There is no hard limit on review rounds, but after at least 3 rounds where the b
 
 A single test role owns both ordinary test-suite execution and browser-based UAT; there is no separate UAT role. It runs the project's gates, decides from the issue's acceptance criteria whether browser UAT is needed, and when it is, drives the workspace's built dashboard with Playwright. It records two separate verdicts, tests and UAT.
 
-For a project in CI mode, the CI test job on the PR head is the test gate, so the merge gate requires it directly. A failed UAT verdict at the PR head always blocks merge, on any project: it is treated as evidence the code does not work.
+For a project in CI mode, the CI test job on the PR head is the test gate, so the merge gate requires it directly. While an issue is held for UAT, the default (see [Merge](#merge)), a failed UAT verdict at the PR head blocks merge: it is treated as evidence the code does not work. With the hold off for that issue, a failed UAT verdict does not block merge.
 
 As of this writing, the test role does not start automatically the moment review approves. It starts only when `pan review request` runs on a PR that is approved at head but whose checks are not yet green, or when an issue whose test agent was stopped gets unpaused. Automatic dispatch on approval is tracked as [issue #5537](https://github.com/eltmon/overdeck/issues/5537).
 
@@ -90,11 +90,11 @@ As of this writing, the test role does not start automatically the moment review
 2. After approval, a conflict-repair patrol asks the work agent once per PR head to run `pan sync-main` and push; if the head still conflicts 45 minutes later, it raises Needs you.
 3. At merge, the server attempts the rebase itself, falling back to the work agent only if that fails (see [Merge](#merge) below).
 
-`pan sync-main <id>` merges the latest `main` into the feature branch; it does not push. A conflict confined to `.pan/` resolves in favor of `main`, and any other conflict aborts the merge for you to resolve by hand in the workspace.
+`pan sync-main <id>` merges the latest `main` into the feature branch; it does not push. A conflict confined to the plan files under `.pan/specs/` and `.pan/continues/` resolves in favor of `main`, and any other conflict aborts the merge for you to resolve by hand in the workspace.
 
 ## Needs you and pan ask
 
-Needs you is the one list of things a person must act on, shown as the top bar's `Needs you · N` button and in the project Home and Board panels. It covers several different kinds of attention: pending agent questions and permission prompts, plans waiting for your approval, `pan ask` decisions, a work agent paused after verification got stuck, a review loop that stopped converging, and a conflict-repair timeout.
+Needs you is the one list of things a person must act on, shown as the top bar's `Needs you · N` button and in the project Home and Board panels. It covers several different kinds of attention: pending agent questions and permission prompts, plans waiting for your approval, and `pan ask` decisions. A work agent paused after verification got stuck, a review loop that stopped converging, and a conflict-repair timeout are also announced as needing you, on the activity feed and, when a Flywheel run is active, in its own needs-you rows.
 
 An agent asks you a blocking decision with `pan ask`: `--option <label>` offers 2 to 4 choices, `--context <text>` carries what it already tried or knows, and `--withdraw` closes a request that is no longer needed. The question appears in the dashboard as a Decision dialog; whatever you pick or type arrives back in the agent's own session as a message, and the agent resumes from there.
 
@@ -102,11 +102,11 @@ Two related commands cover other kinds of pending input: `pan answer` shows a pe
 
 ## Merge
 
-Every merge path, whether it is Awaiting Merge, the Merge button, auto-merge, the merge train or a per-project queue, asks the same one merge gate. A PR passes it only when it is open and not a draft, approved at the head commit with no changes requested, every check is green, the CI test job passed on the head in CI mode, there is no failed UAT verdict at the head, and GitHub itself reports the PR mergeable. Nothing about the answer is stored: it is computed from the PR every time you ask.
+Every merge path, whether it is Awaiting Merge, the Merge button, auto-merge, the merge train or a per-project queue, asks the same one merge gate. A PR passes it only when it is open and not a draft, approved at the head commit with no changes requested, every check is green, the CI test job passed on the head in CI mode, there is no failed UAT verdict at the head while the issue is held for UAT, and GitHub itself reports the PR mergeable. Nothing about the answer is stored: it is computed from the PR every time you ask.
 
 Clicking Merge asks the gate first. A PR that is already clean merges directly; otherwise the server rebases onto main for you, and if that rebase itself fails, it falls back to asking the work agent to rebase and push. Either way the merge itself is a squash merge. [Awaiting Merge](/features/dashboard-views#awaiting-merge) is where ready issues wait for this click.
 
-By default a ready PR waits for you: the per-issue `Auto` or `Hold` label wins if set, otherwise the project's own default, otherwise the global `require_uat_before_merge` setting, which defaults to true. With the hold off for an issue, its ready PR is scheduled and merges itself after a 5-minute cooldown; `pan merge cancel <id>` stops one during that window. See [Auto-merge](/configuration/auto-merge) for the full policy, and [Merge batches](/features/merge-batches) for the merge train, which is off by default.
+By default a ready PR waits for you: the per-issue `auto-merge` or `hold-for-uat` label (set by the Awaiting Merge row's `Auto` / `Hold` toggle) wins if set, otherwise the project's own default, otherwise the global `require_uat_before_merge` setting, which defaults to true. With the hold off for an issue, its ready PR is scheduled and merges itself after a 5-minute cooldown; `pan merge cancel <id>` stops one during that window. See [Auto-merge](/configuration/auto-merge) for the full policy, and [Merge batches](/features/merge-batches) for the merge train, which is off by default.
 
 Awaiting Merge also has a Pipeline Override section for PRs that are not yet ready: `Force Approve` and `Force Merge` both bypass the pipeline, behind a confirmation step, for the rare case where you need to move a PR on without waiting for the gate.
 
@@ -161,7 +161,7 @@ Default output also prints the last few entries from the pipeline journal, an ap
 
 `pan kill <id>` stops agents but keeps the workspace; it is the safe way to pause work without losing anything. Avoid `pan wipe`, which is destructive and not a restart tool.
 
-`pan reopen` is for an issue that is closed, completed or cancelled, not one already in progress. For an open issue, use whichever row above matches what actually stopped: `pan recover` or `pan resume` for a stopped work agent, `pan review restart` only when reviewers are missing. Reopening re-enters the pipeline, adds the `in-progress` label and posts a comment, and refuses an already-open issue unless you pass `--force`. Its help text claims it clears old specialist fields, but there is nothing left to clear: that state was never stored in the first place, so the pipeline simply picks the issue back up from its branch and PR.
+`pan reopen` is for an issue that is closed, completed or cancelled, not one already in progress. For an open issue, use whichever row above matches what actually stopped: `pan recover` or `pan resume` for a stopped work agent, `pan review restart` only when reviewers are missing. Reopening re-enters the pipeline, adds the `in-progress` label and posts a comment, and refuses an already-open issue unless you pass `--force`. The pipeline simply picks the issue back up from its branch and PR; no specialist state needs restoring, because none was ever stored.
 
 ## Get help
 
