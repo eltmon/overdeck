@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5503",
   "created": "2026-11-18T23:39:30.709Z",
-  "updated": "2026-11-18T23:46:08.448Z",
+  "updated": "2026-11-18T23:46:37.782Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,30 @@
     "audit-model-routing.ac3": {
       "status": "completed",
       "doneAt": "2026-11-18T23:46:08.448Z"
+    },
+    "audit-auto-merge": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:46:37.782Z"
+    },
+    "audit-auto-merge.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:46:37.782Z"
+    },
+    "audit-auto-merge.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:46:37.782Z"
+    },
+    "audit-auto-merge.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:46:37.782Z"
+    },
+    "audit-auto-merge.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:46:37.782Z"
+    },
+    "audit-auto-merge.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:46:37.782Z"
     }
   }
 }
