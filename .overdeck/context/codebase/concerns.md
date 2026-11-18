@@ -895,7 +895,7 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   command on macOS creates ~10 processes per call, because libuv retries `posix_spawn` once per `PATH`
   entry (PAN-5168).
 - **A tab open fires ~45 REST requests at once** (PAN-5178, measured 2026-11-13) — on an
-  HTTP/1.1 origin (`http://localhost:3011`, the desktop shell) Chromium sends at most 6 at a
+  HTTP/1.1 origin (`http://localhost:3011`, or the desktop app's `http://127.0.0.1:7825`) Chromium sends at most 6 at a
   time per origin, and a few slow status reads (`/api/prerequisites` 0.8–2.1 s, uncached;
   `/api/claude-code/status` 0.5–1.4 s; `/api/flywheel/status` 0.2–1.7 s; `/api/workspace-registry`
   333 KB, 1.2 s+) hold the slots. A request issued late in the burst waits 1–2 s in the browser
@@ -914,4 +914,14 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   `semgrep_scan_with_custom_rule` works. The server sends `roots/list` requests, so a client that ignores
   them hangs every tool call. Semgrep writes `~/.semgrep/` unless `SEMGREP_SETTINGS_FILE`/`SEMGREP_LOG_FILE`
   point elsewhere, and reads a login token from that settings file.
+- **The desktop app's embedded dashboard is not the `pan up` dashboard** (verified 2026-11-18) —
+  `apps/desktop/src/server.ts` serves on `127.0.0.1:7825` (`BASE_PORT + restartAttempt % 10`, so up
+  to 7834 after crash restarts), never 3011, so `pan open` and other 3011 clients do not reach it.
+  When `pan up` finds an installed app (`src/cli/index.ts`, search `Check for installed Electron app`)
+  it launches the app, starts sidecars and returns without starting its own server; `--no-open` skips
+  the app. Its Linux candidates include `~/.local/bin/overdeck`, where `scripts/install.sh` puts the
+  CLI itself (#5557). Several desktop controls do nothing (#5556): tray colours and badge
+  (`/api/health` has no `agentCount`), the six notification switches (no caller of
+  `overdeckBridge.notify`; real notifications are the frontend's web `Notification` calls), the
+  Open Workspace submenu, and Launch at login on Linux (`setLoginItemSettings` is darwin/win32 only).
 <!-- last-verified: 2026-11-04 -->

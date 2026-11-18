@@ -1,0 +1,179 @@
+---
+title: Desktop app for macOS, Windows and Linux
+description: "Install the Overdeck desktop app, launch it with pan up, use its tray and notifications, and open another machine's dashboard."
+---
+
+# Desktop app
+
+The Overdeck desktop app runs its own dashboard server and opens the dashboard in a window, so you don't need a terminal or a browser tab. It uses the same projects, conversations and agents as `pan up`, so nothing about your setup changes by switching to the app. Instead of running its own server, the app can also show another machine's dashboard; see [Open another machine](#open-another-machine).
+
+## Download and install
+
+Download the installer for your system from [GitHub Releases](https://github.com/eltmon/overdeck/releases/latest).
+
+| OS | File | Architecture |
+| --- | --- | --- |
+| Linux | `.AppImage` | x64 |
+| macOS | `.dmg` | Apple silicon (arm64) |
+| Windows | `Setup` `.exe` | x64 |
+
+There is no build for Intel Macs, Linux on ARM or Windows on ARM. On those systems, install `@overdeck/core` and use the dashboard in a browser with `pan up`.
+
+### Linux
+
+Make the AppImage executable and move it to `~/Applications/` so `pan up` can find it later:
+
+```bash
+chmod +x Overdeck-*.AppImage
+mkdir -p ~/Applications
+mv Overdeck-*.AppImage ~/Applications/
+~/Applications/Overdeck-*.AppImage
+```
+
+### macOS
+
+Open the `.dmg` and drag **Overdeck** into **Applications**.
+
+macOS blocks the first launch because the app is not notarized yet. Run `xattr -dr com.apple.quarantine /Applications/Overdeck.app`, then open it again.
+
+### Windows
+
+Run `Overdeck.Setup.<version>.exe`. Keep the default installation folder so `pan up` can find the app later.
+
+## Run it from npm
+
+Prefer npm to a standalone installer? Run the app directly, or install it as a command:
+
+```bash
+npx @overdeck/desktop
+npm install -g @overdeck/desktop
+```
+
+The launcher needs Node.js 22 or later; otherwise it exits with `[overdeck] Node.js 22 or later is required (found <version>).` A global install adds the `overdeck-desktop` command. The npm package does not include the `pan` command; install `@overdeck/core` for that.
+
+`pan up` does not look for the npm package; it only finds the app at the install locations above.
+
+To update, run `npm install -g @overdeck/desktop@latest`, or just run `npx @overdeck/desktop@latest` again.
+
+## Launch it with pan up
+
+If you already installed the app, `pan up` finds and launches it instead of starting its own dashboard server: it prints `Launching Overdeck desktop app...` and `✓ Desktop app launched`, starts the background sidecars, and returns. If the launch fails, it prints `⚠ Could not launch desktop app: <message>` and falls back to the normal dashboard. Run `pan up --no-open` to skip the app and always start the normal dashboard.
+
+`pan up` looks for the app at:
+
+- **Linux**: `~/Applications/Overdeck*.AppImage`, or `/opt/overdeck/overdeck`
+- **macOS**: `/Applications/Overdeck.app` or `~/Applications/Overdeck.app`
+- **Windows**: `%LOCALAPPDATA%\Programs\Overdeck\Overdeck.exe`
+
+On Linux, `pan up` also treats `~/.local/bin/overdeck` as the app. The install script puts the `overdeck` command there, so `pan up` reports `Desktop app launched` and opens the dashboard in your browser instead ([#5557](https://github.com/eltmon/overdeck/issues/5557)).
+
+### What runs where
+
+The app's embedded server listens on port `7825` (it is not the `pan up` dashboard's port). `pan open` always talks to the `pan up` dashboard; see [The desktop app](/features/open-in-overdeck#the-desktop-app) for how it reaches the app's own window. `pan down` stops the `pan up` dashboard only; it does not quit the app, which you quit from its tray or menu.
+
+Only one copy of the app runs at a time: launching it again focuses the existing window, and launching it with `--open <path>` opens that path in the running window. Closing the window keeps the app running in the background on macOS; on Linux and Windows, closing the last window quits the app and stops its embedded server.
+
+## The tray and the app menu
+
+Clicking the tray icon opens the dashboard window. Its menu has:
+
+- **Show Dashboard**
+- **Connect to a Machine…**
+- **Use This Computer** (enabled only while another machine's dashboard is shown)
+- **Start Cloister**
+- **Stop Cloister**
+- **Emergency Stop All**
+- **Settings**
+- **Quit**
+
+The tray icon's color, its tooltip counts and the macOS dock badge do not change with agent activity yet, so **Settings → Desktop App → System Tray** has no visible effect ([#5556](https://github.com/eltmon/overdeck/issues/5556)).
+
+The app's own menu (the **Overdeck** menu on every platform) has **Start Cloister**, **Stop Cloister**, **Emergency Stop All Agents**, **Connect to a Machine…**, **Use This Computer** and **Settings...**. While another machine's dashboard is shown, it starts with a disabled row naming that machine. A **Help** menu has **Check for Updates...**, **Flywheel Documentation**, **Overdeck on GitHub**, **Report an Issue**, and, once an update has downloaded, **Install Update and Restart**.
+
+## Notifications
+
+The app shows the dashboard's own notifications as native system notifications, the same ones a browser tab would show:
+
+- an agent or conversation is waiting on a decision from you;
+- a plan is waiting for your approval;
+- a conversation hit a permission prompt: **Permission needed**, repeated 5 and 30 minutes later if it is still waiting;
+- memory or disk pressure warnings.
+
+Clicking one reopens that question, plan or permission dialog, or brings the dashboard to the front.
+
+**Settings → Desktop App → Notifications** has six switches (**Input Needed**, **Stuck Agents**, **Merge Failures**, **Work Complete**, **Planning Done**, **Merge Ready**), but none of them controls these notifications yet ([#5556](https://github.com/eltmon/overdeck/issues/5556)). To silence them, use your operating system's notification settings for Overdeck.
+
+## Start at login
+
+**Settings → Desktop App → Auto-start → Launch at login** starts the app automatically when you log in. It works on macOS and Windows; on Linux it has no effect yet ([#5556](https://github.com/eltmon/overdeck/issues/5556)).
+
+On the first launch, a dialog asks whether to start Overdeck automatically, with an option to enable it or skip for now. If you skip it, a reminder toast appears on the next few launches with a button to enable it; after five reminders, or once you enable it, the reminders stop. **Reset reminder** in the Auto-start card starts that sequence again.
+
+Desktop settings, including this one, save to `desktop-settings.json` in the app's user data folder: `~/.config/Overdeck/` on Linux, `~/Library/Application Support/Overdeck/` on macOS, and `%APPDATA%\Overdeck\` on Windows.
+
+## Updates
+
+The app checks GitHub Releases 5 seconds after launch and every 4 hours after that, but it never downloads an update on its own. Use **Help → Check for Updates...**, or click the version number at the bottom of the left column, to open the updater, download the update, and restart into it. Once a download finishes, **Install Update and Restart** appears in the Help menu too.
+
+A canary build (a version ending in `-canary`) only offers canary releases; a stable build only offers stable releases.
+
+If an update cannot install, download the new installer from [GitHub Releases](https://github.com/eltmon/overdeck/releases/latest) and install it over the old one. This is the only way to update on macOS today, since the app is not notarized (see [Download and install](#download-and-install)).
+
+Installed the app through npm instead? See [Run it from npm](#run-it-from-npm) to update it with `npm`.
+
+## Open another machine
+
+Instead of running its own embedded server, the app can show one other machine's dashboard. It stores at most one chosen machine, and while it shows one, no local server runs. See [Remote access](/configuration/remote-access) for pairing in general and [Tailscale](/configuration/tailscale) for setting up a tailnet.
+
+### Pair with a machine
+
+1. On the other machine, create a pairing link: **Settings → Anywhere → Pair a device**, or `pan pair --url <its Tailscale address>`.
+2. In the app, choose **Connect to a Machine…** from the tray or the Overdeck menu.
+3. Paste the whole link into the **Open another machine** window and click **Connect**.
+
+Pasting just the credential, without the address, is refused with "Paste the whole pairing link, including the address." Once paired, the other machine lists this computer under **Settings → Anywhere → Paired devices** as `Overdeck desktop on <hostname>`; manage it from there with `pan devices list` and `pan devices revoke <id>`.
+
+### Which addresses work
+
+The app only sends this computer's credential to:
+
+- any `https:` address;
+- `http:` to loopback (`localhost`, `127.0.0.0/8`, `::1`);
+- `http:` to a Tailscale address (`100.64.0.0/10`, `fd7a:115c:a1e0::/48`, or a name ending in `.ts.net`, or that resolves only to such addresses).
+
+Anything else, such as a plain LAN address, is refused with "Overdeck sends this computer's credential only over HTTPS, Tailscale or this computer's loopback. Use the machine's Tailscale address or an HTTPS address." The app checks this both when you pair and on every launch.
+
+### Where the credential is kept
+
+The chosen machine's record is saved to `remote-machine.json` in the app's user data folder, with its device credential encrypted by the operating system's secure store (Keychain on macOS, Windows credential protection on Windows, GNOME Keyring or KWallet on Linux). Without one of those stores available, the app will not save a machine credential and refuses to pair. The remote dashboard window keeps its session in memory only, so its draft text and UI preferences reset on every launch.
+
+### When the machine cannot be opened
+
+| What happened | Message |
+| --- | --- |
+| The machine is offline or unreachable | Can't reach `<label>` at `<origin>`. Check that its Overdeck is running and that this computer is on the same tailnet. |
+| A different Overdeck now answers at that address | `<origin>` is now a different Overdeck machine (`<new label>`). Pair again. |
+| The machine revoked this computer | `<label>` no longer accepts this computer's credential. Pair again with a new link. |
+| The two sides speak different protocol versions | `<label>` speaks Overdeck protocol `<n>`; this app supports `<m>`. Update the older side. |
+| The credential store could not decrypt the saved credential | This computer's credential store could not decrypt the saved credential. Pair again. |
+
+In every case, the **Open another machine** window opens with the reason and offers **Open `<label>`**, **Use this computer** and **Forget `<label>`**. The app never falls back to this computer on its own.
+
+### Switch back or forget the machine
+
+**Use this computer** keeps the pairing on record but starts the embedded server and shows it instead. **Forget `<label>`** revokes this computer's access on that machine, then removes the local record either way; if the machine cannot be reached, revoke the device from that machine's **Settings → Anywhere → Paired devices** instead. While a chosen machine is shown, links to other origins open in your regular browser, and restarting the dashboard from the app is refused: restart it on the machine that is showing it.
+
+## Get help
+
+- Ask questions on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P).
+- Report bugs and request features in [GitHub Issues](https://github.com/eltmon/overdeck/issues).
+- From the app, use **Help → Report an Issue**.
+
+## See also
+
+- [Quickstart](/quickstart)
+- [Remote access](/configuration/remote-access)
+- [Tailscale](/configuration/tailscale)
+- [Open in Overdeck](/features/open-in-overdeck)
+- [Dashboard views](/features/dashboard-views)
+- [Keyboard shortcuts](/features/keyboard-shortcuts)

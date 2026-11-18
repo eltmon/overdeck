@@ -1,5 +1,7 @@
 # Overdeck Desktop App
 
+For users: see [Desktop app](../features/desktop-app.mdx).
+
 The Electron-based desktop app wraps the Overdeck dashboard in a native window with system tray integration, native notifications, and automatic server embedding.
 
 ---
@@ -17,7 +19,7 @@ chmod +x Overdeck-*.AppImage
 
 Or place it in `~/Applications/` so `pan up` detects and launches it automatically.
 
-You can also install to `~/.local/bin/overdeck` for system-wide detection.
+`pan up` also treats `~/.local/bin/overdeck` as the app, but that path is where `scripts/install.sh` puts the `overdeck` CLI itself, so detection there is wrong; see [#5557](https://github.com/eltmon/overdeck/issues/5557).
 
 ### macOS (DMG)
 
@@ -30,9 +32,9 @@ Open the `.dmg`, drag `Overdeck.app` to `/Applications/`, then launch it. `pan u
 When you launch the desktop app:
 
 1. The embedded dashboard server starts (`dist/dashboard/server.js` under Node.js — not Bun).
-2. The server listens on an available port (default 3011, increments on conflict).
+2. The server listens on port 7825 (`BASE_PORT`); after a crash it restarts with backoff on the next port, up to 7834, and gives up after 8 consecutive failures.
 3. Once the server responds to `/api/health`, a `BrowserWindow` opens and loads the dashboard.
-4. A system tray icon appears, polling `/api/health` every 5 seconds.
+4. A system tray icon appears, polling `/api/health` every 5 seconds (see [System Tray](#system-tray) for what that polling currently does).
 
 The embedded server behaves identically to `pan up` — same SQLite database, same WebSocket endpoints, same REST API. The desktop app sets `OVERDECK_MODE=desktop` and `OVERDECK_NO_BROWSER=1` to suppress the CLI's own browser-open behavior.
 
@@ -80,13 +82,7 @@ While a remote dashboard is shown, links to other origins open in your browser, 
 
 ## System Tray
 
-The tray icon changes color to indicate agent status:
-
-| Color | Meaning |
-|-------|---------|
-| Green | All agents idle |
-| Yellow | Agents active / working |
-| Red | Agent needs attention (input required, stuck, merge failure) |
+The tray icon's color, tooltip counts and dock badge do not reflect agent status today: `/api/health` returns no `agentCount`, `attentionCount` or `lastActivity` for the tray to poll. **Settings → Desktop App → System Tray** (**Show agent count badge**, **Tooltip detail**) has no visible effect until that wiring lands; see [#5556](https://github.com/eltmon/overdeck/issues/5556).
 
 ### Tray Menu
 
@@ -96,16 +92,9 @@ Right-clicking the tray icon shows:
 - **Connect to a Machine…** — open the connect window to pair with or reopen another machine
 - **Use This Computer** — leave the chosen machine and show this computer's dashboard (enabled only while another machine is shown)
 - **Start Cloister** / **Stop Cloister** — toggle autonomous orchestration
-- **Emergency Stop** — halt all running agents immediately
+- **Emergency Stop All**: halt all running agents immediately
 - **Settings** — open the Settings page
 - **Quit** — stop the server and exit
-
-### Tray Settings
-
-Configure tray behavior in **Settings → Desktop App → System Tray**:
-
-- **Show agent count badge** — displays active agent count on the dock/taskbar icon
-- **Tooltip detail** — `Minimal` (agent count only) or `Full` (count + attention + activity)
 
 ---
 
@@ -122,13 +111,15 @@ The desktop app sends native OS notifications for key agent events. Each event t
 | Planning Done | Off | Planning session completed |
 | Merge Ready | On | PR is ready for your approval |
 
+Nothing currently reads these switches: the notifications that actually fire come straight from the frontend's own event handling, regardless of this table; see [#5556](https://github.com/eltmon/overdeck/issues/5556).
+
 Clicking a notification brings the dashboard window to focus.
 
 ---
 
 ## Auto-Start
 
-Enable **Launch at login** in **Settings → Desktop App → Auto-start** to have Overdeck start automatically when you log in.
+Enable **Launch at login** in **Settings → Desktop App → Auto-start** to have Overdeck start automatically when you log in. This works on macOS and Windows only; `app.setLoginItemSettings` is a no-op on Linux, so the switch does nothing there ([#5556](https://github.com/eltmon/overdeck/issues/5556)).
 
 ### Nag Flow
 
@@ -142,59 +133,15 @@ You can reset the nag counter in **Settings → Desktop App → Auto-start → R
 
 ---
 
-## Cmd+K Command Palette
+## Command Palette
 
-Press `Cmd+K` (macOS) or `Ctrl+K` (Linux/Windows) to open the command palette from anywhere in the dashboard.
-
-### Available Actions
-
-| Group | Actions |
-|-------|---------|
-| **Orchestration** | Start Cloister, Stop Cloister, Emergency Stop |
-| **Navigation** | Open Settings, Kanban, Terminal, Agents view |
-| **Active Workspaces** | Issues with running agents (navigates to kanban + selects issue) |
-| **Running Agents** | Jump to the kanban card for a specific agent |
-
-Type to filter. Press `Enter` to execute, `Escape` to close.
-
-### Scope chips
-
-Below the search input, a row of chips filters the result list by type: **All**, plus **Actions**, **Commands**, **Workspaces**, **Issues**, **Conversations**, and **Memory** as each type has results on screen. **Conversations** is always offered, even with zero conversation hits, and narrows the list to conversation search results only. Press `Cmd+J` (macOS) or `Ctrl+J` (Linux/Windows) to open the palette already scoped to Conversations.
-
-### Conversation results
-
-Conversation results are grouped to one row per conversation, labelled by its
-title, with the best-matching excerpt and a hit count. Ranking bands
-conversations into tiers: title matches first, then conversations matching in
-message text, then conversations matching only inside file paths, code blocks,
-or tool output. Archived conversations are included and marked **archived**.
-
-Conversation results default to newest-first order, which keeps title matches
-above everything else and preserves the tier order within that. Use the
-**Newest first** toggle in the palette footer to switch to relevance-rank
-order; the choice persists per browser.
-
-Keyword and title matches still appear when semantic search is slow or the
-embedding provider fails: each slow part of the search has its own time budget,
-and the palette returns what finished. A search you replace by typing more stops
-on the server before its slow scan starts. If no answer arrives, the palette
-stops waiting after 10 seconds and shows "Search timed out after 10 s. Try
-again." instead of the spinner.
-
-Conversation search is enabled by default: indexing sends transcript chunks to the configured embedding provider (OpenAI `text-embedding-3-small` by default, small per-token cost) and requires an OpenAI API key. Toggle it or trigger a full reindex under **Settings → Conversation Search**. When it is off — or no key is configured — the palette still finds conversations by title, but shows no transcript matches.
-
-The palette is also accessible from the desktop app's **Overdeck** menu bar menu.
+The command palette is not a desktop-specific feature; see [Keyboard shortcuts](../features/keyboard-shortcuts.mdx) for how it works in the dashboard, desktop app included.
 
 ---
 
-## Menu Bar (macOS)
+## Application Menu
 
-The macOS menu bar includes a **Overdeck** menu with:
-
-- Start/Stop Cloister
-- Emergency Stop
-- Open Workspace (lists all registered workspaces)
-- Settings
+The app's own menu exists on every platform (not only macOS), with an **Overdeck** menu that has **Start Cloister**, **Stop Cloister**, **Emergency Stop All Agents**, **Connect to a Machine…**, **Use This Computer** and **Settings...**.
 
 Menu actions dispatch to the renderer via IPC, which the frontend handles via `overdeckBridge.onMenuAction()`.
 
@@ -258,7 +205,7 @@ This is equivalent to `pan up` without the Electron wrapper — useful on headle
 
 ## Updating Overdeck
 
-The version beside the **Overdeck** wordmark is an update control. Hovering it explains the action; clicking it opens the updater and always performs a fresh check. The same dialog opens from **Help → Check for Updates…** in the desktop app.
+The `v<version>` button at the bottom of the left column is an update control. Hovering it explains the action; clicking it opens the updater and always performs a fresh check. The same dialog opens from **Help → Check for Updates…** in the desktop app.
 
 The dialog shows the installed and target versions, the GitHub release changelog, download/install progress, and the final restart action. If no newer release exists, it confirms that Overdeck is current instead of silently closing. Development checkouts are detected and show a manual-update message rather than modifying the repository.
 
@@ -266,7 +213,7 @@ The action depends on how Overdeck is running:
 
 | Runtime | Update action |
 |---|---|
-| Desktop app | Download the signed native package, then restart into it |
+| Desktop app | Download the native package, then restart into it |
 | Globally installed dashboard | Install the exact published `@overdeck/core` version, run `pan sync`, then restart the dashboard |
 | Development checkout | Report availability only; update through Git |
 
