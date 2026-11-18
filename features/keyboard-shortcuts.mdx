@@ -36,6 +36,51 @@ Press `?` anywhere outside a text field to open the **Keyboard shortcuts** sheet
 For the `G` shortcuts, press `G`, let go, then press the second key within one and a half seconds.
 For every view these shortcuts reach, see [Dashboard views](/features/dashboard-views).
 
+## Command palette
+
+Press `⌘K` (macOS) or `Ctrl+K` (Linux and Windows) to open the command palette with every result
+type. Press `⌘J` (macOS) or `Ctrl+J` (Linux and Windows) to open it with the **Conversations** chip
+already selected. `Esc` closes the palette from anywhere inside it. The palette is not what `/`
+opens: `/` opens issue search instead.
+
+Before you type anything, the palette lists built-in actions, workspaces, issues and running agents.
+The `pan` command catalog appears only once you start typing. Example actions: **New workspace…**,
+**Open Flywheel**, **Open Settings**, **Go to Kanban Board** and **View Agents**; there are more.
+
+As you type, local results (actions, commands, issues, agents, workspaces) filter instantly against
+your text. Once you have typed two or more characters, the palette also searches conversations and
+memory on the server; that search waits briefly for you to stop typing, and gives up with
+`Search timed out after 10 s. Try again.` if the server has not answered within 10 seconds.
+
+Scope chips under the input narrow the list to one result type:
+
+| Chip | Shows |
+| --- | --- |
+| All | every result type |
+| Actions | built-in actions and other orchestration and navigation entries |
+| Files | files, listed only where a work dock is mounted (the Command Deck) |
+| Commands | the `pan` command catalog |
+| Issues | issues, active workspaces and running agents |
+| Workspaces | the workspaces registry |
+| Conversations | conversations, including results from linked machines |
+| Memory | memory entries and observations |
+
+A chip appears only when its result type is present in the current results, except
+**Conversations**, which is always offered so `⌘J` / `Ctrl+J` always has somewhere to land. If the
+selected chip's type drops out of the results, the palette falls back to **All**.
+
+Choosing a row acts on its type. An action runs it, and an issue or a workspace opens it. A file
+opens it too, but only in the Command Deck, where the Files chip lists anything. A memory row opens
+the issue it belongs to, or shows its text in a toast when it has none. A conversation opens at its
+matching message, see [Find a conversation](/features/conversations#find-a-conversation). A
+**command** row copies the command text to your clipboard instead of running it. A row under
+`On <machine label>` opens that conversation on the linked machine instead of this one.
+
+Inside the palette, `↑` `↓` move the highlight, `↵` chooses the highlighted row, and `Esc` closes the
+palette. The **Newest first** button in the footer reorders conversation results by date; see
+[Find a conversation](/features/conversations#find-a-conversation) for how conversation results are
+ranked.
+
 ## Where shortcuts work
 
 Single keys such as `N`, `?`, `/`, `[`, `J`, `K` and the `G` shortcuts, and the Stage tab keys, work only when you are not typing. They do nothing while focus is in a text field, a terminal or a code editor, so the key goes to what you are typing in.

@@ -1190,6 +1190,133 @@ conversations stay stopped and you can still resume each one. It covers
 Herdr hosts, where the dashboard sees the backend's event stream drop and come
 back. See [Terminal backends](https://github.com/eltmon/overdeck/blob/main/docs/TERMINAL-BACKENDS.md#after-a-session-server-restart-pan-5091) for the details.
 
+## Search your conversations
+
+The command palette (`⌘J` / `Ctrl+J`, see [Command palette](/features/keyboard-shortcuts#command-palette))
+searches conversation titles and transcript text. From the command line, `pan conv` searches a
+separate catalog instead, built by scanning and enriching your sessions; see
+[Search from the command line](#search-from-the-command-line) below.
+
+### Find a conversation
+
+Press `⌘J` (macOS) or `Ctrl+J` (Linux and Windows) to open the command palette with the
+**Conversations** chip already selected (see
+[Command palette](/features/keyboard-shortcuts#command-palette)). Each result is one row, labelled
+by the conversation's title, or by the matching text when it has none, with the best-matching
+excerpt highlighted. A row's chips show the project (and workspace), the issue id when the
+transcript belongs to an issue workspace, where it came from (a named conversation, a Claude
+session, or a subagent), the date, the role, the number of matching chunks when there is more than
+one, and `archived` for archived conversations.
+
+Results rank in three tiers, in this order:
+
+1. **Title matches.** Every query term starts a word of the conversation's title.
+2. **Text matches.** The query matched prose in the transcript.
+3. **Path matches.** The query matched only inside code, inline code or a file path.
+
+The **Newest first** button in the palette footer sorts results by date inside each tier; tiers
+still come first. It is on by default, and your browser remembers the choice.
+
+Choosing a conversation row opens it in the Command Deck and scrolls to the matching message; a
+title-only match opens the conversation without one. Opening a subagent match opens its parent
+conversation with that subagent selected. Results from a linked machine appear under a group headed
+`On <machine label>` and open on that machine instead.
+
+Text search covers only Claude Code transcripts, including subagent transcripts. Conversations on
+other harnesses still match by title.
+
+### Set up semantic search
+
+Transcript text search is on by default, using OpenAI's `text-embedding-3-small` model. To set it up
+or change it:
+
+1. Add an OpenAI key under **Settings → Providers → OpenAI**, or set the `OPENAI_API_KEY`
+   environment variable on the server.
+2. Open **Settings → Conversations → Conversation Search** and check the key status.
+3. Pick a model: `text-embedding-3-small` (recommended, &#36;0.02 per 1M tokens), `text-embedding-3-large`
+   (higher quality, &#36;0.13 per 1M tokens), or `text-embedding-ada-002` (legacy, kept for existing
+   indexes).
+4. Run **Estimate & reindex all conversations** to index transcripts from before search was turned
+   on, or after changing the model.
+
+Without an OpenAI key, the palette returns title matches only: it finds no transcript text matches
+at all, not even keyword ones, and new transcripts go unindexed. Changing the model runs a full
+reindex, because vectors from one model cannot be reused with another.
+
+Turn conversation search off with the card's switch, or in `~/.overdeck/config.yaml`:
+
+```yaml
+conversationSearch:
+  enabled: true
+  provider: openai
+  model: text-embedding-3-small
+  # apiKeyRef: OPENAI_API_KEY   # name of the env var that holds the key
+```
+
+With it off, indexing stops and conversation text hits drop out of the palette; title matches still
+work.
+
+### When search is not working
+
+Conversation search shows a banner in the system notices row when it is enabled but cannot serve
+queries, in one of three cases:
+
+- **Missing key.** A `Conversation search needs an OpenAI API key` banner, with an `Add OpenAI key`
+  button that opens Settings → Providers with the OpenAI key field ready to fill in. Until you add
+  one, `⌘K` / `Ctrl+K` finds conversations by title only.
+- **Recent embedding failures**, such as exhausted credits, billing or quota problems, or a network
+  error. A `Conversation search is not working` banner names the reason, with an `OpenAI billing`
+  link when the reason points to credits, billing or quota.
+- **Transcript indexing is paused.** The watcher that indexes new transcripts has stopped. If
+  restarts have also stopped, restart the dashboard or save the conversation search settings to
+  bring it back; otherwise it keeps retrying on its own.
+
+The palette has its own error states while a search is running: after 10 seconds without an answer
+it shows `Search timed out after 10 s. Try again.`, and a failed request shows `Search unavailable`
+with the reason, instead of an empty result list.
+
+If none of this explains what you are seeing, ask in the
+[Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a
+[GitHub issue](https://github.com/eltmon/overdeck/issues).
+
+### Search from the command line
+
+`pan conv` works on a separate catalog from the palette: a **discovered sessions** table in
+Overdeck's own database, built by scanning your Claude Code transcripts. Because of that,
+`pan conv embed` does not change what `⌘K` / `Ctrl+K` finds, and the palette's own index does not
+help `pan conv search --semantic` or `--similar`.
+
+The usual workflow:
+
+1. `pan conv scan` finds sessions and records them.
+2. `pan conv enrich` writes an AI summary and tags for each one.
+3. `pan conv search "<words>"` searches those summaries, tags and touched files.
+4. `pan conv embed`, then `pan conv search --semantic "<text>"` or `--similar <id>`, for
+   meaning-based search.
+
+| Command | What it does | Main options |
+| --- | --- | --- |
+| `pan conv scan [dirs...]` | Scans `~/.claude/projects/` (default) and records sessions | `--watched`, `--system`, `--dry-run`, `--max-parallel <n>` |
+| `pan conv enrich [ids...]` | Writes AI summaries and tags | `--tier <n>` (1 quick, 2 detailed, 3 deep), `--deep`, `--upgrade`, `--full`, `--with <model>`, `--prompt <text>`, `--limit <n>`, `--workspace <path>`, `--since <time>`, `--yes` |
+| `pan conv search [query]` | Keyword search over summaries, tags and files; add `--semantic` or `--similar` for meaning-based search | `--workspace`, `--model`, `--since`/`--after`/`--before`, `--tag`, `--tool`, `--file`, `--issue`, `--semantic <query>`, `--similar <id>`, `--format table\|json\|brief\|ids` |
+| `pan conv embed [ids...]` | Generates one vector per enriched session, needed for `--semantic` and `--similar` | `--status`, `--regenerate`, `--provider openai\|voyage\|ollama`, `--model <name>` |
+
+`pan conv enrich` asks for confirmation when the estimated cost passes a threshold (&#36;1 by
+default); pass `--yes` to skip the prompt.
+
+The Settings → Conversations card also has a **Semantic embeddings** switch, off by default, with
+**Embedding provider** (OpenAI, Voyage AI or Ollama), **Embedding model**, **Auto-embed after deep
+enrichment** and **Test connection**. `conversations.embeddings` turns this on; with
+`embedding_auto_on_deep` also on, it embeds a session right after a tier 2 or 3 `pan conv enrich`
+run. In `~/.overdeck/config.yaml` under `conversations:`, the matching keys are `embeddings`
+(defaults to `false`), `embedding_provider` (`openai`, `voyage` or `ollama`), `embedding_model` and
+`embedding_auto_on_deep`.
+
+For keys: OpenAI uses the key saved in Settings → Providers → OpenAI, or the `OPENAI_API_KEY`
+environment variable. Voyage has no Providers row; set `VOYAGE_API_KEY` in the environment instead.
+Ollama needs no key. `pan` loads `~/.overdeck.env` before anything else, so a key stored there works
+for every `pan conv` command too.
+
 ## See also
 
 - [Mission Control](/features/mission-control) — the project tree and activity timeline around your conversations
@@ -1198,6 +1325,7 @@ back. See [Terminal backends](https://github.com/eltmon/overdeck/blob/main/docs/
 - `pan conv current` (alias `pan conv whoami`) — print the conversation you're running inside
 - `pan fork [conv]` — create a summary or plain fork without asking the source agent to author a handoff
 - [Session Vault](/configuration/session-vault): save conversations off-machine and continue them elsewhere
+- [Command palette](/features/keyboard-shortcuts#command-palette): find actions, issues, files and conversations with Ctrl+K
 
 ## Subagent activity and direct messages
 
