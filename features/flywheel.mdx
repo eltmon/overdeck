@@ -91,6 +91,28 @@ Require UAT holds a ready PR for your Merge click; it never requires a passed UA
 
 Batch size and wait for the merge train live in **Settings → Merge Train**; see [Auto-merge](/configuration/auto-merge) for the full merge policy and [Merge batches](/features/merge-batches) for how the train itself works.
 
+## Read the Flywheel page
+
+### Header
+
+The header shows a run chip: `running · tick N`, `paused`, `idle`, or `unreachable` when the status read itself fails. The page never shows `idle` for a failed read; a failed read always shows `unreachable`. Next to it sits a freshness badge, the conversation's running duration, an in-flight count (`N in flight · M shipped today`), and the three switches.
+
+Freshness has three states: `live` when the last tick was 60 seconds or less ago, `breathing` when it was 20 minutes or less ago, and `stalled` when it is older than that.
+
+### The rail
+
+The left rail stacks, top to bottom: the merge train card (one per project, linking [Merge batches](/features/merge-batches)), the running order book card when one is bound, and the Flywheel card itself, which has four tabs: **Status**, **State**, **Report** and **Stats**. The State tab renders `.pan/flywheel/state.md`, the Report tab renders `.pan/flywheel/report.md`, and the Stats tab shows the same substrate-bug stats as `pan flywheel stats`. The rail is resizable and stacks above the conversation on narrow screens.
+
+### The lane board
+
+The Status tab opens with a headline strip and a health strip, then the last tick, any Needs-you cards, the lane board, and **Shipped today** (merges, deploys and release tags since local midnight).
+
+The lane board has seven lanes, in this order: Plan, Build, Checks, Review, Merge, Deploy, Done today. Each lane header shows its name and a count. A card in a lane shows the issue id, how long it has sat in that stage, cost, owner, title, an agent line, one plain sentence on why it is not moving, and its last activity. Clicking a card opens the issue; a Deploy or Done today card links to its pull request.
+
+### The right column
+
+The right column holds the `conv-flywheel` conversation itself, with its own composer so you can talk to the loop directly, or its terminal.
+
 ## Known limits
 
 - The loop's author gate names fixed GitHub logins: it acts only on issues whose author is `eltmon` (the Overdeck maintainer) or `panopticon-agent[bot]`, or that are assigned to `eltmon`. On any other repo or account the loop skips your issues, and the current GitHub App bot (`overdeck-agent[bot]`) does not pass it either. See [issue #5544](https://github.com/eltmon/overdeck/issues/5544).
