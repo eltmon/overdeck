@@ -1,0 +1,327 @@
+---
+title: "Model routing: roles, workhorse slots and tiered execution"
+description: "Choose the model and harness for every Overdeck agent with workhorse slots, role models, provider harnesses, tiered execution and presets."
+---
+
+# Model routing: roles, workhorse slots and tiered execution
+
+Overdeck runs every agent in a role. The role decides the model, the model's
+provider decides the harness, and tiered execution can staff planned work by
+difficulty instead of the role's default.
+
+## How Overdeck picks a model
+
+`resolveModel(role, subRole, config, spawnKey)` (`src/lib/config-yaml/roles.ts`)
+resolves a role's model in this order:
+
+1. The sub-role's own model, if one is set and it is not `parent`.
+2. The role's model. If the role's model is a distribution (a weighted list),
+   one entry is picked; see [Split a role across models](#split-a-role-across-models).
+3. The built-in default for that role (see the table in
+   [Roles and sub-roles](#roles-and-sub-roles)).
+4. Whichever of the steps above resolves first, if the result is a workhorse
+   reference (`workhorse:<slot>`), it is then replaced with that slot's model.
+
+A per-call override skips this chain entirely. `pan start <id> --model <model>`
+sets the work model for that session and also skips tier selection (see
+[Tiered execution](#tiered-execution)). `pan start --plan-model <model>`
+overrides the planning model when that start auto-plans, and `pan plan <id>
+--model <model>` sets the planning model directly. `pan start --tier` is
+unrelated to any of this: it picks the remote workspace resiliency tier,
+`ephemeral` or `durable`, not a tiered-execution setting.
+
+## Workhorse slots
+
+A **workhorse slot** is one of three named model slots that roles point at
+instead of naming a model directly: `expensive`, `mid` and `cheap`. Settings
+shows these under Model Routing's `Workhorse Models` panel ("Set the three
+model slots that roles reference with `workhorse:<slot>`."). Only these three
+slot names are allowed; another key fails config load with an unknown
+workhorse slot error, and a slot cannot point at another slot or at `parent`.
+
+```yaml
+workhorses:
+  expensive: claude-opus-5-5
+  mid: claude-opus-5-5
+  cheap: claude-haiku-5-5
+```
+
+A reference to a slot that is not defined fails config load with `config.yaml:
+<field> references workhorse:<slot> but workhorses.<slot> is not defined`.
+
+## Roles and sub-roles
+
+A **role** is one kind of agent run in Overdeck. **Sub-roles** are
+configuration slots under a role with their own model and effort: review has
+four, `security`, `correctness`, `performance` and `requirements`; plan has
+one, `critic`.
+
+| Role | Default model | What it does |
+| --- | --- | --- |
+| `plan` | `workhorse:expensive` | Researches the issue, writes the PRD and xBRIEF plan. |
+| `work` | `workhorse:mid` | Implements the plan's items in the issue workspace. |
+| `review` | `workhorse:expensive`, mode `quick` | Reviews the PR; in `full` mode writes the synthesis of the four lanes. |
+| `review.security` | `workhorse:expensive` | Security lane (`full` mode only). |
+| `review.correctness`, `review.performance`, `review.requirements` | `workhorse:mid` | The other three lanes (`full` mode only). |
+| `test` | `workhorse:mid` | Runs verification suites and browser UAT. |
+| `ship` | `workhorse:mid` | Shipping runs server side; no `ship` agent is spawned in the normal pipeline. |
+| `strike` | `workhorse:expensive` | A precision fix opened as a PR against `main`, skipping plan, review and test. |
+| `sequencer` | `workhorse:expensive` | Ranks the open backlog into `.pan/backlog/sequence.md`. |
+| `knowledge` | `workhorse:expensive` | Maintains the project's OKF knowledge bundle, started by `pan knowledge`. |
+| `worker` | `workhorse:mid` | A delegated worker started with `pan worker run`. |
+| `flywheel` | `claude-opus-5-5`, effort `high` | The Flywheel orchestrator. |
+
+`roles.review.mode` controls how review runs: `quick` (default, one
+reviewer), `full` (four lanes plus the review parent's synthesis), or `none`
+(no AI review; the verification gate still runs). Setting
+`roles.review.model` alone does not move the four lanes, because each lane
+has its own default; set a lane's model to `parent` to have it inherit
+`roles.review.model`.
+
+The plan critic model is `roles.plan.sub.critic.model`. It has no default and
+must come from a different model family than the planner; see
+[Planning](/features/planning) for the critic's role in finalizing a plan.
+
+In Settings, `Role Models` shows eight role cards: Plan, Work, Strike,
+Review, Test, Ship, Flywheel and Sequencer. `knowledge`, `worker` and the plan
+`critic` sub-role have no card; set them directly in `config.yaml`. Review's
+card has a `Show sub-roles` toggle that reveals the four lanes, each with its
+own model and an `Effort` select (`Inherit`, or a level), plus the `Review
+mode` select. The Flywheel card adds `Flywheel effort`, `Flywheel max agents`
+and `Flywheel scope`. There is no per-role harness control, and no role-level
+effort control except Flywheel's. Every model select groups its options as
+`Inheritance` (sub-roles only: `Parent`), `Workhorse`, and specific models by
+provider.
+
+```yaml
+roles:
+  work:
+    model: workhorse:mid
+  review:
+    mode: full
+    sub:
+      security:
+        model: parent
+```
+
+## Split a role across models
+
+A role's `model` can be a weighted list instead of a single reference, each
+entry a positive integer weight:
+
+```yaml
+roles:
+  work:
+    model:
+      - model: claude-opus-5-5
+        weight: 70
+      - model: workhorse:mid
+        weight: 30
+```
+
+The pick is a hash of the spawn key, `<role>:<issueId>`, so one issue always
+gets the same entry across respawns. A sub-role never samples the parent
+role's distribution; it always resolves its own setting. In Settings, the
+role card's button reads `Use distribution` (and `Use single model` to go
+back to one entry).
+
+## Which harness runs a model
+
+A **harness** is the coding-agent CLI that runs a model. `resolveHarness`
+(`src/lib/harness-resolve.ts`) picks it in this order:
+
+1. An explicit pick wins: `pan start --harness`, `pan plan --harness`, or a
+   launch panel or model picker row that names a harness.
+2. Otherwise, the provider default harness set in Settings → Providers
+   (`models.providers.<provider>.harness`).
+3. Otherwise, the provider's own built-in default.
+
+The role a model is launching for is not part of this decision at all; the
+resolver ignores it. See [Harnesses](/configuration/harnesses) for the full
+list of built-in provider defaults.
+
+Settings → Providers shows, per provider, a `Default harness` control
+(`Default (<built-in>)` plus the allowed harnesses for that provider). A
+separate toggle, `Show all harness/model permutations` (off by default),
+makes model pickers show explicit harness and model combinations instead of
+only each provider's default harness. Saving a provider's harness writes:
+
+```yaml
+models:
+  providers:
+    openai:
+      enabled: true
+      harness: codex
+```
+
+A disabled provider does not reroute a role: the agent still launches on the
+model you configured, and `pan doctor` flags a role or crew model whose
+provider is not enabled.
+
+If the chosen harness is denied by policy for the model, an explicit pick
+fails loudly. A provider-default pick falls back to `claude-code` only for
+models native to Anthropic, and otherwise fails the same way.
+
+`roles.<role>.harness` is validated when `config.yaml` loads, but no pipeline
+spawn reads it. Its only effect today is that the dashboard Plan dialog
+preselects `roles.plan.harness` for a new planning session. See
+[#5518](https://github.com/eltmon/overdeck/issues/5518).
+
+## Tiered execution
+
+**Tiered execution** is optional staffing that picks the work agent's model,
+harness and effort from a plan item's `difficulty` (and optionally its
+`kind`), instead of using `roles.work` for every item. It is off by default.
+Settings calls this page `Tiered Execution`, and calls one row of the tier
+table a **crew**.
+
+### Turn it on
+
+Turn tiered execution on with `tiered_execution.enabled: true`, or the
+Settings switch `Route work by difficulty`. A plan can override the global
+switch for its own issue with `plan.metadata.tiered_execution: on` or `off`;
+any other value is a config error. There is no CLI flag for this switch.
+
+```yaml
+workhorses: { expensive: claude-opus-5-5, mid: claude-opus-5-5, cheap: claude-haiku-5-5 }
+tiered_execution:
+  enabled: true
+  tiers:
+    trivial: { model: workhorse:cheap, harness: claude-code, difficulties: [trivial] }
+    simple-medium: { model: workhorse:mid, harness: claude-code, difficulties: [simple, medium], effort: high }
+    complex: { model: workhorse:expensive, harness: claude-code, difficulties: [complex, expert], effort: high }
+  supervisor: { model: workhorse:expensive, harness: claude-code, subscribe: flagged }
+```
+
+Settings → Tiered Execution is laid out in this order: the `Route work by
+difficulty` switch; an invalid-config banner when the block is invalid;
+`Who handles each difficulty?` (one crew per difficulty); `The crews` with
+`+ Add crew`; `Standing reviewer` (model, harness, and a `Reviews` choice of
+`all`, `flagged` or `sampled`); `Kind overrides`; an `Advanced` section with
+`Commit feed`, `Escalation` and `Session replay`; and `What this writes to
+config.yaml`. A crew is labelled with its model's name, `<slot> to <model>`
+for a workhorse reference, or `N-model mix` for a distribution. On save, each
+crew becomes one tier named after its difficulties joined with a hyphen, for
+example `simple-medium`.
+
+### How an item finds its tier
+
+Each of the five difficulties, `trivial`, `simple`, `medium`, `complex` and
+`expert`, must map to exactly one tier, and a `supervisor` is required once
+any tiers exist. `by_kind` keys must be item kinds (`docs`, `api`, `backend`,
+`frontend`, `infra`, `test`, `refactor`, `design`, `spike`), and their values
+must be existing tier names. A `distribution` can replace a tier's `model`
+and `harness` with a weighted list whose integer weights total exactly 100.
+
+A Settings save refuses an invalid block outright. At config load, an
+invalid block does not stop Overdeck from starting: tiered staffing is
+turned off, a warning is logged, and `pan doctor` reports "tiered_execution
+is invalid and has been disabled." A workhorse reference to an undefined
+slot is invalid the same way.
+
+For one item, `resolveTier` first checks for a `by_kind` match on the item's
+`kind`, then falls back to the item's `difficulty`. An item that matches
+neither falls through to `roles.work` instead of any tier. The harness for a
+staffed item comes from its tier (or the matching distribution entry), never
+from the model's provider default.
+
+### Who runs the work
+
+In the normal pipeline, one work agent runs the whole plan, staffed at the
+tier of the hardest item still open. In swarm mode, each item runs in its
+own slot agent, staffed at that item's own tier. Either way, `pan start
+--model` skips tier selection entirely and runs on the model you named.
+
+### The Standing reviewer and the commit feed
+
+The **Standing reviewer** (the supervisor in `config.yaml`) is a review-only
+agent configured with its own `model`, `harness` and `subscribe` setting. It
+runs only in swarm mode, after a slot's work merges. `subscribe: all`
+reviews every item; `flagged` reviews only items with
+`metadata.requiresInspection: true`; `sampled` reviews a fixed 25% of items,
+chosen by a hash of the item id.
+
+The reviewer reports what it finds. Its verdict does not stop other work yet (PAN-5517).
+
+In swarm mode only, once a slot merges, every other live slot agent gets a
+read-only message with that item's title and diff, through the commit feed.
+`feed.exclude` drops matching paths from the diff it sends, and
+`feed.max_diff_bytes` swaps an oversized diff for a `--stat` summary instead
+(there is no size limit by default).
+
+### Fitness warnings
+
+Overdeck checks whether a tier's model fits the difficulties it owns, and
+warns (it never blocks) on `underpowered` (the model is below what the
+tier's hardest difficulty needs), `overpowered` (a frontier model staffed on
+a tier that only owns easy difficulties), `unknown-model`,
+`provider-not-enabled` and `supervisor-underpowered`. These show in `pan
+doctor`, as badges in Settings → Tiered Execution, and as a line in the
+spawn log.
+
+`pan admin config tiers` prints what is actually configured: the resolved
+`roles.work` model, whether tiering is enabled (or invalid, with the
+reason), one line per tier with its resolved model, harness and
+difficulties, a `[overrides roles.work]` marker on any tier that launches a
+different model, and the note "Planned issues take their tier's model, not
+roles.work."
+
+### Settings saved but not acted on yet
+
+Overdeck validates and saves a few settings whose effects do not run yet.
+
+Overdeck checks and saves these settings, but nothing acts on them yet. Do not rely on them to change which model runs an item.
+
+- `escalation.*` (`enabled`, `retries_at_tier`, `max_promotions`,
+  `effort_first`): the function that would act on an escalation has no
+  caller today. See [#4512](https://github.com/eltmon/overdeck/issues/4512).
+- `replay_threshold` and `compaction_reroute` (Session replay): the replay
+  code they referred to was removed.
+- The commit feed's `feed.callouts` `notify` and `corroborate`: the call-out
+  endpoint has no server handler.
+- The Standing reviewer's block verdict, described above.
+
+Both are tracked here: [#5517](https://github.com/eltmon/overdeck/issues/5517)
+and [#4512](https://github.com/eltmon/overdeck/issues/4512).
+
+## Presets and effort
+
+A **preset** writes a coherent, explicit lineup into `config.yaml` in one
+step: the workhorse slots, roles, review lanes, effort, any existing tiers'
+model and harness, and the conversation and background models. It never
+turns tiered execution on or off, and it never creates tiers. Apply one from
+Settings → Model Routing or `pan models preset list | show | apply | undo`;
+see [Model presets](/configuration/model-presets). Every effort a preset
+sets is `high`.
+
+Effort levels are `low`, `medium`, `high`, `xhigh` and `max`, and the default
+is `high`; see [Reasoning effort](/configuration/effort) for the full
+precedence chain. A tiered-execution tier's own `effort` sits in that chain
+below item and plan effort, and above sub-role and role effort.
+
+## Check what will run
+
+- `pan admin config tiers` prints the resolved `roles.work` model and, when
+  tiering is on, every tier's resolved model, harness and difficulties.
+- `GET /api/models/resolve` returns the model each role and each review lane
+  resolves to under the current config.
+- `pan doctor` reports an invalid `tiered_execution` block and any fitness
+  warning from the section above.
+
+## What Overdeck does not do
+
+Overdeck does not pick a model from an issue's wording, labels, size or budget. Models come from roles, workhorse slots and, for planned work, tiered execution.
+
+Older docs described a Cloister complexity router with a `model_selection` block. That router was removed, and Overdeck ignores those keys.
+
+Conversations are not pipeline roles: a new conversation uses
+`models.default_conversation_model` unless you pick a model when you start
+it. Background AI calls, such as titles, compaction and memory extraction,
+have their own settings in Settings → Background AI, which this page does
+not cover.
+
+## Get help
+
+If something here does not match what you see, or you want help with any of
+this, reach the team on [Discord](https://discord.gg/ZpHE2ZTv5P) or file a
+[GitHub Issue](https://github.com/eltmon/overdeck/issues).

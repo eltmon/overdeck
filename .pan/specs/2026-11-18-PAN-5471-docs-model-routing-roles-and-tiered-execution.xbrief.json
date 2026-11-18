@@ -4,17 +4,17 @@
     "created": "2026-11-18T15:05:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5471: docs: model routing, roles and tiered execution",
-    "updated": "2026-11-18T14:56:55.996Z"
+    "updated": "2026-11-18T14:57:56.443Z"
   },
   "plan": {
     "id": "pan-5471",
     "title": "docs: model routing, roles and tiered execution",
-    "status": "proposed",
+    "status": "running",
     "uid": "8c94c31e-ef49-4a39-a5af-ca8ca6af042b",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-18T15:05:00Z",
-    "updated": "2026-11-18T14:56:55.996Z",
+    "updated": "2026-11-18T14:57:56.443Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5471",
@@ -615,5 +615,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
