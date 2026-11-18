@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5498",
   "created": "2026-11-18T15:49:04.065Z",
-  "updated": "2026-11-18T15:59:34.270Z",
+  "updated": "2026-11-18T16:07:39.118Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,5 +46,75 @@
       "timestamp": "2026-11-18T15:59:34Z",
       "markdownBody": "# CodeRabbit findings for PAN-5498 (PR #5524)\n\nCodeRabbit posted 10 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4616933655 · src/cli/commands/__tests__/planning-stream.test.ts:46 [Minor]: Add tests for both `#5498` scenarios. The current assertions do not reach them.\n  https://github.com/eltmon/overdeck/pull/5524#discussion_r4616933655\n- Thread 4616933666 · src/cli/commands/show.ts:230 [Minor]: Say that the retry is paused, not the initial start.\n  https://github.com/eltmon/overdeck/pull/5524#discussion_r4616933666\n- Thread 4616933683 · src/dashboard/server/routes/agents/spawn-issue.ts:299 [Minor]: Bind the consent host override to the generation that the child claims.\n  https://github.com/eltmon/overdeck/pull/5524#discussion_r4616933683\n- Thread 4616933694 · src/lib/cloister/deferred-handoff.ts:240 [Major]: A transient consent read error abandons an interrupted start before its retry deadline.\n  https://github.com/eltmon/overdeck/pull/5524#discussion_r4616933694\n- Thread 4616933713 · src/lib/overdeck/__tests__/planning-promotion-status-event.test.ts:357 [Minor]: Fail promptly if finalize completes before sending the POST.\n  https://github.com/eltmon/overdeck/pull/5524#discussion_r4616933713\n- Thread 4616933728 · src/lib/overdeck/planning-handoff-journal.ts:41 [Major]: Return true only when the request is written.\n  https://github.com/eltmon/overdeck/pull/5524#discussion_r4616933728\n- Thread 4616933743 · src/lib/overdeck/planning-promotion.ts:840 [Major]: Keep accepted container starts resumable across a dashboard restart.\n  https://github.com/eltmon/overdeck/pull/5524#discussion_r4616933743\n- Thread 4616933752 · src/lib/overdeck/planning-promotion.ts:873 [Minor]: Write `handoff.abandoned` before the `planning.failed` append can reject.\n  https://github.com/eltmon/overdeck/pull/5524#discussion_r4616933752\n- Thread 4616933769 · src/lib/planning/auto-spawn-consent.ts:134 [Major]: Do not restore a consumed host override on finalize.\n  https://github.com/eltmon/overdeck/pull/5524#discussion_r4616933769\n- Thread 4616933773 · src/lib/planning/spawn-planning-session.ts:414 [Major]: Clear the host override when workspace setup fails.\n  https://github.com/eltmon/overdeck/pull/5524#discussion_r4616933773\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5524/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5498 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5524 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
     }
-  ]
+  ],
+  "items": {
+    "consent-host-override": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:07:39.118Z"
+    },
+    "consent-host-override.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:07:39.118Z"
+    },
+    "consent-host-override.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:07:39.118Z"
+    },
+    "start-planning-host": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:07:39.118Z"
+    },
+    "start-planning-host.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:07:39.118Z"
+    },
+    "start-planning-host.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:07:39.118Z"
+    },
+    "spawn-route-consent-host": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:07:39.118Z"
+    },
+    "spawn-route-consent-host.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:07:39.118Z"
+    },
+    "spawn-route-consent-host.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:07:39.118Z"
+    },
+    "journal-handoff-request": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:07:39.118Z"
+    },
+    "journal-handoff-request.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:07:39.118Z"
+    },
+    "journal-handoff-request.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:07:39.118Z"
+    },
+    "journal-handoff-request.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:07:39.118Z"
+    },
+    "journal-handoff-request.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:07:39.118Z"
+    },
+    "docs-changelog": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:07:39.118Z"
+    },
+    "docs-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:07:39.118Z"
+    },
+    "docs-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:07:39.118Z"
+    }
+  }
 }
