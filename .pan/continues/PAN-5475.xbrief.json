@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5475",
   "created": "2026-11-18T22:55:50.465Z",
-  "updated": "2026-11-18T23:05:45.997Z",
+  "updated": "2026-11-18T23:07:25.258Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,9 +158,22 @@
       "doneAt": "2026-11-18T23:05:40.885Z"
     },
     "cross-links": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5475",
-      "claimedAt": "2026-11-18T23:05:45.997Z"
+      "claimedAt": "2026-11-18T23:05:45.997Z",
+      "doneAt": "2026-11-18T23:07:25.258Z"
+    },
+    "cross-links.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:07:25.258Z"
+    },
+    "cross-links.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:07:25.258Z"
+    },
+    "cross-links.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:07:25.258Z"
     }
   }
 }
