@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5541",
   "created": "2026-11-18T20:13:04.612Z",
-  "updated": "2026-11-18T20:19:25.580Z",
+  "updated": "2026-11-18T20:19:46.073Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "server-request-issue-id.ac4": {
       "status": "completed",
       "doneAt": "2026-11-18T20:19:25.580Z"
+    },
+    "decision-owner-fields": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5541",
+      "claimedAt": "2026-11-18T20:19:46.073Z"
     }
   }
 }
