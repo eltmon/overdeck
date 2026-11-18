@@ -1256,6 +1256,29 @@ conversationSearch:
 With it off, indexing stops and conversation text hits drop out of the palette; title matches still
 work.
 
+### When search is not working
+
+Conversation search shows a banner in the system notices row when it is enabled but cannot serve
+queries, in one of three cases:
+
+- **Missing key.** A `Conversation search needs an OpenAI API key` banner, with an `Add OpenAI key`
+  button that opens Settings → Providers with the OpenAI key field ready to fill in. Until you add
+  one, `⌘K` / `Ctrl+K` finds conversations by title only.
+- **Recent embedding failures**, such as exhausted credits, billing or quota problems, or a network
+  error. A `Conversation search is not working` banner names the reason, with an `OpenAI billing`
+  link when the reason points to credits, billing or quota.
+- **Transcript indexing is paused.** The watcher that indexes new transcripts has stopped. If
+  restarts have also stopped, restart the dashboard or save the conversation search settings to
+  bring it back; otherwise it keeps retrying on its own.
+
+The palette has its own error states while a search is running: after 10 seconds without an answer
+it shows `Search timed out after 10 s. Try again.`, and a failed request shows `Search unavailable`
+with the reason, instead of an empty result list.
+
+If none of this explains what you are seeing, ask in the
+[Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a
+[GitHub issue](https://github.com/eltmon/overdeck/issues).
+
 ## See also
 
 - [Mission Control](/features/mission-control) — the project tree and activity timeline around your conversations
