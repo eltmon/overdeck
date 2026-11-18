@@ -72,3 +72,20 @@ On Linux, `pan up` also treats `~/.local/bin/overdeck` as the app. The install s
 The app's embedded server listens on port `7825` (it is not the `pan up` dashboard's port). `pan open` always talks to the `pan up` dashboard; see [The desktop app](/features/open-in-overdeck#the-desktop-app) for how it reaches the app's own window. `pan down` stops the `pan up` dashboard only; it does not quit the app, which you quit from its tray or menu.
 
 Only one copy of the app runs at a time: launching it again focuses the existing window, and launching it with `--open <path>` opens that path in the running window. Closing the window keeps the app running in the background on macOS; on Linux and Windows, closing the last window quits the app and stops its embedded server.
+
+## The tray and the app menu
+
+Clicking the tray icon opens the dashboard window. Its menu has:
+
+- **Show Dashboard**
+- **Connect to a Machine…**
+- **Use This Computer** (enabled only while another machine's dashboard is shown)
+- **Start Cloister**
+- **Stop Cloister**
+- **Emergency Stop All**
+- **Settings**
+- **Quit**
+
+The tray icon's color, its tooltip counts and the macOS dock badge do not change with agent activity yet, so **Settings → Desktop App → System Tray** has no visible effect ([#5556](https://github.com/eltmon/overdeck/issues/5556)).
+
+The app's own menu (the **Overdeck** menu on every platform) has **Start Cloister**, **Stop Cloister**, **Emergency Stop All Agents**, **Connect to a Machine…**, **Use This Computer** and **Settings...**. While another machine's dashboard is shown, it starts with a disabled row naming that machine. A **Help** menu has **Check for Updates...**, **Flywheel Documentation**, **Overdeck on GitHub**, **Report an Issue**, and, once an update has downloaded, **Install Update and Restart**.
