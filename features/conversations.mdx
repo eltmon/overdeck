@@ -1190,6 +1190,41 @@ conversations stay stopped and you can still resume each one. It covers
 Herdr hosts, where the dashboard sees the backend's event stream drop and come
 back. See [Terminal backends](https://github.com/eltmon/overdeck/blob/main/docs/TERMINAL-BACKENDS.md#after-a-session-server-restart-pan-5091) for the details.
 
+## Search your conversations
+
+The command palette (`⌘J` / `Ctrl+J`, see [Command palette](/features/keyboard-shortcuts#command-palette))
+searches conversation titles and transcript text. From the command line, `pan conv` searches a
+separate catalog instead, built by scanning and enriching your sessions; see
+[Search from the command line](#search-from-the-command-line) below.
+
+### Find a conversation
+
+Press `⌘J` (macOS) or `Ctrl+J` (Linux and Windows) to open the command palette with the
+**Conversations** chip already selected (see
+[Command palette](/features/keyboard-shortcuts#command-palette)). Each result is one row, labelled
+by the conversation's title, or by the matching text when it has none, with the best-matching
+excerpt highlighted. A row's chips show the project (and workspace), the issue id when the
+transcript belongs to an issue workspace, where it came from (a named conversation, a Claude
+session, or a subagent), the date, the role, the number of matching chunks when there is more than
+one, and `archived` for archived conversations.
+
+Results rank in three tiers, in this order:
+
+1. **Title matches.** Every query term starts a word of the conversation's title.
+2. **Text matches.** The query matched prose in the transcript.
+3. **Path matches.** The query matched only inside code, inline code or a file path.
+
+The **Newest first** button in the palette footer sorts results by date inside each tier; tiers
+still come first. It is on by default, and your browser remembers the choice.
+
+Choosing a conversation row opens it in the Command Deck and scrolls to the matching message; a
+title-only match opens the conversation without one. Opening a subagent match opens its parent
+conversation with that subagent selected. Results from a linked machine appear under a group headed
+`On <machine label>` and open on that machine instead.
+
+Text search covers only Claude Code transcripts, including subagent transcripts. Conversations on
+other harnesses still match by title.
+
 ## See also
 
 - [Mission Control](/features/mission-control) — the project tree and activity timeline around your conversations
