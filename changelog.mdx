@@ -10,6 +10,21 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: do not edit this page for an unreleased change. Each PR adds its bullets to changelog.d/<issue>.md (format: changelog.d/README.md), and pan release stable folds them into a dated <Update> block here. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so in its entry and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.89.1" description="2026-11-18">
+  #### New
+
+  - **GPT-6.2 Astra and GPT-6.2 Sol:** you can pick `gpt-6.2-astra` and `gpt-6.2-sol` in Settings and the model picker. They run on the Codex harness (Codex CLI 0.170.0 or newer under ChatGPT sign-in) and on the claude-code harness through CLIProxy, pinned to the 272K window and priced at &#36;8/&#36;40 and &#36;2/&#36;10 per 1M input/output tokens. ([#5522](https://github.com/eltmon/overdeck/issues/5522))
+
+  #### Fixed
+
+  - **Auto-start after planning honors `--host`:** `pan start <id> --plan auto --host` now starts the work agent on the host once planning finalizes. Before, the post-planning start dropped the host override, so the workspace Docker stack check refused it or ran a slow rebuild first. If the dashboard restarts while that start request is still running, Overdeck now retries the start after 10 minutes instead of leaving the issue planned with no work agent. ([#5498](https://github.com/eltmon/overdeck/issues/5498))
+  - **`pan conversations resume` works from the command line:** the resume route no longer refuses the CLI with `Missing origin`. It now accepts the internal token the CLI sends, the same rule the linked-conversation proxy uses. The route also finds the conversation by its numeric id or its `conv-` session name, as well as its stored name. ([#5516](https://github.com/eltmon/overdeck/issues/5516))
+  - **Review recovery no longer reviews an old commit:** when a stalled review is recovered, Overdeck now relaunches reviewers only into a review run for the current workspace head that has no verdict yet. A run for an earlier head, or one whose verdict is already recorded, gets no reviewers, and the next review request opens a run for the new head. ([#5519](https://github.com/eltmon/overdeck/issues/5519))
+  - **Quality gates no longer wait forever under sustained CPU pressure:** a long, steady CPU load from outside Overdeck used to hold every quality gate, local Vitest run and typecheck lane for as long as it lasted. The gate at the head of the admission queue now starts alone once it has waited on CPU for `resources.quality_gate_cpu_bypass_minutes` (default 10) and no other gate holds a slot. The CPU pressure start threshold is now configurable as `resources.quality_gate_psi_start_avg10` (default 25). Both settings live in `~/.overdeck/config.yaml` and reach queued gates on their next poll. ([#5520](https://github.com/eltmon/overdeck/issues/5520))
+
+  [Compare v0.89.0...v0.89.1](https://github.com/eltmon/overdeck/compare/v0.89.0...v0.89.1)
+</Update>
+
 <Update label="v0.89.0" description="2026-11-18">
   #### New
 
