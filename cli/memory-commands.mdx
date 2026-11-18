@@ -219,14 +219,15 @@ See [Knowledge](/configuration/knowledge).
 ## pan docs
 
 Query and maintain Overdeck's own documentation retrieval index, which chunks `docs/`, skills,
-rules, `CLAUDE.md` files and PRDs so agents can pull relevant snippets into their context.
-Disabling injection stops that automatic retrieval without touching the index itself.
+rules and `CLAUDE.md` files so agents can pull relevant snippets into their context; PRDs are
+chunked too, but only when that corpus source is turned on. Disabling injection stops that
+automatic retrieval without touching the index itself.
 
 ```bash
 pan docs query "how does the merge train work"
 pan docs reindex
-pan docs disable --scope project --reason "debugging a stale snippet"
-pan docs enable --scope project
+pan docs disable --scope global --reason "debugging a stale snippet"
+pan docs enable --scope global
 ```
 
 | Command | What it does | Options |
@@ -235,6 +236,8 @@ pan docs enable --scope project
 | `pan docs reindex` | Regenerates the docs index from the current `docs/`, skills, and related sources | none |
 | `pan docs disable` | Disables docs RAG injection | `--scope session\|project\|global` (default `session`), `--reason <text>` |
 | `pan docs enable` | Re-enables docs RAG injection | `--scope session\|project\|global` (default `session`) |
+
+See [Docs RAG](/configuration/docs-rag) for when snippets are injected and how to turn it off.
 
 ## pan briefing
 
