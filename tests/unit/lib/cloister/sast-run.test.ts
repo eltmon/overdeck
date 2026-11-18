@@ -51,7 +51,7 @@ function harness(opts: {
 } = {}) {
   const release = vi.fn(async () => undefined);
   const acquire = vi.fn(async () => ({
-    admittedAt: '2026-11-16T00:00:00.000Z', slot: 0, slots: 2, footprintBytes: 0, admittedAlone: false,
+    admittedAt: '2026-11-16T00:00:00.000Z', slot: 0, slots: 2, footprintBytes: 0, admittedAlone: false, cpuBypassed: false,
     recordPeak: async () => undefined, release,
   }));
   const git = vi.fn(opts.git ?? (async (_cwd: string, args: string[]) => {

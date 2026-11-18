@@ -34,6 +34,7 @@ import {
   type QualityGateAdmissionDeps,
   type QualityGatePressureSample,
 } from '../../../../src/lib/cloister/quality-gate-admission.js'
+import { resolveQualityGateCpuSettings } from '../../../../src/lib/cloister/quality-gate-cpu.js'
 import { recordGateFootprintPeak } from '../../../../src/lib/cloister/quality-gate-memory.js'
 
 const homes: string[] = []
@@ -59,6 +60,9 @@ function deps(rootDir: string, samples: QualityGatePressureSample[] = [low]): Qu
     samplePressure: vi.fn(async () => samples[Math.min(sampleIndex++, samples.length - 1)]!),
     // PAN-5248: memory-agnostic unless a case opts in.
     sampleMemory: async () => null,
+    // PAN-5520: explicit, so only the config cases reach the mocked loader (concurrent imports of it stall).
+    psiStartAvg10: 25,
+    cpuBypassMs: 10 * 60_000,
   }
 }
 
@@ -1132,6 +1136,153 @@ describe('head-of-line fairness (PAN-5285)', () => {
   })
 })
 
+describe('CPU bypass (PAN-5520)', () => {
+  const OTHER_PID = 515_151
+  const request = { issueId: 'PAN-1', workspacePath: '/tmp/one', gateName: 'vitest', attempt: 1 }
+
+  /** deps() under sustained CPU pressure with a 1 s bound and an injected clock. */
+  function cpuDeps(rootDir: string, clock: () => number, extra: Partial<QualityGateAdmissionDeps> = {}): QualityGateAdmissionDeps {
+    return { ...deps(rootDir), now: clock, cpuBypassMs: 1_000, samplePressure: vi.fn(async () => high), ...extra }
+  }
+
+  function settledFlag(promise: Promise<unknown>): () => boolean {
+    let settled = false
+    promise.then(() => { settled = true }, () => { settled = true })
+    return () => settled
+  }
+
+  /** The cpuBlockedSince the waiter ticket recorded, or undefined. */
+  function cpuBlockedSince(rootDir: string): number | undefined {
+    for (const entry of readdirSync(rootDir).filter((name) => name.startsWith('waiter-') && name.endsWith('.json'))) {
+      try {
+        const since = JSON.parse(readFileSync(join(rootDir, entry), 'utf8')).cpuBlockedSince
+        if (typeof since === 'number') return since
+      } catch {
+        // Mid-replace; the next drive step reads it again.
+      }
+    }
+    return undefined
+  }
+
+  it('admits a head alone once its CPU block outlasts the bound, though pressure never clears', async () => {
+    const rootDir = home()
+    let clock = 1
+    const samplePressure = vi.fn(async () => high)
+    const headPromise = acquireQualityGateAdmission(request, cpuDeps(rootDir, () => clock, { samplePressure }))
+    const headSettled = settledFlag(headPromise)
+    await driveUntil(() => cpuBlockedSince(rootDir) === 1)
+    clock = 900
+    await drive(() => samplePressure.mock.calls.length >= 5)
+    expect(headSettled()).toBe(false)
+
+    clock = 2_000
+    const head = await driveUntilResolved(headPromise)
+    expect(head.cpuBypassed).toBe(true)
+    expect(head.admittedAlone).toBe(false)
+    expect(JSON.parse(readFileSync(join(rootDir, 'owner.json'), 'utf8'))).toMatchObject({ cpuBypassed: true })
+    expect(samplePressure.mock.results.every((result) => result.type === 'return')).toBe(true)
+    await head.release()
+  })
+
+  it('keeps the CPU clock when a later sample is low, so a flapping sample cannot hold the head', async () => {
+    const rootDir = home()
+    let clock = 1
+    // Low before the settle, high after it: without the bound this head would loop forever.
+    let call = 0
+    const samplePressure = vi.fn(async () => (call++ === 0 ? high : call % 2 === 0 ? low : high))
+    const headPromise = acquireQualityGateAdmission(request, cpuDeps(rootDir, () => clock, { samplePressure }))
+    await driveUntil(() => cpuBlockedSince(rootDir) === 1)
+    await drive(() => samplePressure.mock.calls.length >= 6)
+    expect(cpuBlockedSince(rootDir)).toBe(1)
+
+    clock = 2_000
+    expect((await driveUntilResolved(headPromise)).cpuBypassed).toBe(true)
+    await (await headPromise).release()
+  })
+
+  it('does not admit a CPU-blocked head past the bound while another gate holds a slot', async () => {
+    const rootDir = home()
+    writeFileSync(join(rootDir, 'owner.json'), ownerJson(OTHER_PID, 1))
+    let clock = 1
+    const samplePressure = vi.fn(async () => high)
+    const headPromise = acquireQualityGateAdmission(request, cpuDeps(rootDir, () => clock, {
+      slots: 2,
+      staleMs: 60_000,
+      isProcessAlive: (pid) => pid === process.pid || pid === OTHER_PID,
+      samplePressure,
+    }))
+    const headSettled = settledFlag(headPromise)
+    await driveUntil(() => cpuBlockedSince(rootDir) === 1)
+    clock = 5_000
+    // Past the bound with a slot held, the head keeps sampling and waiting on CPU.
+    const calls = samplePressure.mock.calls.length
+    await driveUntil(() => samplePressure.mock.calls.length >= calls + 3)
+    expect(headSettled()).toBe(false)
+
+    unlinkSync(join(rootDir, 'owner.json'))
+    const head = await driveUntilResolved(headPromise)
+    expect(head.cpuBypassed).toBe(true)
+    expect(head.slot).toBe(0)
+    await head.release()
+  })
+
+  it('keeps FIFO behind a CPU-blocked head, and counts the bound only for the head', async () => {
+    const rootDir = home()
+    let clock = 1
+    const headPromise = acquireQualityGateAdmission(request, cpuDeps(rootDir, () => clock, { slots: 2 }))
+    await driveUntil(() => cpuBlockedSince(rootDir) === 1)
+    const onWaiting = vi.fn()
+    const secondPromise = acquireQualityGateAdmission({ ...request, gateName: 'tsc' }, cpuDeps(rootDir, () => clock, { slots: 2, onWaiting }))
+    const secondSettled = settledFlag(secondPromise)
+    await driveUntil(() => onWaiting.mock.calls.length > 0)
+    expect(onWaiting).toHaveBeenCalledWith(expect.objectContaining({ kind: 'queue', position: 1 }))
+
+    clock = 2_000
+    const head = await driveUntilResolved(headPromise)
+    expect(head.cpuBypassed).toBe(true)
+    // The second gate is now head with a slot held: it waits on CPU and starts its own clock.
+    await drive(() => cpuBlockedSince(rootDir) === 2_000)
+    expect(cpuBlockedSince(rootDir)).toBe(2_000)
+    expect(secondSettled()).toBe(false)
+    await head.release()
+    clock = 4_000
+    expect((await driveUntilResolved(secondPromise)).cpuBypassed).toBe(true)
+    await (await secondPromise).release()
+  })
+
+  describe('settings from config', () => {
+    beforeEach(() => {
+      configMocks.loadGlobalConfigNoMigration.mockReset()
+      configMocks.loadConfigNoMigration.mockReset()
+    })
+
+    it('reads the PSI start threshold and the bypass bound from the global config only', async () => {
+      configMocks.loadGlobalConfigNoMigration.mockResolvedValue({
+        config: { resources: { qualityGatePsiStartAvg10: 40, qualityGateCpuBypassMinutes: 3 } },
+      })
+      expect(await resolveQualityGateCpuSettings()).toEqual({ psiStartAvg10: 40, bypassMs: 180_000 })
+      expect(configMocks.loadConfigNoMigration).not.toHaveBeenCalled()
+    })
+
+    it('falls back to 25 and 10 minutes when the config cannot be read', async () => {
+      configMocks.loadGlobalConfigNoMigration.mockRejectedValue(new Error('unreadable'))
+      expect(await resolveQualityGateCpuSettings()).toEqual({ psiStartAvg10: 25, bypassMs: 600_000 })
+    })
+
+    it('samples pressure against the configured threshold', async () => {
+      configMocks.loadGlobalConfigNoMigration.mockResolvedValue({
+        config: { resources: { qualityGatePsiStartAvg10: 40, qualityGateCpuBypassMinutes: 3 } },
+      })
+      const rootDir = home()
+      const { psiStartAvg10: _psi, cpuBypassMs: _bypass, ...rest } = deps(rootDir)
+      const samplePressure = vi.fn(async () => low)
+      const handle = await driveUntilResolved(acquireQualityGateAdmission(request, { ...rest, samplePressure }))
+      expect(samplePressure).toHaveBeenCalledWith(40)
+      await handle.release()
+    })
+  })
+})
+
 describe('readQualityGateQueue (PAN-5283)', () => {
   function waiterJson(ticketId: string, pid: number, createdAt: number, extra: Record<string, unknown> = {}): string {
     return JSON.stringify({ ticketId, pid, createdAt, workspacePath: `/ws/${ticketId}`, gateName: 'vitest', attempt: 1, ...extra })
@@ -1189,6 +1340,14 @@ describe('sampleQualityGatePressure (PAN-4311)', () => {
     const sample = await sampleQualityGatePressure(noWait, async () => ({ someAvg10: 30, someAvg60: 10 }))
 
     expect(sample).toEqual({ cpuUtilization: 0, loadPerCore: 0.1, psiSomeAvg10: 30, pressured: true })
+  })
+
+  it('honors a configured PSI start threshold (PAN-5520)', async () => {
+    osMocks.loadavg.mockReturnValue([0.4, 0, 0])
+    const psi = async () => ({ someAvg10: 30, someAvg60: 10 })
+
+    expect(await sampleQualityGatePressure(noWait, psi, 35)).toMatchObject({ psiSomeAvg10: 30, pressured: false })
+    expect(await sampleQualityGatePressure(noWait, psi, 30)).toMatchObject({ psiSomeAvg10: 30, pressured: true })
   })
 
   it('lets PSI win over a high load per core', async () => {

@@ -5,6 +5,7 @@ import { basename, dirname, join } from 'node:path'
 import { getOverdeckHome } from '../paths.js'
 import { readCpuPsi, type CpuPsi } from '../system-health/cpu-psi.js'
 import { readProcessTreeRssBytes } from '../system-health/process-tree-rss.js'
+import { DEFAULT_QUALITY_GATE_PSI_START_AVG10, resolveQualityGateCpuSettings, type QualityGateCpuSettings } from './quality-gate-cpu.js'
 import {
   evaluateMemoryHeadroom,
   ownerReservationBytes,
@@ -33,17 +34,20 @@ import {
  * and the head is admitted alone. The estimate and the reserves are re-read on
  * every poll, and each waiter writes its current wait reason into its ticket
  * for status readers.
+ *
+ * PAN-5520: CPU waits are bounded too. The head records its first CPU block
+ * (`cpuBlockedSince`, cleared only by admission so a flapping sample cannot
+ * restart it); past `resources.quality_gate_cpu_bypass_minutes` it starts
+ * alone once the slots are empty, skipping both CPU samples. Under sustained
+ * pressure the queue drains one gate at a time. The PSI start threshold is
+ * `resources.quality_gate_psi_start_avg10`.
  * Admitted parents set OVERDECK_GATE_ADMITTED=1 for child-process reentrancy.
  */
 
 const QUALITY_GATE_CPU_START_THRESHOLD = 0.75
 const QUALITY_GATE_LOAD_PER_CORE_START_THRESHOLD = 1
-/**
- * PAN-4311 D10: with CPU PSI available, start heavy runs only once `some avg10`
- * is below the governor's default recovery level. Load per core counts IO
- * wait, so it is the fallback only when PSI is unavailable.
- */
-const QUALITY_GATE_PSI_SOME_AVG10_START_THRESHOLD = 25
+// PAN-4311 D10: with CPU PSI available, start heavy runs only once `some avg10` is below the
+// configured start threshold. Load per core counts IO wait, so it is the fallback only without PSI.
 const QUALITY_GATE_ADMISSION_POLL_MS = 1_000
 const QUALITY_GATE_ADMISSION_SETTLE_MS = 1_500
 const QUALITY_GATE_ADMISSION_STALE_MS = 25 * 60 * 1_000
@@ -129,6 +133,8 @@ export interface QualityGateAdmissionHandle {
   footprintBytes: number
   /** PAN-5285: admitted alone past the bypass bound, below the soft reserve but above the hard reserve. */
   admittedAlone: boolean
+  /** PAN-5520: admitted alone past the CPU bypass bound, without waiting for CPU pressure to clear. */
+  cpuBypassed: boolean
   /** Record the gate's peak RSS under its footprint key (D12); no-op without a key, never throws. */
   recordPeak(peakBytes: number): Promise<void>
   release(): Promise<void>
@@ -145,6 +151,8 @@ interface AdmissionTicket extends QualityGateAdmissionRequest {
   wait?: { since: number; reason: QualityGateWaitReason }
   /** PAN-5285: when this waiter, as head, first failed the memory rule; cleared once it fits. */
   memoryBlockedSince?: number
+  /** PAN-5520: when this waiter, as head, first sampled CPU pressure; cleared only by admission. */
+  cpuBlockedSince?: number
 }
 
 interface AdmissionOwner extends AdmissionTicket {
@@ -153,6 +161,8 @@ interface AdmissionOwner extends AdmissionTicket {
   rssBaselineBytes?: number
   /** PAN-5285: admitted alone past the bypass bound. */
   admittedAlone?: boolean
+  /** PAN-5520: admitted alone past the CPU bypass bound. */
+  cpuBypassed?: boolean
 }
 
 interface AdmissionBreaker {
@@ -166,7 +176,8 @@ export interface QualityGateAdmissionDeps {
   sleep?: (ms: number) => Promise<void>
   pid?: number
   isProcessAlive?: (pid: number) => boolean
-  samplePressure?: () => Promise<QualityGatePressureSample>
+  /** Called with the configured PSI start threshold. */
+  samplePressure?: (psiStartAvg10: number) => Promise<QualityGatePressureSample>
   pollMs?: number
   settleMs?: number
   staleMs?: number
@@ -180,6 +191,9 @@ export interface QualityGateAdmissionDeps {
   hardReserveBytes?: number
   /** PAN-5285: how long later waiters may pass a memory-blocked head. */
   headBypassMs?: number
+  /** PAN-5520: PSI start threshold and CPU bypass bound; default to `resources.quality_gate_*`. */
+  psiStartAvg10?: number
+  cpuBypassMs?: number
   readFootprintEstimate?: (key: string) => Promise<number>
   onWaiting?: (reason: QualityGateWaitReason) => void
 }
@@ -233,6 +247,7 @@ function cpuTotals() {
 export async function sampleQualityGatePressure(
   sleep: (ms: number) => Promise<void> = delay,
   readPsi: () => Promise<CpuPsi> = readCpuPsi,
+  psiStartAvg10: number = DEFAULT_QUALITY_GATE_PSI_START_AVG10,
 ): Promise<QualityGatePressureSample> {
   const before = cpuTotals()
   await sleep(250)
@@ -243,7 +258,7 @@ export async function sampleQualityGatePressure(
   const loadPerCore = loadavg()[0] / after.cores
   const psiSomeAvg10 = (await readPsi()).someAvg10
   const contended = psiSomeAvg10 != null
-    ? psiSomeAvg10 >= QUALITY_GATE_PSI_SOME_AVG10_START_THRESHOLD
+    ? psiSomeAvg10 >= psiStartAvg10
     : loadPerCore >= QUALITY_GATE_LOAD_PER_CORE_START_THRESHOLD
   return {
     cpuUtilization,
@@ -618,7 +633,7 @@ export async function acquireQualityGateAdmission(
   const sleep = deps.sleep ?? delay
   const pid = deps.pid ?? process.pid
   const isProcessAlive = deps.isProcessAlive ?? processIsAlive
-  const samplePressure = deps.samplePressure ?? (() => sampleQualityGatePressure(sleep))
+  const samplePressure = deps.samplePressure ?? ((psi: number) => sampleQualityGatePressure(sleep, readCpuPsi, psi))
   const pollMs = deps.pollMs ?? QUALITY_GATE_ADMISSION_POLL_MS
   const settleMs = deps.settleMs ?? QUALITY_GATE_ADMISSION_SETTLE_MS
   const staleMs = deps.staleMs ?? QUALITY_GATE_ADMISSION_STALE_MS
@@ -668,6 +683,20 @@ export async function acquireQualityGateAdmission(
     const since = blocked ? ticket.memoryBlockedSince ?? now() : undefined
     if (since !== ticket.memoryBlockedSince) {
       ticket.memoryBlockedSince = since
+      ticketDirty = true
+    }
+    if (ticketDirty) await persistTicket()
+  }
+  /** PAN-5520: read per poll like the reserves, so a changed setting reaches waiters already queued. */
+  const resolveCpu = async (): Promise<QualityGateCpuSettings> => {
+    if (deps.psiStartAvg10 != null && deps.cpuBypassMs != null) return { psiStartAvg10: deps.psiStartAvg10, bypassMs: deps.cpuBypassMs }
+    const resolved = await resolveQualityGateCpuSettings()
+    return { psiStartAvg10: deps.psiStartAvg10 ?? resolved.psiStartAvg10, bypassMs: deps.cpuBypassMs ?? resolved.bypassMs }
+  }
+  /** PAN-5520: start our CPU-block clock as head; it keeps running until admission. */
+  const markCpuBlocked = async (): Promise<void> => {
+    if (ticket.cpuBlockedSince == null) {
+      ticket.cpuBlockedSince = now()
       ticketDirty = true
     }
     if (ticketDirty) await persistTicket()
@@ -858,8 +887,14 @@ export async function acquireQualityGateAdmission(
         }
       }
 
-      const pressure = await samplePressure()
-      if (pressure.pressured) {
+      // PAN-5520: a head blocked on CPU for longer than the bound starts alone once the slots
+      // are empty, without sampling again, so a flapping sample cannot hold it either.
+      const cpu = await resolveCpu()
+      const cpuSince = ticket.cpuBlockedSince
+      const cpuAlone = position === 0 && taken.size === 0 && cpuSince != null && now() - cpuSince > cpu.bypassMs
+      const pressure = cpuAlone ? null : await samplePressure(cpu.psiStartAvg10)
+      if (pressure?.pressured) {
+        if (position === 0) await markCpuBlocked()
         await notifyWaiting({ kind: 'cpu', sample: pressure })
         await sleep(pollMs)
         continue
@@ -874,9 +909,11 @@ export async function acquireQualityGateAdmission(
         ...ticket,
         wait: undefined,
         memoryBlockedSince: undefined,
+        cpuBlockedSince: undefined,
         acquiredAt: now(),
         ...(baseline != null ? { rssBaselineBytes: baseline } : {}),
         ...(alone ? { admittedAlone: true } : {}),
+        ...(cpuAlone ? { cpuBypassed: true } : {}),
       }
       try {
         await publishExclusive(path, owner)
@@ -892,8 +929,9 @@ export async function acquireQualityGateAdmission(
       }
 
       await sleep(settleMs)
-      const settledPressure = await samplePressure()
-      if (settledPressure.pressured) {
+      const settledPressure = cpuAlone ? null : await samplePressure(cpu.psiStartAvg10)
+      if (settledPressure?.pressured) {
+        if (position === 0) await markCpuBlocked()
         await notifyWaiting({ kind: 'cpu', sample: settledPressure })
         if (sameOwner(await readJson<AdmissionOwner>(path), owner)) {
           await unlinkIfExists(path)
@@ -934,6 +972,7 @@ export async function acquireQualityGateAdmission(
         slots,
         footprintBytes: owner.footprintBytes ?? 0,
         admittedAlone: alone,
+        cpuBypassed: cpuAlone,
         async recordPeak(peakBytes: number) {
           if (!footprintKey) return
           try {

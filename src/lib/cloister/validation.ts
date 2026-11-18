@@ -19,7 +19,7 @@ import {
   acquireQualityGateAdmission,
   type QualityGateAdmissionHandle,
 } from './quality-gate-admission.js';
-import { admittedAloneMessage, describeMemoryWait, describeWait } from './gate-admission-run.js';
+import { admittedAloneMessage, cpuBypassedMessage, describeMemoryWait, describeWait } from './gate-admission-run.js';
 import { startPeakRssSampler, type PeakRssSampler } from '../system-health/process-tree-rss.js';
 
 const execAsync = promisify(exec);
@@ -496,6 +496,10 @@ export async function runQualityGates(
           if (admission.admittedAlone) {
             console.log(admittedAloneMessage(identity, admission.footprintBytes));
             opts.onLog?.(`${name} admitted alone after waiting past the bypass bound`);
+          }
+          if (admission.cpuBypassed) {
+            console.log(cpuBypassedMessage(identity));
+            opts.onLog?.(`${name} admitted alone after waiting past the CPU bypass bound`);
           }
           if (await opts.shouldStop?.()) {
             stopped = true;
