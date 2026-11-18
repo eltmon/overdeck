@@ -1,29 +1,23 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-18T16:32:17.196670Z · model: claude-opus-5-5 · open: 945_
+_Last sequenced: 2026-11-18T17:52:42.273176Z · model: claude-opus-5-5 · open: 936_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-5520 | S | critical | ok |  |  | CPU-pressure admission holds every quality gate forever (no bound like PAN-5285 memory bypass); outside load stalls the pipeline. |
-| 2 | PAN-5483 | M | high | ok |  |  | Docs canonicalize to panopticon-cli.com and docs.json uses legacy keys the site ignores. In pipeline; lane A first. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
-| 5 | PAN-5519 | S | high | ok |  |  | Review convoy relaunches reviewers into a stale already-approved run (old head); wastes tokens and can't unblock merge. |
 | 6 | PAN-5489 | S | high | ok |  |  | pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause. |
-| 7 | PAN-5498 | S | critical | ok |  |  | pan start --plan auto --host lost the host override at the planning hand-off, so no work agent started; merged, verifying on main. |
 | 7 | PAN-5526 | S | critical | ok |  |  | CLI finalize reads a removed consent field, so pan start --plan auto never auto-starts; likely root cause of PAN-4554. Fix message too. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
-| 9 | PAN-5516 | S | high | ok |  |  | pan conversations resume always fails locally with 'Missing origin': origin check does not exempt the internal token. Fix named. |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
-| 10 | PAN-5523 | S | high | ok |  | PAN-5516 | pan conversations move/heal send raw fetch with no token, so routes refuse with Missing origin; same fix pattern as in-pipeline PAN-5516. |
+| 10 | PAN-5523 | S | high | ok |  |  | pan conversations move/heal send raw fetch with no token, so routes refuse with Missing origin; same fix pattern as in-pipeline PAN-5516. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
 | 12 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
-| 12 | PAN-5522 | M | medium | ok |  |  | Add GPT-6.2 Astra and Sol to catalog, routing, pricing and pickers; operator asked for it ASAP; mirrors the PAN-4633/4634 terra recipe. |
 | 13 | PAN-4710 | S | high | ok |  |  | Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff |
 | 14 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; seen on MYN and now overdeck (PAN-5232). |
 | 14 | PAN-5527 | M | high | needs-refinement |  | PAN-5526 | Overlaps PAN-5526 (consent field, unread marker); unique part is resuming a promotion interrupted by a dashboard death. Scope after 5526. |
-| 14 | PAN-5529 | M | high | ok |  | PAN-5498 | Auto-start hand-off still strands: orphaned consent claims, queued container starts lost on restart, read errors read as revoked. |
+| 14 | PAN-5529 | M | high | ok |  |  | Auto-start hand-off still strands: orphaned consent claims, queued container starts lost on restart, read errors read as revoked. |
 | 15 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
 | 16 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 17 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
@@ -92,8 +86,7 @@ _Last sequenced: 2026-11-18T16:32:17.196670Z · model: claude-opus-5-5 · open: 
 | 80 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
 | 81 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent pane, so a single hungry agent inflates the unit and oomd kills the whole fleet — twice now. |
 | 82 | PAN-3278 | S | critical | needs-refinement |  |  | A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts. |
-| 82 | PAN-5505 | M | high | ok |  | PAN-5483 | Docs: rewrite introduction.mdx, the docs landing page: false Doctor Who epigraph, removed features, Panopticon history. Lane A item 2. |
-| 83 | PAN-5472 | M | high | ok |  | PAN-5483 | Docs P1: first-read pages (state branch, Cloister routing, Inspect, phone, concepts) contradict the shipped product. Lane A item 3. |
+| 83 | PAN-5472 | M | high | ok |  |  | Docs P1: first-read pages (state branch, Cloister routing, Inspect, phone, concepts) contradict the shipped product. Lane A item 3. |
 | 84 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
 | 84 | PAN-5467 | XL | high | ok | ✓ |  | Epic: docs overhaul, 16 page issues, 6 accuracy audits (PAN-5499..5504) and an intro rewrite (PAN-5505); order book drives pickup. |
 | 85 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
@@ -370,12 +363,11 @@ _Last sequenced: 2026-11-18T16:32:17.196670Z · model: claude-opus-5-5 · open: 
 | 347 | PAN-630 | M | high | ok |  |  | Multi-tenant workspace isolation with ACLs |
 | 348 | PAN-471 | M | high | ok |  |  | Cost reconciler: auto-trigger on agent lifecycle events with debounce |
 | 349 | PAN-438 | M | high | ok |  |  | Migrate remaining REST polling endpoints to Effect RPC |
-| 350 | PAN-5468 | M | medium | ok |  | PAN-5483 | Docs P1: features/issue-pipeline.mdx, the pipeline from pan start through merge and close-out. Lane A item 4. |
+| 350 | PAN-5468 | M | medium | ok |  |  | Docs P1: features/issue-pipeline.mdx, the pipeline from pan start through merge and close-out. Lane A item 4. |
 | 350 | PAN-578 | M | high | ok |  |  | Security: Comment mediation layer to prevent prompt injection via tracker comments |
 | 351 | PAN-2921 | S | medium | ok |  |  | Strike merge door can report fetch failure after merge and land the same head twice |
-| 351 | PAN-5470 | M | medium | ok |  | PAN-5483 | Docs P1: features/flywheel.mdx, the loop, lane board, switches and backlog sequencer. Supersedes PAN-2070. Lane A item 5. |
+| 351 | PAN-5470 | M | medium | ok |  |  | Docs P1: features/flywheel.mdx, the loop, lane board, switches and backlog sequencer. Supersedes PAN-2070. Lane A item 5. |
 | 352 | PAN-4195 | M | medium | ok |  |  | Every pan call costs ~0.5s/230MB from eager command imports; lazy-load command modules, target --version <100ms |
-| 352 | PAN-5471 | M | medium | ok |  |  | Docs P1: configuration/model-routing.mdx, roles, workhorse slots, tiered execution; drop stale Cloister routing. Lane B item 2. |
 | 353 | PAN-2839 | S | medium | ok |  |  | plan→work autoSpawn now 500s with a duplicated workspace prep |
 | 354 | PAN-2824 | S | medium | ok |  |  | pan review pending dies when one project's lens gather fails (non-degrading caller; PAN-2820 class) |
 | 355 | PAN-2792 | S | medium | ok |  |  | Orphan-process sweeps killed the dashboard and live conversations via lsof +D over Bun-hardlinked node_modules |
@@ -475,27 +467,26 @@ _Last sequenced: 2026-11-18T16:32:17.196670Z · model: claude-opus-5-5 · open: 
 | 448 | PAN-5264 | M | medium | ok |  |  | Attribute the app-rest GitHub caller (1,422 untraced App REST calls/hour), then cut the largest path. |
 | 449 | PAN-5340 | S | medium | ok |  |  | A Preview link to another Markdown file should open it in Preview, not Edit. Follows PAN-5337. |
 | 450 | PAN-5440 | L | medium | ok |  |  | React Compiler burn-down for all remaining components: 78 skips in 42 files, 288 memo sites. Largest group; do last. |
-| 450 | PAN-5473 | S | medium | ok |  | PAN-5483 | Docs P2: features/desktop-app.mdx, downloads, how pan up finds the app, tray. Supersedes PAN-2073. Lane A item 6. |
+| 450 | PAN-5473 | S | medium | ok |  |  | Docs P2: features/desktop-app.mdx, downloads, how pan up finds the app, tray. Supersedes PAN-2073. Lane A item 6. |
 | 451 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
-| 451 | PAN-5474 | M | medium | ok |  |  | Docs P2: features/dashboard-views.mdx replacing the outdated 13-views table and the Experimental switch. Lane B item 3. |
 | 452 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
-| 452 | PAN-5475 | S | medium | ok |  | PAN-5483 | Docs P2: features/costs.mdx, attribution, pan cost verbs, API-rate vs plan costs. Lane A item 7. |
+| 452 | PAN-5475 | S | medium | ok |  |  | Docs P2: features/costs.mdx, attribution, pan cost verbs, API-rate vs plan costs. Lane A item 7. |
 | 453 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
 | 453 | PAN-5476 | S | medium | ok |  |  | Docs P2: conversation search and Ctrl+K palette scopes, semantic search setup, pan conv search. Lane B item 4. |
 | 454 | PAN-5322 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5319: unguarded identifier.toUpperCase(), modal focus, needs-you rows that open nothing. |
-| 454 | PAN-5477 | M | medium | ok |  | PAN-5483 | Docs P2: configuration/permissions.mdx, auto-approve hook, --yolo, operator-only labels, git shim. Lane A item 8. |
+| 454 | PAN-5477 | M | medium | ok |  |  | Docs P2: configuration/permissions.mdx, auto-approve hook, --yolo, operator-only labels, git shim. Lane A item 8. |
 | 455 | PAN-5317 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5127: route live Codex app-server sends correctly; no replayable mail for keyed sends. |
 | 455 | PAN-5478 | L | medium | ok |  |  | Docs P2: CLI reference completeness for conversation, pipeline, memory and core verbs. Lane B item 5. |
 | 456 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
-| 456 | PAN-5479 | S | medium | ok |  | PAN-5483 | Docs P2: merge the unpublished workspaces config page into features/workspaces and memory pages. Lane A item 9. |
+| 456 | PAN-5479 | S | medium | ok |  |  | Docs P2: merge the unpublished workspaces config page into features/workspaces and memory pages. Lane A item 9. |
 | 457 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
 | 457 | PAN-5480 | XS | medium | ok |  |  | Docs P2: quickstart.mdx install script and overdeck up; drop the nonexistent work verb and model-swap claim. Lane B item 6. |
 | 458 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
-| 458 | PAN-5481 | S | medium | ok |  | PAN-5483 | Docs P2: configuration/voice.mdx, dictation, tts.enabled, local Qwen3-TTS daemon, sidecars. Lane A item 10. |
+| 458 | PAN-5481 | S | medium | ok |  |  | Docs P2: configuration/voice.mdx, dictation, tts.enabled, local Qwen3-TTS daemon, sidecars. Lane A item 10. |
 | 459 | PAN-2469 | S | medium | ok |  |  | Assembly landed (mergeReadySlots + finalization); remaining: alarm when all slots merged but no review requested. Swarm dormant. |
 | 459 | PAN-5500 | L | medium | ok |  | PAN-5472 | Docs audit: line-by-line accuracy check of the 21 Overdeck Anywhere pages against main. Lane A item 11. |
 | 460 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
-| 460 | PAN-5502 | L | medium | ok |  | PAN-5471, PAN-5472, PAN-5474, PAN-5479, PAN-5482 | Docs audit: line-by-line accuracy check of the 14 Features pages; waits on PAN-5471/5472/5474/5479/5482. Lane A item 12. |
+| 460 | PAN-5502 | L | medium | ok |  | PAN-5472, PAN-5479, PAN-5482 | Docs audit: line-by-line accuracy check of the 14 Features pages; waits on PAN-5472/5479/5482. |
 | 461 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
 | 461 | PAN-5504 | L | medium | ok |  | PAN-5472, PAN-5482 | Docs audit: line-by-line accuracy check of the 16 Guides and Reference pages; waits on PAN-5472/5482. Lane A item 13. |
 | 462 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
@@ -653,11 +644,11 @@ _Last sequenced: 2026-11-18T16:32:17.196670Z · model: claude-opus-5-5 · open: 
 | 610 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
 | 610 | PAN-5482 | L | medium | ok |  |  | Docs P3 batch: operating guide, foreman, CI integrations, unpublished pages, proposal in nav, blog draft. Lane B item 7. |
 | 611 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
-| 611 | PAN-5503 | L | medium | ok |  | PAN-5471, PAN-5472 | Docs audit: line-by-line accuracy check of the 21 Configuration pages; waits on PAN-5471/5472. Lane B item 8. |
+| 611 | PAN-5503 | L | medium | ok |  | PAN-5472 | Docs audit: line-by-line accuracy check of the 21 Configuration pages; waits on PAN-5472. |
 | 612 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
 | 612 | PAN-5501 | M | medium | ok |  | PAN-5478 | Docs audit: line-by-line accuracy check of the 7 CLI Reference pages; waits on PAN-5478. Lane B item 9. |
 | 613 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
-| 613 | PAN-5499 | S | medium | ok |  | PAN-5505, PAN-5480, PAN-5470, PAN-5472 | Docs audit: Getting Started, Vision, Changelog intro (5 pages); waits on PAN-5505/5480/5470/5472. Lane B item 10. |
+| 613 | PAN-5499 | S | medium | ok |  | PAN-5480, PAN-5470, PAN-5472 | Docs audit: Getting Started, Vision, Changelog intro (5 pages); waits on PAN-5480/5470/5472. |
 | 614 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
 | 615 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
 | 616 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
@@ -953,14 +944,6 @@ _Last sequenced: 2026-11-18T16:32:17.196670Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
-### PAN-5520 (rank 1)
-
-New substrate bug that is stalling the pipeline right now: sustained CPU PSI from operator workloads kept every verification gate, vitest run and tsc lane waiting 45+ minutes with 44 GB free. The fix is small and well specified (CPU head bypass mirroring memoryBlockedSince, configurable PSI threshold, fake-timer tests), so it ranks first as a pipeline blocker.
-
-### PAN-5483 (rank 2)
-
-New and in the pipeline; the docs order book runs it first in lane A because every other docs page adds itself to the docs.json navigation it restructures.
-
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
@@ -969,17 +952,9 @@ Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat 
 
 New issue, sibling of the just-merged front-matter fix PAN-5427, and already queued in the active workflow-redesign order book, so it takes free rank 4 behind critical PAN-5013. It is a small, well-specified MarkdownTab change with named tests, a sanitising allow-list and a concrete acceptance check on the README preview; its parent epic PAN-5284 is closed, so it carries no contains edge.
 
-### PAN-5519 (rank 5)
-
-New substrate bug seen on PAN-5483: resolveReviewParentRunState returns a saved run id without checking headSha or an existing verdict, so recovery paths dispatch reviewers against an old head. Root cause, fix and test are stated, and stale reviews burn tokens while never producing a mergeable approval, so it sits in the top tier beside the other review-pipeline correctness bugs.
-
 ### PAN-5489 (rank 6)
 
 New pipeline-path bug: the CLI result depends on the caller's environment, so Flywheel-launched planning can fail and strand workspaces; it outranks routine work.
-
-### PAN-5498 (rank 7)
-
-New to the sequence and already in the pipeline (merged, verifying on main), so it is pinned beside PAN-5526, the other auto-start hand-off fix. It restores the host override on the post-planning spawn and journals the hand-off so deacon-lite can resume it.
 
 ### PAN-5526 (rank 7)
 
@@ -989,17 +964,13 @@ New substrate bug left out of PAN-5498's PR: the CLI always posts autoSpawn=fals
 
 New issue. Phones (iOS, Android) and the connector cannot reach the machine at all, directly or through the relay, because RtcTransport.accept awaits ICE servers before registering the signalling session and drops trickle candidates that arrive in that window. The root cause and the fix (buffer candidates from offer acceptance) are stated in the body and touch only the dashboard server, so this is a small, well-defined fix for a full outage of a shipped feature. It takes the open rank-8 slot ahead of the remaining pipeline-substrate bugs.
 
-### PAN-5516 (rank 9)
-
-New substrate bug: a core CLI verb is broken on every local run. The fix is small and precise (reuse crossSiteWriteRefusal's internal-token rule), so it takes the free top-tier slot.
-
 ### PAN-4636 (rank 10)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
 
 ### PAN-5523 (rank 10)
 
-New substrate bug that reuses the PAN-5516 fix (callDashboard + crossSiteWriteRefusal), so it ranks right behind 5516.
+Rank unchanged; PAN-5516 closed, so that dependency is removed.
 
 ### PAN-4553 (rank 11)
 
@@ -1008,10 +979,6 @@ Rank unchanged; its duplicate PAN-4929 entered the pipeline with an open PR, so 
 ### PAN-4733 (rank 12)
 
 Rank held: parent PAN-4732 (move heavy e2e out of the default shards) closed as completed on 2026-11-01, so this follow-up is now unblocked and next in line.
-
-### PAN-5522 (rank 12)
-
-New operator-requested model catalog addition with a verified recipe and pricing; medium importance but ranked high because the operator asked for it as soon as possible.
 
 ### PAN-4710 (rank 13)
 
@@ -1027,7 +994,7 @@ New substrate follow-up to PAN-5498 that duplicates most of PAN-5526, so it rank
 
 ### PAN-5529 (rank 14)
 
-New substrate follow-up to PAN-5498 that review split out: five concrete recovery gaps on the post-planning auto-start path, each with a named reproducing test. It ranks with PAN-5527 and PAN-4554 because the same path keeps leaving planned issues without a work agent, and PAN-5498 has already merged, so nothing blocks it.
+Rank unchanged; PAN-5498 closed, so that dependency is removed.
 
 ### PAN-4666 (rank 15)
 
@@ -1273,6 +1240,30 @@ New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wr
 
 New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.
 
+### PAN-5133 (rank 76)
+
+New substrate bug placed in a freed high-tier slot. Under memory pressure the operator has no supported way to stop a deferred start, and the Flywheel had to write the journal directly.
+
+### PAN-4792 (rank 77)
+
+New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's unnumbered select dialogs, so a failed paste's fallback Enter can answer them, including a silent permission-mode change. PAN-4738 removes the one known trigger on Fly, so it ranks with the high-tier delivery bugs rather than the top tier.
+
+### PAN-3557 (rank 78)
+
+New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
+
+### PAN-3543 (rank 79)
+
+New this pass. A completed-handoff agent owed rework after a blocked verdict cannot be started at all: pan start refuses and recommends --fresh, --fresh gives the identical refusal, and reset-session is refused too because the durable plane reconstructs the session pointer. The refusal message names an action the operator cannot take, which is the self-contradictory-deadlock family PAN-3526 opened.
+
+### PAN-3522 (rank 80)
+
+New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts through a new generation's 138-second boot warm phase and killed it anyway, producing four restarts in ten minutes, racing spawns on port 3012, and a WATCHDOG GIVING UP. Each restart re-triggered docker stack rebuilds, feeding the storm. The probe budget has to know the difference between starved and starting.
+
+### PAN-3314 (rank 81)
+
+New this pass. Every agent pane is a child of one transient tmux-server unit, so agent memory is the unit's memory and systemd-oomd's kill decision is all-or-nothing: one hungry agent takes the entire fleet with it. That has now happened twice, the second time killing seven work agents, four strikes and a live review convoy. Blast-radius containment is a different fix from choosing a better victim.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1280,37 +1271,11 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-18T16:32:17.196670Z",
+  "generatedAt": "2026-11-18T17:52:42.273176Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 945,
+  "openCount": 936,
   "nodes": [
-    {
-      "issue": "PAN-5520",
-      "rank": 1,
-      "size": "S",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "CPU-pressure admission holds every quality gate forever (no bound like PAN-5285 memory bypass); outside load stalls the pipeline.",
-      "rationale": "New substrate bug that is stalling the pipeline right now: sustained CPU PSI from operator workloads kept every verification gate, vitest run and tsc lane waiting 45+ minutes with 44 GB free. The fix is small and well specified (CPU head bypass mirroring memoryBlockedSince, configurable PSI threshold, fake-timer tests), so it ranks first as a pipeline blocker.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5483",
-      "rank": 2,
-      "size": "M",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Docs canonicalize to panopticon-cli.com and docs.json uses legacy keys the site ignores. In pipeline; lane A first.",
-      "rationale": "New and in the pipeline; the docs order book runs it first in lane A because every other docs page adds itself to the docs.json navigation it restructures.",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-5013",
       "rank": 3,
@@ -1338,19 +1303,6 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "planning": "auto"
     },
     {
-      "issue": "PAN-5519",
-      "rank": 5,
-      "size": "S",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Review convoy relaunches reviewers into a stale already-approved run (old head); wastes tokens and can't unblock merge.",
-      "rationale": "New substrate bug seen on PAN-5483: resolveReviewParentRunState returns a saved run id without checking headSha or an existing verdict, so recovery paths dispatch reviewers against an old head. Root cause, fix and test are stated, and stale reviews burn tokens while never producing a mergeable approval, so it sits in the top tier beside the other review-pipeline correctness bugs.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-5489",
       "rank": 6,
       "size": "S",
@@ -1360,19 +1312,6 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "dependsOn": [],
       "why": "pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause.",
       "rationale": "New pipeline-path bug: the CLI result depends on the caller's environment, so Flywheel-launched planning can fail and strand workspaces; it outranks routine work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5498",
-      "rank": 7,
-      "size": "S",
-      "importance": "critical",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan start --plan auto --host lost the host override at the planning hand-off, so no work agent started; merged, verifying on main.",
-      "rationale": "New to the sequence and already in the pipeline (merged, verifying on main), so it is pinned beside PAN-5526, the other auto-start hand-off fix. It restores the host override on the post-planning spawn and journals the hand-off so deacon-lite can resume it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1403,19 +1342,6 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "planning": "auto"
     },
     {
-      "issue": "PAN-5516",
-      "rank": 9,
-      "size": "S",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan conversations resume always fails locally with 'Missing origin': origin check does not exempt the internal token. Fix named.",
-      "rationale": "New substrate bug: a core CLI verb is broken on every local run. The fix is small and precise (reuse crossSiteWriteRefusal's internal-token rule), so it takes the free top-tier slot.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4636",
       "rank": 10,
       "size": "S",
@@ -1435,11 +1361,9 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "importance": "high",
       "score": 74,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5516"
-      ],
+      "dependsOn": [],
       "why": "pan conversations move/heal send raw fetch with no token, so routes refuse with Missing origin; same fix pattern as in-pipeline PAN-5516.",
-      "rationale": "New substrate bug that reuses the PAN-5516 fix (callDashboard + crossSiteWriteRefusal), so it ranks right behind 5516.",
+      "rationale": "Rank unchanged; PAN-5516 closed, so that dependency is removed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1466,19 +1390,6 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "dependsOn": [],
       "why": "Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it.",
       "rationale": "Rank held: parent PAN-4732 (move heavy e2e out of the default shards) closed as completed on 2026-11-01, so this follow-up is now unblocked and next in line.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5522",
-      "rank": 12,
-      "size": "M",
-      "importance": "medium",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Add GPT-6.2 Astra and Sol to catalog, routing, pricing and pickers; operator asked for it ASAP; mirrors the PAN-4633/4634 terra recipe.",
-      "rationale": "New operator-requested model catalog addition with a verified recipe and pricing; medium importance but ranked high because the operator asked for it as soon as possible.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1530,11 +1441,9 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "importance": "high",
       "score": 74,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5498"
-      ],
+      "dependsOn": [],
       "why": "Auto-start hand-off still strands: orphaned consent claims, queued container starts lost on restart, read errors read as revoked.",
-      "rationale": "New substrate follow-up to PAN-5498 that review split out: five concrete recovery gaps on the post-planning auto-start path, each with a named reproducing test. It ranks with PAN-5527 and PAN-4554 because the same path keeps leaving planned issues without a work agent, and PAN-5498 has already merged, so nothing blocks it.",
+      "rationale": "Rank unchanged; PAN-5498 closed, so that dependency is removed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2425,30 +2334,13 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "planning": "auto"
     },
     {
-      "issue": "PAN-5505",
-      "rank": 82,
-      "size": "M",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-5483"
-      ],
-      "why": "Docs: rewrite introduction.mdx, the docs landing page: false Doctor Who epigraph, removed features, Panopticon history. Lane A item 2.",
-      "rationale": "New child of the docs epic. The docs landing page is the second thing every new user reads and it describes removed features plus a false epigraph; the operator asked for a full rewrite. The order book runs it as lane A item 2, just before PAN-5472, so it ranks one slot ahead of that issue.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-5472",
       "rank": 83,
       "size": "M",
       "importance": "high",
       "score": 70,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5483"
-      ],
+      "dependsOn": [],
       "why": "Docs P1: first-read pages (state branch, Cloister routing, Inspect, phone, concepts) contradict the shipped product. Lane A item 3.",
       "rationale": "Rank unchanged. introduction.mdx moved to PAN-5505 (comment 2026-11-17), so this issue now covers the other six first-read pages; it is lane A item 3 behind PAN-5505.",
       "gate": "auto",
@@ -5957,11 +5849,9 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "importance": "medium",
       "score": 60,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5483"
-      ],
+      "dependsOn": [],
       "why": "Docs P1: features/issue-pipeline.mdx, the pipeline from pan start through merge and close-out. Lane A item 4.",
-      "rationale": "New P1 docs page; banded with medium work because the docs order book, not the sequence, sets its pickup order. Rank unchanged; why updated because the docs order book now places it at lane A item 4.",
+      "rationale": "Rank unchanged; PAN-5483 closed, so that dependency is removed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5996,11 +5886,9 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "importance": "medium",
       "score": 58,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5483"
-      ],
+      "dependsOn": [],
       "why": "Docs P1: features/flywheel.mdx, the loop, lane board, switches and backlog sequencer. Supersedes PAN-2070. Lane A item 5.",
-      "rationale": "New P1 docs page that supersedes the older PAN-2070 request; banded with medium work behind the order book. Rank unchanged; why updated because the docs order book now places it at lane A item 5.",
+      "rationale": "Rank unchanged; PAN-5483 closed, so that dependency is removed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6014,19 +5902,6 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "dependsOn": [],
       "why": "Every pan call costs ~0.5s/230MB from eager command imports; lazy-load command modules, target --version <100ms",
       "rationale": "New issue (2026-09-25). Agents and hooks invoke pan constantly, so a 0.5 s, 230 MB floor per call adds latency to every agent turn and memory pressure on the host. The fix (lazy action imports, bundle/compile-cache tuning, a startup regression check) is well scoped with a measurable target, so condition is ok; placed in a free slot among score-63 medium work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5471",
-      "rank": 352,
-      "size": "M",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Docs P1: configuration/model-routing.mdx, roles, workhorse slots, tiered execution; drop stale Cloister routing. Lane B item 2.",
-      "rationale": "New P1 docs page; banded with medium work behind the order book.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7253,11 +7128,9 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "importance": "medium",
       "score": 50,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5483"
-      ],
+      "dependsOn": [],
       "why": "Docs P2: features/desktop-app.mdx, downloads, how pan up finds the app, tray. Supersedes PAN-2073. Lane A item 6.",
-      "rationale": "New P2 docs page that supersedes PAN-2073; banded with mid-medium work. Rank unchanged; why updated because the docs order book now places it at lane A item 6.",
+      "rationale": "Rank unchanged; PAN-5483 closed, so that dependency is removed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7270,19 +7143,6 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "condition": "ok",
       "dependsOn": [],
       "why": "PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5474",
-      "rank": 451,
-      "size": "M",
-      "importance": "medium",
-      "score": 49,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Docs P2: features/dashboard-views.mdx replacing the outdated 13-views table and the Experimental switch. Lane B item 3.",
-      "rationale": "New P2 docs page; banded with mid-medium work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7305,11 +7165,9 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "importance": "medium",
       "score": 49,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5483"
-      ],
+      "dependsOn": [],
       "why": "Docs P2: features/costs.mdx, attribution, pan cost verbs, API-rate vs plan costs. Lane A item 7.",
-      "rationale": "New P2 docs page; banded with mid-medium work. Rank unchanged; why updated because the docs order book now places it at lane A item 7.",
+      "rationale": "Rank unchanged; PAN-5483 closed, so that dependency is removed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7357,11 +7215,9 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "importance": "medium",
       "score": 50,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5483"
-      ],
+      "dependsOn": [],
       "why": "Docs P2: configuration/permissions.mdx, auto-approve hook, --yolo, operator-only labels, git shim. Lane A item 8.",
-      "rationale": "New P2 docs page; banded with mid-medium work. Rank unchanged; why updated because the docs order book now places it at lane A item 8.",
+      "rationale": "Rank unchanged; PAN-5483 closed, so that dependency is removed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7409,11 +7265,9 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "importance": "medium",
       "score": 46,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5483"
-      ],
+      "dependsOn": [],
       "why": "Docs P2: merge the unpublished workspaces config page into features/workspaces and memory pages. Lane A item 9.",
-      "rationale": "New P2 docs page; banded with mid-medium work. Rank unchanged; why updated because the docs order book now places it at lane A item 9.",
+      "rationale": "Rank unchanged; PAN-5483 closed, so that dependency is removed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7461,11 +7315,9 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "importance": "medium",
       "score": 45,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5483"
-      ],
+      "dependsOn": [],
       "why": "Docs P2: configuration/voice.mdx, dictation, tts.enabled, local Qwen3-TTS daemon, sidecars. Lane A item 10.",
-      "rationale": "New P2 docs page; banded with mid-medium work. Rank unchanged; why updated because the docs order book now places it at lane A item 10.",
+      "rationale": "Rank unchanged; PAN-5483 closed, so that dependency is removed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7517,14 +7369,12 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "score": 45,
       "condition": "ok",
       "dependsOn": [
-        "PAN-5471",
         "PAN-5472",
-        "PAN-5474",
         "PAN-5479",
         "PAN-5482"
       ],
-      "why": "Docs audit: line-by-line accuracy check of the 14 Features pages; waits on PAN-5471/5472/5474/5479/5482. Lane A item 12.",
-      "rationale": "New child of the docs epic: an accuracy audit that runs after the page PRs it names merge, so it ranks just behind the last of them in its order-book lane.",
+      "why": "Docs audit: line-by-line accuracy check of the 14 Features pages; waits on PAN-5472/5479/5482.",
+      "rationale": "Rank unchanged; PAN-5471, PAN-5474 closed, so that dependency is removed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9470,11 +9320,10 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "score": 42,
       "condition": "ok",
       "dependsOn": [
-        "PAN-5471",
         "PAN-5472"
       ],
-      "why": "Docs audit: line-by-line accuracy check of the 21 Configuration pages; waits on PAN-5471/5472. Lane B item 8.",
-      "rationale": "New child of the docs epic: an accuracy audit that runs after the page PRs it names merge, so it ranks just behind the last of them in its order-book lane.",
+      "why": "Docs audit: line-by-line accuracy check of the 21 Configuration pages; waits on PAN-5472.",
+      "rationale": "Rank unchanged; PAN-5471 closed, so that dependency is removed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9526,13 +9375,12 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "score": 41,
       "condition": "ok",
       "dependsOn": [
-        "PAN-5505",
         "PAN-5480",
         "PAN-5470",
         "PAN-5472"
       ],
-      "why": "Docs audit: Getting Started, Vision, Changelog intro (5 pages); waits on PAN-5505/5480/5470/5472. Lane B item 10.",
-      "rationale": "New child of the docs epic: an accuracy audit that runs after the page PRs it names merge, so it ranks just behind the last of them in its order-book lane.",
+      "why": "Docs audit: Getting Started, Vision, Changelog intro (5 pages); waits on PAN-5480/5470/5472.",
+      "rationale": "Rank unchanged; PAN-5505 closed, so that dependency is removed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13800,13 +13648,6 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "confidence": 1
     },
     {
-      "from": "PAN-3946",
-      "to": "PAN-5519",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
       "from": "PAN-3952",
       "to": "PAN-3234",
       "type": "informs",
@@ -14094,13 +13935,6 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "confidence": 0.5
     },
     {
-      "from": "PAN-4705",
-      "to": "PAN-5520",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
       "from": "PAN-4710",
       "to": "PAN-4554",
       "type": "informs",
@@ -14361,13 +14195,6 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
     },
     {
       "from": "PAN-5467",
-      "to": "PAN-5471",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5467",
       "to": "PAN-5472",
       "type": "contains",
       "source": "github-ref",
@@ -14376,13 +14203,6 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
     {
       "from": "PAN-5467",
       "to": "PAN-5473",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5467",
-      "to": "PAN-5474",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
@@ -14445,13 +14265,6 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
     },
     {
       "from": "PAN-5467",
-      "to": "PAN-5483",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5467",
       "to": "PAN-5499",
       "type": "contains",
       "source": "github-ref",
@@ -14493,13 +14306,6 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "confidence": 1
     },
     {
-      "from": "PAN-5467",
-      "to": "PAN-5505",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-5470",
       "to": "PAN-2070",
       "type": "informs",
@@ -14512,34 +14318,6 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-5471",
-      "to": "PAN-5482",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-5471",
-      "to": "PAN-5502",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5471",
-      "to": "PAN-5503",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5472",
-      "to": "PAN-5471",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
     },
     {
       "from": "PAN-5472",
@@ -14584,20 +14362,6 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "confidence": 0.85
     },
     {
-      "from": "PAN-5474",
-      "to": "PAN-5502",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5474",
-      "to": "PAN-5532",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
       "from": "PAN-5478",
       "to": "PAN-5501",
       "type": "unblocks",
@@ -14631,83 +14395,6 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-5483",
-      "to": "PAN-4708",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-5483",
-      "to": "PAN-4779",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-5483",
-      "to": "PAN-5468",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-5483",
-      "to": "PAN-5470",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-5483",
-      "to": "PAN-5472",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-5483",
-      "to": "PAN-5473",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-5483",
-      "to": "PAN-5475",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-5483",
-      "to": "PAN-5477",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-5483",
-      "to": "PAN-5479",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-5483",
-      "to": "PAN-5481",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-5483",
-      "to": "PAN-5505",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
     },
     {
       "from": "PAN-5490",
@@ -14764,41 +14451,6 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-5498",
-      "to": "PAN-5529",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5505",
-      "to": "PAN-5499",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-5516",
-      "to": "PAN-5523",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-5517",
-      "to": "PAN-5471",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-5518",
-      "to": "PAN-5471",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
     },
     {
       "from": "PAN-5526",
