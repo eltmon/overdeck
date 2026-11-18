@@ -168,6 +168,88 @@ See [Adding and curating facts](/configuration/memory#adding-and-curating-facts)
 [Linting facts](/configuration/memory#linting-facts) and
 [Syncing operator memory](/configuration/memory#syncing-operator-memory).
 
+## pan context
+
+Manage the layered context model: global, project, and workspace layers that assemble into each
+harness's effective prompt.
+
+```bash
+pan context list
+pan context diff --harness claude
+pan context edit --layer project
+pan context validate
+```
+
+| Command | What it does | Options |
+| --- | --- | --- |
+| `pan context list` | Shows all three layers' files | `--layer global\|project\|workspace`, `--json` |
+| `pan context edit` | Opens a context layer in `$EDITOR` | `--layer global\|project\|workspace` (default `global`) |
+| `pan context sync` | Refreshes Overdeck-managed session context artifacts | none |
+| `pan context diff` | Shows what each harness would receive after templating | `--harness claude\|pi` |
+| `pan context validate` | Lints layer templates for unclosed or unknown harness blocks | none |
+| `pan context migrate` | One-shot migration from the deprecated `sync.devroot` model | `--yes` (registers every discovered project without prompting) |
+| `pan context detach` | Explicitly removes historical Overdeck managed regions from native instruction files | `--dry-run` (previews the files and blocks without changing anything), `--apply` (backs up each file and removes only an unambiguous managed block) |
+
+See [CLI](/configuration/context-layers#cli).
+
+## pan knowledge
+
+Run a knowledge maintenance agent for an issue, or open the project's OKF knowledge bundle in the
+local viewer.
+
+```bash
+pan knowledge PAN-1148
+pan knowledge PAN-1148 --focus "swarm recovery"
+pan knowledge open
+```
+
+| Option | What it does |
+| --- | --- |
+| `--focus <topic>` | Runs `/okf study` for a focused topic before syncing |
+| `--retro` | Runs `/okf retro` before syncing |
+| `--model <model>` | Model override (defaults to `roles.knowledge.model` in config) |
+| `--effort <level>` | Knowledge effort: `low`, `medium`, `high`, `xhigh` or `max` |
+
+| Command | What it does | Options |
+| --- | --- | --- |
+| `pan knowledge open` | Opens the project OKF bundle in the local knowledge viewer | `--no-install` (skips installing `@inkeep/open-knowledge` when the `ok` binary is missing), `--no-browser` (starts or reuses the viewer without opening a browser) |
+
+See [Knowledge](/configuration/knowledge).
+
+## pan docs
+
+Query and maintain Overdeck's own documentation retrieval index, which chunks `docs/`, skills,
+rules, `CLAUDE.md` files and PRDs so agents can pull relevant snippets into their context.
+Disabling injection stops that automatic retrieval without touching the index itself.
+
+```bash
+pan docs query "how does the merge train work"
+pan docs reindex
+pan docs disable --scope project --reason "debugging a stale snippet"
+pan docs enable --scope project
+```
+
+| Command | What it does | Options |
+| --- | --- | --- |
+| `pan docs query <text>` | Queries the docs index for relevant snippets | `--top <n>` (default 5), `--format markdown\|json\|text` (default `markdown`), `--index-path <path>`, `--kind docs\|skill\|rule\|claude-md\|prd` |
+| `pan docs reindex` | Regenerates the docs index from the current `docs/`, skills, and related sources | none |
+| `pan docs disable` | Disables docs RAG injection | `--scope session\|project\|global` (default `session`), `--reason <text>` |
+| `pan docs enable` | Re-enables docs RAG injection | `--scope session\|project\|global` (default `session`) |
+
+## pan briefing
+
+Print the live Overdeck session briefing markdown: the same context a managed session receives at
+launch.
+
+```bash
+pan briefing
+pan briefing --cwd ../other-workspace
+```
+
+| Option | What it does |
+| --- | --- |
+| `--cwd <path>` | Resolves workspace context from this directory |
+
 ## Get help
 
 - [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P)
