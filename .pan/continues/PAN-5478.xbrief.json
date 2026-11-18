@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5478",
   "created": "2026-11-18T19:16:06.870Z",
-  "updated": "2026-11-18T19:27:40.164Z",
+  "updated": "2026-11-18T19:28:48.783Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,9 +158,22 @@
       "doneAt": "2026-11-18T19:27:33.807Z"
     },
     "pipe-flywheel": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5478",
-      "claimedAt": "2026-11-18T19:27:40.163Z"
+      "claimedAt": "2026-11-18T19:27:40.163Z",
+      "doneAt": "2026-11-18T19:28:48.782Z"
+    },
+    "pipe-flywheel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:28:48.782Z"
+    },
+    "pipe-flywheel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:28:48.782Z"
+    },
+    "pipe-flywheel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:28:48.782Z"
     }
   }
 }
