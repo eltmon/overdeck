@@ -87,9 +87,12 @@
               "cli/core-commands",
               "cli/hygiene",
               "cli/agent-commands",
+              "cli/conversation-commands",
+              "cli/pipeline-commands",
               "cli/workspace-commands",
               "cli/review-commands",
-              "cli/skills-commands"
+              "cli/skills-commands",
+              "cli/memory-commands"
             ]
           }
         ]
