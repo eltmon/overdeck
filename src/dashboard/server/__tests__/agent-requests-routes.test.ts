@@ -495,6 +495,20 @@ function storeWithRequest(name = 'OPENAI_API_KEY') {
   return { requests, requestId: (created.body as { requestId: string }).requestId };
 }
 
+describe('GET /api/agent-requests issueId (PAN-5541)', () => {
+  it('answers the caller issue id for a secret request, and null for a conversation caller', () => {
+    const secretRequests = createAgentRequests();
+    handleSecretRequestCreate(agentCredential('agent-pan-1'), validAsk, { requests: secretRequests, caller: callerDeps });
+    const secretRows = (handleAgentRequestList({ requests: secretRequests }).body as { requests: Array<{ agentId: string; issueId: string | null }> }).requests;
+    expect(secretRows).toMatchObject([{ agentId: 'agent-pan-1', issueId: 'PAN-1' }]);
+
+    const linkRequests = createAgentRequests();
+    handleMachineLinkRequestCreate(agentCredential('abc', 'conversation'), validLinkAsk, { requests: linkRequests, caller: callerDeps });
+    const linkRows = (handleAgentRequestList({ requests: linkRequests }).body as { requests: Array<{ agentId: string; issueId: string | null }> }).requests;
+    expect(linkRows).toMatchObject([{ agentId: 'abc', issueId: null }]);
+  });
+});
+
 describe('operator agent request routes through the gate', () => {
   it('refuses a token holding approve and a device on both answer routes with insufficient_scope', async () => {
     const { requests, requestId } = storeWithRequest();
@@ -526,8 +540,8 @@ describe('operator agent request routes through the gate', () => {
     expect(listed.status).toBe(200);
     const rows = (listed.json as { requests: Array<Record<string, unknown>> }).requests;
     expect(rows).toHaveLength(1);
-    expect(Object.keys(rows[0]!).sort()).toEqual(['agentId', 'agentKind', 'createdAt', 'expiresAt', 'id', 'kind', 'label', 'name', 'prompt']);
-    expect(rows[0]).toMatchObject({ id: requestId, kind: 'secret', agentId: 'agent-pan-1', label: 'agent-pan-1 · PAN-1', name: 'OPENAI_API_KEY' });
+    expect(Object.keys(rows[0]!).sort()).toEqual(['agentId', 'agentKind', 'createdAt', 'expiresAt', 'id', 'issueId', 'kind', 'label', 'name', 'prompt']);
+    expect(rows[0]).toMatchObject({ id: requestId, kind: 'secret', agentId: 'agent-pan-1', issueId: 'PAN-1', label: 'agent-pan-1 · PAN-1', name: 'OPENAI_API_KEY' });
     expect(JSON.stringify(listed.json)).not.toContain(home);
   });
 
@@ -684,8 +698,8 @@ describe('operator machine-link routes through the gate', () => {
     const reader = await createAccessToken({ name: 'reader', scopes: ['read:conversations'], kind: 'token' });
     const listed = await send(app, 'GET', '/api/agent-requests', bearer(reader.token));
     const rows = (listed.json as { requests: Array<Record<string, unknown>> }).requests;
-    expect(Object.keys(rows[0]!).sort()).toEqual(['agentId', 'agentKind', 'createdAt', 'expiresAt', 'hint', 'id', 'kind', 'label']);
-    expect(rows[0]).toMatchObject({ id: requestId, kind: 'machine-link', hint: 'my desk Mac', label: 'agent-pan-1 · PAN-1' });
+    expect(Object.keys(rows[0]!).sort()).toEqual(['agentId', 'agentKind', 'createdAt', 'expiresAt', 'hint', 'id', 'issueId', 'kind', 'label']);
+    expect(rows[0]).toMatchObject({ id: requestId, kind: 'machine-link', hint: 'my desk Mac', issueId: 'PAN-1', label: 'agent-pan-1 · PAN-1' });
   });
 });
 

@@ -36,6 +36,8 @@ export interface AgentRequestView {
   kind: AgentRequestKind;
   agentId: string;
   agentKind: 'agent' | 'conversation';
+  /** The caller's issue id, or null. */
+  issueId: string | null;
   label: string;
   /** Secret requests only. */
   name?: string;
@@ -172,6 +174,7 @@ export function createAgentRequests(deps: { now?: () => number; newId?: () => st
       id: newId(),
       agentId: caller.agentId,
       agentKind: caller.agentKind,
+      issueId: caller.issueId,
       label,
       ...fields,
       createdAt: new Date(createdAtMs).toISOString(),

@@ -64,6 +64,8 @@ export interface AgentRequestRow {
   kind: string;
   agentId: string;
   agentKind: 'agent' | 'conversation';
+  /** The caller's issue id, or null. */
+  issueId: string | null;
   label: string;
   name?: string;
   prompt?: string;
@@ -132,6 +134,7 @@ export function handleAgentRequestList(deps: AgentRequestsRouteDeps = {}): SelfR
     kind: view.kind,
     agentId: view.agentId,
     agentKind: view.agentKind,
+    issueId: view.issueId,
     label: view.label,
     name: view.name,
     prompt: view.prompt,
