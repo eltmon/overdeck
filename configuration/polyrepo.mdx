@@ -1,5 +1,6 @@
 ---
-title: Polyrepo Configuration
+title: "Polyrepo configuration: one issue, several repos"
+sidebarTitle: "Polyrepo Configuration"
 description: "Configure Overdeck workspaces for a project that spans several git repositories, such as separate frontend and backend repos."
 ---
 
@@ -84,14 +85,14 @@ projects:
         entries:
           - "{{FEATURE_FOLDER}}.{{DOMAIN}}"
           - "api-{{FEATURE_FOLDER}}.{{DOMAIN}}"
-        sync_method: wsl2hosts  # or: hosts_file, dnsmasq
+        sync_method: wsl2hosts  # default wsl2hosts; use hosts_file or dnsmasq on Linux and macOS
 
       # Port assignments for services
       ports:
         redis:
           range: [6380, 6499]
 
-      # Service definitions - how to start each service
+      # Service definitions: the commands and ports Overdeck shows for each service (it does not start them)
       services:
         - name: api
           path: api
@@ -108,16 +109,18 @@ projects:
 
       # Docker configuration
       docker:
-        traefik: infra/docker-compose.traefik.yml
+        # Any value starts Overdeck's own Traefik from ~/.overdeck/traefik/docker-compose.yml
+        # (installed by pan install). Overdeck never reads a project compose file here.
+        traefik: ~/.overdeck/traefik/docker-compose.yml
         compose_template: infra/.devcontainer-template
 
       # Agent configuration templates
       agent:
         template_dir: infra/.agent-template
         templates:
-          - source: CLAUDE.md.template
-            target: CLAUDE.md
-        symlinks:
+          - source: .mcp.json.template
+            target: .mcp.json
+        copy_dirs:             # directories are copied into the workspace, not linked
           - .claude/commands
           - .claude/skills
 
@@ -129,17 +132,24 @@ projects:
         load: false  # true also exports this .env into agent shells and host quality gates
 ```
 
+A few notes on these keys:
+
+- **Repos:** each repo can also set `forge` (`github` or `gitlab`), `remote` (a legacy alias for `forge`) and `pr_target` (the branch its PR targets). The Add-project dialog's **Add this folder as one project** writes this `workspace` block for you.
+- **Services:** each service needs its own `start_command`, and optionally `docker_command`, `health_url` and `port`.
+- **Docker:** setting `docker.traefik` makes Overdeck start its own Traefik from `~/.overdeck/traefik/docker-compose.yml` (installed by `pan install`) when a workspace starts its containers. It never reads a project compose file. See [Docker & HTTPS Setup](/guides/docker-setup).
+- **Agent templates:** templates that target `CLAUDE.md`, `AGENTS.md` or another harness-native instruction file are dropped. Put project instructions in `.overdeck/context/project.md` instead (see [Context Layers](/configuration/context-layers)). `symlinks:` is a deprecated alias for `copy_dirs:`.
+
 ## Dependency installs in polyrepo workspaces
 
 A polyrepo workspace root is a plain container directory with no `package.json`, so Overdeck skips the root install there. Per-repo installs run only for repos that set `package_manager` (`bun`, `npm`, or `pnpm`) and have a `package.json` in their directory.
 
-Leave `package_manager` unset on a repo when a devcontainer installs that repo's dependencies (for example a pnpm init service) — a host install can conflict with the container's pnpm store. A failed per-repo install fails workspace creation; re-running the command resumes setup.
+Leave `package_manager` unset on a repo when a devcontainer installs that repo's dependencies (for example a pnpm init service): a host install can conflict with the container's pnpm store. A failed per-repo install fails workspace creation; re-running the command resumes setup.
 
 ## The workspace root repository
 
-The workspace root is itself a small git repository (no remote) that holds the sub-repo worktrees alongside Overdeck's own files: the synced skills and agent template (`.claude/`, `.mcp.json`), Hume config (`.hume-config`), and env (`.env`). Overdeck lists these in the root `.gitignore` so they never count as uncommitted work.
+The workspace root becomes a small local repository (no remote) when planning completes. It holds the sub-repo worktrees alongside Overdeck's own files: the synced skills and agent template (`.claude/`, `.mcp.json`), Hume config (`.hume-config`), and env (`.env`). Overdeck lists these in the root `.gitignore` so they never count as uncommitted work.
 
-If a workspace was created before Overdeck started writing these entries, the next `pan start <issue>` for that workspace repairs its `.gitignore` automatically — no manual step needed. Anything else left uncommitted at the workspace root still stops a start, exactly as before.
+If a workspace was created before Overdeck started writing these entries, the next agent start from the dashboard repairs it automatically; no manual step is needed. Anything else left uncommitted at the workspace root still stops a start, exactly as before.
 
 ## Template Placeholders
 
@@ -151,38 +161,16 @@ If a workspace was created before Overdeck started writing these entries, the ne
 | `{{BRANCH_NAME}}` | `feature/min-123` | Git branch name |
 | `{{COMPOSE_PROJECT}}` | `myapp-feature-min-123` | Docker Compose project |
 | `{{DOMAIN}}` | `myapp.test` | DNS domain |
-
-## Service Templates
-
-Overdeck provides built-in templates for common frameworks. Use these to avoid boilerplate:
-
-| Template | Start Command | Port |
-|----------|--------------|------|
-| `react` | `npm start` | 3000 |
-| `react-vite` | `npm run dev` | 5173 |
-| `react-pnpm` | `pnpm start` | 3000 |
-| `nextjs` | `npm run dev` | 3000 |
-| `spring-boot-maven` | `./mvnw spring-boot:run` | 8080 |
-| `spring-boot-gradle` | `./gradlew bootRun` | 8080 |
-| `express` | `npm start` | 3000 |
-| `fastapi` | `uvicorn main:app --reload` | 8000 |
-| `django` | `python manage.py runserver` | 8000 |
-
-Use a template by referencing it in your service config:
-
-```yaml
-services:
-  - name: api
-    template: spring-boot-maven
-    path: api
-    health_url: "https://api-{{FEATURE_FOLDER}}.myapp.test/health"
-```
-
-See `/pan-workspace-config` skill for complete documentation.
+| `{{PROJECT_NAME}}` | `myapp` | Project directory name |
+| `{{PROJECT_PATH}}` | `/home/user/projects/myapp` | Project root |
+| `{{PROJECTS_DIR}}` | `/home/user/projects` | Parent directory of the project root |
+| `{{WORKSPACE_PATH}}` | `/home/user/projects/myapp/workspaces/feature-min-123` | Workspace directory |
+| `{{HOME}}` | `/home/user` | Home directory |
+| `{{CHANGED_BASE}}` | `origin/main` | Git ref quality gates diff against (set only when quality gates run) |
 
 ## What Your Project Needs to Provide
 
-Overdeck is an orchestration layer - it manages workspaces, agents, and workflows, but **your project repository provides the actual templates and configuration**.
+Overdeck is an orchestration layer: it manages workspaces, agents, and workflows, but **your project repository provides the actual templates and configuration**.
 
 Projects can be as simple as just a git repo (for worktree-only workspaces) or as complex as a full polyrepo with Docker, Traefik, and database seeding.
 
@@ -229,32 +217,7 @@ services:
 
 ### Required for HTTPS: Traefik Configuration
 
-If you want local HTTPS (recommended), provide a Traefik compose file:
-
-```
-your-project/
-├── infra/
-│   └── docker-compose.traefik.yml   # Traefik reverse proxy
-└── ...
-```
-
-Example Traefik config:
-```yaml
-# infra/docker-compose.traefik.yml
-services:
-  traefik:
-    image: traefik:v2.10
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ~/.overdeck/traefik/certs:/certs:ro
-    command:
-      - --providers.docker=true
-      - --entrypoints.web.address=:80
-      - --entrypoints.websecure.address=:443
-```
+You do not provide a Traefik compose file. Setting `docker.traefik` makes Overdeck start its own Traefik from `~/.overdeck/traefik/docker-compose.yml` (installed by `pan install`); it never reads a project compose file. Your compose templates only need the Traefik router labels shown above. See [Docker & HTTPS Setup](/guides/docker-setup).
 
 ### Required for Database Seeding: Seed Directory
 
@@ -285,22 +248,24 @@ For customizing how agents work in your project:
 your-project/
 ├── infra/
 │   └── .agent-template/
-│       ├── CLAUDE.md.template    # Project-specific AI instructions
-│       └── .mcp.json.template    # MCP server configuration
+│       ├── .mcp.json.template    # MCP server configuration
+│       └── .claude/commands/     # Copied into each workspace (copy_dirs)
 └── .claude/
     └── skills/                   # Project-specific skills
         └── my-project-standards/
             └── SKILL.md
 ```
 
+Templates that target `CLAUDE.md`, `AGENTS.md` or another harness-native instruction file are dropped. Project instructions belong in `.overdeck/context/project.md`; see [Context Layers](/configuration/context-layers).
+
 ## Quick Checklist
 
 | Component | Required? | Location | Purpose |
 |-----------|-----------|----------|---------|
 | Docker Compose template | Yes (for Docker workspaces) | `infra/.devcontainer-template/` | Container configuration |
-| Traefik config | Only for HTTPS | `infra/docker-compose.traefik.yml` | Reverse proxy |
+| Traefik | Only for HTTPS | `~/.overdeck/traefik/` (installed by `pan install`) | Reverse proxy |
 | Seed file | Only if database needed | `infra/seed/seed.sql` | Pre-populate database |
-| Agent template | Recommended | `infra/.agent-template/` | AI instructions |
+| Agent template | Recommended | `infra/.agent-template/` | MCP config and copied directories |
 | Project skills | Optional | `.claude/skills/` | Project-specific workflows |
 
 ## Example: Minimal Setup
@@ -346,43 +311,29 @@ volumes:
 
 ## Polyrepo Merge Considerations
 
-> **⚠️ Important:** Polyrepo merging requires special handling. The current merge-agent is optimized for monorepos.
-
-For polyrepo projects:
+A polyrepo issue has one PR or MR per repo. **Merge** handles them together as one merge set, and verifies every repo. Automatic merging skips polyrepo issues, so merge them from the dashboard.
 
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Workspace creation | ✅ Supported | Creates worktrees in each repo |
 | Branch management | ✅ Supported | Each repo gets its own feature branch |
 | Agent work | ✅ Supported | Agents can work across repos |
-| Merge | ⚠️ Manual | Push each repo's branch, merge via GitLab/GitHub |
-
-**Current workflow for polyrepo merges:**
-
-1. Agent completes work and pushes branches to each repo
-2. Create merge requests for each repo manually (or via `gh pr create`)
-3. Review and merge each MR separately
-4. The "Approve & Merge" button is not yet polyrepo-aware
-
-**Future enhancement:** Polyrepo-aware merge-agent that handles multiple repos automatically.
+| Merge | ✅ Supported | **Merge** lands every repo's PR as one merge set |
+| Automatic merging | ⏭️ Skipped | Merge polyrepo issues from the dashboard |
 
 ## Quality Gates in Polyrepo Projects
 
-Quality gates support polyrepo projects through **path-based filtering**: each gate runs only when
-the repo being merged matches the gate's `path` field.
+Set a gate's `path` to the repo's workspace directory (its `name`, for example `fe`). The gate runs in that directory.
 
 ### How it works
 
-When a polyrepo merge runs, Overdeck computes the relative path from the project root to the
-sub-repo being merged (e.g., `frontend` or `backend`). It then filters the configured quality gates
-to only those whose `path` field matches that relative path.
+Verification runs every gate. At merge time only gates whose `path` names the repo being merged run again; gates without a `path` are skipped.
 
-| Gate config | Repo being merged | Result |
+| Gate config | Repo being merged | Result at merge time |
 |-------------|-------------------|--------|
-| `path: frontend` | `frontend` | ✅ Runs |
-| `path: backend` | `frontend` | ⏭️ Skipped |
-| no `path` field | `frontend` | ⏭️ Skipped (not applicable to any specific repo) |
-| no `path` field | project root (monorepo) | ✅ Runs |
+| `path: fe` | `fe` | ✅ Runs |
+| `path: api` | `fe` | ⏭️ Skipped |
+| no `path` field | `fe` | ⏭️ Skipped |
 
 ### Configuration example
 
@@ -393,39 +344,36 @@ projects:
     path: /home/user/projects/myapp
 
     quality_gates:
-      # Runs only when merging the frontend repo
+      # Runs in the fe worktree; runs again when merging the fe repo
       fe-lint:
         command: pnpm lint
-        path: frontend
+        path: fe
         required: true
-        phase: pre_push
 
-      # Runs only when merging the backend repo
+      # Runs in the api worktree; runs again when merging the api repo
       api-checkstyle:
         command: ./mvnw checkstyle:check
-        path: backend
+        path: api
         required: true
-        phase: pre_push
 
-      # Global gate — runs in monorepo context only (no path = skipped in polyrepo)
+      # No path: runs at the workspace root during verification, skipped at merge time
       integration-tests:
         command: make integration-test
         required: false
-        phase: post_push
 
     workspace:
       type: polyrepo
       repos:
         - name: fe
-          path: frontend       # Must match gate.path exactly
+          path: frontend       # gate.path uses the name (fe), not this path
           branch_prefix: "feature/"
         - name: api
-          path: backend        # Must match gate.path exactly
+          path: backend        # gate.path uses the name (api), not this path
           branch_prefix: "feature/"
 ```
 
-> **Important:** The `path` value in a quality gate must exactly match the `path` value of the
-> corresponding repo in the `workspace.repos` list (both relative to the project root).
+> **Important:** A gate's `path` is relative to the workspace, so use the repo's `name` from the
+> `workspace.repos` list, not its `path` in the project root.
 
 ## Large-Scale Projects: Progressive Polyrepo
 
@@ -437,9 +385,9 @@ For projects with **10 or more repositories**, consider using progressive polyre
 | Progressive polyrepo | 10+ repos | Only essential repos | On demand via CLI or skill |
 
 **Benefits of progressive mode:**
-- **Faster workspace creation** — only meta/docs repos initially
-- **Less disk usage** — agents only check out repos they need
-- **Flexible scope** — agents add repos as they discover what's needed
+- **Faster workspace creation:** only meta/docs repos initially
+- **Less disk usage:** agents only check out repos they need
+- **Flexible scope:** agents add repos as they discover what's needed
 - **Cleaner meta repos:** symlinked and marked readonly for agents, with no feature branches
 
 See [Progressive Polyrepo Workspaces](/configuration/progressive-polyrepo) for full documentation.
