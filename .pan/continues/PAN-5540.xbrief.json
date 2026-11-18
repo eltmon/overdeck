@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5540",
   "created": "2026-11-18T20:13:27.480Z",
-  "updated": "2026-11-18T20:33:41.345Z",
+  "updated": "2026-11-18T20:37:33.891Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,9 +120,34 @@
       "doneAt": "2026-11-18T20:33:35.857Z"
     },
     "skills-page-available-list": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5540",
-      "claimedAt": "2026-11-18T20:33:41.345Z"
+      "claimedAt": "2026-11-18T20:33:41.345Z",
+      "doneAt": "2026-11-18T20:37:33.890Z"
+    },
+    "skills-page-available-list.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:37:33.890Z"
+    },
+    "skills-page-available-list.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:37:33.890Z"
+    },
+    "skills-page-available-list.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:37:33.890Z"
+    },
+    "skills-page-available-list.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:37:33.890Z"
+    },
+    "skills-page-available-list.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:37:33.890Z"
+    },
+    "skills-page-available-list.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:37:33.890Z"
     }
   }
 }
