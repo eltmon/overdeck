@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5472",
   "created": "2026-11-18T16:42:03.966Z",
-  "updated": "2026-11-18T16:47:51.011Z",
+  "updated": "2026-11-18T16:47:55.329Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,11 @@
     "cloister-page.ac4": {
       "status": "completed",
       "doneAt": "2026-11-18T16:47:51.011Z"
+    },
+    "specialists-page": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5472",
+      "claimedAt": "2026-11-18T16:47:55.329Z"
     }
   }
 }
