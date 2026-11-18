@@ -133,6 +133,7 @@
               "configuration/telemetry",
               "configuration/knowledge",
               "configuration/harnesses",
+              "configuration/model-routing",
               "configuration/model-presets",
               "configuration/local-models",
               "configuration/effort",
