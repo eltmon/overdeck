@@ -4,17 +4,17 @@
     "created": "2026-11-18T19:07:43Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5478: docs: CLI reference completeness",
-    "updated": "2026-11-18T19:15:09.685Z"
+    "updated": "2026-11-18T19:15:46.763Z"
   },
   "plan": {
     "id": "pan-5478",
     "title": "docs: CLI reference completeness",
-    "status": "proposed",
+    "status": "running",
     "uid": "96c9c78d-4e04-494b-9044-5b44d37b72d1",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-18T19:07:43Z",
-    "updated": "2026-11-18T19:15:09.685Z",
+    "updated": "2026-11-18T19:15:46.763Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5478",
@@ -1455,5 +1455,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }

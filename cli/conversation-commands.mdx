@@ -1,0 +1,134 @@
+---
+title: "Conversation commands: pan conv, handoff, fork and resume"
+sidebarTitle: "Conversation Commands"
+description: "Reference for the pan commands that find, hand off, fork, resume, message, open and share Overdeck conversations."
+---
+
+A conversation is a dashboard session running an agent in a terminal-backend pane. These
+commands find, inspect, and drive conversations from a shell instead of the dashboard UI.
+
+## pan conv
+
+`pan conversations` is the full command name; `pan conv` is the alias everyone types. It scans
+your Claude Code session history into Overdeck's own database, then lets you search, filter,
+resume, and manage those sessions and the pull requests linked to them.
+
+```bash
+pan conv search "retry logic" --model claude-opus-5-5   # keyword search over summaries and tags
+pan conv list --managed --limit 10                       # list managed sessions
+pan conv show 2972                                        # full detail for one session
+pan conv resume my-session                                 # resume a stopped conversation
+pan conv current                                           # print the conversation you're in
+```
+
+| Command | What it does |
+| --- | --- |
+| `pan conv scan [dirs...]` | Scans `~/.claude/projects/` (or the given directories) and records newly discovered sessions |
+| `pan conv search [query]` | Full-text search over session summaries and tags |
+| `pan conv list` | Lists discovered sessions with structured filters |
+| `pan conv show <id>` | Shows full detail for one session by ID |
+| `pan conv jsonl <conv-id>` (alias `transcript`) | Prints the Claude JSONL transcript path for a conversation's dashboard number |
+| `pan conv pending <conv>` | Lists messages queued to send once the conversation's usage limit resets |
+| `pan conv resume <name>` | Resumes a stopped conversation, or reattaches if it still runs; accepts `@<machine>/<name>` for one on a linked machine |
+| `pan conv pull <conv>` | Makes this machine own a conversation that currently runs on a linked machine |
+| `pan conv reclaim <conv>` | Takes back a conversation this machine released, once the other machine is no longer running it |
+| `pan conv move <query> <projectKey>` | Reassigns a conversation to a different project |
+| `pan conv link-pr <query> <ref>` | Links a pull request to a conversation |
+| `pan conv unlink-pr <query> <ref>` | Unlinks a pull request from a conversation so the sweep will not re-add it |
+| `pan conv prs <query>` | Lists the pull requests linked to a conversation |
+| `pan conv auto-settle-on-merge [value]` | Shows or sets whether conversations settle automatically once every linked pull request is merged or closed |
+| `pan conv auto-settle <query> [value]` | Shows or sets one conversation's auto-settle-on-merge override |
+| `pan conv auto-settle-idle-days [days]` | Shows or sets how many idle days pass before an operator conversation settles |
+| `pan conv schedule` | Runs a prompt in a conversation on a recurring schedule; see [Scheduled runs](/features/conversations#scheduled-runs) |
+| `pan conv heal <query>` | Clears stale fork or spawn failure state for a live conversation |
+| `pan conv current` (alias `whoami`) | Prints the conversation you are currently running inside |
+| `pan conv cost` | Summarizes estimated API costs across discovered sessions |
+| `pan conv embed [ids...]` | Generates embeddings for enriched sessions, needed for semantic search |
+| `pan conv enrich [ids...]` | Enriches sessions with AI-generated summaries and tags |
+
+Run `pan conv <subcommand> --help` for its options. The subcommands below also take an options
+table because each one has more than a plain confirmation flag.
+
+### pan conv search
+
+| Option | What it does |
+| --- | --- |
+| `--workspace <path>` | Filters by workspace path |
+| `--model <name>` | Filters by primary model |
+| `--since <time>` | Filters sessions after a time (ISO or relative, such as `7d` or `today`) |
+| `--after <time>` | Alias for `--since` |
+| `--before <time>` | Filters sessions before a time |
+| `--min-cost <n>` | Filters by minimum estimated cost |
+| `--max-cost <n>` | Filters by maximum estimated cost |
+| `--min-messages <n>` | Filters sessions with at least N messages |
+| `--managed` | Shows only Overdeck-managed sessions |
+| `--unmanaged` | Shows only unmanaged (personal) sessions |
+| `--enriched` | Shows only enriched sessions |
+| `--not-enriched` | Shows only unenriched sessions |
+| `--tag <value>` | Filters by tag (repeatable) |
+| `--tool <name>` | Filters by tool used (repeatable) |
+| `--file <path>` | Filters by file referenced (repeatable) |
+| `--issue <id>` | Filters by associated issue ID |
+| `--similar <id>` | Finds sessions semantically similar to this session ID |
+| `--semantic <query>` | Finds sessions semantically similar to query text |
+| `--format <fmt>` | Output format: `table`, `json`, `brief` or `ids` (default `table`) |
+| `--limit <n>` | Maximum results (default 20) |
+| `--offset <n>` | Pagination offset (default 0) |
+
+### pan conv list
+
+| Option | What it does |
+| --- | --- |
+| `--workspace <path>` | Filters by workspace path |
+| `--model <name>` | Filters by primary model |
+| `--since <time>` | Sessions after a time (ISO or relative) |
+| `--managed` | Shows only Overdeck-managed sessions |
+| `--enriched` | Shows only enriched sessions |
+| `--format <fmt>` | Output format: `table`, `json`, `brief` or `ids` (default `table`) |
+| `--limit <n>` | Maximum results (default 50) |
+| `--offset <n>` | Pagination offset (default 0) |
+
+### pan conv show
+
+| Option | What it does |
+| --- | --- |
+| `--json` | Outputs as JSON |
+
+### pan conv resume
+
+| Option | What it does |
+| --- | --- |
+| `--json` | Prints the resumed conversation as JSON |
+
+### pan conv pull
+
+| Option | What it does |
+| --- | --- |
+| `--stop-turn` | Stops a running turn instead of waiting for it |
+| `--json` | Prints the final job state as JSON |
+
+### pan conv link-pr
+
+| Option | What it does |
+| --- | --- |
+| `--source <source>` | `agent` or `manual` (defaults to `agent` inside an agent, otherwise `manual`) |
+
+### pan conv current
+
+| Option | What it does |
+| --- | --- |
+| `--json` | Outputs as JSON |
+
+`pan conv search` and `pan conv enrich` are described further in
+[Search your conversations](/features/conversations#search-your-conversations). `pan conv cost`
+summarizes estimated spend across the sessions `pan conv scan` has discovered on this machine; it
+is a different report from `pan cost`, which tracks actual Overdeck usage events across every
+project.
+
+See [Conversations](/features/conversations) for the dashboard side of session discovery, search
+and scheduled runs.
+
+## Get help
+
+- [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P)
+- [GitHub Issues](https://github.com/eltmon/overdeck/issues)
