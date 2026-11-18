@@ -7,25 +7,25 @@ import { ThemedImage } from "/snippets/themed-image.mdx";
 
 # Harnesses
 
-A **harness** is the underlying CLI that drives a workspace agent — the binary
+A **harness** is the underlying CLI that drives a workspace agent: the binary
 that runs in a terminal-backend pane (Herdr by default; see
 [Terminal backend](/configuration/terminal-backend)). The **model** is what the binary calls. They are picked
 independently per spawn.
 
 <Info>
 **Supported today:** `claude-code` (default), `pi`, `ohmypi`, `codex`, `acp`, `kimi-code`, `opencode`, `muse`, `prime-agent`, and `grok`. For the wider
-field of coding-agent harnesses Overdeck could adopt next — and how each one handles
-skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-landscape).
+field of coding-agent harnesses Overdeck could adopt next, and how each one handles
+skills, MCP, and AGENTS.md, see the [Harness Landscape](/reference/harness-landscape).
 </Info>
 
 | Harness | Binary | Default for | Notes |
 | --- | --- | --- | --- |
 | `claude-code` | [Anthropic Claude Code](https://github.com/anthropics/claude-code) | All workflows | Default if you don't pick. Required for Anthropic-subscription users. |
 | `pi` | [Pi Coding Agent](https://pi.dev) (`pi`) | Google, xAI, MiniMax, Z.AI, MiMo, OpenRouter, Nous, DashScope, Groq, Cerebras and Mistral models (built-in default) | RPC over a named pipe, like oh-my-pi; runs on Node; verified with 0.85.0 and 1.5.2. |
-| `ohmypi` | [oh-my-pi](https://github.com/oh-my-pi/pi-coding-agent) (`omp`) | Opt-in multi-provider work | Adds oh-my-pi RPC over a named pipe; reads `~/.claude/skills` for skill parity. Set `providerHarnesses.<provider>: ohmypi` to keep using it. |
+| `ohmypi` | [oh-my-pi](https://github.com/oh-my-pi/pi-coding-agent) (`omp`) | Opt-in multi-provider work | Adds oh-my-pi RPC over a named pipe; reads `~/.claude/skills` for skill parity. Set `models.providers.<provider>.harness: ohmypi` (Settings → Providers → **Default harness**) to keep using it. |
 | `codex` | [OpenAI Codex CLI](https://github.com/openai/codex) (`codex`) | OpenAI-model work | Uses persistent `codex app-server` sessions by default; requires Codex CLI `0.144.0` or newer. |
 | `acp` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Opt-in Kimi work | Uses the open Agent Client Protocol over a persistent authenticated host; Kimi is the first wired ACP agent. |
-| `kimi-code` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Kimi models (built-in default) | Drives Kimi's own native terminal UI directly — no ACP host, no Anthropic-compatibility endpoint. Kimi models only. Set `providerHarnesses.kimi` to `acp` or `claude-code` to opt back out. |
+| `kimi-code` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Kimi models (built-in default) | Drives Kimi's own native terminal UI directly, with no ACP host and no Anthropic-compatibility endpoint. Kimi models only. Set `models.providers.kimi.harness` to `acp` or `claude-code` to opt back out. |
 | `opencode` | [OpenCode](https://opencode.ai) (`opencode`) | OpenCode Go and Zen | Persistent ACP sessions, native credentials, and model discovery; verified with 1.18.31. |
 | `muse` | Muse Code (`muse`) | Meta Muse models (Wonder, Spark, Ember) | Persistent native terminal sessions with separate Standard and Contributor model choices. |
 | `prime-agent` | [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) (`prime-agent`) | Opt-in multi-provider work | RPC mode behind an Overdeck host, with one private Prime daemon per agent; supports 0.8.x. |
@@ -33,11 +33,11 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 
 ## Composer commands across harnesses
 
-The dashboard reserves `/pan <verb> [args]` for Overdeck operator commands. The dashboard parses and executes this namespace before a message reaches the coding harness, so `/pan` has the same syntax, validation, canonical arguments, confirmations, and result shape under `claude-code`, `codex`, `pi`, `ohmypi`, `acp`, `kimi-code`, `muse`, and `prime-agent`. Unprefixed `pan ...` text is still delivered as an ordinary prompt.
+The dashboard reserves `/pan <verb> [args]` for Overdeck operator commands. The dashboard parses and executes this namespace before a message reaches the coding harness, so `/pan` has the same syntax, validation, canonical arguments, confirmations, and result shape under every harness (`claude-code`, `pi`, `ohmypi`, `codex`, `acp`, `kimi-code`, `opencode`, `muse`, `prime-agent` and `grok`). Unprefixed `pan ...` text is still delivered as an ordinary prompt.
 
 Harness-native slash commands are a separate lane and are not uniform. The composer menu reads the active harness's verified capability list: for example, Claude Code exposes native commands such as `/model`, while a harness with no verified inventory shows no native entries. Overdeck commands appear in their own **Overdeck** group, so choosing a harness never changes the `/pan` control-plane surface. Type `/pan` alone and send it to list the Overdeck commands; the ones that run in the composer come first.
 
-Installed skills appear in their own **Skills** group, as `/<skill-name>`, on a harness that runs `/<skill>` as a skill itself (the `skillSlashCommands` capability; today only Claude Code) — unlike `/pan`, the dashboard never intercepts these; the harness receives and runs them. The group lists the skills enabled for the open conversation (or agent session), after its conversation, issue, project, and global overrides, the same way a launch decides what to hide, fetched from `GET /api/skills/overrides` only while the menu is open. Skill pack skills and the `pan` and `pan-handoff` skills are not listed: the composer itself handles `/pan …` and `/pan-handoff`.
+Installed skills appear in their own **Skills** group, as `/<skill-name>`, on a harness that runs `/<skill>` as a skill itself (the `skillSlashCommands` capability; today only Claude Code). Unlike `/pan`, the dashboard never intercepts these; the harness receives and runs them. The group lists the skills enabled for the open conversation (or agent session), after its conversation, issue, project, and global overrides, the same way a launch decides what to hide, fetched from `GET /api/skills/overrides` only while the menu is open. Skill pack skills and the `pan` and `pan-handoff` skills are not listed: the composer itself handles `/pan …` and `/pan-handoff`.
 
 Managed Codex sessions use an isolated `CODEX_HOME`. On initialization and resume, Overdeck copies the Agent Skills standard directories synced by `pan sync` from `~/.agents/skills` into that home's `skills/` directory. Managed skills are refreshed additively, per-agent-only skill directories are preserved, and Codex still keeps its sessions and configuration inside the isolated home.
 
@@ -60,7 +60,7 @@ A steer never falls back silently to a queued message. A harness without steer a
 
 ### Claude Code (default)
 
-- Shipped by Anthropic; Overdeck installs no special integration — drop in
+- Shipped by Anthropic; Overdeck installs no special integration. Drop in
   `claude` and run.
 - **Local models through Ollama.** Ollama 0.14 and newer serves the Anthropic
   Messages API, so Claude Code drives a GPU model on your own machine the same
@@ -112,11 +112,11 @@ A steer never falls back silently to a queued message. A harness without steer a
   provider's eval-backed lineup in one step, use a
   [model preset](/configuration/model-presets).
 - Proxied models use a dedicated Claude Code context policy rather than copying
-  every value from the generic model registry. GPT-6 Astra, Sol, and Luna,
-  GPT-6.1 Sol and Terra, and GPT-5.6 Sol, Terra, and Luna default to a
-  `272000`-token pin for both
+  every value from the generic model registry. GPT-6 Astra, Sol and Luna,
+  GPT-6.1 Sol and Terra, GPT-6.2 Astra and Sol, and GPT-5.6 Sol, Terra and
+  Luna default to a `272000`-token pin for both
   `CLAUDE_CODE_MAX_CONTEXT_TOKENS` and
-  `CLAUDE_CODE_AUTO_COMPACT_WINDOW` — OpenAI bills prompts with more than 272K
+  `CLAUDE_CODE_AUTO_COMPACT_WINDOW`. OpenAI bills prompts with more than 272K
   input tokens at 2x input / 1.5x output for the full request, so the default
   keeps sessions under that tier. The `gpt-5.6-sol[372k]`, `gpt-5.6-terra[372k]`,
   and `gpt-5.6-luna[372k]` picker variants opt into a `372000`-token pin for
@@ -124,23 +124,25 @@ A steer never falls back silently to a queued message. A harness without steer a
   Overdeck-side only and is stripped before the model id reaches the API.
   The GPT-6 models (`gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna`, `gpt-6.1-sol`,
   `gpt-6.1-terra`, `gpt-6.2-astra`, `gpt-6.2-sol`, `gpt-6-rosalind`, `gpt-6-astra-law`) have no
-  `[372k]` variant — the 372K pin was measured on `gpt-5.6-sol` and has not been
+  `[372k]` variant: the 372K pin was measured on `gpt-5.6-sol` and has not been
   re-measured for GPT-6.
   The maximum tells Claude Code the route's capacity; the auto-compact window is
   the capacity used by Claude Code's normal proactive compaction calculation,
   not an instruction to compact at exactly that token count. GPT-5.5 keeps its
-  separately measured conservative `150000` auto-compact policy and Kimi K2.7
-  Code keeps its `262144` auto-compact policy without a maximum override. Kimi
+  separately measured conservative `150000` window and Kimi K2.7 Code its
+  `262144` window; each value is exported as both the maximum and the
+  auto-compact window. Kimi
   K3 exports both values from its model capability: `262144` for `k3` and
   `1048576` for `k3[1m]`, matching Kimi's Claude Code recipe. Anthropic models
-  receive neither override, so Claude Code's native context behavior remains in
-  control.
+  get only `CLAUDE_CODE_AUTO_COMPACT_WINDOW`, set to the model's context
+  window; Claude Code's own maximum stays in control. Ollama models get both
+  values from the loaded model's window.
 
 #### Scratch directory
 
 Managed Claude Code sessions keep their scratchpad under
 `~/.overdeck/tmp/claude-<uid>/` because Overdeck sets
-`CLAUDE_CODE_TMPDIR=~/.overdeck/tmp` (mode `0700`) in every local launch —
+`CLAUDE_CODE_TMPDIR=~/.overdeck/tmp` (mode `0700`) in every local launch.
 `/tmp` is emptied at boot on many Linux distributions, which otherwise loses
 in-progress scratch files on a reboot. `TMPDIR` is left unchanged, so build
 tools still use `/tmp`. Fly (remote) launches are unchanged. The Deacon
@@ -162,13 +164,13 @@ before every `claude-code` launch:
 | Claude Sonnet 5.5 (`claude-sonnet-5-5`) | 2.1.284 |
 | Claude Haiku 5.5 (`claude-haiku-5-5`) | 2.1.293 |
 
-Background calls that run through Claude Code — conversation titles, title
-refinement, the About summary and smart compaction — run the same check, and
+Background calls that run through Claude Code (conversation titles, title
+refinement, the About summary and smart compaction) run the same check, and
 fail with the same message instead of switching models.
 
 A launch whose Claude Code is too old is refused before a terminal session is
 created. The error names the model, the installed and required versions, the
-launch binary's path, and the exact upgrade command — for example:
+launch binary's path, and the exact upgrade command, for example:
 
 ```
 Claude Sonnet 5.5 (claude-sonnet-5-5) needs Claude Code 2.1.284 or newer, but
@@ -181,8 +183,8 @@ created.
 
 #### Automatic updates
 
-Overdeck keeps npm-installed coding-agent CLIs (Claude Code, Codex CLI and
-OpenCode) up to date by default. It checks 2 minutes after the dashboard
+Overdeck keeps npm-installed coding-agent CLIs (Claude Code, pi, Codex CLI,
+OpenCode and Grok Build) up to date by default. It checks 2 minutes after the dashboard
 starts and then once a day. It checks one CLI at a time, and it updates a CLI
 only when npm has a newer version.
 
@@ -222,7 +224,7 @@ Code** button that runs the upgrade in a terminal session and re-checks when
 it finishes; a root-owned npm prefix, an unrecognized install, or Windows
 shows a copyable command instead, since Overdeck never runs `sudo` or a
 root-owned install itself. Either way, running agents and conversations keep
-their current Claude Code — only new launches use the upgraded one.
+their current Claude Code; only new launches use the upgraded one.
 
 `pan doctor` reports the installed Claude Code version, its install method
 and path, one row per configured model with a documented minimum, and a
@@ -298,10 +300,11 @@ internal configuration records are excluded from the chat feed.
 ### Pi Coding Agent / pi
 
 pi (the Pi Coding Agent, `@earendil-works/pi-coding-agent`, binary `pi`) is
-the built-in default harness for every provider that is neither Anthropic nor
-OpenAI: Google, xAI, MiniMax, Z.AI, MiMo, OpenRouter, Nous, DashScope, Groq,
-Cerebras and Mistral. Anthropic models default to `claude-code`, OpenAI models
-to `codex`, and Kimi models to `kimi-code`. A provider's Default harness in
+the built-in default harness for Google, xAI, MiniMax, Z.AI, MiMo, OpenRouter,
+Nous, DashScope, Groq, Cerebras and Mistral. Anthropic models default to
+`claude-code`, OpenAI models to `codex`, Kimi models to `kimi-code`, OpenCode
+Go and Zen to `opencode`, Grok Build to `grok`, Meta to `muse`, and Ollama and
+QuantumLlama to `claude-code`. A provider's Default harness in
 Settings → Providers (`models.providers.<provider>.harness`) overrides that
 built-in default, and an explicit `--harness` or picker choice overrides
 both. See [Model routing](/configuration/model-routing#which-harness-runs-a-model).
