@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5503",
   "created": "2026-11-18T23:39:30.709Z",
-  "updated": "2026-11-18T23:47:29.795Z",
+  "updated": "2026-11-18T23:48:45.485Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -164,6 +164,30 @@
     "audit-order-books.ac4": {
       "status": "completed",
       "doneAt": "2026-11-18T23:47:29.794Z"
+    },
+    "audit-issue-trackers": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:48:45.485Z"
+    },
+    "audit-issue-trackers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:48:45.485Z"
+    },
+    "audit-issue-trackers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:48:45.485Z"
+    },
+    "audit-issue-trackers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:48:45.485Z"
+    },
+    "audit-issue-trackers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:48:45.485Z"
+    },
+    "audit-issue-trackers.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:48:45.485Z"
     }
   }
 }
