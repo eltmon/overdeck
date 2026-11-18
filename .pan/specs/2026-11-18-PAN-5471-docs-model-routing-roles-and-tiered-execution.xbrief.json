@@ -1,0 +1,619 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-18T15:05:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5471: docs: model routing, roles and tiered execution",
+    "updated": "2026-11-18T14:56:55.996Z"
+  },
+  "plan": {
+    "id": "pan-5471",
+    "title": "docs: model routing, roles and tiered execution",
+    "status": "proposed",
+    "uid": "8c94c31e-ef49-4a39-a5af-ca8ca6af042b",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-18T15:05:00Z",
+    "updated": "2026-11-18T14:56:55.996Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5471",
+        "label": "PAN-5471",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5517",
+        "label": "PAN-5517",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5518",
+        "label": "PAN-5518",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docs",
+      "model-routing",
+      "tiered-execution",
+      "docs-overhaul"
+    ],
+    "metadata": {
+      "sizeJustification": "Eight doc files only. lintProjectedSurface counts each root-level doc path (concepts.mdx, docs.json, configuration/*, features/*, docs/*) as its own subsystem; the real surface is one docs site.",
+      "prd": ".pan/drafts/PAN-5471.md",
+      "canonicalFilename": "2026-11-18-PAN-5471-docs-model-routing-roles-and-tiered-execution.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Overdeck has no user page explaining how it picks the model and harness for each agent. features/cloister.mdx documents a deleted keyword complexity router, concepts.mdx claims automatic routing by task type and budget, and configuration/harnesses.mdx says a per-role harness setting wins although no pipeline spawn reads it.",
+      "Proposal": "Add configuration/model-routing.mdx built only from the PRD fact sheet (roles and sub-roles, workhorse slots, distributions, provider harnesses, tiered execution including the settings that are saved but not acted on, presets and effort, check commands), add it to docs.json, replace the two stale routing sections with pointers, correct the harness claims, and link the page from the presets, effort and developer routing docs.",
+      "NonGoals": "- No source, CLI help, UI text or config schema changes (PAN-5517, PAN-5518, PAN-4512)\n- No description of tier promotion, session replay, call-outs or a blocking supervisor as working behavior\n- No description of standing per-tier sessions, a dashboard per-issue tiered toggle, or a pan start flag for tiered execution\n- No claim that roles.<role>.harness routes pipeline agents\n- No rewrite of features/cloister.mdx or concepts.mdx beyond the routing sections and the cloister description (PAN-5472, PAN-5502)\n- No accuracy audit of configuration/model-presets.mdx, configuration/harnesses.mdx or configuration/effort.mdx beyond the named edits (PAN-5503)\n- No docs.json changes beyond inserting configuration/model-routing (PAN-5483)\n- No publishing or editing of blog/standing-crew.mdx\n- No new screenshots and no reuse of the stale Panopticon settings screenshot on the new page\n- No documentation of project-level .pan.yaml role overrides\n- No changelog.d entry"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Document tiered execution settings that are saved but not acted on in one labelled subsection instead of omitting or describing them as working.",
+        "rationale": "Settings shows Escalation, Session replay and Call-outs controls; the issue requires every claim to match code, and code shows they do nothing (decideEscalation has no caller, replay code deleted, call-out endpoint missing). Naming them once with links to PAN-5517 and PAN-4512 is accurate and tells users not to rely on them."
+      },
+      {
+        "summary": "Filed PAN-5517 (inert tiered settings, broken per-issue toggle, stale UI text) and PAN-5518 (roles.<role>.harness ignored) as follow-up bugs; this issue stays docs-only.",
+        "rationale": "The issue body says docs-only unless behavior changes; fixing runtime behavior is out of scope, but the gaps were verified in code and deserve tracking."
+      },
+      {
+        "summary": "Document the provider default harness under its YAML key models.providers.<provider>.harness, mentioning providerHarnesses only as the internal name.",
+        "rationale": "The issue names providerHarnesses, but that is the normalized in-memory map; Settings writes and config load reads models.providers.<provider>.harness (providerConfigForSave, applyProviderHarness)."
+      },
+      {
+        "summary": "Use no screenshot on the new page.",
+        "rationale": "The only Settings screenshot under images/ shows the Panopticon v0.21 UI without the presets bar; the issue forbids invented UI and stale imagery would mislead."
+      },
+      {
+        "summary": "Insert the page directly before configuration/model-presets in docs.json, anchored by neighbour rather than position.",
+        "rationale": "PAN-5483 (PR #5508) may restructure docs.json first; anchoring by the presets entry survives that restructure."
+      },
+      {
+        "summary": "Whole-file dash cleanup only for configuration/model-presets.mdx and features/cloister.mdx (3 dashes each); section-scoped for concepts.mdx, harnesses.mdx, effort.mdx and docs/MODEL_ROUTING.md.",
+        "rationale": "The rule says remove dashes from bodies you edit; the large pages are owned by the accuracy audits and PAN-5472, so whole-file rewrites there would collide with sibling PRs."
+      },
+      {
+        "summary": "Replace the stale routing sections with short pointers rather than deleting the headings.",
+        "rationale": "The issue allows delete or rewrite; a pointer keeps readers of Cloister and Concepts one click from the correct page and keeps existing anchors meaningful."
+      }
+    ],
+    "items": [
+      {
+        "id": "model-routing-page",
+        "title": "Write configuration/model-routing.mdx from the PRD fact sheet",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T15:05:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5471",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/model-routing.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const t=require('fs').readFileSync('configuration/model-routing.mdx','utf8');console.log(t.match(/^title:\\s*\\\"?(.*?)\\\"?$/m)[1]);console.log(t.match(/^description:\\s*\\\"?(.*?)\\\"?$/m)[1].length)\"",
+            "grep -E '^## ' configuration/model-routing.mdx",
+            "grep -E '^### ' configuration/model-routing.mdx",
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/model-routing.mdx",
+            "node --input-type=module -e \"import {findMdxProblems} from './scripts/lint-docs.js'; import {readFileSync} from 'node:fs'; console.log(findMdxProblems(readFileSync('configuration/model-routing.mdx','utf8')).length)\"",
+            "grep -niE 'kimi is the default|standing tier agent|standing tier session|halts downstream' configuration/model-routing.mdx",
+            "for s in 'pan admin config tiers' 'models:' 'providers:' 'workhorse:mid' 'plan.metadata.tiered_execution' 'GET /api/models/resolve' 'discord.gg/ZpHE2ZTv5P' 'github.com/eltmon/overdeck/issues/5517' 'github.com/eltmon/overdeck/issues/4512' 'github.com/eltmon/overdeck/issues/5518' 'Use distribution' 'Default harness'; do grep -qF \"$s\" configuration/model-routing.mdx || echo MISSING: $s; done",
+            "npx mint validate --no-build --files configuration/model-routing.mdx",
+            "npx mint broken-links --files configuration/model-routing.mdx --check-anchors"
+          ],
+          "expected_outputs": [
+            "first command prints 'Model routing: roles, workhorse slots and tiered execution' then a number from 50 to 160",
+            "H2 grep prints the ten D-2 headings in order: How Overdeck picks a model, Workhorse slots, Roles and sub-roles, Split a role across models, Which harness runs a model, Tiered execution, Presets and effort, Check what will run, What Overdeck does not do, Get help",
+            "H3 grep prints the six D-2 subsections in order: Turn it on, How an item finds its tier, Who runs the work, The Standing reviewer and the commit feed, Fitness warnings, Settings saved but not acted on yet",
+            "dash grep prints nothing (exit 1)",
+            "findMdxProblems prints 0",
+            "must-not-claim grep prints nothing (exit 1)",
+            "the presence loop prints no MISSING lines",
+            "mint validate prints success with 0 errors (a duplicate-h1 warning is accepted)",
+            "mint broken-links prints success no broken links found"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "effort-link",
+            "harnesses-role-harness"
+          ]
+        },
+        "narrative": {
+          "Action": "Create configuration/model-routing.mdx exactly as PRD work item WI-1 specifies: frontmatter and H1 from D-1, the ten H2 sections and six H3 subsections in the D-2 order and wording, facts only from F-1 to F-36, the YAML examples named in WI-1 (workhorses, roles with review mode full and one lane on parent, a 70/30 distribution, models.providers.<provider>.harness, the tiered_execution block from F-22), the inert-settings subsection per D-4 linking PAN-5517 and PAN-4512, the harness wording from D-6 linking PAN-5518, and a Get help section linking the Discord and GitHub Issues. Obey the D-5 must-not-claim list and the D-12 writing rules: no em or en dashes, &#36; for a literal dollar sign, &lt; before a digit. Use no image (D-3). Use the exact denial sentences listed in PRD WI-1 step 12 where the page says what Overdeck does not do."
+        },
+        "items": [
+          {
+            "id": "model-routing-page.ac1",
+            "title": "Given configuration/model-routing.mdx, when the frontmatter command runs, then it prints the title 'Model routing: roles, workhorse slots and tiered execution' and a description length from 50 to 160",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "model-routing-page.ac2",
+            "title": "Given the page, when the H2 and H3 greps run, then they print exactly the ten H2 and six H3 headings named in PRD D-2, in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "model-routing-page.ac3",
+            "title": "Given the page, when the must-not-claim grep runs, then it returns no match, the page contains the WI-1 denial sentences verbatim, and it contains no U+2013 or U+2014 character",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "model-routing-page.ac4",
+            "title": "Given the page, when the presence loop runs, then it prints no MISSING line: the page renders pan admin config tiers, the models.providers harness YAML, workhorse refs, plan.metadata.tiered_execution, GET /api/models/resolve, links to PAN-5517, PAN-4512 and PAN-5518, and the Discord link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "model-routing-page.ac5",
+            "title": "Given the page, when findMdxProblems runs and npx mint validate --no-build and npx mint broken-links --check-anchors run on it, then findMdxProblems returns 0, validate reports 0 errors and broken-links reports no broken links",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-nav-entry",
+        "title": "Add configuration/model-routing to docs.json navigation before model-presets",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T15:05:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5471",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const d=JSON.stringify(require('./docs.json'));const a=d.indexOf('\\\"configuration/model-routing\\\"'),b=d.indexOf('\\\"configuration/model-presets\\\"');console.log(a>-1&&b>a&&d.slice(a,b).split(',').length===2)\"",
+            "npx mint validate --no-build --files docs.json"
+          ],
+          "expected_outputs": [
+            "prints true",
+            "mint validate prints success with 0 errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Insert \"configuration/model-routing\" immediately before \"configuration/model-presets\" in whichever docs.json pages array contains configuration/model-presets at work time (PRD D-10). Do not change any other docs.json key or group; PAN-5483 owns the restructure."
+        },
+        "items": [
+          {
+            "id": "docs-nav-entry.ac1",
+            "title": "Given docs.json, when the node check runs, then it parses the file and prints true because configuration/model-routing is the entry directly before configuration/model-presets",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-nav-entry.ac2",
+            "title": "Given git diff the merge base with origin/main -- docs.json, when it is read, then it adds exactly one line and removes none",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cloister-routing-section",
+        "title": "Replace the Cloister complexity-routing section with a pointer to the model routing page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T15:05:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5471",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/cloister.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nE 'Model Routing & Complexity Detection|Complexity Detection Signals|complexity_routing|model_selection|based on complexity|intelligent model routing' features/cloister.mdx",
+            "grep -c '/configuration/model-routing' features/cloister.mdx",
+            "grep -nP '[\\x{2013}\\x{2014}]' features/cloister.mdx",
+            "npx mint broken-links --files features/cloister.mdx --check-anchors"
+          ],
+          "expected_outputs": [
+            "first grep prints nothing (exit 1)",
+            "count is 2 or more",
+            "dash grep prints nothing (exit 1)",
+            "mint broken-links prints success no broken links found"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In features/cloister.mdx apply PRD D-7: delete the section from the heading '## Model Routing & Complexity Detection' up to (not including) '## Related Guides', replace it with '## Model routing' and two sentences that say Cloister does not pick models and link /configuration/model-routing; add the Related Guides bullet; change the frontmatter description to the D-7 text (Cloister, the lifecycle manager that monitors the health of Overdeck's pipeline agents). Also delete the intro bullet '- **Model Routing** - Routes tasks to appropriate models based on complexity, across multiple providers'. Then remove every em and en dash in the file (D-9). Do not touch the '## Configuration' JSON block, the ASCII diagram, the complexity_upgrade triggers row or the handoff-context JSON (PAN-5472 owns them)."
+        },
+        "items": [
+          {
+            "id": "cloister-routing-section.ac1",
+            "title": "Given features/cloister.mdx, when grepped for 'Model Routing & Complexity Detection', 'Complexity Detection Signals', complexity_routing, model_selection, 'based on complexity' and 'intelligent model routing', then it returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cloister-routing-section.ac2",
+            "title": "Given the file, when grepped for /configuration/model-routing, then it returns at least two matches: the Model routing section and the Related Guides bullet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cloister-routing-section.ac3",
+            "title": "Given the file, when grepped for U+2013/U+2014, then it returns no match and the frontmatter description is 50 to 160 characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "concepts-routing-section",
+        "title": "Replace the Multi-Model Routing section in concepts.mdx with a pointer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T15:05:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5471",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "concepts.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nE 'Multi-Model Routing|based on task type|Cost-effective models' concepts.mdx",
+            "grep -c '/configuration/model-routing' concepts.mdx",
+            "git diff -U0 $(git merge-base origin/main HEAD) -- concepts.mdx | grep '^+' | grep -P '[\\x{2013}\\x{2014}]'",
+            "npx mint broken-links --files concepts.mdx --check-anchors"
+          ],
+          "expected_outputs": [
+            "first grep prints nothing (exit 1)",
+            "count is 1 or more",
+            "dash grep on added lines prints nothing (exit 1)",
+            "mint broken-links prints success no broken links found"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In concepts.mdx apply PRD D-7: rename '## Multi-Model Routing' to '## Model routing' and replace its body (four bullets and the override line) with two or three sentences about roles, workhorse slots and tiered execution that link /configuration/model-routing. Change nothing else in concepts.mdx; added lines carry no em or en dash (D-9)."
+        },
+        "items": [
+          {
+            "id": "concepts-routing-section.ac1",
+            "title": "Given concepts.mdx, when grepped for 'Multi-Model Routing', 'based on task type' and 'Cost-effective models', then it returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "concepts-routing-section.ac2",
+            "title": "Given concepts.mdx, when grepped for /configuration/model-routing, then it returns a match under the '## Model routing' heading",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "concepts-routing-section.ac3",
+            "title": "Given git diff -U0 the merge base with origin/main -- concepts.mdx, when the diff is read, then it changes only the routing section, and its added lines contain no U+2013/U+2014",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "harnesses-role-harness",
+        "title": "Correct the role-harness claims in configuration/harnesses.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T15:05:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5471",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nE 'setting always wins|sits next to each role|set the harness once per role|harness \\+ model defaults' configuration/harnesses.mdx",
+            "grep -c '/configuration/model-routing' configuration/harnesses.mdx",
+            "git diff -U0 $(git merge-base origin/main HEAD) -- configuration/harnesses.mdx | grep '^+' | grep -P '[\\x{2013}\\x{2014}]'",
+            "npx mint broken-links --files configuration/harnesses.mdx --check-anchors"
+          ],
+          "expected_outputs": [
+            "first grep prints nothing (exit 1)",
+            "count is 2 or more",
+            "dash grep on added lines prints nothing (exit 1)",
+            "mint broken-links prints success no broken links found"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply PRD D-8 in configuration/harnesses.mdx: replace the 'An explicit providerHarnesses.<provider> or role harness setting always wins.' sentence in '### Pi Coding Agent / pi' with the D-8 text, and replace the two prose paragraphs under '### Role runs (plan / work / review / test / ship)' (keep the heading and the ThemedImage) with the D-8 explanation, linking /configuration/model-routing. Added lines carry no em or en dash (D-9)."
+        },
+        "items": [
+          {
+            "id": "harnesses-role-harness.ac1",
+            "title": "Given configuration/harnesses.mdx, when grepped for 'setting always wins', 'sits next to each role', 'set the harness once per role' and 'harness + model defaults', then it returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harnesses-role-harness.ac2",
+            "title": "Given the file, when grepped for /configuration/model-routing, then it returns at least two matches, one in the Pi section and one under Role runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harnesses-role-harness.ac3",
+            "title": "Given the edited Role runs section, when read, then it states the harness comes from the model's provider default in Settings → Providers and that an explicit --harness pick overrides it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "presets-link",
+        "title": "Link model-presets.mdx to the model routing page and remove its dashes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T15:05:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5471",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/model-presets.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '/configuration/model-routing' configuration/model-presets.mdx",
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/model-presets.mdx",
+            "npx mint broken-links --files configuration/model-presets.mdx --check-anchors"
+          ],
+          "expected_outputs": [
+            "count is 1",
+            "dash grep prints nothing (exit 1)",
+            "mint broken-links prints success no broken links found"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply PRD WI-6 in configuration/model-presets.mdx: after the first paragraph under '# Model presets' add the sentence linking [Model routing](/configuration/model-routing); replace the three en dashes (two '8–0', one '25–45%') with 'to' (D-9). No other change."
+        },
+        "items": [
+          {
+            "id": "presets-link.ac1",
+            "title": "Given configuration/model-presets.mdx, when grepped for /configuration/model-routing, then it returns exactly one match in the opening section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "presets-link.ac2",
+            "title": "Given the file, when grepped for U+2013/U+2014, then it returns no match and the evidence lines read '8 to 0' and '25 to 45%'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "effort-link",
+        "title": "Link the effort precedence table to the tiered execution section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T15:05:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5471",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/effort.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '/configuration/model-routing#tiered-execution' configuration/effort.mdx",
+            "git diff --numstat $(git merge-base origin/main HEAD) -- configuration/effort.mdx",
+            "npx mint broken-links --files configuration/effort.mdx --check-anchors"
+          ],
+          "expected_outputs": [
+            "count is 1",
+            "numstat shows 1 or 2 added lines and 0 removed",
+            "mint broken-links prints success no broken links found"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply PRD WI-7 in configuration/effort.mdx: directly after the precedence table in '## Where effort comes from', add the one sentence linking [Model routing](/configuration/model-routing#tiered-execution). No other change; the added line carries no em or en dash."
+        },
+        "items": [
+          {
+            "id": "effort-link.ac1",
+            "title": "Given configuration/effort.mdx, when grepped for /configuration/model-routing#tiered-execution, then it returns exactly one match after the precedence table",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-link.ac2",
+            "title": "Given git diff --numstat the merge base with origin/main -- configuration/effort.mdx, when run, then it reports no removed lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "model-routing-dev-banner",
+        "title": "Point docs/MODEL_ROUTING.md's Removed banner at the new user page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T15:05:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5471",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MODEL_ROUTING.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "sed -n 1,12p docs/MODEL_ROUTING.md | grep -c '../configuration/model-routing.mdx'"
+          ],
+          "expected_outputs": [
+            "prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply PRD WI-8: in the opening '> **Removed.**' banner of docs/MODEL_ROUTING.md add the line linking ../configuration/model-routing.mdx after the sentence that links configuration/model-presets.mdx. No other change."
+        },
+        "items": [
+          {
+            "id": "model-routing-dev-banner.ac1",
+            "title": "Given docs/MODEL_ROUTING.md, when its first 12 lines are grepped for ../configuration/model-routing.mdx, then it returns exactly one match inside the Removed banner",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "model-routing-dev-banner.ac2",
+            "title": "Given git diff the merge base with origin/main -- docs/MODEL_ROUTING.md, when read, then it adds one banner line and removes none",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "model-routing-page",
+        "to": "docs-nav-entry",
+        "type": "blocks"
+      },
+      {
+        "from": "model-routing-page",
+        "to": "cloister-routing-section",
+        "type": "blocks"
+      },
+      {
+        "from": "model-routing-page",
+        "to": "concepts-routing-section",
+        "type": "blocks"
+      },
+      {
+        "from": "model-routing-page",
+        "to": "harnesses-role-harness",
+        "type": "blocks"
+      },
+      {
+        "from": "model-routing-page",
+        "to": "presets-link",
+        "type": "blocks"
+      },
+      {
+        "from": "model-routing-page",
+        "to": "effort-link",
+        "type": "blocks"
+      },
+      {
+        "from": "model-routing-page",
+        "to": "model-routing-dev-banner",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
