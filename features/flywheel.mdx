@@ -1,0 +1,31 @@
+---
+title: "Flywheel: an autonomous loop that works your backlog"
+sidebarTitle: "Flywheel (early)"
+description: "Run the Flywheel loop that picks, starts and lands issues for you, read its lane board and Needs-you items, and rank your backlog with the sequencer."
+---
+
+The Flywheel is a loop that runs in one conversation. Each tick it picks the next issue, starts it with `pan start`, watches the pull request to landing, and parks what it cannot decide for you. Its status is never stored: everything on this page and in `pan flywheel status` is derived fresh from the conversation, the tracker and the pull request.
+
+<Warning>
+The Flywheel is early: today Overdeck uses it to build Overdeck itself. The limits below are known and worth reading before you turn it on. For the roadmap, see [Flywheel vision](/vision).
+</Warning>
+
+## Known limits
+
+- The loop's author gate names fixed GitHub logins: it acts only on issues whose author is `eltmon` (the Overdeck maintainer) or `panopticon-agent[bot]`, or that are assigned to `eltmon`. On any other repo or account the loop skips your issues, and the current GitHub App bot (`overdeck-agent[bot]`) does not pass it either. See [issue #5544](https://github.com/eltmon/overdeck/issues/5544).
+- The Backlog page and its automatic pass read the sequence from the dashboard server's working directory, the Overdeck checkout or install it runs from. There is no project picker yet.
+- The agent cap (`roles.flywheel.maxAgents`) and the pickup rule are applied by the loop's own instructions; `pan start` checks neither on its own.
+- There is one Flywheel conversation per Overdeck install, `conv-flywheel`.
+
+## Related
+
+- [Flywheel vision](/vision): the roadmap and the readiness criteria for a user-facing v1.0.
+- [Issue pipeline](/features/issue-pipeline): the stages an issue moves through after `pan start`, and Needs you in general.
+- [Order books](/configuration/order-books): curated campaigns and the `pan orders` commands.
+- [Auto-merge](/configuration/auto-merge): the merge policy the loop never bypasses.
+- [Merge batches](/features/merge-batches): the merge train.
+- [Pipeline commands](/cli/pipeline-commands): the full `pan flywheel` and `pan backlog` flag tables.
+
+## Get help
+
+Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file an issue on [GitHub Issues](https://github.com/eltmon/overdeck/issues).
