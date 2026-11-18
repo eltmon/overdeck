@@ -1,0 +1,168 @@
+---
+title: "Issue pipeline: from issue to merged PR"
+sidebarTitle: "Issue pipeline"
+description: "How an issue moves through Overdeck: pan start, planning, work, verification, review, tests, merge and close-out, and what to do when it stalls."
+---
+
+# Issue pipeline: from issue to merged PR
+
+An issue moves through a fixed sequence of stages: plan, work, verification, review, tests and UAT, merge, close-out. Nothing about an issue's position in that sequence is stored. Overdeck derives it each time from git, the tracker and the pull request, so the state you see is always the state those three sources agree on right now.
+
+## The pipeline at a glance
+
+| Stage | Who runs it | What moves it on |
+| --- | --- | --- |
+| Plan | A planning agent | Finalizing the xBRIEF plan |
+| Work | A work agent | `pan done` |
+| Verification | The dashboard server | All quality gates pass |
+| Review | One or more reviewer agents | An approving verdict at the PR head |
+| Tests and UAT | The test role, or CI | The applicable test gate passing, and no failed UAT verdict at the head |
+| Merge | The dashboard server, or you | The one merge gate passes |
+| Close-out | You, or `pan close` | Every Definition of Done row is satisfied |
+
+## Start an issue
+
+Start an issue with `pan start <id>`. When the issue has no plan yet, `pan start` plans it first, and its `--plan <mode>` flag picks the depth:
+
+```bash
+pan start <id> --plan interactive   # Full interview before work starts
+pan start <id> --plan auto          # Non-interactive planning, no questions
+pan start <id> --plan skip          # Skip planning; synthesize a minimal xBRIEF
+```
+
+Which mode runs when you omit `--plan` follows a fixed order: the `--plan` flag, then the deprecated `--auto` flag (treated as `skip`), then the `planning.default_mode` config key, then the shipped default, `auto`.
+
+Planning runs only when the issue has no plan yet. Once a plan exists, `--plan` is ignored and the work agent starts directly. With `auto` or `interactive`, `pan start` never stops at Planned: the work agent starts on its own as soon as planning finalizes.
+
+Starting planning from the dashboard Plan dialog works differently: the issue waits in Planned unless its `Start work as soon as the plan is ready` checkbox is ticked. Otherwise you move it on yourself with the `Start work` issue action, which is enabled once the plan has tasks and no agent is running.
+
+A few more `pan start` flags worth knowing: `--plan-model` sets the planning model and leaves the work model to `--model`; `--fresh` drops the saved Claude session and starts a new one, replacing a live session too; `--force` clears the paused and troubled gates and starts anyway.
+
+## Plan
+
+Planning writes a PRD, an xBRIEF plan and a continue file, then finalizes the plan. A planning agent never writes code. See [Planning: PRDs, xBRIEF plans and the plan critic](/features/planning) for the Plan dialog, `pan plan`, the PRD draft, the xBRIEF schema, finalize and the plan critic.
+
+## Work and pan done
+
+The work agent works through the xBRIEF plan one item at a time: `pan task next` finds the next unblocked item, `pan task claim` claims it, the agent implements and commits with an `Item: <id>` trailer, pushes, then `pan task done` marks it done. The agent runs only the tests the item touched; it never runs the full suite itself.
+
+When every item is done, the agent runs `pan done`, which refuses to proceed on three preflight checks: open plan items or acceptance criteria, uncommitted changes in the workspace, or code changes with no covering tests. `--test-waived <reason>` skips only the test-requirement check, and `--force` skips all three.
+
+Once preflight passes, `pan done` rebases the branch onto the target branch and pushes, opens or updates the pull request and marks it ready, moves the tracker issue to In Review, and starts verification and review.
+
+## Verification
+
+Once `pan done` pushes, the dashboard runs the project's quality gates against the PR head before review starts. Gates come from `quality_gates` in `projects.yaml` (see [Projects](/configuration/projects)), or default to typecheck, lint and test.
+
+The `verification.tests` setting picks `ci` or `local` test mode, and when it is unset Overdeck detects it: `ci` when a GitHub Actions workflow runs a recognizable test job on pull requests, otherwise `local`. In CI mode the host skips its own test gate, because the CI test job on the PR head is the test gate.
+
+A failed gate sends the work agent a message naming the failed check and asking it to fix, push and request review again. Review never starts until verification passes. Overdeck allows up to 3 attempts per PR head; on the last attempt, or when the same check fails twice in a row, it pauses the work agent with a Needs-you signal instead of retrying further.
+
+A test-skip gate runs alongside the others: an added `.skip`, `.only` or `xit` always fails it, and removing tests fails it too unless the whole diff balances or the tested subject was deleted. An operator can let one net test removal through with `pan review waive-test-removal`.
+
+## Review
+
+The `roles.review.mode` setting picks how an issue is reviewed: `quick` (the default) sends it to one reviewer covering correctness, security, performance and requirements; `full` runs the review convoy, four parallel reviewers and a parent that writes one verdict, covered in depth at [Convoys](/features/convoys); `none` skips AI review while the verification gate still applies.
+
+The verdict is a pull request review: approve, or request changes. Approval counts only at the exact head commit, so a push after approval needs a new review. A request for changes goes back to the work agent both as PR comments and as a direct message.
+
+Re-request review after fixing feedback with `pan review request`, re-dispatch reviewer lanes that never reported with `pan review restart`, or stop running reviewers with `pan review abort`. See [Review commands](/cli/review-commands) for the full set. Automatic re-requests are capped at 25 per issue.
+
+There is no hard limit on review rounds, but after at least 3 rounds where the blocker count rose or stalled, automatic re-review stops and Needs you shows `Review loop not converging`. The count resets once a round is approved.
+
+## Tests and UAT
+
+A single test role owns both ordinary test-suite execution and browser-based UAT; there is no separate UAT role. It runs the project's gates, decides from the issue's acceptance criteria whether browser UAT is needed, and when it is, drives the workspace's built dashboard with Playwright. It records two separate verdicts, tests and UAT.
+
+For a project in CI mode, the CI test job on the PR head is the test gate, so the merge gate requires it directly. While an issue is held for UAT, the default (see [Merge](#merge)), a failed UAT verdict at the PR head blocks merge: it is treated as evidence the code does not work. With the hold off for that issue, a failed UAT verdict does not block merge.
+
+As of this writing, the test role does not start automatically the moment review approves. It starts only when `pan review request` runs on a PR that is approved at head but whose checks are not yet green, or when an issue whose test agent was stopped gets unpaused. Automatic dispatch on approval is tracked as [issue #5537](https://github.com/eltmon/overdeck/issues/5537).
+
+## Feedback the work agent receives
+
+**CI failures.** A failed PR check reported by a GitHub webhook is relayed to the work agent with excerpts from the failing log. A failure that also fails on `main` is tagged as inherited from main, so the agent knows it is not its own regression. In CI mode a red test job counts against the same 3-attempt verification budget as any other gate.
+
+**CodeRabbit.** CodeRabbit review is advisory: it never blocks a merge, and nothing waits for it. Its findings are relayed to the work agent, which fixes each one or replies on the thread. Findings still open after merge become a follow-up issue titled "CodeRabbit follow-up for ...".
+
+**Merge conflicts.** Three different paths handle a conflict depending on when it appears:
+
+1. Before review, a PR that conflicts with its target defers review and starts a conflict-resolver run, or messages the agent already running, at most once every 30 minutes.
+2. After approval, a conflict-repair patrol asks the work agent once per PR head to run `pan sync-main` and push; if the head still conflicts 45 minutes later, it raises Needs you.
+3. At merge, the server attempts the rebase itself, falling back to the work agent only if that fails (see [Merge](#merge) below).
+
+`pan sync-main <id>` merges the latest `main` into the feature branch; it does not push. A conflict confined to the plan files under `.pan/specs/` and `.pan/continues/` resolves in favor of `main`, and any other conflict aborts the merge for you to resolve by hand in the workspace.
+
+## Needs you and pan ask
+
+Needs you is the one list of things a person must act on, shown as the top bar's `Needs you · N` button and in the project Home and Board panels. It covers several different kinds of attention: pending agent questions and permission prompts, plans waiting for your approval, and `pan ask` decisions. A work agent paused after verification got stuck, a review loop that stopped converging, and a conflict-repair timeout are also announced as needing you, on the activity feed and, when a Flywheel run is active, in its own needs-you rows.
+
+An agent asks you a blocking decision with `pan ask`: `--option <label>` offers 2 to 4 choices, `--context <text>` carries what it already tried or knows, and `--withdraw` closes a request that is no longer needed. The question appears in the dashboard as a Decision dialog; whatever you pick or type arrives back in the agent's own session as a message, and the agent resumes from there.
+
+Two related commands cover other kinds of pending input: `pan answer` shows a pending pane choice, or answers its numbered option; `pan parked` lists every issue parked in a stall orbit, oldest first, with why and how to release it.
+
+## Merge
+
+Every merge path, whether it is Awaiting Merge, the Merge button, auto-merge, the merge train or a per-project queue, asks the same one merge gate. A PR passes it only when it is open and not a draft, approved at the head commit with no changes requested, every check is green, the CI test job passed on the head in CI mode, there is no failed UAT verdict at the head while the issue is held for UAT, and GitHub itself reports the PR mergeable. Nothing about the answer is stored: it is computed from the PR every time you ask.
+
+Clicking Merge asks the gate first. A PR that is already clean merges directly; otherwise the server rebases onto main for you, and if that rebase itself fails, it falls back to asking the work agent to rebase and push. Either way the merge itself is a squash merge. [Awaiting Merge](/features/dashboard-views#awaiting-merge) is where ready issues wait for this click.
+
+By default a ready PR waits for you: the per-issue `auto-merge` or `hold-for-uat` label (set by the Awaiting Merge row's `Auto` / `Hold` toggle) wins if set, otherwise the project's own default, otherwise the global `require_uat_before_merge` setting, which defaults to true. With the hold off for an issue, its ready PR is scheduled and merges itself after a 5-minute cooldown; `pan merge cancel <id>` stops one during that window. See [Auto-merge](/configuration/auto-merge) for the full policy, and [Merge batches](/features/merge-batches) for the merge train, which is off by default.
+
+Awaiting Merge also has a Pipeline Override section for PRs that are not yet ready: `Force Approve` and `Force Merge` both bypass the pipeline, behind a confirmation step, for the rare case where you need to move a PR on without waiting for the gate.
+
+## Strikes: the short path
+
+`pan strike <ids...>` spawns a strike agent for a small, already understood fix. It bypasses planning, review convoy and the test role entirely: the agent implements on a `strike/<id>` branch in `workspaces/feature-<id>-strike`, verifies the fix itself, and opens a PR.
+
+A strike PR still gets one automatic quick review per head. If it approves, the strike merges itself ahead of other queued work, with the same 5-minute cancel window as any other auto-merge, unless the project holds PRs for UAT, in which case it waits for your Merge click like anything else. A changes-requested verdict stops the strike; nothing reworks it automatically. After the PR merges, Overdeck stops the strike agent and removes its worktree and branch.
+
+`pan done --strike` only checks that the strike branch is already contained in `origin/main`; it opens no PR of its own.
+
+## After merge: close-out
+
+Merging a PR does not close the tracker issue. Overdeck's post-merge lifecycle frees agents, tears down Docker, cleans labels and marks the issue awaiting close-out; closing the issue is a separate, final step.
+
+`pan close <id>` verifies, cleans up, and closes the issue on the tracker. It checks nine Definition of Done rows:
+
+1. Review passed
+2. Tests passed
+3. Verification green on the branch
+4. Merged to main
+5. Post-merge lifecycle ran
+6. Verified on main
+7. Version strings propagated
+8. Deployed
+9. Close-out teardown verified
+
+Rows 1 through 8 each take an `--accept-*` flag (for example `--accept-review`, `--accept-tests`) that records an explicit override in the close-out record when you need to accept a missed row. Row 9 cannot be overridden: close-out teardown has to actually happen.
+
+The dashboard's `Close Out` button asks for confirmation and runs the same close-out. Automatic close-out was removed: the old `close_out.auto` setting is inert.
+
+Once an issue is closed and its branch merged, Overdeck's closed-issue reaper deletes `workspaces/feature-<id>/` and the feature branch, local and remote. Keep nothing you still need inside that workspace once you close the issue.
+
+## Watch an issue: pan show and the pipeline journal
+
+`pan show <id>` is the unified lens on one issue: its derived state, what it needs, recent history, health, effort and work history. The `state` it prints is one of `backlog`, `parked`, `planned`, `working`, `in-review`, `changes-requested`, `ready`, `merged` or `closed`, derived from git, the tracker and the PR every time you ask rather than stored anywhere. Flags narrow the output: `--cv` for agent work history only, `--context` for context-engineering state only, `--health` for health and heartbeat only, and `--json` for the full machine-readable output, including the complete pipeline journal. See [State model](/reference/state-model) for how each state is derived.
+
+Default output also prints the last few entries from the pipeline journal, an append-only log at `<workspace>/.overdeck/pipeline.jsonl` of actions Overdeck has taken on the issue. It is never authority: when the journal disagrees with the PR, the PR wins and the journal is simply stale. It lives only in the workspace and is deleted along with it.
+
+## Restart, rerun or reopen
+
+| Situation | Command |
+| --- | --- |
+| Agent stopped or crashed | `pan recover [id]` |
+| Resume the saved session | `pan resume <id>` |
+| Start over with a new session | `pan start <id> --fresh` |
+| Paused or troubled agent | `pan unpause <id>`, `pan untroubled <id>`, or `pan start <id> --force` |
+| Re-run review after a fix | `pan review request <id> -m "..."` |
+| Review stuck on missing reviewers | `pan review restart <id> [--role ...]` |
+| Stop reviewers | `pan review abort <id>` |
+| Issue already closed, completed or cancelled | `pan reopen <id> [--reason]` |
+
+`pan kill <id>` stops agents but keeps the workspace; it is the safe way to pause work without losing anything. Avoid `pan wipe`, which is destructive and not a restart tool.
+
+`pan reopen` is for an issue that is closed, completed or cancelled, not one already in progress. For an open issue, use whichever row above matches what actually stopped: `pan recover` or `pan resume` for a stopped work agent, `pan review restart` only when reviewers are missing. Reopening re-enters the pipeline, adds the `in-progress` label and posts a comment, and refuses an already-open issue unless you pass `--force`. The pipeline simply picks the issue back up from its branch and PR; no specialist state needs restoring, because none was ever stored.
+
+## Get help
+
+Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file an issue on [GitHub Issues](https://github.com/eltmon/overdeck/issues).
