@@ -1,7 +1,6 @@
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
-import { homedir } from 'os';
 import { dirname, join, resolve } from 'path';
 import { findPlanSync, findWorkspaceDraftPlanSync, readPlanSync, serializeXBriefDocument } from '../../lib/xbrief/io.js';
 import { generateXBriefFilename, slugify } from '../../lib/xbrief/lifecycle.js';
@@ -21,6 +20,7 @@ import { isPlanFlagged, loadCritiqueGateInput } from '../../lib/planning/plan-cr
 import { resolvePlanCritic } from '../../lib/planning/plan-critic-model.js';
 import { dispatchPlanCritic } from '../../lib/planning/plan-critic-dispatch.js';
 import { reviewAcceptanceCriteria } from '../../lib/jev/acceptance-criteria.js';
+import { readAutoSpawnOnFinalizeFlagAsync } from '../../lib/planning/auto-spawn-consent.js';
 
 interface PlanFinalizeOptions {
   workspace?: string;
@@ -146,18 +146,6 @@ function findWorkspaceRoot(start: string): string | null {
     const parent = dirname(dir);
     if (parent === dir) return null;
     dir = parent;
-  }
-}
-
-export function readAutoSpawnOnFinalize(issueId: string): boolean {
-  const overdeckHome = process.env.OVERDECK_HOME ?? join(homedir(), '.overdeck');
-  const flagFile = join(overdeckHome, 'agents', `planning-${issueId.toLowerCase()}`, 'auto-spawn-on-finalize.json');
-  try {
-    if (!existsSync(flagFile)) return false;
-    const flag = JSON.parse(readFileSync(flagFile, 'utf-8')) as { autoSpawnOnFinalize?: unknown };
-    return flag.autoSpawnOnFinalize === true;
-  } catch {
-    return false;
   }
 }
 
@@ -373,7 +361,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   const critique = await runCritiqueStep({ issueId, workspacePath, doc: planDoc, forced: options.critic === true, json: options.json === true });
   if (!critique.proceed) return;
 
-  const autoSpawnOnFinalize = readAutoSpawnOnFinalize(issueId);
+  const autoSpawnOnFinalize = await readAutoSpawnOnFinalizeFlagAsync(issueId);
 
   // Stamp the proposed status, canonical filename, and automatic/manual
   // promotion intent onto the xBRIEF. Atomic temp+rename.
@@ -388,13 +376,13 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     source: 'plan',
     level: 'info',
     message: autoSpawnOnFinalize
-      ? `${issueId} planned — starting implementation`
+      ? `${issueId} planning finalized — promoting with auto-start`
       : `${issueId} planning finalized — awaiting your approval`,
     issueId,
   });
   emitActivityTts({
     utterance: autoSpawnOnFinalize
-      ? `${issueId} planned, starting implementation`
+      ? `${issueId} planning finalized, promoting with auto-start`
       : `${issueId} planning is done, awaiting your approval`,
     priority: 1,
     issueId,
