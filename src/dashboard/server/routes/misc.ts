@@ -27,6 +27,9 @@
  *   GET  /api/skills
  *   GET  /api/skills/overrides
  *   PUT  /api/skills/overrides
+ *   GET  /api/skills/packs/available
+ *   POST /api/skills/packs/preview
+ *   POST /api/skills/packs
  *   GET  /api/planning/:issueId/status
  *   POST /api/planning/:issueId/message
  *   DELETE /api/planning/:issueId
@@ -49,6 +52,7 @@ import { planningRouteLayer } from './misc/planning.js';
 import { metaRouteLayer } from './misc/meta.js';
 import { updatesRouteLayer } from './misc/updates.js';
 import { skillOverridesRouteLayer } from './misc/skill-overrides.js';
+import { skillPacksRouteLayer } from './misc/skill-packs.js';
 import { effortDefaultRouteLayer } from './misc/effort-default.js';
 
 export { readPackageVersion } from './misc/shared.js';
@@ -62,6 +66,7 @@ export const miscRouteLayer = Layer.mergeAll(
   metaRouteLayer,
   updatesRouteLayer,
   skillOverridesRouteLayer,
+  skillPacksRouteLayer,
   effortDefaultRouteLayer,
 );
 

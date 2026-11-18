@@ -125,7 +125,7 @@ A **pack group** is a name for a list of packs, so one command acts on all of th
 pan skills pack add --group video                         # the add flow for each member, in order
 pan skills set --group video on --project myapp           # set each member's pack toggle
 pan handoff self --group video "<focus>"                  # one conversation, every cached member
-pan skills pack list                                      # lists the groups after the packs
+pan skills pack list                                      # lists known packs not added, then the groups with their missing members
 ```
 
 `pan skills pack add --group` prints `<id>: already added` for a member that is registered and continues; it exits 1 at the end when any member was declined or failed. `pan skills set --group` writes nothing and exits 1 when any member is not added yet (`pack <id> is not added; run pan skills pack add --group <name>`). `--group` and `--pack` cannot be combined.
@@ -162,9 +162,31 @@ Pack mattpocock
 Adding a pack trusts this commit and enables nothing. Turn it on with: pan skills set --pack mattpocock on
 ```
 
-Adding a pack trusts the resolved commit and turns nothing on. In a terminal, Overdeck asks `Trust this commit? [y/N]`. Without a terminal, pass `--yes`; otherwise nothing is written. The pack id must match `[a-z0-9][a-z0-9-]*` and cannot be a core skill name. Overdeck picks the adapter itself (the known-pack default, else `claude-plugin` when the repo has `.claude-plugin/plugin.json`, otherwise `plain`); pass `--adapter plain|claude-plugin|deft-readonly|gstack-runtime` to choose. See [Authoring a skill pack](/guides/skill-pack-authoring) for what makes a repository a valid pack. A repository cannot register a pack by committing a file; only `pan skills pack add` can.
+Adding a pack trusts the resolved commit and turns nothing on. In a terminal, Overdeck asks `Trust this commit? [y/N]`. Without a terminal, pass `--yes`; otherwise nothing is written. The pack id must match `[a-z0-9][a-z0-9-]*` and cannot be a core skill name. Overdeck picks the adapter itself (the known-pack default, else `claude-plugin` when the repo has `.claude-plugin/plugin.json`, otherwise `plain`); pass `--adapter plain|claude-plugin|deft-readonly|gstack-runtime` to choose. See [Authoring a skill pack](/guides/skill-pack-authoring) for what makes a repository a valid pack. A repository cannot register a pack by committing a file; only `pan skills pack add` or the dashboard's **Add…** (after you trust the previewed commit) can.
 
 For a known pack (`mattpocock`, `pstack`, `gstack`, `deft`, `sageox`, `atlassian`, `remotion`, `hyperframes`, `openmontage`, `video-use`) the url is optional. `pstack`, `sageox`, `atlassian` and the four video packs also have a default ref, so for example `pan skills pack add pstack` is enough; the others need `--ref`.
+
+`pan skills pack list` ends with the known packs that are not added, each with the exact command that adds it, and each group's members that are not added with `run pan skills pack add --group <name>`:
+
+```
+Known packs not added (2)
+gstack    pan skills pack add gstack --ref <ref>
+remotion  pan skills pack add remotion
+
+Groups
+video  remotion, hyperframes, openmontage, video-use  (built-in)
+  not added: remotion; run pan skills pack add --group video
+```
+
+### Adding packs from the dashboard
+
+The Skills page (`/skills`) lists **Available packs** under Skill packs: each pack group with members you have not added (for example `video · 4 packs not added`), then each known pack you have not added, with its source and disclosure.
+
+The dashboard adds a known pack only when it has a default ref and adding it builds nothing. Those packs, `remotion`, `hyperframes`, `openmontage`, `video-use`, `pstack` and `atlassian`, show an **Add…** button, and so does a group whose missing members are all among them. The other known packs show their CLI command instead: `mattpocock`, `deft` and `gstack` need a ref you choose, and adding `sageox` or `gstack` builds code on this machine. A config group member that is not a known pack makes its group CLI-only.
+
+**Add…** opens a dialog that previews each pack in turn: source and commit, adapter, license, skills and opt-in skills, executables, MCP servers, the Not applied list, and the disclosure. Nothing is registered until you press **Trust and add**. The dashboard then adds each previewed pack at its previewed commit, one at a time. A pack that is already added is skipped. If a pack's ref moved since the preview, nothing is written for it; the dialog says "The pack changed since the preview.", previews it again and waits for another **Trust and add**. Adding turns nothing on: turn packs on with their switches under Skill packs.
+
+The new-conversation skills field (and **Add skills** on a running conversation) shows the same groups as rows such as `video · 4 packs not added`, with **Add…** opening the same dialog over it. After the add, the new packs appear in the field as groups.
 
 ### What is not applied
 
@@ -180,7 +202,7 @@ Runtime packs (gstack) are the exception: their scripts are mounted and run when
 
 - Adding a pack trusts one commit and turns nothing on. Without a terminal, `--yes` is required, else nothing is registered (the fetch and commit extraction still write to the pack cache before you confirm). See [Adding a pack](#adding-a-pack).
 - Every launch mounts exactly the trusted commit; `update` shows the preview again and moves the commit only after you confirm. See [Pinning, updates and forks](#pinning-updates-and-forks).
-- A repository cannot register itself; only `pan skills pack add` can.
+- A repository cannot register itself; only `pan skills pack add` or the dashboard's **Add…** (after you trust the previewed commit) can.
 - Overdeck mounts skill directories only. Hooks, commands, agents, context injection, git hooks and scripts are **Not applied**; scripts inside a skill directory are copied but never run by Overdeck. A `claude-plugin` pack's `https` MCP servers are the one exception, and only once you confirm a preview that lists them. See [What is not applied](#what-is-not-applied).
 - Runtime packs are the exception: gstack runs its pack-mode setup once per trusted commit (at add, update or sync) and its scripts when you invoke a skill; the preview lists every script before you trust it. See [gstack](#gstack).
 - SageOx is the other exception: Overdeck runs `go build` on the trusted commit (at add, update or sync) and runs the built `ox` from hooks it adds itself; the preview lists the build commands, the paths they write, and the downloads. See [SageOx](#sageox).

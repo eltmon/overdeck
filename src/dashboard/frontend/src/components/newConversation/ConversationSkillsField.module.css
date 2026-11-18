@@ -182,6 +182,50 @@
   outline-offset: 2px;
 }
 
+/* PAN-5540: a pack group with members not yet added; same row shape as .groupHeader. */
+.notAddedGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 4px 10px 4px 32px;
+  font-size: 12.5px;
+  color: var(--foreground);
+  border-top: 1px solid var(--border-overlay, var(--border));
+}
+
+.notAddedGroup:first-child {
+  border-top: 0;
+}
+
+.addButton {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  font-size: 11.5px;
+  font-family: inherit;
+  color: var(--foreground);
+  background: transparent;
+  border: 1px solid var(--border-overlay, var(--border));
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.addButton:hover {
+  background: var(--muted);
+}
+
+.addButton:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.addCommand {
+  flex-shrink: 0;
+  font-family: var(--font-mono-ui);
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
 .note {
   font-size: 12px;
   color: var(--muted-foreground);

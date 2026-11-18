@@ -110,6 +110,7 @@ vi.mock('../../../lib/skill-packs/sources.js', () => ({
   readPackRegistry: mocks.readPackRegistry,
   writePackEntry: mocks.writePackEntry,
   getPack: mocks.getPack,
+  buildsOx: (id: string) => id === 'sageox',
 }));
 
 vi.mock('../../../lib/skill-overrides/catalog.js', () => ({
@@ -749,6 +750,12 @@ describe('pan skills pack', () => {
     expect(mocks.addPack).not.toHaveBeenCalled();
   });
 
+  it('add gstack without --ref exits 1 naming the missing ref (PAN-5540 knownPackSource)', async () => {
+    await expect(run('pack', 'add', 'gstack')).rejects.toThrow('exit 1');
+    expect(errors.join('\n')).toContain('pack gstack has no default ref; pass --ref <tag-or-branch>');
+    expect(mocks.addPack).not.toHaveBeenCalled();
+  });
+
   it('add of an unknown id without a url exits 1', async () => {
     await expect(run('pack', 'add', 'foo')).rejects.toThrow('exit 1');
     expect(errors.join('\n')).toContain('pack foo has no default url');
@@ -791,18 +798,25 @@ describe('pan skills pack', () => {
     expect(JSON.parse(logs.join('\n'))[0]).toMatchObject({ cached: false, skills: 0, updateAvailable: 'f'.repeat(40) });
   });
 
-  it('prints the fork add hint when no packs are registered', async () => {
+  it('prints the known packs not added and the group add command when no packs are registered (PAN-5540)', async () => {
     mocks.listPackCatalog.mockResolvedValue([]);
+    mocks.listPacks.mockResolvedValue([]);
     await run('pack', 'list', '--offline');
-    expect(logs[0]).toBe('No skill packs. Add one with: pan skills pack add mattpocock https://github.com/eltmon/skills --ref v1.2.3');
+    expect(logs[0]).toBe('No skill packs added.');
+    expect(logs.join('\n')).not.toContain('--ref v1.2.3');
+    expect(logs).toContain(`Known packs not added (${Object.keys(KNOWN_PACKS).length})`);
+    expect(logs.some(line => /^remotion +pan skills pack add remotion$/.test(line))).toBe(true);
+    expect(logs.some(line => /^gstack +pan skills pack add gstack --ref <ref>$/.test(line))).toBe(true);
     // PAN-5464: the groups still list, so `--group video` is discoverable before any pack is added.
     expect(logs).toContain('video  remotion, hyperframes, openmontage, video-use  (built-in)');
+    expect(logs).toContain('  not added: remotion, hyperframes, openmontage, video-use; run pan skills pack add --group video');
   });
 
   it('prints a Groups section after the pack rows (PAN-5464)', async () => {
     mocks.listPackCatalog.mockResolvedValue([
       { id: 'mattpocock', url: preview.url, ref: 'v1.2.3', commit: COMMIT, adapter: 'claude-plugin', cached: true, manifest: preview.manifest },
     ]);
+    mocks.listPacks.mockResolvedValue([{ id: 'mattpocock' }, ...VIDEO.map(id => ({ id }))]);
     mocks.listPackGroups.mockResolvedValue([
       { name: 'animation', packs: ['remotion'], source: 'config' },
       { name: 'video', packs: VIDEO, source: 'built-in' },
@@ -812,6 +826,10 @@ describe('pan skills pack', () => {
     expect(out.indexOf('Groups')).toBeGreaterThan(out.indexOf('mattpocock'));
     expect(logs).toContain('video  remotion, hyperframes, openmontage, video-use  (built-in)');
     expect(logs).toContain('animation  remotion  (config)');
+    // Every group member is added, so no group prints a not-added line; the other known packs still list.
+    expect(out).not.toContain('not added:');
+    expect(out).toContain('Known packs not added (');
+    expect(out).not.toMatch(/^mattpocock +pan skills pack add/m);
   });
 
   it('reports an up-to-date pack without asking', async () => {

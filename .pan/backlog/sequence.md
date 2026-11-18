@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-18T21:27:34.321081Z · model: claude-opus-5-5 · open: 943_
+_Last sequenced: 2026-11-18T21:58:09.103128Z · model: claude-opus-5-5 · open: 944_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -477,8 +477,10 @@ _Last sequenced: 2026-11-18T21:27:34.321081Z · model: claude-opus-5-5 · open: 
 | 450 | PAN-5440 | L | medium | ok |  |  | React Compiler burn-down for all remaining components: 78 skips in 42 files, 288 memo sites. Largest group; do last. |
 | 450 | PAN-5473 | S | medium | ok |  |  | Docs P2: features/desktop-app.mdx, downloads, how pan up finds the app, tray. Supersedes PAN-2073. Lane A item 6. |
 | 451 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
+| 451 | PAN-5557 | S | medium | ok |  |  | pan up on Linux treats the overdeck CLI in ~/.local/bin as the desktop app, prints a false launch and skips its own startup path. |
 | 452 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
 | 452 | PAN-5475 | S | medium | ok |  |  | Docs P2: features/costs.mdx, attribution, pan cost verbs, API-rate vs plan costs. Lane A item 7. |
+| 452 | PAN-5556 | M | medium | ok |  |  | Desktop app tray status, six notification switches, Open Workspace menu and Linux launch-at-login are dead controls; fix or hide. |
 | 453 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
 | 454 | PAN-5322 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5319: unguarded identifier.toUpperCase(), modal focus, needs-you rows that open nothing. |
 | 454 | PAN-5477 | M | medium | ok |  |  | Docs P2: configuration/permissions.mdx, auto-approve hook, --yolo, operator-only labels, git shim. Lane A item 8. |
@@ -486,7 +488,6 @@ _Last sequenced: 2026-11-18T21:27:34.321081Z · model: claude-opus-5-5 · open: 
 | 456 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
 | 456 | PAN-5479 | S | medium | ok |  |  | Docs P2: merge the unpublished workspaces config page into features/workspaces and memory pages. Lane A item 9. |
 | 457 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
-| 457 | PAN-5480 | XS | medium | ok |  |  | Docs P2: quickstart.mdx install script and overdeck up; drop the nonexistent work verb and model-swap claim. Lane B item 6. |
 | 458 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
 | 458 | PAN-5481 | S | medium | ok |  |  | Docs P2: configuration/voice.mdx, dictation, tts.enabled, local Qwen3-TTS daemon, sidecars. Lane A item 10. |
 | 459 | PAN-2469 | S | medium | ok |  |  | Assembly landed (mergeReadySlots + finalization); remaining: alarm when all slots merged but no review requested. Swarm dormant. |
@@ -654,7 +655,7 @@ _Last sequenced: 2026-11-18T21:27:34.321081Z · model: claude-opus-5-5 · open: 
 | 612 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
 | 612 | PAN-5501 | M | medium | ok |  |  | Docs audit: line-by-line accuracy check of the 7 CLI Reference pages; PAN-5478 merged, so it can run. Lane B item 9. |
 | 613 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
-| 613 | PAN-5499 | S | medium | ok |  | PAN-5480 | Docs audit: Getting Started, Vision, Changelog intro (5 pages); waits on PAN-5480. |
+| 613 | PAN-5499 | S | medium | ok |  |  | Docs audit: Getting Started, Vision, Changelog intro (5 pages); waits on PAN-5480. |
 | 614 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
 | 615 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
 | 616 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
@@ -1278,10 +1279,10 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-18T21:27:34.321081Z",
+  "generatedAt": "2026-11-18T21:58:09.103128Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 943,
+  "openCount": 944,
   "nodes": [
     {
       "issue": "PAN-5541",
@@ -7256,6 +7257,19 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "planning": "auto"
     },
     {
+      "issue": "PAN-5557",
+      "rank": 451,
+      "size": "S",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan up on Linux treats the overdeck CLI in ~/.local/bin as the desktop app, prints a false launch and skips its own startup path.",
+      "rationale": "New bug found while planning PAN-5473; misleading output but no outage, so banded beside the desktop-app docs work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3616",
       "rank": 452,
       "size": "S",
@@ -7277,6 +7291,19 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "dependsOn": [],
       "why": "Docs P2: features/costs.mdx, attribution, pan cost verbs, API-rate vs plan costs. Lane A item 7.",
       "rationale": "Rank unchanged; PAN-5483 closed, so that dependency is removed.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5556",
+      "rank": 452,
+      "size": "M",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Desktop app tray status, six notification switches, Open Workspace menu and Linux launch-at-login are dead controls; fix or hide.",
+      "rationale": "New bug found while planning PAN-5473; four dead desktop controls, banded beside the desktop-app docs work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7365,19 +7392,6 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "why": "Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch.",
       "gate": "auto",
       "planning": "interactive"
-    },
-    {
-      "issue": "PAN-5480",
-      "rank": 457,
-      "size": "XS",
-      "importance": "medium",
-      "score": 48,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Docs P2: quickstart.mdx install script and overdeck up; drop the nonexistent work verb and model-swap claim. Lane B item 6.",
-      "rationale": "Rank unchanged; a 2026-11-17 comment adds two small quickstart.mdx fixes (no overdeck work verb, no mid-conversation model swap), so the why now names them.",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-1444",
@@ -9449,11 +9463,9 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "importance": "medium",
       "score": 41,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5480"
-      ],
+      "dependsOn": [],
       "why": "Docs audit: Getting Started, Vision, Changelog intro (5 pages); waits on PAN-5480.",
-      "rationale": "Rank unchanged; PAN-5470 (the Flywheel docs page) closed, so that dependency is removed and only PAN-5480 remains.",
+      "rationale": "Rank unchanged; PAN-5480 closed, so that dependency is removed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14302,13 +14314,6 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
     },
     {
       "from": "PAN-5467",
-      "to": "PAN-5480",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5467",
       "to": "PAN-5481",
       "type": "contains",
       "source": "github-ref",
@@ -14373,13 +14378,6 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
     {
       "from": "PAN-5479",
       "to": "PAN-5502",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5480",
-      "to": "PAN-5499",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
@@ -14476,13 +14474,6 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "confidence": 0.5
     },
     {
-      "from": "PAN-5543",
-      "to": "PAN-5480",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
       "from": "PAN-5544",
       "to": "PAN-5548",
       "type": "informs",
@@ -14537,6 +14528,20 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.8
+    },
+    {
+      "from": "PAN-5556",
+      "to": "PAN-5473",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-5557",
+      "to": "PAN-5473",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     },
     {
       "from": "PAN-750",

@@ -423,12 +423,13 @@ pan skills set <pack>/<skill> on|off|inherit [--project <key> | --issue <id>]
 pan skills add <conversation> [--pack <id>]... [--skill <pack>/<skill>]... [--off <pack>/<skill>]... [--restart]
 
 # Register, update, inspect, and cache skill packs pinned to a commit
-pan skills pack add <id> [url] [--ref <ref>] [--adapter plain|claude-plugin|deft-readonly|gstack-runtime] [--browser] [--yes]   # known packs default the url; pstack, sageox and atlassian also default the ref
+pan skills pack add <id> [url] [--ref <ref>] [--adapter plain|claude-plugin|deft-readonly|gstack-runtime] [--browser] [--yes]   # known packs default the url; pstack, sageox, atlassian and the four video packs also default the ref
 pan skills pack add gstack --ref main   # gstack runtime pack (needs bun)
 pan skills pack add gstack --ref main --browser   # plus the browser runtime (asks twice)
+pan skills pack add --group video   # every pack of a group (video: remotion, hyperframes, openmontage, video-use)
 pan skills pack browser <id> [on|off] [--yes]   # build or remove gstack's browser, design and PDF runtime
 pan skills pack update <id> [--ref <ref>] [--yes]
-pan skills pack list [--json] [--offline]
+pan skills pack list [--json] [--offline]   # also prints known packs not added and the command that adds each
 pan skills pack remove <id>
 pan skills pack sync [id]
 pan skills pack gc [--max-age-days <n>]
