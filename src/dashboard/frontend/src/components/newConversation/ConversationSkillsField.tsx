@@ -14,11 +14,18 @@
  *
  * D8: an issue no registered project owns answers non-OK, so the field
  * refetches without the issue; if that fails too it shows "Skills unavailable".
+ *
+ * PAN-5540: after the groups, each pack group with members not yet added
+ * (such as `video`) shows a row with **Add…**, which opens the add packs
+ * dialog over this one. The add refreshes this field's skill list, so the new
+ * packs appear as groups.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRight, Search } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { AddPacksDialog } from '../skills/AddPacksDialog';
+import { missingLabel, useAvailablePacks, type AvailableGroup } from '../skills/availablePacks';
 import styles from './ConversationSkillsField.module.css';
 
 interface SkillRow {
@@ -127,6 +134,8 @@ export function ConversationSkillsField({ projectKey, issueId, value, onChange }
   const [opened, setOpened] = useState<Record<string, boolean>>({});
   const query = useConversationSkillGroups(projectKey, issueId);
   const groups = query.data;
+  const available = useAvailablePacks();
+  const [addGroup, setAddGroup] = useState<AvailableGroup | null>(null);
   const rows = useMemo(() => (groups ?? []).flatMap(group => group.rows), [groups]);
 
   // Drop choices for skills the new context no longer lists.
@@ -150,6 +159,11 @@ export function ConversationSkillsField({ projectKey, issueId, value, onChange }
       }))
       .filter(entry => entry.rows.length > 0);
   }, [groups, filtering, needle]);
+
+  // Loading or a failed listing shows nothing; while filtering, only groups whose name matches.
+  const notAddedGroups = (available.data?.groups ?? []).filter(
+    group => group.missing.length > 0 && (!filtering || group.name.toLowerCase().includes(needle)),
+  );
 
   const isOpen = (group: SkillGroup): boolean =>
     filtering || (opened[group.key] ?? group.rows.some(row => Object.prototype.hasOwnProperty.call(value, row.id)));
@@ -181,7 +195,7 @@ export function ConversationSkillsField({ projectKey, issueId, value, onChange }
         />
       </div>
       <div className={styles.list}>
-        {visible.length === 0 && <p className={styles.note}>No skills match.</p>}
+        {visible.length === 0 && notAddedGroups.length === 0 && <p className={styles.note}>No skills match.</p>}
         {visible.map(({ group, rows: groupRows }) => {
           const open = isOpen(group);
           const onCount = group.rows.filter(row =>
@@ -229,7 +243,33 @@ export function ConversationSkillsField({ projectKey, issueId, value, onChange }
             </div>
           );
         })}
+        {notAddedGroups.map(group => (
+          <div key={`not-added:${group.name}`} className={styles.notAddedGroup} data-not-added-group={group.name}>
+            <span className={styles.groupLabel}>
+              {group.name} <span className={styles.groupCount}>· {missingLabel(group)}</span>
+            </span>
+            {group.dashboardAddable ? (
+              <button
+                type="button"
+                className={styles.addButton}
+                aria-label={`Add the ${group.name} group`}
+                onClick={() => setAddGroup(group)}
+              >
+                Add…
+              </button>
+            ) : (
+              <code className={styles.addCommand}>{group.addCommand}</code>
+            )}
+          </div>
+        ))}
       </div>
+      {addGroup && (
+        <AddPacksDialog
+          title={`Add the ${addGroup.name} packs`}
+          packIds={addGroup.missing}
+          onClose={() => setAddGroup(null)}
+        />
+      )}
     </div>
   );
 }
