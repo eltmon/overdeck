@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5482",
   "created": "2026-11-18T21:37:14.666Z",
-  "updated": "2026-11-18T21:52:01.700Z",
+  "updated": "2026-11-18T21:52:06.716Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -124,6 +124,11 @@
     "progressive-polyrepo.ac4": {
       "status": "completed",
       "doneAt": "2026-11-18T21:52:01.700Z"
+    },
+    "delete-wizard-meta": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5482",
+      "claimedAt": "2026-11-18T21:52:06.716Z"
     }
   }
 }
