@@ -1,0 +1,189 @@
+---
+title: "Flywheel: an autonomous loop that works your backlog"
+sidebarTitle: "Flywheel (early)"
+description: "Run the Flywheel loop that picks, starts and lands issues for you, read its lane board and Needs-you items, and rank your backlog with the sequencer."
+---
+
+The Flywheel is a loop that runs in one conversation. Each tick it picks the next issue, starts it with `pan start`, watches the pull request to landing, and parks what it cannot decide for you. Its status is never stored: everything on this page and in `pan flywheel status` is derived fresh from the conversation, the tracker and the pull request.
+
+<Warning>
+The Flywheel is early: today Overdeck uses it to build Overdeck itself. The limits below are known and worth reading before you turn it on. For the roadmap, see [Flywheel vision](/vision).
+</Warning>
+
+## What the loop does
+
+Each tick is one pass through five phases:
+
+1. **Orient**: read the policies, the backlog sequence, the bound order book if any, and the issues already in flight.
+2. **Drain what is already in flight**: walk every in-flight issue first and make the first move each one needs before picking anything new.
+3. **Pick the next item**: choose the next issue from an active order book, or the backlog sequence in rank order.
+4. **Launch**: start the issue with `pan start`, the loop's only launcher. If `pan start` fails with a disk-low error, the loop launches nothing else that tick and raises a Needs-you item instead.
+5. **Watch to landing**: follow the issue's pull request through review, tests and merge.
+
+A fifth step, parking, runs whenever the loop cannot decide something on its own: it parks the issue and moves on rather than blocking the tick on a question only you can answer.
+
+The loop schedules its own next tick with a background sleep: 450 seconds while anything is in flight, 1000 seconds when idle, never longer than 1000 seconds. It stops on its own only when nothing is pickable and nothing is in flight, reporting itself idle with a Needs-you item saying so.
+
+Rails that hold regardless of what it picks:
+
+- It orchestrates and never writes code, specs or plans; the only files it writes are `.pan/flywheel/state.md` and `.pan/flywheel/report.md`.
+- It keeps to `roles.flywheel.maxAgents` (default 30) as its own instruction, not a check `pan start` makes.
+- It never merges or deep-wipes anything itself; merges follow the merge policy, see [Auto-merge](/configuration/auto-merge).
+- It never adds or removes the operator-only labels `released`, `vetoed`, `auto-merge` or `hold-for-uat`; its `gh` access refuses those writes.
+- `vetoed` is absolute: a vetoed issue is never picked up, planned or struck from vetoed by the loop.
+- It does not auto-start changes to pipeline machinery; it marks them `needs-handoff` instead.
+- There is one Flywheel conversation per Overdeck install, and starting a second one while the first is active is refused.
+- After a merge to Overdeck's own main with green CI, it runs `pan reload`; it does not deploy other projects.
+
+Every tick ends with one tick marker line, which is the loop's only status report:
+
+```text
+flywheel-tick: tick=3 pick=PAN-3964 phase=watch in-flight=PAN-3964,PAN-3920 needs-you=none
+```
+
+## Start and control the loop
+
+| Command | What it does | Flags |
+| --- | --- | --- |
+| `pan flywheel start` | Launch a conversation running `/pan-flywheel` | `--model`, `--harness`, `--cwd <path>`, `--orders <book-id>`, `--fresh` |
+| `pan flywheel stop` | Ask the loop to write its report, wait for it, then pause | `--timeout <ms>` (default 120000) |
+| `pan flywheel abort` | Stop the flywheel conversation without a report | none |
+| `pan flywheel pause` | Stop the flywheel session, keeping its conversation and transcript | none |
+| `pan flywheel resume` | Respawn a paused flywheel and re-send `/pan-flywheel` | none |
+| `pan flywheel report` | Ask a running loop for its report, or print `.pan/flywheel/report.md` | none |
+| `pan flywheel status` | Show the derived flywheel status: run, last tick, policies, in-flight issues, order book | `--json` |
+| `pan flywheel stats` | Substrate-bug discovery rate and P0 count, computed from the tracker and forge | `--json`, `--window <days>` (default 30) |
+
+`start` refuses to run while a flywheel is already running, and refuses a paused one too unless you pass `--fresh`, which replaces the paused conversation (its old transcript stays on disk). `stop` pauses the loop either way, even when no report arrives within `--timeout`.
+
+The Flywheel page's toolbar shows different buttons depending on run state: idle shows **Start** (and **Start fresh** when a leftover session is detected); paused shows **Resume** and **Start fresh**; running shows **Pause**, **Report**, **Stop** and **Abort**. **Pop out** and a **Conversation** / **Terminal** toggle are always available.
+
+A **Run config** footer shows the Harness, Model, Effort, Max agents and Scope the loop is running with, and opens `Settings → Roles → Flywheel`, where the `Flywheel effort` and `Flywheel max agents` fields live. The model defaults to `claude-opus-5-5` and the effort to `high`; see [Effort](/configuration/effort) for what effort controls and how a resumed loop keeps the effort it started with.
+
+`pan orders start <book-id>` opens the same flywheel conversation bound to that book; see [Order books](/configuration/order-books) for how that compares to `pan flywheel start --orders`.
+
+Open the page from the left column's **Flywheel** entry, the command palette's **Open Flywheel** action, or directly at `/flywheel`.
+
+## What the loop picks up
+
+An issue is pickable when all of these hold:
+
+- It is ready (the `ready` label).
+- It is planned: it has an xBRIEF with tasks.
+- It is released: the `released` label is set, or Auto-pickup is on, or it is a member of the active order book.
+- It is not parked, not vetoed, not under an `objection`, not already in pipeline, and not an epic.
+
+The loop applies this rule itself before it runs `pan start`, which does not check it on its own. Overdeck's automatic work dispatch, which can start work agents outside the loop, checks the same release conditions in code. The Forecast view on `/backlog` shows the same rule.
+
+Order matters too: a bound or running order book's items come first (see [Order books](/configuration/order-books)); otherwise the loop walks `.pan/backlog/sequence.md` in rank order. A **Promote** gate jumps an issue ahead of its rank; a **Vetoed** issue is never picked up. Before picking anything new, the loop drains every issue already in flight, making the first move each one needs.
+
+## The three switches
+
+The Flywheel page header shows three switches. They are global app settings, not per project.
+
+| Switch | Default | What it does |
+| --- | --- | --- |
+| Auto-pickup | off | Off: the loop picks up only released issues and active order-book items. On: every ready, planned issue is pickable without a release. |
+| Require UAT | on | The global fallback of the merge policy: a ready PR waits for your Merge click unless the issue's Auto/Hold toggle or the project's `auto_merge_default` says otherwise. |
+| Merge train | off | On: normal-priority PRs wait and merge together as one batch once the batch checks are green; high-priority PRs such as strikes still merge on their own. Off: each ready PR that is not held merges on its own. |
+
+Require UAT holds a ready PR for your Merge click; it never requires a passed UAT verdict before merge. A failed UAT verdict at the head commit does block merge on its own, independent of this switch; see [Issue pipeline](/features/issue-pipeline) for that distinction.
+
+Batch size and wait for the merge train live in **Settings → Merge Train**; see [Auto-merge](/configuration/auto-merge) for the full merge policy and [Merge batches](/features/merge-batches) for how the train itself works.
+
+## Read the Flywheel page
+
+### Header
+
+The header shows a run chip: `running · tick N`, `paused`, `idle`, or `unreachable` when the status read itself fails. The page never shows `idle` for a failed read; a failed read always shows `unreachable`. Next to it sits a freshness badge, the conversation's running duration, an in-flight count (`N in flight · M shipped today`), and the three switches.
+
+Freshness has three states: `live` when the last tick was 60 seconds or less ago, `breathing` when it was 20 minutes or less ago, and `stalled` when it is older than that.
+
+### The rail
+
+The left rail stacks, top to bottom: the merge train card (one per project, linking [Merge batches](/features/merge-batches)), the running order book card when one is bound, and the Flywheel card itself, which has four tabs: **Status**, **State**, **Report** and **Stats**. The State tab renders `.pan/flywheel/state.md`, the Report tab renders `.pan/flywheel/report.md`, and the Stats tab shows the same substrate-bug stats as `pan flywheel stats`. The rail is resizable and stacks above the conversation on narrow screens.
+
+### The lane board
+
+The Status tab opens with a headline strip and a health strip, then the last tick, any Needs-you cards, the lane board, and **Shipped today** (merges, deploys and release tags since local midnight).
+
+The lane board has seven lanes, in this order: Plan, Build, Checks, Review, Merge, Deploy, Done today. Each lane header shows its name and a count. A card in a lane shows the issue id, how long it has sat in that stage, cost, owner, title, an agent line, one plain sentence on why it is not moving, and its last activity. Clicking a card opens the issue; a Deploy or Done today card links to its pull request.
+
+### The right column
+
+The right column holds the `conv-flywheel` conversation itself, with its own composer so you can talk to the loop directly, or its terminal.
+
+## Needs-you items
+
+Needs-you items come from the tick marker's `needs-you=` field, one item per `; `-separated part. The loop keeps an item's wording identical until it is resolved, because the page matches items by their exact text.
+
+Each card shows the question, why it came up, and when (`tick <n> · HH:MM · <age>`). An issue id opens that issue; text written as `owner/repo#<n>` links to the GitHub pull request or issue; an item ending in a URL inside angle brackets (for example `<https://...>`) renders as a link. A real control appears only where one applies: the test-removal waiver, **Start** then **Confirm start**, or **Open `<ID>`**.
+
+**Show where this was raised** opens the `conv-flywheel` conversation at the message that first raised the item, or reopens a pending question.
+
+The top bar's `Needs you · N` button counts the one shared Needs-you list, which includes Flywheel items, and is always shown. See [Issue pipeline](/features/issue-pipeline) for Needs you in general.
+
+## Parked issues and pan parked
+
+These are two different things, and the page keeps them apart.
+
+**The loop parks** an issue it cannot decide for itself, such as ambiguous scope or a destructive step outside the acceptance criteria, by listing it in `.pan/parked.md` with a one-line reason, then moves on to the next pick. It skips any issue that already carries the `parked` label or a `.pan/parked.md` listing. You can park an issue yourself with the **Park** toggle in the pickup controls, which sets the `parked` label; such an issue shows state `parked` in `pan show`. To unpark it, remove the label or delete its line from `.pan/parked.md`.
+
+**`pan parked`** lists a different set: issues stalled in one of three orbits, oldest first, each with why and how to release it:
+
+- `operator-gate`: an agent you paused, one marked troubled, one you stopped, or an open `pan ask` decision waiting in Needs you. Release it with `pan unpause <id>`, `pan untroubled <id>`, `pan start <id>`, or by answering the `pan ask` decision.
+- `zombie-session`: a live agent on an issue that is already closed.
+- `idle-running`: a live agent idle for 6 hours or more with no pipeline stage owning the next move.
+
+`--json` prints the raw rows. `pan parked` does not list issues parked by the `parked` label or by a `.pan/parked.md` listing; those only ever show up on this page.
+
+## The backlog sequencer
+
+The Backlog Sequencer page, at `/backlog` (open it from **More → Operations → Backlog**), ranks the open backlog in pickup order with dependency context and the gates that control pickup and planning.
+
+It has three views: **List**, **DAG** and **Forecast**. The List view's columns are rank, importance, the issue with status markers, a one-line why, size, condition, gate and a 0 to 100 score. The DAG view draws the dependency graph, collapsing to the top issues plus their neighbors once the backlog gets large. The Forecast view shows a stat bar of counts (in flight, ready, planned, pickable, and more) and two sub-tabs: **Waves**, which groups pickable work into the order it would run, and **Lanes**, which shows the same work spread across a modeled number of parallel agents.
+
+Filters narrow by importance, condition, pipeline membership, release status, having a PRD, free text, and a stale toggle.
+
+Four buttons run a sequencing pass, one at a time:
+
+- **Run creation pass** ranks the open backlog from scratch; it shows only when there is no sequence yet.
+- **Update changed** re-reads only the issues that changed since the last pass and keeps every other rank.
+- **Re-rank all** re-ranks the whole open backlog; slower and more expensive than an incremental pass.
+- **Clear** deletes the sequence file and its cache so a creation pass can rebuild it.
+
+The dashboard also starts an automatic incremental pass on its own, at most once every 30 minutes, whenever the backlog changes. Each pass runs a `sequencer-runner` agent on `roles.sequencer.model`; see [Model routing](/configuration/model-routing) for what that role resolves to.
+
+Hovering a row shows **+ Order book**, which adds the issue to the active order book's Lane A or Lane B; a row already in a book shows **Open order book** instead. Clicking a row opens its detail panel, with the same pickup controls also found in the issue cockpit and the issue drawer: **Release** moves a planned issue to released, **Recall** undoes it, **Promote** jumps an issue ahead of its rank, and **Vetoed** keeps it out of pickup, planning and the sequence's own ranking entirely.
+
+The sequence lives at `.pan/backlog/sequence.md` in the plan home, committed on `main`. `pan backlog write-sequence <file>` is how the sequencer agent writes it: it validates the file's fields (`issue`, `rank`, `size`, `importance`, `score`, `condition`, `dependsOn`, `why`, `gate`, `planning`), commits and pushes; see [Pipeline commands](/cli/pipeline-commands) for the full command. Never hand-edit the file.
+
+## Files the loop and the sequencer keep
+
+The loop and the sequencer each keep their state in a few plain files under the plan home, never in a database:
+
+- `.pan/flywheel/state.md`: the loop's memory across runs, substrate fixes and learnings it wants to carry forward. It is appended to, then committed and pushed.
+- `.pan/flywheel/report.md`: what shipped, what is in flight, what is parked, and substrate fixes found. It is written on `pan flywheel stop` or `pan flywheel report`, replacing the previous report, then committed and pushed. The Flywheel page's State and Report tabs render these two files.
+- `.pan/backlog/sequence.md`: a human-readable table and rationale for the top of the backlog, followed by a machine-readable JSON block below a marker line. Do not hand-edit anything below that marker; it is committed on `main` as `chore(workspace): backlog sequence`.
+
+`pan backlog write-sequence <file>` is the only way the sequence file should be written: it validates the JSON (naming fields like `issue`, `rank`, `size`, `importance`, `score`, `condition`, `dependsOn`, `why`, `gate` and `planning`), skips the commit when only the timestamp would change, then commits and pushes. A validation error prints `Validation error: ...` and exits 1. See [Pipeline commands](/cli/pipeline-commands) for the full command reference.
+
+## Known limits
+
+- The loop's author gate names fixed GitHub logins: it acts only on issues whose author is `eltmon` (the Overdeck maintainer) or `panopticon-agent[bot]`, or that are assigned to `eltmon`. On any other repo or account the loop skips your issues, and the current GitHub App bot (`overdeck-agent[bot]`) does not pass it either. See [issue #5544](https://github.com/eltmon/overdeck/issues/5544).
+- The Backlog page and its automatic pass read the sequence from the dashboard server's working directory, the Overdeck checkout or install it runs from. There is no project picker yet.
+- The agent cap (`roles.flywheel.maxAgents`) and the pickup rule are applied by the loop's own instructions; `pan start` checks neither on its own.
+- There is one Flywheel conversation per Overdeck install, `conv-flywheel`.
+
+## Related
+
+- [Flywheel vision](/vision): the roadmap and the readiness criteria for a user-facing v1.0.
+- [Issue pipeline](/features/issue-pipeline): the stages an issue moves through after `pan start`, and Needs you in general.
+- [Order books](/configuration/order-books): curated campaigns and the `pan orders` commands.
+- [Auto-merge](/configuration/auto-merge): the merge policy the loop never bypasses.
+- [Merge batches](/features/merge-batches): the merge train.
+- [Pipeline commands](/cli/pipeline-commands): the full `pan flywheel` and `pan backlog` flag tables.
+
+## Get help
+
+Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file an issue on [GitHub Issues](https://github.com/eltmon/overdeck/issues).

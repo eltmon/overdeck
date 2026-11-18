@@ -37,6 +37,7 @@ Planning runs only when the issue has no plan yet. Once a plan exists, `--plan` 
 Starting planning from the dashboard Plan dialog works differently: the issue waits in Planned unless its `Start work as soon as the plan is ready` checkbox is ticked. Otherwise you move it on yourself with the `Start work` issue action, which is enabled once the plan has tasks and no agent is running.
 
 A few more `pan start` flags worth knowing: `--plan-model` sets the planning model and leaves the work model to `--model`; `--fresh` drops the saved Claude session and starts a new one, replacing a live session too; `--force` clears the paused and troubled gates and starts anyway.
+The [Flywheel](/features/flywheel) calls `pan start` itself, on the issue it picks next from your backlog.
 
 ## Plan
 
