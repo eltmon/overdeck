@@ -20,6 +20,28 @@ An issue moves through a fixed sequence of stages: plan, work, verification, rev
 | Merge | The dashboard server, or you | The one merge gate passes |
 | Close-out | You, or `pan close` | Every Definition of Done row is satisfied |
 
+## Start an issue
+
+Start an issue with `pan start <id>`. When the issue has no plan yet, `pan start` plans it first, and its `--plan <mode>` flag picks the depth:
+
+```bash
+pan start <id> --plan interactive   # Full interview before work starts
+pan start <id> --plan auto          # Non-interactive planning, no questions
+pan start <id> --plan skip          # Skip planning; synthesize a minimal xBRIEF
+```
+
+Which mode runs when you omit `--plan` follows a fixed order: the `--plan` flag, then the deprecated `--auto` flag (treated as `skip`), then the `planning.default_mode` config key, then the shipped default, `auto`.
+
+Planning runs only when the issue has no plan yet. Once a plan exists, `--plan` is ignored and the work agent starts directly. With `auto` or `interactive`, `pan start` never stops at Planned: the work agent starts on its own as soon as planning finalizes.
+
+Starting planning from the dashboard Plan dialog works differently: the issue waits in Planned unless its `Start work as soon as the plan is ready` checkbox is ticked. Otherwise you move it on yourself with the `Start work` issue action, which is enabled once the plan has tasks and no agent is running.
+
+A few more `pan start` flags worth knowing: `--plan-model` sets the planning model and leaves the work model to `--model`; `--fresh` drops the saved Claude session and starts a new one, replacing a live session too; `--force` clears the paused and troubled gates and starts anyway.
+
+## Plan
+
+Planning writes a PRD, an xBRIEF plan and a continue file, then finalizes the plan. A planning agent never writes code. See [Planning: PRDs, xBRIEF plans and the plan critic](/features/planning) for the Plan dialog, `pan plan`, the PRD draft, the xBRIEF schema, finalize and the plan critic.
+
 ## Get help
 
 Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file an issue on [GitHub Issues](https://github.com/eltmon/overdeck/issues).
