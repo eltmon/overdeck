@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-5541",
   "created": "2026-11-18T20:13:04.612Z",
-  "updated": "2026-11-18T22:15:11.545Z",
+  "updated": "2026-11-18T22:50:31.145Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-18T22:50Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-18T22:50:31.145Z"
+    }
+  ],
   "items": {
     "server-request-issue-id": {
       "status": "completed",
@@ -251,5 +257,14 @@
       "status": "completed",
       "doneAt": "2026-11-18T22:15:11.545Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-18T22:50:31Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5541\n\nPull request: https://github.com/eltmon/overdeck/pull/5561 (head `0dc2c1ac`)\n\nSource: check_run:test-e2e\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-e2e [INHERITED FROM MAIN — also failing on main]\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/135189333558/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/44413999541/job/135189333558  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/Stage.allProjects.test.tsx\u001b[2m > \u001b[22mStage Layout bar (PAN-5343 H-D7)\u001b[2m > \u001b[22mrenders the Layout bar in the All projects deck\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/Stage.allProjects.test.tsx\u001b[2m > \u001b[22mStage Layout bar (PAN-5343 H-D7)\u001b[2m > \u001b[22mrenders no Layout bar in a project deck\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/Stage.allProjects.test.tsx\u001b[2m > \u001b[22mStage make-only button (PAN-5343 H-D19)\u001b[2m > \u001b[22mcollapses a 2-leaf layout to the chosen pane and keeps the other tab\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/Stage.allProjects.test.tsx\u001b[2m > \u001b[22mStage conversation drop (PAN-5343 H-D8)\u001b[2m > \u001b[22ma project deck shows no overlay for another project's conversation, but does for its own\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/Stage.allProjects.test.tsx\u001b[2m > \u001b[22mStage conversation drop (PAN-5343 H-D8)\u001b[2m > \u001b[22mdropping on the right edge of a one-pane All deck gives two leaves\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/Stage.allProjects.test.tsx\u001b[2m > \u001b[22mStage project marks (PAN-5343 H-D9)\u001b[2m > \u001b[22mmarks agent tabs and split headers with their project in the All deck\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/Stage.allProjects.test.tsx\u001b[2m > \u001b[22mStage project marks (PAN-5343 H-D9)\u001b[2m > \u001b[22mrenders no project mark on agent tabs in a project deck\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/Stage.allProjects.test.tsx\u001b[2m > \u001b[22mStage empty All deck (PAN-5343 H-D10)\u001b[2m > \u001b[22mshows the empty state and no Home tab when the All deck has no panes\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/Stage.allProjects.test.tsx\u001b[2m > \u001b[22mStage empty All deck (PAN-5343 H-D10)\u001b[2m > \u001b[22moffers no \"Changes in\" action in the new-pane menu\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m6 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m563 passed\u001b[39m\u001b[22m\u001b[90m (569)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
 }
