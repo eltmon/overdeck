@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-18T19:57:03.401452Z · model: claude-opus-5-5 · open: 937_
+_Last sequenced: 2026-11-18T20:27:29.662253Z · model: claude-opus-5-5 · open: 938_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -121,6 +121,7 @@ _Last sequenced: 2026-11-18T19:57:03.401452Z · model: claude-opus-5-5 · open: 
 | 112 | PAN-3697 | XS | high | ok |  |  | Deployed dashboard PATH omits Bun, so verification workers hit 'bun: not found' before the required install gate. |
 | 113 | PAN-3633 | S | high | ok |  |  | Strike workspaces spawn without @types, so the contract's own typecheck gate fails and agents abort reporting a false red main. |
 | 114 | PAN-4420 | S | high | ok |  |  | npx @overdeck/core on native Windows serves 404 for every page: static root is built from a URL path |
+| 114 | PAN-5543 | XS | high | ok |  |  | overdeck up treats the install script's ~/.local/bin/overdeck CLI bin as the desktop app, so up never starts the dashboard properly. |
 | 115 | PAN-3099 | XS | critical | ok |  |  | --health-timeout 120 is enforced as 120ms and a false-failed check exits after killing the old server — nothing left listening. |
 | 116 | PAN-4418 | S | high | ok |  |  | vault join fails on native Windows: core.autocrlf=true rewrites the VAULT-FORMAT marker; blocks Windows continue flow |
 | 117 | PAN-3040 | S | critical | ok |  |  | pan strike is monorepo-shaped end to end and fails immediately on polyrepo projects; same defect as PAN-3708. |
@@ -1272,10 +1273,10 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-18T19:57:03.401452Z",
+  "generatedAt": "2026-11-18T20:27:29.662253Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 937,
+  "openCount": 938,
   "nodes": [
     {
       "issue": "PAN-5541",
@@ -2790,6 +2791,19 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "condition": "ok",
       "dependsOn": [],
       "why": "npx @overdeck/core on native Windows serves 404 for every page: static root is built from a URL path",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5543",
+      "rank": 114,
+      "size": "XS",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "overdeck up treats the install script's ~/.local/bin/overdeck CLI bin as the desktop app, so up never starts the dashboard properly.",
+      "rationale": "New first-run bug on the recommended Linux install path (confirmed in src/cli/index.ts and scripts/install.sh): every install-script user's overdeck up launches the CLI as the desktop app and skips the real startup. Banded beside PAN-4420, the comparable Windows first-run break.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14455,6 +14469,13 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
     {
       "from": "PAN-5537",
       "to": "PAN-5502",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-5543",
+      "to": "PAN-5480",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
