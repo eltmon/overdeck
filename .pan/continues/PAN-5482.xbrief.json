@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5482",
   "created": "2026-11-18T21:37:14.666Z",
-  "updated": "2026-11-18T21:52:06.716Z",
+  "updated": "2026-11-18T21:52:44.545Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,9 +126,18 @@
       "doneAt": "2026-11-18T21:52:01.700Z"
     },
     "delete-wizard-meta": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5482",
-      "claimedAt": "2026-11-18T21:52:06.716Z"
+      "claimedAt": "2026-11-18T21:52:06.716Z",
+      "doneAt": "2026-11-18T21:52:44.545Z"
+    },
+    "delete-wizard-meta.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:52:44.545Z"
+    },
+    "delete-wizard-meta.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:52:44.545Z"
     }
   }
 }
