@@ -1,7 +1,7 @@
 ---
 title: "Overdeck concepts"
 sidebarTitle: "Concepts"
-description: Understanding the key concepts behind Overdeck's architecture
+description: "The core ideas behind Overdeck: Command Deck, agents, workspaces, the issue pipeline, model routing, skills and issue trackers."
 ---
 
 import { ThemedImage } from "/snippets/themed-image.mdx";
@@ -12,66 +12,64 @@ Learn the fundamental concepts that power Overdeck.
 
 The live development surface where you and your agents work together. A full-height **project sidebar** on the left owns project selection; everything to its right is scoped to the project you pick and updates in real time:
 
-- **App bar** — the project crumb, a project-scoped search, and status pills at a glance (Deacon health, running-agent count, stopped agents). No more persistent banners — attention items surface as compact pills.
-- **Tab strip** — every issue, agent, and conversation you open becomes a tab. Scroll on overflow, middle-click to close, right-click to pop out to a window or close others, and **split the view** (drag a tab to a pane's edge) to watch two panes side by side.
-- **Pane body** — the working area. A project's **Home cockpit** (issue swimlanes, recent spend, a stuck count), an **issue view** (a title row with the issue's state, cost and next actions; a pipeline strip; a needs-you banner when you must act; and tabs led by the agent's conversation (Conversation, Tasks, Plan, Changes, Activity, Discussion, Skills, Details). It is the same view the issue drawer shows), or an agent's live conversation and terminal.
-- **Activity feed** — the **Feed** tab on `/activity`, with **Needs-you / Project / Global** scopes, so anything waiting on your input is one page away; the top bar's **Needs you** menu lists the same items. Inside Project and Global, the **All / Chats / Activity** tabs: All lists what changed (created, ended, reported, merged) rather than every busy conversation, Chats lists the conversations active in the last day, and a gauntlet run appears as one card.
+- **App bar**: the project crumb, a project-scoped search, and status pills at a glance (Deacon health, running-agent count, stopped agents). No more persistent banners; attention items surface as compact pills.
+- **Tab strip**: every issue, agent, and conversation you open becomes a tab. Scroll on overflow, middle-click to close, right-click to pop out to a window or close others, and **split the view** (drag a tab to a pane's edge) to watch two panes side by side.
+- **Pane body**: the working area. A project's **Home cockpit** (issue swimlanes, recent spend, a stuck count), an **issue view** (a title row with the issue's state, cost and next actions; a pipeline strip; a needs-you banner when you must act; and tabs led by the agent's conversation (Conversation, Tasks, Plan, Changes, Activity, Discussion, Skills, Details). It is the same view the issue drawer shows), or an agent's live conversation and terminal.
+- **Activity feed**: the **Feed** tab on `/activity`, with **Needs-you / Project / Global** scopes, so anything waiting on your input is one page away; the top bar's **Needs you** menu lists the same items. Inside Project and Global, the **All / Chats / Activity** tabs: All lists what changed (created, ended, reported, merged) rather than every busy conversation, Chats lists the conversations active in the last day, and a gauntlet run appears as one card.
 
 <ThemedImage
   light="/images/dashboard/command-deck-hero-light.png"
   dark="/images/dashboard/command-deck-hero-dark.png"
-  alt="Command Deck — the left column with the project's conversations and issues, and an agent's turn-by-turn tool calls and reasoning"
+  alt="Command Deck: the left column with the project's conversations and issues, and an agent's turn-by-turn tool calls and reasoning"
 />
 
 Command Deck is where you *manage the conversation*, not just watch a workflow run. The center pane streams the agent's turn-by-turn reasoning and tool calls as they happen, the left column keeps the project's conversations, issues and workspaces one click away on every page, and the top bar's Needs you menu and the Activity feed on `/activity` collect anything that needs your attention.
 
-Everything is alive — no refresh buttons. Domain events trigger small, informative UI motion: cost increments animate, tool names fade in and out, status dots pulse.
+Everything is alive: no refresh buttons. Domain events trigger small, informative UI motion: cost increments animate, tool names fade in and out, status dots pulse.
 
 <ThemedImage
   light="/images/command-deck/issue-cockpit-light.png"
   dark="/images/command-deck/issue-cockpit-dark.png"
-  alt="The issue view in a Command Deck tab — title row with state, cost and actions, the pipeline strip, the tab strip led by Conversation, and the work agent's conversation"
+  alt="The issue view in a Command Deck tab: title row with state, cost and actions, the pipeline strip, the tab strip led by Conversation, and the work agent's conversation"
 />
 
 The **issue view** above is the same view the issue drawer shows. It has a title row with the issue's state, cost and next actions; a pipeline strip with the checks and pickup controls; a needs-you banner when you must act; and tabs led by the agent's conversation: Conversation, Tasks, Plan, Changes, Activity, Discussion, Skills and Details. Details holds the status, the pipeline with per-agent cost, the ship progress, the workspace, and (in the Command Deck tab) the launcher and agent dock.
 
 ### What You Can Do From Command Deck
 
-- **Review diffs as they land** — every file change appears inline as the agent works. Open the diff panel for a turn-by-turn view, or hit "vs main" to see the full picture.
-- **Talk to agents** — type in the composer to steer an agent mid-task. Point it at the right file, correct its approach, or tell it to rethink.
-- **Hot-swap models** — open the model picker and switch from Sonnet to Opus (or Kimi, GPT, Gemini) without losing the conversation.
-- **Branch to explore** — fork any conversation to try a different approach. Keep the original intact, compare both.
-- **Roll back with checkpoints** — Command Deck snapshots agent state as work progresses. Go sideways? Roll back instead of starting over.
-- **See the plan** — xBRIEF work plans render as interactive DAGs with dependencies, acceptance criteria, and live status tracking.
+- **Review diffs as they land**: every file change appears inline as the agent works. Open the diff panel for a turn-by-turn view, or hit "vs main" to see the full picture.
+- **Talk to agents**: type in the composer to steer an agent mid-task. Point it at the right file, correct its approach, or tell it to rethink.
+- **Fork or hand off**: fork a conversation into a new one that starts from a summary of the work, or hand off to a new conversation on a different model. A conversation's model is fixed once it starts.
+- **See the plan**: xBRIEF work plans render as interactive DAGs with dependencies, acceptance criteria, and live status tracking.
 
 ## Agents
 
-Agents are AI coding assistants that work on the tasks you assign. You direct them from Command Deck — watch them code in real time, send messages to steer their approach, swap their model when the task shifts, fork the conversation to try something different, and review their diffs inline as they go.
+Agents are AI coding assistants that work on the tasks you assign. You direct them from Command Deck: watch them code in real time, send messages to steer their approach, fork or hand off the conversation, and review their diffs inline as they go.
 
 Agent types:
-- **Implementation agents** — Work on features, bugs, refactoring in isolated worktrees
-- **Planning agents** — Explore codebases and create PRDs with Opus
-- **Specialist agents** — Dedicated review, test, inspect, UAT, and merge agents triggered by Cloister
+- **Implementation (work) agents**: work on features, bugs, and refactoring in isolated worktrees
+- **Planning agents**: write a PRD and an xBRIEF plan before work starts
+- **Review and test agents**: check finished work on the pull request
 
 You can manage agents via Command Deck, the CLI, or the REST API.
 
 ## Cloister
 
-The lifecycle manager. Cloister routes tasks to models based on capabilities, detects stuck agents, triggers specialist handoffs, and tracks costs. It runs a patrol loop that checks agent health and manages the specialist queue. Supports multi-provider routing across Anthropic, OpenAI, Google, Kimi, MiniMax, and OpenRouter.
+Cloister is the agent watchdog. It checks each running agent's health, pokes or nudges stuck agents, restarts crashed ones, and recovers stalled reviews. See [Cloister](/features/cloister).
 
-## PRD-Driven Workflow
+## Planning
 
-Opus writes a PRD before implementation starts. Agents are blocked from starting without a PRD — this ensures strategic decisions are made by the strongest model, not cheaper ones. PRDs are auto-committed to the workspace after planning.
+`pan start <issue>` plans the issue before work starts: a planning agent writes a PRD and an xBRIEF plan, and they are committed under `.pan/` in your repo. `pan start --plan skip` skips planning. See [Planning](/features/planning).
 
 ## Workspaces
 
-**Workspaces are git worktrees** — isolated working directories for each issue. Each workspace:
+**Workspaces are git worktrees**: isolated working directories for each issue. Each workspace:
 
 - Has its own feature branch (e.g., `feature/pan-123`)
 - Shares git history with the main repo (no separate clone)
 - Can include Docker containers for full development environments
 - Is located at `{project}/workspaces/feature-{issue-id}/`
-- Contains a `.planning/` directory with PRD, STATE.md, beads, and feedback
+- Keeps runtime files in `.overdeck/`; planning files live in `.pan/` (see [State model](/reference/state-model))
 
 This allows multiple agents to work on different features simultaneously without conflicts.
 
@@ -87,23 +85,15 @@ Workspaces can include Docker containers for full development environments. Supp
 
 ## Specialists
 
-When you want to go hands-off, the specialist pipeline takes over. Five dedicated agents handle the quality lifecycle automatically:
-
-1. **Review Agent** — Comprehensive code review (correctness, security, performance)
-2. **Test Agent** — Runs tests and validates functionality
-3. **Inspect Agent** — Per-step verification after each bead, ensuring implementation matches the spec
-4. **UAT Agent** — Browser-based requirement verification using Playwright after tests pass
-5. **Merge Agent** — Handles PR/MR creation and merging
-
-The only manual step is clicking **MERGE** when you're satisfied with the results.
+When a work agent finishes, a review agent and a test agent check the work on the pull request. When the PR is approved and its checks are green, you click **Merge**, or let [auto-merge](/configuration/auto-merge) ship it. See [Specialists](/features/specialists).
 
 <ThemedImage
   light="/images/dashboard/pipeline-light.png"
   dark="/images/dashboard/pipeline-dark.png"
-  alt="Pipeline page — a metric strip (Active issues, Work running, Review queue, Ship, Spend) above phase-grouped issue rows for Ship, Review, and Verifying, with an activity feed on the right"
+  alt="Pipeline page: a metric strip (Active issues, Work running, Review queue, Ship, Spend) above phase-grouped issue rows for Ship, Review, and Verifying, with an activity feed on the right"
 />
 
-The **Pipeline** page is the at-a-glance view of this lifecycle: a metric strip across the top (Active issues, Work running, Review queue, Ship, Spend) sits over issue rows grouped by phase — Ship, Review, Verifying — with a live activity feed alongside. It shows where every issue sits as specialists hand it forward.
+The **Pipeline** page is the at-a-glance view of this lifecycle: a metric strip across the top (Active issues, Work running, Review queue, Ship, Spend) sits over issue rows grouped by phase (Ship, Review, Verifying) with a live activity feed alongside. It shows where every issue sits as specialists hand it forward.
 
 ## Model routing
 
@@ -111,7 +101,7 @@ Each role runs on a model you choose, usually through one of three workhorse slo
 
 ## Skills
 
-Universal SKILL.md format works across Claude Code, Codex, Cursor, Gemini CLI, and Google Antigravity. 70+ skills ship out of the box covering:
+Overdeck ships more than 120 skills in the SKILL.md format. `pan sync` installs them for Claude Code and for the harnesses that read `~/.agents/skills`, such as Codex and Pi.
 
 - Development workflows (feature work, bug fixing, refactoring)
 - Code review (correctness, security, performance)
@@ -119,25 +109,21 @@ Universal SKILL.md format works across Claude Code, Codex, Cursor, Gemini CLI, a
 - Codebase onboarding
 - Project-specific knowledge capture
 
-Sync skills to all your AI tools with `pan sync`.
-
-## Beads
-
-Git-backed task tracking that survives context compaction and works offline. Beads give agents persistent memory across sessions — when a conversation gets compressed, the agent can recover its task state from beads.
+See [Skills](/features/skills).
 
 ## Convoys
 
-Run parallel agents on related issues. Useful for security audits, performance reviews, or breaking an epic into concurrent work streams. Results are auto-synthesized by a dedicated synthesis agent.
+A convoy is the full review mode: four reviewers (security, correctness, performance and requirements) check one pull request in parallel, and a review parent writes the verdict. Turn it on with `roles.review.mode: full`. See [Convoys](/features/convoys).
 
 ## Issue Tracker Integration
 
 Overdeck integrates with 5 issue trackers:
 
-- **GitHub Issues** — Full integration with PRs and status updates
-- **Linear** — Full integration with cycles, labels, and status updates
-- **GitLab Issues** — Issue tracking and MR management
-- **Rally (CA Agile Central)** — Enterprise issue tracking
-- **Jira (Cloud and Data Center)** — Atlassian issue tracking
+- **GitHub Issues**: Full integration with PRs and status updates
+- **Linear**: Full integration with cycles, labels, and status updates
+- **GitLab Issues**: Issue tracking and MR management
+- **Rally (CA Agile Central)**: Enterprise issue tracking
+- **Jira (Cloud and Data Center)**: Atlassian issue tracking
 
 The dashboard displays issues from all configured trackers in a unified kanban board with cost badges, agent status indicators, and workspace controls.
 
@@ -150,13 +136,9 @@ Per-issue, per-stage token costs with dashboard analytics. Every agent session i
 - Dollar costs per stage (planning, work, review, test, merge)
 - Daily cost summaries on the Board view
 
-## Shadow Engineering
-
-Monitor existing workflows before transitioning to AI-driven development. Upload transcripts, sync discussions, and generate inference documents to build institutional knowledge before handing off to agents.
-
 ## Next Steps
 
 - [CLI Commands](/cli/overview) - Learn about available commands
-- [Mission Control](/features/mission-control) - Deep dive into the dashboard
+- [Command Deck](/features/mission-control) - Deep dive into the dashboard
 - [Cloister](/features/cloister) - Understand the AI lifecycle manager
 - [Specialists](/features/specialists) - Learn about the automated quality pipeline
