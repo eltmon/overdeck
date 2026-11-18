@@ -171,6 +171,55 @@ of three outcomes: the menu, a confirmation that option `n` was selected, or an 
 menu is gone, the menu changed (run `pan answer` again), or delivery is unconfirmed (check the
 terminal).
 
+## pan close
+
+Verify an issue's Definition of Done, clean up its workspace residue, and close the issue on the
+tracker. It checks eight rows, in order: Review passed, Tests passed, Verification green on the
+branch, Merged to main, Post-merge lifecycle ran, Verified on main, Version strings propagated,
+and Deployed.
+
+```bash
+pan close PAN-1148
+pan close PAN-1148 --accept-deploy    # accept a missed row and record the override
+pan close PAN-1148 --abandon "superseded by PAN-1200"
+```
+
+| Option | What it does |
+| --- | --- |
+| `--force` | Skips the confirmation prompt |
+| `--json` | Outputs as JSON |
+| `--accept-review` | Accepts a missed Definition of Done row 1 (Review passed) as an explicit override, recorded in the close-out record |
+| `--accept-tests` | Accepts a missed row 2 (Tests passed) as an explicit override |
+| `--accept-verification` | Accepts a missed row 3 (Verification green on the branch) as an explicit override |
+| `--accept-merged` | Accepts a missed row 4 (Merged to main) as an explicit override |
+| `--accept-post-merge` | Accepts a missed row 5 (Post-merge lifecycle ran) as an explicit override |
+| `--accept-main-verify` | Accepts a missed row 6 (Verified on main) as an explicit override |
+| `--accept-ship` | Accepts a missed row 7 (Version strings propagated) as an explicit override |
+| `--accept-deploy` | Accepts a missed row 8 (Deployed) as an explicit override |
+| `--abandon <reason>` | Records an abandoned disposition: skips the Definition of Done gate and closes without landing evidence |
+| `--residue <reason>` | Records a residue disposition: closes a stale convention PR or MR, skips the gate with verified evidence, and marks the issue terminal without a merge claim |
+
+`--abandon` and `--residue` are operator-conversation only, and neither combines with each other
+or with any `--accept-*` flag.
+
+## pan strike
+
+Spawn a strike agent that implements a fix on a strike branch and opens a pull request against
+main for the operator to merge. A strike bypasses plan, review, test and ship.
+
+```bash
+pan strike PAN-1148
+pan strike PAN-1148 PAN-1200 --effort high
+pan strike PAN-1148 --dry-run
+```
+
+| Option | What it does |
+| --- | --- |
+| `--model <model>` | Model override (defaults to `roles.strike.model` in config) |
+| `--harness <harness>` | Coding-agent harness (defaults to role or provider settings) |
+| `--effort <level>` | Strike effort: `low`, `medium`, `high`, `xhigh` or `max` (default `high`) |
+| `--dry-run` | Prints what would happen without spawning |
+
 ## Get help
 
 - [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P)
