@@ -220,6 +220,84 @@ pan strike PAN-1148 --dry-run
 | `--effort <level>` | Strike effort: `low`, `medium`, `high`, `xhigh` or `max` (default `high`) |
 | `--dry-run` | Prints what would happen without spawning |
 
+## pan flywheel
+
+Start, stop, pause, resume, or inspect the Flywheel conversation, the loop that drives issues
+through the pipeline autonomously.
+
+```bash
+pan flywheel start
+pan flywheel start --orders my-order-book
+pan flywheel status --json
+pan flywheel stop
+```
+
+| Command | What it does | Options |
+| --- | --- | --- |
+| `pan flywheel start` | Launches a conversation running `/pan-flywheel` | `--model`, `--harness`, `--cwd <path>`, `--orders <book-id>`, `--fresh` (replaces a paused flywheel instead of refusing) |
+| `pan flywheel stop` | Asks the loop to write its report, waits for it, then pauses | `--timeout <ms>` (default 120000) |
+| `pan flywheel abort` | Stops the flywheel conversation without a report | none |
+| `pan flywheel pause` | Stops the flywheel session, keeping its conversation and transcript | none |
+| `pan flywheel resume` | Respawns a paused flywheel and re-sends `/pan-flywheel` | none |
+| `pan flywheel report` | Asks a running loop for its report, or prints the saved one | none |
+| `pan flywheel status` | Shows the derived status: run, last tick, policies, in-flight issues, order book | `--json` |
+| `pan flywheel stats` | Shows the substrate-bug discovery rate and P0 count, computed from the tracker and forge | `--json`, `--window <days>` (default 30) |
+
+See [Use the CLI](/configuration/order-books#use-the-cli) for how `pan flywheel` and `pan orders`
+work together.
+
+## pan orders
+
+Create and manage Flywheel order books: named, lane-ordered lists of issues a Flywheel run works
+from.
+
+```bash
+pan orders create my-order-book
+pan orders add my-order-book PAN-1148 PAN-1200 --lane A
+pan orders queue my-order-book
+pan orders start my-order-book
+```
+
+| Command | What it does | Options |
+| --- | --- | --- |
+| `pan orders create <name>` | Creates a draft order book | `--project <key>` |
+| `pan orders list` | Lists order books | `--project <key>` |
+| `pan orders show <id>` | Shows an order book | `--project <key>` |
+| `pan orders add <id> <issues...>` | Adds issues to an order book | `--lane A\|B` (default `A`), `--after <issue>`, `--reverify` (requires PRD re-verification before pickup), `--project <key>` |
+| `pan orders remove <id> <issue>` | Removes an issue from an order book | `--project <key>` |
+| `pan orders move <id> <issue>` | Moves an issue within or between lanes | `--lane A\|B`, `--order <n>` (one-based position in the target lane), `--project <key>` |
+| `pan orders queue <id>` | Marks a draft order book ready for dispatch | `--project <key>` |
+| `pan orders start <id>` | Starts a Flywheel run bound to an order book | `--project <key>` |
+
+See [Use the CLI](/configuration/order-books#use-the-cli).
+
+## pan backlog
+
+Manage the backlog sequencer that ranks and pins issue work.
+
+```bash
+pan backlog write-sequence sequence.json
+```
+
+| Command | What it does | Options |
+| --- | --- | --- |
+| `pan backlog write-sequence <file>` | Validates a SequenceDoc JSON file, writes it to `.pan/backlog/sequence.md`, and commits it | `--project-root <path>` (default cwd) |
+
+## pan merge
+
+Cancel a pending Flywheel auto-merge.
+
+```bash
+pan merge cancel PAN-1148
+```
+
+| Command | What it does | Options |
+| --- | --- | --- |
+| `pan merge cancel <id>` | Cancels a pending Flywheel auto-merge during its cooldown window | none |
+
+See [Cancelling](/configuration/auto-merge#cancelling) for what the cooldown window is and what
+cancelling changes.
+
 ## Get help
 
 - [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P)
