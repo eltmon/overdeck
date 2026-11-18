@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5503",
   "created": "2026-11-18T23:39:30.709Z",
-  "updated": "2026-11-18T23:55:57.727Z",
+  "updated": "2026-11-18T23:57:19.150Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -457,9 +457,30 @@
       "doneAt": "2026-11-18T23:55:53.527Z"
     },
     "harnesses-grok-to-tos": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5503",
-      "claimedAt": "2026-11-18T23:55:57.727Z"
+      "claimedAt": "2026-11-18T23:55:57.727Z",
+      "doneAt": "2026-11-18T23:57:19.150Z"
+    },
+    "harnesses-grok-to-tos.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:57:19.150Z"
+    },
+    "harnesses-grok-to-tos.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:57:19.150Z"
+    },
+    "harnesses-grok-to-tos.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:57:19.150Z"
+    },
+    "harnesses-grok-to-tos.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:57:19.150Z"
+    },
+    "harnesses-grok-to-tos.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:57:19.150Z"
     }
   }
 }
