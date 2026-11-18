@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5468",
   "created": "2026-11-18T19:13:53.395Z",
-  "updated": "2026-11-18T19:23:55.391Z",
+  "updated": "2026-11-18T19:23:59.849Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -172,6 +172,11 @@
     "section-needs-you.ac3": {
       "status": "completed",
       "doneAt": "2026-11-18T19:23:55.391Z"
+    },
+    "section-merge": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5468",
+      "claimedAt": "2026-11-18T19:23:59.848Z"
     }
   }
 }
