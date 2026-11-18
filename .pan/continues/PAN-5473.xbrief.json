@@ -1,0 +1,213 @@
+{
+  "version": "1",
+  "issueId": "PAN-5473",
+  "created": "2026-11-18T22:01:31.208Z",
+  "updated": "2026-11-18T22:21:10.042Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "page-install": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5473",
+      "claimedAt": "2026-11-18T22:01:31.208Z",
+      "doneAt": "2026-11-18T22:05:07.147Z"
+    },
+    "page-install.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:05:07.147Z"
+    },
+    "page-install.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:05:07.147Z"
+    },
+    "page-install.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:05:07.147Z"
+    },
+    "page-install.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:05:07.147Z"
+    },
+    "page-pan-up": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5473",
+      "claimedAt": "2026-11-18T22:05:12.499Z",
+      "doneAt": "2026-11-18T22:06:34.162Z"
+    },
+    "page-pan-up.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:06:34.162Z"
+    },
+    "page-pan-up.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:06:34.162Z"
+    },
+    "page-pan-up.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:06:34.162Z"
+    },
+    "page-tray-menu": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5473",
+      "claimedAt": "2026-11-18T22:06:41.007Z",
+      "doneAt": "2026-11-18T22:07:46.350Z"
+    },
+    "page-tray-menu.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:07:46.350Z"
+    },
+    "page-tray-menu.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:07:46.350Z"
+    },
+    "page-tray-menu.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:07:46.350Z"
+    },
+    "page-notifications": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5473",
+      "claimedAt": "2026-11-18T22:07:50.921Z",
+      "doneAt": "2026-11-18T22:08:46.076Z"
+    },
+    "page-notifications.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:08:46.076Z"
+    },
+    "page-notifications.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:08:46.076Z"
+    },
+    "page-login": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5473",
+      "claimedAt": "2026-11-18T22:08:50.695Z",
+      "doneAt": "2026-11-18T22:09:48.535Z"
+    },
+    "page-login.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:09:48.535Z"
+    },
+    "page-login.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:09:48.535Z"
+    },
+    "page-updates": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5473",
+      "claimedAt": "2026-11-18T22:09:54.972Z",
+      "doneAt": "2026-11-18T22:10:53.696Z"
+    },
+    "page-updates.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:10:53.696Z"
+    },
+    "page-updates.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:10:53.696Z"
+    },
+    "page-remote-machine": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5473",
+      "claimedAt": "2026-11-18T22:10:58.646Z",
+      "doneAt": "2026-11-18T22:12:48.411Z"
+    },
+    "page-remote-machine.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:12:48.411Z"
+    },
+    "page-remote-machine.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:12:48.411Z"
+    },
+    "page-remote-machine.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:12:48.411Z"
+    },
+    "page-help": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5473",
+      "claimedAt": "2026-11-18T22:12:54.126Z",
+      "doneAt": "2026-11-18T22:13:43.857Z"
+    },
+    "page-help.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:13:43.857Z"
+    },
+    "page-help.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:13:43.857Z"
+    },
+    "nav-entry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5473",
+      "claimedAt": "2026-11-18T22:13:48.491Z",
+      "doneAt": "2026-11-18T22:14:36.943Z"
+    },
+    "nav-entry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:14:36.943Z"
+    },
+    "nav-entry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:14:36.943Z"
+    },
+    "cross-links": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5473",
+      "claimedAt": "2026-11-18T22:14:41.787Z",
+      "doneAt": "2026-11-18T22:16:08.963Z"
+    },
+    "cross-links.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:16:08.963Z"
+    },
+    "cross-links.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:16:08.963Z"
+    },
+    "cross-links.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:16:08.963Z"
+    },
+    "dev-doc-fixes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5473",
+      "claimedAt": "2026-11-18T22:16:13.680Z",
+      "doneAt": "2026-11-18T22:19:21.234Z"
+    },
+    "dev-doc-fixes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:19:21.234Z"
+    },
+    "dev-doc-fixes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:19:21.234Z"
+    },
+    "dev-doc-fixes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:19:21.234Z"
+    },
+    "validate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5473",
+      "claimedAt": "2026-11-18T22:19:26.170Z",
+      "doneAt": "2026-11-18T22:21:10.041Z"
+    },
+    "validate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:21:10.041Z"
+    },
+    "validate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:21:10.041Z"
+    },
+    "validate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:21:10.041Z"
+    }
+  }
+}
