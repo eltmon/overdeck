@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5472",
   "created": "2026-11-18T16:42:03.966Z",
-  "updated": "2026-11-18T16:49:21.829Z",
+  "updated": "2026-11-18T16:49:26.068Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,11 @@
     "specialists-page.ac4": {
       "status": "completed",
       "doneAt": "2026-11-18T16:49:21.829Z"
+    },
+    "concepts-page": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5472",
+      "claimedAt": "2026-11-18T16:49:26.068Z"
     }
   }
 }
