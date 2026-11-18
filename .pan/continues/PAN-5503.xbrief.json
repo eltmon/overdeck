@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5503",
   "created": "2026-11-18T23:39:30.709Z",
-  "updated": "2026-11-18T23:39:30.709Z",
+  "updated": "2026-11-18T23:40:57.627Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,26 @@
   "sessionHistory": [],
   "items": {
     "harnesses-intro-to-pi": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5503",
-      "claimedAt": "2026-11-18T23:39:30.709Z"
+      "claimedAt": "2026-11-18T23:39:30.709Z",
+      "doneAt": "2026-11-18T23:40:57.626Z"
+    },
+    "harnesses-intro-to-pi.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:40:57.626Z"
+    },
+    "harnesses-intro-to-pi.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:40:57.626Z"
+    },
+    "harnesses-intro-to-pi.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:40:57.626Z"
+    },
+    "harnesses-intro-to-pi.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:40:57.626Z"
     }
   }
 }
