@@ -10,6 +10,7 @@ vi.mock('../../lib/wsTransport', () => ({
 }));
 
 import { SkillPacksSection, type PackSkillState, type PackState, type SkillPacksSectionProps } from './SkillPacksSection';
+import type { AvailableGroup, AvailablePack } from './availablePacks';
 
 function packSkill(overrides: Partial<PackSkillState> & { name: string }): PackSkillState {
   return {
@@ -53,15 +54,46 @@ function pack(overrides: Partial<PackState> = {}): PackState {
   };
 }
 
+// PAN-5540: the known packs, as GET /api/skills/packs/available reports them on a fresh machine.
+const KNOWN_IDS = ['atlassian', 'deft', 'gstack', 'hyperframes', 'mattpocock', 'openmontage', 'pstack', 'remotion', 'sageox', 'video-use'];
+const NEEDS_REF = new Set(['deft', 'gstack', 'mattpocock']);
+const VIDEO = ['remotion', 'hyperframes', 'openmontage', 'video-use'];
+
+function availablePack(id: string, overrides: Partial<AvailablePack> = {}): AvailablePack {
+  const needsRef = NEEDS_REF.has(id);
+  const reason = needsRef ? 'needs-ref' : id === 'sageox' ? 'runs-build' : null;
+  return {
+    id,
+    url: `https://github.com/eltmon/${id}`,
+    ref: needsRef ? null : 'e'.repeat(40),
+    adapter: 'plain',
+    disclosure: id === 'video-use' ? 'video-use sends audio to ElevenLabs Scribe for transcription.' : null,
+    added: false,
+    dashboardAddable: reason === null,
+    reason,
+    addCommand: needsRef ? `pan skills pack add ${id} --ref <ref>` : `pan skills pack add ${id}`,
+    groups: VIDEO.includes(id) ? ['video'] : [],
+    ...overrides,
+  };
+}
+
+const VIDEO_GROUP: AvailableGroup = {
+  name: 'video', packs: VIDEO, source: 'built-in', missing: VIDEO, unknown: [], dashboardAddable: true,
+  addCommand: 'pan skills pack add --group video',
+};
+
 let putBodies: unknown[];
+let availableBody: unknown;
 
 beforeEach(() => {
   putBodies = [];
-  vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => {
+  availableBody = { packs: [], groups: [] };
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
     if (init?.method === 'PUT') {
       putBodies.push(JSON.parse(String(init.body)));
       return { ok: true, status: 200, json: async () => ({ ok: true }) };
     }
+    if (url === '/api/skills/packs/available') return { ok: true, status: 200, json: async () => availableBody };
     return { ok: true, status: 200, json: async () => ({ packs: [] }) };
   }));
 });
@@ -156,9 +188,107 @@ describe('SkillPacksSection', () => {
     expect(within(packRow('mattpocock')).getByText('1 match')).toBeTruthy();
   });
 
-  it('renders the add command when there are no packs', () => {
+});
+
+describe('Available packs (PAN-5540)', () => {
+  const available = (selector: string) => document.querySelector(selector);
+
+  it('lists the missing video group and the not-added known packs at the global level', async () => {
+    availableBody = { packs: KNOWN_IDS.map(id => availablePack(id)), groups: [VIDEO_GROUP] };
     renderSection({ level: 'global', packs: [] });
-    expect(screen.getByText('No skill packs. Add one from the CLI:')).toBeTruthy();
-    expect(screen.getByText('pan skills pack add mattpocock https://github.com/eltmon/skills --ref v1.2.3')).toBeTruthy();
+
+    expect(screen.getByText('No skill packs added yet.')).toBeTruthy();
+    await waitFor(() => expect(available('[data-available-group="video"]')).toBeTruthy());
+    const video = available('[data-available-group="video"]') as HTMLElement;
+    expect(video.textContent).toContain('4 packs not added');
+    expect(video.textContent).toContain('remotion, hyperframes, openmontage, video-use');
+    expect(video.textContent).toContain('pan skills pack add --group video');
+
+    const gstack = available('[data-available-pack="gstack"]') as HTMLElement;
+    expect(gstack.textContent).toContain('Needs a ref. Add it from the CLI:');
+    expect(gstack.textContent).toContain('pan skills pack add gstack --ref <ref>');
+    expect((available('[data-available-pack="sageox"]') as HTMLElement).textContent).toContain('Adding it builds code on this machine.');
+    expect((available('[data-available-pack="remotion"]') as HTMLElement).textContent).toContain('https://github.com/eltmon/remotion @ eeeeeee');
+    expect(document.body.textContent).not.toContain('mattpocock https://github.com/eltmon/skills --ref v1.2.3');
+  });
+
+  it('renders one row per not-added known pack', async () => {
+    availableBody = { packs: KNOWN_IDS.map(id => availablePack(id)), groups: [] };
+    renderSection({ level: 'global', packs: [] });
+
+    await waitFor(() => expect(document.querySelectorAll('[data-available-pack]')).toHaveLength(10));
+    expect([...document.querySelectorAll('[data-available-pack]')].map(row => row.getAttribute('data-available-pack'))).toEqual(KNOWN_IDS);
+  });
+
+  it('omits added packs and groups with nothing missing, and counts partly added groups', async () => {
+    availableBody = {
+      packs: KNOWN_IDS.map(id => availablePack(id, { added: id !== 'openmontage' })),
+      groups: [
+        { ...VIDEO_GROUP, missing: ['openmontage'] },
+        { ...VIDEO_GROUP, name: 'done', missing: [] },
+      ],
+    };
+    renderSection({ level: 'global', packs: [pack()] });
+
+    await waitFor(() => expect(available('[data-available-group="video"]')).toBeTruthy());
+    expect((available('[data-available-group="video"]') as HTMLElement).textContent).toContain('1 of 4 packs not added');
+    expect(available('[data-available-group="done"]')).toBeNull();
+    expect(document.querySelectorAll('[data-available-pack]')).toHaveLength(1);
+  });
+
+  it('names group members that are not known packs', async () => {
+    availableBody = {
+      packs: [],
+      groups: [{ name: 'mine', packs: ['remotion', 'custom-x'], source: 'config', missing: ['custom-x'], unknown: ['custom-x'], dashboardAddable: false, addCommand: 'pan skills pack add --group mine' }],
+    };
+    renderSection({ level: 'global', packs: [] });
+
+    await waitFor(() => expect(available('[data-available-group="mine"]')).toBeTruthy());
+    expect((available('[data-available-group="mine"]') as HTMLElement).textContent).toContain(
+      'custom-x is not a known pack; add it with pan skills pack add <id> <url> --ref <ref>',
+    );
+  });
+
+  it('points to the Skills page below the global level and lists nothing', async () => {
+    availableBody = { packs: KNOWN_IDS.map(id => availablePack(id)), groups: [VIDEO_GROUP] };
+    const pushState = vi.spyOn(window.history, 'pushState');
+    const popstate = vi.fn();
+    window.addEventListener('popstate', popstate);
+    renderSection({ level: 'project', projectKey: 'tst', packs: [] });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Skills page' }));
+    expect(pushState).toHaveBeenCalledWith({}, '', '/skills');
+    expect(popstate).toHaveBeenCalledTimes(1);
+    window.removeEventListener('popstate', popstate);
+    expect(screen.queryByTestId('available-packs')).toBeNull();
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => url === '/api/skills/packs/available')).toBe(false);
+  });
+
+  it('renders nothing when the listing body has no arrays', async () => {
+    availableBody = { unexpected: true };
+    renderSection({ level: 'global', packs: [] });
+
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url]) => url === '/api/skills/packs/available')).toBe(true));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(screen.queryByTestId('available-packs')).toBeNull();
+    expect(screen.getByText('No skill packs added yet.')).toBeTruthy();
+  });
+
+  it('shows available packs matching the search when no registered pack matches', async () => {
+    availableBody = { packs: KNOWN_IDS.map(id => availablePack(id)), groups: [VIDEO_GROUP] };
+    renderSection({ level: 'global', packs: [], search: 'remotion' });
+
+    await waitFor(() => expect(available('[data-available-pack="remotion"]')).toBeTruthy());
+    expect(available('[data-available-pack="gstack"]')).toBeNull();
+    expect(available('[data-available-group="video"]')).toBeTruthy();
+  });
+
+  it('filters available packs by disclosure text', async () => {
+    availableBody = { packs: KNOWN_IDS.map(id => availablePack(id)), groups: [VIDEO_GROUP] };
+    renderSection({ level: 'global', packs: [pack()], search: 'elevenlabs' });
+
+    await waitFor(() => expect(available('[data-available-pack="video-use"]')).toBeTruthy());
+    expect(document.querySelectorAll('[data-available-pack]')).toHaveLength(1);
+    expect(available('[data-available-group="video"]')).toBeNull();
   });
 });
