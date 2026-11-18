@@ -541,6 +541,12 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
         // Nothing was launched: do not journal a re-dispatch that never happened.
         console.warn(`[deacon-lite] Stalled-review recovery declined for ${issueId}: ${recovery.message}`);
         continue;
+      } else if (recovery.stale) {
+        // PAN-5519: the saved run reviews an earlier head or already has its
+        // verdict. Relaunch nothing; the review request door opens the next run.
+        lastReviewRedispatchAt.set(issueId, now);
+        console.log(`[deacon-lite] ${issueId}: stalled review not re-dispatched — ${recovery.message}`);
+        continue;
       } else if (!recovery.launched) {
         // Nothing to relaunch, so no lane re-dispatch to journal or report
         // (PAN-3914). When every lane of the run has its report on disk, the

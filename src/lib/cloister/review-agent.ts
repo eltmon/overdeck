@@ -579,6 +579,7 @@ async function spawnReviewRoleForIssueBody(
             // siblings stay intact and the synthesis parent can proceed immediately.
             const recovery = await recoverMissingConvoyReviewers(opts.issueId, {
               source: 'same-run parent resume',
+              reopenedByRequest: true,
               ...(opts.model ? { model: opts.model } : {}),
               ...(opts.harness ? { harness: opts.harness } : {}),
             });

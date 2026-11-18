@@ -21,7 +21,7 @@ import { formatTier1Summary, type ReviewContextManifest } from './review-context
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
-import { appendPipelineEntry } from './pipeline-journal.js';
+import { appendPipelineEntry, readPipelineJournal } from './pipeline-journal.js';
 import { AGENTS_DIR, packageRoot } from '../paths.js';
 import type { RuntimeName } from '../runtimes/types.js';
 
@@ -373,15 +373,56 @@ export interface ConvoyRecoveryResult {
    * it (#4134).
    */
   allReported?: boolean;
+  /**
+   * Set on the no-op answer when the parent's saved run is no longer current
+   * (PAN-5519): it reviews an earlier head, or its verdict is already in the
+   * journal. Nothing was launched; the review request door opens the next run.
+   */
+  stale?: boolean;
+}
+
+/**
+ * Why `runId` is not the run to relaunch reviewers into, or null when it is
+ * current (PAN-5519). The run id embeds the workspace head digest the door
+ * derived when it opened the run, so comparing it with the digest of today's
+ * head works for monorepos and polyrepos alike. An unreadable head proves
+ * nothing either way and does not block the recovery.
+ */
+async function staleReviewRunReason(
+  issueId: string,
+  workspace: string,
+  runId: string,
+  checkVerdict: boolean,
+): Promise<string | null> {
+  const { deriveReviewRunHead8 } = await import('./review-agent.js');
+  const head8 = await deriveReviewRunHead8(issueId, workspace);
+  if (head8 !== 'unknown' && runId !== `agent-${issueId.toLowerCase()}-review-${head8}`) {
+    return `it reviews an earlier head, and the workspace head is now ${head8}`;
+  }
+  if (checkVerdict && readPipelineJournal(workspace).some((entry) =>
+    entry.type === 'review.verdict' && entry.data?.['runId'] === runId)) {
+    return 'its verdict is already in the pipeline journal';
+  }
+  return null;
 }
 
 /**
  * Re-launch only convoy lanes whose report and session are both absent for the
  * current parent run. It is idempotent, so a repeated recovery request is a no-op.
+ * A saved run that is no longer current launches nothing (PAN-5519).
  */
 export async function recoverMissingConvoyReviewers(
   issueId: string,
-  opts: { source?: string; model?: string; harness?: RuntimeName } = {},
+  opts: {
+    source?: string;
+    model?: string;
+    harness?: RuntimeName;
+    /**
+     * The review door just reopened this run for a new request on the same
+     * head, so an earlier verdict on it does not make it stale.
+     */
+    reopenedByRequest?: boolean;
+  } = {},
 ): Promise<ConvoyRecoveryResult> {
   const normalized = issueId.toUpperCase();
   const parentId = `agent-${normalized.toLowerCase()}-review`;
@@ -406,6 +447,18 @@ export async function recoverMissingConvoyReviewers(
   }
   const workspace = parent.workspace;
   const runId = parent.reviewRunId;
+
+  // PAN-5519: a recovery path once relaunched reviewers into a run approved a
+  // day earlier, so they reviewed a head the PR had moved past. A stale run
+  // gets no reviewers; the review request door opens a run for the new head.
+  const staleReason = await staleReviewRunReason(normalized, workspace, runId, opts.reopenedByRequest !== true);
+  if (staleReason) {
+    return {
+      success: true,
+      stale: true,
+      message: `Review run ${runId} for ${normalized} is stale (${staleReason}): no reviewers relaunched`,
+    };
+  }
 
   // Reviewer evidence is per lane: one completed report or live pane never
   // proves that a sibling reviewer launched. The probe asks the SELECTED
