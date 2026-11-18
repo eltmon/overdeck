@@ -68,7 +68,7 @@ describe('model capabilities', () => {
   // PAN-3057: the harness pin and the capability table are one number. If these
   // drift again, the dashboard meter and the Deacon's proactive compaction score
   // GPT-5.6 agents against a window the harness was never given.
-  it.each(['gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-5.6-sol', 'gpt-5.6-sol[372k]'] as const)(
+  it.each(['gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6.2-astra', 'gpt-6.2-sol', 'gpt-5.6-sol', 'gpt-5.6-sol[372k]'] as const)(
     'feeds the same window to the harness env exports and the capability table for %s',
     async (model) => {
       const { getClaudeCodeContextPolicyForModel } = await import('../agents/provider-env.js');
@@ -150,9 +150,35 @@ describe('model capabilities', () => {
     expect(pricing.outputPer1k).toBe(output);
   });
 
+  // PAN-5522: GPT-6.2 Astra and Sol (Codex 0.170.0 catalog, prices from
+  // developers.openai.com/api/docs/pricing, checked 2026-11-18). No verified
+  // max output, so these rows do not assert maxOutputTokens.
+  it.each([
+    ['gpt-6.2-astra', 'GPT-6.2 Astra', 24, 0.008, 0.0004, 0.04],
+    ['gpt-6.2-sol', 'GPT-6.2 Sol', 6, 0.002, 0.0001, 0.01],
+  ] as const)('registers %s against the openai provider with the 272K billing-tier pin', async (model, displayName, blend, input, cached, output) => {
+    const { getProviderForModel } = await import('../providers.js');
+    const { getPricing } = await import('../cost.js');
+
+    expect(getProviderForModel(model).name).toBe('openai');
+    expect(capabilityClassOf(model)).toBe('frontier');
+
+    const capability = MODEL_CAPABILITIES[model];
+    expect(capability.displayName).toBe(displayName);
+    expect(capability.costPer1MTokens).toBe(blend);
+    expect(capability.contextWindow).toBe(CLIPROXY_GPT56_CONTEXT_WINDOW);
+    expect(capability.effortLevels).toEqual(['low', 'medium', 'high', 'xhigh', 'max']);
+
+    const pricing = getPricing('openai', model)!;
+    expect(pricing.model).toBe(model);
+    expect(pricing.inputPer1k).toBe(input);
+    expect(pricing.cacheReadPer1k).toBe(cached);
+    expect(pricing.outputPer1k).toBe(output);
+  });
+
   // No [372k] opt-in variant ships for the GPT-6 family: the 372K pin was
   // measured on gpt-5.6-sol only. Guard against adding the id without measuring.
-  it.each(['gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-rosalind', 'gpt-6-astra-law'])('does not surface a %s[372k] variant', async (model) => {
+  it.each(['gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6.2-astra', 'gpt-6.2-sol', 'gpt-6-rosalind', 'gpt-6-astra-law'])('does not surface a %s[372k] variant', async (model) => {
     const { GPT56_LONG_CONTEXT_VARIANTS } = await import('../model-context-windows.js');
     expect(Object.keys(GPT56_LONG_CONTEXT_VARIANTS)).not.toContain(`${model}[372k]`);
     expect((MODEL_CAPABILITIES as Record<string, unknown>)[`${model}[372k]`]).toBeUndefined();

@@ -17,13 +17,17 @@
  * both ids. gpt-6.1-sol (PAN-4422, measured 2026-09-29): 0.158.0 with a
  * ChatGPT login answers 400, 0.159.0 succeeds. gpt-6.1-terra (PAN-4633,
  * measured 2026-10-26): 0.158.0 with a ChatGPT login answers 400
- * model_not_found, 0.159.0 succeeds. API-key auth has no floor.
+ * model_not_found, 0.159.0 succeeds. gpt-6.2-astra and gpt-6.2-sol (PAN-5522,
+ * 2026-11-18): 0.170.0 is the version verified to list both. API-key auth
+ * has no floor.
  */
 export const CODEX_MODEL_MINIMUM_VERSIONS: Readonly<Record<string, string>> = {
   'gpt-6-sol': '0.156.1',
   'gpt-6-luna': '0.156.1',
   'gpt-6.1-sol': '0.159.0',
   'gpt-6.1-terra': '0.159.0',
+  'gpt-6.2-astra': '0.170.0',
+  'gpt-6.2-sol': '0.170.0',
 };
 
 /** Copyable Codex CLI install/upgrade command; Overdeck never runs it. */

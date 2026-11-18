@@ -48,6 +48,8 @@ export function getFriendlyModelName(fullModel: string | undefined | null): stri
   // OpenAI models ([372k] long-context variants before their base ids)
   if (backingModel.includes('gpt-6-astra-law')) return 'GPT-6 Astra for Law';
   if (backingModel.includes('gpt-6-rosalind')) return 'GPT-6 Rosalind';
+  if (backingModel.includes('gpt-6.2-astra')) return 'GPT-6.2 Astra';
+  if (backingModel.includes('gpt-6.2-sol')) return 'GPT-6.2 Sol';
   if (backingModel.includes('gpt-6.1-sol')) return 'GPT-6.1 Sol';
   if (backingModel.includes('gpt-6.1-terra')) return 'GPT-6.1 Terra';
   if (backingModel.includes('gpt-6-sol')) return 'GPT-6 Sol';

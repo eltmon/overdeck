@@ -476,6 +476,59 @@ export const AUDITED_MODEL_ADDITIONS = {
     notes: 'OpenAI GPT-6.1 workhorse tier (October 26, 2026), below gpt-6.1-sol in the slot gpt-5.6-terra fills for GPT-5.6. Pinned to the 272K billing tier (CLIPROXY_GPT56_CONTEXT_WINDOW) — >272K input is billed 2x in / 1.5x out for the full request (PAN-3388). No [372k] variant. 1.05M marketing context. Codex under ChatGPT sign-in needs CLI 0.159.0+. The claude-code route through CLIProxy 7.3.16 was verified on 2026-11-11 (PAN-4634).',
   },
 
+  // GPT-6.2 Astra and GPT-6.2 Sol (PAN-5522, verified 2026-11-18). Codex 0.170.0 `codex debug models`:
+  // astra context_window 272000, sol context_window 500000, both max_context_window 872000,
+  // supported_in_api true, default effort low; both pinned to 272K like the rest of the GPT-6 family.
+  // Pricing: developers.openai.com/api/docs/pricing (checked 2026-11-18). Astra inherits gpt-6-astra's
+  // skills, Sol inherits gpt-6.1-sol's. CLIProxy 8.0.71 listed and served both on 2026-11-18.
+  'gpt-6.2-astra': {
+    model: 'gpt-6.2-astra',
+    provider: 'openai',
+    displayName: 'GPT-6.2 Astra',
+    costPer1MTokens: 24, // $8.00 in / $40.00 out ($0.40 cached)
+    contextWindow: CLIPROXY_GPT56_CONTEXT_WINDOW,
+    minTier: 'plus',
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    skills: {
+      'code-generation': 99,
+      'code-review': 97,
+      debugging: 98,
+      planning: 98,
+      documentation: 95,
+      testing: 96,
+      security: 95,
+      performance: 95,
+      synthesis: 97,
+      speed: 55,
+      'context-length': 95,
+    },
+    notes: 'OpenAI GPT-6.2 flagship (November 2026), successor to gpt-6-astra. Pinned to the 272K billing tier (CLIPROXY_GPT56_CONTEXT_WINDOW): input over 272K bills $16 in / $0.80 cached / $60 out per 1M for the full request (PAN-3388). No [372k] variant. Codex under ChatGPT sign-in needs CLI 0.170.0+.',
+  },
+
+  'gpt-6.2-sol': {
+    model: 'gpt-6.2-sol',
+    provider: 'openai',
+    displayName: 'GPT-6.2 Sol',
+    costPer1MTokens: 6, // $2.00 in / $10.00 out ($0.10 cached)
+    contextWindow: CLIPROXY_GPT56_CONTEXT_WINDOW,
+    minTier: 'plus',
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    skills: {
+      'code-generation': 98,
+      'code-review': 95,
+      debugging: 97,
+      planning: 96,
+      documentation: 93,
+      testing: 95,
+      security: 92,
+      performance: 93,
+      synthesis: 95,
+      speed: 65,
+      'context-length': 95,
+    },
+    notes: 'OpenAI GPT-6.2 mid tier (November 2026), successor to gpt-6.1-sol at the same API price. Pinned to the 272K billing tier (CLIPROXY_GPT56_CONTEXT_WINDOW): input over 272K bills $4 in / $0.20 cached / $15 out per 1M for the full request (PAN-3388). No [372k] variant. Codex under ChatGPT sign-in needs CLI 0.170.0+.',
+  },
+
   // GPT-6 Rosalind (life sciences, released 2026-10-30) and GPT-6 Astra for Law: prices per
   // developers.openai.com/api/docs/pricing (checked 2026-11-02). Their model pages 404, so no
   // native window, max output or effort set is published; the 272K pin is the Codex harness pin
