@@ -54,3 +54,21 @@ The launcher needs Node.js 22 or later; otherwise it exits with `[overdeck] Node
 `pan up` does not look for the npm package; it only finds the app at the install locations above.
 
 To update, run `npm install -g @overdeck/desktop@latest`, or just run `npx @overdeck/desktop@latest` again.
+
+## Launch it with pan up
+
+If you already installed the app, `pan up` finds and launches it instead of starting its own dashboard server: it prints `Launching Overdeck desktop app...` and `✓ Desktop app launched`, starts the background sidecars, and returns. If the launch fails, it prints `⚠ Could not launch desktop app: <message>` and falls back to the normal dashboard. Run `pan up --no-open` to skip the app and always start the normal dashboard.
+
+`pan up` looks for the app at:
+
+- **Linux**: `~/Applications/Overdeck*.AppImage`, or `/opt/overdeck/overdeck`
+- **macOS**: `/Applications/Overdeck.app` or `~/Applications/Overdeck.app`
+- **Windows**: `%LOCALAPPDATA%\Programs\Overdeck\Overdeck.exe`
+
+On Linux, `pan up` also treats `~/.local/bin/overdeck` as the app. The install script puts the `overdeck` command there, so `pan up` reports `Desktop app launched` and opens the dashboard in your browser instead ([#5557](https://github.com/eltmon/overdeck/issues/5557)).
+
+### What runs where
+
+The app's embedded server listens on port `7825` (it is not the `pan up` dashboard's port). `pan open` always talks to the `pan up` dashboard; see [The desktop app](/features/open-in-overdeck#the-desktop-app) for how it reaches the app's own window. `pan down` stops the `pan up` dashboard only; it does not quit the app, which you quit from its tray or menu.
+
+Only one copy of the app runs at a time: launching it again focuses the existing window, and launching it with `--open <path>` opens that path in the running window. Closing the window keeps the app running in the background on macOS; on Linux and Windows, closing the last window quits the app and stops its embedded server.
