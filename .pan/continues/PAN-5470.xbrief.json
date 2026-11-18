@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5470",
   "created": "2026-11-18T20:58:48.978Z",
-  "updated": "2026-11-18T21:05:02.763Z",
+  "updated": "2026-11-18T21:05:09.110Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,11 @@
     "section-pickup.ac3": {
       "status": "completed",
       "doneAt": "2026-11-18T21:05:02.762Z"
+    },
+    "section-switches": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5470",
+      "claimedAt": "2026-11-18T21:05:09.110Z"
     }
   }
 }
