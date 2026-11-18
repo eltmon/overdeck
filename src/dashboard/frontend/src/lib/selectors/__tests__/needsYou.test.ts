@@ -2,10 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const navigateToDecisionSubject = vi.fn()
 const requestReopen = vi.fn()
+const openAgentRequestDialog = vi.fn()
 
 vi.mock('../../navigateToDecision', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../navigateToDecision')>()),
   navigateToDecisionSubject: (...args: unknown[]) => navigateToDecisionSubject(...args),
+}))
+vi.mock('../../agentRequestDialogStore', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../agentRequestDialogStore')>()),
+  openAgentRequestDialog: (...args: unknown[]) => openAgentRequestDialog(...args),
 }))
 import type { DerivedIssueState } from '@overdeck/contracts'
 import type { PendingInputSubject } from '../../store'
@@ -63,8 +68,13 @@ function row(text: string, key: string): NeedsYouRow {
   return { key, text, label: text }
 }
 
+function secretRequest(extra: Partial<NonNullable<Decision['agentRequest']>> = {}): NonNullable<Decision['agentRequest']> {
+  return { id: 'req-1', kind: 'secret', name: 'OPENAI_API_KEY', prompt: 'p', agentId: 'agent-pan-7', agentKind: 'agent', issueId: 'PAN-7', expiresAt: '', ...extra }
+}
+
 beforeEach(() => {
   navigateToDecisionSubject.mockReset()
+  openAgentRequestDialog.mockReset()
   requestReopen.mockReset()
   useAskUserQuestionUiStore.setState({ requestReopen })
 })
@@ -173,5 +183,54 @@ describe('buildNeedsYouItems (PAN-5287 §6.5)', () => {
     item.open()
     expect(navigateToDecisionSubject).toHaveBeenCalledWith({ id: 'chat-1', source: 'conversation', view: 'terminal' })
     expect(requestReopen).not.toHaveBeenCalled()
+  })
+})
+
+describe('buildNeedsYouItems agent requests (PAN-5541)', () => {
+  it('opens the dialog store with the request id, never navigating or pushing history (AC1)', () => {
+    const pushState = vi.spyOn(window.history, 'pushState')
+    const [item] = buildNeedsYouItems(sources({ decisions: [decision('req-1', { agentRequest: secretRequest() })] }))
+    item.open()
+    expect(openAgentRequestDialog).toHaveBeenCalledWith('req-1')
+    expect(navigateToDecisionSubject).not.toHaveBeenCalled()
+    expect(pushState).not.toHaveBeenCalled()
+    pushState.mockRestore()
+  })
+
+  it('asks "Secret requested: <NAME>" for a secret and "Machine link requested: <hint>" for a machine link', () => {
+    const items = buildNeedsYouItems(
+      sources({
+        decisions: [
+          decision('req-1', { agentRequest: secretRequest() }),
+          decision('req-2', { agentRequest: { ...secretRequest(), id: 'req-2', kind: 'machine-link', hint: 'my desk Mac' } }),
+        ],
+      }),
+    )
+    expect(items.map((i) => i.ask)).toEqual(['Secret requested: OPENAI_API_KEY', 'Machine link requested: my desk Mac'])
+  })
+
+  it("files a conversation owner's request under the conversation's project (AC2)", () => {
+    const [item] = buildNeedsYouItems(
+      sources({ decisions: [decision('req-1', { agentRequest: { ...secretRequest(), agentId: 'chat-1', agentKind: 'conversation', issueId: null } })] }),
+    )
+    expect(item).toMatchObject({ projectKey: 'krux' })
+  })
+
+  it("files an agent owner's request under projectOf.issue(issueId) (AC2)", () => {
+    const [item] = buildNeedsYouItems(sources({ decisions: [decision('req-1', { agentRequest: secretRequest({ issueId: 'PAN-7' }) })] }))
+    expect(item).toMatchObject({ projectKey: 'panopticon-cli' })
+  })
+
+  it('files no projectKey for an agent owner with no issue id', () => {
+    const [item] = buildNeedsYouItems(sources({ decisions: [decision('req-1', { agentRequest: secretRequest({ issueId: null }) })] }))
+    expect(item.projectKey).toBeUndefined()
+  })
+
+  it('keeps the agent-request item when filtering to its project (AC3)', () => {
+    const items = buildNeedsYouItems(
+      sources({ decisions: [decision('req-1', { agentRequest: secretRequest({ issueId: 'PAN-7' }) })] }),
+      { projectKey: 'panopticon-cli' },
+    )
+    expect(items.map((i) => i.key)).toEqual(['decision:req-1'])
   })
 })

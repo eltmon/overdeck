@@ -33,6 +33,7 @@ beforeEach(() => {
     if (url === '/api/workspace-registry') return Response.json({ workspaces: [] })
     if (url === '/api/conversations/pending-input') return Response.json([])
     if (url.startsWith('/api/projects/workflow-fixture/changes')) return Response.json({ projectKey: 'workflow-fixture', branch: 'main', commits: [] })
+    if (url === '/api/agent-requests') return Response.json({ requests: [] })
     return undefined
   })
 })

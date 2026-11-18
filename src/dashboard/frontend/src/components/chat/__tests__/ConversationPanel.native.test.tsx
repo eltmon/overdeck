@@ -60,6 +60,7 @@ function defaultResponse(method: string, url: string): Response | undefined {
   if (method === 'GET' && /^\/api\/conversations\/[^/]+\/scheduled-messages$/.test(url)) {
     return Response.json({ supported: true, limit: null, messages: [] });
   }
+  if (method === 'GET' && url === '/api/agent-requests') return Response.json({ requests: [] });
   return undefined;
 }
 

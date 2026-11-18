@@ -87,6 +87,7 @@ src/components/__tests__/StoppedAgentsBanner.test.tsx
 src/components/dock/__tests__/activeDock.test.ts
 src/components/dock/__tests__/changes-model.test.ts
 src/components/dock/__tests__/ConversationChangesList.test.tsx
+src/components/dock/__tests__/ConversationDock.test.tsx
 src/components/dock/__tests__/dockDiffPreview.test.ts
 src/components/dock/__tests__/DockDiffView.test.tsx
 src/components/dock/__tests__/dockScope.test.ts
@@ -206,6 +207,7 @@ src/components/Stage/panes/EditorPane.test.tsx
 src/components/Stage/useStageShortcuts.test.tsx
 src/components/XTerminal.test.tsx
 src/components/__tests__/AgentRequestCard.test.tsx
+src/components/__tests__/AgentRequestDialogHost.test.tsx
 src/components/__tests__/AskUserQuestionDialog.test.tsx
 src/components/__tests__/BackendRestartCard.test.tsx
 src/components/__tests__/DecisionsPanel.test.tsx
@@ -249,6 +251,7 @@ src/components/chat/__tests__/MarkdownDocLink.test.tsx
 src/components/chat/__tests__/MarkdownFileLink.test.tsx
 src/components/chat/__tests__/ModelPicker.test.tsx
 src/components/chat/__tests__/OpenPreviewPopover.test.tsx
+src/components/chat/__tests__/PendingAgentRequestCard.test.tsx
 src/components/chat/__tests__/PullHereDialog.test.tsx
 src/components/chat/__tests__/ScheduledMessageRow.test.tsx
 src/components/chat/__tests__/SendModeMenu.test.tsx

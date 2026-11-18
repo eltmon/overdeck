@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Decision } from '../../../lib/useDecisions';
 import { useAskUserQuestionUiStore } from '../../../lib/askUserQuestionUiStore';
+import { ANYWHERE_STATUS_QUERY_KEY } from '../../Settings/anywhere/anywhereApi';
 import { MobileNeedsYou } from '../MobileNeedsYou';
 
 let decisions: Decision[] = [];
@@ -33,6 +35,33 @@ function okFetch() {
 function lastCall(fetchMock: ReturnType<typeof okFetch>): { url: string; body: unknown } {
   const [url, init] = fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit];
   return { url, body: JSON.parse(String(init.body)) };
+}
+
+function secretRequestDecision(): Decision {
+  return {
+    id: '0123456789abcdef0123456789abcdef',
+    source: 'conversation',
+    label: 'abc',
+    kinds: ['secretRequest'],
+    since: '2026-11-04T00:00:00.000Z',
+    blocking: true,
+    agentRequest: {
+      id: '0123456789abcdef0123456789abcdef',
+      kind: 'secret',
+      name: 'OPENAI_API_KEY',
+      prompt: 'The key',
+      agentId: 'abc',
+      agentKind: 'conversation',
+      issueId: null,
+      expiresAt: '2026-11-04T00:10:00.000Z',
+    },
+  };
+}
+
+function renderWithViewer(viewerKind: 'root-session' | 'device') {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+  client.setQueryData(ANYWHERE_STATUS_QUERY_KEY, { machine: { environmentId: 'env-1', label: 'desk' }, viewer: { kind: viewerKind } });
+  return render(<QueryClientProvider client={client}><MobileNeedsYou subjectId={null} /></QueryClientProvider>);
 }
 
 async function answer(label: string) {
@@ -156,26 +185,20 @@ describe('MobileNeedsYou', () => {
     expect(screen.queryByRole('button', { name: 'Send' })).not.toBeInTheDocument();
   });
 
-  it('PAN-4941: shows "Answer on the desktop" and no Open for a secret request, even from a conversation', () => {
-    decisions = [{
-      id: '0123456789abcdef0123456789abcdef',
-      source: 'conversation',
-      label: 'abc',
-      kinds: ['secretRequest'],
-      since: '2026-11-04T00:00:00.000Z',
-      blocking: true,
-      agentRequest: {
-        id: '0123456789abcdef0123456789abcdef',
-        kind: 'secret',
-        name: 'OPENAI_API_KEY',
-        prompt: 'The key',
-        agentId: 'abc',
-        expiresAt: '2026-11-04T00:10:00.000Z',
-      },
-    }];
-    render(<MobileNeedsYou subjectId={null} />);
-    expect(screen.getByText('Answer on the desktop')).toBeInTheDocument();
+  it('PAN-5541: shows the D10 secret text and no Open for a device viewer, even from a conversation', () => {
+    decisions = [secretRequestDecision()];
+    renderWithViewer('device');
+    expect(screen.getByText(
+      "Answer this on desk's own dashboard. A secret can be typed only in a browser on desk itself, so it never crosses the network.",
+    )).toBeInTheDocument();
+    expect(screen.queryByText('Answer on the desktop')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Open' })).not.toBeInTheDocument();
+  });
+
+  it('PAN-5541: shows the password input for a root-session viewer', () => {
+    decisions = [secretRequestDecision()];
+    renderWithViewer('root-session');
+    expect(screen.getByLabelText('Value for OPENAI_API_KEY')).toHaveAttribute('type', 'password');
   });
 
   it('PAN-4946: shows "Approve on the desktop" and no Open for an MCP sign-in', () => {

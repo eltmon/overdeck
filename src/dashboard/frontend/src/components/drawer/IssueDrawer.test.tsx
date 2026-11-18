@@ -93,6 +93,7 @@ function mockFetch(workspaceOverride?: Record<string, unknown>) {
       return Response.json({ issueId: 'PAN-1', workspacePath: '/tmp/pan-1', tasks: [] });
     }
     if (url.includes('/has-session')) return Response.json({ lifecycle: { canResumeSession: false } });
+    if (url === '/api/agent-requests') return Response.json({ requests: [] });
     return Response.json({ success: true });
   });
 }
@@ -330,6 +331,7 @@ describe('IssueDrawer', () => {
       if (url === '/api/workspaces/PAN-1/artifacts') {
         return new Promise<Response>((resolve) => { resolveArtifacts = resolve; });
       }
+      if (url === '/api/agent-requests') return Promise.resolve(Response.json({ requests: [] }));
       return Promise.resolve(Response.json({ success: true }));
     });
     useDashboardStore.getState().openIssue('PAN-1', 'artifacts');
@@ -346,6 +348,7 @@ describe('IssueDrawer', () => {
       if (url === '/api/workspaces/PAN-1/artifacts') {
         return Promise.resolve(new Response('nope', { status: 500 }));
       }
+      if (url === '/api/agent-requests') return Promise.resolve(Response.json({ requests: [] }));
       return Promise.resolve(Response.json({ success: true }));
     });
 

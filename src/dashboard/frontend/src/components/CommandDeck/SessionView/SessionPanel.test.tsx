@@ -88,6 +88,8 @@ describe('SessionPanel', () => {
     fetchControl = installStrictFetchMock(({ method, url }) => {
       if (method === 'GET' && url.endsWith('/git-info')) return Response.json({});
       if (method === 'GET' && url === '/api/models/resolve') return Response.json({});
+      // PAN-5541 — PendingAgentRequestCards polls the shared agent-requests feed.
+      if (method === 'GET' && url === '/api/agent-requests') return Response.json({ requests: [] });
       return undefined;
     });
     localStorage.clear();
@@ -324,5 +326,51 @@ describe('SessionPanel', () => {
       />,
     );
     expect(screen.getByText('Review rounds')).toBeInTheDocument();
+  });
+});
+
+describe('SessionPanel pinned agent-request card (PAN-5541 WI-6b)', () => {
+  const secretRow = {
+    id: 'req-1',
+    kind: 'secret',
+    agentId: 'agent-pan-821',
+    agentKind: 'agent',
+    issueId: 'PAN-821',
+    label: 'agent-pan-821 · PAN-821',
+    name: 'OPENAI_API_KEY',
+    prompt: 'The key for the eval run',
+    createdAt: '2026-11-04T00:00:00.000Z',
+    expiresAt: '2026-11-04T00:10:00.000Z',
+  };
+
+  beforeEach(() => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url.endsWith('/git-info')) return Response.json({});
+      if (method === 'GET' && url === '/api/models/resolve') return Response.json({});
+      if (method === 'GET' && url === '/api/agent-requests') return Response.json({ requests: [secretRow] });
+      if (method === 'GET' && url === '/api/anywhere/status') {
+        return Response.json({ machine: { environmentId: 'env-1', label: 'desk' }, viewer: { kind: 'root-session' } });
+      }
+      return undefined;
+    });
+    localStorage.clear();
+  });
+
+  afterEach(async () => {
+    await fetchControl.assertNoUnexpectedRequests();
+    localStorage.clear();
+    useDashboardStore.setState({ derivedIssueStateByIssueId: {}, agentsById: {} } as Parameters<typeof useDashboardStore.setState>[0]);
+  });
+
+  it('renders the password input in the terminal view (AC2)', async () => {
+    render(<SessionPanel session={makeSession({ sessionId: 'agent-pan-821' })} />);
+    fireEvent.click(screen.getByText('Terminal'));
+    expect(screen.getByTestId('x-terminal')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Value for OPENAI_API_KEY')).toHaveAttribute('type', 'password');
+  });
+
+  it('renders the pinned card exactly once in the conversation view', async () => {
+    render(<SessionPanel session={makeSession({ sessionId: 'agent-pan-821', hasJsonl: true })} />);
+    expect(await screen.findAllByTestId('pinned-agent-requests')).toHaveLength(1);
   });
 });

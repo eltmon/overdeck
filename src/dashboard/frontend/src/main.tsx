@@ -16,6 +16,7 @@ import { ContinueOnDeviceDialogHost } from './components/chat/continueOnDevice/C
 import { NewConversationDialogHost } from './components/newConversation/NewConversationDialog';
 import { ShareDialogHost } from './components/chat/sharing/ShareDialog';
 import { AnywhereDialogHost } from './components/Settings/anywhere/AnywhereDialogHost';
+import { AgentRequestDialogHost } from './components/AgentRequestDialogHost';
 import { ImageLightboxHost } from './components/chat/ImageLightbox';
 import { startBootRequests } from './lib/bootRequests';
 import './index.css';
@@ -93,6 +94,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <NewConversationDialogHost />
           <ShareDialogHost />
           <AnywhereDialogHost />
+          <AgentRequestDialogHost />
           <ImageLightboxHost />
         </DialogProvider>
       </QueryClientProvider>

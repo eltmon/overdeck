@@ -4,6 +4,7 @@ import { GitFork, TriangleAlert, AlertCircle, TerminalSquare, MessagesSquare, Wr
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import type { Conversation } from '../ConversationList';
 import { ConversationPanel } from '../../chat/ConversationPanel';
+import { PendingAgentRequestCards } from '../../chat/PendingAgentRequestCard';
 import type { RoundMarker } from '../../chat/MessagesTimeline';
 import { ChatMarkdown } from '../../chat/ChatMarkdown';
 import { XTerminal } from '../../XTerminal';
@@ -406,6 +407,7 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
       </div>
 
       {/* View content */}
+      <PendingAgentRequestCards owner={{ kind: 'agent', id: session.sessionId }} />
       <div className={styles.sessionPanelContent}>
         {view === 'conversation' && session.type === 'lint' ? (
           // Test/Lint gate node (PAN-2665): no JSONL/tmux backing — render the

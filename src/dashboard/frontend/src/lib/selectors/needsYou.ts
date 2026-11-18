@@ -15,6 +15,7 @@ import { useDashboardStore, selectIssues, type PendingInputSubject } from '../st
 import { usePendingInputSubjects, useDecisions, type Decision } from '../useDecisions'
 import { useAskUserQuestionUiStore } from '../askUserQuestionUiStore'
 import { navigateToDecisionSubject } from '../navigateToDecision'
+import { openAgentRequestDialog } from '../agentRequestDialogStore'
 import { describePendingInput } from '../pendingInput'
 import { formatIssueRef } from '../issueLabel'
 import { requestRevealNeedsYou } from '../flywheelReveal'
@@ -116,6 +117,18 @@ function openSubject(subject: PendingInputSubject): void {
   useAskUserQuestionUiStore.getState().requestReopen(subject.agentId)
 }
 
+/** D4: a conversation owner files under its own project, falling back to its issue; an agent owner files under its issue. */
+function agentRequestProjectKey(request: NonNullable<Decision['agentRequest']>, projectOf: ProjectResolver): string | undefined {
+  if (request.agentKind === 'conversation') {
+    return projectOf.conversation(request.agentId) ?? (request.issueId ? projectOf.issue(request.issueId) : undefined)
+  }
+  return request.issueId ? projectOf.issue(request.issueId) : undefined
+}
+
+function agentRequestAsk(request: NonNullable<Decision['agentRequest']>): string {
+  return request.kind === 'secret' ? `Secret requested: ${request.name}` : `Machine link requested: ${request.hint}`
+}
+
 function openFlywheel(): void {
   requestRevealNeedsYou()
   window.history.pushState({}, '', '/flywheel')
@@ -193,14 +206,17 @@ export function buildNeedsYouItems(sources: NeedsYouSources, opts?: { projectKey
     if (!decision.remote && subjectIds.has(`${decision.source}:${decision.id}`)) continue
     const key = `decision:${decision.id}`
     if (items.has(key)) continue
+    const request = decision.agentRequest
+    const projectKey = request ? agentRequestProjectKey(request, projectOf) : undefined
     items.set(key, {
       key,
       kind: 'decision',
       title: decision.label,
-      ask: decision.permissionSummary ?? decision.pendingQuestionPrompt ?? describePendingInput(decision.kinds),
-      open: () => navigateToDecisionSubject(decision),
+      ask: request ? agentRequestAsk(request) : decision.permissionSummary ?? decision.pendingQuestionPrompt ?? describePendingInput(decision.kinds),
+      open: request ? () => openAgentRequestDialog(request.id) : () => navigateToDecisionSubject(decision),
       decision,
       ...(decision.since ? { since: decision.since } : {}),
+      ...(projectKey ? { projectKey } : {}),
     })
   }
 

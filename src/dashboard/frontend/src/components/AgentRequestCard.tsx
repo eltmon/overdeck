@@ -6,17 +6,24 @@
  * parked in `secret_wait`. Only a root-session viewer (a browser on this
  * machine) can answer: it gets a masked input, Send and Decline. Every other
  * viewer (a phone, a paired device, another machine's browser) reads where to
- * answer instead, because the answer routes accept only root credentials.
+ * answer instead (D10, `agentRequestElsewhereText`), because the answer
+ * routes accept only root credentials.
  *
- * The value lives only in this component's state until Send posts it. The
- * input is cleared whatever the answer, the value never goes into a URL, and
- * the component never logs.
+ * The value lives only in `AgentRequestAnswer`'s state until Send posts it.
+ * The input is cleared whatever the answer, the value never goes into a URL,
+ * and the component never logs.
  *
  * A machine-link request (`link_machine`, parked in `link_machine_wait`)
  * renders `MachineLinkRequestBody` in the same frame: the agent's hint, then
  * for a root-session viewer **Link a machine…**, which opens the Link a
  * machine dialog with the request id so the dialog resolves it after linking,
  * and **Dismiss**, which declines it. No pairing code passes through here.
+ *
+ * PAN-5541 WI-3: `AgentRequestAnswer` is the answer body alone (no frame, no
+ * testid), so the agent-request dialog and the pinned terminal-view cards can
+ * reuse it without duplicating state. `onAnswered`/`onLinkOpened` let a
+ * caller close itself and toast after a successful answer (D8); neither is
+ * required for the Decisions panel card.
  */
 import { useState, type FormEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -35,11 +42,23 @@ async function postAnswer(path: string, body: Record<string, unknown>): Promise<
   return `HTTP ${res.status}: ${typeof json?.error === 'string' ? json.error : 'request failed'}`;
 }
 
+/** D10: the machine named is the one running this dashboard, not the agent's host. */
+export function agentRequestElsewhereText(kind: 'secret' | 'machine-link', machineLabel: string | null | undefined): string {
+  if (machineLabel) {
+    return kind === 'secret'
+      ? `Answer this on ${machineLabel}'s own dashboard. A secret can be typed only in a browser on ${machineLabel} itself, so it never crosses the network.`
+      : `Answer this on ${machineLabel}'s own dashboard. Machines can be linked only from a browser on ${machineLabel} itself.`;
+  }
+  return kind === 'secret'
+    ? 'Answer this in a browser on the machine that runs this dashboard. A secret can be typed only there, so it never crosses the network.'
+    : 'Answer this in a browser on the machine that runs this dashboard. Machines can be linked only from there.';
+}
+
 function MachineLinkRequestBody({
   label,
   hint,
   canAnswer,
-  machineLabel,
+  elsewhereText,
   sending,
   onLink,
   onDismiss,
@@ -47,7 +66,7 @@ function MachineLinkRequestBody({
   label: string;
   hint: string;
   canAnswer: boolean;
-  machineLabel: string;
+  elsewhereText: string;
   sending: boolean;
   onLink: () => void;
   onDismiss: () => void;
@@ -65,13 +84,24 @@ function MachineLinkRequestBody({
           </button>
         </div>
       ) : (
-        <p className={styles.meta}>Answer this on {machineLabel}'s own dashboard</p>
+        <p className={styles.meta}>{elsewhereText}</p>
       )}
     </>
   );
 }
 
-export function AgentRequestCard({ decision }: { decision: Decision }) {
+/** The answer body for one agent request: the prompt/hint and, for a root-session viewer, the controls to answer it. */
+export function AgentRequestAnswer({
+  decision,
+  onAnswered,
+  onLinkOpened,
+}: {
+  decision: Decision;
+  /** Called after a successful POST, before the `['agent-requests']` invalidate resolves. */
+  onAnswered?: (outcome: 'sent' | 'declined') => void;
+  /** Called right after `openAnywhereDialog('link-machine', …)`. */
+  onLinkOpened?: () => void;
+}) {
   const request = decision.agentRequest;
   const queryClient = useQueryClient();
   const { data: status } = useQuery({ queryKey: ANYWHERE_STATUS_QUERY_KEY, queryFn: loadAnywhereStatus });
@@ -83,13 +113,16 @@ export function AgentRequestCard({ decision }: { decision: Decision }) {
   if (!request) return null;
   const base = `/api/agent-requests/${encodeURIComponent(request.id)}`;
 
-  async function answer(path: string, body: Record<string, unknown>) {
+  async function answer(path: string, body: Record<string, unknown>, outcome: 'sent' | 'declined') {
     setSending(true);
     setError(null);
     try {
       const failure = await postAnswer(path, body);
       if (failure) setError(failure);
-      else await queryClient.invalidateQueries({ queryKey: ['agent-requests'] });
+      else {
+        onAnswered?.(outcome);
+        await queryClient.invalidateQueries({ queryKey: ['agent-requests'] });
+      }
     } catch {
       setError('Could not reach the dashboard');
     } finally {
@@ -101,9 +134,61 @@ export function AgentRequestCard({ decision }: { decision: Decision }) {
   function onSend(event: FormEvent) {
     event.preventDefault();
     if (value === '' || sending) return;
-    void answer(`${base}/secret`, { value });
+    void answer(`${base}/secret`, { value }, 'sent');
   }
 
+  const elsewhereText = agentRequestElsewhereText(request.kind, status?.machine?.label);
+
+  return (
+    <>
+      {request.kind === 'machine-link' ? (
+        <MachineLinkRequestBody
+          label={decision.label}
+          hint={request.hint}
+          canAnswer={canAnswer}
+          elsewhereText={elsewhereText}
+          sending={sending}
+          onLink={() => {
+            openAnywhereDialog('link-machine', { agentRequestId: request.id });
+            onLinkOpened?.();
+          }}
+          onDismiss={() => void answer(`${base}/decline`, {}, 'declined')}
+        />
+      ) : (
+        <>
+          <p className={styles.prompt}>{request.prompt}</p>
+          <div className={styles.meta}>
+            <span className={styles.mono}>{request.name}</span>
+          </div>
+          {canAnswer ? (
+            <form className={styles.secretForm} onSubmit={onSend}>
+              <input
+                className={styles.secretInput}
+                type="password"
+                autoComplete="off"
+                aria-label={`Value for ${request.name}`}
+                value={value}
+                onChange={(event) => setValue(event.target.value)}
+              />
+              <button type="submit" className={styles.answer} disabled={value === '' || sending}>
+                Send
+              </button>
+              <button type="button" className={styles.answer} disabled={sending} onClick={() => void answer(`${base}/decline`, {}, 'declined')}>
+                Decline
+              </button>
+            </form>
+          ) : (
+            <p className={styles.meta}>{elsewhereText}</p>
+          )}
+        </>
+      )}
+      {error && <p role="alert" className={styles.meta}>{error}</p>}
+    </>
+  );
+}
+
+export function AgentRequestCard({ decision }: { decision: Decision }) {
+  if (!decision.agentRequest) return null;
   return (
     <div
       className={`${styles.row} ${styles.rowBlocking}`}
@@ -116,45 +201,7 @@ export function AgentRequestCard({ decision }: { decision: Decision }) {
           <span className={`${styles.badge} ${styles.badgeBlocking}`}>{describePendingInput(decision.kinds)}</span>
           <span className={styles.subject}>{decision.label}</span>
         </div>
-        {request.kind === 'machine-link' ? (
-          <MachineLinkRequestBody
-            label={decision.label}
-            hint={request.hint}
-            canAnswer={canAnswer}
-            machineLabel={status?.machine?.label ?? 'this machine'}
-            sending={sending}
-            onLink={() => openAnywhereDialog('link-machine', { agentRequestId: request.id })}
-            onDismiss={() => void answer(`${base}/decline`, {})}
-          />
-        ) : (
-          <>
-            <p className={styles.prompt}>{request.prompt}</p>
-            <div className={styles.meta}>
-              <span className={styles.mono}>{request.name}</span>
-            </div>
-            {canAnswer ? (
-              <form className={styles.secretForm} onSubmit={onSend}>
-                <input
-                  className={styles.secretInput}
-                  type="password"
-                  autoComplete="off"
-                  aria-label={`Value for ${request.name}`}
-                  value={value}
-                  onChange={(event) => setValue(event.target.value)}
-                />
-                <button type="submit" className={styles.answer} disabled={value === '' || sending}>
-                  Send
-                </button>
-                <button type="button" className={styles.answer} disabled={sending} onClick={() => void answer(`${base}/decline`, {})}>
-                  Decline
-                </button>
-              </form>
-            ) : (
-              <p className={styles.meta}>Answer this on {status?.machine?.label ?? 'this machine'}'s own dashboard</p>
-            )}
-          </>
-        )}
-        {error && <p role="alert" className={styles.meta}>{error}</p>}
+        <AgentRequestAnswer decision={decision} />
       </div>
     </div>
   );

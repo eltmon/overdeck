@@ -1,0 +1,300 @@
+{
+  "version": "1",
+  "issueId": "PAN-5541",
+  "created": "2026-11-18T20:13:04.612Z",
+  "updated": "2026-11-18T23:09:40.664Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-18T22:50Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-18T22:50:31.145Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-18T23:03:50.728Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-18T23:06Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-11-18T23:06:03.325Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-18T23:09Z] ci-monitor → FAILED — seq 3",
+      "timestamp": "2026-11-18T23:09:40.664Z"
+    }
+  ],
+  "items": {
+    "server-request-issue-id": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5541",
+      "claimedAt": "2026-11-18T20:13:04.611Z",
+      "doneAt": "2026-11-18T20:19:25.580Z"
+    },
+    "server-request-issue-id.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:19:25.580Z"
+    },
+    "server-request-issue-id.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:19:25.580Z"
+    },
+    "server-request-issue-id.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:19:25.580Z"
+    },
+    "server-request-issue-id.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:19:25.580Z"
+    },
+    "decision-owner-fields": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5541",
+      "claimedAt": "2026-11-18T20:19:46.073Z",
+      "doneAt": "2026-11-18T20:26:17.926Z"
+    },
+    "decision-owner-fields.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:26:17.926Z"
+    },
+    "decision-owner-fields.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:26:17.926Z"
+    },
+    "decision-owner-fields.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:26:17.926Z"
+    },
+    "decision-owner-fields.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:26:17.926Z"
+    },
+    "decision-owner-fields.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:26:17.926Z"
+    },
+    "answer-body-extract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5541",
+      "claimedAt": "2026-11-18T20:26:30.702Z",
+      "doneAt": "2026-11-18T20:31:55.740Z"
+    },
+    "answer-body-extract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:31:55.740Z"
+    },
+    "answer-body-extract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:31:55.740Z"
+    },
+    "answer-body-extract.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:31:55.740Z"
+    },
+    "answer-body-extract.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:31:55.740Z"
+    },
+    "request-dialog-host": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5541",
+      "claimedAt": "2026-11-18T20:32:06.661Z",
+      "doneAt": "2026-11-18T20:56:14.947Z"
+    },
+    "request-dialog-host.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:56:14.947Z"
+    },
+    "request-dialog-host.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:56:14.947Z"
+    },
+    "request-dialog-host.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:56:14.947Z"
+    },
+    "request-dialog-host.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:56:14.947Z"
+    },
+    "request-dialog-host.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:56:14.947Z"
+    },
+    "needs-you-open-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5541",
+      "claimedAt": "2026-11-18T20:56:39.522Z",
+      "doneAt": "2026-11-18T21:02:30.357Z"
+    },
+    "needs-you-open-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:02:30.357Z"
+    },
+    "needs-you-open-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:02:30.357Z"
+    },
+    "needs-you-open-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:02:30.357Z"
+    },
+    "needs-you-open-dialog.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:02:30.357Z"
+    },
+    "conversation-pinned-card": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5541",
+      "claimedAt": "2026-11-18T21:03:12.087Z",
+      "doneAt": "2026-11-18T21:11:37.397Z"
+    },
+    "conversation-pinned-card.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:11:37.397Z"
+    },
+    "conversation-pinned-card.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:11:37.397Z"
+    },
+    "conversation-pinned-card.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:11:37.397Z"
+    },
+    "conversation-pinned-card.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:11:37.397Z"
+    },
+    "agent-session-pinned-card": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5541",
+      "claimedAt": "2026-11-18T21:11:50.083Z",
+      "doneAt": "2026-11-18T21:26:03.395Z"
+    },
+    "agent-session-pinned-card.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:26:03.395Z"
+    },
+    "agent-session-pinned-card.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:26:03.395Z"
+    },
+    "agent-session-pinned-card.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:26:03.395Z"
+    },
+    "conversation-list-flag": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5541",
+      "claimedAt": "2026-11-18T21:26:17.313Z",
+      "doneAt": "2026-11-18T21:47:02.226Z"
+    },
+    "conversation-list-flag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:47:02.226Z"
+    },
+    "conversation-list-flag.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:47:02.226Z"
+    },
+    "conversation-list-flag.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:47:02.226Z"
+    },
+    "conversation-list-flag.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T21:47:02.226Z"
+    },
+    "dock-needs-you-flag": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5541",
+      "claimedAt": "2026-11-18T21:47:16.846Z",
+      "doneAt": "2026-11-18T22:06:51.700Z"
+    },
+    "dock-needs-you-flag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:06:51.700Z"
+    },
+    "dock-needs-you-flag.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:06:51.700Z"
+    },
+    "mobile-answer-body": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5541",
+      "claimedAt": "2026-11-18T22:07:02.994Z",
+      "doneAt": "2026-11-18T22:12:30.309Z"
+    },
+    "mobile-answer-body.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:12:30.309Z"
+    },
+    "mobile-answer-body.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:12:30.309Z"
+    },
+    "mobile-answer-body.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:12:30.309Z"
+    },
+    "docs-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5541",
+      "claimedAt": "2026-11-18T22:12:43.131Z",
+      "doneAt": "2026-11-18T22:14:08.737Z"
+    },
+    "docs-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:14:08.737Z"
+    },
+    "docs-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:14:08.737Z"
+    },
+    "docs-changelog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:14:08.737Z"
+    },
+    "docs-changelog.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:14:08.737Z"
+    },
+    "needs-you-open-dialog.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:15:11.545Z"
+    },
+    "agent-session-pinned-card.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T22:15:11.545Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-18T22:50:31Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5541\n\nPull request: https://github.com/eltmon/overdeck/pull/5561 (head `0dc2c1ac`)\n\nSource: check_run:test-e2e\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-e2e [INHERITED FROM MAIN — also failing on main]\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/135189333558/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/44413999541/job/135189333558  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/Stage.allProjects.test.tsx\u001b[2m > \u001b[22mStage Layout bar (PAN-5343 H-D7)\u001b[2m > \u001b[22mrenders the Layout bar in the All projects deck\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/Stage.allProjects.test.tsx\u001b[2m > \u001b[22mStage Layout bar (PAN-5343 H-D7)\u001b[2m > \u001b[22mrenders no Layout bar in a project deck\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/Stage.allProjects.test.tsx\u001b[2m > \u001b[22mStage make-only button (PAN-5343 H-D19)\u001b[2m > \u001b[22mcollapses a 2-leaf layout to the chosen pane and keeps the other tab\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/Stage.allProjects.test.tsx\u001b[2m > \u001b[22mStage conversation drop (PAN-5343 H-D8)\u001b[2m > \u001b[22ma project deck shows no overlay for another project's conversation, but does for its own\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/Stage.allProjects.test.tsx\u001b[2m > \u001b[22mStage conversation drop (PAN-5343 H-D8)\u001b[2m > \u001b[22mdropping on the right edge of a one-pane All deck gives two leaves\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/Stage.allProjects.test.tsx\u001b[2m > \u001b[22mStage project marks (PAN-5343 H-D9)\u001b[2m > \u001b[22mmarks agent tabs and split headers with their project in the All deck\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/Stage.allProjects.test.tsx\u001b[2m > \u001b[22mStage project marks (PAN-5343 H-D9)\u001b[2m > \u001b[22mrenders no project mark on agent tabs in a project deck\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/Stage.allProjects.test.tsx\u001b[2m > \u001b[22mStage empty All deck (PAN-5343 H-D10)\u001b[2m > \u001b[22mshows the empty state and no Home tab when the All deck has no panes\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/Stage.allProjects.test.tsx\u001b[2m > \u001b[22mStage empty All deck (PAN-5343 H-D10)\u001b[2m > \u001b[22moffers no \"Changes in\" action in the new-pane menu\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m6 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m563 passed\u001b[39m\u001b[22m\u001b[90m (569)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-18T23:06:03Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-5541\n\n# Review — PAN-5541\n## Verdict: CHANGES REQUESTED — stageDockMenu.test.tsx (CI subset) still fails on an unmocked GET /api/agent-requests\n\n## Context\n- Run ID: agent-pan-5541-review-176e9581\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5541/.pan/review/agent-pan-5541-review-176e9581/context.json\n- Branch / workspace: feature/pan-5541 — /home/eltmon/Projects/overdeck/workspaces/feature-pan-5541\n- PR: https://github.com/eltmon/overdeck/pull/5561\n- HEAD reviewed: 176e958183fa2f35953da522c6efb26b4204439b\n- Base / prior cycle SHA: prior approved cycle 0dc2c1ac68a05b3f2b0fcf4fa6d0c17c13499fd8 (run agent-pan-5541-review-0dc2c1ac)\n\n## Delta since the prior cycle\n- `04b3a0ce650 fix(test): installWorkDockFetchMock handles GET /api/agent-requests`: one line in `src/dashboard/frontend/src/test-utils/strictFetchMock.ts`. This answers CI run 44413999541, which failed 6 frontend test files.\n- `dd1a38b17d9`: workspace CI-feedback record (planning artifact).\n- `176e958183f`: merge of origin/main, which brings PAN-5473 (#5559) desktop-app docs (`features/desktop-app.mdx`, `docs/DESKTOP-APP.md`, `docs.json`, `quickstart.mdx`, `features/*.mdx`, `configuration/remote-access.mdx`, `.overdeck/context/codebase/concerns.md`). Not PAN-5541 code. No PAN-5541 source file changed in the merge.\n- PR source files are byte-identical to the approved 0dc2c1ac review. The prior findings and AC evidence still apply.\n\n## Blocking Findings\n\n### [validation] The CI fix misses `stageDockMenu.test.tsx`, so the frontend test job stays red — `src/dashboard/frontend/src/components/Stage/__tests__/stageDockMenu.test.tsx:30`\n- Severity: !\n- Classification / requirement scope: implementation defect (test fixture), in_pr_scope. This PR adds the request, and the file passes on main.\n- Trigger and changed-code connection: this PR mounts new `['agent-requests']` observers (`usePendingAgentRequestDecisions` in `ConversationList`, `useLiveDockItems`, and `PendingAgentRequestCards`) inside the Stage tree. `stageDockMenu.test.tsx` installs its **own** `installStrictFetchMock` handler (lines 30–37). It does not use `installWorkDockFetchMock`, so commit 04b3a0ce650 does not cover it. Its `afterEach` calls `fetchGuard.assertNoUnexpectedRequests()`.\n- Expected / observed / impact: expected 0 unexpected requests. Observed `AssertionError: expected [ 'GET /api/agent-requests' ] to deeply equal []` on the first test. Because `afterEach` throws before cleanup, the rendered Stage leaks into the next tests, and the other 5 tests fail with `Found multiple elements with the text of: Open new tab`. The file is listed in `scripts/frontend-test-subset.txt`, so the CI frontend test job fails. Main CI run 44404352097 (PAN-5540) passed with this file in the subset.\n- Evidence: `npx vitest run src/components/Stage/__tests__/stageDockMenu.test.tsx` at HEAD 176e958183f: 6 failed (6/6), first error as quoted. CI run 44413999541 named the same file among its 6 failed files. The other 5 files from that run now pass locally: Stage.allProjects, explorer-migration, openBeside, revealPane, EditorPane. CI run 44417385989 on this HEAD was still pending at review time.\n- Fix: in `stageDockMenu.test.tsx`'s handler, add `if (url === '/api/agent-requests') return Response.json({ requests: [] })`. Then grep every other `installStrictFetchMock(` caller in the CI subset that renders Stage, ConversationList, the dock, ConversationPanel, DrawerAgentSession or SessionPanel, and run them. Do not loosen `assertNoUnexpectedRequests`.\n\n## Non-blocking Findings\nCarried forward unchanged from the prior cycle (see agent-pan-5541-review-0dc2c1ac/review.md):\n- ~ Per-observer `refetchInterval: 5000` means the shared query key does not make one poll (NFR-2 wording). The extra requests are cheap and bounded.\n- ? A conversation-owned request without an `issueId` lights no Live-dock dot (spec limit).\n- ? `withPendingAgentRequests` resets `pendingInputCount` to the number of kinds (matches the spec literally; no visible effect).\n- ? The live-check fallback used a reason outside the PRD's stated triggers. The PR-body line still satisfies AC10, and test-role UAT should exercise the flow.\n- ? The `IssueDrawer.test.tsx` mock edits sit outside the CI subset.\n\n## Coverage\n- Delta files: `strictFetchMock.ts` was reviewed and is correct for its callers. The main-merge docs (PAN-5473) are not applicable because they are another issue's already-merged change, and the merge left PAN-5541 files untouched (`git diff 0dc2c1ac68a HEAD` touches no PAN-5541 source).\n- All 42 PAN-5541 files: reviewed in the prior cycle at identical content. The ledger, four-dimension notes and AC matrix in agent-pan-5541-review-0dc2c1ac/review.md still apply.\n- AC status: AC 1–10 are met on behavior. The PR is not mergeable while the CI frontend test job is red because of this PR's fixture gap.\n- Second pass: I swept the strict-fetch-mock callers that render Stage, the dock or session panes (list in Verification). Only `stageDockMenu.test.tsx` fails.\n\n## Verification\n- `npx vitest run` on the 6 files CI failed plus Stage.test, SessionPanel.test, CommandPalette.test, EventRouter.test, ConversationChangesScope.test and ProjectOverview.test: 11 files passed and 1 failed (`stageDockMenu.test.tsx`, 6 tests).\n- `npx vitest run src/components/Stage/__tests__/stageDockMenu.test.tsx` alone: 6/6 fail with the error above.\n- CI: run 44413999541 failed (6 frontend files); main run 44404352097 succeeded; run 44417385989 on this HEAD was pending.\n- I did not re-run the focused PAN-5541 tests or `lint:effect-diagnostics`, because source is unchanged since the prior cycle (294 + 104 tests passed and diagnostics were clean on 0dc2c1ac).\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5541/.pan/review/agent-pan-5541-review-176e9581/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-5541 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 3,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-18T23:09:40Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5541\n\nPull request: https://github.com/eltmon/overdeck/pull/5561 (head `176e9581`)\n\nSource: check_run:test-e2e\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-e2e\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/135201329235/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/44417385989/job/135201329235  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/stageDockMenu.test.tsx\u001b[2m > \u001b[22mStage + menu dock entries (PAN-5289)\u001b[2m > \u001b[22mlists Files, Changes in <project name> and Go to file…\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/stageDockMenu.test.tsx\u001b[2m > \u001b[22mStage + menu dock entries (PAN-5289)\u001b[2m > \u001b[22mopens the dock on Files\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/stageDockMenu.test.tsx\u001b[2m > \u001b[22mStage + menu dock entries (PAN-5289)\u001b[2m > \u001b[22mopens Changes on the project root, anchored to the active tab\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/stageDockMenu.test.tsx\u001b[2m > \u001b[22mStage + menu dock entries (PAN-5289)\u001b[2m > \u001b[22mopens Go to file\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/stageDockMenu.test.tsx\u001b[2m > \u001b[22mStage + menu order and keycaps (PAN-5295)\u001b[2m > \u001b[22mlists New conversation, Files, Changes in <project>, Go to file…, Terminal, Web page in order\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/components/Stage/__tests__/stageDockMenu.test.tsx\u001b[2m > \u001b[22mStage + menu order and keycaps (PAN-5295)\u001b[2m > \u001b[22mshows the registered keycap for this platform and none for an unbound shortcut\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected [ 'GET /api/agent-requests' ] to deeply equal []\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- []\u001b[39m\n\u001b[31m+ [\u001b[39m\n\u001b[31m+   \"GET /api/agent-requests\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m Object.assertNoUnexpectedRequests src/test-utils/strictFetchMock.ts:\u001b[2m39:34\u001b[22m\u001b[39m\n    \u001b[90m 37|\u001b[39m     assertNoUnexpectedRequests\u001b[33m:\u001b[39m \u001b[35masync\u001b[39m () \u001b[33m=>\u001b[39m {\n    \u001b[90m 38|\u001b[39m       \u001b[35mawait\u001b[39m \u001b[33mPromise\u001b[39m\u001b[33m.\u001b[39m\u001b[34mallSettled\u001b[39m([\u001b[33m...\u001b[39mpendingRequests])\u001b[33m;\u001b[39m\n    \u001b[90m 39|\u001b[39m       \u001b[34mexpect\u001b[39m(unexpectedRequests)\u001b[33m.\u001b[39m\u001b[34mtoEqual\u001b[39m([])\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                                  \u001b\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m568 passed\u001b[39m\u001b[22m\u001b[90m (569)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ],
+  "agentModel": "claude-opus-5-5"
+}

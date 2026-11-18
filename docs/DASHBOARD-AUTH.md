@@ -443,7 +443,8 @@ The operator answers agent requests here
 
 - `GET /api/agent-requests` needs `read:conversations` and answers the pending
   requests for the Decisions panel: a secret request's `name` and `prompt`, or
-  a machine-link request's `hint`. It never answers a value, a result or the
+  a machine-link request's `hint`. Each row also carries the requesting
+  caller's `issueId`, or `null`. It never answers a value, a result or the
   agent's directory.
 - `POST /api/agent-requests/:id/secret` (`{ value }`, at most 65,536 bytes),
   `POST /api/agent-requests/:id/linked` and
