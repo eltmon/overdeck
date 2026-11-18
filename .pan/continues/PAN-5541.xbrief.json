@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5541",
   "created": "2026-11-18T20:13:04.612Z",
-  "updated": "2026-11-18T20:26:17.926Z",
+  "updated": "2026-11-18T20:26:30.702Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
     "decision-owner-fields.ac5": {
       "status": "completed",
       "doneAt": "2026-11-18T20:26:17.926Z"
+    },
+    "answer-body-extract": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5541",
+      "claimedAt": "2026-11-18T20:26:30.702Z"
     }
   }
 }
