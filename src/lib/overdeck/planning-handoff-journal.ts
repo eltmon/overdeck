@@ -8,7 +8,7 @@ import { existsSync } from 'node:fs';
 
 import { emitActivityEntry } from '../activity-logger.js';
 import { recordHandoffDeferred, recordHandoffRequested, type DeferredHandoffReason } from '../cloister/deferred-handoff.js';
-import { appendPipelineEntry } from '../cloister/pipeline-journal.js';
+import { appendPipelineEntry, readPipelineJournal } from '../cloister/pipeline-journal.js';
 import { isDeaconGloballyPaused } from './control-settings.js';
 
 export interface CompletePlanningAutoSpawnResult {
@@ -32,13 +32,18 @@ export interface CompletePlanningAutoSpawnResult {
  * PAN-5498: journal `handoff.requested` before the spawn POST. If the
  * dashboard dies while the request runs (a slow stack rebuild, then a
  * restart), it stays the last handoff entry and deacon-lite resumes the start.
- * Returns whether the entry was written. Never throws.
+ * Returns whether the entry reached disk: the journal append swallows write
+ * errors, so it is read back. Never throws.
  */
 export function journalHandoffRequest(workspacePath: string | null | undefined, issueId: string): boolean {
   if (!workspacePath || !existsSync(workspacePath)) return false;
   try {
-    recordHandoffRequested({ workspacePath, issueId });
-    return true;
+    const entry = recordHandoffRequested({ workspacePath, issueId });
+    const persisted = readPipelineJournal(workspacePath).some((e) => e.type === entry.type && e.at === entry.at);
+    if (!persisted) {
+      console.warn(`[complete-planning] The ${issueId} hand-off request did not reach the pipeline journal; a restart before the start answers will not be resumed.`);
+    }
+    return persisted;
   } catch (error) {
     console.warn(`[complete-planning] Could not journal the ${issueId} hand-off request: ${error instanceof Error ? error.message : String(error)}`);
     return false;
