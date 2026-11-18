@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5505",
   "created": "2026-11-18T15:55:14.402Z",
-  "updated": "2026-11-18T15:58:34.488Z",
+  "updated": "2026-11-18T15:58:42.579Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
     "remove-intro-video-assets.ac2": {
       "status": "completed",
       "doneAt": "2026-11-18T15:58:34.488Z"
+    },
+    "validate-docs-site": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5505",
+      "claimedAt": "2026-11-18T15:58:42.578Z"
     }
   }
 }
