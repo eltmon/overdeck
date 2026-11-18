@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5526",
   "created": "2026-11-18T19:12:30.887Z",
-  "updated": "2026-11-18T19:19:37.628Z",
+  "updated": "2026-11-18T19:26:14.435Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,9 +32,30 @@
       "doneAt": "2026-11-18T19:19:30.590Z"
     },
     "finalize-consent-reader": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5526",
-      "claimedAt": "2026-11-18T19:19:37.628Z"
+      "claimedAt": "2026-11-18T19:19:37.628Z",
+      "doneAt": "2026-11-18T19:26:14.434Z"
+    },
+    "finalize-consent-reader.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:26:14.434Z"
+    },
+    "finalize-consent-reader.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:26:14.434Z"
+    },
+    "finalize-consent-reader.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:26:14.434Z"
+    },
+    "finalize-consent-reader.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:26:14.434Z"
+    },
+    "finalize-consent-reader.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:26:14.434Z"
     }
   }
 }
