@@ -4,17 +4,17 @@
     "created": "2026-11-18T23:29:16Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5564: Flaky test: changes-view 'goes back to the plain editor' races the DiffEditor mock's onMount effect",
-    "updated": "2026-11-18T23:33:03.781Z"
+    "updated": "2026-11-18T23:33:37.052Z"
   },
   "plan": {
     "id": "pan-5564",
     "title": "Flaky test: changes-view 'goes back to the plain editor' races the DiffEditor mock's onMount effect",
-    "status": "proposed",
+    "status": "running",
     "uid": "120d3a95-58bb-4712-aec2-0ccd2c77cb36",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-18T23:29:16Z",
-    "updated": "2026-11-18T23:33:03.781Z",
+    "updated": "2026-11-18T23:33:37.052Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5564",
@@ -136,5 +136,5 @@
     ],
     "edges": []
   },
-  "status": "proposed"
+  "status": "active"
 }
