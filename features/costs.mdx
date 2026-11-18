@@ -78,3 +78,27 @@ tables, **By stage** and **By model** (see
 
 On the board, hovering a card that has recorded cost shows a cost badge; clicking it opens the
 same cost breakdown.
+
+## The Costs page
+
+The Costs page (`/costs`) needs Experimental features turned on; see
+[Dashboard views](/features/dashboard-views#experimental-features). It opens on a header
+**Cost Tracking** with three tabs: **Issues**, **Experiments** and **Machines**.
+
+The **Issues** tab opens with four cards (**Total Cost** with the number of issues tracked,
+**Event Count**, **Budget Warnings** and **Over Budget**), then a **30-Day Cost Trend** chart, a
+**Costs by Issue** list sorted by cost, and a detail panel for the selected row with its token
+usage, by-model and by-stage breakdowns; a chart icon or **Full detail** opens the same breakdowns
+with a 30-day trend for that issue. Two of the four cards do not show real numbers yet:
+**Event Count** shows the number of issue rows, not the number of events, and **Budget Warnings**
+and **Over Budget** always show `0` ([#5562](https://github.com/eltmon/overdeck/issues/5562),
+items 2 and 3).
+
+The **Experiments** tab compares Caveman output-compression variants. With no data it points to
+setting `agents.caveman.enabled: true`; the A/B split itself needs
+`agents.caveman.ab_test: true` as well.
+
+The **Machines** tab lists each linked machine's today/week/month spend, with a cached figure and
+its age for an offline machine, and an All machines row that counts a request recorded on two
+machines once; see
+[Linked machines](/configuration/linked-machines#fleet-usage).
