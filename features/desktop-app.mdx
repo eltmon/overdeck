@@ -120,3 +120,45 @@ A canary build (a version ending in `-canary`) only offers canary releases; a st
 If an update cannot install, download the new installer from [GitHub Releases](https://github.com/eltmon/overdeck/releases/latest) and install it over the old one. This is the only way to update on macOS today, since the app is not notarized (see [Download and install](#download-and-install)).
 
 Installed the app through npm instead? See [Run it from npm](#run-it-from-npm) to update it with `npm`.
+
+## Open another machine
+
+Instead of running its own embedded server, the app can show one other machine's dashboard. It stores at most one chosen machine, and while it shows one, no local server runs. See [Remote access](/configuration/remote-access) for pairing in general and [Tailscale](/configuration/tailscale) for setting up a tailnet.
+
+### Pair with a machine
+
+1. On the other machine, create a pairing link: **Settings → Anywhere → Pair a device**, or `pan pair --url <its Tailscale address>`.
+2. In the app, choose **Connect to a Machine…** from the tray or the Overdeck menu.
+3. Paste the whole link into the **Open another machine** window and click **Connect**.
+
+Pasting just the credential, without the address, is refused with "Paste the whole pairing link, including the address." Once paired, the other machine lists this computer under **Settings → Anywhere → Paired devices** as `Overdeck desktop on <hostname>`; manage it from there with `pan devices list` and `pan devices revoke <id>`.
+
+### Which addresses work
+
+The app only sends this computer's credential to:
+
+- any `https:` address;
+- `http:` to loopback (`localhost`, `127.0.0.0/8`, `::1`);
+- `http:` to a Tailscale address (`100.64.0.0/10`, `fd7a:115c:a1e0::/48`, or a name ending in `.ts.net`, or that resolves only to such addresses).
+
+Anything else, such as a plain LAN address, is refused with "Overdeck sends this computer's credential only over HTTPS, Tailscale or this computer's loopback. Use the machine's Tailscale address or an HTTPS address." The app checks this both when you pair and on every launch.
+
+### Where the credential is kept
+
+The chosen machine's record is saved to `remote-machine.json` in the app's user data folder, with its device credential encrypted by the operating system's secure store (Keychain on macOS, Windows credential protection on Windows, GNOME Keyring or KWallet on Linux). Without one of those stores available, the app will not save a machine credential and refuses to pair. The remote dashboard window keeps its session in memory only, so its draft text and UI preferences reset on every launch.
+
+### When the machine cannot be opened
+
+| What happened | Message |
+| --- | --- |
+| The machine is offline or unreachable | Can't reach `<label>` at `<origin>`. Check that its Overdeck is running and that this computer is on the same tailnet. |
+| A different Overdeck now answers at that address | `<origin>` is now a different Overdeck machine (`<new label>`). Pair again. |
+| The machine revoked this computer | `<label>` no longer accepts this computer's credential. Pair again with a new link. |
+| The two sides speak different protocol versions | `<label>` speaks Overdeck protocol `<n>`; this app supports `<m>`. Update the older side. |
+| The credential store could not decrypt the saved credential | This computer's credential store could not decrypt the saved credential. Pair again. |
+
+In every case, the **Open another machine** window opens with the reason and offers **Open `<label>`**, **Use this computer** and **Forget `<label>`**. The app never falls back to this computer on its own.
+
+### Switch back or forget the machine
+
+**Use this computer** keeps the pairing on record but starts the embedded server and shows it instead. **Forget `<label>`** revokes this computer's access on that machine, then removes the local record either way; if the machine cannot be reached, revoke the device from that machine's **Settings → Anywhere → Paired devices** instead. While a chosen machine is shown, links to other origins open in your regular browser, and restarting the dashboard from the app is refused: restart it on the machine that is showing it.
