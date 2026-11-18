@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5472",
   "created": "2026-11-18T16:42:03.966Z",
-  "updated": "2026-11-18T16:54:40.899Z",
+  "updated": "2026-11-18T16:54:46.171Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -154,6 +154,11 @@
     "god-view-experimental.ac3": {
       "status": "completed",
       "doneAt": "2026-11-18T16:54:40.899Z"
+    },
+    "mission-control-fix": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5472",
+      "claimedAt": "2026-11-18T16:54:46.171Z"
     }
   }
 }
