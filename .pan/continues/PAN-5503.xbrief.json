@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5503",
   "created": "2026-11-18T23:39:30.709Z",
-  "updated": "2026-11-18T23:52:44.218Z",
+  "updated": "2026-11-18T23:53:15.398Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -331,6 +331,22 @@
     "audit-skills.ac2": {
       "status": "completed",
       "doneAt": "2026-11-18T23:52:44.217Z"
+    },
+    "audit-knowledge": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:53:15.397Z"
+    },
+    "audit-knowledge.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:53:15.397Z"
+    },
+    "audit-knowledge.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:53:15.397Z"
+    },
+    "audit-knowledge.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:53:15.397Z"
     }
   }
 }
