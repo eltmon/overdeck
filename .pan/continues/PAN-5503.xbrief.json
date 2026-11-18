@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5503",
   "created": "2026-11-18T23:39:30.709Z",
-  "updated": "2026-11-18T23:46:37.782Z",
+  "updated": "2026-11-18T23:47:03.266Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,30 @@
     "audit-auto-merge.ac5": {
       "status": "completed",
       "doneAt": "2026-11-18T23:46:37.782Z"
+    },
+    "audit-polyrepo": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:47:03.266Z"
+    },
+    "audit-polyrepo.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:47:03.266Z"
+    },
+    "audit-polyrepo.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:47:03.266Z"
+    },
+    "audit-polyrepo.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:47:03.266Z"
+    },
+    "audit-polyrepo.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:47:03.266Z"
+    },
+    "audit-polyrepo.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:47:03.266Z"
     }
   }
 }
