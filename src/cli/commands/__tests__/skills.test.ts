@@ -750,6 +750,12 @@ describe('pan skills pack', () => {
     expect(mocks.addPack).not.toHaveBeenCalled();
   });
 
+  it('add gstack without --ref exits 1 naming the missing ref (PAN-5540 knownPackSource)', async () => {
+    await expect(run('pack', 'add', 'gstack')).rejects.toThrow('exit 1');
+    expect(errors.join('\n')).toContain('pack gstack has no default ref; pass --ref <tag-or-branch>');
+    expect(mocks.addPack).not.toHaveBeenCalled();
+  });
+
   it('add of an unknown id without a url exits 1', async () => {
     await expect(run('pack', 'add', 'foo')).rejects.toThrow('exit 1');
     expect(errors.join('\n')).toContain('pack foo has no default url');

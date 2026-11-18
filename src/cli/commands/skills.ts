@@ -366,9 +366,6 @@ async function packConfirm(
   };
 }
 
-/** A pack add that cannot start (no default url or ref); the single-id path prints it and exits 1. */
-class PackAddUsageError extends Error {}
-
 export async function skillsPackAddCommand(id: string | undefined, url: string | undefined, options: PackAddOptions): Promise<void> {
   if (!id === !options.group) {
     console.error(chalk.red('provide a pack id or --group <name>'));
@@ -392,11 +389,13 @@ export async function skillsPackAddCommand(id: string | undefined, url: string |
   const validated: AddOneOptions = { ...options, adapter: options.adapter };
   if (options.group) return addGroupPacks(options.group, validated);
   const packId = id as string;
+  const { KnownPackError } = await import('../../lib/skill-packs/known.js');
   let outcome;
   try {
     outcome = await addOnePack(packId, url, validated);
   } catch (error) {
-    if (error instanceof PackAddUsageError) {
+    // A pack add that cannot start (no default url or ref): print it and exit 1.
+    if (error instanceof KnownPackError) {
       console.error(chalk.red(error.message));
       process.exit(1);
     }
@@ -427,18 +426,16 @@ async function addGroupPacks(group: string, options: AddOneOptions): Promise<voi
   if (failed) process.exit(1);
 }
 
-/** Add one pack; 'declined' when its preview is not trusted. Throws PackSourceError (code 'exists' when registered) and PackAddUsageError. */
+/** Add one pack; 'declined' when its preview is not trusted. Throws PackSourceError (code 'exists' when registered) and KnownPackError (no default url or ref). */
 async function addOnePack(id: string, url: string | undefined, options: AddOneOptions): Promise<'added' | 'declined'> {
-  const [{ addPack }, { CORE_SKILLS }, { KNOWN_PACKS }] = await Promise.all([
+  const [{ addPack }, { CORE_SKILLS }, { KNOWN_PACKS }, { knownPackSource }] = await Promise.all([
     import('../../lib/skill-packs/sources.js'),
     import('../../lib/skill-overrides/resolve.js'),
     import('../../lib/skill-packs/adapters.js'),
+    import('../../lib/skill-packs/known.js'),
   ]);
   const known = KNOWN_PACKS[id];
-  const resolvedUrl = url ?? known?.url;
-  const ref = options.ref ?? known?.ref;
-  if (!resolvedUrl) throw new PackAddUsageError(`pack ${id} has no default url; pass one: pan skills pack add ${id} <url> --ref <ref>`);
-  if (!ref) throw new PackAddUsageError(`pack ${id} has no default ref; pass --ref <tag-or-branch>`);
+  const { url: resolvedUrl, ref } = knownPackSource(id, { url, ref: options.ref });
   const runtimeNote =
     (options.adapter ?? known?.adapter) === 'gstack-runtime'
       ? '\nTrusting runs the command above once now; skills run the listed scripts when you invoke them.'

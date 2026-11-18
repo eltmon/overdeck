@@ -6,14 +6,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PackGroup } from '../groups.js';
 import type { PackRegistryEntry } from '../sources.js';
 
-const { listPacks, listPackGroups } = vi.hoisted(() => ({
+const { listPacks, listPackGroups, addPack } = vi.hoisted(() => ({
   listPacks: vi.fn<() => Promise<PackRegistryEntry[]>>(),
   listPackGroups: vi.fn<() => Promise<PackGroup[]>>(),
+  addPack: vi.fn<typeof import('../sources.js').addPack>(),
 }));
 
 vi.mock('../sources.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../sources.js')>()),
   listPacks,
+  addPack,
 }));
 
 vi.mock('../groups.js', async (importOriginal) => ({
@@ -21,9 +23,20 @@ vi.mock('../groups.js', async (importOriginal) => ({
   listPackGroups,
 }));
 
-import { KNOWN_PACKS } from '../adapters.js';
+import { KNOWN_PACKS, notAppliedLabels, type PackManifest } from '../adapters.js';
 import { KNOWN_PACK_GROUPS } from '../groups.js';
-import { formatAvailablePackLines, listAvailablePacks, notAddableReason, packAddCommand } from '../known.js';
+import {
+  addKnownPack,
+  formatAvailablePackLines,
+  KnownPackError,
+  knownPackSource,
+  listAvailablePacks,
+  notAddableReason,
+  packAddCommand,
+  previewKnownPack,
+  serializePackPreview,
+} from '../known.js';
+import type { PackPreview } from '../sources.js';
 
 const COMMIT = 'a'.repeat(40);
 const BUILT_IN_GROUPS: PackGroup[] = Object.entries(KNOWN_PACK_GROUPS).map(([name, packs]) => ({
@@ -38,7 +51,51 @@ const registered = (...ids: string[]): PackRegistryEntry[] =>
 beforeEach(() => {
   listPacks.mockReset().mockResolvedValue([]);
   listPackGroups.mockReset().mockResolvedValue(BUILT_IN_GROUPS);
+  addPack.mockReset();
 });
+
+const MANIFEST: PackManifest = {
+  skills: [
+    { name: 'remotion-best-practices', dir: 'skills/remotion-best-practices', description: 'Remotion rules', optIn: false },
+    { name: 'render-setup', dir: 'skills/render-setup', description: 'Writes config', optIn: true },
+  ],
+  capabilities: {
+    hooks: true,
+    mcpServers: true,
+    commands: false,
+    agents: false,
+    contextInjection: false,
+    gitHooks: false,
+    executables: ['skills/render-setup/run.sh'],
+    projectMutatingSkills: ['render-setup'],
+    requiresCli: [],
+  },
+  license: 'MIT',
+  pluginName: null,
+  excluded: [{ name: 'old', reason: 'archived' }],
+  mcpServers: {
+    zeta: { type: 'http', url: 'https://zeta.example/mcp', headers: {} },
+    alpha: { type: 'http', url: 'https://alpha.example/mcp', headers: { 'x-key': 'k' } },
+  },
+};
+
+const previewFor = (id: string, commit: string): PackPreview => ({
+  id,
+  url: KNOWN_PACKS[id]?.url ?? '',
+  ref: KNOWN_PACKS[id]?.ref ?? '',
+  commit,
+  adapter: 'plain',
+  manifest: MANIFEST,
+});
+
+const rejection = async (promise: Promise<unknown>): Promise<KnownPackError> => {
+  const error = await promise.then(
+    () => null,
+    (caught: unknown) => caught,
+  );
+  expect(error).toBeInstanceOf(KnownPackError);
+  return error as KnownPackError;
+};
 
 describe('notAddableReason', () => {
   it('lets the dashboard add packs with a default ref and no build step', () => {
@@ -176,5 +233,157 @@ describe('formatAvailablePackLines', () => {
 
     expect(lines).not.toContain('Groups');
     expect(lines.at(-1)).not.toBe('');
+  });
+});
+
+describe('knownPackSource', () => {
+  it('refuses a known pack without a default ref, with the CLI message', () => {
+    expect(() => knownPackSource('gstack')).toThrow(new KnownPackError('bad-request', 'pack gstack has no default ref; pass --ref <tag-or-branch>'));
+  });
+
+  it('lets an explicit ref fill the gap and keeps the default url', () => {
+    expect(knownPackSource('gstack', { ref: 'main' })).toEqual({ url: 'https://github.com/eltmon/gstack', ref: 'main' });
+  });
+
+  it('refuses an unknown id without a url', () => {
+    expect(() => knownPackSource('nope', { ref: 'main' })).toThrow(
+      'pack nope has no default url; pass one: pan skills pack add nope <url> --ref <ref>',
+    );
+  });
+
+  it('prefers explicit values over the defaults', () => {
+    expect(knownPackSource('remotion', { url: 'https://example.com/fork', ref: 'v1' })).toEqual({ url: 'https://example.com/fork', ref: 'v1' });
+  });
+});
+
+describe('previewKnownPack', () => {
+  it('refuses a pack whose add runs a build, without fetching', async () => {
+    expect((await rejection(previewKnownPack('sageox', []))).code).toBe('not-addable');
+    expect(addPack).not.toHaveBeenCalled();
+  });
+
+  it('refuses an id outside KNOWN_PACKS, without fetching', async () => {
+    expect((await rejection(previewKnownPack('nope', []))).code).toBe('unknown-pack');
+    expect((await rejection(previewKnownPack('../etc', []))).code).toBe('unknown-pack');
+    expect(addPack).not.toHaveBeenCalled();
+  });
+
+  it('fetches the known url and ref and declines the trust step', async () => {
+    const preview = previewFor('remotion', COMMIT);
+    addPack.mockResolvedValue({ written: false, preview });
+
+    expect(await previewKnownPack('remotion', [])).toBe(preview);
+    expect(addPack).toHaveBeenCalledTimes(1);
+    const [input, confirm] = addPack.mock.calls[0]!;
+    expect(input).toEqual({
+      id: 'remotion',
+      url: 'https://github.com/eltmon/remotion-skills',
+      ref: '3e20ac75161bc34468845df714701cc9bf6075f4',
+      reservedIds: [],
+    });
+    expect(await confirm(preview)).toBe(false);
+  });
+
+  it('shares a running preview and refuses an add until it settles', async () => {
+    const preview = previewFor('remotion', COMMIT);
+    let settle!: (value: { written: boolean; preview: PackPreview }) => void;
+    addPack.mockImplementationOnce(() => new Promise((resolve) => { settle = resolve; }));
+
+    const first = previewKnownPack('remotion', []);
+    const second = previewKnownPack('remotion', []);
+    await vi.waitFor(() => expect(addPack).toHaveBeenCalledTimes(1));
+    expect((await rejection(addKnownPack('remotion', COMMIT, []))).code).toBe('busy');
+
+    settle({ written: false, preview });
+    expect(await first).toBe(preview);
+    expect(await second).toBe(preview);
+    expect(addPack).toHaveBeenCalledTimes(1);
+
+    addPack.mockResolvedValueOnce({ written: false, preview });
+    await previewKnownPack('remotion', []);
+    expect(addPack).toHaveBeenCalledTimes(2);
+  });
+
+  it('refuses a preview while an add of the same pack runs', async () => {
+    const preview = previewFor('remotion', COMMIT);
+    let settle!: (value: { written: boolean; preview: PackPreview }) => void;
+    addPack.mockImplementationOnce(() => new Promise((resolve) => { settle = resolve; }));
+
+    const adding = addKnownPack('remotion', COMMIT, []);
+    await vi.waitFor(() => expect(addPack).toHaveBeenCalledTimes(1));
+    expect((await rejection(previewKnownPack('remotion', []))).code).toBe('busy');
+    expect((await rejection(addKnownPack('remotion', COMMIT, []))).code).toBe('busy');
+
+    settle({ written: true, preview });
+    expect(await adding).toBe(preview);
+  });
+
+  it('runs different packs at the same time', async () => {
+    addPack.mockImplementation(async ({ id }) => ({ written: false, preview: previewFor(id, COMMIT) }));
+    const [remotion, hyperframes] = await Promise.all([previewKnownPack('remotion', []), previewKnownPack('hyperframes', [])]);
+    expect(remotion.id).toBe('remotion');
+    expect(hyperframes.id).toBe('hyperframes');
+    expect(addPack).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('addKnownPack', () => {
+  it('trusts only the previewed commit', async () => {
+    const preview = previewFor('remotion', COMMIT);
+    addPack.mockResolvedValue({ written: true, preview });
+
+    expect(await addKnownPack('remotion', COMMIT, ['pan-done'])).toBe(preview);
+    const [input, confirm] = addPack.mock.calls[0]!;
+    expect(input).toMatchObject({ id: 'remotion', reservedIds: ['pan-done'] });
+    expect(await confirm(previewFor('remotion', COMMIT))).toBe(true);
+    expect(await confirm(previewFor('remotion', 'b'.repeat(40)))).toBe(false);
+  });
+
+  it('reports commit-changed when the ref now resolves to another commit', async () => {
+    addPack.mockResolvedValue({ written: false, preview: previewFor('remotion', 'b'.repeat(40)) });
+
+    const error = await rejection(addKnownPack('remotion', COMMIT, []));
+    expect(error.code).toBe('commit-changed');
+    expect(error.message).toContain('bbbbbbb');
+    expect(error.message).toContain('aaaaaaa');
+  });
+
+  it('refuses a pack the dashboard cannot add', async () => {
+    expect((await rejection(addKnownPack('gstack', COMMIT, []))).code).toBe('not-addable');
+    expect(addPack).not.toHaveBeenCalled();
+  });
+});
+
+describe('serializePackPreview', () => {
+  it('maps the preview rows the add dialog shows', () => {
+    const dto = serializePackPreview({ ...previewFor('video-use', COMMIT), pluginRoot: 'plugin' });
+
+    expect(dto).toEqual({
+      id: 'video-use',
+      url: KNOWN_PACKS['video-use']?.url,
+      ref: KNOWN_PACKS['video-use']?.ref,
+      commit: COMMIT,
+      adapter: 'plain',
+      pluginRoot: 'plugin',
+      license: 'MIT',
+      skills: [
+        { name: 'remotion-best-practices', description: 'Remotion rules', optIn: false },
+        { name: 'render-setup', description: 'Writes config', optIn: true },
+      ],
+      excluded: [{ name: 'old', reason: 'archived' }],
+      notApplied: notAppliedLabels(MANIFEST.capabilities),
+      executables: ['skills/render-setup/run.sh'],
+      mcpServers: [
+        { name: 'alpha', url: 'https://alpha.example/mcp' },
+        { name: 'zeta', url: 'https://zeta.example/mcp' },
+      ],
+      disclosure: KNOWN_PACKS['video-use']?.disclosure,
+    });
+  });
+
+  it('reports no root, no exclusions and no MCP servers when the manifest has none', () => {
+    const { excluded: _excluded, mcpServers: _mcp, ...bare } = MANIFEST;
+    const dto = serializePackPreview({ ...previewFor('pstack', COMMIT), manifest: { ...bare, license: null } });
+    expect(dto).toMatchObject({ pluginRoot: null, license: null, excluded: [], mcpServers: [], disclosure: null });
   });
 });
