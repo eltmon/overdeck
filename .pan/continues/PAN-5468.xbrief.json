@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5468",
   "created": "2026-11-18T19:13:53.395Z",
-  "updated": "2026-11-18T19:29:29.640Z",
+  "updated": "2026-11-18T19:29:37.342Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -270,6 +270,11 @@
     "section-restart.ac3": {
       "status": "completed",
       "doneAt": "2026-11-18T19:29:29.640Z"
+    },
+    "xlink-features": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5468",
+      "claimedAt": "2026-11-18T19:29:37.342Z"
     }
   }
 }
