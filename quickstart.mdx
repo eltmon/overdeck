@@ -37,7 +37,7 @@ The script installs the `overdeck` command and its short alias `pan`. You need N
 
 Run the script again at any time to upgrade to the latest release. To install somewhere else, set `OVERDECK_INSTALL_PREFIX` before you run it. The script then leaves your shell profile alone, so add that prefix's `bin` directory to your PATH yourself.
 
-Open a new terminal so the PATH change applies, then start the dashboard:
+Open a new terminal so the PATH change applies, then start the dashboard. If your shell still reports `overdeck: command not found`, run `export PATH="$HOME/.local/bin:$PATH"` first:
 
 ```bash
 overdeck up
