@@ -1,9 +1,15 @@
 ---
 title: God View
-description: Read the Confluence river, hook telemetry, issue states, and controls at /god-view
+description: "God View is an experimental map of the live pipeline at /god-view, with hook telemetry, issue states and controls."
 ---
 
 # God View
+
+<Note>
+God View is experimental. To show it, open Settings → Experimental and turn on
+**Experimental features**. God View then appears under **More → System** in the sidebar. With
+the switch off, `/god-view` opens Home instead.
+</Note>
 
 God View's **Confluence** canvas turns the live pipeline into one ambient
 operational map. Open `/god-view` to see where issues are moving, which harness
@@ -35,8 +41,8 @@ same operational view in canvas-only mode when WebGL is unavailable.
 
 The left hook bus lists the complete harness-hook inventory. Wired rows flash
 and count real events. Dim dotted rows are **dark fiber**: the hook exists in the
-contract, but no producer is wired, so God View shows `—` instead of pretending
-that it fired.
+contract, but no producer is wired, so God View shows a dash placeholder instead
+of pretending that it fired.
 
 The bottom strip is a 60-second logic-analyzer trace. Each wired hook gets one
 channel in the same order and color as the bus. Closely timed events stack into
@@ -44,8 +50,8 @@ brighter ticks, while the aggregate band shows current and peak events per
 second. The box beside it shows the live agent-role mix.
 
 The top bar combines event rate, event ECG, host health, merge queue,
-cost, merges, tokens, stale work, and active agents. A `—` means the source is
-unavailable; it does not mean zero.
+cost, merges, tokens, stale work, and active agents. A dash placeholder means
+the source is unavailable; it does not mean zero.
 
 ## Inspect and open work
 
