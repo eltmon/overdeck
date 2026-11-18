@@ -1204,18 +1204,19 @@ describe('CPU bypass (PAN-5520)', () => {
     const rootDir = home()
     writeFileSync(join(rootDir, 'owner.json'), ownerJson(OTHER_PID, 1))
     let clock = 1
-    const onWaiting = vi.fn()
+    const samplePressure = vi.fn(async () => high)
     const headPromise = acquireQualityGateAdmission(request, cpuDeps(rootDir, () => clock, {
       slots: 2,
       staleMs: 60_000,
       isProcessAlive: (pid) => pid === process.pid || pid === OTHER_PID,
-      onWaiting,
+      samplePressure,
     }))
     const headSettled = settledFlag(headPromise)
     await driveUntil(() => cpuBlockedSince(rootDir) === 1)
     clock = 5_000
-    const calls = onWaiting.mock.calls.length
-    await drive(() => onWaiting.mock.calls.length > calls + 3)
+    // Past the bound with a slot held, the head keeps sampling and waiting on CPU.
+    const calls = samplePressure.mock.calls.length
+    await driveUntil(() => samplePressure.mock.calls.length >= calls + 3)
     expect(headSettled()).toBe(false)
 
     unlinkSync(join(rootDir, 'owner.json'))
