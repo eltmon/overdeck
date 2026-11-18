@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5476",
   "created": "2026-11-18T17:44:47.849Z",
-  "updated": "2026-11-18T17:50:08.590Z",
+  "updated": "2026-11-18T17:50:15.772Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,11 @@
     "conv-setup.ac4": {
       "status": "completed",
       "doneAt": "2026-11-18T17:50:08.589Z"
+    },
+    "conv-troubleshoot": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5476",
+      "claimedAt": "2026-11-18T17:50:15.772Z"
     }
   }
 }
