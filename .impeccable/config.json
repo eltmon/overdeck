@@ -64,6 +64,15 @@
         ],
         "createdAt": "2026-11-14T18:41:20.614Z",
         "reason": "Claude: remaining sub-11px text is the letter glyph inside file-type icon badges (an icon, not text) and the mockup-notes tag chrome (not product UI); the one real 10.5px label was raised to 11px"
+      },
+      {
+        "rule": "tiny-text",
+        "value": "*",
+        "files": [
+          ".tmp/computer-use-settings/index.html"
+        ],
+        "createdAt": "2026-11-17T11:26:47.322Z",
+        "reason": "Overdeck style guide (design/style-guide/STYLE-GUIDE.md) sets 11px mono eyebrows and 10px badge labels; body text is 13px Broadsheet"
       }
     ]
   }

@@ -56,6 +56,20 @@ describe('renderResultText (PAN-5452)', () => {
     const text = renderResultText({ action: { path: 'accessibility', actionName: 'click' }, snapshot: SNAPSHOT, screenshot: null });
     expect(text.split('\n')[0]).toBe('Action: accessibility/click');
   });
+
+  it('appends the macOS delivery after the verification (PAN-5463)', () => {
+    const text = renderResultText({
+      action: { path: 'accessibility', actionName: 'AXPress', delivery: 'background', verification: { state: 'verified', reason: 'value read back' } },
+      snapshot: SNAPSHOT,
+      screenshot: null,
+    });
+    expect(text.split('\n')[0]).toBe('Action: accessibility/AXPress, verification: verified (value read back), delivery: background');
+  });
+
+  it('passes delivery through to the JSON action (PAN-5463)', () => {
+    const json = renderResultJson({ action: { path: 'synthetic', actionName: null, delivery: 'foreground' }, snapshot: SNAPSHOT, screenshot: null });
+    expect((json.action as Record<string, unknown>).delivery).toBe('foreground');
+  });
 });
 
 describe('renderResultText note placement (PAN-5452, PRD 3e)', () => {

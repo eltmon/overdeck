@@ -1,11 +1,10 @@
 ---
-title: Architecture
-description: Technical architecture and design decisions
+title: "Overdeck architecture"
+sidebarTitle: "Architecture"
+description: "How Overdeck fits together: the pan CLI, the dashboard server, the agents it runs in workspaces, health monitoring and where agent state lives."
 ---
 
 import { ThemedImage } from "/snippets/themed-image.mdx";
-
-# Architecture
 
 Deep dive into Overdeck's technical architecture and design decisions.
 
@@ -95,7 +94,7 @@ Overdeck stores all runtime state in `~/.overdeck/`:
     handoffs.jsonl      # All handoff events (for analytics)
 
   costs/                # Raw cost logs (JSONL)
-  backups/              # Sync backups
+  backups/              # Sync backups (newest 10 kept)
   traefik/              # Traefik reverse proxy config
     dynamic/            # Dynamic route configs
     certs/              # TLS certificates

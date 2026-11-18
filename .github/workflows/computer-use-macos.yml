@@ -1,0 +1,97 @@
+name: Computer use (macOS helper)
+
+# PAN-5463: builds and tests the vendored macOS computer-use helper
+# (native/computer-use-macos, Swift). Swift does not build on the Linux hosts
+# where agents work, so this workflow is the compile proof for every pushed
+# Swift change. It runs on feature-branch pushes as well as PRs, so a change
+# gets a macOS run before its PR exists (D-19).
+on:
+  push:
+    branches: ['feature/**']
+    paths:
+      - 'native/computer-use-macos/**'
+      - 'scripts/build-computer-macos.mjs'
+      - 'scripts/ci/macos-helper-smoke.ts'
+      - 'src/lib/computer-use/**'
+      - '.github/workflows/computer-use-macos.yml'
+  pull_request:
+    paths:
+      - 'native/computer-use-macos/**'
+      - 'scripts/build-computer-macos.mjs'
+      - 'scripts/ci/macos-helper-smoke.ts'
+      - 'src/lib/computer-use/**'
+      - '.github/workflows/computer-use-macos.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: computer-use-macos-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  helper:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Swift tests
+        run: swift test --package-path native/computer-use-macos
+
+      - name: Build the helper app
+        run: npm run build:computer-macos
+
+      - name: Unpack the helper zip
+        run: |
+          mkdir -p "$RUNNER_TEMP/helper"
+          ditto -x -k native/computer-use-macos/dist/overdeck-computer-use-macos.zip "$RUNNER_TEMP/helper"
+          ls -la "$RUNNER_TEMP/helper"
+
+      # D-20: GitHub's macOS runners may pre-grant TCC permissions, so this
+      # step checks the output shape and only logs the permission values.
+      - name: Permission status
+        run: |
+          app="$RUNNER_TEMP/helper/Overdeck Computer Use.app"
+          out="$("$app/Contents/MacOS/overdeck-computer-use-macos" --permission-status)"
+          echo "permission-status: $out"
+          STATUS="$out" node -e '
+            const status = JSON.parse(process.env.STATUS);
+            const keys = Object.keys(status).sort().join(",");
+            if (keys !== "accessibility,screenshots") {
+              throw new Error(`expected keys accessibility,screenshots, got ${keys}`);
+            }
+            for (const [key, value] of Object.entries(status)) {
+              if (value !== "granted" && value !== "not-granted") {
+                throw new Error(`${key} is ${JSON.stringify(value)}, expected granted or not-granted`);
+              }
+              console.log(`${key}: ${value}`);
+            }
+          '
+
+      # WI-4 part B: drive the built helper through the real TypeScript daemon
+      # client (launch via LaunchServices, handshake, getAppState, terminate).
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Daemon client smoke test
+        run: npx tsx scripts/ci/macos-helper-smoke.ts "$RUNNER_TEMP/helper/Overdeck Computer Use.app"
+
+      - name: Upload the helper zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: computer-use-macos
+          path: |
+            native/computer-use-macos/dist/overdeck-computer-use-macos.zip
+            native/computer-use-macos/dist/overdeck-computer-use-macos.zip.sha256

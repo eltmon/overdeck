@@ -674,12 +674,14 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   filter drops, and `resolveMissingIssue` memoizes failures for the process
   lifetime. A drawer for such an issue shows `Issue details` with no title.
   Never widen the snapshot to fix one view: about 14 frontend views read `issuesRaw`.
-- **`npx mint broken-links` is red on `main`** (PAN-4779) — two MDX parse errors
-  (a bare `<machine>` in `configuration/linked-machines.mdx`, a bare `<label>` in
-  `cli/agent-commands.mdx`) and 15 links in `vision.mdx` to repo files that
-  `.mintignore` excludes. `npm run lint:docs` catches `$` in prose and `<` before a
-  digit, not `<word>` in prose. Until PAN-4779 lands, scope a docs change's link check
-  to its own pages and compare the rest against this baseline.
+- **`npx mint validate` and `npx mint broken-links` pass on `main`** (PAN-4779 and PAN-5483
+  fixed both). What broke them: bare `<word>` tags in prose (MDX reads an unescaped `<word>` as
+  a JSX open tag unless it is in backticks), unquoted frontmatter `description` values
+  containing `: ` (invalid YAML), an `import ... from "react"` line in a snippet (Mintlify
+  pre-injects React hooks, so the import itself is the parse error), and relative links to
+  repo files that `.mintignore` excludes from the docs site. `mint validate` never checks
+  `docs.json` keys: an unknown key passes silently. `npm run lint:docs` catches only `$` in
+  prose and `<` before a digit, not `<word>` in prose or any of the others above.
 - **Merge-train AC lookup roots** (PAN-1696, PAN-3165, PAN-4799) — batch members
   are unmerged, so their specs are never on `main`; `memberSpecRoots`
   (`services/uat-member-spec-roots.ts`) orders batch worktree → feature

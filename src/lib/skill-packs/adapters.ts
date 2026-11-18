@@ -23,13 +23,19 @@ import {
   GSTACK_OPT_IN_SKILLS,
   classifyGstackSkill,
 } from './gstack.js';
+import { OPENMONTAGE_DISCLOSURE, OPENMONTAGE_EXCLUDE } from './openmontage.js';
 
 export type PackAdapterId = 'plain' | 'claude-plugin' | 'deft-readonly' | 'gstack-runtime';
 
 export interface PackSkill {
   name: string;
-  /** Repo-relative posix path of the skill directory. */
+  /** Repo-relative posix path of the skill directory; `.` for a root skill. */
   dir: string;
+  /**
+   * A root skill's files and dirs, relative to `dir` (PAN-5464 D-8). When set, every consumer follows
+   * these paths instead of the whole `dir`.
+   */
+  paths?: readonly string[];
   description: string;
   optIn: boolean;
 }
@@ -51,6 +57,8 @@ export interface PackCapabilities {
   requiresCli: string[];
   /** True when the pack's runtime is mounted and its executables run (gstack). */
   runtime?: boolean;
+  /** Git LFS pointer files inside included skill dirs (PAN-5464); extraction never fetches their content. Absent when 0. */
+  lfsObjects?: number;
 }
 
 export interface PackManifest {
@@ -88,6 +96,20 @@ export interface KnownPack {
   disclosure?: string;
   /** Plugin-root-relative dirs the skill scan skips (archived copies). */
   skillsExclude?: readonly string[];
+  /**
+   * Repo-relative paths `git archive` receives (PAN-5464): extraction holds only these, plus the
+   * capability-probe paths, that exist at the commit. Never combined with `pluginRoot`.
+   */
+  archivePaths?: readonly string[];
+  /** A skill whose SKILL.md sits at the repo root (PAN-5464): its name and the root files and dirs it mounts. */
+  rootSkill?: RootSkill;
+  /** Mount transform for a pack whose adapter has none (PAN-5464 D-10): 'video-use' adds its host notice. */
+  mountTransform?: 'video-use';
+}
+
+export interface RootSkill {
+  name: string;
+  paths: readonly string[];
 }
 
 export const KNOWN_PACKS: Readonly<Record<string, KnownPack>> = {
@@ -153,12 +175,59 @@ export const KNOWN_PACKS: Readonly<Record<string, KnownPack>> = {
     optIn: ATLASSIAN_OPT_IN_SKILLS,
     disclosure: ATLASSIAN_DISCLOSURE,
   },
+  // Video production packs (PAN-5464), the members of the built-in `video` pack group.
+  // eltmon/remotion-skills main head 2026-11-17 (PAN-5464)
+  remotion: {
+    id: 'remotion',
+    url: 'https://github.com/eltmon/remotion-skills',
+    ref: '3e20ac75161bc34468845df714701cc9bf6075f4',
+    adapter: 'plain',
+    disclosure:
+      'Remotion skills. The repo has no license file; Remotion itself needs a company license for some uses (see the remotion-license skill).',
+  },
+  // eltmon/hyperframes main head 2026-11-17 (PAN-5464)
+  hyperframes: {
+    id: 'hyperframes',
+    url: 'https://github.com/eltmon/hyperframes',
+    ref: '34f98e6a04e572296e314485d8e2f330edb0ca69',
+    adapter: 'claude-plugin',
+    archivePaths: ['skills', 'plugin.json'],
+    disclosure: 'HyperFrames skills. media-use and figma call HeyGen or Figma APIs only with keys you set.',
+  },
+  // eltmon/OpenMontage main head 2026-11-17 (PAN-5464)
+  openmontage: {
+    id: 'openmontage',
+    url: 'https://github.com/eltmon/OpenMontage',
+    ref: '2e003e65fa99a0f329478a2c1cdcf26bc481933a',
+    adapter: 'plain',
+    skillsRoot: '.agents/skills',
+    skillsExclude: OPENMONTAGE_EXCLUDE,
+    archivePaths: ['.agents/skills'],
+    disclosure: OPENMONTAGE_DISCLOSURE,
+  },
+  // eltmon/video-use main head 2026-11-17 (PAN-5464)
+  'video-use': {
+    id: 'video-use',
+    url: 'https://github.com/eltmon/video-use',
+    ref: '43cfc566833548093455c9d4a46bd69913b7e552',
+    adapter: 'plain',
+    rootSkill: { name: 'video-use', paths: ['SKILL.md', 'helpers', 'install.md', 'pyproject.toml'] },
+    mountTransform: 'video-use',
+    archivePaths: ['SKILL.md', 'helpers', 'install.md', 'pyproject.toml', 'skills'],
+    disclosure: 'video-use sends audio to ElevenLabs Scribe for transcription, using ELEVENLABS_API_KEY.',
+  },
 };
 
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const PLAIN_MAX_DEPTH = 4;
 const PLUGIN_JSON = join('.claude-plugin', 'plugin.json');
 const LICENSE_TOKENS = ['MIT', 'Apache', 'BSD', 'GPL'] as const;
+/** Full license names, checked before the tokens: GNU license titles spell the name out and never contain `GPL`. */
+const LICENSE_NAMES: ReadonlyArray<readonly [RegExp, string]> = [
+  [/GNU AFFERO GENERAL PUBLIC LICENSE/i, 'AGPL-3.0'],
+  [/GNU LESSER GENERAL PUBLIC LICENSE/i, 'LGPL'],
+  [/GNU GENERAL PUBLIC LICENSE/i, 'GPL'],
+];
 const MANIFEST_FS_CONCURRENCY = 32;
 const limitFs = createPromiseConcurrencyLimiter(MANIFEST_FS_CONCURRENCY);
 
@@ -362,6 +431,50 @@ async function listExecutables(root: string, skillDir: string, skipTopLevel: Rea
   return walk(skillDir);
 }
 
+const LFS_POINTER_FIRST_LINE = 'version https://git-lfs.github.com/spec/v1';
+const LFS_POINTER_MAX_BYTES = 1024;
+
+/** `rel` when it is an executable or `.sh` file, or the executables under it when it is a dir (a root skill path). */
+async function executablesAt(root: string, rel: string): Promise<string[]> {
+  let stats;
+  try {
+    stats = await limitFs(() => lstat(join(root, rel)));
+  } catch {
+    return [];
+  }
+  if (stats.isDirectory()) return listExecutables(root, rel);
+  return stats.isFile() && (rel.endsWith('.sh') || (stats.mode & 0o111) !== 0) ? [rel] : [];
+}
+
+/**
+ * Git LFS pointer files at `rel` under `root` (PAN-5464): regular files of at most 1024 bytes whose
+ * first line is the LFS spec line. `rel` may name a file, which is checked directly, or a dir, which is walked.
+ */
+export async function countLfsPointers(root: string, rel: string): Promise<number> {
+  const check = async (path: string): Promise<number> => {
+    let stats;
+    try {
+      stats = await limitFs(() => lstat(join(root, path)));
+    } catch {
+      return 0;
+    }
+    if (stats.isDirectory()) {
+      let dirents;
+      try {
+        dirents = await limitFs(() => readdir(join(root, path), { withFileTypes: true }));
+      } catch {
+        return 0;
+      }
+      const counts = await Promise.all(dirents.map((dirent) => check(posix.join(path, dirent.name))));
+      return counts.reduce((sum, count) => sum + count, 0);
+    }
+    if (!stats.isFile() || stats.size > LFS_POINTER_MAX_BYTES) return 0;
+    const text = await limitFs(() => readTextOrNull(join(root, path)));
+    return text?.split('\n', 1)[0]?.trim() === LFS_POINTER_FIRST_LINE ? 1 : 0;
+  };
+  return check(rel);
+}
+
 const MCP_SERVER_NAME_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 /** Parsed JSON's `mcpServers` key as an object, or null when the text is unreadable, invalid, or lacks one. */
@@ -461,6 +574,8 @@ async function readLicense(root: string, plugin: Record<string, unknown> | null)
     if (text === null) continue;
     const firstLine = text.split('\n').find((line) => line.trim());
     if (!firstLine) continue;
+    const named = LICENSE_NAMES.find(([pattern]) => pattern.test(firstLine));
+    if (named) return named[1];
     return LICENSE_TOKENS.find((token) => firstLine.includes(token)) ?? null;
   }
   return null;
@@ -475,6 +590,7 @@ export async function readPackManifest(
     pluginRoot?: string;
     browser?: boolean;
     skillsExclude?: readonly string[];
+    rootSkill?: RootSkill;
   } = {},
 ): Promise<PackManifest> {
   let prefix = '';
@@ -504,8 +620,28 @@ export async function readPackManifest(
   const skills: PackSkill[] = [];
   const seen = new Set<string>();
   const executables: string[] = [];
+  // PAN-5464 D-8: a root skill comes first, so `seen` reserves its name; its executables and LFS
+  // pointers come only from its paths, never from the whole repo root.
+  const rootPaths: string[] = [];
+  const rootSkill = adapter === 'plain' ? opts.rootSkill : undefined;
+  if (rootSkill && SKILL_NAME_PATTERN.test(rootSkill.name)) {
+    const content = await readTextOrNull(join(base, 'SKILL.md'));
+    if (content !== null) {
+      const paths = rootSkill.paths.map(toRepoRelative).filter((path): path is string => path !== null);
+      seen.add(rootSkill.name);
+      skills.push({
+        name: rootSkill.name,
+        dir: prefix || '.',
+        paths,
+        description: readSkillFrontmatter(content).description,
+        optIn: optIn.has(rootSkill.name),
+      });
+      rootPaths.push(...paths);
+    }
+  }
   const contents = await Promise.all(skillDirs.map((dir) => limitFs(() => readTextOrNull(join(base, dir, 'SKILL.md')))));
   const executableDirs: string[] = [];
+  const includedDirs: string[] = [];
   skillDirs.forEach((dir, index) => {
     const content = contents[index] ?? null;
     if (content === null) return;
@@ -521,8 +657,11 @@ export async function readPackManifest(
     seen.add(name);
     const repoDir = prefix ? posix.join(prefix, dir) : dir;
     skills.push({ name, dir: repoDir, description: frontmatter.description, optIn: optIn.has(name) });
+    includedDirs.push(dir);
     if (!gstack) executableDirs.push(dir);
   });
+  const rootExecutables = (await Promise.all(rootPaths.map((path) => executablesAt(base, path)))).flat();
+  executables.push(...(prefix ? rootExecutables.map((e) => posix.join(prefix, e)) : rootExecutables));
   for (const dirExecutables of await Promise.all(executableDirs.map((dir) => listExecutables(base, dir)))) {
     executables.push(...(prefix ? dirExecutables.map((e) => posix.join(prefix, e)) : dirExecutables));
   }
@@ -531,6 +670,11 @@ export async function readPackManifest(
     const runtimeExecutables = await listExecutables(base, '', RUNTIME_SKIP_DIRS);
     executables.push(...(prefix ? runtimeExecutables.map((e) => posix.join(prefix, e)) : runtimeExecutables));
   }
+
+  const lfsObjects = (await Promise.all([...rootPaths, ...includedDirs].map((dir) => countLfsPointers(base, dir)))).reduce(
+    (sum, n) => sum + n,
+    0,
+  );
 
   // Deft always carries agent hooks, an AGENTS.md section, and .githooks, and its skills call the directive CLI.
   const capabilities: PackCapabilities = {
@@ -545,6 +689,7 @@ export async function readPackManifest(
     projectMutatingSkills: skills.filter((skill) => skill.optIn).map((skill) => skill.name),
     requiresCli: deft ? ['directive'] : gstack ? ['bun'] : [],
     ...(gstack ? { runtime: true } : {}),
+    ...(lfsObjects > 0 ? { lfsObjects } : {}),
   };
   const pluginName = typeof plugin?.['name'] === 'string' ? plugin['name'] : null;
   const manifest: PackManifest = {
@@ -570,6 +715,7 @@ export function notAppliedLabels(capabilities: PackCapabilities): string[] {
   if (capabilities.executables.length > 0 && !capabilities.runtime) {
     labels.push(`executables (${capabilities.executables.length})`);
   }
+  if (capabilities.lfsObjects) labels.push(`LFS objects (${capabilities.lfsObjects})`);
   if (capabilities.projectMutatingSkills.length > 0) {
     labels.push(`project-mutating skills (${capabilities.projectMutatingSkills.length})`);
   }

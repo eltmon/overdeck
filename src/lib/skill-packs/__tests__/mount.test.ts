@@ -12,6 +12,7 @@ import {
   readdirSync,
   readFileSync,
   readlinkSync,
+  realpathSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -34,6 +35,7 @@ const { overdeckHome } = await vi.hoisted(async () => {
 import {
   buildMount,
   CODEX_PACK_BLOCK_BEGIN,
+  emptyMountPluginsDir,
   CODEX_PACK_MARKETPLACE,
   gcMounts,
   linkClaudeMount,
@@ -113,6 +115,27 @@ const pWithExtras = (extras: string[] = ['docs', 'README.md']): MountPack => ({
   pluginRoot: 'harness/p/claude-code',
   skills: [{ name: 'a', dir: 'harness/p/claude-code/skills/a' }],
   extras,
+});
+
+const COMMIT_V = 'e'.repeat(40);
+const rootVideo = join(scratch, 'video-use');
+mkdirSync(join(rootVideo, 'helpers'), { recursive: true });
+mkdirSync(join(rootVideo, 'tests'), { recursive: true });
+mkdirSync(join(rootVideo, 'skills', 'manim-video'), { recursive: true });
+writeFileSync(join(rootVideo, 'SKILL.md'), '---\nname: video-use\ndescription: Edit videos.\n---\n\n# Video Use\n');
+writeFileSync(join(rootVideo, 'helpers', 'a.py'), 'print(1)\n');
+writeFileSync(join(rootVideo, 'tests', 'x.py'), 'print(2)\n');
+writeFileSync(join(rootVideo, 'pyproject.toml'), '[project]\nname = "video-use"\ndependencies = ["requests", "numpy"]\n');
+writeFileSync(join(rootVideo, 'skills', 'manim-video', 'SKILL.md'), '---\nname: manim-video\ndescription: Manim.\n---\n');
+const videoUse = (): MountPack => ({
+  id: 'video-use',
+  commit: COMMIT_V,
+  root: rootVideo,
+  transform: 'video-use',
+  skills: [
+    { name: 'video-use', dir: '.', paths: ['SKILL.md', 'helpers', 'pyproject.toml'] },
+    { name: 'manim-video', dir: 'skills/manim-video' },
+  ],
 });
 
 function walk(dir: string): string[] {
@@ -277,10 +300,54 @@ describe('buildMount', () => {
   });
 });
 
+describe('root skills and the video-use transform (PAN-5464)', () => {
+  it('mounts only the root skill paths with the host notice and a generated requirements.txt', async () => {
+    const mount = await buildMount({ packs: [videoUse()] });
+    if (!mount) throw new Error('expected a mount');
+    const skillDir = join(mount.path, 'plugins', 'video-use', 'skills', 'video-use');
+    expect(readdirSync(skillDir).sort()).toEqual(['SKILL.md', 'helpers', 'pyproject.toml', 'requirements.txt']);
+    expect(readFileSync(join(skillDir, 'helpers', 'a.py'), 'utf8')).toBe('print(1)\n');
+    expect(readFileSync(join(skillDir, 'requirements.txt'), 'utf8')).toBe('requests\nnumpy\n');
+    const skillMd = readFileSync(join(skillDir, 'SKILL.md'), 'utf8');
+    expect(skillMd.split('<!-- overdeck:video-use-host-notice v1 -->')).toHaveLength(2);
+    expect(skillMd).toMatch(/^---\nname: video-use\n/);
+    const manim = readFileSync(join(mount.path, 'plugins', 'video-use', 'skills', 'manim-video', 'SKILL.md'), 'utf8');
+    expect(manim).toBe(readFileSync(join(rootVideo, 'skills', 'manim-video', 'SKILL.md'), 'utf8'));
+  });
+
+  it('keeps the hash of a selection with no paths and no new transform (NFR-2)', () => {
+    // Captured from mountHash before PAN-5464 changed it.
+    expect(
+      mountHash({
+        packs: [
+          { id: 'mattpocock', commit: COMMIT_A, root: '/x', skills: [{ name: 'grilling', dir: 'skills/grilling' }, { name: 'tdd', dir: 'skills/tdd' }] },
+          { id: 'deft', commit: COMMIT_B, root: '/y', transform: 'deft-readonly', skills: [{ name: 'setup', dir: 'skills/deft-directive-setup' }] },
+          { id: 'pstack', commit: COMMIT_A, root: '/z', pluginRoot: 'harness/p', extras: ['docs'], skills: [{ name: 'p', dir: 'harness/p/skills/p' }] },
+        ],
+      }),
+    ).toBe('49a07f0cd239d252bc8d9d26d0fddf27424c894cb4869dd7ea6f21f9da2ad2e2');
+  });
+
+  it('covers skill paths and the video-use transform in the hash', () => {
+    const base = videoUse();
+    expect(mountHash({ packs: [base] })).not.toBe(mountHash({ packs: [{ ...base, transform: undefined }] }));
+    const fewer = { ...base, skills: [{ name: 'video-use', dir: '.', paths: ['SKILL.md'] }, base.skills[1]!] };
+    expect(mountHash({ packs: [base] })).not.toBe(mountHash({ packs: [fewer] }));
+    const split = { ...base, skills: [{ name: 'video-use', dir: '.', paths: ['SKILL.md', 'a', 'b'] }] };
+    const joined = { ...base, skills: [{ name: 'video-use', dir: '.', paths: ['SKILL.md', 'a,b'] }] };
+    expect(mountHash({ packs: [split] })).not.toBe(mountHash({ packs: [joined] }));
+  });
+
+  it('rejects skill paths that escape the pack', async () => {
+    const escaping = { ...videoUse(), skills: [{ name: 'video-use', dir: '.', paths: ['../outside'] }] };
+    await expect(buildMount({ packs: [escaping] })).rejects.toThrow('skill path escapes pack video-use');
+  });
+});
+
 describe('linkClaudeMount', () => {
   const link = join(overdeckHome, 'launch', 'agent-1', 'skill-packs');
 
-  it('links to the mount plugins, replaces the target, and removes the link for null', async () => {
+  it('links to the mount plugins and replaces the target', async () => {
     const first = await buildMount({ packs: [alpha()] });
     const second = await buildMount({ packs: [beta()] });
     await linkClaudeMount(link, first);
@@ -288,9 +355,30 @@ describe('linkClaudeMount', () => {
     await linkClaudeMount(link, second);
     expect(readlinkSync(link)).toBe(join(second?.path ?? '', 'plugins'));
     expect(existsSync(join(link, 'beta', '.claude-plugin', 'plugin.json'))).toBe(true);
+  });
+
+  it('links to an existing empty mount when there is no mount (PAN-5465 D-2)', async () => {
+    rmSync(join(mountsDir(), 'empty'), { recursive: true, force: true });
+    rmSync(link, { force: true });
     await linkClaudeMount(link, null);
-    expect(() => lstatSync(link)).toThrow();
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(link)).toBe(emptyMountPluginsDir());
+    expect(emptyMountPluginsDir()).toBe(join(mountsDir(), 'empty', 'plugins'));
+    expect(realpathSync(link)).toBe(realpathSync(emptyMountPluginsDir()));
+    expect(readdirSync(link)).toEqual([]);
     await linkClaudeMount(link, null);
+    expect(readlinkSync(link)).toBe(emptyMountPluginsDir());
+  });
+
+  it('re-points a link at a real mount to the empty mount without removing it (PAN-5465 D-2)', async () => {
+    const mount = await buildMount({ packs: [alpha()] });
+    await linkClaudeMount(link, mount);
+    expect(readlinkSync(link)).toBe(join(mount?.path ?? '', 'plugins'));
+    await linkClaudeMount(link, null);
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(link)).toBe(emptyMountPluginsDir());
+    expect(readdirSync(link)).toEqual([]);
+    expect(readdirSync(join(overdeckHome, 'launch', 'agent-1')).filter((name) => name.includes('.tmp-'))).toEqual([]);
   });
 });
 
@@ -409,6 +497,15 @@ describe('gcMounts', () => {
     expect(existsSync(freshUnused.path)).toBe(true);
     expect(existsSync(oldUnused.path)).toBe(false);
     expect(() => lstatSync(danglingLink)).toThrow();
+  });
+
+  it('keeps the old, unreferenced empty mount (PAN-5465 D-2)', async () => {
+    mkdirSync(emptyMountPluginsDir(), { recursive: true });
+    const emptyMount = join(mountsDir(), 'empty');
+    age(emptyMount, 30);
+    const result = await gcMounts({ maxAgeMs: 0, now });
+    expect(result.removedMounts).not.toContain(emptyMount);
+    expect(existsSync(emptyMountPluginsDir())).toBe(true);
   });
 
   it('touches a reused mount so it stays young', async () => {

@@ -76,7 +76,9 @@ jobs:
   # PAN-5176: build, test and pack @overdeck/core once. The tarball this job
   # uploads is exactly what bare-host-macos smokes and what npm publishes.
   pack:
-    needs: classify
+    # PAN-5463: the tarball ships the macOS computer-use helper zip that the
+    # computer-use-macos job builds, so pack waits for it.
+    needs: [classify, computer-use-macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -142,16 +144,119 @@ jobs:
           node dist/cli/index.js --version
           node dist/cli/index.js --help
 
+      # PAN-5463: put the macOS helper zip where package.json `files` ("native")
+      # picks it up, so `npx @overdeck/core` on macOS can install it.
+      - name: Download the macOS computer-use helper
+        uses: actions/download-artifact@v4
+        with:
+          name: computer-use-macos-helper
+          path: native/computer-use-macos/dist
+
+      - name: Check the macOS computer-use helper is present
+        run: |
+          for f in overdeck-computer-use-macos.zip overdeck-computer-use-macos.zip.sha256; do
+            if [ ! -s "native/computer-use-macos/dist/$f" ]; then
+              echo "::error::native/computer-use-macos/dist/$f is missing; the computer-use-macos job must build it."
+              exit 1
+            fi
+          done
+
       # PAN-5176: pack AFTER the sourcemaps step (it injects chunk ids into dist and
       # removes .map files) and after the test gate; this tarball is what npm gets.
       - name: Pack @overdeck/core
         run: |
           mkdir -p "$RUNNER_TEMP/release"
           npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP/release"
+
+      # PAN-5463: a nested .gitignore or a `files` change could silently drop the
+      # helper from the tarball; fail the release instead.
+      - name: Check the tarball contains the macOS computer-use helper
+        run: |
+          tarball="$(ls "$RUNNER_TEMP"/release/*.tgz)"
+          entries="$(tar -tzf "$tarball")"
+          for f in overdeck-computer-use-macos.zip overdeck-computer-use-macos.zip.sha256; do
+            if ! grep -qx "package/native/computer-use-macos/dist/$f" <<<"$entries"; then
+              echo "::error::$tarball lacks package/native/computer-use-macos/dist/$f"
+              exit 1
+            fi
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: release-core-tarball
           path: ${{ runner.temp }}/release/*.tgz
+          if-no-files-found: error
+
+  # PAN-5463: build the macOS computer-use helper (`Overdeck Computer Use.app`,
+  # zipped) that pack ships in the npm tarball. Ad-hoc signed unless the
+  # Developer ID certificate secret exists; notarized only when the App Store
+  # Connect API key secrets exist (see scripts/build-computer-macos.mjs).
+  computer-use-macos:
+    needs: classify
+    runs-on: macos-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      # The `secrets` context is not allowed in step-level `if:` expressions,
+      # so surface presence flags here (same pattern as the desktop job).
+      HAS_MAC_CERT: ${{ secrets.MACOS_CERTIFICATE != '' }}
+      HAS_APPLE_API_KEY: ${{ secrets.APPLE_API_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Import the Developer ID certificate (certificate configured)
+        if: env.HAS_MAC_CERT == 'true'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+        run: |
+          cert_path="$RUNNER_TEMP/developer-id.p12"
+          keychain="$RUNNER_TEMP/computer-use-signing.keychain-db"
+          keychain_pwd="$(openssl rand -hex 16)"
+          echo "$MACOS_CERTIFICATE" | base64 --decode > "$cert_path"
+          security create-keychain -p "$keychain_pwd" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_pwd" "$keychain"
+          security import "$cert_path" -P "$MACOS_CERTIFICATE_PWD" -A -t cert -f pkcs12 -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple: -k "$keychain_pwd" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          rm -f "$cert_path"
+          identity="$(security find-identity -v -p codesigning "$keychain" | grep -o '"Developer ID Application: [^"]*"' | head -1 | tr -d '"')"
+          if [ -z "$identity" ]; then
+            echo "::error::MACOS_CERTIFICATE holds no Developer ID Application identity."
+            exit 1
+          fi
+          echo "OVERDECK_COMPUTER_MACOS_SIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
+
+      - name: Prepare Apple API key (API key configured)
+        if: env.HAS_APPLE_API_KEY == 'true'
+        env:
+          APPLE_API_KEY_B64: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          key_path="$RUNNER_TEMP/AuthKey.p8"
+          echo "$APPLE_API_KEY_B64" | base64 --decode > "$key_path"
+          {
+            echo "APPLE_API_KEY=$key_path"
+            echo "APPLE_API_KEY_ID=$APPLE_API_KEY_ID"
+            echo "APPLE_API_ISSUER_ID=$APPLE_API_ISSUER_ID"
+          } >> "$GITHUB_ENV"
+
+      - name: Build the helper app
+        run: npm run build:computer-macos
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: computer-use-macos-helper
+          path: |
+            native/computer-use-macos/dist/overdeck-computer-use-macos.zip
+            native/computer-use-macos/dist/overdeck-computer-use-macos.zip.sha256
           if-no-files-found: error
 
   # PAN-5176: the release gate. Install the exact tarball npm will get on a

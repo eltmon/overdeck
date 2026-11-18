@@ -1,9 +1,7 @@
 ---
 title: "MCP server"
-description: Overdeck's MCP server: the tools every managed agent gets, and scoped, revocable access for outside tools and bots
+description: "Overdeck's MCP server: the tools every managed agent gets, and scoped, revocable access for outside tools and bots"
 ---
-
-# MCP server
 
 Overdeck serves a Model Context Protocol (MCP) server, so another tool (Claude
 Desktop, another agent harness, a chat bot) can list conversations, read one,
@@ -40,6 +38,7 @@ There is no second path to any operation.
 | `start_issue` | Starts a planned issue's work agent on this machine through the same gates as the dashboard's Start button, or on `machine` through that machine's work door. `issueId`, optional `model`, `harness`, `effort`, `machine`, `needs`. An unplanned issue answers an error that says to run `pan start <id>`, which plans first. | `operate` |
 | `stop_conversation` | Stops a conversation. `conversation` (`@<machine>/<name>` for one on a linked machine). | `operate` |
 | `resume_conversation` | Resumes a stopped conversation on its transcript, as the dashboard's Resume button does. A conversation that still runs is reattached, not started twice. `conversation` (`@<machine>/<name>` for one on a linked machine). | `operate` |
+| `add_skills` | Loads skill packs or pack skills into a conversation, by default the caller's own. Claude Code loads them in place (from the caller's own conversation they arrive when its current turn ends); Codex and native skills need a restart. `conversation` (omit for your own), `packs` (pack ids; every non-opt-in skill), `skills` (`pack/skill` ids), `restart` (restart a named conversation that cannot load them in place). | `operate` |
 | `interrupt_conversation` | Interrupts the current turn of a Pi conversation. Other harnesses answer an error; use `stop_conversation` to end them. | `operate` |
 | `schedule_message` | Queues a message for a Claude Code conversation that Overdeck sends after its usage limit resets, or at once if it is not limited. At most 20 queued; `/pan` commands are refused. | `tell` |
 | `schedule_recurring` | Creates a recurring schedule: `prompt`, a 5-field `cron` (runs at least 15 minutes apart), optional `timeZone` (default: the Overdeck machine's zone) and `enabled`. Not for agent conversations. | `tell` |
@@ -115,7 +114,7 @@ of asking in chat, so the value never enters its transcript.
 - The request appears as a **Secret requested** card in the Decisions panel.
   Only this machine's own dashboard, opened in a browser on this machine, can
   answer it. A phone, a paired device or another machine's browser shows
-  "Answer this on <machine>'s own dashboard".
+  "Answer this on &lt;machine&gt;'s own dashboard".
 - The operator types the value into the masked input and chooses **Send**, or
   chooses **Decline**.
 - The value lands in a file: `~/.overdeck/agents/<agentId>/secrets/<NAME>` for
@@ -141,7 +140,7 @@ transcript.
 - The request appears as a **Machine link requested** card in the Decisions
   panel. Only this machine's own dashboard, opened in a browser on this
   machine, can answer it. A phone, a paired device or another machine's
-  browser shows "Answer this on <machine>'s own dashboard".
+  browser shows "Answer this on &lt;machine&gt;'s own dashboard".
 - **Link a machine…** opens the usual Link a machine dialog. After the link
   succeeds, the agent's `link_machine_wait` answers `linked` with the new
   machine's `environmentId` and `label`. The agent passes that label as

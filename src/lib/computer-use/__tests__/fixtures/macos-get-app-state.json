@@ -1,0 +1,25 @@
+{
+  "snapshot": {
+    "id": "snap-42",
+    "app": { "name": "TextEdit", "bundleId": "com.apple.TextEdit", "pid": 4242 },
+    "window": {
+      "id": 77,
+      "title": "Untitled",
+      "x": 100,
+      "y": 80,
+      "width": 800,
+      "height": 600,
+      "isMinimized": false,
+      "isOffscreen": false,
+      "screenIndex": 0,
+      "platform": { "layer": 0 }
+    },
+    "coordinateSpace": "window",
+    "treeText": "App=com.apple.TextEdit (pid 4242)\nWindow: \"Untitled\", App: TextEdit.\n\n0 standard window Untitled\n\t1 scroll area\n\t\t4 text field Untitled\n\t\t... 3 more not shown (snapshot limit)\n\t7 button (disabled) Close\n\nThe focused UI element is 4 text field.",
+    "elementCount": 4,
+    "focusedElementId": 4,
+    "truncation": { "truncated": true, "maxNodes": 1200, "maxDepth": 40, "maxDepthReached": false }
+  },
+  "screenshot": { "data": "iVBORw0KGgo=", "format": "png", "width": 1600, "height": 1200, "scale": 2 },
+  "screenshotStatus": { "state": "captured", "metadata": { "engine": "screencapturekit", "windowId": 77 } }
+}

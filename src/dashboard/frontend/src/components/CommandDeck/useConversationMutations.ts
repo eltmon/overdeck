@@ -214,6 +214,10 @@ export interface ConversationMutations {
   forkTargetFocus: string | undefined;
   closeForkModal: () => void;
   isForkPending: boolean;
+  /** PAN-5465: the conversation whose Add skills dialog is open. */
+  addSkillsTarget: Conversation | null;
+  openAddSkillsModal: (conv: Conversation) => void;
+  closeAddSkillsModal: () => void;
 }
 
 export function useConversationMutations(
@@ -224,6 +228,7 @@ export function useConversationMutations(
   const [forkTarget, setForkTarget] = useState<Conversation | null>(null);
   const [forkTargetMode, setForkTargetMode] = useState<ForkModeOption | undefined>(undefined);
   const [forkTargetFocus, setForkTargetFocus] = useState<string | undefined>(undefined);
+  const [addSkillsTarget, setAddSkillsTarget] = useState<Conversation | null>(null);
   const pendingFavoriteNamesRef = useRef(new Set<string>());
 
   const archiveMutation = useMutation({
@@ -577,5 +582,8 @@ export function useConversationMutations(
     forkTargetFocus,
     closeForkModal: () => { setForkTarget(null); setForkTargetMode(undefined); setForkTargetFocus(undefined); },
     isForkPending,
-  }), [archiveMutate, pendingArchiveNames, queryClient, stopMutate, pendingStopNames, renameMutate, retitleMutate, favoriteMutate, moveMutate, linkPullRequestMutate, unlinkPullRequestMutate, triageMutate, autoSettleOverrideMutate, openForkModal, submitFork, forkTarget, forkTargetMode, forkTargetFocus, isForkPending, pendingRetitleNames]);
+    addSkillsTarget,
+    openAddSkillsModal: (conv: Conversation) => setAddSkillsTarget(conv),
+    closeAddSkillsModal: () => setAddSkillsTarget(null),
+  }), [archiveMutate, pendingArchiveNames, queryClient, stopMutate, pendingStopNames, renameMutate, retitleMutate, favoriteMutate, moveMutate, linkPullRequestMutate, unlinkPullRequestMutate, triageMutate, autoSettleOverrideMutate, openForkModal, submitFork, forkTarget, forkTargetMode, forkTargetFocus, isForkPending, pendingRetitleNames, addSkillsTarget]);
 }

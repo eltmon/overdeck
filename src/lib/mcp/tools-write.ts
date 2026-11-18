@@ -2,7 +2,7 @@
  * The write tools of the Overdeck MCP server (PAN-4649 FR-5, FR-6):
  * `send_message`, `start_conversation`, `start_worker` and (PAN-4938 FR-6,
  * FR-7) `start_issue`, `stop_conversation`, `interrupt_conversation` and
- * (PAN-5091) `resume_conversation`. Each
+ * (PAN-5091) `resume_conversation` and (PAN-5465) `add_skills`. Each
  * proxies one dashboard route; the route enforces the scope (`tell` or
  * `operate`).
  * PAN-4651 D-4651-18: the start tools go through the fleet routes, which
@@ -210,4 +210,45 @@ const interruptConversation = conversationControlTool(
   'Interrupts the current turn of a Pi conversation. Other harnesses answer an error; use stop_conversation to end them.',
 );
 
-export const WRITE_TOOLS: readonly OverdeckTool[] = [sendMessage, startConversation, startWorker, startIssue, stopConversation, resumeConversation, interruptConversation];
+/**
+ * PAN-5465 FR-10: load skill packs into a conversation. Without `conversation`
+ * it posts to `/api/self/skills` (the caller's own conversation; the reload is
+ * queued until the current turn ends); with it, to
+ * `/api/conversations/<conversation>/skills`.
+ */
+const addSkills: OverdeckTool = {
+  name: 'add_skills',
+  description: 'Load skill packs or pack skills into a conversation, by default your own. Claude Code loads them in place; from your own conversation they arrive when your current turn ends. Codex and native skills need a restart.',
+  scope: 'operate',
+  audience: 'any',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      conversation: { type: 'string', description: 'Conversation name; omit for your own.' },
+      packs: { type: 'array', items: { type: 'string' }, description: 'Pack ids; adds every non-opt-in skill.' },
+      skills: { type: 'array', items: { type: 'string' }, description: 'pack/skill ids.' },
+      restart: { type: 'boolean', description: 'Restart a named conversation that cannot load them in place.' },
+    },
+  },
+  async run(args, ctx) {
+    const conversation = optionalString(args, 'conversation');
+    if (!conversation.ok) return conversation.error;
+    const body: Record<string, unknown> = {};
+    for (const field of ['packs', 'skills'] as const) {
+      const value = args[field];
+      if (value === undefined) continue;
+      if (!Array.isArray(value) || !value.every((id) => typeof id === 'string')) return errorResult(`${field} must be a list of ids`);
+      body[field] = value;
+    }
+    if (args['restart'] !== undefined) {
+      if (typeof args['restart'] !== 'boolean') return errorResult('restart must be a boolean');
+      body['restart'] = args['restart'];
+    }
+    const path = conversation.value
+      ? `/api/conversations/${encodeURIComponent(conversation.value)}/skills`
+      : '/api/self/skills';
+    return routeResult(await ctx.api.request('POST', path, body));
+  },
+};
+
+export const WRITE_TOOLS: readonly OverdeckTool[] = [sendMessage, startConversation, startWorker, startIssue, stopConversation, resumeConversation, interruptConversation, addSkills];

@@ -43,6 +43,8 @@ export interface HelperAction {
   path: string;
   actionName: string | null;
   fallbackReason?: string | null;
+  /** macOS only (PAN-5463): whether the helper delivered the action in the background or brought the window forward. */
+  delivery?: 'background' | 'foreground';
   verification?: ActionVerification | null;
 }
 
@@ -76,7 +78,8 @@ function renderSnapshotLines(snapshot: RawSnapshot, screenshot: SavedScreenshot 
 
 function renderActionLine(action: HelperAction): string {
   const base = `Action: ${action.path}/${action.actionName ?? '-'}`;
-  return action.verification ? `${base}, verification: ${action.verification.state} (${action.verification.reason})` : base;
+  const verified = action.verification ? `${base}, verification: ${action.verification.state} (${action.verification.reason})` : base;
+  return action.delivery ? `${verified}, delivery: ${action.delivery}` : verified;
 }
 
 function renderAppsLines(apps: RenderInput['apps']): string[] {

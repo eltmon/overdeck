@@ -1,12 +1,12 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "name": "Overdeck \u2014 The IDE for the Agent Era",
+  "name": "Overdeck",
+  "description": "Docs for Overdeck, the open source control plane for AI coding agents.",
   "theme": "maple",
-  "layout": "topnav",
   "colors": {
-    "primary": "#D4A27F",
-    "light": "#E5C4A8",
-    "dark": "#B8886A"
+    "primary": "#4f46e5",
+    "light": "#818cf8",
+    "dark": "#4f46e5"
   },
   "background": {
     "color": {
@@ -19,15 +19,12 @@
     "light": "/logo/overdeck-light.svg",
     "dark": "/logo/overdeck-dark.svg"
   },
-  "topbarLinks": [
-    {
-      "name": "GitHub",
-      "url": "https://github.com/eltmon/overdeck"
-    }
-  ],
-  "topbarCtaButton": {
-    "name": "Install",
-    "url": "https://www.npmjs.com/package/overdeck"
+  "navbar": {
+    "links": [
+      { "label": "Community", "href": "https://discord.gg/ZpHE2ZTv5P" },
+      { "label": "GitHub", "href": "https://github.com/eltmon/overdeck" }
+    ],
+    "primary": { "type": "button", "label": "Install", "href": "/quickstart" }
   },
   "navigation": {
     "tabs": [
@@ -45,14 +42,8 @@
         ]
       },
       {
-        "tab": "Vision",
+        "tab": "Anywhere",
         "groups": [
-          {
-            "group": "Vision",
-            "pages": [
-              "vision"
-            ]
-          },
           {
             "group": "Overdeck Anywhere",
             "pages": [
@@ -66,7 +57,12 @@
               "configuration/mcp",
               "configuration/bots",
               "configuration/phone",
-              "configuration/push-notifications",
+              "configuration/push-notifications"
+            ]
+          },
+          {
+            "group": "Anywhere CLI",
+            "pages": [
               "cli/vault",
               "cli/pair",
               "cli/tailscale",
@@ -104,20 +100,21 @@
           {
             "group": "Features",
             "pages": [
-              "features/mission-control",
+              "features/planning",
               "features/conversations",
+              "features/file-explorer",
+              "features/mission-control",
+              "features/convoys",
               "features/specialists",
-              "features/cloister",
-              "features/safe-shutdown",
+              "features/merge-batches",
+              "features/swarm",
               "features/skills",
               "features/skill-packs",
               "features/workspaces",
-              "features/file-explorer",
+              "features/cloister",
+              "features/safe-shutdown",
               "features/open-in-overdeck",
-              "features/keyboard-shortcuts",
-              "features/convoys",
-              "features/swarm",
-              "features/merge-batches"
+              "features/keyboard-shortcuts"
             ]
           }
         ]
@@ -181,10 +178,16 @@
               "reference/state-model",
               "reference/harness-landscape",
               "reference/posthog-agents",
-              "reference/template-conversations",
               "reference/prompts",
               "reference/troubleshooting",
               "reference/token-spend-report"
+            ]
+          },
+          {
+            "group": "Roadmap",
+            "pages": [
+              "vision",
+              "reference/template-conversations"
             ]
           }
         ]
@@ -202,21 +205,62 @@
       }
     ]
   },
-  "metadata": {
-    "og:image": "/images/dashboard/command-deck-hero-light.png",
-    "og:type": "website"
+  "footer": {
+    "socials": {
+      "github": "https://github.com/eltmon/overdeck",
+      "discord": "https://discord.gg/ZpHE2ZTv5P",
+      "website": "https://overdeck.ai"
+    },
+    "links": [
+      {
+        "header": "Overdeck",
+        "items": [
+          { "label": "overdeck.ai", "href": "https://overdeck.ai" },
+          { "label": "Blog", "href": "https://overdeck.ai/blog/" },
+          { "label": "Support", "href": "https://overdeck.ai/support/" }
+        ]
+      },
+      {
+        "header": "Community",
+        "items": [
+          { "label": "Discord", "href": "https://discord.gg/ZpHE2ZTv5P" },
+          { "label": "GitHub Issues", "href": "https://github.com/eltmon/overdeck/issues" },
+          { "label": "npm package", "href": "https://www.npmjs.com/package/@overdeck/core" }
+        ]
+      }
+    ]
   },
-  "footerSocials": {
-    "github": "https://github.com/eltmon/overdeck"
-  },
-  "feedback": {
-    "thumbsRating": true,
-    "suggestEdit": true
+  "seo": {
+    "metatags": {
+      "og:image": "https://overdeck.ai/assets/og-image.png",
+      "og:image:width": "1200",
+      "og:image:height": "630",
+      "og:type": "website",
+      "twitter:card": "summary_large_image",
+      "twitter:image": "https://overdeck.ai/assets/og-image.png"
+    },
+    "organization": {
+      "name": "Overdeck",
+      "url": "https://overdeck.ai",
+      "sameAs": [
+        "https://github.com/eltmon/overdeck",
+        "https://discord.gg/ZpHE2ZTv5P",
+        "https://www.npmjs.com/package/@overdeck/core"
+      ]
+    }
   },
   "redirects": [
     {
       "source": "/cli/convoy-commands",
       "destination": "/cli/review-commands"
+    },
+    {
+      "source": "/features/tldr",
+      "destination": "/changelog"
+    },
+    {
+      "source": "/configuration/beads",
+      "destination": "/features/skills"
     }
   ]
 }

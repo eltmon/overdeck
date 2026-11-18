@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import { listBackups, cleanOldBackups } from '../../lib/backup.js';
+import { exitCli } from '../exit.js';
 
 export async function backupListCommand(options: { json?: boolean }): Promise<void> {
   const backups = listBackups();
@@ -28,7 +29,13 @@ export async function backupListCommand(options: { json?: boolean }): Promise<vo
 }
 
 export async function backupCleanCommand(options: { keep?: string }): Promise<void> {
-  const keepCount = parseInt(options.keep || '10', 10);
+  const raw = options.keep ?? '10';
+  // At most 15 digits keeps the value a finite, exact safe integer (Number.MAX_SAFE_INTEGER has 16).
+  if (!/^\d{1,15}$/.test(raw)) {
+    console.error(chalk.red(`--keep must be a non-negative integer, got "${raw}"`));
+    return exitCli(1);
+  }
+  const keepCount = Number(raw);
   const removed = cleanOldBackups(keepCount);
 
   if (removed === 0) {

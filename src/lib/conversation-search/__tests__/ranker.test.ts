@@ -1,6 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { buildMarkedExcerpt, fuseRankedRows, parseMarkedExcerpt, rankConversationSearch } from '../ranker.js';
+import {
+  buildMarkedExcerpt,
+  ConversationQueryEmbedTimeoutError,
+  DEFAULT_EMBED_TIMEOUT_MS,
+  fuseRankedRows,
+  parseMarkedExcerpt,
+  rankConversationSearch,
+} from '../ranker.js';
 import type { RankedChunkRow } from '../ranker.js';
 import type { ConversationEmbeddingProvider } from '../embedding-provider.js';
 
@@ -50,7 +57,7 @@ describe('conversation ranker', () => {
 
     const hits = await rankConversationSearch({ query: 'keyword', store, provider: embeddingProvider, limit: 2 });
 
-    expect(embeddingProvider.embed).toHaveBeenCalledWith(['keyword']);
+    expect(embeddingProvider.embed).toHaveBeenCalledWith(['keyword'], { signal: expect.any(AbortSignal) });
     expect(store.searchBm25).toHaveBeenCalledWith('keyword', 50);
     expect(store.searchVector).toHaveBeenCalledWith(new Float32Array([0.1, 0.2]), 50);
     expect(hits).toHaveLength(2);
@@ -78,5 +85,96 @@ describe('conversation ranker', () => {
     expect(hits.map((hit) => hit.rowid)).toEqual([20, 10, 30]);
     expect(hits[0]?.excerptSegments).toContainEqual({ text: 'alpha', match: true });
     expect(hits[1]?.excerpt).toBe('⦇alpha⦈ exact match');
+  });
+
+  describe('query embedding (PAN-5447)', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function pendingProvider(): { provider: ConversationEmbeddingProvider; resolve: () => void; signals: AbortSignal[] } {
+      let release!: () => void;
+      const signals: AbortSignal[] = [];
+      const embeddingProvider: ConversationEmbeddingProvider = {
+        ...provider(),
+        embed: vi.fn((_texts: string[], options?: { signal?: AbortSignal }) => new Promise((resolve, reject) => {
+          if (options?.signal) signals.push(options.signal);
+          options?.signal?.addEventListener('abort', () => reject(options.signal?.reason ?? new Error('aborted')), { once: true });
+          release = () => resolve({ embeddings: [new Float32Array([0.1, 0.2])], model: 'text-embedding-3-small' });
+        })),
+      };
+      return { provider: embeddingProvider, resolve: () => release(), signals };
+    }
+
+    it('starts BM25 before the embedding resolves', async () => {
+      const pending = pendingProvider();
+      const store = {
+        searchBm25: vi.fn(() => [row(1, 'keyword')]),
+        searchVector: vi.fn(() => [row(2, 'keyword neighbor')]),
+      };
+
+      const search = rankConversationSearch({ query: 'keyword', store, provider: pending.provider });
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(store.searchBm25).toHaveBeenCalledWith('keyword', 50);
+      expect(store.searchVector).not.toHaveBeenCalled();
+      pending.resolve();
+      await expect(search).resolves.toHaveLength(2);
+      expect(store.searchVector).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns BM25 hits and reports onEmbedFailure when the embedding rejects', async () => {
+      const failure = new Error('insufficient_quota');
+      const embeddingProvider: ConversationEmbeddingProvider = { ...provider(), embed: vi.fn(async () => { throw failure; }) };
+      const store = { searchBm25: vi.fn(() => [row(1, 'keyword')]), searchVector: vi.fn(() => []) };
+      const onEmbedFailure = vi.fn();
+      const onEmbedSuccess = vi.fn();
+
+      const hits = await rankConversationSearch({ query: 'keyword', store, provider: embeddingProvider, onEmbedFailure, onEmbedSuccess });
+
+      expect(hits.map((hit) => hit.rowid)).toEqual([1]);
+      expect(onEmbedFailure).toHaveBeenCalledWith(failure);
+      expect(onEmbedSuccess).not.toHaveBeenCalled();
+      expect(store.searchVector).not.toHaveBeenCalled();
+    });
+
+    it('times out the embedding after embedTimeoutMs, returns BM25 hits, and reports a ConversationQueryEmbedTimeoutError', async () => {
+      vi.useFakeTimers();
+      const pending = pendingProvider();
+      const store = { searchBm25: vi.fn(() => [row(1, 'keyword')]), searchVector: vi.fn(() => []) };
+      const onEmbedFailure = vi.fn();
+
+      const search = rankConversationSearch({ query: 'keyword', store, provider: pending.provider, onEmbedFailure });
+      await vi.advanceTimersByTimeAsync(DEFAULT_EMBED_TIMEOUT_MS);
+      const hits = await search;
+
+      expect(hits.map((hit) => hit.rowid)).toEqual([1]);
+      expect(pending.signals[0]?.aborted).toBe(true);
+      expect(onEmbedFailure).toHaveBeenCalledTimes(1);
+      const error = onEmbedFailure.mock.calls[0]?.[0];
+      expect(error).toBeInstanceOf(ConversationQueryEmbedTimeoutError);
+      expect((error as ConversationQueryEmbedTimeoutError).timeoutMs).toBe(DEFAULT_EMBED_TIMEOUT_MS);
+      expect(store.searchVector).not.toHaveBeenCalled();
+    });
+
+    it('rejects with the abort reason and never calls searchVector when the signal aborts during the embedding', async () => {
+      const pending = pendingProvider();
+      const store = { searchBm25: vi.fn(() => [row(1, 'keyword')]), searchVector: vi.fn(() => []) };
+      const controller = new AbortController();
+      const reason = new Error('client left');
+      const onEmbedFailure = vi.fn();
+      const onEmbedSuccess = vi.fn();
+
+      const search = rankConversationSearch({ query: 'keyword', store, provider: pending.provider, signal: controller.signal, onEmbedFailure, onEmbedSuccess });
+      await Promise.resolve();
+      controller.abort(reason);
+
+      await expect(search).rejects.toBe(reason);
+      expect(pending.signals[0]?.aborted).toBe(true);
+      expect(store.searchVector).not.toHaveBeenCalled();
+      expect(onEmbedFailure).not.toHaveBeenCalled();
+      expect(onEmbedSuccess).not.toHaveBeenCalled();
+    });
   });
 });

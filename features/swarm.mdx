@@ -1,17 +1,16 @@
 ---
-title: Swarm
-description: Per-item DAG dispatch — many work agents on one issue, in parallel
+title: "Swarm: parallel agents on one issue"
+sidebarTitle: "Swarm"
+description: "Run one work agent per plan item on the same issue, in parallel, and dispatch each item in dependency order from the plan's blocks edges."
 ---
 
 import { ThemedImage } from "/snippets/themed-image.mdx";
-
-# Swarm: Per-Item DAG Dispatch
 
 A swarm runs one work agent per plan item, in parallel, on the same issue. Each agent gets its own git worktree and slot branch. The dispatcher uses the plan's `blocks` edges as a DAG: an item becomes dispatchable the moment every blocking parent has merged or completed, not when its wave does.
 
 ## When to Use a Swarm
 
-A swarm fits when an issue's xBRIEF plan splits into several items that can be implemented independently. If the plan is one linear sequence, a single work agent is faster — there is nothing to parallelize.
+A swarm fits when an issue's [xBRIEF plan](/features/planning) splits into several items that can be implemented independently. If the plan is one linear sequence, a single work agent is faster; there is nothing to parallelize.
 
 Use a swarm when:
 

@@ -46,3 +46,88 @@ describe('assertKeyComboAllowed (PAN-5452)', () => {
     );
   });
 });
+
+describe('assertKeyComboAllowed platform (PAN-5461 D-16)', () => {
+  it('applies the Linux rules when the platform is linux', () => {
+    expect(() => assertKeyComboAllowed('alt+F4', false, 'linux')).toThrow(/close the window/);
+    expect(() => assertKeyComboAllowed('ctrl+a', false, 'linux')).not.toThrow();
+  });
+
+  it('has a rule table for every key platform, so none fails closed', () => {
+    for (const platform of ['linux', 'windows', 'mac'] as const) {
+      expect(() => assertKeyComboAllowed('ctrl+a', false, platform)).not.toThrow();
+    }
+  });
+});
+
+describe('assertKeyComboAllowed on windows (PAN-5462 D-8)', () => {
+  function windowsError(key: string, allowSystemShortcut = false): unknown {
+    try {
+      assertKeyComboAllowed(key, allowSystemShortcut, 'windows');
+      return null;
+    } catch (error) {
+      return error;
+    }
+  }
+
+  it.each([
+    ['alt+f4', 'close the app'],
+    ['win+l', 'lock Windows'],
+    ['cmd+l', 'lock Windows'],
+    ['super+l', 'lock Windows'],
+    ['ctrl+shift+esc', 'open Task Manager'],
+  ])('blocks %s and names the effect (ac1)', (key, effect) => {
+    const error = windowsError(key);
+    expect(isComputerUseError(error)).toBe(true);
+    expect((error as { code: string }).code).toBe('system_shortcut_blocked');
+    expect((error as Error).message).toContain(`would ${effect}`);
+  });
+
+  it('accepts ctrl+q, which Windows apps handle themselves (ac2)', () => {
+    expect(windowsError('ctrl+q')).toBeNull();
+  });
+
+  it('still rejects alt+f4 and ctrl+q on linux (ac3)', () => {
+    expect(() => assertKeyComboAllowed('alt+f4', false, 'linux')).toThrow(/close the window/);
+    expect(() => assertKeyComboAllowed('ctrl+q', false, 'linux')).toThrow(/quit the app/);
+  });
+
+  it('accepts alt+f4 when allowSystemShortcut is true (ac4)', () => {
+    expect(windowsError('alt+f4', true)).toBeNull();
+  });
+});
+
+describe('assertKeyComboAllowed on macOS (PAN-5463 D-10)', () => {
+  function macError(key: string, allow = false): unknown {
+    try {
+      assertKeyComboAllowed(key, allow, 'mac');
+      return null;
+    } catch (error) {
+      return error;
+    }
+  }
+
+  it.each([
+    ['cmd+q', 'quit the app'],
+    ['cmd+ctrl+q', 'lock the screen'],
+    ['cmd+shift+q', 'log out of macOS'],
+    ['command+option+esc', 'open the Force Quit window'],
+    ['meta+alt+escape', 'open the Force Quit window'],
+    ['cmd+shift+delete', 'empty the Trash'],
+    ['CmdOrCtrl+Shift+Backspace', 'empty the Trash'],
+    ['cmd+alt+shift+q', 'log out of macOS'],
+  ])('blocks %s as "%s"', (key, effect) => {
+    const error = macError(key);
+    expect(isComputerUseError(error) && error.code).toBe('system_shortcut_blocked');
+    expect((error as Error).message).toContain(`would ${effect}`);
+  });
+
+  it.each(['cmd+a', 'cmd+c', 'ctrl+q', 'cmd+shift+p', 'Return'])('allows %s', (key) => {
+    expect(macError(key)).toBeNull();
+  });
+
+  it('allows a blocked combo with allowSystemShortcut, while Linux rules still block theirs', () => {
+    expect(macError('cmd+shift+q', true)).toBeNull();
+    expect(() => assertKeyComboAllowed('ctrl+alt+delete', false, 'linux')).toThrow(/log out and power off/);
+  });
+});

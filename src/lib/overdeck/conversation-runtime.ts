@@ -99,7 +99,7 @@ const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 const PROCESS_CLEANUP_GRACE_MS = 750;
 const PTY_SUPERVISOR_SOCKET_WAIT_MS = 30_000;
-type ProcessTableRow = {
+export type ProcessTableRow = {
   pid: number;
   ppid: number;
   args: string;
@@ -118,7 +118,7 @@ function parseProcessTable(output: string): ProcessTableRow[] {
     })
     .filter((row): row is ProcessTableRow => row !== null && Number.isFinite(row.pid) && Number.isFinite(row.ppid));
 }
-async function readProcessTable(): Promise<ProcessTableRow[]> {
+export async function readProcessTable(): Promise<ProcessTableRow[]> {
   const { stdout } = await execFileAsync('ps', ['-eo', 'pid=,ppid=,args='], {
     encoding: 'utf-8',
     maxBuffer: 10 * 1024 * 1024,

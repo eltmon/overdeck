@@ -25,6 +25,7 @@ import {
   Smartphone,
   Archive,
   GitMerge,
+  MousePointerClick,
 } from 'lucide-react';
 import { type BackgroundAiFeature } from './types';
 import { type NavItem } from './primitives';
@@ -64,6 +65,7 @@ export const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'providers', label: 'Providers', icon: Key },
   { id: 'permissions', label: 'Permissions', icon: ShieldCheck },
   { id: 'security', label: 'Security', icon: ShieldAlert },
+  { id: 'computer-use', label: 'Computer Use', icon: MousePointerClick },
   { id: 'coding-agents', label: 'Coding Agents', icon: Terminal },
   { id: 'tiered-execution', label: 'Tiered Execution', icon: Route },
   { id: 'swarming', label: 'Swarming', icon: GitBranch },
