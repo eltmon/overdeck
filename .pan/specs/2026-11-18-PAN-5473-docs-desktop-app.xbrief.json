@@ -1,0 +1,880 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-18T21:54:50Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5473: docs: desktop app",
+    "updated": "2026-11-18T21:59:20.616Z"
+  },
+  "plan": {
+    "id": "pan-5473",
+    "title": "docs: desktop app",
+    "status": "proposed",
+    "uid": "71b80900-18c0-4fa2-be78-8d1ea8f02d14",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-18T21:54:50Z",
+    "updated": "2026-11-18T21:59:20.616Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5473",
+        "label": "PAN-5473",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5467",
+        "label": "Docs overhaul epic",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5556",
+        "label": "Desktop dead surfaces bug",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5557",
+        "label": "pan up Linux candidate bug",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docs",
+      "desktop",
+      "mintlify"
+    ],
+    "narratives": {
+      "Problem": "Overdeck has no user page for the desktop app. Its facts are scattered across apps/desktop/, a partly wrong developer doc (docs/DESKTOP-APP.md: port 3011, a macOS-only menu, a working tray colour table) and two short sections in quickstart.mdx and configuration/remote-access.mdx. Planning also found desktop controls that do nothing (filed as #5556) and a pan up Linux bug (#5557).",
+      "Proposal": "Add features/desktop-app.mdx with nine sections (download and install per OS, the @overdeck/desktop npm package, how pan up finds and launches the app, the tray and app menu, notifications, start at login, updates, opening another machine, getting help), every fact taken from code per the PRD's F-1 to F-39. Document only working behavior and link #5556/#5557 once where a control does nothing. Add the page to docs.json after open-in-overdeck, link it from four related pages, correct the stale facts in docs/DESKTOP-APP.md, and validate with mint@4.3.49 and lint:docs.",
+      "NonGoals": "- No code change: tray status, notification switches, Open Workspace submenu and Linux launch-at-login (#5556) and the pan up Linux candidate (#5557) are fixed in their own issues\n- No screenshots (images/ has none of the app)\n- No command palette, browser-dashboard updater or build/packaging content on the user page\n- No change to anywhere.mdx, and no sentence changes in the four linking pages beyond one link or sentence each\n- No changelog.d entry\n- No description of tray colours, the dock badge, tooltip counts or the Open Workspace menu"
+    },
+    "autoDecisions": [
+      {
+        "summary": "One new page features/desktop-app.mdx placed right after features/open-in-overdeck in the docs.json Features group",
+        "rationale": "The issue names the page path; open-in-overdeck is the closest related page and a one-line insert keeps the docs.json conflict with five sibling specs small."
+      },
+      {
+        "summary": "Document only working behavior; name each broken control once with a link to #5556 or #5557",
+        "rationale": "The issue requires every claim to match current code; readers who find the switches in Settings need to know they have no effect yet, and the bugs are filed for the fix."
+      },
+      {
+        "summary": "The new page owns the full open-another-machine procedure; remote-access.mdx keeps its summary and links to the page instead of the GitHub blob",
+        "rationale": "A user page should not send readers to a developer doc on GitHub; one owner avoids two drifting copies."
+      },
+      {
+        "summary": "docs/DESKTOP-APP.md stays the developer doc; only its verified-wrong facts are corrected and it points to the user page",
+        "rationale": "Leaving known-wrong facts in the repo invites the next writer to copy them; a full rewrite is out of scope."
+      },
+      {
+        "summary": "The macOS Gatekeeper step is conditional on the latest release still being un-notarized (implementation checkpoint IC-1)",
+        "rationale": "The v0.89.1 release log shows notarization skipped, but signing secrets may be added before the PR merges."
+      },
+      {
+        "summary": "Filed #5556 (desktop dead surfaces) and #5557 (pan up Linux candidate) during planning",
+        "rationale": "Agents may file verified issues; the docs need stable links for the caveats."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Docs-only: one new page plus one-line links in four pages, docs.json and a developer-doc correction; 7 files.",
+      "canonicalFilename": "2026-11-18-PAN-5473-docs-desktop-app.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "page-install",
+        "title": "Create features/desktop-app.mdx with intro, Download and install, and Run it from npm",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:54:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5473",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/desktop-app.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -cE '^## (Download and install|Run it from npm)$' features/desktop-app.mdx",
+            "head -4 features/desktop-app.mdx | grep -P '[\\x{2013}\\x{2014}]' ; test $? -eq 1",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 2",
+            "the dash grep prints nothing and the test exits 0",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5473.md work item 1 and facts F-1 to F-11, F-17, F-19, decisions D-1 and D-2, and implementation checkpoint IC-1. Create features/desktop-app.mdx with the exact title and quoted description from D-1, an intro, a '## Download and install' section (asset table, no Intel/ARM builds, per-OS ### steps, Gatekeeper step only if the latest release is still not notarized) and a '## Run it from npm' section. Re-grep every cited anchor first; never copy from docs/DESKTOP-APP.md or other pages."
+        },
+        "items": [
+          {
+            "id": "page-install.ac1",
+            "title": "features/desktop-app.mdx frontmatter contains the D-1 title and a quoted description of 50 to 160 characters with no U+2013 or U+2014",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-install.ac2",
+            "title": "The '## Download and install' section contains .AppImage, .dmg, Setup, arm64 and a link to https://github.com/eltmon/overdeck/releases/latest",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-install.ac3",
+            "title": "The '## Run it from npm' section contains npx @overdeck/desktop and overdeck-desktop and states that the package does not include the pan command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-install.ac4",
+            "title": "Given the latest release mac job log still prints 'NOT notarized', the macOS steps contain the xattr -dr com.apple.quarantine command; otherwise the page contains no xattr line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-pan-up",
+        "title": "Add the 'Launch it with pan up' section with its 'What runs where' subsection",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:54:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5473",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/desktop-app.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## Launch it with pan up$' features/desktop-app.mdx",
+            "grep -c '7825' features/desktop-app.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 1",
+            "the port grep prints at least 1",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5473.md work item 2 and facts F-12 to F-16 and F-18 to F-22. Add '## Launch it with pan up' after the npm section: what pan up does when it finds the app, pan up --no-open, the recommended per-OS locations, the #5557 Linux note guarded by the F-13 decision rule, and '### What runs where' (port 7825, pan open link, pan down, single instance and --open, window close per OS)."
+        },
+        "items": [
+          {
+            "id": "page-pan-up.ac1",
+            "title": "The section contains ~/Applications, /Applications/Overdeck.app, %LOCALAPPDATA% and --no-open",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-pan-up.ac2",
+            "title": "The '### What runs where' subsection contains 7825, links /features/open-in-overdeck#the-desktop-app and states pan down does not quit the app",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-pan-up.ac3",
+            "title": "Given src/cli/index.ts still lists ~/.local/bin/overdeck as a Linux candidate, the section contains a link to https://github.com/eltmon/overdeck/issues/5557; otherwise it contains no ~/.local/bin/overdeck text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-tray-menu",
+        "title": "Add 'The tray and the app menu' section without any agent-status claims",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:54:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5473",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/desktop-app.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## The tray and the app menu$' features/desktop-app.mdx",
+            "grep -niwE 'green|yellow|red' features/desktop-app.mdx; test $? -eq 1"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 1",
+            "the colour-word grep prints nothing and the test exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5473.md work item 3, facts F-23 to F-25 and decision D-3. Add '## The tray and the app menu': tray click and every tray menu item, one sentence linking issue #5556 that the tray icon, tooltip and badge do not show agent status yet (so Settings -> Desktop App -> System Tray has no visible effect), then the Overdeck and Help menus without Open Workspace."
+        },
+        "items": [
+          {
+            "id": "page-tray-menu.ac1",
+            "title": "The section contains Emergency Stop All, Connect to a Machine… and Use This Computer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-tray-menu.ac2",
+            "title": "The section contains a link to https://github.com/eltmon/overdeck/issues/5556",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-tray-menu.ac3",
+            "title": "grep -niwE 'green|yellow|red' features/desktop-app.mdx prints nothing and the page contains no 'Open Workspace' text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-notifications",
+        "title": "Add the 'Notifications' section listing the notifications that actually fire",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:54:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5473",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/desktop-app.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## Notifications$' features/desktop-app.mdx",
+            "grep -c 'Permission needed' features/desktop-app.mdx"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 1",
+            "the label grep prints at least 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5473.md work item 4, facts F-26 and F-27 and decision D-3. Add '## Notifications': the four kinds (questions, plans awaiting approval, permission prompts repeated after 5 and 30 minutes, memory and disk pressure warnings), what a click does, that the browser dashboard shows the same ones, and one sentence that the six Settings -> Desktop App -> Notifications switches do not control them yet (#5556) with the OS-settings workaround."
+        },
+        "items": [
+          {
+            "id": "page-notifications.ac1",
+            "title": "The section contains 'Permission needed' and states the 5 and 30 minute reminders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-notifications.ac2",
+            "title": "The section contains a link to https://github.com/eltmon/overdeck/issues/5556 and names the operating system notification settings as the way to silence Overdeck",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-login",
+        "title": "Add the 'Start at login' section with the Linux caveat",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:54:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5473",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/desktop-app.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## Start at login$' features/desktop-app.mdx",
+            "grep -c 'desktop-settings.json' features/desktop-app.mdx"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 1",
+            "the file-name grep prints at least 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5473.md work item 5, facts F-28, F-29 and F-39. Add '## Start at login': the Settings -> Desktop App -> Auto-start -> Launch at login path, that it works on macOS and Windows and does nothing on Linux yet (#5556), the first-launch dialog and the reminders on launches 2 to 5 (paraphrased, no quoted dashed toast text), Reset reminder, and where desktop-settings.json lives per OS."
+        },
+        "items": [
+          {
+            "id": "page-login.ac1",
+            "title": "The section contains 'Launch at login', 'Reset reminder' and the word Linux next to a link to issue 5556",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-login.ac2",
+            "title": "The section contains desktop-settings.json with the Linux, macOS and Windows folders from F-39",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-updates",
+        "title": "Add the 'Updates' section covering checks, channels and the manual fallback",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:54:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5473",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/desktop-app.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## Updates$' features/desktop-app.mdx",
+            "grep -c 'every 4 hours' features/desktop-app.mdx"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 1",
+            "the schedule grep prints at least 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5473.md work item 6, facts F-30 to F-32. Add '## Updates': first check 5 seconds after launch and every 4 hours, nothing downloads until you choose, Help -> Check for Updates... and Install Update and Restart, stable versus canary channels, the download-from-GitHub fallback, and a link to #run-it-from-npm for npm installs. Do not claim the macOS in-app update works."
+        },
+        "items": [
+          {
+            "id": "page-updates.ac1",
+            "title": "The section contains 'Check for Updates', 'every 4 hours' and 'Install Update and Restart'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-updates.ac2",
+            "title": "The section contains a link to #run-it-from-npm and the GitHub Releases fallback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-remote-machine",
+        "title": "Add the 'Open another machine' section with pairing, addresses, storage and launch checks",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:54:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5473",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/desktop-app.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## Open another machine$' features/desktop-app.mdx",
+            "grep -c '100.64.0.0/10' features/desktop-app.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 1",
+            "the subnet grep prints at least 1",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5473.md work item 7, facts F-33 to F-38 and decision D-4. Add '## Open another machine' with the subsections Pair with a machine, Which addresses work, Where the credential is kept, When the machine cannot be opened (a table of the five F-37 messages with labels and origins in backticks) and Switch back or forget the machine. Re-read apps/desktop/src/machine-url.ts, machine-client.ts, machine-store.ts and connection.ts before writing."
+        },
+        "items": [
+          {
+            "id": "page-remote-machine.ac1",
+            "title": "The section contains 100.64.0.0/10, fd7a:115c:a1e0::/48, .ts.net and 'Paste the whole pairing link'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-remote-machine.ac2",
+            "title": "The section contains all five launch-check messages from F-37 and the buttons Use this computer and Forget",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-remote-machine.ac3",
+            "title": "The section links /configuration/remote-access and states the app runs no local server while it shows the chosen machine",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-help",
+        "title": "Add the 'Get help' and 'See also' sections to the desktop app page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:54:50Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5473",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/desktop-app.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'discord.gg/ZpHE2ZTv5P' features/desktop-app.mdx",
+            "grep -c '^## See also$' features/desktop-app.mdx"
+          ],
+          "expected_outputs": [
+            "the Discord grep prints at least 1",
+            "the heading grep prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5473.md work item 8 and requirement FR-10. Add '## Get help' linking the Overdeck Discord https://discord.gg/ZpHE2ZTv5P, GitHub Issues https://github.com/eltmon/overdeck/issues and the app's Help -> Report an Issue, then '## See also' with the six links listed in work item 8."
+        },
+        "items": [
+          {
+            "id": "page-help.ac1",
+            "title": "The page contains https://discord.gg/ZpHE2ZTv5P and https://github.com/eltmon/overdeck/issues under '## Get help'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-help.ac2",
+            "title": "The '## See also' list contains /configuration/remote-access, /configuration/tailscale and /features/open-in-overdeck",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "nav-entry",
+        "title": "Add features/desktop-app to the Features group in docs.json",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:54:50Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5473",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '\"features/desktop-app\"' docs.json",
+            "grep -A1 '\"features/open-in-overdeck\"' docs.json",
+            "node -e \"JSON.parse(require('fs').readFileSync('docs.json','utf8'))\""
+          ],
+          "expected_outputs": [
+            "the count grep prints 1",
+            "the line after open-in-overdeck contains features/desktop-app",
+            "node exits 0 (valid JSON)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5473.md work item 9. Merge origin/main first (five sibling specs edit docs.json), then insert the single line \"features/desktop-app\" directly after \"features/open-in-overdeck\" in the Features group pages list. Change nothing else in docs.json."
+        },
+        "items": [
+          {
+            "id": "nav-entry.ac1",
+            "title": "grep -c '\"features/desktop-app\"' docs.json prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "nav-entry.ac2",
+            "title": "In docs.json the line after \"features/open-in-overdeck\", contains \"features/desktop-app\" and git diff --stat shows exactly 1 insertion for docs.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cross-links",
+        "title": "Link the desktop app page from quickstart, remote-access, open-in-overdeck and dashboard-views",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:54:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5473",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "quickstart.mdx",
+            "configuration/remote-access.mdx",
+            "features/open-in-overdeck.mdx",
+            "features/dashboard-views.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -l '/features/desktop-app' quickstart.mdx configuration/remote-access.mdx features/open-in-overdeck.mdx features/dashboard-views.mdx",
+            "grep -c 'blob/main/docs/DESKTOP-APP.md' configuration/remote-access.mdx; test $? -eq 1"
+          ],
+          "expected_outputs": [
+            "the grep lists all four files",
+            "the blob-link count prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5473.md work item 10, decision D-4 and NFR-7. Make one additive sentence or link per file: quickstart.mdx '## Desktop app'; configuration/remote-access.mdx replaces the GitHub blob link target with /features/desktop-app#open-another-machine; features/open-in-overdeck.mdx '## The desktop app'; features/dashboard-views.mdx the 'Desktop App content only' sentence. No other sentence changes."
+        },
+        "items": [
+          {
+            "id": "cross-links.ac1",
+            "title": "Each of quickstart.mdx, configuration/remote-access.mdx, features/open-in-overdeck.mdx and features/dashboard-views.mdx contains /features/desktop-app",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cross-links.ac2",
+            "title": "grep -c 'blob/main/docs/DESKTOP-APP.md' configuration/remote-access.mdx prints 0 and the file contains /features/desktop-app#open-another-machine",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cross-links.ac3",
+            "title": "git diff --numstat against the merge base shows at most 2 deleted lines per linking page",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dev-doc-fixes",
+        "title": "Correct the stale facts in docs/DESKTOP-APP.md and point it at the user page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:54:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5473",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DESKTOP-APP.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'features/desktop-app.mdx' docs/DESKTOP-APP.md",
+            "grep -nE 'default 3011|Menu Bar \\(macOS\\)|accessible from the desktop app' docs/DESKTOP-APP.md; test $? -eq 1"
+          ],
+          "expected_outputs": [
+            "the pointer grep prints at least 1",
+            "the stale-fact grep prints nothing and the test exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5473.md work item 11, decision D-6 and fact F-40. Add the pointer line under the H1, then fix each F-40 fact in place: port 7825 to 7834 and the crash-restart rule, tray status not wired (#5556) with the Emergency Stop All label, 'Application menu' on every platform without Open Workspace, notification switches not read (#5556), Auto-start macOS and Windows only, palette section reduced to a link to ../features/keyboard-shortcuts.mdx, and the ~/.local/bin/overdeck install line removed with a #5557 link. Also replace 'The version beside the Overdeck wordmark' with the v<version> button at the bottom of the left column and drop 'signed' from 'Download the signed native package'. Keep the IPC, protocol, packaging and architecture sections."
+        },
+        "items": [
+          {
+            "id": "dev-doc-fixes.ac1",
+            "title": "docs/DESKTOP-APP.md contains features/desktop-app.mdx and 7825",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dev-doc-fixes.ac2",
+            "title": "grep -nE 'default 3011|Menu Bar \\(macOS\\)|accessible from the desktop app|beside the \\*\\*Overdeck\\*\\* wordmark|signed native package' docs/DESKTOP-APP.md prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dev-doc-fixes.ac3",
+            "title": "docs/DESKTOP-APP.md contains links to issues 5556 and 5557 and no edited line contains U+2013 or U+2014",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "validate",
+        "title": "Run the mint check, lint:docs and the dash checks and record the clean output in the PR body",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:54:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5473",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/desktop-app.mdx",
+            "docs.json",
+            "quickstart.mdx",
+            "configuration/remote-access.mdx",
+            "features/open-in-overdeck.mdx",
+            "features/dashboard-views.mdx",
+            "docs/DESKTOP-APP.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx -y mint@4.3.49 validate",
+            "npx -y mint@4.3.49 broken-links",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "mint validate prints build passed",
+            "mint broken-links prints no broken links found",
+            "lint:docs exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-4",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5473.md work item 12. Run npx -y mint@4.3.49 validate, npx -y mint@4.3.49 broken-links, npm run lint:docs, the two dash checks and the nine-heading check from the PRD; fix anything they report in the file it names; paste both clean mint outputs in the PR body. Never run mint validate --fix."
+        },
+        "items": [
+          {
+            "id": "validate.ac1",
+            "title": "npx -y mint@4.3.49 broken-links prints 'no broken links found' and npx -y mint@4.3.49 validate prints 'build passed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate.ac2",
+            "title": "npm run lint:docs exits 0 and both dash checks from work item 12 exit 0 with no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate.ac3",
+            "title": "The nine-heading grep from work item 12 prints 9 and the PR body contains both mint outputs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "page-install",
+        "to": "page-pan-up",
+        "type": "blocks"
+      },
+      {
+        "from": "page-pan-up",
+        "to": "page-tray-menu",
+        "type": "blocks"
+      },
+      {
+        "from": "page-tray-menu",
+        "to": "page-notifications",
+        "type": "blocks"
+      },
+      {
+        "from": "page-notifications",
+        "to": "page-login",
+        "type": "blocks"
+      },
+      {
+        "from": "page-login",
+        "to": "page-updates",
+        "type": "blocks"
+      },
+      {
+        "from": "page-updates",
+        "to": "page-remote-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "page-remote-machine",
+        "to": "page-help",
+        "type": "blocks"
+      },
+      {
+        "from": "page-install",
+        "to": "nav-entry",
+        "type": "blocks"
+      },
+      {
+        "from": "page-install",
+        "to": "cross-links",
+        "type": "blocks"
+      },
+      {
+        "from": "page-remote-machine",
+        "to": "cross-links",
+        "type": "blocks"
+      },
+      {
+        "from": "page-install",
+        "to": "dev-doc-fixes",
+        "type": "blocks"
+      },
+      {
+        "from": "page-help",
+        "to": "validate",
+        "type": "blocks"
+      },
+      {
+        "from": "nav-entry",
+        "to": "validate",
+        "type": "blocks"
+      },
+      {
+        "from": "cross-links",
+        "to": "validate",
+        "type": "blocks"
+      },
+      {
+        "from": "dev-doc-fixes",
+        "to": "validate",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
