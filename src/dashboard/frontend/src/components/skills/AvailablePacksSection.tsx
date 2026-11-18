@@ -3,12 +3,16 @@
  * on the global Skills page under Skill packs.
  *
  * A group row lists its missing members; a pack row shows its source and
- * disclosure. A pack the dashboard cannot add (it needs a ref, or adding it
- * builds code) shows the exact CLI command instead. The section is
+ * disclosure. With `onAdd`, a pack or group the dashboard can add gets an
+ * **Add…** button that asks the host to open the add dialog (the host owns
+ * the dialog, so it survives this list changing under it). A pack the
+ * dashboard cannot add (it needs a ref, or adding it builds code) shows the
+ * exact CLI command instead. The section is
  * supplementary: while loading, on error, or with nothing to show it renders
  * nothing.
  */
 import { cn } from '../../lib/utils';
+import formStyles from '../shared/ModalForm.module.css';
 import {
   missingLabel,
   unknownMembersNote,
@@ -33,7 +37,18 @@ function packMatches(pack: AvailablePack, search: string): boolean {
   return pack.id.toLowerCase().includes(search) || (pack.disclosure ?? '').toLowerCase().includes(search);
 }
 
-export function AvailablePacksSection({ search = '' }: { search?: string }) {
+/** What the add dialog opens with: its title and the pack ids to preview and add. */
+export interface AddPacksRequest {
+  title: string;
+  packIds: string[];
+}
+
+export interface AvailablePacksSectionProps {
+  search?: string;
+  onAdd?: (request: AddPacksRequest) => void;
+}
+
+export function AvailablePacksSection({ search = '', onAdd }: AvailablePacksSectionProps) {
   const { data } = useAvailablePacks();
   if (!data) return null;
   const query = search.toLowerCase();
@@ -59,10 +74,16 @@ export function AvailablePacksSection({ search = '' }: { search?: string }) {
             <div className="flex flex-wrap items-baseline gap-x-2">
               <span className="font-mono-ui text-[13px] text-foreground">{group.name}</span>
               <span className="text-muted-foreground">group · {missingLabel(group)}</span>
+              {onAdd && group.dashboardAddable && (
+                <AddButton
+                  label={`Add the ${group.name} group`}
+                  onClick={() => onAdd({ title: `Add the ${group.name} packs`, packIds: [...group.missing] })}
+                />
+              )}
             </div>
             <p className="font-mono text-muted-foreground">{group.missing.join(', ')}</p>
             {group.unknown.length > 0 && <p className="text-body-foreground">{unknownMembersNote(group.unknown)}</p>}
-            <code className="block font-mono text-foreground">{group.addCommand}</code>
+            {!(onAdd && group.dashboardAddable) && <code className="block font-mono text-foreground">{group.addCommand}</code>}
           </div>
         ))}
         {packs.map((pack, index) => (
@@ -71,7 +92,12 @@ export function AvailablePacksSection({ search = '' }: { search?: string }) {
             data-available-pack={pack.id}
             className={cn('space-y-0.5 px-3 py-2 text-xs leading-5', (groups.length > 0 || index > 0) && 'border-t border-border')}
           >
-            <span className="font-mono-ui text-[13px] text-foreground">{pack.id}</span>
+            <div className="flex flex-wrap items-baseline gap-x-2">
+              <span className="font-mono-ui text-[13px] text-foreground">{pack.id}</span>
+              {onAdd && pack.dashboardAddable && (
+                <AddButton label={`Add ${pack.id}`} onClick={() => onAdd({ title: `Add ${pack.id}`, packIds: [pack.id] })} />
+              )}
+            </div>
             {pack.disclosure && <p className="max-w-[96ch] text-body-foreground">{pack.disclosure}</p>}
             {pack.url && (
               <p className="truncate font-mono text-muted-foreground" title={pack.url}>
@@ -80,10 +106,18 @@ export function AvailablePacksSection({ search = '' }: { search?: string }) {
               </p>
             )}
             {pack.reason && <p className="text-muted-foreground">{REASON_LABELS[pack.reason]}</p>}
-            <code className="block font-mono text-foreground">{pack.addCommand}</code>
+            {!(onAdd && pack.dashboardAddable) && <code className="block font-mono text-foreground">{pack.addCommand}</code>}
           </div>
         ))}
       </div>
     </section>
+  );
+}
+
+function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button type="button" aria-label={label} className={cn(formStyles.button, 'ml-auto')} onClick={onClick}>
+      Add…
+    </button>
   );
 }

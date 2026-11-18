@@ -12,7 +12,8 @@ import { useState, type RefObject } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { cn } from '../../lib/utils';
-import { AvailablePacksSection } from './AvailablePacksSection';
+import { AddPacksDialog } from './AddPacksDialog';
+import { AvailablePacksSection, type AddPacksRequest } from './AvailablePacksSection';
 import { GroupHeader, LevelChoice, RowError as SaveError, SkillSwitch } from './SkillControls';
 
 // Declared here rather than imported: SkillOverridesPanel imports this module.
@@ -113,6 +114,12 @@ export function SkillPacksSection({ level, projectKey, issueId, packs, packOverr
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [rowErrors, setRowErrors] = useState<Record<string, { message: string; target: SaveTarget; enabled: boolean | null }>>({});
+  // The add dialog lives here, at a fixed place in both returns below, so it stays open while an add
+  // changes which branch renders and removes rows from the Available list.
+  const [addRequest, setAddRequest] = useState<AddPacksRequest | null>(null);
+  const addDialog = addRequest && (
+    <AddPacksDialog title={addRequest.title} packIds={addRequest.packIds} onClose={() => setAddRequest(null)} />
+  );
 
   // The update check runs `git ls-remote`, so only the global page asks, separately from the main list.
   const updates = useQuery({
@@ -149,9 +156,17 @@ export function SkillPacksSection({ level, projectKey, issueId, packs, packOverr
   const shown = packs
     .map(pack => ({ pack, skills: pack.skills.filter(matches) }))
     .filter(({ pack, skills }) => !search || skills.length > 0 || pack.id.toLowerCase().includes(search));
-  if (search && shown.length === 0) return level === 'global' ? <AvailablePacksSection search={search} /> : null;
+  if (search && shown.length === 0) {
+    return level === 'global' ? (
+      <>
+        <AvailablePacksSection search={search} onAdd={setAddRequest} />
+        {addDialog}
+      </>
+    ) : null;
+  }
 
   return (
+    <>
     <section ref={sectionRef} tabIndex={-1} aria-label="Skill packs" className="scroll-mt-4 space-y-2 pt-2 focus:outline-none" data-testid={`skill-packs-${level}`}>
       <div>
         <h3 className="text-[13px] font-medium text-foreground">Skill packs</h3>
@@ -283,8 +298,10 @@ export function SkillPacksSection({ level, projectKey, issueId, packs, packOverr
           })}
         </div>
       )}
-      {level === 'global' && <AvailablePacksSection search={search} />}
+      {level === 'global' && <AvailablePacksSection search={search} onAdd={setAddRequest} />}
     </section>
+    {addDialog}
+    </>
   );
 }
 

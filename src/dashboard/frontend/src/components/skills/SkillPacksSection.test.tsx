@@ -94,6 +94,7 @@ beforeEach(() => {
       return { ok: true, status: 200, json: async () => ({ ok: true }) };
     }
     if (url === '/api/skills/packs/available') return { ok: true, status: 200, json: async () => availableBody };
+    if (url === '/api/skills/packs/preview') return { ok: false, status: 502, json: async () => ({ error: 'offline', code: 'git' }) };
     return { ok: true, status: 200, json: async () => ({ packs: [] }) };
   }));
 });
@@ -104,11 +105,13 @@ afterEach(() => {
 
 function renderSection(props: SkillPacksSectionProps) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const ui = (next: SkillPacksSectionProps) => (
     <QueryClientProvider client={client}>
-      <SkillPacksSection {...props} />
-    </QueryClientProvider>,
+      <SkillPacksSection {...next} />
+    </QueryClientProvider>
   );
+  const result = render(ui(props));
+  return { ...result, rerenderSection: (next: SkillPacksSectionProps) => result.rerender(ui(next)) };
 }
 
 function packRow(id: string): HTMLElement {
@@ -202,12 +205,15 @@ describe('Available packs (PAN-5540)', () => {
     const video = available('[data-available-group="video"]') as HTMLElement;
     expect(video.textContent).toContain('4 packs not added');
     expect(video.textContent).toContain('remotion, hyperframes, openmontage, video-use');
-    expect(video.textContent).toContain('pan skills pack add --group video');
+    expect(within(video).getByRole('button', { name: 'Add the video group' })).toBeTruthy();
+    expect(video.textContent).not.toContain('pan skills pack add --group video');
 
     const gstack = available('[data-available-pack="gstack"]') as HTMLElement;
     expect(gstack.textContent).toContain('Needs a ref. Add it from the CLI:');
     expect(gstack.textContent).toContain('pan skills pack add gstack --ref <ref>');
     expect((available('[data-available-pack="sageox"]') as HTMLElement).textContent).toContain('Adding it builds code on this machine.');
+    expect(within(gstack).queryByRole('button')).toBeNull();
+    expect(within(available('[data-available-pack="remotion"]') as HTMLElement).getByRole('button', { name: 'Add remotion' })).toBeTruthy();
     expect((available('[data-available-pack="remotion"]') as HTMLElement).textContent).toContain('https://github.com/eltmon/remotion @ eeeeeee');
     expect(document.body.textContent).not.toContain('mattpocock https://github.com/eltmon/skills --ref v1.2.3');
   });
@@ -279,8 +285,32 @@ describe('Available packs (PAN-5540)', () => {
     renderSection({ level: 'global', packs: [], search: 'remotion' });
 
     await waitFor(() => expect(available('[data-available-pack="remotion"]')).toBeTruthy());
+    expect(screen.getByRole('button', { name: 'Add remotion' })).toBeTruthy();
     expect(available('[data-available-pack="gstack"]')).toBeNull();
     expect(available('[data-available-group="video"]')).toBeTruthy();
+  });
+
+  it('opens the add dialog for the missing group members and keeps it open while the list changes', async () => {
+    availableBody = { packs: KNOWN_IDS.map(id => availablePack(id)), groups: [{ ...VIDEO_GROUP, missing: ['openmontage', 'video-use'] }] };
+    const { rerenderSection } = renderSection({ level: 'global', packs: [], search: 'video' });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add the video group' }));
+    expect(screen.getByRole('dialog', { name: 'Add the video packs' })).toBeTruthy();
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url]) => url === '/api/skills/packs/preview')).toBe(true));
+    const previewed = vi.mocked(fetch).mock.calls.filter(([url]) => url === '/api/skills/packs/preview');
+    expect(JSON.parse(String(previewed[0]?.[1]?.body))).toEqual({ id: 'openmontage' });
+
+    // An add registers video-use: the panel switches from the search-only branch to the full section.
+    rerenderSection({ level: 'global', packs: [pack({ id: 'video-use', skills: [] })], search: 'video' });
+    expect(document.querySelector('[data-pack="video-use"]')).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: 'Add the video packs' })).toBeTruthy();
+    // The same dialog stayed mounted: its previews ran once each, not again after a remount.
+    await waitFor(() => expect(document.querySelectorAll('[data-add-pack]')).toHaveLength(2));
+    await waitFor(() => expect(screen.getAllByText('preview failed')).toHaveLength(2));
+    const ids = vi.mocked(fetch).mock.calls
+      .filter(([url]) => url === '/api/skills/packs/preview')
+      .map(([, init]) => (JSON.parse(String(init?.body)) as { id: string }).id);
+    expect(ids).toEqual(['openmontage', 'video-use']);
   });
 
   it('filters available packs by disclosure text', async () => {
