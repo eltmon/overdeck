@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5468",
   "created": "2026-11-18T19:13:53.395Z",
-  "updated": "2026-11-18T19:28:19.125Z",
+  "updated": "2026-11-18T19:28:23.327Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -252,6 +252,11 @@
     "section-show-journal.ac3": {
       "status": "completed",
       "doneAt": "2026-11-18T19:28:19.124Z"
+    },
+    "section-restart": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5468",
+      "claimedAt": "2026-11-18T19:28:23.326Z"
     }
   }
 }
