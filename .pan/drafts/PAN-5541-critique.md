@@ -1,0 +1,9 @@
+plan-digest: 8d0766a46d8071ae31300fa450b21cf445feccab52987525d4872eb97fa918b6
+
+## blocks-the-design: Terminal session views omit the request card
+
+The PRD promises the pinned input in both conversation and terminal modes (FR-6, D6, `.pan/drafts/PAN-5541.md`, lines 55 and 196), but WI-6 mounts it only inside `ConversationPanel` (lines 194-197). The issue agent drawer renders `ConversationPanel` only for its conversation view and renders `XTerminal` directly for its terminal view (`src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx`, lines 270-287). The Stage session pane uses `SessionPanel` (`src/dashboard/frontend/src/components/Stage/panes/AgentPane.tsx`, lines 22-24), whose terminal view also renders `XTerminal` directly (`src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx`, lines 517-518). Those common paths still have no secret input. Mount the pinned card in the shared session chrome for both views, or add it to each terminal branch, and test opening an agent-owned request in the terminal view of both surfaces.
+
+## blocks-the-design: Malformed response discards a typed secret
+
+WI-2 explicitly keeps `fetchAgentRequests` resolving `[]` for a 200 response without a `requests` array (`.pan/drafts/PAN-5541.md`, line 106); the current guard is at `src/dashboard/frontend/src/lib/useDecisions.ts`, lines 220-224. WI-4 closes the dialog when the fetched list lacks its request id (`.pan/drafts/PAN-5541.md`, line 136). Thus one malformed 200 response replaces the last good list with `[]` and closes the dialog, losing a partly typed secret even though the request may still be pending. Treat a malformed response as a fetch error so React Query retains the last valid list, and add a refetch test that preserves the dialog and input for this case.
