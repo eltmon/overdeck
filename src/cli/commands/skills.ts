@@ -512,7 +512,7 @@ export async function skillsPackUpdateCommand(id: string, options: PackUpdateOpt
 }
 
 export async function skillsPackListCommand(options: PackListOptions): Promise<void> {
-  const [{ packUpdateAvailable }, { listPackCatalog }, { notAppliedLabels, KNOWN_PACKS }] = await Promise.all([
+  const [{ packUpdateAvailable }, { listPackCatalog }, { notAppliedLabels }] = await Promise.all([
     import('../../lib/skill-packs/sources.js'),
     import('../../lib/skill-overrides/catalog.js'),
     import('../../lib/skill-packs/adapters.js'),
@@ -537,8 +537,7 @@ export async function skillsPackListCommand(options: PackListOptions): Promise<v
     return;
   }
   if (rows.length === 0) {
-    const url = KNOWN_PACKS['mattpocock']?.url;
-    console.log(`No skill packs. Add one with: pan skills pack add mattpocock ${url} --ref v1.2.3`);
+    console.log('No skill packs added.');
   } else {
     console.log(chalk.bold(`\nSkill packs (${rows.length})\n`));
     for (const row of rows) {
@@ -549,10 +548,10 @@ export async function skillsPackListCommand(options: PackListOptions): Promise<v
       ));
     }
   }
-  // PAN-5464 D-2: groups are aliases, listed only in the text output so the --json rows stay unchanged.
-  const { listPackGroups } = await import('../../lib/skill-packs/groups.js');
-  console.log(chalk.bold('\nGroups\n'));
-  for (const group of await listPackGroups()) console.log(`${group.name}  ${group.packs.join(', ')}  (${group.source})`);
+  // PAN-5540: known packs not added and group add commands, text output only (--json rows unchanged, D-10).
+  const { listAvailablePacks, formatAvailablePackLines } = await import('../../lib/skill-packs/known.js');
+  console.log('');
+  for (const line of formatAvailablePackLines(await listAvailablePacks())) console.log(line);
 }
 
 /** gstack skills write `.gstack/` and `.gstack-worktrees/` in the projects they run in (PAN-4727 D9); remove never deletes them. */
