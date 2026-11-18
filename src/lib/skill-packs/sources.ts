@@ -545,7 +545,7 @@ async function buildPackBrowser(id: string, dir: string, commit: string): Promis
 }
 
 /** PAN-4852 D5: Overdeck builds `ox` (and its session adapters) for the sageox pack. */
-const buildsOx = (id: string): boolean => id === 'sageox';
+export const buildsOx = (id: string): boolean => id === 'sageox';
 
 /** Before consent (AD-8/AD-9): go is on PATH; returns the build commands, writes and downloads. */
 async function oxBuildPreview(id: string, dir: string): Promise<NonNullable<PackPreview['oxBuild']>> {
