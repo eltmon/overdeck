@@ -239,6 +239,41 @@ pan unarchive-conversation conv-20261030-4471
 pan unarchive-conversation "fix the webhook retry"
 ```
 
+## pan open
+
+Open a file, folder, or issue workspace in Overdeck's dashboard, or in an external editor.
+
+```bash
+pan open src/cli/index.ts --line 42
+pan open workspaces/feature-pan-5478
+pan open PAN-5478 --editor cursor
+pan open src/cli/index.ts --new-tab
+```
+
+| Option | What it does |
+| --- | --- |
+| `-e, --editor [editor]` | Opens in an external editor instead (`cursor`, `vscode`, `zed`, `file-manager`, and others) |
+| `--line <n>` | Opens a file at this line |
+| `--column <n>` | Opens a file at this column |
+| `--new-tab` | Opens in a new browser tab instead of the focused dashboard tab |
+
+See [Open in Overdeck](/features/open-in-overdeck) for the full set of targets and editors.
+
+## pan share
+
+Share a conversation by link: prints the join link and join code for a Shared Session.
+
+```bash
+pan share 2972
+pan share my-conversation --json
+```
+
+| Option | What it does |
+| --- | --- |
+| `--json` | Prints the share as JSON |
+
+See [pan share](/cli/share#pan-share) for how the link and join code work.
+
 ## Get help
 
 - [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P)
