@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5503",
   "created": "2026-11-18T23:39:30.709Z",
-  "updated": "2026-11-18T23:51:21.369Z",
+  "updated": "2026-11-18T23:51:52.941Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -283,6 +283,30 @@
     },
     "audit-memory-governor.ac1": {
       "status": "cancelled"
+    },
+    "audit-effort": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:51:52.941Z"
+    },
+    "audit-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:51:52.941Z"
+    },
+    "audit-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:51:52.941Z"
+    },
+    "audit-effort.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:51:52.941Z"
+    },
+    "audit-effort.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:51:52.941Z"
+    },
+    "audit-effort.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:51:52.941Z"
     }
   }
 }
