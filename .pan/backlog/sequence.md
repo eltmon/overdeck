@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-18T16:03:26.228710Z · model: claude-opus-5-5 · open: 942_
+_Last sequenced: 2026-11-18T16:32:17.196670Z · model: claude-opus-5-5 · open: 945_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -11,6 +11,7 @@ _Last sequenced: 2026-11-18T16:03:26.228710Z · model: claude-opus-5-5 · open: 
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
 | 5 | PAN-5519 | S | high | ok |  |  | Review convoy relaunches reviewers into a stale already-approved run (old head); wastes tokens and can't unblock merge. |
 | 6 | PAN-5489 | S | high | ok |  |  | pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause. |
+| 7 | PAN-5498 | S | critical | ok |  |  | pan start --plan auto --host lost the host override at the planning hand-off, so no work agent started; merged, verifying on main. |
 | 7 | PAN-5526 | S | critical | ok |  |  | CLI finalize reads a removed consent field, so pan start --plan auto never auto-starts; likely root cause of PAN-4554. Fix message too. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
 | 9 | PAN-5516 | S | high | ok |  |  | pan conversations resume always fails locally with 'Missing origin': origin check does not exempt the internal token. Fix named. |
@@ -22,6 +23,7 @@ _Last sequenced: 2026-11-18T16:03:26.228710Z · model: claude-opus-5-5 · open: 
 | 13 | PAN-4710 | S | high | ok |  |  | Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff |
 | 14 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; seen on MYN and now overdeck (PAN-5232). |
 | 14 | PAN-5527 | M | high | needs-refinement |  | PAN-5526 | Overlaps PAN-5526 (consent field, unread marker); unique part is resuming a promotion interrupted by a dashboard death. Scope after 5526. |
+| 14 | PAN-5529 | M | high | ok |  | PAN-5498 | Auto-start hand-off still strands: orphaned consent claims, queued container starts lost on restart, read errors read as revoked. |
 | 15 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
 | 16 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 17 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
@@ -237,6 +239,7 @@ _Last sequenced: 2026-11-18T16:03:26.228710Z · model: claude-opus-5-5 · open: 
 | 224 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
 | 225 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
 | 226 | PAN-5435 | M | medium | ok |  |  | React Compiler burn-down for app shell, pages, hooks, lib: 67 skips, 100 memo sites. Do first; hooks feed all groups. Unblocked. |
+| 226 | PAN-5532 | S | medium | ok |  |  | Six dashboard UI bugs where text or filters disagree with code: Experimental copy, Cycle filter, No PR chip, Merging label, palette. |
 | 227 | PAN-4242 | M | high | ok |  |  | pan handoff --cwd skips the folder-trust pre-trust pan start does; successor sits at the trust prompt for hours while shown live |
 | 228 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 229 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
@@ -853,7 +856,7 @@ _Last sequenced: 2026-11-18T16:03:26.228710Z · model: claude-opus-5-5 · open: 
 | 808 | PAN-2348 | XS | low | ok |  |  | docs: migrate STATE-STORAGE-AUDIT.md content to living docs, then delete |
 | 809 | PAN-2346 | XS | low | ok |  |  | docs: refresh AGENT_TYPES_INDEX.md to the post-Cut taxonomy in ROLES.md (xBRIEF items, foreman, conv-flywheel, worker role). |
 | 810 | PAN-2345 | XS | low | ok |  |  | docs: rewrite pan-done.md against done.ts + done-preflight.ts; fix continue path; point MERGE link at MERGE-WORKFLOW.md. |
-| 811 | PAN-2344 | XS | low | ok |  |  | docs: rewrite KANBAN-MODEL.md for derived issue state, pipeline-membership buckets, PR reviews; drop Inspect and beads. |
+| 811 | PAN-2344 | XS | low | needs-refinement |  |  | docs: rewrite KANBAN-MODEL.md for the current pipeline; relabeled needs-rescope, so scope must be restated before work. |
 | 812 | PAN-2343 | XS | low | ok |  |  | docs: rewrite MISSION-CONTROL.md: state label from deriveStateLabel, membership, liveness.ts; review_status table is gone. |
 | 813 | PAN-2073 | XS | low | ok |  |  | docs: add user-facing page for the Desktop App |
 | 814 | PAN-2071 | XS | low | ok |  |  | docs: add user-facing page for the Hooks system |
@@ -974,6 +977,10 @@ New substrate bug seen on PAN-5483: resolveReviewParentRunState returns a saved 
 
 New pipeline-path bug: the CLI result depends on the caller's environment, so Flywheel-launched planning can fail and strand workspaces; it outranks routine work.
 
+### PAN-5498 (rank 7)
+
+New to the sequence and already in the pipeline (merged, verifying on main), so it is pinned beside PAN-5526, the other auto-start hand-off fix. It restores the host override on the post-planning spawn and journals the hand-off so deacon-lite can resume it.
+
 ### PAN-5526 (rank 7)
 
 New substrate bug left out of PAN-5498's PR: the CLI always posts autoSpawn=false, which blocks the --plan auto paved road, so it takes 5498's vacated rank 7.
@@ -1017,6 +1024,10 @@ New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan
 ### PAN-5527 (rank 14)
 
 New substrate follow-up to PAN-5498 that duplicates most of PAN-5526, so it ranks just after the related PAN-4554 and needs scoping once 5526 lands.
+
+### PAN-5529 (rank 14)
+
+New substrate follow-up to PAN-5498 that review split out: five concrete recovery gaps on the post-planning auto-start path, each with a named reproducing test. It ranks with PAN-5527 and PAN-4554 because the same path keeps leaving planned issues without a work agent, and PAN-5498 has already merged, so nothing blocks it.
 
 ### PAN-4666 (rank 15)
 
@@ -1262,14 +1273,6 @@ New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wr
 
 New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.
 
-### PAN-5133 (rank 76)
-
-New substrate bug placed in a freed high-tier slot. Under memory pressure the operator has no supported way to stop a deferred start, and the Flywheel had to write the journal directly.
-
-### PAN-4792 (rank 77)
-
-New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's unnumbered select dialogs, so a failed paste's fallback Enter can answer them, including a silent permission-mode change. PAN-4738 removes the one known trigger on Fly, so it ranks with the high-tier delivery bugs rather than the top tier.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1277,10 +1280,10 @@ New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-18T16:03:26.228710Z",
+  "generatedAt": "2026-11-18T16:32:17.196670Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 942,
+  "openCount": 945,
   "nodes": [
     {
       "issue": "PAN-5520",
@@ -1357,6 +1360,19 @@ New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's
       "dependsOn": [],
       "why": "pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause.",
       "rationale": "New pipeline-path bug: the CLI result depends on the caller's environment, so Flywheel-launched planning can fail and strand workspaces; it outranks routine work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5498",
+      "rank": 7,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan start --plan auto --host lost the host override at the planning hand-off, so no work agent started; merged, verifying on main.",
+      "rationale": "New to the sequence and already in the pipeline (merged, verifying on main), so it is pinned beside PAN-5526, the other auto-start hand-off fix. It restores the host override on the post-planning spawn and journals the hand-off so deacon-lite can resume it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1504,6 +1520,21 @@ New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's
       ],
       "why": "Overlaps PAN-5526 (consent field, unread marker); unique part is resuming a promotion interrupted by a dashboard death. Scope after 5526.",
       "rationale": "New substrate follow-up to PAN-5498 that duplicates most of PAN-5526, so it ranks just after the related PAN-4554 and needs scoping once 5526 lands.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5529",
+      "rank": 14,
+      "size": "M",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5498"
+      ],
+      "why": "Auto-start hand-off still strands: orphaned consent claims, queued container starts lost on restart, read errors read as revoked.",
+      "rationale": "New substrate follow-up to PAN-5498 that review split out: five concrete recovery gaps on the post-planning auto-start path, each with a named reproducing test. It ranks with PAN-5527 and PAN-4554 because the same path keeps leaving planned issues without a work agent, and PAN-5498 has already merged, so nothing blocks it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4262,6 +4293,19 @@ New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's
       "dependsOn": [],
       "why": "React Compiler burn-down for app shell, pages, hooks, lib: 67 skips, 100 memo sites. Do first; hooks feed all groups. Unblocked.",
       "rationale": "PAN-4561 (React 19 + compiler) merged on 2026-11-16, so this first burn-down group is now buildable and moves into the parent's freed slot at 226.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5532",
+      "rank": 226,
+      "size": "S",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Six dashboard UI bugs where text or filters disagree with code: Experimental copy, Cycle filter, No PR chip, Merging label, palette.",
+      "rationale": "New, self-contained UI correctness batch found while planning PAN-5474; ranked with other medium dashboard fixes because each item misleads the operator but none blocks the pipeline.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11924,10 +11968,10 @@ New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's
       "size": "XS",
       "importance": "low",
       "score": 10,
-      "condition": "ok",
+      "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "docs: rewrite KANBAN-MODEL.md for derived issue state, pipeline-membership buckets, PR reviews; drop Inspect and beads.",
-      "rationale": "Rank held; triage gave concrete source files for the rewrite, so condition moves to ok.",
+      "why": "docs: rewrite KANBAN-MODEL.md for the current pipeline; relabeled needs-rescope, so scope must be restated before work.",
+      "rationale": "Rank held; the issue was relabeled needs-rescope, so condition moves to needs-refinement until the rewrite scope is restated.",
       "gate": "auto",
       "planning": "skip"
     },
@@ -14547,6 +14591,13 @@ New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's
       "confidence": 1
     },
     {
+      "from": "PAN-5474",
+      "to": "PAN-5532",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
       "from": "PAN-5478",
       "to": "PAN-5501",
       "type": "unblocks",
@@ -14715,6 +14766,13 @@ New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's
       "confidence": 1
     },
     {
+      "from": "PAN-5498",
+      "to": "PAN-5529",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
       "from": "PAN-5505",
       "to": "PAN-5499",
       "type": "unblocks",
@@ -14755,6 +14813,20 @@ New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.8
+    },
+    {
+      "from": "PAN-5526",
+      "to": "PAN-5529",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-5532",
+      "to": "PAN-2344",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.6
     },
     {
       "from": "PAN-750",
