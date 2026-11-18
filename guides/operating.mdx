@@ -1,0 +1,87 @@
+---
+title: "Operating Overdeck: stop, restart, recover and back up"
+sidebarTitle: "Operating Overdeck"
+description: "Stop every agent at once, react to low-disk alerts, choose pan reload or pan restart, hold restarts, and know what comes back after a crash."
+---
+
+Running Overdeck day to day means knowing how to stop everything in an emergency, what a low-disk alert means, when to reload versus restart, how a restart hold and approval gate work together, what comes back after a crash, and what is and is not backed up. This page covers all of it in one place.
+
+## Stop every agent now
+
+Emergency stop kills every running agent across all harnesses right away. Nothing it kills is deleted; work in progress is simply cut off.
+
+You can trigger it four ways:
+
+- The hotkey `Ctrl+Shift+.` (`Cmd+Shift+.` on macOS, see [Keyboard shortcuts](/features/keyboard-shortcuts)), which works even while typing in a text field. It opens a confirm dialog: press Enter to stop all agents, or Esc to cancel.
+- The top bar's Agents menu, "Stop all agents…": kills every agent now, and work in progress is cut off.
+- The command palette's "Emergency Stop All Agents" action.
+- The System Health popover, under System controls: a stop button with an inline "Kill all?" confirm.
+
+Stopping also freezes auto-resume for crashed agents, so nothing restarts on its own while you are dealing with the emergency. The freeze survives a restart. To undo it, click the "Auto-resume frozen" chip (snowflake icon) in the top bar, or use the Auto-resume toggle in the System Health popover.
+
+Emergency stop is not the same as [Safe shutdown](/features/safe-shutdown). Safe shutdown lets each agent finish its current step before stopping; emergency stop kills every agent now.
+
+## Low-disk alerts
+
+Overdeck checks free space on the filesystem holding `~/.overdeck` every 30 seconds. Two thresholds control it: `resources.disk_warn_gb` and `resources.disk_critical_gb` in `~/.overdeck/config.yaml`. See [Memory governor](/configuration/memory-governor) for the keys table and their defaults.
+
+When free space drops below a threshold, Overdeck sends one phone push (titled "Disk low" or "Disk critical", following the phone Failures switch described in [Push notifications](/configuration/push-notifications)) and, at the critical level, a desktop notification too. Needs you shows a Disk low or Disk critical card listing the biggest folders and an Open Resources button. A critical alert only sorts into the Blocking group; it does not stop or hold anything, and the auto-resume freeze from emergency stop does not affect it.
+
+A separate, fixed 10 GiB disk floor refuses new workspace starts, workspace stack rebuilds and lane launches, regardless of the alert thresholds above. See [Troubleshooting](/reference/troubleshooting) for what gets held and why, and [Lanes](/reference/lanes) for `pan lane disk-check`, which checks the floor before a launch wave or a worktree you create yourself.
+
+## pan reload or pan restart
+
+Use `pan reload` to ship new code: it builds from `origin/main`, checks the build, waits for restart approval, then restarts. If the build or health check fails, the old dashboard keeps running. `pan reload` refuses during a safe-shutdown drain and while a restart hold is active.
+
+Use `pan restart` to relaunch the build you already have: it never builds. It can target just the dashboard (the default), CLIProxy, Traefik, or the full stack. Only the dashboard and full scopes wait for restart approval and obey a restart hold.
+
+Both commands keep the running dashboard's auto-resume setting unless you pass `--resume` or `--no-resume`. See [Core commands](/cli/core-commands) for the full flag tables.
+
+## Restart approval and the restart hold
+
+### Approving a restart
+
+Every voluntary dashboard restart (`pan reload`, a dashboard or full-scope `pan restart`, and the post-merge deploy) waits for your approval before it runs. One approval satisfies every request waiting at that moment, with a single restart. If the gate is unreachable, or the dashboard's health check keeps failing for 60 seconds, the restart proceeds without approval.
+
+Approve with the "Restart now" button on the dashboard's approval banner, with `pan restart approve`, or with `pan restart --now`, which approves and restarts in one step.
+
+### Holding restarts
+
+A restart hold refuses every voluntary restart until you release it:
+
+```bash
+pan restart hold --reason "live demo" --until 2h
+pan restart hold --status
+pan restart release
+```
+
+`--reason` is required; `--until` takes a duration such as `30m`, `2h`, `1d`, or an ISO time in the future. While a hold is active, the approval banner shows "Restarts on hold" with the reason and a lock icon instead of a button, and `pan restart --now` cannot bypass it. The hold does not block the CLIProxy or Traefik scopes, or the supervisor's own watchdog restart. On release, Overdeck tells you that a reload refused during the hold was not queued, so run `pan reload` again to ship whatever merged while the hold was active.
+
+## After a crash or reboot
+
+A work agent whose pane dies with no recorded stop is resumed automatically, but only when all of the following hold: it was seen dead on two checks at least 45 seconds apart, nobody stopped it on purpose, it is not paused, troubled, or in failure backoff, its issue is open and not merged, auto-resume is not frozen, the dashboard was not started with `--no-resume`, and memory pressure is normal. At most one resume happens every 45 seconds, oldest crash first, with one attempt per crash.
+
+If a resume fails, Needs you reports it and tells you to run `pan resume <id>`. Turn auto-resume off for a boot with `pan up --no-resume` or `pan restart --no-resume`; the emergency-stop freeze also stops it.
+
+Conversations are never auto-resumed. After a terminal-backend restart, Needs you offers to resume the conversations that were running, listed in [Conversations](/features/conversations). After `pan shutdown`, Needs you instead offers to resume the sessions the shutdown drain stopped, described in [Safe shutdown](/features/safe-shutdown).
+
+To resume things by hand, see `pan resume` and `pan recover` in [Agent commands](/cli/agent-commands).
+
+## Backups
+
+Overdeck backs up only the `~/.claude/skills`, `~/.claude/commands` and `~/.claude/agents` folders that `pan sync` writes. **Nothing backs up the Overdeck database or the rest of `~/.overdeck` state.**
+
+`pan sync` makes a backup of those folders first, unless you have turned that off in `~/.overdeck/config.toml`, and keeps a configurable number of the newest backups. You can also trigger a backup without syncing, and manage backups directly:
+
+```bash
+pan sync --backup-only       # back up skills, commands and agents without syncing
+pan backup list              # list available backups
+pan backup clean             # drop old backups, keeping the newest ones
+pan restore                  # pick a backup to restore from, with confirmation
+```
+
+`pan restore` with no timestamp lists the newest backups to choose from, and always asks for confirmation before replacing the target folder.
+
+## Get help
+
+Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file an issue on [GitHub Issues](https://github.com/eltmon/overdeck/issues).
