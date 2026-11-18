@@ -1,0 +1,376 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-18T19:01:20Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5526: pan plan finalize reads a removed consent field (always no auto-start) and promises a deacon promotion recovery that does not exist",
+    "updated": "2026-11-18T19:12:14.137Z"
+  },
+  "plan": {
+    "id": "pan-5526",
+    "title": "pan plan finalize reads a removed consent field (always no auto-start) and promises a deacon promotion recovery that does not exist",
+    "status": "running",
+    "uid": "b8589e03-7c02-4f02-838c-3e1bf7a7776d",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-18T19:01:20Z",
+    "updated": "2026-11-18T19:12:14.137Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5526",
+        "label": "PAN-5526",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5527",
+        "label": "PAN-5527 (owns any pending-promotion marker consumer)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "planning",
+      "cli",
+      "auto-start",
+      "bugfix"
+    ],
+    "narratives": {
+      "Problem": "readAutoSpawnOnFinalize in src/cli/commands/plan-finalize.ts reads the legacy v1 field autoSpawnOnFinalize, but every consent record written today is v2 (status granted|claimed|spent). So pan plan finalize and pan plan done always read false: the activity/TTS line says 'awaiting your approval' for auto-start plans, the deferred/skipped work-start report branches are unreachable, and the pending-promotion marker records autoSpawnRequested:false. The server still auto-starts because resolveAutoSpawnOnFinalize reads the v2 record when autoSpawn is omitted. Separately, when promotion fails finalize prints that 'the deacon will complete promotion automatically', but nothing reads pending-promotion.json since the Cut (PAN-3917) deleted its reconciler, and nothing announces the failure in the activity feed.",
+      "Proposal": "The CLI stops sending autoSpawn (an explicit value makes the server write a new consent generation before its in-flight lease, a renewal race found by the plan critic); the server decides auto-start from the record. Delete readAutoSpawnOnFinalize; finalize awaits readAutoSpawnOnFinalizeFlagAsync only to word its output, and the pre-POST line says 'promoting with auto-start', never 'starting implementation'. Reword both promotion-failure messages to 'Promotion was not confirmed ... run pan plan done <id>' and emit an error activity entry plus TTS on that path. Keep writing the marker unchanged for PAN-5527. Document the manual recovery in features/planning.mdx and docs/XBRIEF.md, and add changelog.d/pan-5526.md. Full detail: .pan/drafts/PAN-5526.md.",
+      "NonGoals": "- No consumer for the pending-promotion marker in deacon-lite, dashboard boot or anywhere else (PAN-5527 owns it)\n- No removal or shape change of the marker, PendingPromotionMarker or PENDING_PROMOTION_FILENAME\n- No behavior change to the complete-planning route, resolveAutoSpawnOnFinalize or src/lib/planning/auto-spawn-consent.ts (one comment edit in planning-promotion.ts only)\n- No renamed JSON output keys for pan plan finalize --json (promotionDeferred and promotionMarkerError stay)\n- No change to promotePlanning retry counts, backoff or the 90 s timeout\n- No separate wording for timeout versus definite failure\n- The CLI must never send autoSpawn, and never claim, spend or rewrite the consent record"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix the misleading promotion-failure message instead of adding a pending-promotion marker consumer",
+        "rationale": "The issue names the message change as the smaller fix and says to pick it unless a reader is trivial. A reader must re-run promotion (PRD gates, git commit and push, tracker transition) and coordinate the auto-start handoff, so it is not trivial; open issue PAN-5527 owns it."
+      },
+      {
+        "summary": "Keep writing pending-promotion.json with its current shape",
+        "rationale": "PAN-5527 may build a consumer for it, and after this fix it records the correct autoSpawnRequested value. Removing it would pre-empt PAN-5527's choice."
+      },
+      {
+        "summary": "Keep the --json output keys promotionDeferred and promotionMarkerError",
+        "rationale": "Only human-readable text was wrong; renaming machine-readable keys is churn for any script consuming them."
+      },
+      {
+        "summary": "Import readAutoSpawnOnFinalizeFlagAsync from auto-spawn-consent.js directly, not the spawn-planning-session.js re-export",
+        "rationale": "The consent module is the owner and is small; the re-export would load the whole planning spawn module into the CLI command."
+      },
+      {
+        "summary": "The CLI never sends autoSpawn in the complete-planning body, deviating from the issue's suggested test that expects autoSpawn:true",
+        "rationale": "The plan critic showed, and code confirms, that an explicit value makes resolveAutoSpawnOnFinalize write a new consent generation before the route's in-flight lease, so a concurrent finalize can leave usable consent after work started. The omitted-key path only reads the record and already auto-starts today, so the issue's goal (honor consent) is met without the race."
+      },
+      {
+        "summary": "Pre-POST activity/TTS for a consent plan says 'promoting with auto-start'; failure emits its own error activity and TTS",
+        "rationale": "The route already announces confirmed success and closes the planning pane right after promotion when auto-start applies, so the CLI cannot reliably announce success afterwards; it must not promise a start it cannot confirm."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Four small items across two CLI files, one comment in planning-promotion.ts, three new unit tests and three doc files.",
+      "canonicalFilename": "2026-11-18-PAN-5526-pan-plan-finalize-reads-a-removed-consent-field-always-no-auto-start-and-promises-a-deacon-promotion-recovery-that-does-not-exist.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "cli-stops-sending-autospawn",
+        "title": "promotePlanning drops its autoSpawn parameter so neither CLI command sends autoSpawn",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T19:01:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5526",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/plan-finalize.ts",
+            "src/cli/commands/plan-done.ts",
+            "tests/unit/cli/plan-finalize-promote-deferred.test.ts",
+            "src/lib/overdeck/planning-promotion.ts",
+            "tests/unit/cli/plan-done-auto-spawn-consent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/plan-done-auto-spawn-consent.test.ts tests/unit/cli/plan-finalize-promote-deferred.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 1 exactly. In src/cli/commands/plan-finalize.ts change the promotePlanning signature to `promotePlanning(issueId: string, opts: { noPrd?: boolean; critic?: boolean } = {})`, delete the `...(autoSpawn ? { autoSpawn: true } : {}),` body line, update the call at the `const promotion = await promotePlanning(` site to `promotePlanning(issueId, { noPrd: options.prd === false, critic: critique.required })`, and reword the comment above PROMOTE_MAX_ATTEMPTS to say the route reads auto-start consent itself. In src/cli/commands/plan-done.ts import only promotePlanning, delete the readAutoSpawnOnFinalize comment and call, call `promotePlanning(issueId, { noPrd: options.prd === false })`, and rewrite header lines 8-11 with the PRD text. In tests/unit/cli/plan-finalize-promote-deferred.test.ts change `promotePlanning('PAN-4155', true)` to `promotePlanning('PAN-4155')` (3 places). In src/lib/overdeck/planning-promotion.ts edit only the comment above `if (bodyAutoSpawn === true)` as the PRD states. Add tests/unit/cli/plan-done-auto-spawn-consent.test.ts per PRD (temp OVERDECK_HOME, OVERDECK_DASHBOARD_URL=http://127.0.0.1:3011, exitCli mocked, fetch stubbed HTTP 200 capturing init.body)."
+        },
+        "items": [
+          {
+            "id": "cli-stops-sending-autospawn.ac1",
+            "title": "Given writeAutoSpawnOnFinalizeFlag('PAN-9999', true), when planDoneCommand('pan-9999') runs, then the captured complete-planning body has no autoSpawn key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-stops-sending-autospawn.ac2",
+            "title": "Given a granted consent record, when planDoneCommand('pan-9999') runs, then the consent file bytes after the run equal the bytes before it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-stops-sending-autospawn.ac3",
+            "title": "Given planDoneCommand('pan-9999', { prd: false }), when it posts, then the body contains noPrd: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-stops-sending-autospawn.ac4",
+            "title": "Given the updated calls promotePlanning('PAN-4155'), when plan-finalize-promote-deferred.test.ts runs, then all three cases pass and npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "finalize-consent-reader",
+        "title": "pan plan finalize words its output from readAutoSpawnOnFinalizeFlagAsync; readAutoSpawnOnFinalize is deleted",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T19:01:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5526",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/plan-finalize.ts",
+            "tests/unit/cli/plan-finalize-auto-spawn-consent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/plan-finalize-auto-spawn-consent.test.ts tests/unit/cli/plan-finalize-jev-review.test.ts",
+            "npm run typecheck",
+            "rg -n 'readAutoSpawnOnFinalize\\b' src tests"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "rg prints no matches"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 2 exactly. Delete `export function readAutoSpawnOnFinalize` and `import { homedir } from 'os';` from src/cli/commands/plan-finalize.ts (keep existsSync/readFileSync/join). Import readAutoSpawnOnFinalizeFlagAsync from '../../lib/planning/auto-spawn-consent.js' and set `const autoSpawnOnFinalize = await readAutoSpawnOnFinalizeFlagAsync(issueId);`. Change the consent branch of the pre-POST emitActivityEntry message to `${issueId} planning finalized — promoting with auto-start` and of emitActivityTts to `${issueId} planning finalized, promoting with auto-start`; leave the non-consent strings unchanged. Add tests/unit/cli/plan-finalize-auto-spawn-consent.test.ts modeled on plan-finalize-jev-review.test.ts plus a plan-critique-io.js mock ({ isPlanFlagged: async () => false, loadCritiqueGateInput: vi.fn() }) and OVERDECK_DASHBOARD_URL=http://127.0.0.1:3011; cover the five PRD cases. Never stub a retryable failure (thrown fetch, 502/503/504) with real timers."
+        },
+        "items": [
+          {
+            "id": "finalize-consent-reader.ac1",
+            "title": "Given a granted v2 record and a complete-planning response with workAgentDeferred:true, when planFinalizeCommand runs, then a console.log line contains 'Work agent start deferred' and emitActivityEntry receives a message containing 'promoting with auto-start'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finalize-consent-reader.ac2",
+            "title": "Given a legacy {\"autoSpawnOnFinalize\":true} record and an HTTP 500 response, when planFinalizeCommand runs, then <workspace>/.overdeck/pending-promotion.json has autoSpawnRequested true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finalize-consent-reader.ac3",
+            "title": "Given a spent record and an HTTP 500 response, when planFinalizeCommand runs, then the marker has autoSpawnRequested false and emitActivityEntry receives a message containing 'awaiting your approval'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finalize-consent-reader.ac4",
+            "title": "Given a granted record, when planFinalizeCommand runs, then no emitActivityEntry message or emitActivityTts utterance contains 'starting implementation' and the consent file bytes are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finalize-consent-reader.ac5",
+            "title": "Given the change is applied, when rg -n 'readAutoSpawnOnFinalize\\b' src tests runs, then it prints no matches and npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "promotion-failure-message",
+        "title": "Unconfirmed promotion prints a pan plan done instruction and emits an error activity entry and TTS",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:01:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5526",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/plan-finalize.ts",
+            "tests/unit/cli/plan-finalize-promotion-failure-message.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/plan-finalize-promotion-failure-message.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "plan-finalize-promotion-failure-message.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 3 exactly. Replace the two console.log strings in the `else if (promotionDeferred)` and final `else` report branches (search `Promotion deferred` and `Promotion failed, and the pending-promotion marker`) with the PRD's 'Promotion was not confirmed ...' strings; keep the dim detail lines, the promotionDeferred variable, the marker write and every --json key. In the `if (!noPromote && !promoted)` marker block, after its try/catch, add the PRD's emitActivityEntry (level 'error', message `${issueId} plan promotion not confirmed — run pan plan done ${issueId} if it did not reach Planned`) and emitActivityTts (utterance `${issueId} plan promotion was not confirmed`, eventType 'planning.promotion-unconfirmed'). Add tests/unit/cli/plan-finalize-promotion-failure-message.test.ts with the item-2 harness and fetch HTTP 500 (not retried); case B creates a directory at <workspace>/.overdeck/pending-promotion.json.tmp so the marker write fails."
+        },
+        "items": [
+          {
+            "id": "promotion-failure-message.ac1",
+            "title": "Given complete-planning returns HTTP 500, when planFinalizeCommand runs, then exitCli receives 1 and a console.log line contains 'Promotion was not confirmed' and 'pan plan done PAN-9999'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "promotion-failure-message.ac2",
+            "title": "Given complete-planning returns HTTP 500, when planFinalizeCommand runs, then no captured output line matches /deacon/i or /automatically once/i",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "promotion-failure-message.ac3",
+            "title": "Given complete-planning returns HTTP 500, when planFinalizeCommand runs, then emitActivityEntry receives level 'error' with 'plan promotion not confirmed' and emitActivityTts receives an utterance containing 'was not confirmed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "promotion-failure-message.ac4",
+            "title": "Given HTTP 500 and a directory at <workspace>/.overdeck/pending-promotion.json.tmp, when planFinalizeCommand runs, then a line contains 'marker could not be written' and 'pan plan done PAN-9999'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-manual-promotion-recovery",
+        "title": "Document that a failed promotion is finished with pan plan done, plus changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:01:20Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5526",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/planning.mdx",
+            "docs/XBRIEF.md",
+            "changelog.d/pan-5526.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'Nothing retries it automatically' features/planning.mdx",
+            "grep -n 'No process reads that marker' docs/XBRIEF.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep prints the new planning.mdx line",
+            "grep prints the new XBRIEF.md line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 4 exactly. Add the paragraph from step 1 to features/planning.mdx under '## Finalize the plan', right after the paragraph that starts '`--no-prd` bypasses the PRD gate'. Append the step 2 text to lifecycle step 3 ('3. **Planning completes**') in docs/XBRIEF.md. Create changelog.d/pan-5526.md with the exact '#### Fixed' entry from step 3. Do not edit .pan/drafts/PAN-5469.md, CLAUDE.md, roles/ or sync-sources/."
+        },
+        "items": [
+          {
+            "id": "docs-manual-promotion-recovery.ac1",
+            "title": "Given features/planning.mdx, when a reader opens '## Finalize the plan', then it renders a paragraph stating 'Nothing retries it automatically' and naming `pan plan done <id>`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-manual-promotion-recovery.ac2",
+            "title": "Given docs/XBRIEF.md, when a reader opens lifecycle step 3, then it renders 'No process reads that marker' and states that neither CLI command sends autoSpawn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-manual-promotion-recovery.ac3",
+            "title": "Given changelog.d/pan-5526.md with one '#### Fixed' bullet linking #5526, when npm run lint:docs runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "cli-stops-sending-autospawn",
+        "to": "finalize-consent-reader",
+        "type": "blocks"
+      },
+      {
+        "from": "finalize-consent-reader",
+        "to": "promotion-failure-message",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -1,7 +1,6 @@
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
-import { homedir } from 'os';
 import { dirname, join, resolve } from 'path';
 import { findPlanSync, findWorkspaceDraftPlanSync, readPlanSync, serializeXBriefDocument } from '../../lib/xbrief/io.js';
 import { generateXBriefFilename, slugify } from '../../lib/xbrief/lifecycle.js';
@@ -21,6 +20,7 @@ import { isPlanFlagged, loadCritiqueGateInput } from '../../lib/planning/plan-cr
 import { resolvePlanCritic } from '../../lib/planning/plan-critic-model.js';
 import { dispatchPlanCritic } from '../../lib/planning/plan-critic-dispatch.js';
 import { reviewAcceptanceCriteria } from '../../lib/jev/acceptance-criteria.js';
+import { readAutoSpawnOnFinalizeFlagAsync } from '../../lib/planning/auto-spawn-consent.js';
 
 interface PlanFinalizeOptions {
   workspace?: string;
@@ -146,18 +146,6 @@ function findWorkspaceRoot(start: string): string | null {
     const parent = dirname(dir);
     if (parent === dir) return null;
     dir = parent;
-  }
-}
-
-export function readAutoSpawnOnFinalize(issueId: string): boolean {
-  const overdeckHome = process.env.OVERDECK_HOME ?? join(homedir(), '.overdeck');
-  const flagFile = join(overdeckHome, 'agents', `planning-${issueId.toLowerCase()}`, 'auto-spawn-on-finalize.json');
-  try {
-    if (!existsSync(flagFile)) return false;
-    const flag = JSON.parse(readFileSync(flagFile, 'utf-8')) as { autoSpawnOnFinalize?: unknown };
-    return flag.autoSpawnOnFinalize === true;
-  } catch {
-    return false;
   }
 }
 
@@ -373,7 +361,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   const critique = await runCritiqueStep({ issueId, workspacePath, doc: planDoc, forced: options.critic === true, json: options.json === true });
   if (!critique.proceed) return;
 
-  const autoSpawnOnFinalize = readAutoSpawnOnFinalize(issueId);
+  const autoSpawnOnFinalize = await readAutoSpawnOnFinalizeFlagAsync(issueId);
 
   // Stamp the proposed status, canonical filename, and automatic/manual
   // promotion intent onto the xBRIEF. Atomic temp+rename.
@@ -388,13 +376,13 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     source: 'plan',
     level: 'info',
     message: autoSpawnOnFinalize
-      ? `${issueId} planned — starting implementation`
+      ? `${issueId} planning finalized — promoting with auto-start`
       : `${issueId} planning finalized — awaiting your approval`,
     issueId,
   });
   emitActivityTts({
     utterance: autoSpawnOnFinalize
-      ? `${issueId} planned, starting implementation`
+      ? `${issueId} planning finalized, promoting with auto-start`
       : `${issueId} planning is done, awaiting your approval`,
     priority: 1,
     issueId,
@@ -417,7 +405,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   const noPromote = options.promote === false;
   if (!noPromote) {
     emitAutoPromotePhase(issueId, 'completePlanning', 'start', autoSpawnOnFinalize ? 'posting complete-planning autoSpawn request' : 'posting complete-planning request');
-    const promotion = await promotePlanning(issueId, autoSpawnOnFinalize, { noPrd: options.prd === false, critic: critique.required });
+    const promotion = await promotePlanning(issueId, { noPrd: options.prd === false, critic: critique.required });
     promoted = promotion.success;
     promoteMessage = promotion.message;
     promoteError = promotion.error;
@@ -454,6 +442,20 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     } catch (error) {
       promotionMarkerError = error instanceof Error ? error.message : String(error);
     }
+
+    emitActivityEntry({
+      source: 'plan',
+      level: 'error',
+      message: `${issueId} plan promotion not confirmed — run pan plan done ${issueId} if it did not reach Planned`,
+      issueId,
+    });
+    emitActivityTts({
+      utterance: `${issueId} plan promotion was not confirmed`,
+      priority: 1,
+      issueId,
+      source: 'planning-agent',
+      eventType: 'planning.promotion-unconfirmed',
+    });
   }
 
   emitAutoPromotePhase(issueId, 'terminal', promoted || noPromote ? 'success' : 'failure', promoted ? 'planning promoted' : noPromote ? 'promotion skipped' : (promoteError ?? 'promotion failed'), {
@@ -507,10 +509,10 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
         console.log(chalk.dim('Run `pan start ' + issueId + '` or click Start Agent to begin implementation.'));
       }
     } else if (promotionDeferred) {
-      console.log(chalk.yellow('⚠ Promotion deferred — the dashboard did not complete promotion. A pending-promotion marker was written; the deacon will complete promotion automatically once the dashboard is healthy. Manual fallback: pan plan done ' + issueId + '.'));
+      console.log(chalk.yellow('⚠ Promotion was not confirmed. Nothing retries it automatically. Once the dashboard is healthy, check whether ' + issueId + ' reached Planned; if it did not, run `pan plan done ' + issueId + '`.'));
       if (promoteError) console.log(chalk.dim('  ' + promoteError));
     } else {
-      console.log(chalk.red('✗ Promotion failed, and the pending-promotion marker could not be written. Automatic recovery is unavailable. Manual fallback: pan plan done ' + issueId + '.'));
+      console.log(chalk.red('✗ Promotion was not confirmed, and the pending-promotion marker could not be written. Nothing retries it automatically. Once the dashboard is healthy, check whether ' + issueId + ' reached Planned; if it did not, run `pan plan done ' + issueId + '`.'));
       if (promoteError) console.log(chalk.dim('  Promotion error: ' + promoteError));
       if (promotionMarkerError) console.log(chalk.dim('  Marker error: ' + promotionMarkerError));
     }
@@ -529,9 +531,11 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
  * tmux session still see this response.
  */
 // PAN-1972: the complete-planning POST carries the whole finalize handoff —
-// promote spec, commit, transition, AND the `--auto-start` stamp. If it lands
-// while the dashboard is momentarily down (e.g. mid-restart), a single fetch
-// fails and the work agent never auto-starts. Retry with exponential backoff.
+// promote spec, commit, and transition. The route reads the auto-start
+// consent record itself (PAN-5526), so a retry still auto-starts. If it
+// lands while the dashboard is momentarily down (e.g. mid-restart), a single
+// fetch fails and the work agent never auto-starts. Retry with exponential
+// backoff.
 const PROMOTE_MAX_ATTEMPTS = 5;
 const PROMOTE_BASE_DELAY_MS = 1_000;
 // Retry only on transient gateway/unavailable statuses (dashboard up but not
@@ -548,7 +552,7 @@ const promoteFailure = (error: string): PromotePlanningResult => ({
   workAgentSpawned: false, workAgentMessage: null, workAgentError: null, workAgentSkipReason: null,
 });
 
-export async function promotePlanning(issueId: string, autoSpawn = false, opts: { noPrd?: boolean; critic?: boolean } = {}): Promise<PromotePlanningResult> {
+export async function promotePlanning(issueId: string, opts: { noPrd?: boolean; critic?: boolean } = {}): Promise<PromotePlanningResult> {
   const url = `${getDashboardApiUrl()}/api/issues/${issueId}/complete-planning`;
   let lastError = 'complete-planning failed';
 
@@ -563,7 +567,6 @@ export async function promotePlanning(issueId: string, autoSpawn = false, opts: 
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Origin: getDashboardApiUrl() },
           body: JSON.stringify({
-            ...(autoSpawn ? { autoSpawn: true } : {}),
             ...(opts.noPrd ? { noPrd: true } : {}),
             ...(opts.critic ? { critic: true } : {}),
           }),

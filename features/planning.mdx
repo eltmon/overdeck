@@ -196,6 +196,8 @@ Finalize runs the PRD-first gate, then the xBRIEF quality lint, then the plan cr
 
 `--no-prd` bypasses the PRD gate and prints a warning. `--no-promote` stops after marking the plan `proposed`; promote it later with `pan plan done <id>` or the dashboard's `Done` button.
 
+If promotion is not confirmed (exit code `1`), for example because the dashboard was down or did not answer within 90 seconds, finalize tries to record a pending-promotion marker in the workspace and stops. Nothing retries it automatically. Once the dashboard is healthy, check whether the issue reached Planned; if it did not, run `pan plan done <id>`. The dashboard reads the plan's auto-start consent itself, so a plan that began with auto-start still starts work after `pan plan done`.
+
 After promotion, whether a work agent starts depends on how planning began. By default the issue waits in Planned with a `Start work` action. Work starts automatically when planning began with the Plan dialog's `Start work as soon as the plan is ready` checkbox checked, or when `pan start <id>` itself triggered the planning.
 
 ## The plan critic

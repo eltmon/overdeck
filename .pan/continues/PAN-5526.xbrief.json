@@ -1,0 +1,101 @@
+{
+  "version": "1",
+  "issueId": "PAN-5526",
+  "created": "2026-11-18T19:12:30.887Z",
+  "updated": "2026-11-18T19:32:06.394Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "cli-stops-sending-autospawn": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5526",
+      "claimedAt": "2026-11-18T19:12:30.887Z",
+      "doneAt": "2026-11-18T19:19:30.590Z"
+    },
+    "cli-stops-sending-autospawn.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:19:30.590Z"
+    },
+    "cli-stops-sending-autospawn.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:19:30.590Z"
+    },
+    "cli-stops-sending-autospawn.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:19:30.590Z"
+    },
+    "cli-stops-sending-autospawn.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:19:30.590Z"
+    },
+    "finalize-consent-reader": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5526",
+      "claimedAt": "2026-11-18T19:19:37.628Z",
+      "doneAt": "2026-11-18T19:26:14.434Z"
+    },
+    "finalize-consent-reader.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:26:14.434Z"
+    },
+    "finalize-consent-reader.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:26:14.434Z"
+    },
+    "finalize-consent-reader.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:26:14.434Z"
+    },
+    "finalize-consent-reader.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:26:14.434Z"
+    },
+    "finalize-consent-reader.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:26:14.434Z"
+    },
+    "promotion-failure-message": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5526",
+      "claimedAt": "2026-11-18T19:26:22.853Z",
+      "doneAt": "2026-11-18T19:30:54.873Z"
+    },
+    "promotion-failure-message.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:30:54.873Z"
+    },
+    "promotion-failure-message.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:30:54.873Z"
+    },
+    "promotion-failure-message.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:30:54.873Z"
+    },
+    "promotion-failure-message.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:30:54.873Z"
+    },
+    "docs-manual-promotion-recovery": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5526",
+      "claimedAt": "2026-11-18T19:31:01.586Z",
+      "doneAt": "2026-11-18T19:32:06.394Z"
+    },
+    "docs-manual-promotion-recovery.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:32:06.394Z"
+    },
+    "docs-manual-promotion-recovery.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:32:06.394Z"
+    },
+    "docs-manual-promotion-recovery.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:32:06.394Z"
+    }
+  }
+}
