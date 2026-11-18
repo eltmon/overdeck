@@ -318,8 +318,9 @@ describe('completePlanningForIssue status event (PAN-3338)', () => {
 
       expect(response.status).toBe(200);
       const entries = readPipelineJournal(workspacePath).filter((entry) => entry.type.startsWith('handoff.'));
-      expect(entries).toHaveLength(1);
-      expect(entries[0]).toMatchObject({
+      // PAN-5498: the request is journaled before the POST, then the outcome.
+      expect(entries.map((entry) => entry.type)).toEqual(['handoff.requested', 'handoff.started']);
+      expect(entries[1]).toMatchObject({
         type: 'handoff.started',
         issueId: 'PAN-3230',
         source: 'complete-planning',
@@ -327,7 +328,74 @@ describe('completePlanningForIssue status event (PAN-3338)', () => {
       });
       // PAN-4399 review fix: requestedAt is stamped before the spawn POST,
       // so deriveWorkStart can tell a real start apart from a never-started one.
-      expect(typeof entries[0]!.data!['requestedAt']).toBe('string');
+      expect(typeof entries[1]!.data!['requestedAt']).toBe('string');
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  // PAN-5498 (PAN-5469): the spawn request ran a slow stack rebuild, and the
+  // dashboard restarted before it answered. The request must already be in
+  // the journal, as a pending entry deacon-lite resumes.
+  it('journals handoff.requested before the spawn POST, so a request that never answers stays resumable', async () => {
+    const { workspacePath } = createWorkspace();
+    testState.sessionAlive = true;
+    const originalFetch = global.fetch;
+    let requestSent!: () => void;
+    const sent = new Promise<void>((resolve) => { requestSent = resolve; });
+    let dropRequest!: (error: Error) => void;
+    global.fetch = vi.fn(() => {
+      requestSent();
+      return new Promise<Response>((_resolve, reject) => { dropRequest = reject; });
+    }) as unknown as typeof fetch;
+    let completion: Promise<unknown> | undefined;
+    try {
+      const deps = serviceDependencies();
+      deps.body = { noPrd: false, skipKill: false, autoSpawn: true };
+
+      completion = completePlanningForIssue(deps);
+      // Fail at once, with the outcome, if finalize settles without sending the POST.
+      const early = await Promise.race([
+        sent.then(() => null),
+        completion.then(
+          (response) => ({ settled: 'resolved', response }),
+          (error: unknown) => ({ settled: 'rejected', error: String(error) }),
+        ),
+      ]);
+      expect(early).toBeNull();
+
+      const entries = readPipelineJournal(workspacePath).filter((entry) => entry.type.startsWith('handoff.'));
+      expect(entries).toHaveLength(1);
+      expect(entries[0]).toMatchObject({
+        type: 'handoff.requested',
+        issueId: 'PAN-3230',
+        source: 'complete-planning',
+        data: { attempt: 0, reason: 'interrupted' },
+      });
+      const data = entries[0]!.data as { deferredAt: string; nextRetryAt: string };
+      expect(Date.parse(data.nextRetryAt) - Date.parse(data.deferredAt)).toBe(10 * 60_000);
+    } finally {
+      // Settle the request so the finalize lease is released for later tests.
+      dropRequest?.(new Error('dashboard restarted'));
+      await completion?.catch(() => undefined);
+      global.fetch = originalFetch;
+    }
+  });
+
+  it('closes the journaled request when the spawn fails in a way no wait fixes', async () => {
+    const { workspacePath } = createWorkspace();
+    testState.sessionAlive = true;
+    const originalFetch = global.fetch;
+    global.fetch = vi.fn(async () => new Response(JSON.stringify({ success: false, error: 'boom' }), { status: 500 })) as unknown as typeof fetch;
+    try {
+      const deps = serviceDependencies();
+      deps.body = { noPrd: false, skipKill: false, autoSpawn: true };
+
+      await completePlanningForIssue(deps);
+
+      const entries = readPipelineJournal(workspacePath).filter((entry) => entry.type.startsWith('handoff.'));
+      expect(entries.map((entry) => entry.type)).toEqual(['handoff.requested', 'handoff.abandoned']);
+      expect(entries[1]).toMatchObject({ data: { outcome: 'failed', skipReason: 'spawn-failed', error: 'boom' } });
     } finally {
       global.fetch = originalFetch;
     }

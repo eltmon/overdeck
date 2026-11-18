@@ -129,6 +129,10 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   // OpenAI — prices per developers.openai.com/api/docs/pricing (May 2026);
   // gpt-6-astra per developers.openai.com/api/docs/models/gpt-6-astra (Sept 2026)
   { provider: 'openai', model: 'gpt-6-astra', inputPer1k: 0.010, outputPer1k: 0.050, cacheReadPer1k: 0.001, currency: 'USD' },
+  // gpt-6.2-astra / gpt-6.2-sol per developers.openai.com/api/docs/pricing (checked 2026-11-18).
+  // Their >272K tier (astra $16/$0.80/$60, sol $4/$0.20/$15) is not modeled, same as the GPT-5.6/6 rows.
+  { provider: 'openai', model: 'gpt-6.2-astra', inputPer1k: 0.008, outputPer1k: 0.040, cacheReadPer1k: 0.0004, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-6.2-sol', inputPer1k: 0.002, outputPer1k: 0.010, cacheReadPer1k: 0.0001, currency: 'USD' },
   // gpt-6.1-sol per developers.openai.com/api/docs/models/gpt-6.1-sol (2026-09-29)
   { provider: 'openai', model: 'gpt-6.1-sol', inputPer1k: 0.002, outputPer1k: 0.010, cacheReadPer1k: 0.0001, currency: 'USD' },
   // gpt-6.1-terra per developers.openai.com/api/docs/models/gpt-6.1-terra (2026-10-26)

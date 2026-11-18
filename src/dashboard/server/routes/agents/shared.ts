@@ -14,6 +14,7 @@ import { jsonResponse } from '../../http-helpers.js';
 import { getHeaderFromMap } from '../origin-validation.js';
 import { getOverdeckHome } from '../../../../lib/paths.js';
 import { normalizeModelOverride } from '../../../../lib/model-validation.js';
+import { buildHostOverrideConfirmation } from '../../../../lib/agents/host-override.js';
 import { claudeSessionTranscriptExists } from '../../../../lib/runtimes/storage/claude-code.js';
 import { resolvePrimaryWorkspaceRepoDir } from '../../../../lib/project-repos.js';
 import {
@@ -447,10 +448,6 @@ async function captureAgentOutputBeforeKill(agentId: string): Promise<void> {
   const agentDir = getAgentDir(agentId);
   await mkdir(agentDir, { recursive: true });
   await writeFile(join(agentDir, 'output.log'), output);
-}
-
-function buildHostOverrideConfirmation(issueId: string): string {
-  return `I understand this bypasses workspace isolation for ${issueId.toUpperCase()}`;
 }
 
 function getProjectPath(linearProjectId?: string, issuePrefix?: string): string {

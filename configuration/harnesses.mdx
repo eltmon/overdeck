@@ -123,7 +123,7 @@ A steer never falls back silently to a queued message. A harness without steer a
   long-research sessions that accept the surcharge; the `[372k]` suffix is
   Overdeck-side only and is stripped before the model id reaches the API.
   The GPT-6 models (`gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna`, `gpt-6.1-sol`,
-  `gpt-6.1-terra`, `gpt-6-rosalind`, `gpt-6-astra-law`) have no
+  `gpt-6.1-terra`, `gpt-6.2-astra`, `gpt-6.2-sol`, `gpt-6-rosalind`, `gpt-6-astra-law`) have no
   `[372k]` variant — the 372K pin was measured on `gpt-5.6-sol` and has not been
   re-measured for GPT-6.
   The maximum tells Claude Code the route's capacity; the auto-compact window is
@@ -301,8 +301,10 @@ pi (the Pi Coding Agent, `@earendil-works/pi-coding-agent`, binary `pi`) is
 the built-in default harness for every provider that is neither Anthropic nor
 OpenAI: Google, xAI, MiniMax, Z.AI, MiMo, OpenRouter, Nous, DashScope, Groq,
 Cerebras and Mistral. Anthropic models default to `claude-code`, OpenAI models
-to `codex`, and Kimi models to `kimi-code`. An explicit
-`providerHarnesses.<provider>` or role `harness` setting always wins.
+to `codex`, and Kimi models to `kimi-code`. A provider's Default harness in
+Settings → Providers (`models.providers.<provider>.harness`) overrides that
+built-in default, and an explicit `--harness` or picker choice overrides
+both. See [Model routing](/configuration/model-routing#which-harness-runs-a-model).
 
 pi is oh-my-pi's upstream, so Overdeck drives both the same way: RPC mode
 (`pi --mode rpc`) over the `rpc.in` named pipe for work agents, the TUI for
@@ -345,7 +347,7 @@ Stored conversations with `harness: pi` read as pi. They all predate the
 
 ### OpenAI Codex CLI (alternative)
 
-- First-party OpenAI agent loop for the GPT model family (GPT-6 Astra/Sol/Luna, GPT-6 Rosalind, GPT-6 Astra for Law,
+- First-party OpenAI agent loop for the GPT model family (GPT-6.2 Astra/Sol, GPT-6 Astra/Sol/Luna, GPT-6 Rosalind, GPT-6 Astra for Law,
   GPT-6.1 Sol/Terra, GPT-5.6 Sol/Terra/Luna, GPT-5.5, GPT-5.4, GPT-5.3-Codex, …) with
   ChatGPT-subscription or API-key auth.
 - `gpt-5.6-sol` is the default OpenAI model surfaced by this harness. `gpt-6-astra`
@@ -360,6 +362,7 @@ Stored conversations with `harness: pi` read as pi. They all predate the
   sign-in it needs Codex CLI `0.159.0` or newer.
   `gpt-6.1-terra` (October 26, 2026) is the GPT-6.1 workhorse tier below GPT-6.1 Sol, at
   &#36;1/M input, &#36;0.05/M cached input and &#36;5/M output; it is opt-in. Under ChatGPT sign-in it also needs Codex CLI `0.159.0` or newer.
+  `gpt-6.2-astra` and `gpt-6.2-sol` (November 2026) are the GPT-6.2 successors to GPT-6 Astra and GPT-6.1 Sol. `gpt-6.2-astra` costs &#36;8/M input, &#36;0.40/M cached input and &#36;40/M output; `gpt-6.2-sol` costs &#36;2/M input, &#36;0.10/M cached input and &#36;10/M output. Input over 272K bills more (astra &#36;16/&#36;0.80/&#36;60, sol &#36;4/&#36;0.20/&#36;15), so both are pinned to the 272K window like the rest of GPT-6. Both are opt-in. Under ChatGPT sign-in they need Codex CLI `0.170.0` or newer, the first version verified to list them.
   `gpt-6-rosalind` (October 30, 2026, life sciences) costs &#36;15/M input, &#36;1.50/M cached input and &#36;75/M output, and its API access is limited to OpenAI's trusted-access program. `gpt-6-astra-law` (the legal configuration of GPT-6 Astra) costs &#36;10/M input, &#36;1/M cached input and &#36;50/M output at a promotional price through at least December 31, 2026. Both are opt-in and run on the Codex harness only. Neither appears in the Codex `0.159.0` ChatGPT sign-in catalog, so Overdeck sets no Codex floor for them.
   `gpt-6-astra` and API-key auth have no floor. Overdeck refuses such a
   launch before it starts (`pan start`, the dashboard, conversations, and
@@ -368,7 +371,7 @@ Stored conversations with `harness: pi` read as pi. They all predate the
   `pan install` does not manage the Codex CLI. `pan doctor` shows a
   `Codex model floor` row per model. On the claude-code harness through
   CLIProxy, CLIProxy `7.3.16` (the pin until [PAN-5282](https://github.com/eltmon/overdeck/issues/5282) moved it to `v8.0.71`) was verified
-  on 2026-09-29 to serve `gpt-6-sol`, `gpt-6-luna` and `gpt-6.1-sol` under ChatGPT sign-in. The same version served `gpt-6.1-terra` on the claude-code harness on 2026-11-11 ([PAN-4634](https://github.com/eltmon/overdeck/issues/4634)); on 2026-10-26 it did not. CLIProxy refreshes its model list from a remote catalog every three hours, so which models it serves can change without a version change. It does not list `gpt-6-rosalind` or `gpt-6-astra-law`; use those on the Codex harness.
+  on 2026-09-29 to serve `gpt-6-sol`, `gpt-6-luna` and `gpt-6.1-sol` under ChatGPT sign-in. The same version served `gpt-6.1-terra` on the claude-code harness on 2026-11-11 ([PAN-4634](https://github.com/eltmon/overdeck/issues/4634)); on 2026-10-26 it did not. CLIProxy refreshes its model list from a remote catalog every three hours, so which models it serves can change without a version change. CLIProxy `v8.0.71` listed and served `gpt-6.2-astra` and `gpt-6.2-sol` under ChatGPT sign-in on 2026-11-18 ([PAN-5522](https://github.com/eltmon/overdeck/issues/5522)). It does not list `gpt-6-rosalind` or `gpt-6-astra-law`; use those on the Codex harness.
 - Work agents use a persistent `codex app-server` child by default. Overdeck
   talks newline-delimited JSON-RPC over stdio, so message delivery, approvals,
   readiness, and interruption are structured protocol events rather than TUI
@@ -1048,11 +1051,13 @@ looks wrong, report the case and continue in the fresh fallback session.
 
 ### Role runs (plan / work / review / test / ship)
 
-Pipeline-spawned roles do **not** prompt at runtime. They read per-role
-harness + model defaults from the dashboard Settings page. A `harness` selector
-sits next to each role's model dropdown to mix and match. Sub-roles such as
-`review.security` inherit from the parent role unless configured more
-specifically.
+Pipeline-spawned roles do **not** prompt at runtime. Each role's model comes
+from Settings → Model Routing. Its harness comes from the model's provider
+default in Settings → Providers, not from a per-role setting, unless an
+explicit `--harness` pick overrides it. Review lanes have their own model
+settings and use the review model only when a lane is set to `parent`. See
+[Model routing](/configuration/model-routing) for how the model and harness
+are each resolved.
 
 <ThemedImage
   light="/images/dashboard/settings-light.png"
@@ -1061,9 +1066,8 @@ specifically.
 />
 
 The Settings page is also where you wire up tracker API keys and project
-configuration, so harness routing for autonomous role runs lives alongside the
-rest of the orchestrator's defaults — set the harness once per role here and
-every pipeline spawn for that role inherits it.
+configuration, so model and harness routing for autonomous role runs lives
+alongside the rest of the orchestrator's defaults.
 
 ## Use Overdeck workers instead of harness plugins
 

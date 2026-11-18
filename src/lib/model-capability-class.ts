@@ -21,6 +21,8 @@ export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityCl
   'claude-opus-4-6': 'frontier',
   'muse-wonder-1.0': 'frontier',
   'muse-wonder-full-1.0': 'frontier',
+  'gpt-6.2-astra': 'frontier',
+  'gpt-6.2-sol': 'frontier',
   'gpt-6-astra': 'frontier',
   'gpt-6-sol': 'frontier',
   'gpt-6.1-sol': 'frontier',

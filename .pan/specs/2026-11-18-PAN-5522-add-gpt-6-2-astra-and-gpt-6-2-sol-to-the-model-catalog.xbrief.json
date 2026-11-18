@@ -1,0 +1,348 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-18T16:10:06Z",
+    "author": "overdeck/0.89.0",
+    "description": "Plan for PAN-5522: Add GPT-6.2 Astra and GPT-6.2 Sol to the model catalog",
+    "updated": "2026-11-18T16:10:47.442Z"
+  },
+  "plan": {
+    "id": "pan-5522",
+    "title": "Add GPT-6.2 Astra and GPT-6.2 Sol to the model catalog",
+    "status": "proposed",
+    "uid": "378aec29-2d10-4f36-8ccf-ef328b25c0ae",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-18T16:10:06Z",
+    "updated": "2026-11-18T16:10:47.442Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5522",
+        "label": "PAN-5522",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/pull/5530",
+        "label": "PR #5530",
+        "type": "pull_request"
+      }
+    ],
+    "tags": [
+      "models",
+      "openai",
+      "catalog",
+      "retroactive-plan"
+    ],
+    "narratives": {
+      "Problem": "OpenAI released GPT-6.2 Astra and GPT-6.2 Sol. Overdeck could not pick, route or price them.",
+      "Proposal": "Retroactive plan for work already in PR #5530, built by a supervised handoff. Mirror PAN-4633 and PAN-4634: add both ids at every site that lists GPT-6.x models, pin both to the 272K billing tier, price them from the 2026-11-18 pricing page, set the Codex floor to 0.170.0, add them to the CLIProxy 272K pin set after a live probe, and document them.",
+      "NonGoals": "- No change to any default model, role routing or the openai-to-codex harness routing\n- No [372k] long-context variant for either model\n- No gpt-reserve entry (no published price)\n- No modeling of the >272K long-context price tier in cost rows\n- No maxOutputTokens for either model (not published)"
+    },
+    "autoDecisions": [],
+    "items": [
+      {
+        "id": "catalog-entries",
+        "title": "Register gpt-6.2-astra and gpt-6.2-sol in the capability, class, fallback, provider and settings tables",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T16:10:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5522",
+          "files_scope": [
+            "src/lib/model-capability-additions.ts",
+            "src/lib/model-capability-class.ts",
+            "src/lib/model-fallback.ts",
+            "src/lib/providers.ts",
+            "src/lib/settings.ts",
+            "src/lib/settings-model-catalog.ts",
+            "src/dashboard/server/routes/settings.ts",
+            "src/lib/__tests__/model-capabilities.test.ts",
+            "src/lib/__tests__/model-catalog-audit.test.ts",
+            "src/lib/__tests__/settings-model-catalog.test.ts",
+            "tests/lib/model-fallback.test.ts",
+            "tests/lib/settings.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-capabilities.test.ts src/lib/__tests__/model-catalog-audit.test.ts src/lib/__tests__/settings-model-catalog.test.ts tests/lib/model-fallback.test.ts tests/lib/settings.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the five test files pass"
+          ],
+          "readiness": "ready",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Add capability entries for both models (contextWindow CLIPROXY_GPT56_CONTEXT_WINDOW, efforts low through max, astra inherits gpt-6-astra skills, sol inherits gpt-6.1-sol skills, costPer1MTokens 24 and 6), class frontier, fallback to claude-sonnet-5-5, tier rank 3 and 2, the openai provider and settings lists, the settings catalog order with 6.2 first, and MODEL_API_IDS."
+        },
+        "items": [
+          {
+            "id": "catalog-entries.ac1",
+            "title": "Given MODEL_CAPABILITIES, when gpt-6.2-astra and gpt-6.2-sol are read, then each has the openai provider, contextWindow 272000, effort levels low/medium/high/xhigh/max and capability class frontier, as model-capabilities.test.ts asserts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "catalog-entries.ac2",
+            "title": "Given the settings model catalog API, when it lists OpenAI models, then gpt-6.2-astra and gpt-6.2-sol are the first two entries, as settings-model-catalog.test.ts asserts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cost-rows",
+        "title": "Price gpt-6.2-astra and gpt-6.2-sol from the 2026-11-18 OpenAI pricing page",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T16:10:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5522",
+          "files_scope": [
+            "src/lib/cost.ts",
+            "tests/lib/cost.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cost.test.ts"
+          ],
+          "expected_outputs": [
+            "cost.test.ts passes"
+          ],
+          "readiness": "ready",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Add DEFAULT_PRICING rows: gpt-6.2-astra $0.008/$0.0004/$0.040 per 1K input/cached/output and gpt-6.2-sol $0.002/$0.0001/$0.010, citing developers.openai.com/api/docs/pricing (checked 2026-11-18)."
+        },
+        "items": [
+          {
+            "id": "cost-rows.ac1",
+            "title": "Given getPricing, when called for openai gpt-6.2-astra and gpt-6.2-sol, then it returns the row for that exact model with the published input, cached and output prices, as cost.test.ts asserts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-rows.ac2",
+            "title": "Given src/lib/cost.ts, when read, then the 6.2 rows cite developers.openai.com/api/docs/pricing (checked 2026-11-18) and state that the price tier above 272K is not modeled.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-floor",
+        "title": "Set the Codex ChatGPT sign-in floor for both models to 0.170.0",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T16:10:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5522",
+          "files_scope": [
+            "src/lib/codex/model-floors.ts",
+            "src/lib/__tests__/harness-policy.test.ts",
+            "src/lib/codex/__tests__/app-server-manager.test.ts",
+            "src/lib/runtimes/__tests__/codex.test.ts",
+            "tests/unit/cli/doctor-codex-models.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/harness-policy.test.ts src/lib/codex/__tests__/app-server-manager.test.ts src/lib/runtimes/__tests__/codex.test.ts tests/unit/cli/doctor-codex-models.test.ts"
+          ],
+          "expected_outputs": [
+            "the four test files pass"
+          ],
+          "readiness": "ready",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Add gpt-6.2-astra and gpt-6.2-sol to CODEX_MODEL_MINIMUM_VERSIONS at 0.170.0, the version verified to list both."
+        },
+        "items": [
+          {
+            "id": "codex-floor.ac1",
+            "title": "Given a ChatGPT sign-in and Codex CLI 0.169.0, when canUseHarness checks either 6.2 model on the codex harness, then it refuses and names 0.170.0; at 0.170.0 or with api-key auth it allows the launch, as harness-policy.test.ts asserts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-floor.ac2",
+            "title": "Given pan doctor, when checkCodexModelFloors runs, then it returns six floor rows including both 6.2 models, as doctor-codex-models.test.ts asserts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cliproxy-route",
+        "title": "Pin both models to 272K on the claude-code CLIProxy route",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T16:10:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5522",
+          "files_scope": [
+            "src/lib/agents/provider-env.ts",
+            "src/lib/cliproxy.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/model-capabilities.test.ts"
+          ],
+          "expected_outputs": [
+            "model-capabilities.test.ts passes"
+          ],
+          "readiness": "ready",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Add both models to GPT_56_MODELS and record the 2026-11-18 probe: CLIProxy v8.0.71 listed both in GET /v1/models and returned a completion for each through POST /v1/messages."
+        },
+        "items": [
+          {
+            "id": "cliproxy-route.ac1",
+            "title": "Given getClaudeCodeContextPolicyForModel, when called for gpt-6.2-astra or gpt-6.2-sol, then it exports the same 272K window as the capability table, as the model-capabilities.test.ts harness-env case asserts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cliproxy-route.ac2",
+            "title": "Given src/lib/cliproxy.ts, when read, then a comment records the 2026-11-18 probe of v8.0.71 (both models listed and served), and CLIPROXY_RELEASE_VERSION stays v8.0.71.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-lists",
+        "title": "Show both models in the Settings catalog, model picker and friendly names",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T16:10:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5522",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
+            "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+            "src/dashboard/frontend/src/lib/dashboard-utils.ts",
+            "src/dashboard/frontend/src/lib/__tests__/dashboard-utils.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/dashboard-utils.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "dashboard-utils.test.ts passes"
+          ],
+          "readiness": "ready",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Add both models at the top of the frontend MODELS_BY_PROVIDER openai list and the ModelPicker fallback group, and map them in getFriendlyModelName."
+        },
+        "items": [
+          {
+            "id": "frontend-lists.ac1",
+            "title": "Given getFriendlyModelName, when called with gpt-6.2-astra or gpt-6.2-sol, then it returns GPT-6.2 Astra or GPT-6.2 Sol, as dashboard-utils.test.ts asserts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-lists.ac2",
+            "title": "Given the frontend MODELS_BY_PROVIDER openai list and the ModelPicker OpenAI fallback group, when read, then both list gpt-6.2-astra and gpt-6.2-sol first, with costPer1MTokens 24 and 6.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-changelog",
+        "title": "Document both models and add the changelog entry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T16:10:06Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5522",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "docs/MODEL-CONTEXT-AUDIT.md",
+            "changelog.d/pan-5522.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "docs lint passes"
+          ],
+          "readiness": "ready",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Document prices, the 272K pin, the 0.170.0 Codex floor and the CLIProxy probe in configuration/harnesses.mdx and docs/MODEL-CONTEXT-AUDIT.md, and add changelog.d/pan-5522.md under New."
+        },
+        "items": [
+          {
+            "id": "docs-changelog.ac1",
+            "title": "Given configuration/harnesses.mdx, when read, then it names gpt-6.2-astra and gpt-6.2-sol with their prices, the 0.170.0 Codex floor and the 2026-11-18 CLIProxy probe.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac2",
+            "title": "Given changelog.d/pan-5522.md, when npm run lint:docs runs, then it passes with one New bullet for the two models.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "sizeJustification": "Adding a model id is one inseparable change: the same id must land in every catalog, routing, pricing, floor, frontend and docs list at once, or the model is half-registered (pickable but unpriced, or priced but unroutable). The diff is about 150 lines spread thinly across those lists, mirroring PAN-4633 (29 files).",
+      "canonicalFilename": "2026-11-18-PAN-5522-add-gpt-6-2-astra-and-gpt-6-2-sol-to-the-model-catalog.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}

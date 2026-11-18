@@ -281,6 +281,8 @@ describe('settings', () => {
         'gpt-6.1-terra',
         'gpt-6-rosalind',
         'gpt-6-astra-law',
+        'gpt-6.2-astra',
+        'gpt-6.2-sol',
       ]);
     });
 
