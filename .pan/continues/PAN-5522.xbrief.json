@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5522",
   "created": "2026-11-18T16:10:47.412Z",
-  "updated": "2026-11-18T16:12:51.812Z",
+  "updated": "2026-11-18T16:13:14.484Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -71,6 +71,18 @@
     "cliproxy-route.ac2": {
       "status": "completed",
       "doneAt": "2026-11-18T16:12:51.812Z"
+    },
+    "frontend-lists": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:13:14.483Z"
+    },
+    "frontend-lists.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:13:14.483Z"
+    },
+    "frontend-lists.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:13:14.483Z"
     }
   }
 }
