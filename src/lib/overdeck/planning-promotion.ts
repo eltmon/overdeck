@@ -18,8 +18,12 @@ import { getAgentState } from '../agents.js';
 import { planningHandoffStartedBy } from '../agents/provenance.js';
 import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
 import { appendPipelineEntry } from '../cloister/pipeline-journal.js';
-import { recordHandoffDeferred, type DeferredHandoffReason } from '../cloister/deferred-handoff.js';
-import { isDeaconGloballyPaused } from './control-settings.js';
+import {
+  journalHandoffFailed,
+  journalHandoffRequest,
+  recordPlanningAutoHandoffDeferred,
+  type CompletePlanningAutoSpawnResult,
+} from './planning-handoff-journal.js';
 import { createInFlightGuard } from '../cloister/in-flight-guard.js';
 import { saveAgentStateAndEmitEvent } from '../../dashboard/server/services/agent-projection.js';
 import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
@@ -39,6 +43,8 @@ import { formatPlanFinalizedTrailer, planFinalizedHash } from '../xbrief/plan-fi
 import { assertPlanQuality, PlanQualityLintError } from '../xbrief/quality-lint.js';
 import { isPreWorktreeMetadataOnlyDir } from '../workspace-manager/worktree-ops.js';
 import { resolveIssueProjectPath } from './issue-reads.js';
+
+export { recordPlanningAutoHandoffDeferred, type CompletePlanningAutoSpawnResult };
 
 const execFileAsync = promisify(execFile);
 
@@ -108,23 +114,6 @@ function getProjectPath(linearProjectId?: string, issuePrefix?: string): string 
     }
   }
   return join(homedir(), 'Projects');
-}
-
-export interface CompletePlanningAutoSpawnResult {
-  workAgentSpawned: boolean;
-  workAgentQueued?: boolean;
-  workAgentSession?: string;
-  workAgentError?: string;
-  workAgentSkipReason?: 'stack-unhealthy' | 'guardrails' | 'paused' | 'troubled' | 'unauthorized' | 'spawn-failed';
-  /**
-   * PAN-4155: a spawn guardrail refused the start (the response carried a
-   * guardrail decision). Deacon-lite retries it later, so the hand-off is
-   * deferred, not failed. Other 409s (start gate, dirty tree) stay failures.
-   */
-  workAgentDeferred?: boolean;
-  workAgentHttpStatus?: number;
-  /** PAN-4399: stamped before the `/api/agents` POST, since `pan start` writes its own `startedAt` before the route answers. */
-  workAgentRequestedAt?: string;
 }
 
 type CompletePlanningPhase = 'prdGate' | 'prdPromote' | 'critiqueGate' | 'beadsMaterialize' | 'specWrite' | 'branchPush' | 'autoSpawn' | 'terminal';
@@ -400,57 +389,6 @@ export async function recordPlanningAutoHandoffFailure(options: {
   });
 
   return error;
-}
-
-/** Default `readDeaconPaused`: the retry hold is advisory, so an unreadable pause flag reads as unpaused. */
-function defaultReadDeaconPaused(): boolean {
-  try {
-    return isDeaconGloballyPaused();
-  } catch {
-    return false;
-  }
-}
-
-/**
- * PAN-4155: a guardrail or an unhealthy workspace Docker stack refused the
- * hand-off. Journal the deferral in the workspace so deacon-lite retries the
- * spawn without acknowledgement, and say so at warn level. No
- * `planning.failed`: that is recorded only if the retries give up.
- *
- * PAN-4210: deacon-lite's retry only ever runs from `runDeaconLite()`, which
- * returns immediately while the Deacon is globally frozen — so a deferral
- * recorded during a freeze is journaled but silently never retried. Say so.
- */
-export function recordPlanningAutoHandoffDeferred(options: {
-  issueId: string;
-  workspacePath: string;
-  result: CompletePlanningAutoSpawnResult;
-  emitActivity?: typeof emitActivityEntry;
-  readDeaconPaused?: () => boolean;
-}): { error: string; deaconPaused: boolean } {
-  const reason: DeferredHandoffReason = options.result.workAgentSkipReason === 'stack-unhealthy' ? 'stack-unhealthy' : 'guardrails';
-  const cause = reason === 'stack-unhealthy' ? 'the workspace docker stack is unhealthy' : 'spawn guardrails';
-  const error = options.result.workAgentError ?? `Work agent startup refused by ${cause}`;
-  const deaconPaused = (options.readDeaconPaused ?? defaultReadDeaconPaused)();
-  recordHandoffDeferred({
-    workspacePath: options.workspacePath,
-    issueId: options.issueId,
-    error,
-    reason,
-    httpStatus: options.result.workAgentHttpStatus,
-    deaconPaused,
-  });
-  console.warn(`[complete-planning] ${options.issueId} auto-handoff deferred by ${cause}: ${error}`);
-  (options.emitActivity ?? emitActivityEntry)({
-    source: 'plan',
-    level: 'warn',
-    message: deaconPaused
-      ? `${options.issueId} planning complete; work-agent start deferred by ${cause}. The retry is held while the Deacon is frozen: unfreeze it, or run pan start ${options.issueId}. ${error}`
-      : `${options.issueId} planning complete; work-agent start deferred by ${cause} and retried for up to 2 hours: ${error}`,
-    issueId: options.issueId,
-    details: JSON.stringify({ workAgentSkipReason: reason, workAgentError: error }),
-  });
-  return { error, deaconPaused };
 }
 
 export async function completePlanningAutoSpawn(options: {
@@ -898,6 +836,8 @@ export async function completePlanningForIssue(options: {
     emitCompletePlanningPhase(id, 'branchPush', push.pushed ? 'success' : 'failure', push.reason ?? `pushed feature/${issueLower}`);
     const gitPushed = push.pushed;
 
+    // PAN-5498: journal the request first, so one that dies with the dashboard is resumed.
+    const handoffJournaled = effectiveAutoSpawn && journalHandoffRequest(workspacePath, id);
     const autoSpawnResult = await completePlanningAutoSpawnAndKill({
       issueId: id,
       autoSpawn: effectiveAutoSpawn,
@@ -925,6 +865,8 @@ export async function completePlanningForIssue(options: {
       autoHandoffError = deferred.error;
       autoHandoffDeaconPaused = deferred.deaconPaused;
     } else if (autoHandoffFailed && autoSpawnResult) {
+      // Journal first: a rejected planning.failed append must not leave the refused request retryable.
+      if (handoffJournaled) journalHandoffFailed(workspacePath, id, autoSpawnResult);
       autoHandoffError = await recordPlanningAutoHandoffFailure({
         issueId: id,
         result: autoSpawnResult,

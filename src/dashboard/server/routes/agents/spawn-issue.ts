@@ -22,7 +22,7 @@ import {
   clearAgentPaused,
   clearAgentTroubled,
 } from '../../../../lib/agents.js';
-import { readAutoSpawnConsentWorkModel, readAutoSpawnConsentWorkspaceLocation } from '../../../../lib/planning/auto-spawn-consent.js';
+import { readAutoSpawnConsentHostOverride, readAutoSpawnConsentWorkModel, readAutoSpawnConsentWorkspaceLocation } from '../../../../lib/planning/auto-spawn-consent.js';
 import { loadConfigSync } from '../../../../lib/config.js';
 import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
@@ -281,8 +281,8 @@ export const spawnIssueAgentForRoute = (input: { body: unknown; internalRequest:
     }
 
     const hostOverrideConfirmation = buildHostOverrideConfirmation(String(issueId));
-    const allowHost = requestedHostOverride && (body as any).hostOverrideConfirmation === hostOverrideConfirmation;
-    if (requestedHostOverride && !allowHost) {
+    const confirmedHostOverride = requestedHostOverride && (body as any).hostOverrideConfirmation === hostOverrideConfirmation;
+    if (requestedHostOverride && !confirmedHostOverride) {
       return jsonResponse({
         success: false,
         error: 'host_override_confirmation_required',
@@ -291,6 +291,12 @@ export const spawnIssueAgentForRoute = (input: { body: unknown; internalRequest:
         hint: `Host override bypasses workspace isolation. Retry only after explicitly confirming: ${hostOverrideConfirmation}`,
       }, { status: 409 });
     }
+    // PAN-5498: a consent-bearing spawn (the post-planning start and its
+    // deferred retries) carries the --host override the operator confirmed on
+    // `pan start --plan auto --host`, the same way it carries the location.
+    const consentHostOverride = !confirmedHostOverride && autoSpawnConsentRequired
+      && (yield* Effect.promise(() => readAutoSpawnConsentHostOverride(String(issueId)).catch(() => false)));
+    const allowHost = confirmedHostOverride || consentHostOverride;
 
     // Guard: reject starting agents for already-closed issues
     const issueDataService = getIssueDataService();
@@ -562,7 +568,7 @@ export const spawnIssueAgentForRoute = (input: { body: unknown; internalRequest:
 
     if (allowHost) {
       // PAN-1556: host-override is a spawn detail, not user-facing activity.
-      console.warn(`[agents] agent-spawn-host-override: ${issueId.toUpperCase()} (dashboard-confirmed)`);
+      console.warn(`[agents] agent-spawn-host-override: ${issueId.toUpperCase()} (${consentHostOverride ? 'recorded on auto-start consent' : 'dashboard-confirmed'})`);
     }
 
     // PAN-3917: planning artifacts live in the repo's `.pan/` and are committed

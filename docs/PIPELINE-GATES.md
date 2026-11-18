@@ -1837,6 +1837,20 @@ Auto-resume is intentionally suppressible:
   spawn already gets (`SPAWN_STACK_REBUILD_MAX_ATTEMPTS = 3`,
   `SPAWN_STACK_REBUILD_COOLDOWN_MS` = 15 minutes, `agents/spawn-prep.ts`), so
   the rebuild still happens, just from one call path instead of two.
+- **Host override on auto-start (PAN-5498):** `pan start <id> --plan auto
+  --host` sends `host: true` with the confirmation phrase to start-planning,
+  which records `hostOverride: true` on the auto-start consent record. A
+  consent-bearing `/api/agents` request (the first hand-off and every
+  deferred retry) reads it back and skips the stack-health gate and its
+  rebuild, exactly like a confirmed `pan start --host`. A new planning cycle
+  without `--host` clears it, and a spent consent no longer reports it.
+- **Interrupted hand-off (PAN-5498):** complete-planning journals
+  `handoff.requested` just before the spawn POST. A refusal, an acceptance or
+  a plain failure appends a newer entry (a plain failure appends
+  `handoff.abandoned` with `outcome: 'failed'`, so it is not retried). When
+  the dashboard dies mid-request, `handoff.requested` stays last, and
+  deacon-lite resumes the start `HANDOFF_REQUEST_RESUME_DELAY_MS` (10 minutes)
+  after the request, with `reason: 'interrupted'`.
 - **Preemptive scheduler** (opt-in via `[concurrency] preemption = true`,
   PAN-2507) may **yield** an idle work agent — pause it to free capacity for
   a blocked review/test dispatch. A yield reuses the same `paused: true`
@@ -2079,8 +2093,9 @@ One piece of stored pipeline state came back, and it is not a status.
 | `conflict.repair-escalated` | `cloister/conflict-repair.ts` `tickConflictRepair`, when that head still conflicts after the 45-minute grace or its work agent cannot be reached (`data.head`, `data.reason`) |
 | `blocked.declared` | `pan task block <issue> <item> --on <ref>...` (source `pan-task-block`), with `data.item` and canonical `data.blockers` |
 | `blocked.woken` | `cloister/blocker-wake.ts` `tickBlockerWake`, once per declaration when all its blockers merged (`data.item`, `data.declaredAt`, `data.outcome`: `delivered` \| `unreachable`) |
+| `handoff.requested` | `completePlanningForIssue`, just before the auto-start spawn POST (`data.requestedAt`, `nextRetryAt`, `reason: 'interrupted'`), so a request that dies with the dashboard is resumed (PAN-5498) |
 | `handoff.deferred` | `completePlanningForIssue` (`overdeck/planning-promotion.ts`), when a spawn guardrail or a stack-unhealthy answer (`reason: 'guardrails'` \| `'stack-unhealthy'`) refused the auto-start |
-| `handoff.retried` / `.abandoned` | deacon-lite's `retryDeferredHandoffs`, on each retry and when it stops |
+| `handoff.retried` / `.abandoned` | deacon-lite's `retryDeferredHandoffs`, on each retry and when it stops; also `completePlanningForIssue` (`.abandoned`, `outcome: 'failed'`) when the auto-start failed in a way no wait fixes |
 | `handoff.started` | `completePlanningForIssue`, when the auto-start is accepted; also deacon-lite's `retryDeferredHandoffs`, when a deferred retry is accepted |
 | `operator.decision-requested` | `pan ask` (`src/cli/commands/ask.ts`), when a work agent needs an operator decision |
 | `operator.decision-answered` | the dashboard answer route, a delivered dashboard message, or a delivered `pan tell` to the asking agent |
@@ -2557,7 +2572,10 @@ four lanes on a quick-mode issue; neither `review.stalled` nor
 `review.stall-escalated` is a tail `recoverStalledReviews` acts on.
 
 `retryDeferredHandoffs` acts only when an issue's last `handoff.*` entry is
-`handoff.deferred` or `handoff.retried`. Each of those entries carries the
+`handoff.requested`, `handoff.deferred` or `handoff.retried`. A
+`handoff.requested` entry is due 10 minutes after the request, because the
+original request can run a stack rebuild for minutes before it claims the
+agent start (PAN-5498). Each of those entries carries the
 schedule (`deferredAt`, `attempt`, `nextRetryAt`), so a dashboard or deacon
 restart resumes the backoff where it stood; nothing is held in memory. Retries
 run 2, 4, 8 and 16 minutes apart, then every 20 minutes. Each one POSTs

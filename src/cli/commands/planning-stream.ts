@@ -1,5 +1,7 @@
 import chalk from 'chalk';
 
+import { buildHostOverrideConfirmation } from '../../lib/agents/host-override.js';
+
 export interface PlanningStreamEvent {
   type?: string;
   label?: string;
@@ -74,6 +76,12 @@ export function buildStartPlanningBody(input: {
   effort?: string;
   workspaceLocation?: 'remote' | 'local';
   startedBy?: string;
+  /**
+   * PAN-5498: set to the issue ID when the operator confirmed `pan start --host`.
+   * The request then carries the override and its confirmation phrase, and the
+   * post-planning start skips the workspace Docker stack gate.
+   */
+  hostOverrideIssueId?: string;
 }): string {
   return JSON.stringify({
     auto: input.auto,
@@ -85,6 +93,9 @@ export function buildStartPlanningBody(input: {
     effort: input.effort || undefined,
     workspaceLocation: input.workspaceLocation ?? 'local',
     startedBy: input.startedBy || undefined,
+    ...(input.hostOverrideIssueId
+      ? { host: true, hostOverrideConfirmation: buildHostOverrideConfirmation(input.hostOverrideIssueId) }
+      : {}),
   });
 }
 

@@ -1,0 +1,346 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-18T15:49:52Z",
+    "author": "overdeck/0.89.0",
+    "description": "Plan for PAN-5498: pan start --plan auto --host: work agent never auto-starts after planning (host override lost; no handoff after finalize timeout)",
+    "updated": "2026-11-18T16:00:33.723Z"
+  },
+  "plan": {
+    "id": "pan-5498",
+    "title": "pan start --plan auto --host: work agent never auto-starts after planning (host override lost; no handoff after finalize timeout)",
+    "status": "proposed",
+    "uid": "3a1566f4-f827-4b75-9bb7-1895d38d46c2",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-18T15:49:52Z",
+    "updated": "2026-11-18T16:00:33.723Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5498",
+        "label": "PAN-5498",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/pull/5524",
+        "label": "PR #5524",
+        "type": "pull_request"
+      }
+    ],
+    "tags": [
+      "planning",
+      "auto-spawn",
+      "host-override",
+      "deacon-lite",
+      "pipeline-journal"
+    ],
+    "narratives": {
+      "Problem": "After `pan start <id> --plan auto --host --yes` finalizes planning, the work agent does not always start. Cause 1: the --host override reaches the planning start but not the finalize-time spawn request or the deacon-lite retries, so POST /api/agents runs the stack-health gate and refuses with 422 start_blocked_stack_unhealthy when the workspace has no healthy Docker stack. Cause 2: when the spawn request is in flight (for example during a slow stack rebuild) and the dashboard restarts, nothing is journaled, so deacon-lite has nothing to resume.",
+      "Proposal": "Record the operator-confirmed host override on the v2 auto-spawn consent record when planning starts with --host, and let the spawn route honor it for consent-bearing requests (first handoff and deacon-lite retries). Journal `handoff.requested` before complete-planning sends the spawn POST, journal `handoff.abandoned` (outcome failed) on a plain failure, and let deacon-lite resume a trailing `handoff.requested` after 10 minutes on the existing backoff, standing down when the operator already started the agent.",
+      "NonGoals": "- No change to the stack-health gate itself or its rebuild behavior\n- No host override for spawn requests that carry no auto-spawn consent\n- No fix for the readAutoSpawnOnFinalize legacy-field bug in plan-finalize.ts\n- No fix for the stale 'deacon will complete promotion' CLI message\n- No change to the deacon-lite pass cadence"
+    },
+    "autoDecisions": [],
+    "items": [
+      {
+        "id": "consent-host-override",
+        "title": "Store the host override on the auto-spawn consent record",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T15:49:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5498",
+          "files_scope": [
+            "src/lib/planning/auto-spawn-consent.ts",
+            "src/lib/planning/__tests__/auto-spawn-consent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/planning/__tests__/auto-spawn-consent.test.ts"
+          ],
+          "expected_outputs": [
+            "auto-spawn-consent.test.ts passes, including the hostOverride (PAN-5498) block"
+          ],
+          "readiness": "ready",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add optional hostOverride: true to AutoSpawnConsentRecord; writeAutoSpawnOnFinalizeFlag accepts hostOverride (null clears, undefined preserves); add readAutoSpawnConsentHostOverride, which returns false for a missing or spent record."
+        },
+        "items": [
+          {
+            "id": "consent-host-override.ac1",
+            "title": "A granted record written with hostOverride reads back true; a rewrite without the option preserves it; a new cycle with null clears it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "consent-host-override.ac2",
+            "title": "readAutoSpawnConsentHostOverride returns false once the record is spent or the stored value is not exactly true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "start-planning-host",
+        "title": "Carry --host from pan start through the start-planning route onto the consent record",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T15:49:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5498",
+          "files_scope": [
+            "src/lib/agents/host-override.ts",
+            "src/dashboard/server/routes/agents/shared.ts",
+            "src/cli/commands/planning-stream.ts",
+            "src/cli/commands/start.ts",
+            "src/lib/overdeck/planning-sessions.ts",
+            "src/lib/planning/spawn-planning-session.ts",
+            "src/cli/commands/__tests__/planning-stream.test.ts",
+            "src/lib/overdeck/__tests__/start-planning-host-override.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/planning-stream.test.ts src/lib/overdeck/__tests__/start-planning-host-override.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "planning-stream.test.ts and start-planning-host-override.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Move buildHostOverrideConfirmation to src/lib/agents/host-override.ts (re-exported from shared.ts). buildStartPlanningBody adds host: true and the confirmation phrase when hostOverrideIssueId is set; start.ts passes it when --host is given. The start-planning route rejects a mismatched phrase with 409 host_override_confirmation_required and passes hostOverride to spawnPlanningSession, which writes it on the consent record (null when absent)."
+        },
+        "items": [
+          {
+            "id": "start-planning-host.ac1",
+            "title": "The start-planning body carries host and the confirmation phrase only when the host override is set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-planning-host.ac2",
+            "title": "The start-planning route refuses host: true with a wrong phrase (409) and records hostOverride on consent otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-route-consent-host",
+        "title": "Honor the consent host override in the spawn route stack gate",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T15:49:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5498",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/spawn-issue.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/planning/__tests__/auto-spawn-consent.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "auto-spawn-consent.test.ts passes"
+          ],
+          "readiness": "ready",
+          "requiresInspection": false,
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In spawnIssueAgentForRoute, when the request carries autoSpawnConsentRequired and no dashboard-confirmed host override, read readAutoSpawnConsentHostOverride and treat a true value as allowHost, logging which source granted it."
+        },
+        "items": [
+          {
+            "id": "spawn-route-consent-host.ac1",
+            "title": "A consent-bearing spawn request for an issue whose consent records hostOverride skips the stack-health refusal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-route-consent-host.ac2",
+            "title": "When a spawn request carries no auto-spawn consent, the route ignores the consent record and the stack-health gate still refuses an unhealthy stack",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "journal-handoff-request",
+        "title": "Journal handoff.requested before the finalize spawn and resume it from deacon-lite",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T15:49:52Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5498",
+          "files_scope": [
+            "src/lib/cloister/deferred-handoff.ts",
+            "src/lib/cloister/pipeline-journal.ts",
+            "src/lib/overdeck/planning-handoff-journal.ts",
+            "src/lib/overdeck/planning-promotion.ts",
+            "src/lib/flywheel/board.ts",
+            "src/cli/commands/show.ts",
+            "src/lib/cloister/__tests__/deacon-lite-resume-requested-handoff.test.ts",
+            "src/lib/overdeck/__tests__/planning-promotion-status-event.test.ts",
+            "src/lib/overdeck/__tests__/planning-handoff-journal.test.ts",
+            "tests/unit/lib/flywheel/board.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/deacon-lite-resume-requested-handoff.test.ts src/lib/cloister/__tests__/deacon-lite-retry-deferred-handoff.test.ts src/lib/overdeck/__tests__/planning-promotion-status-event.test.ts src/cli/commands/__tests__/show-pipeline-journal.test.ts src/lib/overdeck/__tests__/planning-handoff-journal.test.ts tests/unit/lib/flywheel/board.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "all six test files pass",
+            "file-size guard passes with planning-promotion.ts under its allowance"
+          ],
+          "readiness": "ready",
+          "requiresInspection": false,
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "Touches only the journal, deacon-lite and planning-promotion files; no other item edits them."
+        },
+        "narrative": {
+          "Action": "Add the handoff.requested journal entry type and recordHandoffRequested (reason interrupted, nextRetryAt now + 10 minutes). completePlanningForIssue journals it before completePlanningAutoSpawnAndKill and journals handoff.abandoned (outcome failed) on a plain failure. retryDeferredHandoffs acts on a trailing handoff.requested with the existing backoff and stand-down rules. pan show and the flywheel board label the entry. Journal helpers move to planning-handoff-journal.ts to keep planning-promotion.ts under its file-size allowance."
+        },
+        "items": [
+          {
+            "id": "journal-handoff-request.ac1",
+            "title": "complete-planning appends handoff.requested before the spawn POST, then handoff.started on success or handoff.abandoned (failed) on a 500",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "journal-handoff-request.ac2",
+            "title": "deacon-lite starts the agent 10 minutes after a trailing handoff.requested, keeps backing off on refusal, and stands down when the agent was already started",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "journal-handoff-request.ac3",
+            "title": "When the last journal entry is handoff.abandoned with outcome failed, deacon-lite sends no retry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "journal-handoff-request.ac4",
+            "title": "When the journal write never reaches disk, journalHandoffRequest returns false and logs a warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-changelog",
+        "title": "Document the host override on auto-start and the interrupted hand-off",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T15:49:52Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5498",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "changelog.d/pan-5498.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Add the PAN-5498 host-override and interrupted hand-off bullets and the handoff.requested journal row to docs/PIPELINE-GATES.md; add changelog.d/pan-5498.md with a Fixed entry."
+        },
+        "items": [
+          {
+            "id": "docs-changelog.ac1",
+            "title": "docs/PIPELINE-GATES.md contains the consent host override bullet and a handoff.requested journal row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac2",
+            "title": "changelog.d/pan-5498.md contains a Fixed entry for the auto-start fix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "consent-host-override",
+        "to": "start-planning-host",
+        "type": "blocks"
+      },
+      {
+        "from": "consent-host-override",
+        "to": "spawn-route-consent-host",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-18-PAN-5498-pan-start-plan-auto-host-work-agent-never-auto-starts-after-planning-host-override-lost-no-handoff-after-finalize-timeout.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}

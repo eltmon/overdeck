@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { buildHostOverrideConfirmation } from '../../../lib/agents/host-override.js';
 import { buildStartPlanningBody, printPlanningConnectionError } from '../planning-stream.js';
 
 describe('buildStartPlanningBody', () => {
@@ -36,6 +37,18 @@ describe('buildStartPlanningBody', () => {
     }));
     expect(body.model).toBe('claude-fable-5');
     expect(body.workModel).toBe('kimi-k3-1m');
+  });
+
+  it('carries a confirmed --host override with its confirmation phrase (PAN-5498)', () => {
+    const body = JSON.parse(buildStartPlanningBody({ auto: true, autoStart: true, hostOverrideIssueId: 'pan-5484' }));
+    expect(body.host).toBe(true);
+    expect(body.hostOverrideConfirmation).toBe(buildHostOverrideConfirmation('PAN-5484'));
+  });
+
+  it('sends no host override without --host', () => {
+    const body = JSON.parse(buildStartPlanningBody({ auto: true, autoStart: true }));
+    expect(body.host).toBeUndefined();
+    expect(body.hostOverrideConfirmation).toBeUndefined();
   });
 });
 
