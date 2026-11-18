@@ -77,6 +77,20 @@ The loop applies this rule itself before it runs `pan start`, which does not che
 
 Order matters too: a bound or running order book's items come first (see [Order books](/configuration/order-books)); otherwise the loop walks `.pan/backlog/sequence.md` in rank order. A **Promote** gate jumps an issue ahead of its rank; a **Vetoed** issue is never picked up. Before picking anything new, the loop drains every issue already in flight, making the first move each one needs.
 
+## The three switches
+
+The Flywheel page header shows three switches. They are global app settings, not per project.
+
+| Switch | Default | What it does |
+| --- | --- | --- |
+| Auto-pickup | off | Off: the loop picks up only released issues and active order-book items. On: every ready, planned issue is pickable without a release. |
+| Require UAT | on | The global fallback of the merge policy: a ready PR waits for your Merge click unless the issue's Auto/Hold toggle or the project's `auto_merge_default` says otherwise. |
+| Merge train | off | On: normal-priority PRs wait and merge together as one batch once the batch checks are green; high-priority PRs such as strikes still merge on their own. Off: each ready PR that is not held merges on its own. |
+
+Require UAT holds a ready PR for your Merge click; it never requires a passed UAT verdict before merge. A failed UAT verdict at the head commit does block merge on its own, independent of this switch; see [Issue pipeline](/features/issue-pipeline) for that distinction.
+
+Batch size and wait for the merge train live in **Settings → Merge Train**; see [Auto-merge](/configuration/auto-merge) for the full merge policy and [Merge batches](/features/merge-batches) for how the train itself works.
+
 ## Known limits
 
 - The loop's author gate names fixed GitHub logins: it acts only on issues whose author is `eltmon` (the Overdeck maintainer) or `panopticon-agent[bot]`, or that are assigned to `eltmon`. On any other repo or account the loop skips your issues, and the current GitHub App bot (`overdeck-agent[bot]`) does not pass it either. See [issue #5544](https://github.com/eltmon/overdeck/issues/5544).
