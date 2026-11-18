@@ -70,6 +70,14 @@ Re-request review after fixing feedback with `pan review request`, re-dispatch r
 
 There is no hard limit on review rounds, but after at least 3 rounds where the blocker count rose or stalled, automatic re-review stops and Needs you shows `Review loop not converging`. The count resets once a round is approved.
 
+## Tests and UAT
+
+A single test role owns both ordinary test-suite execution and browser-based UAT; there is no separate UAT role. It runs the project's gates, decides from the issue's acceptance criteria whether browser UAT is needed, and when it is, drives the workspace's built dashboard with Playwright. It records two separate verdicts, tests and UAT.
+
+For a project in CI mode, the CI test job on the PR head is the test gate, so the merge gate requires it directly. A failed UAT verdict at the PR head always blocks merge, on any project: it is treated as evidence the code does not work.
+
+As of this writing, the test role does not start automatically the moment review approves. It starts only when `pan review request` runs on a PR that is approved at head but whose checks are not yet green, or when an issue whose test agent was stopped gets unpaused. Automatic dispatch on approval is tracked as [issue #5537](https://github.com/eltmon/overdeck/issues/5537).
+
 ## Get help
 
 Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file an issue on [GitHub Issues](https://github.com/eltmon/overdeck/issues).
