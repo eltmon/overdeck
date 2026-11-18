@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5503",
   "created": "2026-11-18T23:39:30.709Z",
-  "updated": "2026-11-18T23:44:43.368Z",
+  "updated": "2026-11-18T23:45:17.978Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,18 @@
     "harnesses-ohmypi-to-opencode.ac4": {
       "status": "completed",
       "doneAt": "2026-11-18T23:44:43.368Z"
+    },
+    "audit-telemetry": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:45:17.978Z"
+    },
+    "audit-telemetry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:45:17.978Z"
+    },
+    "audit-telemetry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:45:17.978Z"
     }
   }
 }
