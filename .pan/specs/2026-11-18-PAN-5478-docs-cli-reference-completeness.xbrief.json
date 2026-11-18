@@ -1,0 +1,1459 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-18T19:07:43Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5478: docs: CLI reference completeness",
+    "updated": "2026-11-18T19:15:09.685Z"
+  },
+  "plan": {
+    "id": "pan-5478",
+    "title": "docs: CLI reference completeness",
+    "status": "proposed",
+    "uid": "96c9c78d-4e04-494b-9044-5b44d37b72d1",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-18T19:07:43Z",
+    "updated": "2026-11-18T19:15:09.685Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5478",
+        "label": "PAN-5478",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5467",
+        "label": "PAN-5467 docs overhaul epic",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5478.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "docs",
+      "cli",
+      "mintlify",
+      "docs-overhaul"
+    ],
+    "metadata": {
+      "sizeJustification": "Docs-only change across 11 Mintlify files in three doc directories (cli/, features/, configuration/) plus docs.json. Three new CLI pages and one extended page run as four independent per-file chains; nav, cross-links and validation depend on the pages existing, so splitting into sibling issues would ship orphaned pages or dead links.",
+      "canonicalFilename": "2026-11-18-PAN-5478-docs-cli-reference-completeness.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The CLI Reference covers about half of pan's 97 top-level verbs. The 2026-11-17 feature inventory (section 1.12) lists 32 verbs no cli/*.mdx page covers, including plan, task, show, handoff, fork, conv, memory, flywheel, orders, reload, shutdown and cost; the existing pan restart section contradicts current help (ports 3010, no hold/approve).",
+      "Proposal": "Add cli/conversation-commands.mdx, cli/pipeline-commands.mdx and cli/memory-commands.mdx, extend cli/core-commands.mdx (rewrite pan restart; add reload, shutdown, update, cost, models, integrate, tts, backup, restore), add the pages to docs.json and cli/overview.mdx, and link them from five related pages. Each verb gets a reference section built from pan <verb> --help and source, per the PRD template; concepts stay on owning feature pages, which the sections link. Mechanical checks prove every subcommand is listed, no flag is invented, no dashes, and Mintlify validates.",
+      "NonGoals": "- No changes under src/, scripts/, tests/, packages/ or apps/; no changelog.d entry\n- No fix to stale CLI help text (for example pan scope's 'Move xBRIEF to proposed/'); docs describe the code\n- No accuracy rewrite of pan up, pan down, pan health or other untouched sections of existing CLI pages (PAN-5501 owns them)\n- No CLI sections for artifacts (PAN-5482 G21), init, monitor, inbox, reset-session, sync-main, destroy, test, release, rollout, compliance, registry, ohmypi-auth, caveman-compress, dev or projects\n- No feature pages for the issue pipeline, Flywheel, costs, voice or operating Overdeck (PAN-5468, PAN-5470, PAN-5475, PAN-5481, PAN-5482)\n- No moving or deleting sections on other pages; no documentation of hidden options such as pan shutdown --finish\n- No screenshots\n- No mint validate --fix and no mint@latest"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Cover the issue's named verbs plus short sections for the eight other row-1.12 verbs (scope, staffing, context, knowledge, docs, briefing, tts, backup) and restore and unarchive-conversation as halves of documented verbs; leave artifacts and 15 other uncovered verbs as non-goals",
+        "rationale": "The issue names pages and verbs explicitly and says to read help for every verb in the 1.12 CLI row; a short section on the nearest page closes the row without inventing pages. artifacts must first be confirmed user-facing by PAN-5482 G21."
+      },
+      {
+        "summary": "Full subcommand table plus options only for named subcommands of pan conv and pan memory (D-4)",
+        "rationale": "Both verbs have 20+ subcommands; a fixed rule makes the diff deterministic and keeps the page readable while the completeness check still lists every subcommand."
+      },
+      {
+        "summary": "Short entries plus links for tell, share and open, which already have pages (D-5)",
+        "rationale": "Avoids duplicating or moving content that other issues (PAN-5501) own while still making the CLI reference complete."
+      },
+      {
+        "summary": "Rewrite only the pan restart section of cli/core-commands.mdx; leave up, down and health to PAN-5501 (D-9)",
+        "rationale": "The issue asks for restart hold additions and the existing section contradicts help; the rest of the page belongs to the accuracy audit."
+      },
+      {
+        "summary": "Link unlanded sibling pages only if the .mdx file exists after sync-main, else a stand-in (D-7)",
+        "rationale": "mint broken-links fails on links to missing pages; sibling issues PAN-5468/5470/5475/5481 may land in either order."
+      },
+      {
+        "summary": "Code wins over stale help text; ignored, deprecated and refused flags are documented with their status (D-6)",
+        "rationale": "The issue requires every claim to match current code; features/planning.mdx already set this precedent for pan scope."
+      },
+      {
+        "summary": "Remove all dashes from the three new pages, cli/core-commands.mdx and cli/overview.mdx; only added lines elsewhere (D-8)",
+        "rationale": "The issue requires removing dashes from bodies we edit; these five files are substantially edited, while cross-link pages get one line each and their other lines belong to their own issues."
+      },
+      {
+        "summary": "One xBRIEF with four parallel per-file chains instead of sibling issues (D-11)",
+        "rationale": "The pages are independent but nav, overview, cross-links and validation need all of them; one plan keeps them consistent."
+      }
+    ],
+    "items": [
+      {
+        "id": "conv-page",
+        "title": "Create cli/conversation-commands.mdx with the pan conv section and Get help",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:07:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/conversation-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for v in conv; do grep -q \"^## pan $v\\b\" cli/conversation-commands.mdx || echo \"NO SECTION $v\"; done",
+            "for s in $(OVERDECK_RTK_ENABLED=0 pan conv --help | awk '/^Commands:/{p=1;next} p&&/^  [a-z]/{print $1}' | sed 's/|.*//' | grep -vx help); do grep -q \"pan conv $s\" cli/conversation-commands.mdx || echo \"MISSING conv $s\"; done",
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/conversation-commands.mdx",
+            "head -6 cli/conversation-commands.mdx"
+          ],
+          "expected_outputs": [
+            "NO SECTION/MISSING loops print nothing",
+            "dash grep prints nothing",
+            "frontmatter shows the PRD D-2 title, sidebarTitle and description"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-7",
+            "FR-11",
+            "NFR-1",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 1. Re-run `pan <verb> --help` (with OVERDECK_RTK_ENABLED=0) and re-grep the PRD Background anchors before writing. Follow PRD D-3 section template and D-4 depth rule. Paraphrase help text, never paste it (it contains em dashes and bare <id> placeholders). No em or en dash anywhere in the page. Sections follow the PRD page-to-verb map order and `## Get help` stays the last H2 on new pages (insert new sections above it). Write `$` in prose as &#36; and `<` before a digit as &lt;. Create the page with the exact D-2 frontmatter (no body H1), a two-sentence intro, `## pan conv` (state `pan conversations` is the full name and `pan conv` the alias; table of all 22 subcommands with aliases; options tables only for search, list, show, resume, pull, link-pr, current; the 'Run pan conv <subcommand> --help for its options.' sentence once under the table; schedule links /features/conversations#scheduled-runs; link /features/conversations#search-your-conversations), one sentence distinguishing `pan conv cost` from `pan cost`, and `## Get help` linking https://discord.gg/ZpHE2ZTv5P and https://github.com/eltmon/overdeck/issues."
+        },
+        "items": [
+          {
+            "id": "conv-page.ac1",
+            "title": "Given the new page, when the PRD FR-5 loop for `conv` runs, then it prints nothing because every `pan conv --help` subcommand appears as `pan conv <subcommand>`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-page.ac2",
+            "title": "The page frontmatter contains title \"Conversation commands: pan conv, handoff, fork and resume\" and sidebarTitle \"Conversation Commands\", and the description measures 50 to 160 characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-page.ac3",
+            "title": "The pan conv section contains an options table for exactly the D-4 subcommands (search, list, show, resume, pull, link-pr, current) and a sentence that `pan conv cost` differs from `pan cost`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-page.ac4",
+            "title": "The page contains, as its last H2, a `## Get help` section that links https://discord.gg/ZpHE2ZTv5P and https://github.com/eltmon/overdeck/issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conv-handoff-fork",
+        "title": "Add pan handoff and pan fork sections to the conversation commands page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:07:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/conversation-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for v in handoff fork; do grep -q \"^## pan $v\\b\" cli/conversation-commands.mdx || echo \"NO SECTION $v\"; done",
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/conversation-commands.mdx"
+          ],
+          "expected_outputs": [
+            "both greps print nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6",
+            "FR-10",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 2. Re-run `pan <verb> --help` (with OVERDECK_RTK_ENABLED=0) and re-grep the PRD Background anchors before writing. Follow PRD D-3 section template and D-4 depth rule. Paraphrase help text, never paste it (it contains em dashes and bare <id> placeholders). No em or en dash anywhere in the page. Sections follow the PRD page-to-verb map order and `## Get help` stays the last H2 on new pages (insert new sections above it). Write `$` in prose as &#36; and `<` before a digit as &lt;. `## pan handoff`: every non-hidden option from help in a table; `self` or no conv means the current conversation; focus limit 10000 characters with long briefs in a file the focus points at; `--hold` with `pan handoff start <conv>` (parsed in src/cli/commands/handoff.ts, anchor `convRef === 'start'`); `--fresh`; `--harness` and `--author-harness` rows say accepted and ignored. Link /features/conversations#handing-off-from-the-cli. `## pan fork`: summary fork versus `--plain` raw history copy and every option."
+        },
+        "items": [
+          {
+            "id": "conv-handoff-fork.ac1",
+            "title": "The pan handoff section contains every option shown by `pan handoff --help` except -h, and its `--harness` and `--author-harness` rows state that the flag is accepted and ignored",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-handoff-fork.ac2",
+            "title": "The pan handoff section shows `pan handoff start <conv>` as the way to send a held handoff's kickoff and links /features/conversations#handing-off-from-the-cli",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-handoff-fork.ac3",
+            "title": "The pan fork section contains `--plain` as copying raw conversation history instead of generating a summary and lists every option from `pan fork --help`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conv-tell-resume",
+        "title": "Add pan tell, pan resume and pan unarchive-conversation sections",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:07:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/conversation-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for v in tell resume unarchive-conversation; do grep -q \"^## pan $v\\b\" cli/conversation-commands.mdx || echo \"NO SECTION $v\"; done",
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/conversation-commands.mdx"
+          ],
+          "expected_outputs": [
+            "both greps print nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-7",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 3. Re-run `pan <verb> --help` (with OVERDECK_RTK_ENABLED=0) and re-grep the PRD Background anchors before writing. Follow PRD D-3 section template and D-4 depth rule. Paraphrase help text, never paste it (it contains em dashes and bare <id> placeholders). No em or en dash anywhere in the page. Sections follow the PRD page-to-verb map order and `## Get help` stays the last H2 on new pages (insert new sections above it). Write `$` in prose as &#36; and `<` before a digit as &lt;. `## pan tell` per D-5: short description, full options table (--force, --steer, --when-limit-resets, --message-id), and a link to /cli/agent-commands#pan-tell for targeting rules and linked machines. `## pan resume <id>`: it resumes a stopped Overdeck work agent (by issue id or agent id) from its saved harness session (src/lib/work-agent-lifecycle.ts, assertCanResumeSession(agentOrIssueId)); one sentence that a dashboard conversation is resumed with `pan conv resume <name>`; options --host, --yes, --compact. `## pan unarchive-conversation <query>`: restores an archived conversation by exact name, then matching title."
+        },
+        "items": [
+          {
+            "id": "conv-tell-resume.ac1",
+            "title": "The pan tell section contains --force, --steer, --when-limit-resets and --message-id and links /cli/agent-commands#pan-tell",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-tell-resume.ac2",
+            "title": "The pan resume section contains a sentence stating that `pan resume <id>` resumes an issue's work agent while `pan conv resume <name>` resumes a conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-tell-resume.ac3",
+            "title": "The pan unarchive-conversation section contains a sentence stating that it restores an archived conversation by exact name or matching title",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conv-open-share",
+        "title": "Add pan open and pan share sections",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:07:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/conversation-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for v in open share; do grep -q \"^## pan $v\\b\" cli/conversation-commands.mdx || echo \"NO SECTION $v\"; done",
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/conversation-commands.mdx"
+          ],
+          "expected_outputs": [
+            "both greps print nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 4. Re-run `pan <verb> --help` (with OVERDECK_RTK_ENABLED=0) and re-grep the PRD Background anchors before writing. Follow PRD D-3 section template and D-4 depth rule. Paraphrase help text, never paste it (it contains em dashes and bare <id> placeholders). No em or en dash anywhere in the page. Sections follow the PRD page-to-verb map order and `## Get help` stays the last H2 on new pages (insert new sections above it). Write `$` in prose as &#36; and `<` before a digit as &lt;. `## pan open <target>` (file, folder or issue workspace; options -e/--editor [editor], --line, --column, --new-tab; link /features/open-in-overdeck). `## pan share <conversation>`: two sentences (prints the join link and join code; --json) plus a link to /cli/share. Do not move content from those pages."
+        },
+        "items": [
+          {
+            "id": "conv-open-share.ac1",
+            "title": "The pan open section contains the options --editor, --line, --column and --new-tab and links /features/open-in-overdeck",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-open-share.ac2",
+            "title": "The pan share section contains a link to /cli/share and names the `--json` option",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipe-page-plan",
+        "title": "Create cli/pipeline-commands.mdx with pan plan, pan task and pan scope",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:07:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/pipeline-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for v in plan task scope; do grep -q \"^## pan $v\\b\" cli/pipeline-commands.mdx || echo \"NO SECTION $v\"; done",
+            "for s in $(OVERDECK_RTK_ENABLED=0 pan plan --help | awk '/^Commands:/{p=1;next} p&&/^  [a-z]/{print $1}' | sed 's/|.*//' | grep -vx help); do grep -q \"pan plan $s\" cli/pipeline-commands.mdx || echo \"MISSING plan $s\"; done",
+            "for s in $(OVERDECK_RTK_ENABLED=0 pan task --help | awk '/^Commands:/{p=1;next} p&&/^  [a-z]/{print $1}' | sed 's/|.*//' | grep -vx help); do grep -q \"pan task $s\" cli/pipeline-commands.mdx || echo \"MISSING task $s\"; done",
+            "for s in $(OVERDECK_RTK_ENABLED=0 pan scope --help | awk '/^Commands:/{p=1;next} p&&/^  [a-z]/{print $1}' | sed 's/|.*//' | grep -vx help); do grep -q \"pan scope $s\" cli/pipeline-commands.mdx || echo \"MISSING scope $s\"; done",
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/pipeline-commands.mdx",
+            "head -6 cli/pipeline-commands.mdx"
+          ],
+          "expected_outputs": [
+            "NO SECTION/MISSING loops print nothing",
+            "dash grep prints nothing",
+            "frontmatter shows the PRD D-2 title, sidebarTitle and description"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5",
+            "FR-10",
+            "FR-11",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 5. Re-run `pan <verb> --help` (with OVERDECK_RTK_ENABLED=0) and re-grep the PRD Background anchors before writing. Follow PRD D-3 section template and D-4 depth rule. Paraphrase help text, never paste it (it contains em dashes and bare <id> placeholders). No em or en dash anywhere in the page. Sections follow the PRD page-to-verb map order and `## Get help` stays the last H2 on new pages (insert new sections above it). Write `$` in prose as &#36; and `<` before a digit as &lt;. Create the page with exact D-2 frontmatter, a two-sentence intro that links the pipeline page per D-7 (features/issue-pipeline if `test -f features/issue-pipeline.mdx` succeeds after pan sync-main, else /features/convoys). `## pan plan`: all options (`--auto-start` row says deprecated, use `pan start <id>`), subcommands finalize and done with their options; link /features/planning. `## pan task`: all eight subcommands; the Item: <id> trailer rule for done; link /features/planning#work-through-the-checklist-with-pan-task. `## pan scope`: describe the code behavior (status fields rewritten in place, no file moves) per D-6 and link /features/planning#change-lifecycle-status-with-pan-scope. `## Get help` with Discord and GitHub Issues."
+        },
+        "items": [
+          {
+            "id": "pipe-page-plan.ac1",
+            "title": "When the PRD FR-5 loops for plan, task and scope run against the page, then they print nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipe-page-plan.ac2",
+            "title": "The pan plan section marks `--auto-start` as deprecated in favor of `pan start <id>` and lists `pan plan finalize` and `pan plan done <id>`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipe-page-plan.ac3",
+            "title": "The pan scope section contains a sentence stating that the subcommands rewrite the spec's status in place and never move a file, and links /features/planning#change-lifecycle-status-with-pan-scope",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipe-page-plan.ac4",
+            "title": "The page frontmatter contains the title \"Issue pipeline commands: plan, task, show, close and the Flywheel\" and the page ends with `## Get help` linking Discord and GitHub Issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipe-observe",
+        "title": "Add pan show, pan staffing and pan parked sections",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:07:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/pipeline-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for v in show staffing parked; do grep -q \"^## pan $v\\b\" cli/pipeline-commands.mdx || echo \"NO SECTION $v\"; done",
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/pipeline-commands.mdx"
+          ],
+          "expected_outputs": [
+            "both greps print nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 6. Re-run `pan <verb> --help` (with OVERDECK_RTK_ENABLED=0) and re-grep the PRD Background anchors before writing. Follow PRD D-3 section template and D-4 depth rule. Paraphrase help text, never paste it (it contains em dashes and bare <id> placeholders). No em or en dash anywhere in the page. Sections follow the PRD page-to-verb map order and `## Get help` stays the last H2 on new pages (insert new sections above it). Write `$` in prose as &#36; and `<` before a digit as &lt;. `## pan show <id>` (options --cv, --context, --health, --json; read src/cli/commands/show.ts to describe the default output). `## pan staffing <id>` (read-only; resolves from config.yaml and projects.yaml; no override flags; one-off model via `pan start --model`). `## pan parked` (parked orbits, oldest first, why parked and release condition; --json)."
+        },
+        "items": [
+          {
+            "id": "pipe-observe.ac1",
+            "title": "The pan show section contains the options --cv, --context, --health and --json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipe-observe.ac2",
+            "title": "The pan staffing section contains a sentence stating that it is read-only and that a one-off model is passed with `pan start --model`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipe-observe.ac3",
+            "title": "The pan parked section contains a sentence stating that issues print oldest first with why each is parked and what would release it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipe-ask-answer",
+        "title": "Add pan ask and pan answer sections",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:07:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/pipeline-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for v in ask answer; do grep -q \"^## pan $v\\b\" cli/pipeline-commands.mdx || echo \"NO SECTION $v\"; done",
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/pipeline-commands.mdx"
+          ],
+          "expected_outputs": [
+            "both greps print nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 7. Re-run `pan <verb> --help` (with OVERDECK_RTK_ENABLED=0) and re-grep the PRD Background anchors before writing. Follow PRD D-3 section template and D-4 depth rule. Paraphrase help text, never paste it (it contains em dashes and bare <id> placeholders). No em or en dash anywhere in the page. Sections follow the PRD page-to-verb map order and `## Get help` stays the last H2 on new pages (insert new sections above it). Write `$` in prose as &#36; and `<` before a digit as &lt;. `## pan ask <id> [question]`: run by a work agent; records a blocking decision in the issue's pipeline journal; shows under Needs you in the dashboard; the answer arrives as a message in the agent's session; options --option (2 to 4 times), --context, --withdraw. `## pan answer <id> [option]`: shows a numbered choice menu on screen in an agent's pane, or picks option n; id forms per PRD Background; the three error cases. One explicit sentence that `pan answer` does not answer a `pan ask` request, which the operator answers from Needs you."
+        },
+        "items": [
+          {
+            "id": "pipe-ask-answer.ac1",
+            "title": "The pan ask section contains a sentence stating that the question appears under Needs you and that the answer arrives as a message in the agent's session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipe-ask-answer.ac2",
+            "title": "The pan answer section contains a sentence stating that `pan answer` answers a choice menu in an agent's pane and does not answer a `pan ask` request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipe-ask-answer.ac3",
+            "title": "The pan answer section shows both forms `pan answer <id>` and `pan answer <id> <option>`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipe-close-strike",
+        "title": "Add pan close and pan strike sections",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:07:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/pipeline-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for v in close strike; do grep -q \"^## pan $v\\b\" cli/pipeline-commands.mdx || echo \"NO SECTION $v\"; done",
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/pipeline-commands.mdx",
+            "grep -c -- '--accept-' cli/pipeline-commands.mdx"
+          ],
+          "expected_outputs": [
+            "first two greps print nothing",
+            "accept count is at least 8"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 8. Re-run `pan <verb> --help` (with OVERDECK_RTK_ENABLED=0) and re-grep the PRD Background anchors before writing. Follow PRD D-3 section template and D-4 depth rule. Paraphrase help text, never paste it (it contains em dashes and bare <id> placeholders). No em or en dash anywhere in the page. Sections follow the PRD page-to-verb map order and `## Get help` stays the last H2 on new pages (insert new sections above it). Write `$` in prose as &#36; and `<` before a digit as &lt;. Read src/cli/commands/close.ts first. `## pan close <id>`: verifies the eight Definition of Done rows in order (Review passed, Tests passed, Verification green on the branch, Merged to main, Post-merge lifecycle ran, Verified on main, Version strings propagated, Deployed), cleans up, closes the issue on the tracker; table of the eight --accept-* options; --abandon <reason> and --residue <reason> are operator-conversation only and cannot be combined with each other or with --accept-*; --force, --json. `## pan strike <ids...>`: bypasses plan, review, test and ship and opens a PR against main for the operator to merge; options --model, --harness, --effort, --dry-run."
+        },
+        "items": [
+          {
+            "id": "pipe-close-strike.ac1",
+            "title": "The pan close section contains all eight Definition of Done rows in order and has a table row for each of the eight `--accept-*` options",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipe-close-strike.ac2",
+            "title": "The pan close section contains a sentence stating that `--abandon` and `--residue` are operator-conversation only and cannot be combined with `--accept-*`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipe-close-strike.ac3",
+            "title": "The pan strike section contains a sentence stating that a strike bypasses plan, review, test and ship and opens a PR against main for the operator to merge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipe-flywheel",
+        "title": "Add pan flywheel, pan orders, pan backlog and pan merge sections",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:07:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/pipeline-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for v in flywheel orders backlog merge; do grep -q \"^## pan $v\\b\" cli/pipeline-commands.mdx || echo \"NO SECTION $v\"; done",
+            "for s in $(OVERDECK_RTK_ENABLED=0 pan flywheel --help | awk '/^Commands:/{p=1;next} p&&/^  [a-z]/{print $1}' | sed 's/|.*//' | grep -vx help); do grep -q \"pan flywheel $s\" cli/pipeline-commands.mdx || echo \"MISSING flywheel $s\"; done",
+            "for s in $(OVERDECK_RTK_ENABLED=0 pan orders --help | awk '/^Commands:/{p=1;next} p&&/^  [a-z]/{print $1}' | sed 's/|.*//' | grep -vx help); do grep -q \"pan orders $s\" cli/pipeline-commands.mdx || echo \"MISSING orders $s\"; done",
+            "for s in $(OVERDECK_RTK_ENABLED=0 pan backlog --help | awk '/^Commands:/{p=1;next} p&&/^  [a-z]/{print $1}' | sed 's/|.*//' | grep -vx help); do grep -q \"pan backlog $s\" cli/pipeline-commands.mdx || echo \"MISSING backlog $s\"; done",
+            "for s in $(OVERDECK_RTK_ENABLED=0 pan merge --help | awk '/^Commands:/{p=1;next} p&&/^  [a-z]/{print $1}' | sed 's/|.*//' | grep -vx help); do grep -q \"pan merge $s\" cli/pipeline-commands.mdx || echo \"MISSING merge $s\"; done",
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/pipeline-commands.mdx"
+          ],
+          "expected_outputs": [
+            "all loops and greps print nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 9. Re-run `pan <verb> --help` (with OVERDECK_RTK_ENABLED=0) and re-grep the PRD Background anchors before writing. Follow PRD D-3 section template and D-4 depth rule. Paraphrase help text, never paste it (it contains em dashes and bare <id> placeholders). No em or en dash anywhere in the page. Sections follow the PRD page-to-verb map order and `## Get help` stays the last H2 on new pages (insert new sections above it). Write `$` in prose as &#36; and `<` before a digit as &lt;. Each section has a subcommand table with the D-4 third column Options. Link /configuration/order-books#use-the-cli and the Flywheel page per D-7 (features/flywheel only if `test -f features/flywheel.mdx` succeeds after pan sync-main). `pan backlog write-sequence <file>` validates a SequenceDoc JSON file, writes .pan/backlog/sequence.md and commits it. `pan merge cancel <id>` cancels a pending Flywheel auto-merge during its cooldown window; link /configuration/auto-merge#cancelling."
+        },
+        "items": [
+          {
+            "id": "pipe-flywheel.ac1",
+            "title": "When the PRD FR-5 loops for flywheel, orders, backlog and merge run, then they print nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipe-flywheel.ac2",
+            "title": "The pan merge section contains a sentence stating that `pan merge cancel <id>` cancels a pending Flywheel auto-merge during its cooldown window and links /configuration/auto-merge#cancelling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipe-flywheel.ac3",
+            "title": "The pan orders section contains a link to /configuration/order-books#use-the-cli",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipe-swarm-spawn",
+        "title": "Add pan swarm and pan spawn sections",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:07:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/pipeline-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for v in swarm spawn; do grep -q \"^## pan $v\\b\" cli/pipeline-commands.mdx || echo \"NO SECTION $v\"; done",
+            "for s in $(OVERDECK_RTK_ENABLED=0 pan swarm --help | awk '/^Commands:/{p=1;next} p&&/^  [a-z]/{print $1}' | sed 's/|.*//' | grep -vx help); do grep -q \"pan swarm $s\" cli/pipeline-commands.mdx || echo \"MISSING swarm $s\"; done",
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/pipeline-commands.mdx"
+          ],
+          "expected_outputs": [
+            "all loops and greps print nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 10. Re-run `pan <verb> --help` (with OVERDECK_RTK_ENABLED=0) and re-grep the PRD Background anchors before writing. Follow PRD D-3 section template and D-4 depth rule. Paraphrase help text, never paste it (it contains em dashes and bare <id> placeholders). No em or en dash anywhere in the page. Sections follow the PRD page-to-verb map order and `## Get help` stays the last H2 on new pages (insert new sections above it). Write `$` in prose as &#36; and `<` before a digit as &lt;. `## pan swarm`: all nine subcommands with options column; link /features/swarm#cli. `## pan spawn`: creates a worker pane for one xBRIEF item in its own item worktree; options --issue, --item, --model, --harness, --effort, --shared (foreman or operator only, serial use)."
+        },
+        "items": [
+          {
+            "id": "pipe-swarm-spawn.ac1",
+            "title": "When the PRD FR-5 loop for swarm runs, then it prints nothing and the pan swarm section contains a link to /features/swarm#cli",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipe-swarm-spawn.ac2",
+            "title": "The pan spawn section contains a sentence stating that `--shared` runs the worker in the issue workspace and is for the foreman or operator only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mem-page",
+        "title": "Create cli/memory-commands.mdx with the pan memory section and Get help",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:07:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/memory-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for v in memory; do grep -q \"^## pan $v\\b\" cli/memory-commands.mdx || echo \"NO SECTION $v\"; done",
+            "for s in $(OVERDECK_RTK_ENABLED=0 pan memory --help | awk '/^Commands:/{p=1;next} p&&/^  [a-z]/{print $1}' | sed 's/|.*//' | grep -vx help); do grep -q \"pan memory $s\" cli/memory-commands.mdx || echo \"MISSING memory $s\"; done",
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/memory-commands.mdx",
+            "head -6 cli/memory-commands.mdx"
+          ],
+          "expected_outputs": [
+            "loops print nothing",
+            "dash grep prints nothing",
+            "frontmatter shows the PRD D-2 title, sidebarTitle and description"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "FR-10",
+            "FR-11",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 11. Re-run `pan <verb> --help` (with OVERDECK_RTK_ENABLED=0) and re-grep the PRD Background anchors before writing. Follow PRD D-3 section template and D-4 depth rule. Paraphrase help text, never paste it (it contains em dashes and bare <id> placeholders). No em or en dash anywhere in the page. Sections follow the PRD page-to-verb map order and `## Get help` stays the last H2 on new pages (insert new sections above it). Write `$` in prose as &#36; and `<` before a digit as &lt;. Create the page with exact D-2 frontmatter, an intro naming curated facts, observation memory and pinned docs, `## pan memory` with the subcommand table grouped facts (add, list, show, edit, retire, lint, sync, reindex), observations (search, status, timeline, summary, reset, backfill, doctor, config, read), pins (pin, unpin, pins); options tables only for search, add, list, show, edit, retire, lint, sync (D-4); the store options --user, --machine, --project of `pan memory add`; link /configuration/memory; `## Get help` with Discord and GitHub Issues."
+        },
+        "items": [
+          {
+            "id": "mem-page.ac1",
+            "title": "When the PRD FR-5 loop for memory runs against the page, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-page.ac2",
+            "title": "The pan memory subcommand table contains rows grouped under facts, observations and pins in the PRD order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-page.ac3",
+            "title": "The pan memory add options table lists --user, --machine and --project and the section contains a link to /configuration/memory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-page.ac4",
+            "title": "The page frontmatter contains the title \"Memory and context commands: pan memory, context and knowledge\" and the page ends with `## Get help` linking Discord and GitHub Issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mem-context-knowledge",
+        "title": "Add pan context, pan knowledge, pan docs and pan briefing sections",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:07:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/memory-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for v in context knowledge docs briefing; do grep -q \"^## pan $v\\b\" cli/memory-commands.mdx || echo \"NO SECTION $v\"; done",
+            "for s in $(OVERDECK_RTK_ENABLED=0 pan context --help | awk '/^Commands:/{p=1;next} p&&/^  [a-z]/{print $1}' | sed 's/|.*//' | grep -vx help); do grep -q \"pan context $s\" cli/memory-commands.mdx || echo \"MISSING context $s\"; done",
+            "for s in $(OVERDECK_RTK_ENABLED=0 pan knowledge --help | awk '/^Commands:/{p=1;next} p&&/^  [a-z]/{print $1}' | sed 's/|.*//' | grep -vx help); do grep -q \"pan knowledge $s\" cli/memory-commands.mdx || echo \"MISSING knowledge $s\"; done",
+            "for s in $(OVERDECK_RTK_ENABLED=0 pan docs --help | awk '/^Commands:/{p=1;next} p&&/^  [a-z]/{print $1}' | sed 's/|.*//' | grep -vx help); do grep -q \"pan docs $s\" cli/memory-commands.mdx || echo \"MISSING docs $s\"; done",
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/memory-commands.mdx"
+          ],
+          "expected_outputs": [
+            "all loops and greps print nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 12. Re-run `pan <verb> --help` (with OVERDECK_RTK_ENABLED=0) and re-grep the PRD Background anchors before writing. Follow PRD D-3 section template and D-4 depth rule. Paraphrase help text, never paste it (it contains em dashes and bare <id> placeholders). No em or en dash anywhere in the page. Sections follow the PRD page-to-verb map order and `## Get help` stays the last H2 on new pages (insert new sections above it). Write `$` in prose as &#36; and `<` before a digit as &lt;. `## pan context` (seven subcommands; link /configuration/context-layers#cli). `## pan knowledge [id]` (runs a knowledge maintenance agent for an issue; --focus, --retro, --model, --effort; `pan knowledge open`; link /configuration/knowledge). `## pan docs` (four subcommands; read src/cli/commands/docs.ts to state what the index holds and what injection does; do not paste the issue number from its help). `## pan briefing` (prints the live session briefing markdown; --cwd)."
+        },
+        "items": [
+          {
+            "id": "mem-context-knowledge.ac1",
+            "title": "When the PRD FR-5 loops for context, knowledge and docs run against the page, then they print nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-context-knowledge.ac2",
+            "title": "The pan context section contains a link to /configuration/context-layers#cli and the pan knowledge section contains a link to /configuration/knowledge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-context-knowledge.ac3",
+            "title": "The pan briefing section contains a sentence stating that it prints the live session briefing and names the `--cwd` option",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "core-restart-reload",
+        "title": "Rewrite pan restart and add pan reload in cli/core-commands.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:07:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/core-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for v in restart reload; do grep -q \"^## pan $v\\b\" cli/core-commands.mdx || echo \"NO SECTION $v\"; done",
+            "for s in $(OVERDECK_RTK_ENABLED=0 pan restart --help | awk '/^Commands:/{p=1;next} p&&/^  [a-z]/{print $1}' | sed 's/|.*//' | grep -vx help); do grep -q \"pan restart $s\" cli/core-commands.mdx || echo \"MISSING restart $s\"; done",
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/core-commands.mdx",
+            "awk '/^## pan restart/,/^## pan health/' cli/core-commands.mdx | grep -c 3010 ; true",
+            "head -4 cli/core-commands.mdx"
+          ],
+          "expected_outputs": [
+            "loops and dash grep print nothing",
+            "3010 count prints 0 for the restart section",
+            "description is the D-2 core description"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 13. Re-run `pan <verb> --help` (with OVERDECK_RTK_ENABLED=0) and re-grep the PRD Background anchors before writing. Follow PRD D-3 section template and D-4 depth rule. Paraphrase help text, never paste it (it contains em dashes and bare <id> placeholders). No em or en dash anywhere in the page. Sections follow the PRD page-to-verb map order and `## Get help` stays the last H2 on new pages (insert new sections above it). Write `$` in prose as &#36; and `<` before a digit as &lt;. Replace `## pan restart` (from its heading to the line before `## pan health`, anchor `Frees ports (3010, 3011)`) with a D-3 section: default dashboard only, --cliproxy, --traefik, --full, the operator approval wait and --now, subcommands approve, hold (--reason, --until, --status), release, and every option. Add `## pan reload` after `## pan health`: works only from an Overdeck source checkout, builds origin/main into a new deployment and restarts only if the build succeeds; uncommitted changes and a HEAD that differs from origin/main are excluded; --no-deacon refused; an npm install uses `pan update`; every option. Replace the frontmatter description with the D-2 text. Remove all six em dashes in the page (D-8). Do not rewrite pan up, pan down or pan health (D-9)."
+        },
+        "items": [
+          {
+            "id": "core-restart-reload.ac1",
+            "title": "The pan restart section contains `pan restart hold`, `pan restart release`, `pan restart approve` and `--now`, and states that the default restarts only the dashboard",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-restart-reload.ac2",
+            "title": "The pan restart section no longer contains the text `3010`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-restart-reload.ac3",
+            "title": "The pan reload section contains a sentence stating that it builds origin/main of an Overdeck source checkout and restarts the dashboard only after the build succeeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-restart-reload.ac4",
+            "title": "When `grep -nP '[\\x{2013}\\x{2014}]' cli/core-commands.mdx` runs, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "core-shutdown-update",
+        "title": "Add pan shutdown and pan update sections to core commands",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:07:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/core-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for v in shutdown update; do grep -q \"^## pan $v\\b\" cli/core-commands.mdx || echo \"NO SECTION $v\"; done",
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/core-commands.mdx",
+            "grep -c -- '--finish' cli/core-commands.mdx ; true"
+          ],
+          "expected_outputs": [
+            "first two greps print nothing",
+            "--finish count prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 14. Re-run `pan <verb> --help` (with OVERDECK_RTK_ENABLED=0) and re-grep the PRD Background anchors before writing. Follow PRD D-3 section template and D-4 depth rule. Paraphrase help text, never paste it (it contains em dashes and bare <id> placeholders). No em or en dash anywhere in the page. Sections follow the PRD page-to-verb map order and `## Get help` stays the last H2 on new pages (insert new sections above it). Write `$` in prose as &#36; and `<` before a digit as &lt;. Insert after `## pan reload` (D-10 order). `## pan shutdown`: every option from help (--deadline default 120, range 10 to 3600, --reboot Linux, --force, --cancel, --status, --no-wait); link /features/safe-shutdown; never document the hidden --finish. `## pan update`: checks npm for the latest @overdeck/core, installs it, runs an automatic sync, and says to restart the dashboard and running agents; --check, --force; a source checkout uses `pan reload` instead."
+        },
+        "items": [
+          {
+            "id": "core-shutdown-update.ac1",
+            "title": "The pan shutdown section contains --deadline, --reboot, --force, --cancel, --status and --no-wait, links /features/safe-shutdown, and does not contain `--finish`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-shutdown-update.ac2",
+            "title": "The pan update section contains a sentence stating that it installs the latest @overdeck/core from npm and names --check and --force",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "core-cost-models",
+        "title": "Add pan cost and pan models sections to core commands",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:07:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/core-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for v in cost models; do grep -q \"^## pan $v\\b\" cli/core-commands.mdx || echo \"NO SECTION $v\"; done",
+            "for s in $(OVERDECK_RTK_ENABLED=0 pan cost --help | awk '/^Commands:/{p=1;next} p&&/^  [a-z]/{print $1}' | sed 's/|.*//' | grep -vx help); do grep -q \"pan cost $s\" cli/core-commands.mdx || echo \"MISSING cost $s\"; done",
+            "for s in $(OVERDECK_RTK_ENABLED=0 pan cost budget --help | awk '/^Commands:/{p=1;next} p&&/^  [a-z]/{print $1}' | sed 's/|.*//' | grep -vx help); do grep -q \"pan cost budget $s\" cli/core-commands.mdx || echo \"MISSING cost budget $s\"; done",
+            "for s in $(OVERDECK_RTK_ENABLED=0 pan models --help | awk '/^Commands:/{p=1;next} p&&/^  [a-z]/{print $1}' | sed 's/|.*//' | grep -vx help); do grep -q \"pan models $s\" cli/core-commands.mdx || echo \"MISSING models $s\"; done",
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/core-commands.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "loops and dash grep print nothing",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 15. Re-run `pan <verb> --help` (with OVERDECK_RTK_ENABLED=0) and re-grep the PRD Background anchors before writing. Follow PRD D-3 section template and D-4 depth rule. Paraphrase help text, never paste it (it contains em dashes and bare <id> placeholders). No em or en dash anywhere in the page. Sections follow the PRD page-to-verb map order and `## Get help` stays the last H2 on new pages (insert new sections above it). Write `$` in prose as &#36; and `<` before a digit as &lt;. `## pan cost`: every subcommand with options column; `pan cost budget create <name>`, `list`, `check <id>`, `delete <id>` as rows; one sentence that `pan cost` reports Overdeck's recorded agent costs while `pan conv cost` estimates API cost across discovered sessions (re-read both helps and src/cli/commands/cost.ts to state the difference accurately); currency in prose as &#36;; link the costs page only if features/costs.mdx exists (D-7). `## pan models`: `pan models preset list|show|apply|undo` with options; link /configuration/model-presets#apply-a-preset."
+        },
+        "items": [
+          {
+            "id": "core-cost-models.ac1",
+            "title": "When the PRD FR-5 loops for cost, cost budget and models run against cli/core-commands.mdx, then they print nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-cost-models.ac2",
+            "title": "The pan cost section contains a sentence distinguishing `pan cost` from `pan conv cost`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-cost-models.ac3",
+            "title": "The pan models section contains a link to /configuration/model-presets#apply-a-preset and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "core-misc",
+        "title": "Add pan integrate, pan tts, pan backup and pan restore sections and Next Steps links",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:07:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/core-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for v in integrate tts backup restore; do grep -q \"^## pan $v\\b\" cli/core-commands.mdx || echo \"NO SECTION $v\"; done",
+            "for s in $(OVERDECK_RTK_ENABLED=0 pan integrate --help | awk '/^Commands:/{p=1;next} p&&/^  [a-z]/{print $1}' | sed 's/|.*//' | grep -vx help); do grep -q \"pan integrate $s\" cli/core-commands.mdx || echo \"MISSING integrate $s\"; done",
+            "for s in $(OVERDECK_RTK_ENABLED=0 pan tts --help | awk '/^Commands:/{p=1;next} p&&/^  [a-z]/{print $1}' | sed 's/|.*//' | grep -vx help); do grep -q \"pan tts $s\" cli/core-commands.mdx || echo \"MISSING tts $s\"; done",
+            "for s in $(OVERDECK_RTK_ENABLED=0 pan backup --help | awk '/^Commands:/{p=1;next} p&&/^  [a-z]/{print $1}' | sed 's/|.*//' | grep -vx help); do grep -q \"pan backup $s\" cli/core-commands.mdx || echo \"MISSING backup $s\"; done",
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/core-commands.mdx",
+            "awk '/^## Next Steps/,0' cli/core-commands.mdx"
+          ],
+          "expected_outputs": [
+            "loops and dash grep print nothing",
+            "Next Steps lists /cli/conversation-commands, /cli/pipeline-commands and /cli/memory-commands"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 16. Re-run `pan <verb> --help` (with OVERDECK_RTK_ENABLED=0) and re-grep the PRD Background anchors before writing. Follow PRD D-3 section template and D-4 depth rule. Paraphrase help text, never paste it (it contains em dashes and bare <id> placeholders). No em or en dash anywhere in the page. Sections follow the PRD page-to-verb map order and `## Get help` stays the last H2 on new pages (insert new sections above it). Write `$` in prose as &#36; and `<` before a digit as &lt;. `## pan integrate` (file-manager with --remove and --dry-run; link /features/open-in-overdeck). `## pan tts` (seven subcommands; link configuration/voice only if that file exists, D-7). `## pan backup` (list --json, clean --keep default 10; pan sync backs up the synced skill and command directories before each sync; backups in ~/.overdeck/backups/). `## pan restore [timestamp]` (no timestamp: pick from the 10 newest; restores into the Claude Code skill and command directories). Add three bullets to `## Next Steps` linking the new pages."
+        },
+        "items": [
+          {
+            "id": "core-misc.ac1",
+            "title": "When the PRD FR-5 loops for integrate, tts and backup run against cli/core-commands.mdx, then they print nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-misc.ac2",
+            "title": "The pan backup section contains a sentence stating that `pan sync` creates a backup before each sync and that backups live in ~/.overdeck/backups/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-misc.ac3",
+            "title": "The Next Steps section of cli/core-commands.mdx contains links to /cli/conversation-commands, /cli/pipeline-commands and /cli/memory-commands",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "nav-overview",
+        "title": "Add the three pages to docs.json navigation and cli/overview.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:07:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs.json",
+            "cli/overview.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'cli/agent-commands\\|cli/conversation-commands\\|cli/pipeline-commands\\|cli/skills-commands\\|cli/memory-commands' docs.json",
+            "grep -c 'cli/conversation-commands\\|cli/pipeline-commands\\|cli/memory-commands' cli/overview.mdx",
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/overview.mdx",
+            "python3 -c \"import json;json.load(open('docs.json'))\""
+          ],
+          "expected_outputs": [
+            "order is agent-commands, conversation-commands, pipeline-commands, then skills-commands, memory-commands",
+            "overview count is at least 3",
+            "dash grep prints nothing",
+            "docs.json parses"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 17. Insert \"cli/conversation-commands\" and \"cli/pipeline-commands\" directly after \"cli/agent-commands\", and \"cli/memory-commands\" directly after \"cli/skills-commands\" in the CLI Reference group. In cli/overview.mdx add Command Structure rows Pipeline and Memory (PRD WI 17 examples), link the Conversations row to /cli/conversation-commands, add three Next Steps bullets, and remove the em dash on line 19. Minimal insertions only: sibling issues edit both files."
+        },
+        "items": [
+          {
+            "id": "nav-overview.ac1",
+            "title": "Given docs.json, when the nav grep runs, then cli/conversation-commands and cli/pipeline-commands sit directly after cli/agent-commands and cli/memory-commands sits directly after cli/skills-commands",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "nav-overview.ac2",
+            "title": "cli/overview.mdx contains links to /cli/conversation-commands, /cli/pipeline-commands and /cli/memory-commands from Next Steps and has Pipeline and Memory rows in the Command Structure table",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "nav-overview.ac3",
+            "title": "When the dash grep runs on cli/overview.mdx, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cross-links",
+        "title": "Link the new pages from five related pages",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:07:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "features/planning.mdx",
+            "configuration/memory.mdx",
+            "configuration/order-books.mdx",
+            "cli/agent-commands.mdx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -c 'cli/conversation-commands' features/conversations.mdx cli/agent-commands.mdx",
+            "grep -c 'cli/pipeline-commands' features/planning.mdx configuration/order-books.mdx cli/agent-commands.mdx",
+            "grep -c 'cli/memory-commands' configuration/memory.mdx",
+            "git diff origin/main...HEAD -U0 -- features/conversations.mdx features/planning.mdx configuration/memory.mdx configuration/order-books.mdx cli/agent-commands.mdx | grep '^+' | grep -P '[\\x{2013}\\x{2014}]'"
+          ],
+          "expected_outputs": [
+            "each count is at least 1",
+            "dash grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 18. Add one dash-free link line to each: features/conversations.mdx `## See also` bullet to /cli/conversation-commands; features/planning.mdx `### From the CLI` sentence linking /cli/pipeline-commands; configuration/memory.mdx `## Adding and curating facts` sentence linking /cli/memory-commands#pan-memory; configuration/order-books.mdx `## Use the CLI` sentence linking /cli/pipeline-commands#pan-orders; cli/agent-commands.mdx `## Next Steps` bullets to /cli/conversation-commands and /cli/pipeline-commands. Do not edit other lines (D-8)."
+        },
+        "items": [
+          {
+            "id": "cross-links.ac1",
+            "title": "Each of the five pages contains a link to /cli/conversation-commands, /cli/pipeline-commands or /cli/memory-commands as listed in PRD Work item 18",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cross-links.ac2",
+            "title": "When the dash grep runs on the lines this item added, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "validate-and-record",
+        "title": "Run the completeness, flag, dash, frontmatter and Mintlify checks and record them",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:07:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/conversation-commands.mdx",
+            "cli/pipeline-commands.mdx",
+            "cli/memory-commands.mdx",
+            "cli/core-commands.mdx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx -y mint@4.3.49 validate",
+            "npx -y mint@4.3.49 broken-links",
+            "npm run lint:docs",
+            "for f in cli/conversation-commands.mdx cli/pipeline-commands.mdx cli/memory-commands.mdx; do grep '^## ' $f | tail -1; done",
+            "git diff --name-only origin/main...HEAD | grep -E '^(src|scripts|tests|packages|apps)/|^changelog\\.d/'"
+          ],
+          "expected_outputs": [
+            "validate exits 0 and adds no warning naming a touched page compared with the origin/main baseline",
+            "broken-links prints 'no broken links found'",
+            "lint:docs exits 0",
+            "each new page prints '## Get help'",
+            "scope grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-11",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 19. Run `pan sync-main` first, then every command block in PRD Work item 19: FR-5 completeness for all four pages; FR-6 flag check using the helpdump helper and $HOME/.overdeck/tmp/pan-5478-help/ (whole file for the three new pages, added lines only for cli/core-commands.mdx); dash greps; frontmatter title and description checks for all eleven touched doc files; the last-H2 check; lint:docs; the mint baseline (validate in a detached worktree of origin/main at $HOME/.overdeck/tmp/pan-5478-main, then on the branch, then compare warnings naming touched pages; remove the worktree afterwards with git worktree remove); mint broken-links; scope grep. Never run `mint validate --fix` or mint@latest. Fix lines on pages this PR touches (commit under the owning item's trailer); report but do not edit failures on untouched pages. Record results in an allow-empty commit `chore: record docs site validation for PAN-5478` quoting each mint command's exit code and final line, and paste both full mint outputs under `## Mintlify checks` in the PR body."
+        },
+        "items": [
+          {
+            "id": "validate-and-record.ac1",
+            "title": "When the FR-5 completeness loops and the FR-6 flag loops run for all four pages, then they print nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-record.ac2",
+            "title": "When npx -y mint@4.3.49 broken-links runs on the branch, then it exits 0 and prints no broken links found",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-record.ac3",
+            "title": "When npx -y mint@4.3.49 validate runs on the branch and on origin/main, then the branch exits 0 and prints no warning naming a touched page that the origin/main run does not also print",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-record.ac4",
+            "title": "When the frontmatter checks run on all eleven touched doc files, then each description measures 50 to 160 characters and no title or description contains an em or en dash, and the last H2 of each new page prints as Get help",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-record.ac5",
+            "title": "The PR body contains a Mintlify checks section with both mint outputs and the validation commit records each mint exit code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "conv-page",
+        "to": "conv-handoff-fork",
+        "type": "blocks"
+      },
+      {
+        "from": "conv-handoff-fork",
+        "to": "conv-tell-resume",
+        "type": "blocks"
+      },
+      {
+        "from": "conv-tell-resume",
+        "to": "conv-open-share",
+        "type": "blocks"
+      },
+      {
+        "from": "pipe-page-plan",
+        "to": "pipe-observe",
+        "type": "blocks"
+      },
+      {
+        "from": "pipe-observe",
+        "to": "pipe-ask-answer",
+        "type": "blocks"
+      },
+      {
+        "from": "pipe-ask-answer",
+        "to": "pipe-close-strike",
+        "type": "blocks"
+      },
+      {
+        "from": "pipe-close-strike",
+        "to": "pipe-flywheel",
+        "type": "blocks"
+      },
+      {
+        "from": "pipe-flywheel",
+        "to": "pipe-swarm-spawn",
+        "type": "blocks"
+      },
+      {
+        "from": "mem-page",
+        "to": "mem-context-knowledge",
+        "type": "blocks"
+      },
+      {
+        "from": "core-restart-reload",
+        "to": "core-shutdown-update",
+        "type": "blocks"
+      },
+      {
+        "from": "core-shutdown-update",
+        "to": "core-cost-models",
+        "type": "blocks"
+      },
+      {
+        "from": "core-cost-models",
+        "to": "core-misc",
+        "type": "blocks"
+      },
+      {
+        "from": "conv-page",
+        "to": "nav-overview",
+        "type": "blocks"
+      },
+      {
+        "from": "pipe-page-plan",
+        "to": "nav-overview",
+        "type": "blocks"
+      },
+      {
+        "from": "mem-page",
+        "to": "nav-overview",
+        "type": "blocks"
+      },
+      {
+        "from": "conv-page",
+        "to": "core-misc",
+        "type": "blocks"
+      },
+      {
+        "from": "pipe-page-plan",
+        "to": "core-misc",
+        "type": "blocks"
+      },
+      {
+        "from": "mem-page",
+        "to": "core-misc",
+        "type": "blocks"
+      },
+      {
+        "from": "conv-page",
+        "to": "cross-links",
+        "type": "blocks"
+      },
+      {
+        "from": "pipe-flywheel",
+        "to": "cross-links",
+        "type": "blocks"
+      },
+      {
+        "from": "mem-page",
+        "to": "cross-links",
+        "type": "blocks"
+      },
+      {
+        "from": "conv-open-share",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "pipe-swarm-spawn",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "mem-context-knowledge",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "core-misc",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "nav-overview",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "cross-links",
+        "to": "validate-and-record",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
