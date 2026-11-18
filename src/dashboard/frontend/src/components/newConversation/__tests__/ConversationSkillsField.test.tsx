@@ -271,6 +271,39 @@ describe('ConversationSkillsField', () => {
     expect(parentClose).not.toHaveBeenCalled();
   });
 
+  it('keeps the add dialog and its result when the skills refetch fails after an add', async () => {
+    let added = false;
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      const body = init?.body ? (JSON.parse(String(init.body)) as { id: string }) : null;
+      if (url === '/api/skills/packs/available') {
+        return respond(true, { packs: [], groups: added ? [] : [{ ...VIDEO_GROUP, missing: ['remotion'] }] });
+      }
+      if (url === '/api/skills/packs/preview') {
+        return respond(true, { preview: {
+          id: body!.id, url: 'https://github.com/eltmon/remotion', ref: 'e'.repeat(40), commit: '1'.repeat(40), adapter: 'plain',
+          pluginRoot: null, license: 'MIT', skills: [], excluded: [], notApplied: [], executables: [], mcpServers: [], disclosure: null,
+        } });
+      }
+      if (url === '/api/skills/packs') {
+        added = true;
+        return { ok: true, status: 201, json: async () => ({ added: true }) };
+      }
+      return respond(!added);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderField({ projectKey: 'tst' });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add the video group' }));
+    const dialog = screen.getByRole('dialog', { name: 'Add the video packs' });
+    const trust = await within(dialog).findByRole('button', { name: 'Trust and add 1 pack' });
+    await waitFor(() => expect((trust as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(trust);
+
+    await waitFor(() => expect(screen.getByText('Skills unavailable')).toBeTruthy());
+    expect(screen.getByRole('dialog', { name: 'Add the video packs' })).toBeTruthy();
+    expect(screen.getByText('Added 1 pack.')).toBeTruthy();
+  });
+
   it('shows the CLI command for a group the dashboard cannot add', async () => {
     stubFetch(() => respond(true), {
       packs: [],

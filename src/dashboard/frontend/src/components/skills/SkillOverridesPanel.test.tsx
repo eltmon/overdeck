@@ -494,3 +494,57 @@ describe('skill override sections', () => {
     await waitFor(() => expect(fetchImpl).toHaveBeenCalledWith('/api/skills/overrides?project=tst'));
   });
 });
+
+describe('SkillOverridesPanel — adding known packs (PAN-5540)', () => {
+  const VIDEO = ['remotion', 'hyperframes', 'openmontage', 'video-use'];
+
+  function registeredPack(id: string) {
+    return {
+      id, url: `https://github.com/eltmon/${id}`, ref: 'e'.repeat(40), commit: '1'.repeat(40), adapter: 'plain',
+      license: 'MIT', cached: true, notApplied: [], disclosure: null, duplicatePluginInstall: false,
+      global: null, project: null, issue: null, enabled: false, source: 'default',
+      inherited: { enabled: false, source: 'default' }, skills: [],
+    };
+  }
+
+  it('keeps the add dialog and its result open while the panel refreshes with the new packs', async () => {
+    const added: string[] = [];
+    fetchImpl = vi.fn(async (url: string, init?: RequestInit) => {
+      const body = init?.body ? (JSON.parse(String(init.body)) as { id: string; commit?: string }) : null;
+      if (url === '/api/skills/packs/preview') {
+        return { ok: true, status: 200, json: async () => ({ preview: {
+          id: body!.id, url: `https://github.com/eltmon/${body!.id}`, ref: 'e'.repeat(40), commit: '1'.repeat(40), adapter: 'plain',
+          pluginRoot: null, license: 'MIT', skills: [], excluded: [], notApplied: [], executables: [], mcpServers: [], disclosure: null,
+        } }) };
+      }
+      if (url === '/api/skills/packs') {
+        added.push(body!.id);
+        return { ok: true, status: 201, json: async () => ({ added: true }) };
+      }
+      if (url === '/api/skills/packs/available') {
+        const missing = VIDEO.filter(id => !added.includes(id));
+        return { ok: true, status: 200, json: async () => ({
+          packs: [],
+          groups: [{ name: 'video', packs: VIDEO, source: 'built-in', missing, unknown: [], dashboardAddable: missing.length > 0, addCommand: 'pan skills pack add --group video' }],
+        }) };
+      }
+      return { ok: true, status: 200, json: async () => ({ project: null, issue: null, skills: [GRILLING], packs: added.map(registeredPack) }) };
+    });
+    vi.stubGlobal('fetch', fetchImpl);
+    renderPanel({ level: 'global' });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add the video group' }));
+    const dialog = screen.getByRole('dialog', { name: 'Add the video packs' });
+    const trust = await within(dialog).findByRole('button', { name: 'Trust and add 4 packs' });
+    await waitFor(() => expect((trust as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(trust);
+
+    await waitFor(() => expect(within(dialog).getByText('Added 4 packs.')).toBeTruthy());
+    expect(added).toEqual(VIDEO);
+    // The panel refetched: the packs are registered rows and the Available list is gone, yet the dialog stays.
+    await waitFor(() => expect(document.querySelector('[data-pack="video-use"]')).toBeTruthy());
+    await waitFor(() => expect(screen.queryByTestId('available-packs')).toBeNull());
+    expect(screen.getByRole('dialog', { name: 'Add the video packs' })).toBeTruthy();
+    expect(screen.getByText('Added 4 packs.')).toBeTruthy();
+  });
+});

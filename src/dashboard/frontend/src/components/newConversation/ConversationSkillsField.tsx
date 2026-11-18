@@ -178,10 +178,31 @@ export function ConversationSkillsField({ projectKey, issueId, value, onChange }
     setOpened(prev => ({ ...prev, [group.key]: true }));
   };
 
-  if (query.isLoading) return <p className={styles.note}>Loading skills…</p>;
-  if (query.isError || !groups) return <p className={styles.note}>Skills unavailable</p>;
+  // The add dialog sits at a fixed place in every return below, so a refetch that fails after an add
+  // (the field then shows "Skills unavailable") does not unmount the dialog and its result.
+  const addDialog = addGroup && (
+    <AddPacksDialog title={`Add the ${addGroup.name} packs`} packIds={addGroup.missing} onClose={() => setAddGroup(null)} />
+  );
+
+  if (query.isLoading) {
+    return (
+      <>
+        <p className={styles.note}>Loading skills…</p>
+        {addDialog}
+      </>
+    );
+  }
+  if (query.isError || !groups) {
+    return (
+      <>
+        <p className={styles.note}>Skills unavailable</p>
+        {addDialog}
+      </>
+    );
+  }
 
   return (
+    <>
     <div className={styles.field}>
       <div className={styles.filterField}>
         <span className={styles.lead} aria-hidden="true"><Search size={14} /></span>
@@ -263,13 +284,8 @@ export function ConversationSkillsField({ projectKey, issueId, value, onChange }
           </div>
         ))}
       </div>
-      {addGroup && (
-        <AddPacksDialog
-          title={`Add the ${addGroup.name} packs`}
-          packIds={addGroup.missing}
-          onClose={() => setAddGroup(null)}
-        />
-      )}
     </div>
+    {addDialog}
+    </>
   );
 }
