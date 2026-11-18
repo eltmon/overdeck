@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5480",
   "created": "2026-11-18T20:29:40.360Z",
-  "updated": "2026-11-18T20:32:16.422Z",
+  "updated": "2026-11-18T20:32:24.972Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,6 +34,11 @@
     "quickstart-rewrite.ac5": {
       "status": "completed",
       "doneAt": "2026-11-18T20:32:16.422Z"
+    },
+    "workspaces-anchor-fix": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5480",
+      "claimedAt": "2026-11-18T20:32:24.972Z"
     }
   }
 }
