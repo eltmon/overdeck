@@ -1,0 +1,61 @@
+---
+title: "Docs RAG: Overdeck's own docs in agent prompts"
+sidebarTitle: "Docs RAG"
+description: "How Overdeck injects snippets from its own docs, skills and rules into agent prompts, and how to query, reindex or turn it off."
+---
+
+Docs RAG is retrieval over Overdeck's own developer documentation, skills and rules, injected into an agent's prompt when the prompt looks like it is asking about Overdeck itself. It never indexes your project's own code or docs, and it never touches the published documentation site.
+
+## What it indexes
+
+Docs RAG indexes Overdeck's own package: the Markdown files under `docs/` (not `docs/prds/`), every `SKILL.md` under `sync-sources/skills/`, every rule under `sync-sources/rules/`, and the root `CLAUDE.md`. PRDs are indexed only when `docs.corpus.prds` is turned on; it is off by default. Search runs as SQLite full-text search plus local embeddings.
+
+The index lives at `~/.overdeck/docs/index.sqlite`, and a prebuilt copy ships as `dist/docs-index.sqlite`.
+
+## When snippets are added to a prompt
+
+Injection is on by default. When a prompt mentions one of nine trigger words, in any case, Docs RAG adds a block of at most 5 snippets and 3000 tokens to the prompt, at most once every 10 turns:
+
+```text
+pan, overdeck, cloister, deacon, workspace, specialist, harness, vbrief, workhorse
+```
+
+The callers that inject this way are the Claude Code `UserPromptSubmit` hook and Codex app-server turns.
+
+## Query the index
+
+```bash
+pan docs query "how does the merge train work"
+pan docs reindex
+```
+
+`pan docs reindex` rebuilds the index from this package's own `docs/` folder. That folder does not ship in the published npm package, so reindexing only works from a source checkout of Overdeck, not from an installed copy.
+
+## Turn it off
+
+```bash
+pan docs disable --scope global
+pan docs enable --scope global
+```
+
+`pan docs disable --scope global` turns injection off everywhere; `pan docs enable --scope global` turns it back on. You can also set `docs.enabled: false` to turn off the whole feature, or `docs.prompt_injection: false` to keep the index but stop automatic injection into prompts, in `~/.overdeck/config.yaml`.
+
+## Configuration keys
+
+All Docs RAG keys in `config.yaml` are snake_case, under the top-level `docs` key:
+
+| Key | Controls |
+| --- | --- |
+| `docs.enabled` | Turns the whole feature on or off |
+| `docs.prompt_injection` | Turns automatic prompt injection on or off, independent of the index |
+| `docs.trigger.regexes` | The list of trigger words or patterns above |
+| `docs.trigger.case_sensitive` | Whether trigger matching cares about case |
+| `docs.corpus.*` | Which sources are indexed, including `docs.corpus.prds` |
+| `docs.budget.injection_rate` | How often a prompt is allowed to receive an injection |
+| `docs.budget.turn_window` | The turn window the injection rate is measured over |
+| `docs.budget.max_tokens_per_injection` | The token cap on one injected block |
+| `docs.budget.max_chunks_per_injection` | The snippet-count cap on one injected block |
+
+## Get help
+
+Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file an issue on [GitHub Issues](https://github.com/eltmon/overdeck/issues).
