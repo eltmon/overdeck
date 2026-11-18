@@ -123,6 +123,20 @@ Each card shows the question, why it came up, and when (`tick <n> · HH:MM · <a
 
 The top bar's `Needs you · N` button counts the one shared Needs-you list, which includes Flywheel items, and is always shown. See [Issue pipeline](/features/issue-pipeline) for Needs you in general.
 
+## Parked issues and pan parked
+
+These are two different things, and the page keeps them apart.
+
+**The loop parks** an issue it cannot decide for itself, such as ambiguous scope or a destructive step outside the acceptance criteria, by listing it in `.pan/parked.md` with a one-line reason, then moves on to the next pick. It skips any issue that already carries the `parked` label or a `.pan/parked.md` listing. You can park an issue yourself with the **Park** toggle in the pickup controls, which sets the `parked` label; such an issue shows state `parked` in `pan show`. To unpark it, remove the label or delete its line from `.pan/parked.md`.
+
+**`pan parked`** lists a different set: issues stalled in one of three orbits, oldest first, each with why and how to release it:
+
+- `operator-gate`: an agent you paused, one marked troubled, one you stopped, or an open `pan ask` decision waiting in Needs you. Release it with `pan unpause <id>`, `pan untroubled <id>`, `pan start <id>`, or by answering the `pan ask` decision.
+- `zombie-session`: a live agent on an issue that is already closed.
+- `idle-running`: a live agent idle for 6 hours or more with no pipeline stage owning the next move.
+
+`--json` prints the raw rows. `pan parked` does not list issues parked by the `parked` label or by a `.pan/parked.md` listing; those only ever show up on this page.
+
 ## Known limits
 
 - The loop's author gate names fixed GitHub logins: it acts only on issues whose author is `eltmon` (the Overdeck maintainer) or `panopticon-agent[bot]`, or that are assigned to `eltmon`. On any other repo or account the loop skips your issues, and the current GitHub App bot (`overdeck-agent[bot]`) does not pass it either. See [issue #5544](https://github.com/eltmon/overdeck/issues/5544).
