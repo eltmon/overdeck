@@ -2,9 +2,15 @@
   "version": "1",
   "issueId": "PAN-5505",
   "created": "2026-11-18T15:55:14.402Z",
-  "updated": "2026-11-18T16:00:49.113Z",
+  "updated": "2026-11-18T16:02:18.985Z",
   "gitState": {},
-  "decisions": [],
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Docs-only change (.pan/drafts/PAN-5505.md: 'Kind: docs only. No code, no changelog.d entry'); the gate's 'test' match is the PRD's own pipeline-stage prose ('plan, work, review, test, merge'), not a test request. Coverage is the grep/lint/mint checks already run and pasted into the PR body.",
+      "recordedAt": "2026-11-18T16:02:18.985Z"
+    }
+  ],
   "hazards": [],
   "resumePoint": null,
   "sessionHistory": [],
