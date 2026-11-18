@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5472",
   "created": "2026-11-18T16:42:03.966Z",
-  "updated": "2026-11-18T16:46:12.257Z",
+  "updated": "2026-11-18T16:47:51.011Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -54,9 +54,26 @@
       "doneAt": "2026-11-18T16:46:07.538Z"
     },
     "cloister-page": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5472",
-      "claimedAt": "2026-11-18T16:46:12.257Z"
+      "claimedAt": "2026-11-18T16:46:12.257Z",
+      "doneAt": "2026-11-18T16:47:51.011Z"
+    },
+    "cloister-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:47:51.011Z"
+    },
+    "cloister-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:47:51.011Z"
+    },
+    "cloister-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:47:51.011Z"
+    },
+    "cloister-page.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T16:47:51.011Z"
     }
   }
 }
