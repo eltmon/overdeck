@@ -338,27 +338,32 @@ Stored conversations with `harness: pi` read as pi. They all predate the
 
 ### oh-my-pi / ohmypi (alternative)
 
-- Adds RPC mode (`omp --mode rpc`) so Overdeck can write structured commands to
-  omp's stdin via a named pipe (`mkfifo` at `~/.overdeck/agents/<agentId>/rpc.in`).
+- Runs in RPC mode (`omp --mode rpc`), like pi, so Overdeck can write structured
+  commands to omp's stdin via a named pipe (`mkfifo` at
+  `~/.overdeck/agents/<agentId>/rpc.in`).
+- No provider defaults to oh-my-pi. Pick it with
+  `models.providers.<provider>.harness: ohmypi`, or explicitly per launch.
 - Vendored extension at `packages/ohmypi-extension/` reports lifecycle events:
   `session_start` writes a `ready.json`, `tool_execution_end` updates a
   heartbeat, and a `/pan-done` slash command writes a completion marker.
-- Multi-provider — drives Anthropic, OpenAI, Google, OpenRouter, Minimax,
+- Multi-provider: drives Anthropic, OpenAI, Google, OpenRouter, Minimax,
   DashScope through omp's own provider routing. (QuantumLlama, a fictional
   benchmark provider with no live endpoint, is also registered for pipeline
-  testing — see `benchmarks/specs/quantumllama.md`.)
+  testing; see `benchmarks/specs/quantumllama.md`.)
 
 ### OpenAI Codex CLI (alternative)
 
 - First-party OpenAI agent loop for the GPT model family (GPT-6.2 Astra/Sol, GPT-6 Astra/Sol/Luna, GPT-6 Rosalind, GPT-6 Astra for Law,
-  GPT-6.1 Sol/Terra, GPT-5.6 Sol/Terra/Luna, GPT-5.5, GPT-5.4, GPT-5.3-Codex, …) with
-  ChatGPT-subscription or API-key auth.
-- `gpt-5.6-sol` is the default OpenAI model surfaced by this harness. `gpt-6-astra`
-  is the newest and most capable OpenAI model but is opt-in — pick it explicitly.
+  GPT-6.1 Sol/Terra, GPT-5.6 Sol/Terra/Luna) with ChatGPT-subscription or
+  API-key auth. Older GPT-5.x selections migrate to the GPT-5.6 tier.
+- `gpt-5.6-sol` is the default OpenAI model surfaced by this harness. `gpt-6.2-astra`
+  is the newest and most capable OpenAI model; it and `gpt-6-astra` are opt-in,
+  so pick them explicitly.
   `gpt-6-sol` and `gpt-6-luna` (September 2026) are the GPT-6 successors to
-  GPT-5.6 Sol and Luna at half their API price; they are opt-in too. Under
+  GPT-5.6 Sol and Luna at half or less of their API price (Sol &#36;2/&#36;10,
+  Luna &#36;0.10/&#36;0.50 per 1M input/output tokens); they are opt-in too. Under
   ChatGPT sign-in, `gpt-6-sol` and `gpt-6-luna` need Codex CLI `0.156.1` or
-  newer — OpenAI answers HTTP 400 below that version
+  newer; OpenAI answers HTTP 400 below that version
   ([openai/codex#47784](https://github.com/openai/codex/issues/47784)).
   `gpt-6.1-sol` (September 29, 2026) is the GPT-6.1 successor to GPT-6 Sol at
   the same &#36;2/&#36;10 price with &#36;0.10 cached input; it is opt-in. Under ChatGPT
@@ -371,7 +376,8 @@ Stored conversations with `harness: pi` read as pi. They all predate the
   launch before it starts (`pan start`, the dashboard, conversations, and
   every other spawn path), names the required version, and never
   substitutes another model. Upgrade with `npm install -g @openai/codex`;
-  `pan install` does not manage the Codex CLI. `pan doctor` shows a
+  `pan install` does not manage the Codex CLI. An npm-installed Codex CLI is
+  also updated daily; see [Automatic updates](#automatic-updates). `pan doctor` shows a
   `Codex model floor` row per model. On the claude-code harness through
   CLIProxy, CLIProxy `7.3.16` (the pin until [PAN-5282](https://github.com/eltmon/overdeck/issues/5282) moved it to `v8.0.71`) was verified
   on 2026-09-29 to serve `gpt-6-sol`, `gpt-6-luna` and `gpt-6.1-sol` under ChatGPT sign-in. The same version served `gpt-6.1-terra` on the claude-code harness on 2026-11-11 ([PAN-4634](https://github.com/eltmon/overdeck/issues/4634)); on 2026-10-26 it did not. CLIProxy refreshes its model list from a remote catalog every three hours, so which models it serves can change without a version change. CLIProxy `v8.0.71` listed and served `gpt-6.2-astra` and `gpt-6.2-sol` under ChatGPT sign-in on 2026-11-18 ([PAN-5522](https://github.com/eltmon/overdeck/issues/5522)). It does not list `gpt-6-rosalind` or `gpt-6-astra-law`; use those on the Codex harness.
@@ -381,7 +387,7 @@ Stored conversations with `harness: pi` read as pi. They all predate the
   keystrokes.
 - Set `codex.transport: tui` as a temporary escape hatch to the legacy live,
   attachable TUI path (`codexMode: work-tui`) under the PTY supervisor.
-  Both transports are persistent sessions — never one-shot `codex exec`.
+  Both transports are persistent sessions, never one-shot `codex exec`.
 - The app-server transport requires Codex CLI `0.144.0` or newer. Upgrade with
   your normal Codex CLI install method, then verify with `codex --version`.
 - Conversations (not work or review agents) run their app-server on a private
@@ -393,8 +399,8 @@ Stored conversations with `harness: pi` read as pi. They all predate the
   see [Native Codex CLI in Terminal](/features/conversations#native-codex-cli-in-terminal).
   The native CLI needs Codex CLI `0.153.4` or newer. With an older CLI the
   conversation keeps working over stdio and Terminal explains the upgrade.
-  Conversations started before this release show **Restart required for the
-  native CLI** until they are stopped and resumed. Protocol evidence:
+  A conversation whose host started without the native endpoint shows
+  **Restart required for the native CLI** until it is stopped and resumed. Protocol evidence:
   `docs/CODEX-APP-SERVER-PROTOCOL.md`.
 - Runtime adapter at `src/lib/runtimes/codex.ts`; per-agent thread-id pinning
   enables session introspection and cost parsing
@@ -451,9 +457,9 @@ for rule precedence and the full execpolicy syntax.
 newline-delimited JSON-RPC protocol for driving coding agents as persistent
 child processes. Overdeck's native `acp` harness launches the agent without a
 shell and keeps structured prompts, tool calls, approvals, cancellation, and
-session resume off the terminal keystroke path. Kimi Code CLI is the first ACP
-agent wired into Overdeck; other ACP-capable agents require a provider adapter
-before they can be selected.
+session resume off the terminal keystroke path. The `acp` harness runs Kimi
+Code CLI only. OpenCode and Grok Build also use Overdeck's ACP host, under their
+own `opencode` and `grok` harnesses.
 
 Install Kimi Code CLI using its
 [getting-started guide](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html),
@@ -475,26 +481,29 @@ Default harness**, which offers `ACP` and `Kimi Code` alongside the shared
 harnesses. The same choice can be written directly in `~/.overdeck/config.yaml`:
 
 ```yaml
-providers:
-  kimi:
-    harness: acp
+models:
+  providers:
+    kimi:
+      harness: acp
 
 acp:
   permissionMode: auto
   kimi:
-    # Optional — Overdeck already searches PATH and `~/.kimi-code/bin`.
+    # Optional: Overdeck already searches PATH and `~/.kimi-code/bin`.
     binaryPath: /opt/kimi/bin/kimi
 ```
 
-The provider setting normalizes internally to `providerHarnesses.kimi: acp`.
+The provider setting (`models.providers.kimi.harness`) is stored internally as
+`providerHarnesses.kimi`.
 Version one supports only `acp.permissionMode: auto`: Overdeck chooses an
 allow option the ACP agent actually advertised, preferring a session-scoped
 allow and then a one-shot allow. A configured ACP route fails loudly when its
 binary or saved authentication is missing; it never falls back to Claude Code.
 
-Each session runs through the authenticated `acp-host` process, with its socket,
-token, ACP session id, and append-only transcript stored under
-`~/.overdeck/agents/<agentId>/`. The transcript records agent reasoning
+Each session runs through the authenticated `acp-host` process, with its token
+(`acp-token`), ACP session id (`acp-session-id`) and append-only transcript
+(`acp-session.jsonl`) under `~/.overdeck/agents/<agentId>/`, and its socket at
+`~/.overdeck/sockets/acp-<agentId>.sock`. The transcript records agent reasoning
 (`agent_thought_chunk` updates) under a separate `thought` role, and the
 conversation feed renders it as thinking rows, as it does for Claude Code
 thinking blocks. The runtime adapter is
@@ -507,9 +516,9 @@ OpenCode provider error such as `Rate limit exceeded`), the host records a
 ### Kimi Code CLI, native (alternative)
 
 `kimi-code` drives Moonshot's own Kimi Code CLI directly through its native
-terminal UI — no Agent Client Protocol host, no JSON-RPC, no shell-out to a
-subprocess wrapper. Overdeck launches `kimi` in a tmux session under the PTY
-supervisor (the same delivery path `claude-code` uses), reads Kimi's own
+terminal UI, with no Agent Client Protocol host, no JSON-RPC and no shell-out
+to a subprocess wrapper. Overdeck launches `kimi` in a terminal-backend pane
+(Herdr or tmux) under the PTY supervisor (the same delivery path `claude-code` uses), reads Kimi's own
 `wire.jsonl` transcript for cost and conversation-feed rendering, and lets
 Kimi's server-side context cache discipline apply exactly as it would for a
 human running `kimi` at a terminal.
@@ -520,20 +529,20 @@ the same `kimi` binary:
 | | `acp` | `kimi-code` |
 | --- | --- | --- |
 | Drives | `kimi acp` (Agent Client Protocol JSON-RPC host) | native `kimi` terminal UI |
-| Delivery | Persistent authenticated host process | PTY supervisor + tmux paste fallback |
+| Delivery | Persistent authenticated host process | PTY supervisor (tmux paste fallback on the tmux backend) |
 | Transcript | Normalized `acp-session.jsonl` | Kimi's own `wire.jsonl` |
 | Why pick it | Portable across any ACP-capable agent | Reaches Kimi-specific behavior the ACP lowest-common-denominator surface can't |
 
 Neither replaces `claude-code` pointed at Kimi's Anthropic-compatibility
 endpoint (`ANTHROPIC_BASE_URL` + `KIMI_API_KEY`, still supported as an
-operator override — see [When to pick which](#when-to-pick-which)): that route
+operator override; see [When to pick which](#when-to-pick-which)): that route
 runs the Claude Code binary itself against Kimi's models, forfeiting Kimi's
 own server-side context cache accounting that `kimi-code` and `acp` both keep.
 
 Install Kimi Code CLI using its
 [getting-started guide](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html).
 The binary installs to `~/.kimi-code/bin/kimi`. The installer does **not** put
-that directory on the `PATH` Overdeck inherits — on Linux it appends the export
+that directory on the `PATH` Overdeck inherits. On Linux it appends the export
 to the interactive section of `~/.bashrc`, which a non-interactive login shell
 skips, so neither the dashboard's own `PATH` nor its `bash -lc command -v kimi`
 fallback can see the binary. Overdeck therefore searches `~/.kimi-code/bin`
@@ -557,16 +566,16 @@ kimi
 `kimi-code` is **Kimi-only**: `canUseHarness('kimi-code', model, authMode)`
 blocks every non-Kimi model with a reason naming the restriction, the same
 way the ToS gate blocks `ohmypi` + Anthropic + subscription (see
-[ToS rules](#tos-rules) below — this is a model-provider restriction, not a
+[ToS rules](#tos-rules) below; this is a model-provider restriction, not a
 Terms of Service one, but it is enforced identically at every spawn entry
 point and every picker). Pick a Kimi model, or use the model's supported
 harness.
 
-`kimi-code` is the **built-in default** for Kimi models — no config change is
+`kimi-code` is the **built-in default** for Kimi models, so no config change is
 needed to use it. This is a behavior change: a Kimi model that previously
 resolved to `claude-code` (routed through Kimi's Anthropic-compatibility
 endpoint) now resolves to the native `kimi-code` harness by default, which
-requires the installed `kimi` binary and its own `kimi login` — not
+requires the installed `kimi` binary and its own `kimi login`, not
 `config.apiKeys.kimi`.
 
 Migration note for existing model pins: the native CLI's own catalog only
@@ -574,13 +583,14 @@ exposes `kimi-code/k3`, `kimi-code/k3-256k`, `kimi-code/kimi-for-coding`,
 `kimi-code/kimi-for-coding-highspeed`, `kimi-code/k3.1-pro`, and
 `kimi-code/k3.1-pro-highspeed`. A role pinned to the claude-code-routed
 `k3` or `k3[1m]` id is remapped automatically to the matching native alias
-(`kimi-code/k3-256k` and `kimi-code/k3` respectively — the context-window
+(`kimi-code/k3-256k` and `kimi-code/k3` respectively; the context-window
 sizes, not the bare-string names, decide the mapping). A role pinned to
 `k3.1-pro` or `k3.1-pro-highspeed` is remapped to the same-named `kimi-code/`
-alias. A role pinned to `kimi-k2.7-code`, `kimi-k2.6`, `kimi-k2.5`, `kimi-k2`,
-or `K2.6-code-preview` has no native equivalent and fails loudly at spawn with
-the list of valid native aliases, rather than silently launching the wrong
-model.
+alias. A role pinned to `kimi-k2.7-code` is remapped to `kimi-code/kimi-for-coding`.
+The retired ids `kimi-k2.6`, `kimi-k2.5`, `kimi-k2` and `K2.6-code-preview`
+migrate to `kimi-k2.7-code` first. Any other id with no native alias fails
+loudly at spawn with the list of valid native aliases, rather than silently
+launching the wrong model.
 
 `kimi-code/kimi-for-coding` is K2.8 Preview (1,048,576-token context, effort
 low/high/max); `kimi-code/kimi-for-coding-highspeed` is K2.7 Code Highspeed
@@ -590,28 +600,30 @@ To opt back out to `claude-code` or `acp`, override the provider's harness in
 `~/.overdeck/config.yaml`:
 
 ```yaml
-providers:
-  kimi:
-    harness: acp   # or claude-code
+models:
+  providers:
+    kimi:
+      harness: acp   # or claude-code
 ```
 
 ### Kimi rows in the model picker name their launch route
 
 Kimi models appear in the conversation model picker as one row per launch
-route, and the row label states the harness it spawns:
+route. Each row label is the model name with its context size, followed by the
+harness it spawns (for example **Kimi K3 (1M context)** then **Kimi Code CLI**):
 
-| Row label | Model id | Launch route |
-| --- | --- | --- |
-| `Kimi K3 (256K) — Claude Code` | `k3` | Claude Code against Kimi's Anthropic-compatibility endpoint |
-| `Kimi K3 (1M) — Kimi Code CLI` | `kimi-code/k3` | the native `kimi` binary directly |
-| `Kimi K3 (1M) — ACP (Kimi Code)` | `kimi-code/k3` | the native `kimi` binary over ACP |
-| `Kimi K3.1 Pro (1M) — Claude Code` | `k3.1-pro` | Claude Code against Kimi's Anthropic-compatibility endpoint |
-| `Kimi K3.1 Pro (1M) — Kimi Code CLI` | `kimi-code/k3.1-pro` | the native `kimi` binary directly |
-| `Kimi K3.1 Pro (1M) — ACP (Kimi Code)` | `kimi-code/k3.1-pro` | the native `kimi` binary over ACP |
+| Model name in the label | Harness in the label | Model id | Launch route |
+| --- | --- | --- | --- |
+| `Kimi K3 (256K context)` | `Claude Code` | `k3` | Claude Code against Kimi's Anthropic-compatibility endpoint |
+| `Kimi K3 (1M context)` | `Kimi Code CLI` | `kimi-code/k3` | the native `kimi` binary directly |
+| `Kimi K3 (1M context)` | `ACP (Kimi Code)` | `kimi-code/k3` | the native `kimi` binary over ACP |
+| `Kimi K3.1 Pro (1M context)` | `Claude Code` | `k3.1-pro` | Claude Code against Kimi's Anthropic-compatibility endpoint |
+| `Kimi K3.1 Pro (1M context)` | `Kimi Code CLI` | `kimi-code/k3.1-pro` | the native `kimi` binary directly |
+| `Kimi K3.1 Pro (1M context)` | `ACP (Kimi Code)` | `kimi-code/k3.1-pro` | the native `kimi` binary over ACP |
 
 Clicking a row sets model and harness together, and the spawn honors the pick
-as an explicit harness choice (policy-gated and fail-loud) — the row launches
-what it says, regardless of the `providers.kimi.harness` default above.
+as an explicit harness choice (policy-gated and fail-loud). The row launches
+what it says, regardless of the `models.providers.kimi.harness` default above.
 
 The two id spaces are not interchangeable. `kimi-code/*` ids exist only in the
 native CLI's catalog, so `canUseHarness` blocks them on every harness except
@@ -624,14 +636,14 @@ while Claude Code rows offer the full five-level slider.
 On the Claude Code route, a `sk-kimi-` key sends `k3.1-pro` (or
 `k3.1-pro-highspeed`) unchanged to the coding endpoint; any other key sends
 `kimi-k3.1-pro` (or `kimi-k3.1-pro-highspeed`) to the Moonshot platform
-endpoint. K3.1 has one 1,048,576-token tier — there is no 256K variant.
+endpoint. K3.1 has one 1,048,576-token tier; there is no 256K variant.
 Highspeed needs a Kimi Code Allegretto (Pro) plan or higher and uses about 2x
 quota.
 
 Runtime adapter is `src/lib/runtimes/kimi-code.ts`; the per-agent
 `kimi-session-id` file (captured post-launch, since Kimi generates its own
 session id and it cannot be preset) enables transcript resolution
-(`resolveKimiWirePath` in `src/dashboard/server/routes/jsonl-resolver.ts`) and
+(`resolveKimiWirePath` in `src/lib/agents/transcript-resolver.ts`) and
 cost parsing (`src/lib/cost-parsers/kimi-parser.ts`).
 
 ### OpenCode with Go and Zen
