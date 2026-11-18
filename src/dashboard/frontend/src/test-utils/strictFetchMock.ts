@@ -74,6 +74,8 @@ export function installWorkDockFetchMock() {
     if (method === 'GET' && url === '/api/registered-projects') return Response.json([]);
     if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
     if (method === 'GET' && url === '/api/conversations/pending-input') return Response.json([]);
+    // PAN-5541 — ConversationList polls the shared agent-requests feed.
+    if (method === 'GET' && url === '/api/agent-requests') return Response.json({ requests: [] });
     return undefined;
   });
 }
