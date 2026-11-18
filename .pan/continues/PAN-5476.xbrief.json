@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5476",
   "created": "2026-11-18T17:44:47.849Z",
-  "updated": "2026-11-18T17:49:05.514Z",
+  "updated": "2026-11-18T17:50:08.590Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,9 +58,26 @@
       "doneAt": "2026-11-18T17:48:54.610Z"
     },
     "conv-setup": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5476",
-      "claimedAt": "2026-11-18T17:49:05.514Z"
+      "claimedAt": "2026-11-18T17:49:05.514Z",
+      "doneAt": "2026-11-18T17:50:08.589Z"
+    },
+    "conv-setup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T17:50:08.589Z"
+    },
+    "conv-setup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T17:50:08.589Z"
+    },
+    "conv-setup.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T17:50:08.589Z"
+    },
+    "conv-setup.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T17:50:08.589Z"
     }
   }
 }
