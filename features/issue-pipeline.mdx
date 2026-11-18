@@ -140,6 +140,12 @@ The dashboard's `Close Out` button asks for confirmation and runs the same close
 
 Once an issue is closed and its branch merged, Overdeck's closed-issue reaper deletes `workspaces/feature-<id>/` and the feature branch, local and remote. Keep nothing you still need inside that workspace once you close the issue.
 
+## Watch an issue: pan show and the pipeline journal
+
+`pan show <id>` is the unified lens on one issue: its derived state, what it needs, recent history, health, effort and work history. The `state` it prints is one of `backlog`, `parked`, `planned`, `working`, `in-review`, `changes-requested`, `ready`, `merged` or `closed`, derived from git, the tracker and the PR every time you ask rather than stored anywhere. Flags narrow the output: `--cv` for agent work history only, `--context` for context-engineering state only, `--health` for health and heartbeat only, and `--json` for the full machine-readable output, including the complete pipeline journal. See [State model](/reference/state-model) for how each state is derived.
+
+Default output also prints the last few entries from the pipeline journal, an append-only log at `<workspace>/.overdeck/pipeline.jsonl` of actions Overdeck has taken on the issue. It is never authority: when the journal disagrees with the PR, the PR wins and the journal is simply stale. It lives only in the workspace and is deleted along with it.
+
 ## Get help
 
 Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file an issue on [GitHub Issues](https://github.com/eltmon/overdeck/issues).
