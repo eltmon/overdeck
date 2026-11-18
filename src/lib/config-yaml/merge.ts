@@ -271,6 +271,8 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       governorCpuPsiRecoveryAvg60: DEFAULT_CONFIG.resources.governorCpuPsiRecoveryAvg60,
       governorCpuHoldDispatch: DEFAULT_CONFIG.resources.governorCpuHoldDispatch,
       qualityGateSlots: DEFAULT_CONFIG.resources.qualityGateSlots,
+      qualityGatePsiStartAvg10: DEFAULT_CONFIG.resources.qualityGatePsiStartAvg10,
+      qualityGateCpuBypassMinutes: DEFAULT_CONFIG.resources.qualityGateCpuBypassMinutes,
       diskWarnGb: DEFAULT_CONFIG.resources.diskWarnGb,
       diskCriticalGb: DEFAULT_CONFIG.resources.diskCriticalGb,
     },

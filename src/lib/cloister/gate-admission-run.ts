@@ -77,6 +77,11 @@ export function admittedAloneMessage(subject: string, footprintBytes: number): s
     + `needs ${gib(footprintBytes)}, which leaves less than the soft reserve but at least the hard reserve free`
 }
 
+/** PAN-5520: the line a gate admitted past the CPU bypass bound prints, because it may start under CPU pressure. */
+export function cpuBypassedMessage(subject: string): string {
+  return `[gate-admission] ${subject} admitted alone after waiting past the CPU bypass bound: it starts without waiting for CPU pressure to clear and may run slowly`
+}
+
 /** The memory numbers of a memory-reason admission timeout, or null for any other failure. */
 export function memoryTimeoutOf(error: unknown): { reason: MemoryWaitReason | undefined } | null {
   const candidate = error as { name?: unknown; lastWaitReason?: unknown; lastMemory?: MemoryWaitReason } | null
@@ -161,6 +166,7 @@ export async function runAdmittedCommand(
         { maxWaitMs, onWaiting: (reason) => warn(`[gate-admission] ${footprintKey} ${describeWait(reason)}`) },
       )
       if (handle.admittedAlone) warn(admittedAloneMessage(footprintKey, handle.footprintBytes))
+      if (handle.cpuBypassed) warn(cpuBypassedMessage(footprintKey))
     } catch (error) {
       const memoryTimeout = memoryTimeoutOf(error)
       if (memoryTimeout) {
