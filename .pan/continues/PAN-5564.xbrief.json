@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5564",
+  "created": "2026-11-18T23:33:54.570Z",
+  "updated": "2026-11-18T23:33:54.571Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "fix-diff-mock-mount": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5564",
+      "claimedAt": "2026-11-18T23:33:54.570Z"
+    }
+  }
+}
