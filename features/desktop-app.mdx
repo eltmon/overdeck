@@ -1,0 +1,56 @@
+---
+title: Desktop app for macOS, Windows and Linux
+description: "Install the Overdeck desktop app, launch it with pan up, use its tray and notifications, and open another machine's dashboard."
+---
+
+# Desktop app
+
+The Overdeck desktop app runs its own dashboard server and opens the dashboard in a window, so you don't need a terminal or a browser tab. It uses the same projects, conversations and agents as `pan up`, so nothing about your setup changes by switching to the app. Instead of running its own server, the app can also show another machine's dashboard; see [Open another machine](#open-another-machine).
+
+## Download and install
+
+Download the installer for your system from [GitHub Releases](https://github.com/eltmon/overdeck/releases/latest).
+
+| OS | File | Architecture |
+| --- | --- | --- |
+| Linux | `.AppImage` | x64 |
+| macOS | `.dmg` | Apple silicon (arm64) |
+| Windows | `Setup` `.exe` | x64 |
+
+There is no build for Intel Macs, Linux on ARM or Windows on ARM. On those systems, install `@overdeck/core` and use the dashboard in a browser with `pan up`.
+
+### Linux
+
+Make the AppImage executable and move it to `~/Applications/` so `pan up` can find it later:
+
+```bash
+chmod +x Overdeck-*.AppImage
+mkdir -p ~/Applications
+mv Overdeck-*.AppImage ~/Applications/
+~/Applications/Overdeck-*.AppImage
+```
+
+### macOS
+
+Open the `.dmg` and drag **Overdeck** into **Applications**.
+
+macOS blocks the first launch because the app is not notarized yet. Run `xattr -dr com.apple.quarantine /Applications/Overdeck.app`, then open it again.
+
+### Windows
+
+Run `Overdeck.Setup.<version>.exe`. Keep the default installation folder so `pan up` can find the app later.
+
+## Run it from npm
+
+Prefer npm to a standalone installer? Run the app directly, or install it as a command:
+
+```bash
+npx @overdeck/desktop
+npm install -g @overdeck/desktop
+```
+
+The launcher needs Node.js 22 or later; otherwise it exits with `[overdeck] Node.js 22 or later is required (found <version>).` A global install adds the `overdeck-desktop` command. The npm package does not include the `pan` command; install `@overdeck/core` for that.
+
+`pan up` does not look for the npm package; it only finds the app at the install locations above.
+
+To update, run `npm install -g @overdeck/desktop@latest`, or just run `npx @overdeck/desktop@latest` again.
