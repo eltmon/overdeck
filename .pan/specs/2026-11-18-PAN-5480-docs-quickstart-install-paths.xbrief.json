@@ -1,0 +1,234 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-18T20:24:06Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5480: docs: quickstart install paths",
+    "updated": "2026-11-18T20:28:41.787Z"
+  },
+  "plan": {
+    "id": "pan-5480",
+    "title": "docs: quickstart install paths",
+    "status": "proposed",
+    "uid": "5b8d5159-da86-405d-93fa-4a70cda88185",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-18T20:24:06Z",
+    "updated": "2026-11-18T20:28:41.787Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5480",
+        "label": "PAN-5480",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5467",
+        "label": "PAN-5467 docs overhaul epic",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5499",
+        "label": "PAN-5499 Getting Started accuracy audit (runs after this)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5543",
+        "label": "PAN-5543 overdeck up treats ~/.local/bin/overdeck as the desktop app",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5480.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "docs",
+      "quickstart",
+      "install",
+      "mintlify"
+    ],
+    "narratives": {
+      "Problem": "The homepage advertises `curl -fsSL https://overdeck.ai/install | sh` and `overdeck up`, but quickstart.mdx shows neither. The quickstart also shows a nonexistent `overdeck work` verb, says to swap models mid-conversation (a started conversation keeps its model), claims inline tool installs that do not exist, says Node 22+ (the CLI needs 22.16), lists tools `pan install` never installs, calls the macOS dmg universal (it is arm64 only), and uses em dashes. features/workspaces.mdx links a nonexistent /quickstart#planning-session anchor.",
+      "Proposal": "Replace quickstart.mdx with the exact After text in the PRD (.pan/drafts/PAN-5480.md, W1): try with npx, install with the script then `overdeck up`, the Herdr/`overdeck install` note, corrected requirements, What happens next with the handoff fix, npm install (headless and full setup) with `overdeck start PAN-123`, desktop downloads, architecture, and a Get help section. Point the dead anchor in features/workspaces.mdx at /features/planning. Validate with mint@4.3.49 validate, broken-links and broken-links --check-anchors, and npm run lint:docs.",
+      "NonGoals": "- No code changes; the `overdeck up` desktop-app misdetection is tracked in #5543.\n- No edits to the install script in this repo or in overdeck-landing.\n- No docs.json change and no new pages.\n- No line-by-line audit of What happens next steps 1 to 4, the board paragraph or Architecture at a glance beyond dash removal; #5499 audits them after this merges.\n- No new screenshots; the two existing ThemedImage blocks stay unchanged.\n- No fixes to the other pre-existing broken anchors reported by broken-links --check-anchors.\n- No changelog.d entry (no behavior change)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Rewrite the install sections fully, fix the two comment items, remove every dash on the page, and leave the substance of steps 1 to 4, the board paragraph and the architecture paragraph to #5499.",
+        "rationale": "#5499 explicitly audits quickstart.mdx after this PR merges; the issue's own scope is install paths plus the two comment fixes, and the dash ban applies to the whole touched page."
+      },
+      {
+        "summary": "Keep the homepage's two-command path (install script, then `overdeck up`) and add one paragraph saying `overdeck up` does not install Herdr, so run `overdeck install` once.",
+        "rationale": "Code shows `up` never installs Herdr (src/lib/herdr-setup/ensure.ts) and agents need it, but `overdeck install` is interactive and slow, so it should not be a silent third mandatory step; the Get set up card shows `pan install` when Herdr is missing."
+      },
+      {
+        "summary": "State Node.js 22.16 or later, not 22.",
+        "rationale": "src/cli/node-preflight.ts sets MIN_MINOR = 16 because node:sqlite needs 22.16+; the install script's major-only check is looser than the real requirement."
+      },
+      {
+        "summary": "Tell users to re-run the script to upgrade; do not mention `pan update`.",
+        "rationale": "The script is idempotent and installs @latest into the same prefix; `pan update` may install into a different npm prefix."
+      },
+      {
+        "summary": "Fix the dead /quickstart#planning-session link in features/workspaces.mdx by pointing it at /features/planning.",
+        "rationale": "mint broken-links --check-anchors reports it on the baseline; it is a link to this page, and the issue asks for related pages to link correctly."
+      },
+      {
+        "summary": "File the `overdeck up` misdetection as #5543 instead of fixing it here, and phrase `overdeck up` only as 'starts the dashboard and opens it in your browser'.",
+        "rationale": "This is a docs-only issue; that phrasing is true on both the normal and the misdetected path."
+      }
+    ],
+    "items": [
+      {
+        "id": "quickstart-rewrite",
+        "title": "Replace quickstart.mdx with the PRD's After text (install script, overdeck up, corrected claims)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T20:24:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5480",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "quickstart.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'curl -fsSL https://overdeck.ai/install | sh' quickstart.mdx",
+            "grep -nE 'overdeck work|swap models|installed inline|universal, arm64|claudish' quickstart.mdx; test $? -eq 1",
+            "grep -nP '[\\x{2013}\\x{2014}]' quickstart.mdx; test $? -eq 1",
+            "npm run lint:docs",
+            "npx -y mint@4.3.49 validate",
+            "npx -y mint@4.3.49 broken-links",
+            "npx -y mint@4.3.49 broken-links --check-anchors"
+          ],
+          "expected_outputs": [
+            "the curl grep prints 1",
+            "the stale-claim grep prints nothing",
+            "the dash grep prints nothing",
+            "lint:docs exits 0",
+            "mint validate exits 0 with no warning listed under quickstart.mdx",
+            "mint broken-links prints 'no broken links found'",
+            "broken-links --check-anchors lists no entry under quickstart.mdx (planning dry run: 4 remaining pre-existing breaks in cli/agent-commands.mdx, features/skills.mdx, guides/docker-setup.mdx)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Open .pan/drafts/PAN-5480.md, section 'W1. Rewrite quickstart.mdx'. Copy the text between the ````mdx and ```` fences (exclusive) and write it as the entire content of quickstart.mdx at the repo root, byte for byte. Do not reword anything, including the 137-character description. Then run the six test commands listed under W1 in the PRD, plus `npx -y mint@4.3.49 validate` and `npx -y mint@4.3.49 broken-links`, and paste the two mint outputs in the PR body. Never run `mint validate --fix` or `mint@latest`."
+        },
+        "items": [
+          {
+            "id": "quickstart-rewrite.ac1",
+            "title": "Given the new quickstart.mdx, when `grep -c 'curl -fsSL https://overdeck.ai/install | sh' quickstart.mdx` runs, then it prints 1, and an `overdeck up` code block follows it on the page",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quickstart-rewrite.ac2",
+            "title": "Given the new quickstart.mdx, when `grep -nE 'overdeck work|swap models|installed inline|universal, arm64|claudish' quickstart.mdx` runs, then it returns no matches, and `grep -c 'overdeck start PAN-123'` and `grep -c 'features/conversations#why-hand-off'` each print 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quickstart-rewrite.ac3",
+            "title": "Given the new quickstart.mdx, when `grep -nP '[\\x{2013}\\x{2014}]' quickstart.mdx` runs, then it returns no matches, and the frontmatter title is 'Install Overdeck and start your first agent' with the 137-character description from the PRD",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quickstart-rewrite.ac4",
+            "title": "The page renders a Requirements list stating Node.js 22.16 or later, and a Get help section linking https://discord.gg/ZpHE2ZTv5P and https://github.com/eltmon/overdeck/issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quickstart-rewrite.ac5",
+            "title": "When `npm run lint:docs`, `npx -y mint@4.3.49 validate`, `npx -y mint@4.3.49 broken-links` and `npx -y mint@4.3.49 broken-links --check-anchors` run, then the first three exit 0 with no validate warning under quickstart.mdx and 'no broken links found', and --check-anchors lists nothing under quickstart.mdx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workspaces-anchor-fix",
+        "title": "Point the dead /quickstart#planning-session link in features/workspaces.mdx at /features/planning",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T20:24:06Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5480",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/workspaces.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'quickstart#planning-session' features/workspaces.mdx; true",
+            "npx -y mint@4.3.49 broken-links --check-anchors"
+          ],
+          "expected_outputs": [
+            "the grep prints 0",
+            "broken-links --check-anchors output has no line containing /quickstart#"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In features/workspaces.mdx, Related Guides list near the end (line 412 on 2026-11-18), replace the line `- [Planning Session](/quickstart#planning-session) - Using workspaces for planning` with `- [Planning](/features/planning) - Planning an issue before work starts`. Change nothing else in the file. See PRD W2."
+        },
+        "items": [
+          {
+            "id": "workspaces-anchor-fix.ac1",
+            "title": "Given the edited features/workspaces.mdx, when `grep -c 'quickstart#planning-session' features/workspaces.mdx` runs, then it prints 0 and the Related Guides list contains `[Planning](/features/planning)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspaces-anchor-fix.ac2",
+            "title": "When `npx -y mint@4.3.49 broken-links --check-anchors` runs, then its output contains no line with `/quickstart#`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-11-18-PAN-5480-docs-quickstart-install-paths.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
