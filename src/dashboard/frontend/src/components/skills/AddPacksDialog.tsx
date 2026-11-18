@@ -112,25 +112,19 @@ export function AddPacksDialog({ title, packIds, onClose, onAdded }: AddPacksDia
   const trust = async () => {
     setAdding(true);
     const added: string[] = [];
-    try {
-      for (const { id, preview } of ready) {
-        if (await runAdd(id, preview)) added.push(id);
-      }
-    } finally {
-      setAdding(false);
+    // runAdd never throws: every failure becomes that row's failed state.
+    for (const { id, preview } of ready) {
+      if (await runAdd(id, preview)) added.push(id);
     }
+    setAdding(false);
     await finishAdds(added);
   };
 
   const retry = async (id: string, state: Extract<RowState, { kind: 'failed' }>) => {
     if (state.retry === 'add' && state.preview) {
       setAdding(true);
-      let added = false;
-      try {
-        added = await runAdd(id, state.preview);
-      } finally {
-        setAdding(false);
-      }
+      const added = await runAdd(id, state.preview);
+      setAdding(false);
       await finishAdds(added ? [id] : []);
       return;
     }
