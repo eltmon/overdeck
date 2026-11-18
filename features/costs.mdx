@@ -5,10 +5,10 @@ description: "See what agents and conversations spend, how Overdeck attributes c
 
 # Costs and spend
 
-Overdeck records what every agent and conversation spends, down to the request. It prices every
-token with its own built-in price table, so the figures are an estimate of API cost, not a bill
-from your subscription. This page explains how Overdeck counts cost, how it attributes spend to
-issues and projects, and where to read it from the dashboard and the terminal.
+Overdeck records what every agent and conversation spends, down to the request. Most of that is
+priced from its own built-in API price table, so the figures are an estimate of API cost, not a
+bill from your subscription. This page explains how Overdeck counts cost, how it attributes
+spend to issues and projects, and where to read it from the dashboard and the terminal.
 
 ## How Overdeck counts cost
 
@@ -21,8 +21,8 @@ lag the sweep by up to five minutes, and nothing is swept while the dashboard is
 Every event is written to two places: the append-only archive `~/.overdeck/costs/events.jsonl`
 and the `cost_events` table in `~/.overdeck/overdeck.db`. If history is missing from either one,
 `pan cost backfill` can reconstruct events from the stored Claude Code, Pi and Codex transcripts.
-Run on its own, it is a dry run that only prints what it would import; add `--write` to persist
-the events it finds that are not already recorded.
+Run on its own, it only prints what it would import, as a dry run. Run
+`pan cost backfill --write` to persist the events it finds that are not already recorded.
 
 ## API prices, not your plan bill
 
@@ -53,22 +53,22 @@ Spend with no issue sorts into one of three buckets, shown on the Costs page und
 Flywheel's own conversation), or an unattributed bucket for everything else. A project's spend
 counts both its issues and the sessions of its own conversations, live or archived.
 
-Spend is also grouped by **stage**, the role the session ran as. Stages observed on this machine
-include `implementation` and `review.security`, among others; this list is not exhaustive.
+Spend is also grouped by **stage**, the role the session ran as, such as `implementation` or
+`review.security`; there are more stages than these two examples.
 
-The today/week/month windows differ by source: Project Home's weekly figure reads the archive and
-starts the day at local midnight on the dashboard machine, the week at the start of the day seven
-days ago, and the month over the last 30 days. The Costs page's issue list reads a separate
-rollup in the database. The two totals are not guaranteed to reconcile exactly.
+**Today** starts at local midnight on the dashboard machine, **week** starts at the beginning of
+the day seven days ago, and **month** covers the last 30 days. Project Home's weekly figure reads
+the archive for these windows, while the Costs page's issue list reads a separate rollup in the
+database; the two totals are not guaranteed to reconcile exactly.
 
 ## Where to see spend
 
-Project Home shows **Spend this week**, with today's spend below it. Without an issue prefix
-configured for the project it shows a dash and says it needs an issue prefix; if the read fails or
-takes more than 20 seconds it shows "unavailable". Clicking it opens the Costs page, but only when
-Experimental features is on (see
-[Dashboard views](/features/dashboard-views#experimental-features)); otherwise it lands back on
-Home. The Costs page link itself is currently broken
+[Project Home](/features/mission-control#project-home) shows **Spend this week**, with today's
+spend below it. Without an issue prefix configured for the project it shows a dash and says it
+needs an issue prefix; if the read fails or takes more than 20 seconds it shows "unavailable".
+Clicking it opens the Costs page only when Experimental features is on (see
+[Dashboard views](/features/dashboard-views#experimental-features)); with Experimental features
+off, the default, the click lands back on Home with no explanation
 ([#5562](https://github.com/eltmon/overdeck/issues/5562) item 4).
 
 The issue drawer's **Details** tab lists each pipeline phase's agent with its cost and a **Total**
@@ -89,7 +89,7 @@ The **Issues** tab opens with four cards (**Total Cost** with the number of issu
 **Event Count**, **Budget Warnings** and **Over Budget**), then a **30-Day Cost Trend** chart, a
 **Costs by Issue** list sorted by cost, and a detail panel for the selected row with its token
 usage, by-model and by-stage breakdowns; a chart icon or **Full detail** opens the same breakdowns
-with a 30-day trend for that issue. Two of the four cards do not show real numbers yet:
+with a 30-day trend for that issue. Three of the four cards do not show real numbers yet:
 **Event Count** shows the number of issue rows, not the number of events, and **Budget Warnings**
 and **Over Budget** always show `0` ([#5562](https://github.com/eltmon/overdeck/issues/5562),
 items 2 and 3).
