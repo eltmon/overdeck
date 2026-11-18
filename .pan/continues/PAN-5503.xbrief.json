@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5503",
   "created": "2026-11-18T23:39:30.709Z",
-  "updated": "2026-11-18T23:55:21.563Z",
+  "updated": "2026-11-18T23:55:53.527Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -439,6 +439,22 @@
     "audit-projects.ac5": {
       "status": "completed",
       "doneAt": "2026-11-18T23:55:21.563Z"
+    },
+    "audit-docs-rag": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:55:53.527Z"
+    },
+    "audit-docs-rag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:55:53.527Z"
+    },
+    "audit-docs-rag.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:55:53.527Z"
+    },
+    "audit-docs-rag.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:55:53.527Z"
     }
   }
 }
