@@ -28,6 +28,8 @@
  *   GET  /api/skills/overrides
  *   PUT  /api/skills/overrides
  *   GET  /api/skills/packs/available
+ *   POST /api/skills/packs/preview
+ *   POST /api/skills/packs
  *   GET  /api/planning/:issueId/status
  *   POST /api/planning/:issueId/message
  *   DELETE /api/planning/:issueId
