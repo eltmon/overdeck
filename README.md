@@ -15,7 +15,7 @@
 
 </div>
 
-IDEs were built for humans who type code. Overdeck is built for humans who **direct** it — not with prompts, with **loops**. One agent or twenty, hands-on or hands-off: spawn agents on real issues, watch every diff land live, steer mid-task, and let a built-in specialist pipeline review, test, and merge the work — while you decide exactly how much of the loop runs without you.
+IDEs were built for humans who type code. Overdeck is built for humans who **direct** it: not with prompts, with **loops**. One agent or twenty, hands-on or hands-off: spawn agents on real issues, watch every diff land live, steer mid-task, and let a built-in specialist pipeline review, test, and merge the work, while you decide exactly how much of the loop runs without you.
 
 <div align="center">
 
@@ -34,7 +34,7 @@ npx @overdeck/core
 
 No install step required. `npx @overdeck/core` starts Command Deck and opens the dashboard in your browser. Use `overdeck` or `pan` after `npm install -g @overdeck/core`. The packaged desktop app is published separately as `@overdeck/desktop`.
 
-**Requires Node.js 22.16+** (or 24+) — the floor for the bundled `node:sqlite` driver. If your shell's default Node is older, Overdeck automatically relaunches under an installed compatible Node (Homebrew `node@22`, nvm, fnm, volta, or asdf) — no manual switching needed. If none is found, it prints the exact install command for your setup.
+**Requires Node.js 22.16+** (or 24+): the floor for the bundled `node:sqlite` driver. If your shell's default Node is older, Overdeck automatically relaunches under an installed compatible Node (Homebrew `node@22`, nvm, fnm, volta, or asdf), no manual switching needed. If none is found, it prints the exact install command for your setup.
 
 Dashboard runs at https://overdeck.localhost (or http://localhost:3011 if you skip HTTPS setup).
 
@@ -170,7 +170,7 @@ Overdeck started as a CLI and grew into **Command Deck**, a desktop-class develo
 <td><img src="docs/screenshot-agents.png" alt="Agent Management" width="400" /></td>
 </tr>
 <tr>
-<td align="center"><em>Command Deck — project tree, activity timeline, specialist pipeline</em></td>
+<td align="center"><em>Command Deck: project tree, activity timeline, specialist pipeline</em></td>
 <td align="center"><em>Cloister Deacon, specialist agents, and issue agent management</em></td>
 </tr>
 <tr>
@@ -184,33 +184,36 @@ Overdeck started as a CLI and grew into **Command Deck**, a desktop-class develo
 
 ---
 
-## Supported Tools
+## Supported harnesses
 
-| Tool | Support |
+| Harness | Support |
 |:-----|:--------|
-| **Claude Code** | Full support — agent runtime, hooks, skills |
-| **Pi** | Alternative multi-provider agent harness |
-| **Codex** | Skills sync and OpenAI subscription login for GPT work agents |
-| **Cursor** | Skills sync |
-| **Gemini CLI** | Skills sync |
-| **Google Antigravity** | Skills sync |
+| **Claude Code** | Full support: agent runtime, hooks, skills |
+| **Codex** | Agent runtime and skills |
+| **Pi** | Agent runtime and skills |
+| **OpenCode** | Agent runtime |
+| **Kimi Code** | Agent runtime |
+| **Grok Build** | Agent runtime |
+
+See [Harnesses](https://docs.overdeck.ai/configuration/harnesses) for the full list.
 
 ---
 
 ## Requirements
 
 ### Required
-- Node.js 22+
-- Git (for worktree-based workspaces)
-- Docker (for Traefik and workspace containers)
-- tmux (for agent sessions)
-- **GitHub CLI (`gh`)** or **GitLab CLI (`glab`)** for Git operations
-- **ttyd** - Auto-installed by `pan install`
+- Node.js 22.16+ (or 24+)
+- Git
+- GitHub CLI (`gh`) or GitLab CLI (`glab`)
+
+### Installed by `pan install`
+- Herdr (the default terminal backend), ttyd, jq
 
 ### Optional
-- **mkcert** - For HTTPS certificates (recommended)
-- **Linear API key** - For Linear issue tracking
-- **Beads CLI** - Auto-installed by `pan install`
+- Docker (workspace containers and Traefik)
+- mkcert (HTTPS certificates)
+- tmux (only with `terminal.backend: tmux`)
+- A Linear, Jira or Rally API key for those trackers
 
 ---
 
@@ -219,10 +222,10 @@ Overdeck started as a CLI and grew into **Command Deck**, a desktop-class develo
 Overdeck is actively used in production to develop itself and multiple other projects. Most of the code in this repository was planned, written, reviewed, tested, and merged by Overdeck's own pipeline.
 
 - **2,200+ issues** filed against this repo; hundreds shipped end-to-end through the pipeline
-- **70+ skills** shipped and synced across tools
-- **4 tracker integrations** (GitHub, Linear, GitLab, Rally)
-- **6 AI providers** with capability-based model routing
-- **5 specialist roles** in the automated quality pipeline
+- **More than 120 skills** shipped and synced
+- **5 tracker integrations** (GitHub, Linear, GitLab, Rally, Jira)
+- **Many agent harnesses** (Claude Code, Codex, Pi, OpenCode, Kimi Code, Grok Build and others) and models from many providers, chosen per role
+- **Review and test agents** that check every pull request
 
 ---
 
@@ -235,14 +238,14 @@ Full documentation at **[docs.overdeck.ai](https://docs.overdeck.ai)**
 | [Quick Start](https://docs.overdeck.ai/quickstart) | Installation and setup |
 | [Core Concepts](https://docs.overdeck.ai/concepts) | Architecture and key concepts |
 | [CLI Reference](https://docs.overdeck.ai/cli/overview) | All available commands |
-| [Features](https://docs.overdeck.ai/features/mission-control) | Deep dive into key features |
+| [Features](https://docs.overdeck.ai/features/mission-control) | Command Deck and other features |
 | [Guides](https://docs.overdeck.ai/guides/legacy-codebases) | Step-by-step guides |
 
 ---
 
 ## Support Overdeck
 
-Overdeck is free, MIT-licensed, and built by one developer directing a fleet of agents. The fleet isn't free — the model bills behind Overdeck's own development run about **$1,000/month**, all self-funded.
+Overdeck is free, MIT-licensed, and built by one developer directing a fleet of agents. The fleet isn't free: the model bills behind Overdeck's own development run about **$1,000/month**, all self-funded.
 
 If Overdeck saves you time, [**sponsoring on GitHub**](https://github.com/sponsors/overdeck-ai) directly keeps the agents running. Even $5/month genuinely helps.
 
