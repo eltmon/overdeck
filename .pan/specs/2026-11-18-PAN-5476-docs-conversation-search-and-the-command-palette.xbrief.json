@@ -4,17 +4,17 @@
     "created": "2026-11-18T17:36:11Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5476: docs: conversation search and the command palette",
-    "updated": "2026-11-18T17:43:56.954Z"
+    "updated": "2026-11-18T17:44:28.761Z"
   },
   "plan": {
     "id": "pan-5476",
     "title": "docs: conversation search and the command palette",
-    "status": "proposed",
+    "status": "running",
     "uid": "a429536f-60b6-4f5d-bc0e-eb8c84d834e0",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-18T17:36:11Z",
-    "updated": "2026-11-18T17:43:56.954Z",
+    "updated": "2026-11-18T17:44:28.761Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5476",
@@ -601,5 +601,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
