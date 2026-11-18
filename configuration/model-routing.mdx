@@ -19,8 +19,8 @@ resolves a role's model in this order:
    one entry is picked; see [Split a role across models](#split-a-role-across-models).
 3. The built-in default for that role (see the table in
    [Roles and sub-roles](#roles-and-sub-roles)).
-4. Whichever of the steps above resolves first, if the result is a workhorse
-   reference (`workhorse:<slot>`), it is then replaced with that slot's model.
+4. If the result of steps 1 to 3 is a workhorse reference (`workhorse:<slot>`),
+   it is then replaced with that slot's model.
 
 A per-call override skips this chain entirely. `pan start <id> --model <model>`
 sets the work model for that session and also skips tier selection (see
@@ -155,12 +155,12 @@ models:
 ```
 
 A disabled provider does not reroute a role: the agent still launches on the
-model you configured, and `pan doctor` flags a role or crew model whose
-provider is not enabled.
+model you configured, and `pan doctor` flags a crew model, or `roles.work.model`
+when tiered execution is off, whose provider is not enabled.
 
 If the chosen harness is denied by policy for the model, an explicit pick
 fails loudly. A provider-default pick falls back to `claude-code` only for
-models native to Anthropic, and otherwise fails the same way.
+models native to `claude-code`, and otherwise fails the same way.
 
 `roles.<role>.harness` is validated when `config.yaml` loads, but no pipeline
 spawn reads it. Its only effect today is that the dashboard Plan dialog
@@ -180,7 +180,7 @@ table a **crew**.
 Turn tiered execution on with `tiered_execution.enabled: true`, or the
 Settings switch `Route work by difficulty`. A plan can override the global
 switch for its own issue with `plan.metadata.tiered_execution: on` or `off`;
-any other value is a config error. There is no CLI flag for this switch.
+any other value is an error. There is no CLI flag for this switch.
 
 ```yaml
 workhorses: { expensive: claude-opus-5-5, mid: claude-opus-5-5, cheap: claude-haiku-5-5 }
@@ -199,7 +199,7 @@ difficulty` switch; an invalid-config banner when the block is invalid;
 `+ Add crew`; `Standing reviewer` (model, harness, and a `Reviews` choice of
 `all`, `flagged` or `sampled`); `Kind overrides`; an `Advanced` section with
 `Commit feed`, `Escalation` and `Session replay`; and `What this writes to
-config.yaml`. A crew is labelled with its model's name, `<slot> to <model>`
+config.yaml`. A crew is labelled with its model's name, `workhorse:<slot> → <model name>`
 for a workhorse reference, or `N-model mix` for a distribution. On save, each
 crew becomes one tier named after its difficulties joined with a hyphen, for
 example `simple-medium`.
@@ -243,7 +243,7 @@ chosen by a hash of the item id.
 
 The reviewer reports what it finds. Its verdict does not stop other work yet (PAN-5517).
 
-In swarm mode only, once a slot merges, every other live slot agent gets a
+In swarm mode only, once a slot merges, every live slot agent gets a
 read-only message with that item's title and diff, through the commit feed.
 `feed.exclude` drops matching paths from the diff it sends, and
 `feed.max_diff_bytes` swaps an oversized diff for a `--stat` summary instead
@@ -268,8 +268,6 @@ roles.work."
 
 ### Settings saved but not acted on yet
 
-Overdeck validates and saves a few settings whose effects do not run yet.
-
 Overdeck checks and saves these settings, but nothing acts on them yet. Do not rely on them to change which model runs an item.
 
 - `escalation.*` (`enabled`, `retries_at_tier`, `max_promotions`,
@@ -281,7 +279,7 @@ Overdeck checks and saves these settings, but nothing acts on them yet. Do not r
   endpoint has no server handler.
 - The Standing reviewer's block verdict, described above.
 
-Both are tracked here: [#5517](https://github.com/eltmon/overdeck/issues/5517)
+These are tracked in [#5517](https://github.com/eltmon/overdeck/issues/5517)
 and [#4512](https://github.com/eltmon/overdeck/issues/4512).
 
 ## Presets and effort
