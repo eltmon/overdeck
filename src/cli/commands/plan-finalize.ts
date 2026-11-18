@@ -417,7 +417,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   const noPromote = options.promote === false;
   if (!noPromote) {
     emitAutoPromotePhase(issueId, 'completePlanning', 'start', autoSpawnOnFinalize ? 'posting complete-planning autoSpawn request' : 'posting complete-planning request');
-    const promotion = await promotePlanning(issueId, autoSpawnOnFinalize, { noPrd: options.prd === false, critic: critique.required });
+    const promotion = await promotePlanning(issueId, { noPrd: options.prd === false, critic: critique.required });
     promoted = promotion.success;
     promoteMessage = promotion.message;
     promoteError = promotion.error;
@@ -529,9 +529,11 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
  * tmux session still see this response.
  */
 // PAN-1972: the complete-planning POST carries the whole finalize handoff —
-// promote spec, commit, transition, AND the `--auto-start` stamp. If it lands
-// while the dashboard is momentarily down (e.g. mid-restart), a single fetch
-// fails and the work agent never auto-starts. Retry with exponential backoff.
+// promote spec, commit, and transition. The route reads the auto-start
+// consent record itself (PAN-5526), so a retry still auto-starts. If it
+// lands while the dashboard is momentarily down (e.g. mid-restart), a single
+// fetch fails and the work agent never auto-starts. Retry with exponential
+// backoff.
 const PROMOTE_MAX_ATTEMPTS = 5;
 const PROMOTE_BASE_DELAY_MS = 1_000;
 // Retry only on transient gateway/unavailable statuses (dashboard up but not
@@ -548,7 +550,7 @@ const promoteFailure = (error: string): PromotePlanningResult => ({
   workAgentSpawned: false, workAgentMessage: null, workAgentError: null, workAgentSkipReason: null,
 });
 
-export async function promotePlanning(issueId: string, autoSpawn = false, opts: { noPrd?: boolean; critic?: boolean } = {}): Promise<PromotePlanningResult> {
+export async function promotePlanning(issueId: string, opts: { noPrd?: boolean; critic?: boolean } = {}): Promise<PromotePlanningResult> {
   const url = `${getDashboardApiUrl()}/api/issues/${issueId}/complete-planning`;
   let lastError = 'complete-planning failed';
 
@@ -563,7 +565,6 @@ export async function promotePlanning(issueId: string, autoSpawn = false, opts: 
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Origin: getDashboardApiUrl() },
           body: JSON.stringify({
-            ...(autoSpawn ? { autoSpawn: true } : {}),
             ...(opts.noPrd ? { noPrd: true } : {}),
             ...(opts.critic ? { critic: true } : {}),
           }),

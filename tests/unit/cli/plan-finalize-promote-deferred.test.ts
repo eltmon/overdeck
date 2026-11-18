@@ -20,7 +20,7 @@ describe('promotePlanning', () => {
       workAgentDeferred: true,
     }), { status: 200 })));
 
-    const result = await promotePlanning('PAN-4155', true);
+    const result = await promotePlanning('PAN-4155');
 
     expect(result).toMatchObject({
       success: true,
@@ -41,7 +41,7 @@ describe('promotePlanning', () => {
       workAgentRetryHeld: 'deacon-paused',
     }), { status: 200 })));
 
-    const result = await promotePlanning('PAN-4155', true);
+    const result = await promotePlanning('PAN-4155');
 
     expect(result).toMatchObject({
       success: true,
@@ -58,7 +58,7 @@ describe('promotePlanning', () => {
       workAgentDeferred: false,
     }), { status: 200 })));
 
-    const result = await promotePlanning('PAN-4155', true);
+    const result = await promotePlanning('PAN-4155');
 
     expect(result.workAgentDeferred).toBeUndefined();
   });

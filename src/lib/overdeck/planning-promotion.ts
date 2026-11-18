@@ -558,12 +558,13 @@ export async function completePlanningForIssue(options: {
   // `pan plan done` propagates here as body.noPrd. The dashboard Done button
   // never sets it, so a manual Done still requires a qualifying PRD draft.
   const noPrd = (body as any)?.noPrd === true;
-  // The origin gate guards the cross-process CLI caller, which sets autoSpawn
-  // explicitly in the body and carries a trusted Origin. A flag-derived
-  // autoSpawn comes from the same dashboard finalize request the operator
-  // already initiated (the rest of complete-planning runs without an origin
-  // gate), so don't add a new gate that could 403 a browser whose Origin host
-  // lags the rename (e.g. overdeck.localhost not yet in trusted origins).
+  // The origin gate guards the cross-process CLI caller, which may set
+  // autoSpawn explicitly in the body (the pan CLI no longer does, PAN-5526)
+  // and carries a trusted Origin. A flag-derived autoSpawn comes from the
+  // same dashboard finalize request the operator already initiated (the rest
+  // of complete-planning runs without an origin gate), so don't add a new
+  // gate that could 403 a browser whose Origin host lags the rename (e.g.
+  // overdeck.localhost not yet in trusted origins).
   if (bodyAutoSpawn === true) {
     const originCheck = validateOrigin(request as never);
     if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
