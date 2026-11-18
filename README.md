@@ -84,7 +84,7 @@ Command Deck is the live development surface where you and your agents work toge
 
 - **Live diffs as agents code**: every file change appears inline as the agent works. Open the diff panel to review changes turn by turn, or hit "vs main" to see the full picture without waiting for a PR.
 - **Talk to your agents**: type in the composer to steer an agent mid-task. Correct its approach, point it at the right file, tell it to rethink: pair-programming, not babysitting.
-- **Fork or hand off**: start a new conversation from a summary of this one, or hand off to a different model. A conversation's model is fixed once it starts.
+- **Fork or hand off**: start a new conversation from a summary of this one, or hand off to a different model. On most harnesses a conversation's model is fixed once it starts; Pi conversations can switch model in place.
 - **Ship without switching tabs**: when the code looks right, review and test agents check it on the pull request, and you click Merge. No CI dashboard to babysit.
 
 ### Dashboard views

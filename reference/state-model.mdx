@@ -22,7 +22,7 @@ Everything Overdeck needs, to show you a board, run the pipeline, or recover aft
 
 ## The local database is a cache
 
-Overdeck uses a local SQLite database (`~/.overdeck/panopticon.db`) for two jobs:
+Overdeck uses a local SQLite database (`~/.overdeck/overdeck.db`) for two jobs:
 
 1. **A uniform read/write API** for the dashboard, the deacon, and the CLI, so every component talks to state the same way instead of each parsing files.
 2. **A materialized view of the pipeline**, so the board renders instantly instead of re-scanning every workspace on each page load.
@@ -62,8 +62,9 @@ Overdeck computes this view by walking the workspaces and reading GitHub, then c
 | Cost | derived from transcripts | ✅ cached |
 | Live activity (who's thinking) | ephemeral | cache only |
 | Retry counters, merge-queue position | ephemeral bookkeeping | cache only (safe to lose) |
+| Pinned document selections, workspace origin | database only | cache only (no other copy) |
 
-The only things that vanish on a database loss are **ephemeral counters**: retry counts, queue positions. They gate loop-prevention, not your work; on a rebuild they reset, and the worst case is an agent gets a fresh set of attempts.
+Most of what a database loss wipes out are **ephemeral counters**: retry counts, queue positions. They gate loop-prevention, not your work; on a rebuild they reset, and the worst case is an agent gets a fresh set of attempts. Pinned document selections and a workspace's recorded origin (pipeline, operator, or vault) are the exception: they live only in the database, with no other copy to rebuild from, so a database loss drops them for good.
 
 ## Planning artifacts under `.pan/`
 

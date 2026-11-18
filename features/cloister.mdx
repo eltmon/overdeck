@@ -24,7 +24,7 @@ Cloister starts automatically when the dashboard starts. Set `auto_start = false
 
 ## Agent health
 
-Cloister marks an agent stale after 5 minutes without activity, warning after 15 and stuck after 30. It pokes an agent at warning and at stuck, at most once every 30 minutes per agent. It never kills a stuck agent unless you set `kill_on_stuck = true`. When an agent's harness crashes, Cloister restarts it up to 3 times, waiting 30 seconds, 1 minute and then 2 minutes.
+Cloister marks an agent stale after 5 minutes without activity, warning after 15 and stuck after 30. It pokes an agent at warning and at stuck, at most once every 30 minutes per agent. It never kills a stuck agent unless you set `kill_on_stuck = true`. When a work agent's harness dies with no recorded stop, Cloister resumes it automatically, at most once per launch generation, after confirming the death on two consecutive checks. An operator stop, pause, or a troubled or failure-backoff gate blocks the resume; a failed resume raises a Needs-you item for you.
 
 ```toml
 [thresholds]
@@ -36,10 +36,6 @@ stuck = 30
 poke_on_warning = true
 poke_on_stuck = true
 kill_on_stuck = false
-
-[auto_restart]
-enabled = true
-max_retries = 3
 ```
 
 ## The patrol loop

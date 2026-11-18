@@ -39,7 +39,7 @@ The **issue view** above is the same view the issue drawer shows. It has a title
 
 - **Review diffs as they land**: every file change appears inline as the agent works. Open the diff panel for a turn-by-turn view, or hit "vs main" to see the full picture.
 - **Talk to agents**: type in the composer to steer an agent mid-task. Point it at the right file, correct its approach, or tell it to rethink.
-- **Fork or hand off**: fork a conversation into a new one that starts from a summary of the work, or hand off to a new conversation on a different model. A conversation's model is fixed once it starts.
+- **Fork or hand off**: fork a conversation into a new one that starts from a summary of the work, or hand off to a new conversation on a different model. On most harnesses a conversation's model is fixed once it starts; Pi conversations can switch model in place.
 - **See the plan**: xBRIEF work plans render as interactive DAGs with dependencies, acceptance criteria, and live status tracking.
 
 ## Agents
@@ -59,7 +59,7 @@ Cloister is the agent watchdog. It checks each running agent's health, pokes or 
 
 ## Planning
 
-`pan start <issue>` plans the issue before work starts: a planning agent writes a PRD and an xBRIEF plan, and they are committed under `.pan/` in your repo. `pan start --plan skip` skips planning. See [Planning](/features/planning).
+`pan start <issue>` plans the issue before work starts: a planning agent writes a PRD and an xBRIEF plan, and they are committed under `.pan/` in your repo. `pan start <issue> --plan skip` skips planning. See [Planning](/features/planning).
 
 ## Workspaces
 

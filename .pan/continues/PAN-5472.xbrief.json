@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-5472",
   "created": "2026-11-18T16:42:03.966Z",
-  "updated": "2026-11-18T17:07:55.916Z",
+  "updated": "2026-11-18T17:21:09.684Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-18T17:21Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-18T17:21:09.684Z"
+    }
+  ],
   "items": {
     "state-branch-retire": {
       "status": "completed",
@@ -257,5 +263,14 @@
       "status": "completed",
       "doneAt": "2026-11-18T17:07:55.915Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-18T17:21:09Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5472 (PR #5535)\n\nCodeRabbit posted 4 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4618079202 · concepts.mdx:62 [Minor]: Include the issue identifier in the skip command.\n  https://github.com/eltmon/overdeck/pull/5535#discussion_r4618079202\n- Thread 4618079209 · features/cloister.mdx:27 [Minor]: The restart limit and backoff waits do not apply to automatic resumes.\n  https://github.com/eltmon/overdeck/pull/5535#discussion_r4618079209\n- Thread 4618079219 · README.md:87 [Minor]: Qualify the model lock by harness.\n  https://github.com/eltmon/overdeck/pull/5535#discussion_r4618079219\n- Thread 4618079229 · reference/state-model.mdx:66 [Minor]: Correct the database-loss claim at line 66. Pinned-document selections and workspace origin are also lost.\n  https://github.com/eltmon/overdeck/pull/5535#discussion_r4618079229\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5535/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5472 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5535 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    }
+  ]
 }
