@@ -80,7 +80,7 @@ afterEach(async () => {
 describe('POST /api/conversations/:name/resume (PAN-5516)', () => {
   it('admits a POST that carries only the internal token', async () => {
     const answer = await postResume(NAME, CLI);
-    expect(answer.status).toBe(200);
+    expect(answer).toMatchObject({ status: 200, json: { name: NAME, reattached: true } });
     expect(resumeMock).toHaveBeenCalledTimes(1);
   });
 
@@ -113,8 +113,11 @@ describe('POST /api/conversations/:name/resume (PAN-5516)', () => {
     expect(resumeMock).toHaveBeenCalledWith(NAME, {}, expect.anything());
   });
 
-  it('passes an unknown identifier through unchanged so the handler answers 404', async () => {
-    await postResume('no-such-conversation', CLI);
+  it('passes an unknown identifier through unchanged so the real handler answers 404', async () => {
+    const actual = await vi.importActual<typeof import('../../../../lib/overdeck/conversation-runtime.js')>('../../../../lib/overdeck/conversation-runtime.js');
+    resumeMock.mockImplementation(actual.handleConversationResume);
+    const answer = await postResume('no-such-conversation', CLI);
     expect(resumeMock).toHaveBeenCalledWith('no-such-conversation', {}, expect.anything());
+    expect(answer).toMatchObject({ status: 404, json: { error: 'Conversation not found' } });
   });
 });
