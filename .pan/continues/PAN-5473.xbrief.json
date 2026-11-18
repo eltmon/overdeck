@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5473",
   "created": "2026-11-18T22:01:31.208Z",
-  "updated": "2026-11-18T22:10:53.696Z",
+  "updated": "2026-11-18T22:10:58.646Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -108,6 +108,11 @@
     "page-updates.ac2": {
       "status": "completed",
       "doneAt": "2026-11-18T22:10:53.696Z"
+    },
+    "page-remote-machine": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5473",
+      "claimedAt": "2026-11-18T22:10:58.646Z"
     }
   }
 }
