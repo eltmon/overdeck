@@ -8,6 +8,7 @@
 > and [MODEL-CALLS.md](MODEL-CALLS.md). This page is kept for history.
 > For one-click provider lineups see
 > [configuration/model-presets.mdx](../configuration/model-presets.mdx).
+> For the current user-facing guide see [configuration/model-routing.mdx](../configuration/model-routing.mdx).
 
 Overdeck routes LLM models by **work type**. A work type is a canonical routing identifier that represents a specific job slot in the Overdeck workflow (e.g., `issue-agent:implementation`, `review:security`). Every time a workflow step needs to call an LLM, Overdeck looks up which model is assigned to that step's work type.
 

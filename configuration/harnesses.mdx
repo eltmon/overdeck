@@ -301,8 +301,10 @@ pi (the Pi Coding Agent, `@earendil-works/pi-coding-agent`, binary `pi`) is
 the built-in default harness for every provider that is neither Anthropic nor
 OpenAI: Google, xAI, MiniMax, Z.AI, MiMo, OpenRouter, Nous, DashScope, Groq,
 Cerebras and Mistral. Anthropic models default to `claude-code`, OpenAI models
-to `codex`, and Kimi models to `kimi-code`. An explicit
-`providerHarnesses.<provider>` or role `harness` setting always wins.
+to `codex`, and Kimi models to `kimi-code`. A provider's Default harness in
+Settings → Providers (`models.providers.<provider>.harness`) overrides that
+built-in default, and an explicit `--harness` or picker choice overrides
+both. See [Model routing](/configuration/model-routing#which-harness-runs-a-model).
 
 pi is oh-my-pi's upstream, so Overdeck drives both the same way: RPC mode
 (`pi --mode rpc`) over the `rpc.in` named pipe for work agents, the TUI for
@@ -1048,11 +1050,13 @@ looks wrong, report the case and continue in the fresh fallback session.
 
 ### Role runs (plan / work / review / test / ship)
 
-Pipeline-spawned roles do **not** prompt at runtime. They read per-role
-harness + model defaults from the dashboard Settings page. A `harness` selector
-sits next to each role's model dropdown to mix and match. Sub-roles such as
-`review.security` inherit from the parent role unless configured more
-specifically.
+Pipeline-spawned roles do **not** prompt at runtime. Each role's model comes
+from Settings → Model Routing. Its harness comes from the model's provider
+default in Settings → Providers, not from a per-role setting, unless an
+explicit `--harness` pick overrides it. Review lanes have their own model
+settings and use the review model only when a lane is set to `parent`. See
+[Model routing](/configuration/model-routing) for how the model and harness
+are each resolved.
 
 <ThemedImage
   light="/images/dashboard/settings-light.png"
@@ -1061,9 +1065,8 @@ specifically.
 />
 
 The Settings page is also where you wire up tracker API keys and project
-configuration, so harness routing for autonomous role runs lives alongside the
-rest of the orchestrator's defaults — set the harness once per role here and
-every pipeline spawn for that role inherits it.
+configuration, so model and harness routing for autonomous role runs lives
+alongside the rest of the orchestrator's defaults.
 
 ## Use Overdeck workers instead of harness plugins
 
