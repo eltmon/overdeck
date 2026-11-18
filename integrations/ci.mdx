@@ -1,0 +1,58 @@
+---
+title: "CI integrations: GitHub Actions tests, Dagger Cloud, CodeRabbit and Semgrep"
+sidebarTitle: "CI integrations"
+description: "How Overdeck reads GitHub Actions test results, Dagger Cloud checks, CodeRabbit reviews, merge train batches and Semgrep in CI."
+---
+
+Overdeck reads your project's CI through GitHub webhooks: check runs, check suites, commit statuses and pull request reviews. It never writes to your CI configuration itself, with one exception: `pan semgrep ci-setup`, which can open a pull request that adds a workflow file.
+
+## Run tests on CI
+
+Each project has a `verification.tests` setting in `projects.yaml`, either `ci` or `local`. If it is unset, Overdeck detects it: the project is treated as `tests: ci` when a GitHub Actions workflow in the project, or in a polyrepo member, runs a test job on pull requests to the PR base or on pushes to a feature branch. A job counts as a test job when its check name is `test`, `tests`, `test (...)`, `test-...`, `test:...` or `test / ...`. Detection re-runs when `projects.yaml` or a workflow file changes, and a project with no GitHub repo configured is always `local`.
+
+In `ci` mode, the host's verification gate skips only the check named exactly `test`. `typecheck`, `lint` and any other configured gate still run locally. A custom gate must not be named `test`, or CI mode drops it along with the real one.
+
+Merging needs at least one test check to have concluded successfully on the PR head; if none ran, or every one was skipped, the merge is blocked. A red test job is relayed back to the work agent as a verification failure and counts against its attempt budget, unless the same job is already failing on the main branch. A GitLab project with `tests: ci` gets the merge gate, but not this automatic agent feedback.
+
+There is no dashboard control for `verification.tests` today; set it directly in `projects.yaml`. See [Quality gates](/configuration/projects) for the rest of the verification configuration.
+
+## Dagger Cloud
+
+Overdeck recognizes Dagger Cloud check results, but has no Dagger configuration key, token, secret or generated workflow of its own. Finding a `dagger.toml` file does not switch a project to `tests: ci` by itself; it only notes that Dagger is present, and the project must still set `verification.tests: ci` explicitly.
+
+A commit status is treated as a CI test check when its link points at `dagger.cloud` and one of its `/`-separated name segments is a test name, for example `go-client/test`. A status such as `python-client/format` or `helm/lint` is not treated as a test check. This needs the GitHub `status` webhook event enabled. See [Auto-merge](/configuration/auto-merge) for how this feeds the merge gate.
+
+## CodeRabbit
+
+CodeRabbit's own checks are advisory and never block a merge. When CodeRabbit posts a review with inline comments on a `feature/` branch pull request, Overdeck relays the findings to the issue's work agent, which answers each thread with a fix or a reason and then requests review again. If there is no agent to receive the relay, Needs you shows it instead; a review posted while the dashboard is down is not relayed later.
+
+After a pull request merges, any CodeRabbit thread nobody answered becomes a follow-up issue, created automatically. This needs the GitHub App to have Issues: Read and write access on the repository, or Needs you reports the failure. See [Feedback the work agent receives](/features/issue-pipeline) for the rest of the review feedback loop.
+
+## Merge-train batches need a CI workflow
+
+Batching pull requests into a `uat/**` branch needs a GitHub Actions workflow whose `name:` is exactly `CI` and that runs on pushes to `uat/**`. If no run of that workflow appears within 10 minutes of a batch push, Overdeck pauses batching for the project, merges its pull requests one at a time instead, and retries batching again a day later.
+
+A reference trigger block that satisfies this requirement:
+
+```yaml
+name: CI
+on:
+  push:
+    branches: [main, 'uat/**']
+  pull_request:
+    branches: [main]
+```
+
+Settings → Merge Train controls `Batch size` (default 3) and `Batch wait (minutes)` (default 30). See [Merge batches](/features/merge-batches) for the rest of the batching behavior.
+
+## Semgrep in CI
+
+`pan semgrep ci-setup` opens a pull request that adds a Semgrep GitHub Actions workflow to a project, with the setup commit skipping repository hooks. It writes the workflow to a dedicated branch, and refuses when Semgrep is off, the project has no GitHub repo configured, the project is a polyrepo, or the workflow file already exists. Pushing the new workflow file over HTTPS needs a GitHub token with the `workflow` scope. See [Semgrep](/configuration/semgrep) for the full command and its flags.
+
+## Webhook events Overdeck uses
+
+Overdeck's webhook route handles `check_suite`, `check_run`, `pull_request`, `pull_request_review`, `pull_request_review_comment`, `pull_request_review_thread`, `issue_comment`, `status` and `issues` events. CI test feedback needs `check_run`, `check_suite` and `status`; the CodeRabbit relay needs `pull_request_review`.
+
+## Get help
+
+Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P), or see [Troubleshooting](/reference/troubleshooting) for how to report an issue.
