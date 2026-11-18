@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5503",
   "created": "2026-11-18T23:39:30.709Z",
-  "updated": "2026-11-18T23:51:52.941Z",
+  "updated": "2026-11-18T23:52:22.464Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -307,6 +307,18 @@
     "audit-effort.ac5": {
       "status": "completed",
       "doneAt": "2026-11-18T23:51:52.941Z"
+    },
+    "audit-computer-use": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:52:22.463Z"
+    },
+    "audit-computer-use.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:52:22.463Z"
+    },
+    "audit-computer-use.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:52:22.463Z"
     }
   }
 }
