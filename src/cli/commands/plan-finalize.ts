@@ -442,6 +442,20 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     } catch (error) {
       promotionMarkerError = error instanceof Error ? error.message : String(error);
     }
+
+    emitActivityEntry({
+      source: 'plan',
+      level: 'error',
+      message: `${issueId} plan promotion not confirmed — run pan plan done ${issueId} if it did not reach Planned`,
+      issueId,
+    });
+    emitActivityTts({
+      utterance: `${issueId} plan promotion was not confirmed`,
+      priority: 1,
+      issueId,
+      source: 'planning-agent',
+      eventType: 'planning.promotion-unconfirmed',
+    });
   }
 
   emitAutoPromotePhase(issueId, 'terminal', promoted || noPromote ? 'success' : 'failure', promoted ? 'planning promoted' : noPromote ? 'promotion skipped' : (promoteError ?? 'promotion failed'), {
@@ -495,10 +509,10 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
         console.log(chalk.dim('Run `pan start ' + issueId + '` or click Start Agent to begin implementation.'));
       }
     } else if (promotionDeferred) {
-      console.log(chalk.yellow('⚠ Promotion deferred — the dashboard did not complete promotion. A pending-promotion marker was written; the deacon will complete promotion automatically once the dashboard is healthy. Manual fallback: pan plan done ' + issueId + '.'));
+      console.log(chalk.yellow('⚠ Promotion was not confirmed. Nothing retries it automatically. Once the dashboard is healthy, check whether ' + issueId + ' reached Planned; if it did not, run `pan plan done ' + issueId + '`.'));
       if (promoteError) console.log(chalk.dim('  ' + promoteError));
     } else {
-      console.log(chalk.red('✗ Promotion failed, and the pending-promotion marker could not be written. Automatic recovery is unavailable. Manual fallback: pan plan done ' + issueId + '.'));
+      console.log(chalk.red('✗ Promotion was not confirmed, and the pending-promotion marker could not be written. Nothing retries it automatically. Once the dashboard is healthy, check whether ' + issueId + ' reached Planned; if it did not, run `pan plan done ' + issueId + '`.'));
       if (promoteError) console.log(chalk.dim('  Promotion error: ' + promoteError));
       if (promotionMarkerError) console.log(chalk.dim('  Marker error: ' + promotionMarkerError));
     }
