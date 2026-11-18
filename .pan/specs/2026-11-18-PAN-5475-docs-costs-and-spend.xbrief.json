@@ -4,17 +4,17 @@
     "created": "2026-11-18T22:53:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5475: docs: costs and spend",
-    "updated": "2026-11-18T22:54:39.100Z"
+    "updated": "2026-11-18T22:55:11.605Z"
   },
   "plan": {
     "id": "pan-5475",
     "title": "docs: costs and spend",
-    "status": "proposed",
+    "status": "running",
     "uid": "d6c33e19-2df7-468d-b3bd-89ae1d6783c9",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-18T22:53:00Z",
-    "updated": "2026-11-18T22:54:39.100Z",
+    "updated": "2026-11-18T22:55:11.605Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5475",
@@ -772,5 +772,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
