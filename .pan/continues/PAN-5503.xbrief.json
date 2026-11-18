@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5503",
   "created": "2026-11-18T23:39:30.709Z",
-  "updated": "2026-11-18T23:57:19.150Z",
+  "updated": "2026-11-18T23:57:22.882Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -481,6 +481,11 @@
     "harnesses-grok-to-tos.ac5": {
       "status": "completed",
       "doneAt": "2026-11-18T23:57:19.150Z"
+    },
+    "harnesses-troubleshooting-to-end": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5503",
+      "claimedAt": "2026-11-18T23:57:22.882Z"
     }
   }
 }
