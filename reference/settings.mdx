@@ -31,14 +31,14 @@ Settings is one scrolling page at `/settings`, with every section listed in a le
 | TTS | "Enable TTS", "Daemon", "Volume", "Rate" | `tts.*` in `config.yaml` | Not documented yet |
 | Tracker Keys | Linear, GitHub, GitLab, Rally and Jira keys | `tracker_keys.*` in `config.yaml`, overriding the environment variables | [Issue trackers](/configuration/issue-trackers) |
 | GitHub Identities | Read-only table: Owner, Project, Repository, Acts as, Why | Nothing; this section only displays existing state | [Issue trackers](/configuration/issue-trackers) |
-| Appearance | "Overdeck Theme", "Color theme", "Ready to Merge shimmer" | "Overdeck Theme" in `ui.theme` in `config.yaml`; "Color theme" and "Ready to Merge shimmer" in this browser's `localStorage` only | [Appearance](/configuration/appearance) |
+| Appearance | "Overdeck Theme", "Color theme", "Ready to Merge shimmer" | "Overdeck Theme" in `ui.theme` and "Color theme" in `ui.color_theme` in `config.yaml` (theme files live in `~/.overdeck/themes/`); "Ready to Merge shimmer" in this browser's `localStorage` only | [Appearance](/configuration/appearance) |
 | Diff | "Diff style", "Line wrapping" and other diff display options | This browser only | No page |
 | Desktop App | Tray badge, notifications, launch at login (desktop app only) | Desktop app local settings | Not documented yet |
 | Maintenance | "Issue cache" clear | Not persisted; it clears a runtime cache | No page |
 | Telemetry | "Share anonymous usage data", "Group my installs (pseudonymous)" | `telemetry.*` in `config.yaml` | [Telemetry](/configuration/telemetry) |
 | Experimental | "Experimental features", "RTK Bash compression", "Claude Code Channels", "Streamdown renderer" | `experimental.*` in `config.yaml` (RTK writes `agents.rtk.enabled`) | [Experimental features](/features/dashboard-views#experimental-features) |
 
-Diff preferences, the color theme selection and the Ready to Merge shimmer toggle are the exceptions to the `config.yaml` pattern above: they live only in this browser and are never synced or backed up.
+Diff preferences and the Ready to Merge shimmer toggle are the exceptions to the `config.yaml` pattern above: they live only in this browser and are never synced or backed up.
 
 ## Get help
 

@@ -8,7 +8,7 @@ Docs RAG is retrieval over Overdeck's own developer documentation, skills and ru
 
 ## What it indexes
 
-Docs RAG indexes Overdeck's own package: the Markdown files under `docs/` (not `docs/prds/`), every `SKILL.md` under `sync-sources/skills/`, every rule under `sync-sources/rules/` and `.claude/rules/`, and the root `CLAUDE.md`. PRDs are indexed only when `docs.corpus.prds` is turned on; it is off by default. Search runs as SQLite full-text search plus local embeddings.
+Docs RAG indexes Overdeck's own package: the Markdown files under `docs/` (not `docs/prds/`), every `SKILL.md` under `sync-sources/skills/`, every rule under `sync-sources/rules/` and `.claude/rules/`, and the root `CLAUDE.md`. PRDs are not indexed. Search runs as SQLite full-text search plus local embeddings.
 
 The index lives at `~/.overdeck/docs/index.sqlite`, and a prebuilt copy ships as `dist/docs-index.sqlite`.
 
@@ -52,7 +52,7 @@ All Docs RAG keys in `config.yaml` are snake_case, under the top-level `docs` ke
 | `docs.prompt_injection` | Turns automatic prompt injection on or off, independent of the index |
 | `docs.trigger.regexes` | The list of trigger words or patterns above |
 | `docs.trigger.case_sensitive` | Whether trigger matching cares about case |
-| `docs.corpus.*` | Which sources are indexed, including `docs.corpus.prds` |
+| `docs.corpus.*` | Accepted in `config.yaml`, but no index build reads these keys today |
 | `docs.budget.injection_rate` | How often a prompt is allowed to receive an injection |
 | `docs.budget.turn_window` | The turn window the injection rate is measured over |
 | `docs.budget.max_tokens_per_injection` | The token cap on one injected block |

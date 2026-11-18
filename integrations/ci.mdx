@@ -19,7 +19,7 @@ If it is unset, Overdeck detects it: the project is treated as `tests: ci` when 
 
 In `ci` mode, the host's verification gate skips only the check named exactly `test`. `typecheck`, `lint` and any other configured gate still run locally. A custom gate must not be named `test`, or CI mode drops it along with the real one.
 
-Merging needs at least one test check to have concluded successfully on the PR head; if none ran, or every one was skipped, the merge is blocked. A red test job is relayed back to the work agent as a verification failure and counts against its attempt budget, unless the same job is already failing on the main branch. This successful test-check requirement applies only to GitHub projects. On GitLab, merge readiness depends on the merge request pipeline result instead, and the `tests` setting does not change that.
+Merging needs at least one test check to have concluded successfully on the PR head; if none ran, or every one was skipped, the merge is blocked. A red test job is relayed back to the work agent as a verification failure and counts against its attempt budget, unless the same job is already failing on the main branch. This successful test-check requirement applies only to GitHub projects. On GitLab, merge readiness depends on the merge request pipeline result instead, and the `tests` setting does not change that. The CI-failure relay to the work agent is also GitHub-webhook-driven: on GitLab, a red pipeline is not relayed to the work agent automatically.
 
 There is no dashboard control for `verification.tests` today; set it directly in `projects.yaml`. See [Quality gates](/configuration/projects) for the rest of the verification configuration.
 
