@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5475",
   "created": "2026-11-18T22:55:50.465Z",
-  "updated": "2026-11-18T23:00:15.685Z",
+  "updated": "2026-11-18T23:00:20.793Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,11 @@
     "page-attribution.ac3": {
       "status": "completed",
       "doneAt": "2026-11-18T23:00:15.684Z"
+    },
+    "page-where": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5475",
+      "claimedAt": "2026-11-18T23:00:20.793Z"
     }
   }
 }
