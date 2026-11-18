@@ -41,6 +41,8 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'claude-haiku-4-5': 'anthropic',
 
   // OpenAI models (supported per Codex CLI catalog, 2026-09-07)
+  'gpt-6.2-astra': 'openai',
+  'gpt-6.2-sol': 'openai',
   'gpt-6-astra': 'openai',
   'gpt-5.6-sol': 'openai',
   'gpt-5.6-terra': 'openai',
@@ -168,6 +170,8 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
  */
 const FALLBACK_MAP: Record<string, AnthropicModel> = {
   // OpenAI → Anthropic
+  'gpt-6.2-astra': 'claude-sonnet-5-5', // GPT-6.2 flagship → Sonnet
+  'gpt-6.2-sol': 'claude-sonnet-5-5', // GPT-6.2 mid tier → Sonnet
   'gpt-6-astra': 'claude-sonnet-5-5', // GPT-6 flagship → Sonnet
   'gpt-5.6-sol': 'claude-sonnet-5-5', // Flagship model → Sonnet
   'gpt-5.6-terra': 'claude-sonnet-5-5', // Balanced model → Sonnet
@@ -279,6 +283,8 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
  */
 const MODEL_TIER_RANK: Record<string, number> = {
   // OpenAI tiers — addendum 2026-09-07 catalog (Codex CLI)
+  'gpt-6.2-astra': 3,
+  'gpt-6.2-sol': 2,
   'gpt-6-astra': 3,
   'gpt-5.6-sol': 2,
   'gpt-5.6-terra': 2,

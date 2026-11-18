@@ -1,6 +1,7 @@
 /**
  * PAN-4363: `pan doctor` reports the Codex per-model client-version floor
- * (gpt-6-sol/gpt-6-luna/gpt-6.1-sol/gpt-6.1-terra under ChatGPT sign-in).
+ * (gpt-6-sol/gpt-6-luna/gpt-6.1-sol/gpt-6.1-terra/gpt-6.2-astra/gpt-6.2-sol
+ * under ChatGPT sign-in).
  */
 import { describe, expect, it } from 'vitest';
 
@@ -19,7 +20,7 @@ describe('checkCodexModelFloors (PAN-4363)', () => {
       readVersion: async () => '0.153.4',
       authMode: async () => 'subscription',
     });
-    expect(results).toHaveLength(4);
+    expect(results).toHaveLength(6);
     for (const result of results) {
       expect(result.status).toBe('warn');
       expect(result.fix).toBe('Upgrade: npm install -g @openai/codex');
@@ -30,15 +31,18 @@ describe('checkCodexModelFloors (PAN-4363)', () => {
     expect(results.map(r => r.message).join('\n')).toContain('gpt-6.1-sol');
     expect(results.map(r => r.message).join('\n')).toContain('0.159.0');
     expect(results.map(r => r.message).join('\n')).toContain('gpt-6.1-terra');
+    expect(results.map(r => r.message).join('\n')).toContain('gpt-6.2-astra');
+    expect(results.map(r => r.message).join('\n')).toContain('gpt-6.2-sol');
+    expect(results.map(r => r.message).join('\n')).toContain('0.170.0');
   });
 
   it('is ok for all floored models at or above the floor', async () => {
     const results = await checkCodexModelFloors({
       resolveBinary: binary,
-      readVersion: async () => '0.159.0',
+      readVersion: async () => '0.170.0',
       authMode: async () => 'subscription',
     });
-    expect(results).toHaveLength(4);
+    expect(results).toHaveLength(6);
     for (const result of results) {
       expect(result.status).toBe('ok');
     }
@@ -50,7 +54,7 @@ describe('checkCodexModelFloors (PAN-4363)', () => {
       readVersion: async () => '0.153.4',
       authMode: async () => 'api-key',
     });
-    expect(results).toHaveLength(4);
+    expect(results).toHaveLength(6);
     for (const result of results) {
       expect(result.status).toBe('ok');
       expect(result.message).toContain('API-key auth, no client-version floor');
@@ -63,7 +67,7 @@ describe('checkCodexModelFloors (PAN-4363)', () => {
       readVersion: async () => undefined,
       authMode: async () => 'subscription',
     });
-    expect(results).toHaveLength(4);
+    expect(results).toHaveLength(6);
     for (const result of results) {
       expect(result.status).toBe('warn');
       expect(result.message).toContain('version unknown');

@@ -220,6 +220,21 @@ describe('cost module', () => {
       expect(sol6?.cacheReadPer1k).toBe(0.0002);
     });
 
+    it('prices gpt-6.2-astra and gpt-6.2-sol from the 2026-11-18 pricing page (PAN-5522)', () => {
+      const astra62 = getPricing('openai', 'gpt-6.2-astra');
+      const astra6 = getPricing('openai', 'gpt-6-astra');
+      expect(astra62?.model).toBe('gpt-6.2-astra');
+      expect(astra62?.inputPer1k).toBe(0.008);
+      expect(astra62?.cacheReadPer1k).toBe(0.0004);
+      expect(astra62?.outputPer1k).toBe(0.040);
+      expect(astra6?.inputPer1k).toBe(0.010);
+      const sol62 = getPricing('openai', 'gpt-6.2-sol');
+      expect(sol62?.model).toBe('gpt-6.2-sol');
+      expect(sol62?.inputPer1k).toBe(0.002);
+      expect(sol62?.cacheReadPer1k).toBe(0.0001);
+      expect(sol62?.outputPer1k).toBe(0.010);
+    });
+
     it('prices gpt-6.1-terra distinctly from gpt-5.6-terra', () => {
       const terra61 = getPricing('openai', 'gpt-6.1-terra');
       const terra56 = getPricing('openai', 'gpt-5.6-terra');

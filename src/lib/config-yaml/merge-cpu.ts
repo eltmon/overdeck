@@ -46,6 +46,10 @@ export function mergeCpuResources(
   }
   if (typeof yaml.governor_cpu_hold_dispatch === 'boolean') resolved.governorCpuHoldDispatch = yaml.governor_cpu_hold_dispatch;
   if (isIntegerInRange(yaml.quality_gate_slots, 1, 16)) resolved.qualityGateSlots = yaml.quality_gate_slots;
+  if (isPercent(yaml.quality_gate_psi_start_avg10, false)) resolved.qualityGatePsiStartAvg10 = yaml.quality_gate_psi_start_avg10;
+  // PAN-5520: below the gate wrappers' 30-minute admission wait, so the head starts before it times out.
+  const bypass = yaml.quality_gate_cpu_bypass_minutes;
+  if (typeof bypass === 'number' && Number.isFinite(bypass) && bypass > 0 && bypass < 30) resolved.qualityGateCpuBypassMinutes = bypass;
   if (resolved.governorCpuPsiRecoveryAvg60 >= resolved.governorCpuPsiHoldAvg60) {
     warnInvertedCpuPsiThresholds(resolved.governorCpuPsiHoldAvg60, resolved.governorCpuPsiRecoveryAvg60, defaults);
     resolved.governorCpuPsiHoldAvg60 = defaults.governorCpuPsiHoldAvg60;

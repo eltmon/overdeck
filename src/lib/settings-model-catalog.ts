@@ -102,11 +102,12 @@ export function getAvailableModelsApi(openCodeModels: readonly AvailableModel[] 
     }
   }
 
-  // Order OpenAI models with latest family first: gpt-6-astra → 6.1-sol → 6.1-terra → 6-sol → 6-luna → 5.6-sol (current default) → 5.6-terra → 5.6-luna → 6-astra-law → 6-rosalind (domain models) → 5.5 → 5.4 → 5.3-codex → 5.2 → o-series → gpt-4o legacy.
+  // Order OpenAI models with latest family first: gpt-6.2-astra → 6.2-sol → 6-astra → 6.1-sol → 6.1-terra → 6-sol → 6-luna → 5.6-sol (current default) → 5.6-terra → 5.6-luna → 6-astra-law → 6-rosalind (domain models) → 5.5 → 5.4 → 5.3-codex → 5.2 → o-series → gpt-4o legacy.
   const openaiOrder: Record<string, number> = {
-    'gpt-6-astra': 0, 'gpt-6.1-sol': 1, 'gpt-6.1-terra': 2, 'gpt-6-sol': 3, 'gpt-6-luna': 4,
-    'gpt-5.6-sol': 5, 'gpt-5.6-terra': 6, 'gpt-5.6-luna': 7, 'gpt-6-astra-law': 8, 'gpt-6-rosalind': 9,
-    'gpt-5.5': 10, 'gpt-5.5-pro': 11,
+    'gpt-6.2-astra': 0, 'gpt-6.2-sol': 1,
+    'gpt-6-astra': 2, 'gpt-6.1-sol': 3, 'gpt-6.1-terra': 4, 'gpt-6-sol': 5, 'gpt-6-luna': 6,
+    'gpt-5.6-sol': 7, 'gpt-5.6-terra': 8, 'gpt-5.6-luna': 9, 'gpt-6-astra-law': 10, 'gpt-6-rosalind': 11,
+    'gpt-5.5': 12, 'gpt-5.5-pro': 13,
     'gpt-5.4': 20, 'gpt-5.4-pro': 21, 'gpt-5.4-mini': 22,
     'gpt-5.3-codex': 30,
     'gpt-5.2': 40,

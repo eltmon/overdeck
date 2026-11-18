@@ -107,13 +107,16 @@ target-branch sync, skipped when CI is already green on the exact tip commit
   gates each wait behind roughly 21 admissions.
 - **The pressure rule.** Before granting the slot, the admission queue samples
   the host: it is pressured when CPU utilization is at or above `0.75`, or
-  when PSI `some avg10` is at or above `25`, or — only when PSI is
+  when PSI `some avg10` is at or above
+  `resources.quality_gate_psi_start_avg10` (default `25`), or — only when PSI is
   unavailable — when 1-minute load per core is at or above `1`. If not
   pressured, it writes the holder record, waits 1.5 seconds, and samples
   again; if the host is pressured on that second look, it gives the slot back
-  and keeps waiting. A gate with a memory footprint also waits while starting
+  and keeps waiting. The CPU wait is bounded: a queue head that has waited on
+  CPU for `resources.quality_gate_cpu_bypass_minutes` (default 10) starts
+  alone once no slot is held (PAN-5520). A gate with a memory footprint also waits while starting
   it would push MemAvailable below `resources.governor_soft_reserve_gb`; see
-  [CPU and memory admission](#cpu-and-memory-admission-pan-4311-pan-4546-pan-5248-pan-5285).
+  [CPU and memory admission](#cpu-and-memory-admission-pan-4311-pan-4546-pan-5248-pan-5285-pan-5520).
 - **Agent shells share the queue.** Both `vitest.config.ts` and
   `src/dashboard/frontend/vitest.config.ts` load
   `tests/vitest-cpu-admission.ts` as `globalSetup`, which calls
@@ -488,7 +491,7 @@ Work agents run only the tests they touched (the work prompt names
 CI" only in a CI-mode project); reviewers never run the suite — they read the
 CI result on the head (`gh pr checks <pr>`) where tests run on CI.
 
-### CPU and memory admission (PAN-4311, PAN-4546, PAN-5248, PAN-5285)
+### CPU and memory admission (PAN-4311, PAN-4546, PAN-5248, PAN-5285, PAN-5520)
 
 Before each local gate starts, it waits in a machine-wide FIFO queue under
 `~/.overdeck/verification-workers/admission/`. Direct local Vitest runs and
@@ -496,9 +499,11 @@ every `tsc` lane run through `scripts/tsc-admitted.mjs` join the same queue. Up 
 once (default 2; set it in the global `~/.overdeck/config.yaml`, because a
 project `.pan.yaml` value is ignored). A gate is admitted only when its CPU
 sample is unpressured both before and 1.5 s after it takes its slot:
-utilization below 75 %, and CPU PSI `some avg10` below 25, or load per core
-below 1 where PSI is unavailable. Under pressure, new gates wait while running
-gates keep their slots; nothing is preempted. The file layout and stale-owner
+utilization below 75 %, and CPU PSI `some avg10` below
+`resources.quality_gate_psi_start_avg10` (default 25), or load per core below 1
+where PSI is unavailable. Under pressure, new gates wait while running gates
+keep their slots; nothing is preempted, and the head's CPU wait is bounded (see
+"Admitted past CPU pressure" below). The file layout and stale-owner
 reclaim are described in the CPU-pressure bullet of
 [Agent Auto-Resume Gates](#agent-auto-resume-gates).
 
@@ -575,6 +580,23 @@ already queued, without killing them:
   its estimate and reserve at enqueue, so after a reserve change it can look
   as if it fits and still never start; one that has looked that way for 30 s
   with a slot free is treated as blocked on memory.
+- **Admitted past CPU pressure (PAN-5520).** CPU contention slows a gate down
+  but does not break it, so the CPU wait has a bound,
+  `resources.quality_gate_cpu_bypass_minutes` (default 10, under 30 so the
+  head starts before the wrappers' 30-minute wait ends). The clock starts at
+  the first CPU sample that blocks the head as head, before or after the
+  settle, and the head writes that moment into its ticket
+  (`cpuBlockedSince`). The clock clears only on admission: a later
+  unpressured sample does not reset it, so a sample that flaps between low
+  before the settle and high after it cannot hold the head forever. Past the
+  bound the head starts once no slot is held, without sampling CPU before or
+  after the settle; while any slot is held it keeps waiting. Its memory rule
+  still applies as usual. Waiters behind a CPU-blocked head keep their places
+  (FIFO yields only to memory), so under sustained pressure the queue drains
+  one gate at a time, and each head's clock starts only once it is head.
+  Both CPU settings are read from the global config on every poll, so
+  raising `resources.quality_gate_psi_start_avg10` or lowering the bound
+  reaches gates that are already queued.
 - **Logs.** A waiting gate says why. The wrapper and a local Vitest run print
   `[gate-admission] <key> waiting for memory: available X GiB, reserved Y GiB,
   needs Z GiB, soft reserve W GiB`, `… waiting in the admission queue at
@@ -584,7 +606,9 @@ already queued, without killing them:
   `[quality-gate] <reason>: <identity>` for the other reasons, and sends them
   to the run log. A changed reason is printed at most once a minute. A gate
   admitted alone prints `[gate-admission] <key> admitted alone after waiting
-  past the bypass bound: needs X GiB, …`.
+  past the bypass bound: needs X GiB, …`, and a gate admitted past CPU
+  pressure prints `[gate-admission] <key> admitted alone after waiting past the
+  CPU bypass bound: …`.
 - **Status readers.** Each waiter writes its current reason and the time it
   began into its `waiter-*.json` ticket (`wait: { since, reason }`).
   The read-only snapshot `readQualityGateQueue()` in
@@ -1752,7 +1776,10 @@ Auto-resume is intentionally suppressible:
   `cpu-pressure sample` calibration line (PSI some avg10/avg60, load per core)
   to `~/.overdeck/logs/deacon.log` every 5 minutes. Quality-gate admission
   (`quality-gate-admission.ts`) treats the host as contended at PSI `some
-  avg10 >= 25`, with load per core `>= 1` as the fallback. Admission has
+  avg10 >= resources.quality_gate_psi_start_avg10` (default 25), with load per
+  core `>= 1` as the fallback; a head blocked on CPU longer than
+  `resources.quality_gate_cpu_bypass_minutes` (default 10) starts alone once
+  the slots are empty (PAN-5520). Admission has
   `resources.quality_gate_slots` slots (default 2, read from the global
   config only): slot 0 is `owner.json` and slot *i* is `slot-<i>.json`.
   Waiters stay FIFO, and the head takes the lowest free slot only while fewer
@@ -1837,6 +1864,20 @@ Auto-resume is intentionally suppressible:
   spawn already gets (`SPAWN_STACK_REBUILD_MAX_ATTEMPTS = 3`,
   `SPAWN_STACK_REBUILD_COOLDOWN_MS` = 15 minutes, `agents/spawn-prep.ts`), so
   the rebuild still happens, just from one call path instead of two.
+- **Host override on auto-start (PAN-5498):** `pan start <id> --plan auto
+  --host` sends `host: true` with the confirmation phrase to start-planning,
+  which records `hostOverride: true` on the auto-start consent record. A
+  consent-bearing `/api/agents` request (the first hand-off and every
+  deferred retry) reads it back and skips the stack-health gate and its
+  rebuild, exactly like a confirmed `pan start --host`. A new planning cycle
+  without `--host` clears it, and a spent consent no longer reports it.
+- **Interrupted hand-off (PAN-5498):** complete-planning journals
+  `handoff.requested` just before the spawn POST. A refusal, an acceptance or
+  a plain failure appends a newer entry (a plain failure appends
+  `handoff.abandoned` with `outcome: 'failed'`, so it is not retried). When
+  the dashboard dies mid-request, `handoff.requested` stays last, and
+  deacon-lite resumes the start `HANDOFF_REQUEST_RESUME_DELAY_MS` (10 minutes)
+  after the request, with `reason: 'interrupted'`.
 - **Preemptive scheduler** (opt-in via `[concurrency] preemption = true`,
   PAN-2507) may **yield** an idle work agent — pause it to free capacity for
   a blocked review/test dispatch. A yield reuses the same `paused: true`
@@ -2079,8 +2120,9 @@ One piece of stored pipeline state came back, and it is not a status.
 | `conflict.repair-escalated` | `cloister/conflict-repair.ts` `tickConflictRepair`, when that head still conflicts after the 45-minute grace or its work agent cannot be reached (`data.head`, `data.reason`) |
 | `blocked.declared` | `pan task block <issue> <item> --on <ref>...` (source `pan-task-block`), with `data.item` and canonical `data.blockers` |
 | `blocked.woken` | `cloister/blocker-wake.ts` `tickBlockerWake`, once per declaration when all its blockers merged (`data.item`, `data.declaredAt`, `data.outcome`: `delivered` \| `unreachable`) |
+| `handoff.requested` | `completePlanningForIssue`, just before the auto-start spawn POST (`data.requestedAt`, `nextRetryAt`, `reason: 'interrupted'`), so a request that dies with the dashboard is resumed (PAN-5498) |
 | `handoff.deferred` | `completePlanningForIssue` (`overdeck/planning-promotion.ts`), when a spawn guardrail or a stack-unhealthy answer (`reason: 'guardrails'` \| `'stack-unhealthy'`) refused the auto-start |
-| `handoff.retried` / `.abandoned` | deacon-lite's `retryDeferredHandoffs`, on each retry and when it stops |
+| `handoff.retried` / `.abandoned` | deacon-lite's `retryDeferredHandoffs`, on each retry and when it stops; also `completePlanningForIssue` (`.abandoned`, `outcome: 'failed'`) when the auto-start failed in a way no wait fixes |
 | `handoff.started` | `completePlanningForIssue`, when the auto-start is accepted; also deacon-lite's `retryDeferredHandoffs`, when a deferred retry is accepted |
 | `operator.decision-requested` | `pan ask` (`src/cli/commands/ask.ts`), when a work agent needs an operator decision |
 | `operator.decision-answered` | the dashboard answer route, a delivered dashboard message, or a delivered `pan tell` to the asking agent |
@@ -2557,7 +2599,10 @@ four lanes on a quick-mode issue; neither `review.stalled` nor
 `review.stall-escalated` is a tail `recoverStalledReviews` acts on.
 
 `retryDeferredHandoffs` acts only when an issue's last `handoff.*` entry is
-`handoff.deferred` or `handoff.retried`. Each of those entries carries the
+`handoff.requested`, `handoff.deferred` or `handoff.retried`. A
+`handoff.requested` entry is due 10 minutes after the request, because the
+original request can run a stack rebuild for minutes before it claims the
+agent start (PAN-5498). Each of those entries carries the
 schedule (`deferredAt`, `attempt`, `nextRetryAt`), so a dashboard or deacon
 restart resumes the backoff where it stood; nothing is held in memory. Retries
 run 2, 4, 8 and 16 minutes apart, then every 20 minutes. Each one POSTs

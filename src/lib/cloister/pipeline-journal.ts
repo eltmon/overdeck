@@ -43,7 +43,7 @@ export type PipelineJournalEntryType =
   | 'strike.landed'
   | 'conflict.repair-requested' | 'conflict.repair-escalated'
   | 'blocked.declared' | 'blocked.woken'
-  | 'handoff.deferred' | 'handoff.retried' | 'handoff.started' | 'handoff.abandoned'
+  | 'handoff.requested' | 'handoff.deferred' | 'handoff.retried' | 'handoff.started' | 'handoff.abandoned'
   | 'workspace.adopted' | 'workspace.adoption-failed' | 'workspace.synced-to-pr-head'
   | 'operator.decision-requested' | 'operator.decision-answered' | 'operator.decision-withdrawn';
 

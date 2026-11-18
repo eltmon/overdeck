@@ -14,6 +14,7 @@ import { getSharedIssueService } from '../../dashboard/server/services/issue-ser
 import { getGitHubConfig } from '../../dashboard/server/services/tracker-config.js';
 import { cleanupAgentStateDirs } from './workspace-hygiene.js';
 import { getAgentState, getProviderAuthMode, saveAgentStateSync } from '../agents.js';
+import { buildHostOverrideConfirmation } from '../agents/host-override.js';
 import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
 import { appendContinueSessionEntryForIssue } from '../xbrief/lifecycle-io.js';
 import { isPlanningComplete, findPlan } from '../xbrief/io.js';
@@ -216,6 +217,17 @@ export function startPlanningForIssue(options: {
     } = body as any;
     void skipWorkspace;
     void startDocker;
+    // PAN-5498: `pan start --plan auto --host` records the host override on the
+    // auto-start consent so the post-planning start skips the workspace Docker
+    // stack gate. Like POST /api/agents, it needs the exact confirmation phrase.
+    const hostOverride = (body as any).host === true;
+    if (hostOverride && (body as any).hostOverrideConfirmation !== buildHostOverrideConfirmation(id)) {
+      return jsonResponse({
+        error: 'host_override_confirmation_required',
+        requiresHostConfirmation: true,
+        confirmation: buildHostOverrideConfirmation(id),
+      }, { status: 409 });
+    }
     if (effort !== undefined && effort !== null && effort !== '' && !isEffortLevel(effort)) {
       return jsonResponse({ error: `Invalid effort "${effort}". Expected one of: ${EFFORT_LEVELS.join(', ')}.` }, { status: 400 });
     }
@@ -480,6 +492,7 @@ export function startPlanningForIssue(options: {
             probe: probe === true,
             autoSpawnOnFinalize: autoStart === true,
             workModel: trimmedWorkModel,
+            hostOverride,
             startedBy,
             onProgress: (event) => {
               console.log(`[start-planning] Progress: step=${event.step} label="${event.label}" status=${event.status} detail="${event.detail}"`);

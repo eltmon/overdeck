@@ -13,6 +13,11 @@ interface AutoSpawnConsentRecord {
   workModel?: string;
   /** PAN-4683: the planning request's location, so the post-planning start honors `--remote`. */
   workspaceLocation?: WorkspaceLocation;
+  /**
+   * PAN-5498: the operator confirmed `pan start --host` for this planning
+   * request, so the post-planning start skips the workspace Docker stack gate.
+   */
+  hostOverride?: true;
   updatedAt: string;
 }
 
@@ -43,9 +48,10 @@ function parseConsentRecord(raw: string): AutoSpawnConsentRecord | null {
   const value = JSON.parse(raw) as Partial<AutoSpawnConsentRecord> & { autoSpawnOnFinalize?: unknown };
   const workModel = typeof value.workModel === 'string' && value.workModel.length > 0 ? value.workModel : undefined;
   const workspaceLocation = value.workspaceLocation === 'local' || value.workspaceLocation === 'remote' ? value.workspaceLocation : undefined;
+  const hostOverride = value.hostOverride === true ? true : undefined;
   if (value.version === 2 && typeof value.generation === 'string'
     && (value.status === 'granted' || value.status === 'claimed' || value.status === 'spent')) {
-    return { ...(value as AutoSpawnConsentRecord), workModel, workspaceLocation };
+    return { ...(value as AutoSpawnConsentRecord), workModel, workspaceLocation, hostOverride };
   }
   if (typeof value.autoSpawnOnFinalize === 'boolean') {
     return {
@@ -110,7 +116,7 @@ export async function readAutoSpawnOnFinalizeFlagAsync(issueId: string): Promise
 export async function writeAutoSpawnOnFinalizeFlag(
   issueId: string,
   enabled: boolean,
-  options: { workModel?: string | null; workspaceLocation?: WorkspaceLocation | null } = {},
+  options: { workModel?: string | null; workspaceLocation?: WorkspaceLocation | null; hostOverride?: boolean | null } = {},
 ): Promise<void> {
   await withConsentLock(issueId, 'planning-consent:new-cycle', async () => {
     // Read tolerantly (never throws — null on any unreadable/corrupt file) and
@@ -118,18 +124,25 @@ export async function writeAutoSpawnOnFinalizeFlag(
     // block a fresh generation from overwriting it, which is the only
     // self-heal path for a corrupt consent file. null clears, undefined preserves.
     const prior = options.workModel === undefined || options.workspaceLocation === undefined
+      || options.hostOverride === undefined
       ? await readConsentRecord(issueId)
       : null;
     const workModel = options.workModel === null ? undefined : (options.workModel ?? prior?.workModel);
     const workspaceLocation = options.workspaceLocation === null
       ? undefined
       : (options.workspaceLocation ?? prior?.workspaceLocation);
+    // A spent record's override was used by the start it granted; a new generation
+    // must not inherit it without a fresh confirmation.
+    const hostOverride = options.hostOverride === undefined
+      ? (prior?.status === 'spent' ? undefined : prior?.hostOverride)
+      : (options.hostOverride === true ? true : undefined);
     await writeConsentRecord(issueId, {
       version: 2,
       generation: randomUUID(),
       status: enabled ? 'granted' : 'spent',
       workModel,
       workspaceLocation,
+      hostOverride,
       updatedAt: new Date().toISOString(),
     });
   });
@@ -165,6 +178,13 @@ export async function readAutoSpawnConsentWorkspaceLocation(issueId: string): Pr
   const record = await readConsentRecord(issueId);
   if (!record || record.status === 'spent') return undefined;
   return record.workspaceLocation;
+}
+
+/** PAN-5498: true when the current (unspent) generation records a confirmed `--host` start. */
+export async function readAutoSpawnConsentHostOverride(issueId: string): Promise<boolean> {
+  const record = await readConsentRecord(issueId);
+  if (!record || record.status === 'spent') return false;
+  return record.hostOverride === true;
 }
 
 async function transitionClaim(

@@ -258,6 +258,8 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     governorCpuPsiRecoveryAvg60: 25,
     governorCpuHoldDispatch: false,
     qualityGateSlots: 2,
+    qualityGatePsiStartAvg10: 25,
+    qualityGateCpuBypassMinutes: 10,
     diskWarnGb: 5,
     diskCriticalGb: 2,
   },

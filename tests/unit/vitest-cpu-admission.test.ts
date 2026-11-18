@@ -21,6 +21,7 @@ function admittedHandle(order: string[] = []) {
     slots: 2,
     footprintBytes: 2.5 * GiB,
     admittedAlone: false,
+    cpuBypassed: false,
     recordPeak: vi.fn(async (bytes: number) => { order.push(`recordPeak:${bytes}`) }),
     release: vi.fn(async () => { order.push('release') }),
   }

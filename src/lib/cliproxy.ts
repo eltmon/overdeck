@@ -89,6 +89,9 @@ export const CLIPROXY_BASE_URL = `http://${CLIPROXY_HOST}:${CLIPROXY_PORT}`;
 // auth files): auth-files 200 with both files, "1 Gemini API keys" at startup,
 // Claude list free of the nine Codex aliases (8 of them reappear when
 // oauth.excluded-models.claude is removed), second write skipped (wrote: false).
+// PAN-5522: probed 2026-11-18 on 8.0.71 under ChatGPT sign-in; GET /v1/models
+// lists gpt-6.2-astra and gpt-6.2-sol and POST /v1/messages returned a
+// completion for each.
 const CLIPROXY_RELEASE_VERSION = 'v8.0.71';
 
 function getCliproxyDir(): string {

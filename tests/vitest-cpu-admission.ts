@@ -14,6 +14,7 @@ import { dirname, join, relative, resolve } from 'node:path'
 
 import {
   admittedAloneMessage,
+  cpuBypassedMessage,
   describeWait,
   memoryRefusalMessage,
   memoryTimeoutOf,
@@ -95,6 +96,7 @@ export async function setup(deps: VitestCpuAdmissionDeps = {}): Promise<void> {
       },
     )
     if (admission.admittedAlone) warn(admittedAloneMessage(footprintKey, admission.footprintBytes))
+    if (admission.cpuBypassed) warn(cpuBypassedMessage(footprintKey))
     admittedEnv = env
     priorAdmittedValue = env.OVERDECK_GATE_ADMITTED
     env.OVERDECK_GATE_ADMITTED = '1'

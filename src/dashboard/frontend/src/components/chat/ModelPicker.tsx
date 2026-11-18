@@ -121,6 +121,8 @@ const FALLBACK_GROUPS: ModelGroup[] = [
     provider: 'openai',
     label: 'OpenAI',
     models: [
+      { id: 'gpt-6.2-astra', label: 'GPT-6.2 Astra (272K context)', provider: 'openai', costDisplay: '$24/1M', costPer1MTokens: 24, effortLevels: EFFORT_LEVELS },
+      { id: 'gpt-6.2-sol', label: 'GPT-6.2 Sol (272K context)', provider: 'openai', costDisplay: '$6/1M', costPer1MTokens: 6, effortLevels: EFFORT_LEVELS },
       { id: 'gpt-6-astra', label: 'GPT-6 Astra (272K context)', provider: 'openai', costDisplay: '$30/1M', costPer1MTokens: 30, effortLevels: EFFORT_LEVELS },
       { id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol (272K context)', provider: 'openai', costDisplay: '$6/1M', costPer1MTokens: 6, effortLevels: EFFORT_LEVELS },
       { id: 'gpt-6.1-terra', label: 'GPT-6.1 Terra (272K context)', provider: 'openai', costDisplay: '$3/1M', costPer1MTokens: 3, effortLevels: EFFORT_LEVELS },

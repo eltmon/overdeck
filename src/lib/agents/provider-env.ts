@@ -142,12 +142,13 @@ const PROVIDER_ENV_KEYS = [
 // window 2.5x smaller than the one the harness was actually given.
 // PAN-3388: bare ids pin to the 272K billing tier; [372k] variants opt into
 // the long window at 2x-input/1.5x-output quota burn past 272K.
-// The GPT-6 family (astra, sol, luna, 6.1 sol, 6.1 terra) shares the 272K billing tier and the 872K
+// The GPT-6 family (astra, sol, luna, 6.1 sol, 6.1 terra, 6.2 astra, 6.2 sol) shares the 272K billing tier and the 872K
 // raw ceiling with GPT-5.6 (Codex catalog, 2026-09-07 / 0.157.1), so it takes the same pin. The
 // set name is kept for continuity with PAN-3057/PAN-3388.
 // gpt-6.1-terra joined after CLIProxy 7.3.16 served it under ChatGPT sign-in on 2026-11-11 (PAN-4634).
+// gpt-6.2-astra and gpt-6.2-sol joined after CLIProxy 8.0.71 listed and served both on 2026-11-18 (PAN-5522).
 // gpt-6-rosalind and gpt-6-astra-law are deliberately absent: CLIProxy does not list them (PAN-4826 D6, re-checked 2026-11-11). Their claude-code policy still resolves to 272K through the capability fallthrough below.
-const GPT_56_MODELS = new Set(['gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']);
+const GPT_56_MODELS = new Set(['gpt-6.2-astra', 'gpt-6.2-sol', 'gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']);
 const GPT_56_LONG_MODELS = new Set(Object.keys(GPT56_LONG_CONTEXT_VARIANTS));
 
 interface ClaudeCodeContextPolicy {

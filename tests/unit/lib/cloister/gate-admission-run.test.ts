@@ -31,6 +31,7 @@ function fakeHandle(order: string[] = []): QualityGateAdmissionHandle {
     slots: 2,
     footprintBytes: 2.5 * GiB,
     admittedAlone: false,
+    cpuBypassed: false,
     recordPeak: vi.fn(async (bytes: number) => { order.push(`recordPeak:${bytes}`) }),
     release: vi.fn(async () => { order.push('release') }),
   }
@@ -164,6 +165,14 @@ describe('runAdmittedCommand (PAN-5248)', () => {
     expect(lines[0]).toBe('[gate-admission] tsc:tsconfig.json waiting in the admission queue at position 1: '
       + 'vitest in /w has waited past the bypass bound and runs alone next')
     expect(lines[1]).toContain('[gate-admission] tsc:tsconfig.json admitted alone after waiting past the bypass bound: needs 9.0 GiB')
+  })
+
+  it('announces an admission past the CPU bypass bound (PAN-5520)', async () => {
+    const { deps, warn } = setup({ acquire: vi.fn(async () => ({ ...fakeHandle(), cpuBypassed: true })) })
+    await runAdmittedCommand(input, deps)
+    const lines = warn.mock.calls.map(([line]) => String(line))
+    expect(lines).toContain('[gate-admission] tsc:tsconfig.json admitted alone after waiting past the CPU bypass bound: '
+      + 'it starts without waiting for CPU pressure to clear and may run slowly')
   })
 
   it('releases and resolves 1 when the command cannot start', async () => {

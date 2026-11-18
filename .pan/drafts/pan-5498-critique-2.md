@@ -1,0 +1,13 @@
+plan-digest: 66be2fb887024307ea1a3fafcaaf8a3c3cf6e0def8ee2794284f148a5b76c7f9
+
+## blocks-the-design: Planned state precedes recoverable handoff
+
+`src/lib/overdeck/planning-promotion.ts:699-709` writes and commits the finalized plan; lines 742-749 apply the `planned` label; lines 806-816 emit planning completion. The new `handoff.requested` entry is not written until line 840, after the additional awaited commit and push at lines 829-835. A dashboard death in that interval leaves the same finalized, planned issue cited in the PRD's PAN-5469 evidence, but no `handoff.*` entry for `retryDeferredHandoffs` to discover (`src/lib/cloister/deferred-handoff.ts:238-240`). The Plan-Finalized commit and planned label therefore do not establish that the death happened at or after the spawn request. Persist handoff intent once the plan is committed, before the subsequent awaits, and make recovery finish or validate the remaining pre-spawn work before starting the agent. Add a test that interrupts completion between the planned label and the spawn POST.
+
+## blocks-the-design: A stranded consent claim stops recovery
+
+`src/lib/planning/auto-spawn-consent.ts:147-163` changes consent from `granted` to `claimed` before `spawnClaimedAgent` prepares and launches the agent (`src/lib/agents/spawn.ts:639-665`). If the child start process dies after that durable claim but before it accepts or releases consent, the `handoff.requested` entry remains pending with no work agent. Yet `readAutoSpawnOnFinalizeFlagAsync` returns true only for `granted` (`auto-spawn-consent.ts:112-114`), so `retryDeferredHandoffs` writes `handoff.abandoned` and never sends a retry (`src/lib/cloister/deferred-handoff.ts:272-278`). Recover an orphaned `claimed` generation only after proving its start process and agent are absent, then retry with the same consent generation. Test a persisted claim whose owner dies before agent acceptance.
+
+## sharpens-framing: Route criteria are not verified by the named tests
+
+The xBRIEF's `start-planning-host.ac2` says the route records `hostOverride`, but `src/lib/overdeck/__tests__/start-planning-host-override.test.ts:71-85` supplies an invalid effort and stops before `spawnPlanningSession` writes consent (`src/lib/planning/spawn-planning-session.ts:409-415`). The `spawn-route-consent-host` item's verification commands run typecheck and consent-record tests, neither of which executes `spawnIssueAgentForRoute` (`src/dashboard/server/routes/agents/spawn-issue.ts:224,294-299`). Add tests that reach the start-planning consent write and exercise the spawn route with consent-bearing and ordinary requests, or narrow the acceptance claims to the behavior actually tested.

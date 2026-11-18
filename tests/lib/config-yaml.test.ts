@@ -326,6 +326,8 @@ api_keys:
         governorCpuPsiRecoveryAvg60: 25,
         governorCpuHoldDispatch: false,
         qualityGateSlots: 2,
+        qualityGatePsiStartAvg10: 25,
+        qualityGateCpuBypassMinutes: 10,
       });
     });
 
@@ -340,6 +342,8 @@ api_keys:
           governor_cpu_psi_recovery_avg60: 30,
           governor_cpu_hold_dispatch: true,
           quality_gate_slots: 3,
+          quality_gate_psi_start_avg10: 40,
+          quality_gate_cpu_bypass_minutes: 5,
         },
       }).config.resources).toMatchObject({
         dashboardCpuWeight: 400,
@@ -350,6 +354,8 @@ api_keys:
         governorCpuPsiRecoveryAvg60: 30,
         governorCpuHoldDispatch: true,
         qualityGateSlots: 3,
+        qualityGatePsiStartAvg10: 40,
+        qualityGateCpuBypassMinutes: 5,
       });
     });
 
@@ -364,6 +370,8 @@ api_keys:
           governor_cpu_psi_recovery_avg60: -1,
           governor_cpu_hold_dispatch: 'yes' as never,
           quality_gate_slots: 0,
+          quality_gate_psi_start_avg10: 0,
+          quality_gate_cpu_bypass_minutes: 30,
         },
       }).config.resources).toMatchObject({
         dashboardCpuWeight: 1000,
@@ -374,6 +382,8 @@ api_keys:
         governorCpuPsiRecoveryAvg60: 25,
         governorCpuHoldDispatch: false,
         qualityGateSlots: 2,
+        qualityGatePsiStartAvg10: 25,
+        qualityGateCpuBypassMinutes: 10,
       });
     });
 
