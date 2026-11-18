@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5541",
   "created": "2026-11-18T20:13:04.612Z",
-  "updated": "2026-11-18T21:11:37.398Z",
+  "updated": "2026-11-18T21:11:50.083Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,6 +148,11 @@
     "conversation-pinned-card.ac4": {
       "status": "completed",
       "doneAt": "2026-11-18T21:11:37.397Z"
+    },
+    "agent-session-pinned-card": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5541",
+      "claimedAt": "2026-11-18T21:11:50.083Z"
     }
   }
 }
