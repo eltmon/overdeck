@@ -1,5 +1,6 @@
 ---
-title: Harnesses
+title: "Harnesses: choose the coding agent for each run"
+sidebarTitle: "Harnesses"
 description: Choosing the coding-agent harness that drives a workspace agent
 ---
 
@@ -1197,6 +1198,10 @@ signed in to the Claude Code subscription. Set one or the other, not both.
 
 ## Troubleshooting
 
+pi agents use the same ready file, named pipe and heartbeat as oh-my-pi, so the
+omp steps below apply to pi as well. pi's extension bundle is
+`dist/extensions/pi.js` (`packages/pi-extension/dist/index.js` in a checkout).
+
 ### "omp not on PATH" or wrong version
 
 Run `pan doctor`. The ohmypi check reports OK / missing / too-old with the resolved
@@ -1204,10 +1209,12 @@ version. The fix message includes the install/upgrade command.
 
 ### omp spawns but the agent never reaches "ready"
 
-Check `~/.overdeck/agents/<id>/ready.json` — the vendored extension writes this
+Check `~/.overdeck/agents/<id>/ready.json`; the vendored extension writes this
 on `session_start`. If it never appears:
 
-1. Confirm `packages/ohmypi-extension/dist/index.js` exists (`pan doctor` will warn).
+1. Run `pan doctor`. The "ohmypi Extension Bundle" check warns when neither
+   `dist/extensions/ohmypi.js` (installed) nor
+   `packages/ohmypi-extension/dist/index.js` (checkout) exists.
 2. Watch the agent's pane: open it in the dashboard, or run the `Attach:`
    command `pan start <id>` prints (Herdr or tmux, whichever backend launched
    it). omp prints stdout to the pane; structural errors show up there.
@@ -1218,8 +1225,9 @@ on `session_start`. If it never appears:
 
 `OhmypiRuntime.getHeartbeat()` walks three sources in priority order: active
 heartbeat (&lt;60s old) → JSONL session mtime → tmux session created timestamp.
+The third source applies only on the tmux backend.
 If your dashboard shows a stale heartbeat, check
-`~/.overdeck/heartbeats/<id>.json` — omp writes there on every
+`~/.overdeck/heartbeats/<id>.json`; omp writes there on every
 `tool_execution_end`.
 
 ### Codex app-server is unavailable or too old
@@ -1238,35 +1246,40 @@ Upgrade, then stop and resume the conversation.
 
 A `claude-code` launch was refused because the configured model's minimum
 Claude Code version is newer than the launch binary. See
-[Claude Code version requirements](#claude-code-version-requirements) — run
+[Claude Code version requirements](#claude-code-version-requirements): run
 the upgrade command the error names, or click **Upgrade Claude Code** in the
 dashboard banner, then launch again. With
 [automatic updates](#automatic-updates) on, Overdeck has already tried the
 update, and the end of the error says what failed.
+
+Still stuck? Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a
+[GitHub Issue](https://github.com/eltmon/overdeck/issues).
 
 ## Tradeoffs
 
 ### RPC over named pipe vs tmux paste-buffer
 
 ohmypi's harness uses a per-agent `mkfifo` (`~/.overdeck/agents/<id>/rpc.in`) for
-command delivery. Claude Code uses tmux's `load-buffer` + `paste-buffer`
-pattern. The fifo path:
+command delivery. Claude Code receives messages typed into its pane (a Herdr
+prompt, or tmux `load-buffer` + `paste-buffer` on the tmux backend). The fifo
+path:
 
 - skips the 300ms paste-render wait Claude Code needs;
-- gives omp its own structured RPC channel separate from the visible tmux pane;
-- keeps the agent inside tmux for crash isolation and visual attach (omp's stdout
-  still flows into the pane).
+- gives omp its own structured RPC channel separate from the visible pane;
+- keeps the agent inside its terminal-backend pane (Herdr or tmux) for crash
+  isolation and visual attach (omp's stdout still flows into the pane).
 
-The downside: a reader-less fifo throws `ENXIO` immediately, so `writeOhmypiCommand`
-returns a typed `OhmypiNotReady` error and the runtime adapter recycles the agent
-rather than blocking on the open call.
+The downside: opening a fifo with no reader fails at once with `ENXIO`, so
+`writeOhmypiCommandSync` throws a typed `OhmypiNotReady` error instead of
+blocking, and the send fails with "reader gone before prompt could be
+delivered".
 
 ### Multi-provider via pi/ohmypi vs CLIProxy
 
 Both pi and ohmypi (with native multi-provider routing) and Claude Code (via the CLIProxy
 auth shim) can drive non-Anthropic models. pi and ohmypi give you provider routing without
 an extra middleware process; CLIProxy gives you Claude Code's tooling/UX with
-non-Anthropic providers. Pick by which UX you want — there is no correctness
+non-Anthropic providers. Pick by which UX you want; there is no correctness
 difference today.
 
 CLIProxy auto-installs its pinned release on Linux, macOS, and Windows for amd64 and
@@ -1286,8 +1299,8 @@ rank. See "Account pool and reset-first routing" in `docs/CONFIGURATION.md`.
 - **`pi` is the default** for non-Anthropic, non-OpenAI providers; pick it
   explicitly for any other provider pi's catalog covers.
 - **Switch to `ohmypi`** when you want omp's compact-context behavior or its
-  additional tools; set `providerHarnesses.<provider>: ohmypi` to make it the
-  default for a provider again.
+  additional tools; set `models.providers.<provider>.harness: ohmypi` in
+  `config.yaml` to make it the default for a provider again.
 - **Mix per role** in Settings if you want, e.g., a pi work role feeding a
   Claude Code review role.
 - **Switch to `kimi-code`** for Kimi models when you want native Kimi behavior
@@ -1313,17 +1326,19 @@ name. Every field is required, so a harness cannot leave a decision undeclared.
 | `nativeManualCompact` | The harness has a native manual `/compact` that Overdeck can intercept. |
 | `paneInputGuard` | A message send first checks the pane for a permission prompt and the main input target. |
 | `transcriptDeliveryReceipt` | Delivery is confirmed by finding the sent turn in the transcript. |
-| `hostEffortFlag` | The launch host accepts an `--effort` flag for this harness. |
+| `hostEffortFlag` | The ACP launch host gets an `--effort` flag for this harness (OpenCode, Grok Build). |
 | `binaryLabel` | The name used in binary-resolution errors. |
 | `installHint` | The install command shown when the binary is missing, or `null`. |
+| `updateArgs` | The arguments after the binary that update the CLI in place, or `null` when Overdeck must not update it. |
+| `npmPackage` | The CLI's npm package; a binary under `<prefix>/lib/node_modules/<package>/` is updated with npm. `null` for none. |
 | `binaryConfigKey` | The config key that holds an operator-configured binary path, or `null`. |
 | `launchPreflight` | A check run before launch (`claude-code-model-minimum`), or `null`. |
 | `workspaceResolution` | How the conversation scanner finds a transcript's workspace: `claude-project-hash`, `agent-dir`, or `first-message-only`. |
 | `correlatesBySessionId` | The conversation scanner correlates transcripts to agents by session id. |
 | `answersQuestionByMessage` | The MCP `answer_question` tool may answer this harness's pending question with a composed message. It is narrower than `askAnswerDelivery`: the tool carries no tool-use id, so it cannot tell a Codex approval from a question, and only Claude Code declares it. |
 | `askAnswerDelivery` | How the dashboard delivers an answer to a conversation's pending question: `message` sends it as a message; `pi-ask-modal` drives the open ask modal with keystrokes; `codex-approval` means it is really a numbered approval prompt, answered with `answer_codex_approval` (PAN-4944), not a question. |
-| `runsOnFlyMachine` | A conversation may be started on a Fly machine (`pan machines add-fly`). Only Claude Code declares it; other harnesses on Fly are #4296. |
-| `overdeckMcp` | Launches get the `overdeck` MCP server with a per-agent token. Claude Code, Codex, `acp` and `opencode` declare it. |
+| `runsOnFlyMachine` | A conversation may be started on a Fly machine (`pan machines add-fly`). Claude Code and Codex declare it. |
+| `overdeckMcp` | Launches get the `overdeck` MCP server with a per-agent token. Claude Code, Codex, `acp`, `opencode` and `grok` declare it. |
 | `skillSlashCommands` | The composer `/` menu lists installed skills as `/<skill-name>` under a Skills group, because this harness runs a typed `/<skill>` command. Only Claude Code declares it. |
 | `conversationSkillApply` | How pack skills added to a running conversation load (`pan skills add`, `add_skills`, **Add skills…**): `hot-reload` re-points the plugin dir and sends `/reload-plugins` (Claude Code); `restart` stores them and loads them on a resume (Codex); `null` means the harness gets no conversation packs, so the dashboard hides **Add skills…** and the route answers 409. |
 
@@ -1439,25 +1454,31 @@ in a commit whose message carries an issue reference;
    Unlisted harnesses are denied.
 8. Run `npm run lint:harness-branches`.
 
-Steps 1–3 are the capability declaration. Steps 4–7 are the adapter work that
+Steps 1 to 3 are the capability declaration. Steps 4 to 7 are the adapter work that
 the declaration does not replace.
 
 ## Implementation
 
-- `src/lib/runtimes/ohmypi.ts` — `OhmypiRuntime`, the pi-family `AgentRuntime` adapter, constructed for omp and for pi (`src/lib/runtimes/pi.ts`)
-- `src/lib/runtimes/pi-family.ts` — the pi/omp launch profiles (binary, resume flag, `--no-approve`, extension bundle, `models.json` dir)
-- `src/lib/launcher-pi-command.ts` — the pi-family launcher command and `models.json` provisioning dispatch
-- `src/lib/pi-models.ts` — pi `models.json` provisioning for tier models pi's catalog lacks
-- `packages/pi-extension/` — vendored lifecycle extension pi loads via `--extension`
-- `src/lib/runtimes/ohmypi-fifo.ts` — `createOhmypiFifo`, `writeOhmypiCommandSync`, `OhmypiNotReady`
-- `src/lib/cost-parsers/ohmypi-parser.ts` — omp JSONL active-branch walker
-- `src/lib/harness-policy.ts` — `canUseHarness` ToS/model-provider gate
-- `packages/contracts/src/harness-capabilities.ts` — `HarnessCapabilities`, the per-harness behavior declarations (see [Harness capabilities](#harness-capabilities))
-- `packages/ohmypi-extension/` — vendored lifecycle extension omp loads via `--extension`
-- `src/lib/runtimes/kimi-code.ts` — `KimiCodeRuntimeSync` (native Kimi Code adapter)
-- `src/lib/cost-parsers/kimi-parser.ts` — Kimi `wire.jsonl` usage/cost parser
-- `src/lib/prime-agent/` — Prime Agent host (`host.ts`), RPC client and framing, managed policy, provider map, daemon reaper, and version pin; see [docs/PRIME-AGENT-HARNESS.md](https://github.com/eltmon/overdeck/blob/main/docs/PRIME-AGENT-HARNESS.md)
-- `src/lib/runtimes/prime-agent.ts` — `PrimeAgentRuntimeSync` (Cloister adapter)
+- `src/lib/runtimes/ohmypi.ts`: `OhmypiRuntime`, the pi-family `AgentRuntime` adapter, constructed for omp and for pi (`src/lib/runtimes/pi.ts`)
+- `src/lib/runtimes/pi-family.ts`: the pi/omp launch profiles (binary, resume flag, `--no-approve`, extension bundle, `models.json` dir)
+- `src/lib/launcher-pi-command.ts`: the pi-family launcher command and `models.json` provisioning dispatch
+- `src/lib/pi-models.ts`: pi `models.json` provisioning for tier models pi's catalog lacks
+- `packages/pi-extension/`: vendored lifecycle extension pi loads via `--extension`
+- `src/lib/runtimes/ohmypi-fifo.ts`: `createOhmypiFifo`, `writeOhmypiCommandSync`, `OhmypiNotReady`
+- `src/lib/runtimes/pi-fifo.ts`: the pi fifo writer and `PiNotReady`
+- `src/lib/ohmypi-models.ts`: omp `models.json` provisioning
+- `src/lib/cost-parsers/ohmypi-parser.ts`: omp JSONL active-branch walker
+- `src/lib/harness-policy.ts`: `canUseHarness` ToS/model-provider gate
+- `packages/contracts/src/harness-capabilities.ts`: `HarnessCapabilities`, the per-harness behavior declarations (see [Harness capabilities](#harness-capabilities))
+- `packages/ohmypi-extension/`: vendored lifecycle extension omp loads via `--extension`
+- `src/lib/runtimes/kimi-code.ts`: `KimiCodeRuntimeSync` (native Kimi Code adapter)
+- `src/lib/cost-parsers/kimi-parser.ts`: Kimi `wire.jsonl` usage/cost parser
+- `src/lib/prime-agent/`: Prime Agent host (`host.ts`), RPC client and framing, managed policy, provider map, daemon reaper, and version pin; see [docs/PRIME-AGENT-HARNESS.md](https://github.com/eltmon/overdeck/blob/main/docs/PRIME-AGENT-HARNESS.md)
+- `src/lib/runtimes/prime-agent.ts`: `PrimeAgentRuntimeSync` (Cloister adapter)
+- `src/lib/runtimes/claude-code.ts`: the Claude Code adapter
+- `src/lib/runtimes/codex.ts` and `src/lib/codex/`: the Codex adapter and app-server host
+- `src/lib/runtimes/acp.ts` and `src/lib/acp/`: the ACP adapter and host for Kimi over ACP, OpenCode and Grok Build
+- `src/lib/runtimes/muse.ts`: the Muse Code adapter
 
 ## Storage paths
 
@@ -1470,8 +1491,8 @@ module for a path instead of building one.
 | `storage/claude-code.ts` | `~/.claude/projects/<encoded-cwd>/<session-id>.jsonl` (`claudeProjectsRoot`, `claudeProjectDir`, `sessionFilePath`) |
 | `storage/codex.ts` | `$CODEX_HOME/sessions/**/rollout-*.jsonl`, the per-conversation `CODEX_HOME`, and each agent's `<agentDir>/codex-home/sessions` (`codexHome`, `codexSessionsRoot`, `codexAgentHome`, `codexAgentSessionsDir`, `findRolloutPath`) |
 | `storage/kimi-code.ts` | `~/.kimi-code/sessions/<work-dir-key>/<session-id>/agents/main/wire.jsonl` (`kimiHomeDefault`, `kimiSessionsRoot`, `kimiWirePath`) |
-| `storage/pi.ts` | `<agentDir>/sessions/**.jsonl` and the user's own `~/.pi/agent` (`piSessionsRoot`, `findPiTranscriptPath`) |
-| `storage/acp.ts` | `<agentDir>/acp-session.jsonl`, the transcript for ACP agents including OpenCode (`ACP_TRANSCRIPT_FILE`, `acpTranscriptPath`) |
+| `storage/pi.ts` | `<agentDir>/sessions/**.jsonl` and the user's own `~/.pi/agent`; it also serves oh-my-pi (`piSessionsRoot`, `findPiTranscriptPath`) |
+| `storage/acp.ts` | `<agentDir>/acp-session.jsonl`, the transcript for ACP agents including OpenCode and Grok Build (`ACP_TRANSCRIPT_FILE`, `acpTranscriptPath`) |
 | `storage/muse.ts` | `<agentDir>/muse-data/muse/sessions/…/session.jsonl` (`museSessionsRoot`, `resolveMuseSessionPath`) |
 | `storage/prime-agent.ts` | `<agentDir>/prime-sessions/*.jsonl`, the `prime-agent-session-file` pointer, the per-agent daemon socket `$OVERDECK_HOME/sockets/pd-<hash>.sock`, and the path of Prime's own `~/.prime/agent/auth.json` (`primeAgentSessionDir`, `readPrimeAgentSessionFile`, `primeAgentDaemonSocketPath`) |
 
@@ -1490,11 +1511,11 @@ file don't break the row.
 
 ## See also
 
-- [Harness Landscape](/reference/harness-landscape) — survey of coding-agent
+- [Harness Landscape](/reference/harness-landscape): survey of coding-agent
   harnesses and their extensibility mechanisms
-- [Template Conversations](/reference/template-conversations) — proposal for
+- [Template Conversations](/reference/template-conversations): proposal for
   loading a curated skill set into a single conversation
-- [Skills System](/features/skills) — how Overdeck distributes skills across
+- [Skills System](/features/skills): how Overdeck distributes skills across
   harnesses
 
 ## Context and reasoning effort
@@ -1524,7 +1545,7 @@ Subscription usage allowances are not API token prices. A larger window can cons
 
 Overdeck resolves and clamps effort before launch (see [Reasoning effort](/configuration/effort)), and a launch path that reaches a harness without a resolved effort fails with a `requires …Effort` error instead of silently falling back to that harness's own default.
 
-The Pi and Muse CLIs parse `max` (`omp` 17.4.1, `pi` 0.85.0, `muse` 1.4.2), but Overdeck sends at most `xhigh` because their harness rows stop there — relaxing that is a separate decision, not a bug.
+The Pi and Muse CLIs parse `max` (`omp` 17.4.1, `pi` 0.85.0, `muse` 1.4.2), but Overdeck sends at most `xhigh` because their harness rows stop there. Relaxing that is a separate decision, not a bug.
 
 **GPT through Claude Code (CLIProxy):** Claude Code sends the level as `output_config.effort` with adaptive thinking; CLIProxy maps it (verified on `v7.3.16`) to the Codex request's `reasoning.effort` and clamps it to the model, so `--effort` is honored end to end. Overdeck always passes `--effort` on a Claude Code launch, so CLIProxy's own fallbacks (`xhigh` for adaptive thinking without a level, `medium` with no thinking block) never apply. One caveat: `gpt-5.5` is a deprecated alias of `gpt-5.6-sol` in the model catalog, so its effective effort levels and clamping come from the `gpt-5.6-sol` row, not from any levels set on `gpt-5.5` itself.
 
@@ -1535,4 +1556,4 @@ Saved OpenRouter favorites remain selectable even when OpenRouter's model catalo
 omits them. Overdeck displays the model ID and marks pricing and context as
 unknown until the catalog includes the model again. Catalog omission alone does
 not determine whether OpenRouter can serve a model. You can remove these saved
-models from Settings → OpenRouter like any other favorite.
+models from Settings → Providers → OpenRouter like any other favorite.
