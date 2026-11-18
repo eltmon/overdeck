@@ -110,6 +110,14 @@ By default a ready PR waits for you: the per-issue `Auto` or `Hold` label wins i
 
 Awaiting Merge also has a Pipeline Override section for PRs that are not yet ready: `Force Approve` and `Force Merge` both bypass the pipeline, behind a confirmation step, for the rare case where you need to move a PR on without waiting for the gate.
 
+## Strikes: the short path
+
+`pan strike <ids...>` spawns a strike agent for a small, already understood fix. It bypasses planning, review convoy and the test role entirely: the agent implements on a `strike/<id>` branch in `workspaces/feature-<id>-strike`, verifies the fix itself, and opens a PR.
+
+A strike PR still gets one automatic quick review per head. If it approves, the strike merges itself ahead of other queued work, with the same 5-minute cancel window as any other auto-merge, unless the project holds PRs for UAT, in which case it waits for your Merge click like anything else. A changes-requested verdict stops the strike; nothing reworks it automatically. After the PR merges, Overdeck stops the strike agent and removes its worktree and branch.
+
+`pan done --strike` only checks that the strike branch is already contained in `origin/main`; it opens no PR of its own.
+
 ## Get help
 
 Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file an issue on [GitHub Issues](https://github.com/eltmon/overdeck/issues).
