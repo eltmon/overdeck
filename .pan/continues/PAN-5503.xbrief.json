@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5503",
   "created": "2026-11-18T23:39:30.709Z",
-  "updated": "2026-11-18T23:43:24.074Z",
+  "updated": "2026-11-18T23:44:43.368Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,9 +32,26 @@
       "doneAt": "2026-11-18T23:40:57.626Z"
     },
     "harnesses-ohmypi-to-opencode": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5503",
-      "claimedAt": "2026-11-18T23:43:24.073Z"
+      "claimedAt": "2026-11-18T23:43:24.073Z",
+      "doneAt": "2026-11-18T23:44:43.368Z"
+    },
+    "harnesses-ohmypi-to-opencode.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:44:43.368Z"
+    },
+    "harnesses-ohmypi-to-opencode.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:44:43.368Z"
+    },
+    "harnesses-ohmypi-to-opencode.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:44:43.368Z"
+    },
+    "harnesses-ohmypi-to-opencode.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:44:43.368Z"
     }
   }
 }
