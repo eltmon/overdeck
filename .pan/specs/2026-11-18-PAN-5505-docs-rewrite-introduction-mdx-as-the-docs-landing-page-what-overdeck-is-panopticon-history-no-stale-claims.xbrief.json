@@ -1,0 +1,284 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-18T15:52:43Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5505: docs: rewrite introduction.mdx as the docs landing page (what Overdeck is, Panopticon history, no stale claims)",
+    "updated": "2026-11-18T15:53:49.644Z"
+  },
+  "plan": {
+    "id": "pan-5505",
+    "title": "docs: rewrite introduction.mdx as the docs landing page (what Overdeck is, Panopticon history, no stale claims)",
+    "status": "proposed",
+    "uid": "a44377c2-9f22-4b28-8d23-754431fb4840",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-18T15:52:43Z",
+    "updated": "2026-11-18T15:53:49.644Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5505",
+        "label": "PAN-5505",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5467",
+        "label": "PAN-5467 docs overhaul epic",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5505.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "docs",
+      "mintlify",
+      "introduction",
+      "docs-overhaul"
+    ],
+    "narratives": {
+      "Problem": "introduction.mdx is the docs landing page (docs.overdeck.ai/ redirects to /introduction). It opens with a false Doctor Who epigraph (the great hall of the Capitol on Gallifrey is the Panopticon, not the Overdeck) and describes features that do not exist or were removed: model hot-swap mid-conversation, 13 dashboard views including Mission Control, Convoys and Handoffs, automatic checkpoints with rollback, Cursor, Gemini CLI and Antigravity skill sync, the Inspect specialist, `overdeck work <id>`, 70+ skills and beads. It embeds the outdated September intro video.",
+      "Proposal": "Replace the whole page body with the exact text in the PRD's After block (.pan/drafts/PAN-5505.md): what Overdeck is (matching the overdeck.ai framing), Get started (npx @overdeck/core and the install script, link to Quickstart), one short paragraph per big area with links only to pages in docs.json navigation on main, a short verified history (Panopticon in January 2026, @panctl/cli in April 2026, renamed Overdeck in June 2026, @overdeck/core on 2026-06-20), and Get help (Discord, GitHub Issues, overdeck.ai support). Keep the PAN-5483 frontmatter already on main. Drop the video and delete its orphaned assets. Validate with mint@4.3.49 validate and broken-links.",
+      "NonGoals": "- Editing README.md, quickstart.mdx, concepts.mdx or any page other than introduction.mdx (owned by #5472, #5480, #5499)\n- Changing docs.json navigation, redirects or frontmatter title/sidebarTitle/description set by PAN-5483\n- Linking pages that open sibling issues will create (#5468 pipeline, #5470 Flywheel, #5474 dashboard views, #5475 costs) or pages #5472 is fixing (features/specialists, features/cloister, configuration/state-branch, concepts)\n- Linking the experimental /costs dashboard page\n- Adding any count of harnesses, skills, views, trackers or providers to the page\n- Embedding any video, or adding new screenshots\n- Adding a body # heading (Mintlify renders title as the H1)\n- Fixing pre-existing mint validate or broken-links failures in other files\n- A changelog.d entry (docs only, no behavior change)\n- Running mint validate --fix"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Drop the intro video and link overdeck.ai for a product tour",
+        "rationale": "The issue makes the 0.87 video conditional on stable hosting and names dropping it as the fallback; no stable hosting is known to the plan."
+      },
+      {
+        "summary": "Delete images/intro-video/overdeck-intro.mp4 and overdeck-intro-poster.jpg",
+        "rationale": "git grep shows introduction.mdx is the only reference in the repo; the overdeck-landing sites use their own asset copies. Removing the embed orphans them, and git history keeps them."
+      },
+      {
+        "summary": "Say planning files live under .pan/, not config",
+        "rationale": "The issue says config and planning paths use .pan/, but config lives in ~/.overdeck/; the repo's .pan/ holds drafts, specs, continues, backlog and orders. The docs must match the code."
+      },
+      {
+        "summary": "Link only to pages present in docs.json navigation on main; costs get a sentence without a link",
+        "rationale": "Sibling pages do not exist yet and several existing pages are stale under #5472; links to them would mislead or break. Sibling issues add their own inbound links."
+      },
+      {
+        "summary": "Ban counts on the page",
+        "rationale": "Counts (70+ skills, 13 views, six providers) are exactly what went stale; naming examples instead keeps the page accurate as the product grows."
+      },
+      {
+        "summary": "Keep the PAN-5483 frontmatter on main unchanged and merge main first",
+        "rationale": "PAN-5483 (#5508) already set the title What is Overdeck, sidebarTitle and a 157-character dash-free description that meets the issue's requirement; the workspace branch predates that merge."
+      },
+      {
+        "summary": "Keep only the Command Deck hero screenshot",
+        "rationale": "The model picker image illustrated the removed hot-swap claim, and the dashboard overview image supported the removed 13-views table; the hero image exists and still matches the product."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Single docs page rewrite plus deletion of two orphaned assets; well under the files_scope and subsystem limits.",
+      "canonicalFilename": "2026-11-18-PAN-5505-docs-rewrite-introduction-mdx-as-the-docs-landing-page-what-overdeck-is-panopticon-history-no-stale-claims.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "rewrite-introduction",
+        "title": "Rewrite introduction.mdx body to the PRD After text",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-18T15:52:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5505",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "introduction.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c sidebarTitle introduction.mdx",
+            "grep -nP '[\\x{2013}\\x{2014}]' introduction.mdx",
+            "grep -niE 'Founders of Gallifrey|Time Lord Citadel|hot-swap|13 views|checkpoint|cursor|gemini|antigravity|inspect|overdeck work|70\\+|beads|mission control|IDE for the agent era|intro-video' introduction.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "grep -c sidebarTitle prints 1",
+            "the dash grep and the stale-claim grep print nothing (exit 1)",
+            "npm run lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "First merge origin/main into feature/pan-5505 (pan sync-main pan-5505, or git merge origin/main) so the PAN-5483 frontmatter (title \"What is Overdeck\", sidebarTitle \"Introduction\", the 157-character description) is present. Then replace the whole of introduction.mdx with the After block in .pan/drafts/PAN-5505.md (the content between the ````mdx and ```` fences), byte for byte. Do not add a body # heading. Do not change wording; if Mintlify cannot parse a line, change only that line and record it in the PR body. Every ](/...) href must be in the PRD link table and have a matching .mdx file."
+        },
+        "items": [
+          {
+            "id": "rewrite-introduction.ac1",
+            "title": "Given the branch has merged origin/main, when introduction.mdx is read, then its frontmatter keeps title \"What is Overdeck\", sidebarTitle \"Introduction\" and the 157-character description, and the body matches the PRD After block with no line starting with '# '",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rewrite-introduction.ac2",
+            "title": "When grep -nP '[\\x{2013}\\x{2014}]' introduction.mdx and the PRD's stale-claim grep (Founders of Gallifrey, hot-swap, 13 views, checkpoint, cursor, gemini, antigravity, inspect, overdeck work, 70+, beads, mission control, intro-video) run, then both exit 1 and print nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rewrite-introduction.ac3",
+            "title": "The page renders a Get started section with npx @overdeck/core, curl -fsSL https://overdeck.ai/install | sh and a /quickstart link, a history section naming Panopticon, panopticon-cli, @panctl/cli, June 2026 and @overdeck/core on June 20, 2026, and a Get help section linking https://discord.gg/ZpHE2ZTv5P, GitHub Issues and https://overdeck.ai/support/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rewrite-introduction.ac4",
+            "title": "Every internal href in introduction.mdx resolves to an existing .mdx file listed in docs.json navigation, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remove-intro-video-assets",
+        "title": "Delete the orphaned intro video assets",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T15:52:43Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5505",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "images/intro-video/overdeck-intro.mp4",
+            "images/intro-video/overdeck-intro-poster.jpg"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n intro-video -- ':!.pan'",
+            "test ! -e images/intro-video"
+          ],
+          "expected_outputs": [
+            "git grep prints nothing (exit 1)",
+            "test exits 0 because images/intro-video no longer exists"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "After rewrite-introduction lands, confirm git grep -n intro-video -- ':!.pan' prints nothing, then git rm images/intro-video/overdeck-intro.mp4 images/intro-video/overdeck-intro-poster.jpg. If git grep finds any reference outside .pan/, stop and keep the files, and note the reference in the PR body."
+        },
+        "items": [
+          {
+            "id": "remove-intro-video-assets.ac1",
+            "title": "When git grep -n intro-video -- ':!.pan' runs on the branch, then it exits 1 and prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-intro-video-assets.ac2",
+            "title": "When test ! -e images/intro-video runs, then it exits 0 because the commit removes both overdeck-intro.mp4 and overdeck-intro-poster.jpg",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "validate-docs-site",
+        "title": "Run mint@4.3.49 validate and broken-links and record the output for the PR",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T15:52:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5505",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "introduction.mdx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx -y mint@4.3.49 validate",
+            "npx -y mint@4.3.49 broken-links"
+          ],
+          "expected_outputs": [
+            "mint validate exits 0 with 0 errors",
+            "mint broken-links exits 0 and prints no broken links found"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2"
+          ],
+          "acJustification": "Two commands, two criteria; the PR-body paste is the observable output of both."
+        },
+        "narrative": {
+          "Action": "From the workspace root, after rewrite-introduction and remove-intro-video-assets, run npx -y mint@4.3.49 validate and npx -y mint@4.3.49 broken-links. Do not run mint validate --fix and do not use mint@latest. Save both outputs for the PR body (every PR in epic #5467 must paste them). If a command fails only because of another file (a pre-existing break), do not edit that file; report it in the PR body and confirm the output names no introduction.mdx problem. If it names introduction.mdx, fix that line in introduction.mdx. This item edits no file unless validation reports an introduction.mdx problem."
+        },
+        "items": [
+          {
+            "id": "validate-docs-site.ac1",
+            "title": "When npx -y mint@4.3.49 validate runs on the branch, then it exits 0, or every reported error names a file other than introduction.mdx and the PR body lists them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-docs-site.ac2",
+            "title": "When npx -y mint@4.3.49 broken-links runs on the branch, then it prints no broken links found, or reports no link located in introduction.mdx, and the PR body contains both command outputs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "rewrite-introduction",
+        "to": "remove-intro-video-assets",
+        "type": "blocks"
+      },
+      {
+        "from": "rewrite-introduction",
+        "to": "validate-docs-site",
+        "type": "blocks"
+      },
+      {
+        "from": "remove-intro-video-assets",
+        "to": "validate-docs-site",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
