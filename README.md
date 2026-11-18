@@ -44,35 +44,35 @@ See the [full documentation](https://docs.overdeck.ai) for detailed setup, confi
 
 ## Loops, Not Prompts
 
-The industry has caught on to what agent-native developers already knew: the unit of AI-assisted work isn't the prompt, it's the **loop** — act, verify, correct, go again. Models write better prompts than we do now; the scarce skill is designing the loop that keeps agents pointed at the goal, and the verifier that decides whether the work is actually done.
+The industry has caught on to what agent-native developers already knew: the unit of AI-assisted work isn't the prompt, it's the **loop**: act, verify, correct, go again. Models write better prompts than we do now; the scarce skill is designing the loop that keeps agents pointed at the goal, and the verifier that decides whether the work is actually done.
 
 Overdeck is loop machinery, three loops deep:
 
 | Loop | Timescale | What runs |
 |:-----|:----------|:----------|
-| **Inner — the agent** | seconds–minutes | The harness loop: write code, run it, read the result, try again |
-| **Middle — the pipeline** | minutes–hours | The verifier wrapped around every agent: four-lens review convoy, quality gates, tests, browser UAT, per-bead inspection, and a merge train that keeps main green |
-| **Outer — the Flywheel** | continuous | The loop that prompts the loops: pulls the next issue from the backlog, drives it end-to-end, files what it finds along the way, and goes again |
+| **Inner, the agent** | seconds to minutes | The harness loop: write code, run it, read the result, try again |
+| **Middle, the pipeline** | minutes to hours | The verifier wrapped around every agent: quality gates, review (one reviewer, or a four-lens convoy), tests, browser UAT, and merge batches that keep main green |
+| **Outer, the Flywheel** | continuous | The loop that prompts the loops: pulls the next issue from the backlog, drives it end-to-end, files what it finds along the way, and goes again |
 
-The Flywheel is the part most tools don't have. It doesn't run tasks — it runs **revolutions**: every pass around the loop either ships the work or surfaces a defect that gets filed and fixed. It's the loop that improves the loop, and it's how most of Overdeck itself gets built.
+The Flywheel is the part most tools don't have. It doesn't run tasks, it runs **revolutions**: every pass around the loop either ships the work or surfaces a defect that gets filed and fixed. It's the loop that improves the loop, and it's how most of Overdeck itself gets built.
 
 ### The Autonomy Dial
 
-How much of the loop runs without you is **your choice, per issue, per day** — not a property of the tool:
+How much of the loop runs without you is **your choice, per issue, per day**, not a property of the tool:
 
 | Mode | You do | Overdeck does |
 |:-----|:-------|:--------------|
-| **Pair** | Watch diffs land live, steer the agent in the composer, swap models mid-task | Runs the inner loop with checkpoints and live cost tracking |
-| **Pipeline** | Write the issue, click Merge at the end | Runs the inner and middle loops: plan, implement, review convoy, tests, UAT, merge train |
+| **Pair** | Watch diffs land live, steer the agent in the composer, hand off to another model | Runs the inner loop with per-turn diffs and live cost tracking |
+| **Pipeline** | Write the issue, click Merge at the end | Runs the inner and middle loops: plan, implement, review, tests, UAT, merge |
 | **Flywheel** | Review the morning recap | Runs all three loops across the backlog, in parallel |
 
-Most sessions live somewhere between — you pair on the gnarly issue while the pipeline ships three routine ones behind you.
+Most sessions live somewhere between: you pair on the gnarly issue while the pipeline ships three routine ones behind you.
 
 ---
 
 ## Command Deck
 
-Command Deck is the live development surface where you and your agents work together. It's built around three zones that update in real time — no refresh buttons, no polling. Every event animates in as it happens.
+Command Deck is the live development surface where you and your agents work together. It's built around three zones that update in real time: no refresh buttons, no polling. Every event animates in as it happens.
 
 | Zone | What You See |
 |:-----|:-------------|
@@ -82,26 +82,24 @@ Command Deck is the live development surface where you and your agents work toge
 
 ### What You Can Do
 
-- **Live diffs as agents code** — every file change appears inline as the agent works. Open the diff panel to review changes turn by turn, or hit "vs main" to see the full picture without waiting for a PR.
-- **Talk to your agents** — type in the composer to steer an agent mid-task. Correct its approach, point it at the right file, tell it to rethink — pair-programming, not babysitting.
-- **Hot-swap models** — agent struggling? Open the model picker and switch from Sonnet to Opus (or Kimi, GPT, Gemini) without losing the conversation. Right model for each phase.
-- **Branch to explore** — fork any conversation to try an alternative approach. Keep the original intact, compare both, merge the one you like.
-- **Automatic checkpoints** — Command Deck snapshots agent state as work progresses. If an agent goes sideways, roll back to any earlier checkpoint instead of starting over.
-- **Ship without switching tabs** — when the code looks right, the specialist pipeline picks it up. Automated review, tests, and merge. No CI dashboard to babysit.
+- **Live diffs as agents code**: every file change appears inline as the agent works. Open the diff panel to review changes turn by turn, or hit "vs main" to see the full picture without waiting for a PR.
+- **Talk to your agents**: type in the composer to steer an agent mid-task. Correct its approach, point it at the right file, tell it to rethink: pair-programming, not babysitting.
+- **Fork or hand off**: start a new conversation from a summary of this one, or hand off to a different model. A conversation's model is fixed once it starts.
+- **Ship without switching tabs**: when the code looks right, review and test agents check it on the pull request, and you click Merge. No CI dashboard to babysit.
 
-### 13 Dashboard Views
+### Dashboard views
 
-Project tree, activity feed, kanban board, agent status, cost analytics, convoy status, specialist handoffs, real-time activity log, performance metrics, skill library, health diagnostics, God View (cross-project), and settings.
+The sidebar has Project home, Flywheel, Order books and More. More holds Backlog, Board, Pipeline, Awaiting Merge, Activity, Deacon, Knowledge, Skills, Context and Settings. Agents, AutoPreso, Resources, Sessions, Metrics, Costs, Health and God View are experimental: turn on Settings → Experimental → **Experimental features** to see them.
 
 ---
 
 ## Why Overdeck?
 
 - **You stay in the loop without being in the way.** Watch agents code, review their diffs live, send a message when they drift. You're pair-programming, not babysitting a terminal.
-- **The right model for every phase.** A frontier model plans the architecture, faster models write the code and handle mechanical steps. Overdeck routes automatically — or you override with two clicks when you know better.
-- **Context that outlasts the conversation.** PRDs, plans, checkpoints, beads, and skills carry forward across sessions. Agents pick up where the last one left off, not from a blank slate.
-- **One skill format, every tool.** Write a SKILL.md once and it works across Claude Code, Codex, Cursor, and Gemini CLI. 70+ ship out of the box.
-- **A pipeline that ships while you move on.** When the implementation looks right, hand it to the specialist pipeline — a four-lens review convoy, automated tests, browser UAT, and a merge train that keeps main green. You click Merge when you're satisfied, or keep working on the next issue.
+- **The right model for every phase.** A frontier model plans the architecture, faster models write the code and handle mechanical steps. You set the model for each role, and Overdeck uses it every time.
+- **Context that outlasts the conversation.** PRDs, xBRIEF plans, project memory and skills carry forward across sessions. Agents pick up where the last one left off, not from a blank slate.
+- **One skill format, many harnesses.** Write a SKILL.md once and `pan sync` installs it for Claude Code, Codex and Pi. More than 120 ship out of the box.
+- **A pipeline that ships while you move on.** When the implementation looks right, review and test agents check it, with browser UAT where the change has a UI, and merge batches keep main green. You click Merge when you're satisfied, or keep working on the next issue.
 - **Built by itself.** Overdeck is developed with Overdeck: its own agents plan, implement, review, test, and merge most of its changes. Every rough edge in the pipeline gets hit by us before it gets hit by you.
 
 ---
