@@ -1225,6 +1225,37 @@ conversation with that subagent selected. Results from a linked machine appear u
 Text search covers only Claude Code transcripts, including subagent transcripts. Conversations on
 other harnesses still match by title.
 
+### Set up semantic search
+
+Transcript text search is on by default, using OpenAI's `text-embedding-3-small` model. To set it up
+or change it:
+
+1. Add an OpenAI key under **Settings → Providers → OpenAI**, or set the `OPENAI_API_KEY`
+   environment variable on the server.
+2. Open **Settings → Conversations → Conversation Search** and check the key status.
+3. Pick a model: `text-embedding-3-small` (recommended, &#36;0.02 per 1M tokens), `text-embedding-3-large`
+   (higher quality, &#36;0.13 per 1M tokens), or `text-embedding-ada-002` (legacy, kept for existing
+   indexes).
+4. Run **Estimate & reindex all conversations** to index transcripts from before search was turned
+   on, or after changing the model.
+
+Without an OpenAI key, the palette returns title matches only: it finds no transcript text matches
+at all, not even keyword ones, and new transcripts go unindexed. Changing the model runs a full
+reindex, because vectors from one model cannot be reused with another.
+
+Turn conversation search off with the card's switch, or in `~/.overdeck/config.yaml`:
+
+```yaml
+conversationSearch:
+  enabled: true
+  provider: openai
+  model: text-embedding-3-small
+  # apiKeyRef: OPENAI_API_KEY   # name of the env var that holds the key
+```
+
+With it off, indexing stops and conversation text hits drop out of the palette; title matches still
+work.
+
 ## See also
 
 - [Mission Control](/features/mission-control) — the project tree and activity timeline around your conversations
