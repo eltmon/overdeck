@@ -60,6 +60,16 @@ A failed gate sends the work agent a message naming the failed check and asking 
 
 A test-skip gate runs alongside the others: an added `.skip`, `.only` or `xit` always fails it, and removing tests fails it too unless the whole diff balances or the tested subject was deleted. An operator can let one net test removal through with `pan review waive-test-removal`.
 
+## Review
+
+The `roles.review.mode` setting picks how an issue is reviewed: `quick` (the default) sends it to one reviewer covering correctness, security, performance and requirements; `full` runs the review convoy, four parallel reviewers and a parent that writes one verdict, covered in depth at [Convoys](/features/convoys); `none` skips AI review while the verification gate still applies.
+
+The verdict is a pull request review: approve, or request changes. Approval counts only at the exact head commit, so a push after approval needs a new review. A request for changes goes back to the work agent both as PR comments and as a direct message.
+
+Re-request review after fixing feedback with `pan review request`, re-dispatch reviewer lanes that never reported with `pan review restart`, or stop running reviewers with `pan review abort`. See [Review commands](/cli/review-commands) for the full set. Automatic re-requests are capped at 25 per issue.
+
+There is no hard limit on review rounds, but after at least 3 rounds where the blocker count rose or stalled, automatic re-review stops and Needs you shows `Review loop not converging`. The count resets once a round is approved.
+
 ## Get help
 
 Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file an issue on [GitHub Issues](https://github.com/eltmon/overdeck/issues).
