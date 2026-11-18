@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5503",
   "created": "2026-11-18T23:39:30.709Z",
-  "updated": "2026-11-18T23:50:02.345Z",
+  "updated": "2026-11-18T23:50:27.614Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -244,6 +244,26 @@
     "audit-jev.ac4": {
       "status": "completed",
       "doneAt": "2026-11-18T23:50:02.345Z"
+    },
+    "audit-local-models": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:50:27.613Z"
+    },
+    "audit-local-models.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:50:27.613Z"
+    },
+    "audit-local-models.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:50:27.613Z"
+    },
+    "audit-local-models.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:50:27.613Z"
+    },
+    "audit-local-models.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:50:27.613Z"
     }
   }
 }
