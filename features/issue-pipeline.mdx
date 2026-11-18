@@ -100,6 +100,16 @@ An agent asks you a blocking decision with `pan ask`: `--option <label>` offers 
 
 Two related commands cover other kinds of pending input: `pan answer` shows a pending pane choice, or answers its numbered option; `pan parked` lists every issue parked in a stall orbit, oldest first, with why and how to release it.
 
+## Merge
+
+Every merge path, whether it is Awaiting Merge, the Merge button, auto-merge, the merge train or a per-project queue, asks the same one merge gate. A PR passes it only when it is open and not a draft, approved at the head commit with no changes requested, every check is green, the CI test job passed on the head in CI mode, there is no failed UAT verdict at the head, and GitHub itself reports the PR mergeable. Nothing about the answer is stored: it is computed from the PR every time you ask.
+
+Clicking Merge asks the gate first. A PR that is already clean merges directly; otherwise the server rebases onto main for you, and if that rebase itself fails, it falls back to asking the work agent to rebase and push. Either way the merge itself is a squash merge. [Awaiting Merge](/features/dashboard-views#awaiting-merge) is where ready issues wait for this click.
+
+By default a ready PR waits for you: the per-issue `Auto` or `Hold` label wins if set, otherwise the project's own default, otherwise the global `require_uat_before_merge` setting, which defaults to true. With the hold off for an issue, its ready PR is scheduled and merges itself after a 5-minute cooldown; `pan merge cancel <id>` stops one during that window. See [Auto-merge](/configuration/auto-merge) for the full policy, and [Merge batches](/features/merge-batches) for the merge train, which is off by default.
+
+Awaiting Merge also has a Pipeline Override section for PRs that are not yet ready: `Force Approve` and `Force Merge` both bypass the pipeline, behind a confirmation step, for the rare case where you need to move a PR on without waiting for the gate.
+
 ## Get help
 
 Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file an issue on [GitHub Issues](https://github.com/eltmon/overdeck/issues).
