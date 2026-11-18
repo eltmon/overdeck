@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5540",
   "created": "2026-11-18T20:13:27.480Z",
-  "updated": "2026-11-18T20:24:37.600Z",
+  "updated": "2026-11-18T20:24:43.233Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,11 @@
     "available-route.ac3": {
       "status": "completed",
       "doneAt": "2026-11-18T20:24:37.600Z"
+    },
+    "known-add-core": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5540",
+      "claimedAt": "2026-11-18T20:24:43.233Z"
     }
   }
 }
