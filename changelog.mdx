@@ -10,6 +10,27 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: do not edit this page for an unreleased change. Each PR adds its bullets to changelog.d/<issue>.md (format: changelog.d/README.md), and pan release stable folds them into a dated <Update> block here. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so in its entry and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.89.0" description="2026-11-18">
+  #### New
+
+  - **Computer Use settings:** Settings → Computer Use sets up desktop control in one click. It installs what's missing, turns computer use on and tests it. ([#5461](https://github.com/eltmon/overdeck/issues/5461))
+  - **Computer use on Windows:** computer use now works on Windows through WSL2: agents can operate Windows apps with `pan computer`, set up from Settings → Computer Use with one click. Nothing is installed on Windows; the built-in Windows PowerShell runs the helper. ([#5462](https://github.com/eltmon/overdeck/issues/5462))
+  - **Computer use on macOS:** Computer use now works on macOS, including from npx: Settings → Computer Use installs a small helper and walks you through the two macOS permissions. ([#5463](https://github.com/eltmon/overdeck/issues/5463))
+  - **Video production skill packs:** `remotion`, `hyperframes`, `openmontage` and `video-use` are known packs, each pinned to an `eltmon/` fork, so `pan skills pack add <id>` needs no url or ref. `openmontage` mounts the 38 skills that work outside an OpenMontage checkout, and `video-use` mounts its root skill with a host notice and a generated `requirements.txt`. ([#5464](https://github.com/eltmon/overdeck/issues/5464))
+  - **Pack groups:** one name turns several packs on. The built-in `video` group holds the four video packs; `pan skills pack add --group video`, `pan skills set --group video on` and `pan handoff --group video` act on every member, and `skills.pack_groups` in `config.yaml` adds or replaces groups. ([#5464](https://github.com/eltmon/overdeck/issues/5464))
+  - **Add skills to a running conversation:** `pan skills add <conversation> --pack <id>`, the `add_skills` MCP tool and the **Add skills…** item in the conversation menus load skill packs into a conversation that is already running. Claude Code loads them in place with `/reload-plugins` and keeps its context; Codex and launch-wired packs restart and resume the conversation with its history. ([#5465](https://github.com/eltmon/overdeck/issues/5465))
+
+  #### Fixed
+
+  - **Conversation search in the command palette no longer stalls:** searching no longer freezes the dashboard or spins for 15 seconds or more. Searches you replace by typing more stop before their slow scan, keyword and title matches return when semantic search is slow, and the palette stops waiting after 10 seconds with a "Search timed out" message. ([#5447](https://github.com/eltmon/overdeck/issues/5447))
+  - **HyperFrames pack extraction:** adding a pack no longer downloads Git LFS objects, so `hyperframes` no longer fails on the LFS rate limit. LFS pointer files in a pack now show under Not applied as `LFS objects (<n>)`. ([#5464](https://github.com/eltmon/overdeck/issues/5464))
+  - **AGPL license shown as unknown:** pack previews now recognize AGPL, LGPL and GPL license files by their full GNU titles. ([#5464](https://github.com/eltmon/overdeck/issues/5464))
+  - **Paused counts only real holds:** the Home page Paused card no longer counts agents whose issue is merged or closed, or agents Overdeck paused itself while a merged issue waits for close-out. It now reads "Held agents on open issues". The Agents page Live view also stops listing old pauses on issues that finished long ago. ([#5466](https://github.com/eltmon/overdeck/issues/5466))
+  - **`pan sync` prunes its backups:** each sync now keeps the newest 10 backups in `~/.overdeck/backups` (set `backup_keep` under `[sync]` in `config.toml`) instead of keeping every one forever. Retention skips `dist-rollbacks` and other named folders and never deletes `pan context detach` backups, and `pan backup clean --keep` now rejects a count that is not a whole number instead of deleting every backup. ([#5484](https://github.com/eltmon/overdeck/issues/5484))
+
+  [Compare v0.88.0...v0.89.0](https://github.com/eltmon/overdeck/compare/v0.88.0...v0.89.0)
+</Update>
+
 <Update label="v0.88.0" description="2026-11-16">
   #### New
 
