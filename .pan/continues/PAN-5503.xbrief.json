@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5503",
+  "created": "2026-11-18T23:39:30.709Z",
+  "updated": "2026-11-18T23:39:30.709Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "harnesses-intro-to-pi": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5503",
+      "claimedAt": "2026-11-18T23:39:30.709Z"
+    }
+  }
+}
