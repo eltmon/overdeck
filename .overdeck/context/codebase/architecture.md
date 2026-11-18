@@ -125,8 +125,10 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   triggers are `pan memory sync` (`memory-sync.ts`), `pan sync`, `--user` writes and the dashboard's
   `operator-memory-sync-service.ts` — never a launch. CLI verbs in `src/cli/commands/memory-facts.ts`.
   Distinct from observation memory (`memory/*.ts`, `~/.overdeck/memory/`).
-- `cloister/` — the Deacon (lifecycle watchdog), model routing (`router.ts`),
-  legacy `model_selection.specialist_harnesses` (PAN-636).
+- `cloister/` — the Deacon (lifecycle watchdog) and
+  legacy `model_selection.specialist_harnesses` (PAN-636). It does no model
+  routing: role models resolve in `config-yaml/roles.ts` (`resolveModel`) and
+  work staffing in `agents/staffing.ts` (`resolveStaffing`).
 - `planning/spawn-planning-session.ts` — plan-role kickoff (own spawn path).
 - `launcher-generator.ts` — generates tmux launcher scripts (`--resume`, PTY
   supervisor wrapping, env exports).

@@ -1,11 +1,10 @@
 ---
-title: Core Concepts
+title: "Overdeck concepts"
+sidebarTitle: "Concepts"
 description: Understanding the key concepts behind Overdeck's architecture
 ---
 
 import { ThemedImage } from "/snippets/themed-image.mdx";
-
-# Core Concepts
 
 Learn the fundamental concepts that power Overdeck.
 
@@ -106,16 +105,9 @@ The only manual step is clicking **MERGE** when you're satisfied with the result
 
 The **Pipeline** page is the at-a-glance view of this lifecycle: a metric strip across the top (Active issues, Work running, Review queue, Ship, Spend) sits over issue rows grouped by phase — Ship, Review, Verifying — with a live activity feed alongside. It shows where every issue sits as specialists hand it forward.
 
-## Multi-Model Routing
+## Model routing
 
-Overdeck routes tasks to the right model automatically based on task type, capability, and budget:
-
-- **Planning** — Opus-class models for strategic decisions
-- **Implementation** — Cost-effective models (Kimi, Sonnet, GPT) for writing code
-- **Review** — Strong models for code review judgment
-- **Helpers** — Fast models (Haiku) for quick commands
-
-Override any routing decision from Command Deck's model picker or the Settings page.
+Each role runs on a model you choose, usually through one of three workhorse slots. Planned work can also be staffed by difficulty with tiered execution. See [Model routing](/configuration/model-routing) for how roles, workhorse slots, harnesses and tiered execution fit together.
 
 ## Skills
 

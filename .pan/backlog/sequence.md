@@ -1,22 +1,27 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-18T15:02:18.873480Z · model: claude-opus-5-5 · open: 937_
+_Last sequenced: 2026-11-18T16:03:26.228710Z · model: claude-opus-5-5 · open: 942_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
+| 1 | PAN-5520 | S | critical | ok |  |  | CPU-pressure admission holds every quality gate forever (no bound like PAN-5285 memory bypass); outside load stalls the pipeline. |
 | 2 | PAN-5483 | M | high | ok |  |  | Docs canonicalize to panopticon-cli.com and docs.json uses legacy keys the site ignores. In pipeline; lane A first. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
+| 5 | PAN-5519 | S | high | ok |  |  | Review convoy relaunches reviewers into a stale already-approved run (old head); wastes tokens and can't unblock merge. |
 | 6 | PAN-5489 | S | high | ok |  |  | pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause. |
-| 7 | PAN-5498 | S | critical | ok |  |  | pan start --plan auto --host loses the host override at the planning→work handoff; no work agent starts. Hit twice 11-17. |
+| 7 | PAN-5526 | S | critical | ok |  |  | CLI finalize reads a removed consent field, so pan start --plan auto never auto-starts; likely root cause of PAN-4554. Fix message too. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
 | 9 | PAN-5516 | S | high | ok |  |  | pan conversations resume always fails locally with 'Missing origin': origin check does not exempt the internal token. Fix named. |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
+| 10 | PAN-5523 | S | high | ok |  | PAN-5516 | pan conversations move/heal send raw fetch with no token, so routes refuse with Missing origin; same fix pattern as in-pipeline PAN-5516. |
 | 11 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
 | 12 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
+| 12 | PAN-5522 | M | medium | ok |  |  | Add GPT-6.2 Astra and Sol to catalog, routing, pricing and pickers; operator asked for it ASAP; mirrors the PAN-4633/4634 terra recipe. |
 | 13 | PAN-4710 | S | high | ok |  |  | Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff |
 | 14 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; seen on MYN and now overdeck (PAN-5232). |
+| 14 | PAN-5527 | M | high | needs-refinement |  | PAN-5526 | Overlaps PAN-5526 (consent field, unread marker); unique part is resuming a promotion interrupted by a dashboard death. Scope after 5526. |
 | 15 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
 | 16 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
 | 17 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
@@ -945,6 +950,10 @@ _Last sequenced: 2026-11-18T15:02:18.873480Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
+### PAN-5520 (rank 1)
+
+New substrate bug that is stalling the pipeline right now: sustained CPU PSI from operator workloads kept every verification gate, vitest run and tsc lane waiting 45+ minutes with 44 GB free. The fix is small and well specified (CPU head bypass mirroring memoryBlockedSince, configurable PSI threshold, fake-timer tests), so it ranks first as a pipeline blocker.
+
 ### PAN-5483 (rank 2)
 
 New and in the pipeline; the docs order book runs it first in lane A because every other docs page adds itself to the docs.json navigation it restructures.
@@ -957,13 +966,17 @@ Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat 
 
 New issue, sibling of the just-merged front-matter fix PAN-5427, and already queued in the active workflow-redesign order book, so it takes free rank 4 behind critical PAN-5013. It is a small, well-specified MarkdownTab change with named tests, a sanitising allow-list and a concrete acceptance check on the README preview; its parent epic PAN-5284 is closed, so it carries no contains edge.
 
+### PAN-5519 (rank 5)
+
+New substrate bug seen on PAN-5483: resolveReviewParentRunState returns a saved run id without checking headSha or an existing verdict, so recovery paths dispatch reviewers against an old head. Root cause, fix and test are stated, and stale reviews burn tokens while never producing a mergeable approval, so it sits in the top tier beside the other review-pipeline correctness bugs.
+
 ### PAN-5489 (rank 6)
 
 New pipeline-path bug: the CLI result depends on the caller's environment, so Flywheel-launched planning can fail and strand workspaces; it outranks routine work.
 
-### PAN-5498 (rank 7)
+### PAN-5526 (rank 7)
 
-New substrate-improvement issue in the free rank-7 slot. The paved road promises the work agent starts after planning, but the post-planning spawn drops host:true, so the stack-health gate refuses it and the deferred retry never fires; two Overdeck issues stalled this way on 2026-11-17. The fix is small and named (consent record, spawn args, finalize-timeout path, retry survival), and it sits in the same failure family as PAN-4554 at rank 14.
+New substrate bug left out of PAN-5498's PR: the CLI always posts autoSpawn=false, which blocks the --plan auto paved road, so it takes 5498's vacated rank 7.
 
 ### PAN-5385 (rank 8)
 
@@ -977,6 +990,10 @@ New substrate bug: a core CLI verb is broken on every local run. The fix is smal
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
 
+### PAN-5523 (rank 10)
+
+New substrate bug that reuses the PAN-5516 fix (callDashboard + crossSiteWriteRefusal), so it ranks right behind 5516.
+
 ### PAN-4553 (rank 11)
 
 Rank unchanged; its duplicate PAN-4929 entered the pipeline with an open PR, so this issue now waits on that PR instead of being picked up separately.
@@ -985,6 +1002,10 @@ Rank unchanged; its duplicate PAN-4929 entered the pipeline with an open PR, so 
 
 Rank held: parent PAN-4732 (move heavy e2e out of the default shards) closed as completed on 2026-11-01, so this follow-up is now unblocked and next in line.
 
+### PAN-5522 (rank 12)
+
+New operator-requested model catalog addition with a verified recipe and pricing; medium importance but ranked high because the operator asked for it as soon as possible.
+
 ### PAN-4710 (rank 13)
 
 New issue, ranked into the rank-10 slot beside PAN-4554. When pan start --plan auto finishes planning while the pipeline is busy, the deferred hand-off retries without the agent_count_high/memory_tight acknowledgement the first attempt sends, so it is refused below the ceiling until the attempt cap gives up with no operator signal; PAN-4663 and PAN-4670 sat three hours without work agents. It is substrate work with a precise root cause and testable ACs, but it carries needs-handoff (TENET-10), so it lands through a supervised handoff, and a manual second pan start is a working fallback, so it ranks high rather than critical.
@@ -992,6 +1013,10 @@ New issue, ranked into the rank-10 slot beside PAN-4554. When pan start --plan a
 ### PAN-4554 (rank 14)
 
 New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it. A 2026-11-14 comment adds an overdeck instance (PAN-5232), so it is not polyrepo-only; rank and importance unchanged because a second pan start still works.
+
+### PAN-5527 (rank 14)
+
+New substrate follow-up to PAN-5498 that duplicates most of PAN-5526, so it ranks just after the related PAN-4554 and needs scoping once 5526 lands.
 
 ### PAN-4666 (rank 15)
 
@@ -1245,26 +1270,6 @@ New substrate bug placed in a freed high-tier slot. Under memory pressure the op
 
 New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's unnumbered select dialogs, so a failed paste's fallback Enter can answer them, including a silent permission-mode change. PAN-4738 removes the one known trigger on Fly, so it ranks with the high-tier delivery bugs rather than the top tier.
 
-### PAN-3557 (rank 78)
-
-New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
-
-### PAN-3543 (rank 79)
-
-New this pass. A completed-handoff agent owed rework after a blocked verdict cannot be started at all: pan start refuses and recommends --fresh, --fresh gives the identical refusal, and reset-session is refused too because the durable plane reconstructs the session pointer. The refusal message names an action the operator cannot take, which is the self-contradictory-deadlock family PAN-3526 opened.
-
-### PAN-3522 (rank 80)
-
-New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts through a new generation's 138-second boot warm phase and killed it anyway, producing four restarts in ten minutes, racing spawns on port 3012, and a WATCHDOG GIVING UP. Each restart re-triggered docker stack rebuilds, feeding the storm. The probe budget has to know the difference between starved and starting.
-
-### PAN-3314 (rank 81)
-
-New this pass. Every agent pane is a child of one transient tmux-server unit, so agent memory is the unit's memory and systemd-oomd's kill decision is all-or-nothing: one hungry agent takes the entire fleet with it. That has now happened twice, the second time killing seven work agents, four strikes and a live review convoy. Blast-radius containment is a different fix from choosing a better victim.
-
-### PAN-3278 (rank 82)
-
-Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1272,11 +1277,24 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-18T15:02:18.873480Z",
+  "generatedAt": "2026-11-18T16:03:26.228710Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 937,
+  "openCount": 942,
   "nodes": [
+    {
+      "issue": "PAN-5520",
+      "rank": 1,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CPU-pressure admission holds every quality gate forever (no bound like PAN-5285 memory bypass); outside load stalls the pipeline.",
+      "rationale": "New substrate bug that is stalling the pipeline right now: sustained CPU PSI from operator workloads kept every verification gate, vitest run and tsc lane waiting 45+ minutes with 44 GB free. The fix is small and well specified (CPU head bypass mirroring memoryBlockedSince, configurable PSI threshold, fake-timer tests), so it ranks first as a pipeline blocker.",
+      "gate": "auto",
+      "planning": "auto"
+    },
     {
       "issue": "PAN-5483",
       "rank": 2,
@@ -1317,6 +1335,19 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "planning": "auto"
     },
     {
+      "issue": "PAN-5519",
+      "rank": 5,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Review convoy relaunches reviewers into a stale already-approved run (old head); wastes tokens and can't unblock merge.",
+      "rationale": "New substrate bug seen on PAN-5483: resolveReviewParentRunState returns a saved run id without checking headSha or an existing verdict, so recovery paths dispatch reviewers against an old head. Root cause, fix and test are stated, and stale reviews burn tokens while never producing a mergeable approval, so it sits in the top tier beside the other review-pipeline correctness bugs.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-5489",
       "rank": 6,
       "size": "S",
@@ -1330,15 +1361,15 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "planning": "auto"
     },
     {
-      "issue": "PAN-5498",
+      "issue": "PAN-5526",
       "rank": 7,
       "size": "S",
       "importance": "critical",
       "score": 84,
       "condition": "ok",
       "dependsOn": [],
-      "why": "pan start --plan auto --host loses the host override at the planning→work handoff; no work agent starts. Hit twice 11-17.",
-      "rationale": "New substrate-improvement issue in the free rank-7 slot. The paved road promises the work agent starts after planning, but the post-planning spawn drops host:true, so the stack-health gate refuses it and the deferred retry never fires; two Overdeck issues stalled this way on 2026-11-17. The fix is small and named (consent record, spawn args, finalize-timeout path, retry survival), and it sits in the same failure family as PAN-4554 at rank 14.",
+      "why": "CLI finalize reads a removed consent field, so pan start --plan auto never auto-starts; likely root cause of PAN-4554. Fix message too.",
+      "rationale": "New substrate bug left out of PAN-5498's PR: the CLI always posts autoSpawn=false, which blocks the --plan auto paved road, so it takes 5498's vacated rank 7.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1382,6 +1413,21 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "planning": "auto"
     },
     {
+      "issue": "PAN-5523",
+      "rank": 10,
+      "size": "S",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5516"
+      ],
+      "why": "pan conversations move/heal send raw fetch with no token, so routes refuse with Missing origin; same fix pattern as in-pipeline PAN-5516.",
+      "rationale": "New substrate bug that reuses the PAN-5516 fix (callDashboard + crossSiteWriteRefusal), so it ranks right behind 5516.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-4553",
       "rank": 11,
       "size": "S",
@@ -1408,6 +1454,19 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "planning": "auto"
     },
     {
+      "issue": "PAN-5522",
+      "rank": 12,
+      "size": "M",
+      "importance": "medium",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Add GPT-6.2 Astra and Sol to catalog, routing, pricing and pickers; operator asked for it ASAP; mirrors the PAN-4633/4634 terra recipe.",
+      "rationale": "New operator-requested model catalog addition with a verified recipe and pricing; medium importance but ranked high because the operator asked for it as soon as possible.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-4710",
       "rank": 13,
       "size": "S",
@@ -1430,6 +1489,21 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "dependsOn": [],
       "why": "pan start --plan auto finalizes planning but never spawns the work agent; seen on MYN and now overdeck (PAN-5232).",
       "rationale": "New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it. A 2026-11-14 comment adds an overdeck instance (PAN-5232), so it is not polyrepo-only; rank and importance unchanged because a second pan start still works.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5527",
+      "rank": 14,
+      "size": "M",
+      "importance": "high",
+      "score": 70,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-5526"
+      ],
+      "why": "Overlaps PAN-5526 (consent field, unread marker); unique part is resuming a promotion interrupted by a dashboard death. Scope after 5526.",
+      "rationale": "New substrate follow-up to PAN-5498 that duplicates most of PAN-5526, so it ranks just after the related PAN-4554 and needs scoping once 5526 lands.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13682,6 +13756,13 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "confidence": 1
     },
     {
+      "from": "PAN-3946",
+      "to": "PAN-5519",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
       "from": "PAN-3952",
       "to": "PAN-3234",
       "type": "informs",
@@ -13964,6 +14045,13 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
     {
       "from": "PAN-4705",
       "to": "PAN-4746",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-4705",
+      "to": "PAN-5520",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
@@ -14627,15 +14715,15 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "confidence": 1
     },
     {
-      "from": "PAN-5498",
-      "to": "PAN-4554",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-5505",
       "to": "PAN-5499",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-5516",
+      "to": "PAN-5523",
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.8
@@ -14653,6 +14741,20 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-5526",
+      "to": "PAN-4554",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-5526",
+      "to": "PAN-5527",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
     },
     {
       "from": "PAN-750",
