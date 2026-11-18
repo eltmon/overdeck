@@ -1,6 +1,6 @@
 ---
 title: Core Commands
-description: "Core pan commands to install, sync, start, stop and check Overdeck: pan install, pan sync, pan doctor, pan up, pan down, pan restart and more."
+description: "Core pan commands to install, sync, run, reload, restart, shut down, update and check Overdeck, plus costs and presets."
 ---
 
 import { ThemedImage } from "/snippets/themed-image.mdx";
@@ -109,9 +109,9 @@ pan semgrep ci-setup myapp
 ```
 
 Options:
-- `--dry-run` — print the target repository, base branch, gate mode and the
+- `--dry-run`: print the target repository, base branch, gate mode and the
   workflow, and change nothing
-- `--sarif-upload` — also scan base-branch pushes and upload the results to
+- `--sarif-upload`: also scan base-branch pushes and upload the results to
   GitHub code scanning
 
 It needs `security.semgrep.enabled: true` and a single-repo GitHub project. The
@@ -136,8 +136,8 @@ with a logged-in session. See [Computer use](/configuration/computer-use).
 
 Collect a redacted diagnostic bundle and, with your consent, start Claude
 Code or Codex in that bundle's directory to find and fix the problem. It
-works even when the dashboard, the supervisor, or Herdr is down — that is
-when you need it most.
+works even when the dashboard, the supervisor, or Herdr is down, which is
+exactly when you need it most.
 
 ```bash
 pan diagnose
@@ -152,7 +152,7 @@ Flags: `--harness <claude-code|codex>`, `--describe <text>`, `--bundle-only`
 launch confirmation).
 
 Before starting a harness, `pan diagnose` always prints the bundle path and
-its file list, then asks for confirmation — nothing launches without it. See
+its file list, then asks for confirmation; nothing launches without it. See
 [DIAGNOSTICS-BUNDLE.md](https://github.com/eltmon/overdeck/blob/main/docs/DIAGNOSTICS-BUNDLE.md)
 for exactly what the bundle holds, what is redacted, and what is never
 collected.
@@ -199,7 +199,7 @@ The dashboard provides:
 
 Beyond the board, the dashboard is where you watch and steer live agent
 conversations and the work moving through the pipeline. The Pipeline page
-groups every active issue by phase — Ship, Review, and Verifying — above a
+groups every active issue by phase (Ship, Review, and Verifying) above a
 metric strip tracking active issues, work running, the review queue, ship
 count, and spend, with a live activity feed alongside.
 
@@ -210,7 +210,7 @@ count, and spend, with a live activity feed alongside.
 />
 
 <Tip>
-  The metric strip is the fastest way to answer "where are we?" at a glance —
+  The metric strip is the fastest way to answer "where are we?" at a glance:
   it surfaces how many agents are working, how deep the review queue is, and
   the running spend without opening any individual issue.
 </Tip>
@@ -233,23 +233,67 @@ Agents continue running independently in tmux sessions.
 
 ## pan restart
 
-Restart the dashboard (frontend and API server).
+Restart one part of the Overdeck stack. With no option it restarts only the dashboard and leaves
+CLIProxy and Traefik running.
 
 ```bash
-pan restart
+pan restart                                          # dashboard only
+pan restart --full                                   # same as pan down, then pan up
+pan restart --cliproxy --force                       # redownload the pinned CLIProxy binary first
+pan restart hold --reason "live demo" --until 2h
+pan restart release
 ```
 
-This is a clean restart that:
-- Kills old processes
-- Frees ports (3010, 3011)
-- Waits for API health check
-- Starts fresh instances
+Dashboard restarts, reloads, and post-merge deploy restarts wait for operator approval before
+they run, so they cannot interrupt live work. `pan restart --now` approves everything already
+waiting and restarts immediately, the same as the dashboard banner's Restart now button.
 
-Use this when:
-- Dashboard becomes unresponsive
-- API is not responding
-- After upgrading Overdeck
-- To clear any stuck state
+| Command | What it does |
+| --- | --- |
+| `pan restart approve` | Approves every dashboard restart request waiting for the operator |
+| `pan restart hold` | Holds every dashboard restart and reload until `pan restart release`, or until `--until` expires; `--reason <text>`, `--until <when>` (a duration such as `90m`, `2h`, `1d`, or an ISO time), `--status` (shows the current hold instead of setting one) |
+| `pan restart release` | Releases the restart hold so `pan reload` and `pan restart` run again |
+
+| Option | What it does |
+| --- | --- |
+| `--dashboard` | Restarts only the dashboard (default) |
+| `--cliproxy` | Restarts only the CLIProxy sidecar |
+| `--traefik` | Restarts only Traefik |
+| `--full` | Restarts the entire stack, equivalent to `pan down` then `pan up` |
+| `--force` | For `--cliproxy`: redownloads the binary at the pinned version first. For the dashboard scope: bypasses the agent deploy-window gate, which otherwise refuses an agent-initiated restart while a deploy-window block reason is active |
+| `--health-timeout <duration>` | Dashboard health-check wait budget, in milliseconds or with an `s`/`m` suffix (default 15s; floor 1000ms) |
+| `--deacon` | Forces Cloister/Deacon auto-start even if the shell inherited `OVERDECK_DISABLE_DEACON` |
+| `--no-deacon` | Skips Cloister/Deacon auto-start on restart; an escape hatch when the Deacon's startup scan is starving the event loop |
+| `--resume` | Enables agent auto-resume on boot (kept for explicitness; auto-resume is on by default) |
+| `--no-resume` | Disables agent auto-resume on restart, opting out of the default-on behavior |
+| `--now` | Skips the operator-approval wait: approves everything already waiting, then restarts the dashboard immediately |
+
+## pan reload
+
+Build Overdeck and restart the dashboard only if the build succeeds; the old dashboard keeps
+running if it does not. It works only from an Overdeck source checkout: it resolves the primary
+repo root of the current directory, fetches `origin/main`, and builds and deploys that commit,
+never the local branch. Uncommitted changes and a local `HEAD` that differs from `origin/main`
+are excluded from what gets deployed. An npm install that only updates the published package
+uses `pan update` instead.
+
+```bash
+pan reload
+pan reload --skip-build                 # restart the existing bundle without rebuilding
+pan reload --health-timeout 60s
+```
+
+| Option | What it does |
+| --- | --- |
+| `--skip-build` | Skips `npm run build` and restarts the existing bundle |
+| `--force` | Bypasses the agent deploy-window gate, which otherwise refuses an agent-initiated reload while a deploy-window block reason is active |
+| `--health-timeout <duration>` | Dashboard health-check wait budget, in milliseconds or with an `s`/`m` suffix (default 30s; floor 1000ms) |
+| `--deacon` | Starts Cloister/Deacon on the reloaded dashboard (always on after a reload) |
+| `--no-deacon` | Refused: a Deacon-off dashboard is a peer and cannot hold the host dashboard port |
+| `--resume` | Enables agent auto-resume on the reloaded dashboard (default: keeps the running dashboard's resume gate) |
+| `--no-resume` | Disables agent auto-resume on the reloaded dashboard (default: keeps the running dashboard's resume gate) |
+
+A hold from `pan restart hold` also blocks `pan reload` until released.
 
 ## pan health
 
