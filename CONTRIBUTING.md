@@ -283,6 +283,10 @@ git status   # Must not show .overdeck/ runtime files, *.log, or dist/ changes
 
 `.overdeck/continue.json` and other workspace runtime files are gitignored because canonical plans and durable task state live on `overdeck-state`. If you see workspace runtime files staged, something has gone wrong upstream — do not commit them.
 
+### 5. Docs site pages
+
+Pages in `docs.json` navigation are the published docs site. Every published page needs a `title` and a `description` of 50 to 160 characters, with no em or en dash. Quote a frontmatter value that contains `: `. Write a bare `<word>` in prose as `&lt;word&gt;` or put it in backticks, because MDX reads it as a JSX tag. Use only current `docs.json` keys (`navbar`, `footer`, `seo`); Mintlify ignores the old `mint.json` keys, and `mint validate` does not report them. Link a repo file outside the docs site by its GitHub URL, not a relative path. Before pushing a docs change, run `npx -y mint@4.3.49 validate` and `npx -y mint@4.3.49 broken-links` and check that both exit 0.
+
 ---
 
 ## Architecture Rules

@@ -381,7 +381,7 @@ about 15 seconds.
 
 To hide one machine's conversations without unlinking it, open the ⋮ menu on one of its
 rows and choose **Hide this machine**. The list footer then reads
-"<machine> conversations hidden · Show"; **Show** brings them back.
+"&lt;machine&gt; conversations hidden · Show"; **Show** brings them back.
 
 A conversation appears once, however many machines list it: this machine's own row wins
 over a linked row, and a linked row wins over its Session Vault saved copy (the row then
@@ -399,10 +399,10 @@ tones, never status colors.
 | State | Title bar | Banner and actions |
 | --- | --- | --- |
 | Local | the usual card surface | none |
-| Remote (owner online) | the remote surface, chip "on <machine>" | **Preview** and **Pull here** in the title bar |
-| Owner offline, saved copy | remote surface, muted title, hollow dot "offline" | "<machine> is offline (last seen …)" with **Read saved copy** and **Continue here** |
+| Remote (owner online) | the remote surface, chip "on &lt;machine&gt;" | **Preview** and **Pull here** in the title bar |
+| Owner offline, saved copy | remote surface, muted title, hollow dot "offline" | "&lt;machine&gt; is offline (last seen …)" with **Read saved copy** and **Continue here** |
 | Owner offline, no saved copy | remote surface, muted title, hollow dot "offline" | the same text with **Reconnect** |
-| Released (this machine's copy after a pull) | remote surface, muted title, hollow dot "released" | "Continued on <machine> · this copy is read-only" with **Open there** |
+| Released (this machine's copy after a pull) | remote surface, muted title, hollow dot "released" | "Continued on &lt;machine&gt; · this copy is read-only" with **Open there** |
 
 In the three non-live states the composer is read-only and the conversation cannot be
 renamed.
@@ -435,7 +435,7 @@ conversation runs on one machine at a time. The pull has four steps:
 2. **Transfer.** The settled conversation crosses the encrypted channel.
 3. **Adopt.** This machine continues it in its own checkout and resumes the harness. It
    keeps the title it had on the owner.
-4. **Finish.** The old copy shows "Continued on <this machine>" and is read-only.
+4. **Finish.** The old copy shows "Continued on &lt;this machine&gt;" and is read-only.
 
 If adoption fails, the owner takes the conversation back and resumes it; nothing is
 lost. When the owner is offline, the banner's **Continue here** continues this machine's
@@ -627,7 +627,7 @@ repository: a project that other machines also have shows "· N machines", conve
 those machines appear in its conversation list, and repositories that only other machines have
 are listed under **On other machines**.
 
-**Add this project to <machine>** clones the repository on the target machine through the
+**Add this project to &lt;machine&gt;** clones the repository on the target machine through the
 normal project creation, registers it, and copies the git-ignored files you select: `.env`,
 `.envrc` and `.dev.vars` are selected by default, files larger than 1 MiB, directories and
 symlinks are never copied, and an existing file on the target is kept. Files cross only an
@@ -641,9 +641,9 @@ pan machines add-project laptop overdeck --to desk   # this machine's overdeck, 
 ## Fleet Needs-You and search
 
 **Needs you** lists questions and permission prompts waiting on every online linked
-machine, labelled "on <machine>". A conversation on another machine opens through the link;
+machine, labelled "on &lt;machine&gt;". A conversation on another machine opens through the link;
 an agent there is answered on that machine. The command palette's search adds an
-"On <machine>" group for every online linked machine. `pan machines who PAN-123` lists which
+"On &lt;machine&gt;" group for every online linked machine. `pan machines who PAN-123` lists which
 machines run agents or conversations for an issue. Offline machines add nothing. When this
 machine cannot fetch the list of an online or connecting machine, Needs you shows
 `Can't reach <machine>; it may have items waiting.` on the desktop and the phone until a fetch
@@ -653,7 +653,7 @@ machine is switched off.
 ## Fleet usage
 
 The Costs page's **Machines** tab shows today, week and month spend for each machine and an
-**All machines** total. An offline machine shows its last known numbers with "cached <time>".
+**All machines** total. An offline machine shows its last known numbers with "cached &lt;time&gt;".
 A provider request recorded on two machines (for example a conversation pulled from one to the
 other) is counted once in All machines.
 
@@ -663,7 +663,7 @@ other) is counted once in All machines.
 `config.yaml` keys whose values differ between this machine and that one. Secrets show only
 "set" or "not set". Each value this machine sets comes with a copyable
 `pan admin config set <key> <value>` line to run on the other machine; nothing is changed for
-you. With a Tailscale route, **Open <machine>'s dashboard** goes to that machine's own
+you. With a Tailscale route, **Open &lt;machine&gt;'s dashboard** goes to that machine's own
 Settings.
 
 ## Unlink
