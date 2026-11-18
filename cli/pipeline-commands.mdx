@@ -1,0 +1,97 @@
+---
+title: "Issue pipeline commands: plan, task, show, close and the Flywheel"
+sidebarTitle: "Pipeline Commands"
+description: "Reference for the pan commands that plan issues, track checklists, inspect and close issues, and run the Flywheel, swarms and strikes."
+---
+
+An Overdeck issue moves through plan, work, review, test and merge before it ships. These
+commands drive and inspect that pipeline from a shell; see [Review convoy](/features/convoys) for
+more on how a change moves through review on its way to merge.
+
+## pan plan
+
+Run or inspect an issue's planning lifecycle: generate the PRD and xBRIEF, then finalize and
+promote the plan to canonical state.
+
+```bash
+pan plan PAN-1148                       # interactive planning for an issue
+pan plan PAN-1148 --auto                # non-interactive planning
+pan plan finalize                       # promote the workspace plan to canonical state
+pan plan done PAN-1148                  # complete planning and transition the issue to Planned
+```
+
+| Option | What it does |
+| --- | --- |
+| `--auto` | Runs non-interactive planning; inferred choices are recorded in `plan.autoDecisions[]` |
+| `--auto-start` | Deprecated: use `pan start <id>` instead. After planning completes, it used to start the work agent automatically |
+| `--probe` | Adds an adversarial pre-finalize probe pass to the planning prompt |
+| `--model <model>` | Model to use for the planning role |
+| `--harness <harness>` | Coding-agent harness for planning (defaults to role or provider settings) |
+| `--effort <level>` | Planning effort: `low`, `medium`, `high`, `xhigh` or `max` |
+| `--remote` | Uses a remote planning workspace (Fly.io) |
+| `--local` | Uses a local planning workspace |
+
+| Command | What it does |
+| --- | --- |
+| `pan plan finalize` | Marks the workspace plan as proposed and promotes it to canonical state; `-w, --workspace <path>`, `--json`, `--no-promote` (leaves the spec at `status=proposed` for a manual Done), `--no-quality-lint`, `--no-prd`, `--critic` (requires an independent plan critique before promotion) |
+| `pan plan done <id>` | Completes planning: promotes the xBRIEF and transitions the issue to Planned; `--no-prd` |
+
+See [Planning](/features/planning) for what planning produces and when to skip it.
+
+## pan task
+
+Read and update xBRIEF item state for one issue: claim an item, mark it done, or change its
+lifecycle.
+
+```bash
+pan task next PAN-1148                               # find the next unblocked item
+pan task claim PAN-1148 conv-page                     # claim it
+pan task done PAN-1148 conv-page conv-page.ac1        # record the item and its ACs as done
+pan task block PAN-1148 conv-page --on PAN-1200        # wait on another issue
+```
+
+| Command | What it does |
+| --- | --- |
+| `pan task next <issue>` | Prints the next unblocked item; `--json` |
+| `pan task show <issue> <item>` | Shows one item's detail; `--json` |
+| `pan task claim <issue> <item>` | Claims an item; `--json`, `--steal` (claims even when a running agent holds this item or an overlapping one; foreman or operator only) |
+| `pan task done <issue> <items...>` | Records one or more items as done in one continue commit; `--json` |
+| `pan task block <issue> <item>` | Marks an item blocked; `--json`, `--on <refs...>` (issues or PRs it waits on; Overdeck wakes the agent once they all merge) |
+| `pan task unblock <issue> <item>` | Clears a block; `--json` |
+| `pan task reopen <issue> <item>` | Reopens a terminal item; `--json` |
+| `pan task cancel <issue> <item>` | Cancels an item; `--json` |
+
+`pan task done` only records an item once every id passed to it has a commit on the pushed branch
+carrying the body line `Item: <id>`; if any id lacks one, nothing is written. See
+[Work through the checklist with pan task](/features/planning#work-through-the-checklist-with-pan-task).
+
+## pan scope
+
+Move an xBRIEF plan's lifecycle status. Every subcommand rewrites status fields on the spec file
+in place; none of them moves the file between directories, even though some help text still
+describes it that way.
+
+```bash
+pan scope list                     # list every registered project's xBRIEFs
+pan scope show PAN-1148            # plan, items and continue-state summary
+pan scope propose PAN-1148
+pan scope approve PAN-1148
+```
+
+| Command | What it does |
+| --- | --- |
+| `pan scope list` | Lists every scope xBRIEF across registered projects; `--project <path>` |
+| `pan scope show <issueId>` | Displays the xBRIEF plan, items and continue-state summary; `--project <path>` |
+| `pan scope propose <issueId>` | Sets the xBRIEF status to proposed; `--project <path>` |
+| `pan scope approve <issueId>` | Sets the xBRIEF status to approved; `--project <path>` |
+| `pan scope complete <issueId>` | Sets the xBRIEF status to completed; `--project <path>` |
+| `pan scope cancel <issueId>` | Sets the xBRIEF status to cancelled; `--project <path>` |
+| `pan scope restore <issueId>` | Restores a completed or cancelled xBRIEF back to active; `--project <path>` |
+
+Every `--project <path>` defaults to the project resolved from the issue. See
+[Change lifecycle status with pan scope](/features/planning#change-lifecycle-status-with-pan-scope).
+
+## Get help
+
+- [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P)
+- [GitHub Issues](https://github.com/eltmon/overdeck/issues)
