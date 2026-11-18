@@ -4,17 +4,17 @@
     "created": "2026-11-18T16:45:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5472: docs: fix published pages that contradict the product (state branch, Cloister routing, Inspect, phone apps, introduction)",
-    "updated": "2026-11-18T16:40:44.922Z"
+    "updated": "2026-11-18T16:41:47.265Z"
   },
   "plan": {
     "id": "pan-5472",
     "title": "docs: fix published pages that contradict the product (state branch, Cloister routing, Inspect, phone apps, introduction)",
-    "status": "proposed",
+    "status": "running",
     "uid": "74c99744-f267-4dde-b277-293d47877fdd",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-18T16:45:00Z",
-    "updated": "2026-11-18T16:40:44.922Z",
+    "updated": "2026-11-18T16:41:47.265Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5472",
@@ -1026,5 +1026,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
