@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5468",
   "created": "2026-11-18T19:13:53.395Z",
-  "updated": "2026-11-18T19:17:50.095Z",
+  "updated": "2026-11-18T19:17:57.940Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,11 @@
     "section-start-plan.ac4": {
       "status": "completed",
       "doneAt": "2026-11-18T19:17:50.095Z"
+    },
+    "section-work-done": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5468",
+      "claimedAt": "2026-11-18T19:17:57.940Z"
     }
   }
 }
