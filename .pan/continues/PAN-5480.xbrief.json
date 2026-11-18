@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5480",
   "created": "2026-11-18T20:29:40.360Z",
-  "updated": "2026-11-18T20:32:24.972Z",
+  "updated": "2026-11-18T20:33:18.903Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -36,9 +36,18 @@
       "doneAt": "2026-11-18T20:32:16.422Z"
     },
     "workspaces-anchor-fix": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5480",
-      "claimedAt": "2026-11-18T20:32:24.972Z"
+      "claimedAt": "2026-11-18T20:32:24.972Z",
+      "doneAt": "2026-11-18T20:33:18.903Z"
+    },
+    "workspaces-anchor-fix.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:33:18.903Z"
+    },
+    "workspaces-anchor-fix.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T20:33:18.903Z"
     }
   }
 }
