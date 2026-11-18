@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-5540",
   "created": "2026-11-18T20:13:27.480Z",
-  "updated": "2026-11-18T20:54:52.374Z",
+  "updated": "2026-11-18T21:18:16.382Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-18T21:18Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-18T21:18:16.382Z"
+    }
+  ],
   "items": {
     "known-listing-core": {
       "status": "completed",
@@ -237,5 +243,14 @@
       "status": "completed",
       "doneAt": "2026-11-18T20:54:52.373Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-18T21:18:16Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5540\n\nPull request: https://github.com/eltmon/overdeck/pull/5547 (head `3c65114c`)\n\nSource: check_run:test-e2e\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-e2e\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/135136531092/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/44398989195/job/135136531092  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m src/__tests__/reactCompilerCoverage.test.ts\u001b[2m > \u001b[22mReact Compiler skip coverage\u001b[2m > \u001b[22mthe frontend tree matches scripts/react-compiler-skip-baseline.txt\n\u001b[31m\u001b[1mAssertionError\u001b[22m: React Compiler skip baseline mismatch:\n  src/dashboard/frontend/src/components/skills/AddPacksDialog.tsx: 2 skip(s), baseline none (`try`/`finally` without `catch` is not supported by React Compiler)\nA new skip: fix the component (docs/DASHBOARD-ARCHITECTURE.md, React Compiler). A stale row: run npx tsx src/dashboard/frontend/scripts/reactCompilerCoverage.ts --update.: expected { …(3) } to deeply equal { added: [], raised: [], stale: [] }\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[2m  {\u001b[22m\n\u001b[32m-   \"added\": [],\u001b[39m\n\u001b[31m+   \"added\": [\u001b[39m\n\u001b[31m+     \"src/dashboard/frontend/src/components/skills/AddPacksDialog.tsx\",\u001b[39m\n\u001b[31m+   ],\u001b[39m\n\u001b[2m    \"raised\": [],\u001b[22m\n\u001b[2m    \"stale\": [],\u001b[22m\n\u001b[2m  }\u001b[22m\n\n\u001b[36m \u001b[2m❯\u001b[22m src/__tests__/reactCompilerCoverage.test.ts:\u001b[2m83:29\u001b[22m\u001b[39m\n\n    \u001b[90m 81|\u001b[39m       'A new skip: fix the component (docs/DASHBOARD-ARCHITECTURE.md, …\n    \u001b[90m 82|\u001b[39m     ]\u001b[33m.\u001b[39m\u001b[34mjoin\u001b[39m(\u001b[32m'\\n'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m 83|\u001b[39m     expect(result, message).toEqual({ added: [], raised: [], stale: []…\n    \u001b[90m   |\u001b[39m                             \u001b[31m^\u001b[39m\n    \u001b[90m 84|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m 85|\u001b[39m })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m565 passed\u001b[39m\u001b[22m\u001b[90m (566)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
 }
