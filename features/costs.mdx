@@ -60,3 +60,21 @@ The today/week/month windows differ by source: Project Home's weekly figure read
 starts the day at local midnight on the dashboard machine, the week at the start of the day seven
 days ago, and the month over the last 30 days. The Costs page's issue list reads a separate
 rollup in the database. The two totals are not guaranteed to reconcile exactly.
+
+## Where to see spend
+
+Project Home shows **Spend this week**, with today's spend below it. Without an issue prefix
+configured for the project it shows a dash and says it needs an issue prefix; if the read fails or
+takes more than 20 seconds it shows "unavailable". Clicking it opens the Costs page, but only when
+Experimental features is on (see
+[Dashboard views](/features/dashboard-views#experimental-features)); otherwise it lands back on
+Home. The Costs page link itself is currently broken
+([#5562](https://github.com/eltmon/overdeck/issues/5562) item 4).
+
+The issue drawer's **Details** tab lists each pipeline phase's agent with its cost and a **Total**
+row for the whole issue, including agents not listed above. A **Cost breakdown** expands two
+tables, **By stage** and **By model** (see
+[Dashboard views](/features/dashboard-views#issue-drawer-and-full-issue-view)).
+
+On the board, hovering a card that has recorded cost shows a cost badge; clicking it opens the
+same cost breakdown.
