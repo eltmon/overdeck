@@ -41,6 +41,29 @@ Every tick ends with one tick marker line, which is the loop's only status repor
 flywheel-tick: tick=3 pick=PAN-3964 phase=watch in-flight=PAN-3964,PAN-3920 needs-you=none
 ```
 
+## Start and control the loop
+
+| Command | What it does | Flags |
+| --- | --- | --- |
+| `pan flywheel start` | Launch a conversation running `/pan-flywheel` | `--model`, `--harness`, `--cwd <path>`, `--orders <book-id>`, `--fresh` |
+| `pan flywheel stop` | Ask the loop to write its report, wait for it, then pause | `--timeout <ms>` (default 120000) |
+| `pan flywheel abort` | Stop the flywheel conversation without a report | none |
+| `pan flywheel pause` | Stop the flywheel session, keeping its conversation and transcript | none |
+| `pan flywheel resume` | Respawn a paused flywheel and re-send `/pan-flywheel` | none |
+| `pan flywheel report` | Ask a running loop for its report, or print `.pan/flywheel/report.md` | none |
+| `pan flywheel status` | Show the derived flywheel status: run, last tick, policies, in-flight issues, order book | `--json` |
+| `pan flywheel stats` | Substrate-bug discovery rate and P0 count, computed from the tracker and forge | `--json`, `--window <days>` (default 30) |
+
+`start` refuses to run while a flywheel is already running, and refuses a paused one too unless you pass `--fresh`, which replaces the paused conversation (its old transcript stays on disk). `stop` pauses the loop either way, even when no report arrives within `--timeout`.
+
+The Flywheel page's toolbar shows different buttons depending on run state: idle shows **Start** (and **Start fresh** when a leftover session is detected); paused shows **Resume** and **Start fresh**; running shows **Pause**, **Report**, **Stop** and **Abort**. **Pop out** and a **Conversation** / **Terminal** toggle are always available.
+
+A **Run config** footer shows the Harness, Model, Effort, Max agents and Scope the loop is running with, and opens `Settings → Roles → Flywheel`, where the `Flywheel effort` and `Flywheel max agents` fields live. The model defaults to `claude-opus-5-5` and the effort to `high`; see [Effort](/configuration/effort) for what effort controls and how a resumed loop keeps the effort it started with.
+
+`pan orders start <book-id>` opens the same flywheel conversation bound to that book; see [Order books](/configuration/order-books) for how that compares to `pan flywheel start --orders`.
+
+Open the page from the left column's **Flywheel** entry, the command palette's **Open Flywheel** action, or directly at `/flywheel`.
+
 ## Known limits
 
 - The loop's author gate names fixed GitHub logins: it acts only on issues whose author is `eltmon` (the Overdeck maintainer) or `panopticon-agent[bot]`, or that are assigned to `eltmon`. On any other repo or account the loop skips your issues, and the current GitHub App bot (`overdeck-agent[bot]`) does not pass it either. See [issue #5544](https://github.com/eltmon/overdeck/issues/5544).
