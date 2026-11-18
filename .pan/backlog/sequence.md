@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-18T17:52:42.273176Z · model: claude-opus-5-5 · open: 936_
+_Last sequenced: 2026-11-18T19:27:03.268351Z · model: claude-opus-5-5 · open: 935_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -37,6 +37,7 @@ _Last sequenced: 2026-11-18T17:52:42.273176Z · model: claude-opus-5-5 · open: 
 | 31 | PAN-4708 | M | high | needs-refinement |  |  | docs.json nav is a hot file: concurrent docs PRs conflict, each costing a merge-main and re-review. Pick a fix option first. |
 | 32 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
 | 33 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
+| 33 | PAN-5537 | M | high | ok |  |  | Nothing emits review.approved, so the test role and browser UAT never run after review approval; re-emit it or retire the step. |
 | 34 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
 | 35 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
 | 36 | PAN-3524 | M | critical | needs-refinement |  |  | A server-owned --changed verification loop relaunches through deacon freeze, review abort, pause and operator stop; peaked at 78 workers. |
@@ -86,7 +87,6 @@ _Last sequenced: 2026-11-18T17:52:42.273176Z · model: claude-opus-5-5 · open: 
 | 80 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
 | 81 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent pane, so a single hungry agent inflates the unit and oomd kills the whole fleet — twice now. |
 | 82 | PAN-3278 | S | critical | needs-refinement |  |  | A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts. |
-| 83 | PAN-5472 | M | high | ok |  |  | Docs P1: first-read pages (state branch, Cloister routing, Inspect, phone, concepts) contradict the shipped product. Lane A item 3. |
 | 84 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
 | 84 | PAN-5467 | XL | high | ok | ✓ |  | Epic: docs overhaul, 16 page issues, 6 accuracy audits (PAN-5499..5504) and an intro rewrite (PAN-5505); order book drives pickup. |
 | 85 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
@@ -472,7 +472,6 @@ _Last sequenced: 2026-11-18T17:52:42.273176Z · model: claude-opus-5-5 · open: 
 | 452 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
 | 452 | PAN-5475 | S | medium | ok |  |  | Docs P2: features/costs.mdx, attribution, pan cost verbs, API-rate vs plan costs. Lane A item 7. |
 | 453 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
-| 453 | PAN-5476 | S | medium | ok |  |  | Docs P2: conversation search and Ctrl+K palette scopes, semantic search setup, pan conv search. Lane B item 4. |
 | 454 | PAN-5322 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5319: unguarded identifier.toUpperCase(), modal focus, needs-you rows that open nothing. |
 | 454 | PAN-5477 | M | medium | ok |  |  | Docs P2: configuration/permissions.mdx, auto-approve hook, --yolo, operator-only labels, git shim. Lane A item 8. |
 | 455 | PAN-5317 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5127: route live Codex app-server sends correctly; no replayable mail for keyed sends. |
@@ -484,11 +483,11 @@ _Last sequenced: 2026-11-18T17:52:42.273176Z · model: claude-opus-5-5 · open: 
 | 458 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
 | 458 | PAN-5481 | S | medium | ok |  |  | Docs P2: configuration/voice.mdx, dictation, tts.enabled, local Qwen3-TTS daemon, sidecars. Lane A item 10. |
 | 459 | PAN-2469 | S | medium | ok |  |  | Assembly landed (mergeReadySlots + finalization); remaining: alarm when all slots merged but no review requested. Swarm dormant. |
-| 459 | PAN-5500 | L | medium | ok |  | PAN-5472 | Docs audit: line-by-line accuracy check of the 21 Overdeck Anywhere pages against main. Lane A item 11. |
+| 459 | PAN-5500 | L | medium | ok |  |  | Docs audit: line-by-line accuracy check of the 21 Overdeck Anywhere pages against main. Lane A item 11. |
 | 460 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
-| 460 | PAN-5502 | L | medium | ok |  | PAN-5472, PAN-5479, PAN-5482 | Docs audit: line-by-line accuracy check of the 14 Features pages; waits on PAN-5472/5479/5482. |
+| 460 | PAN-5502 | L | medium | ok |  | PAN-5479, PAN-5482 | Docs audit: line-by-line accuracy check of the 14 Features pages; waits on PAN-5479/5482. |
 | 461 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
-| 461 | PAN-5504 | L | medium | ok |  | PAN-5472, PAN-5482 | Docs audit: line-by-line accuracy check of the 16 Guides and Reference pages; waits on PAN-5472/5482. Lane A item 13. |
+| 461 | PAN-5504 | L | medium | ok |  | PAN-5482 | Docs audit: line-by-line accuracy check of the 16 Guides and Reference pages; waits on PAN-5482. Lane A item 13. |
 | 462 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
 | 463 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
 | 464 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
@@ -644,11 +643,11 @@ _Last sequenced: 2026-11-18T17:52:42.273176Z · model: claude-opus-5-5 · open: 
 | 610 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
 | 610 | PAN-5482 | L | medium | ok |  |  | Docs P3 batch: operating guide, foreman, CI integrations, unpublished pages, proposal in nav, blog draft. Lane B item 7. |
 | 611 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
-| 611 | PAN-5503 | L | medium | ok |  | PAN-5472 | Docs audit: line-by-line accuracy check of the 21 Configuration pages; waits on PAN-5472. |
+| 611 | PAN-5503 | L | medium | ok |  |  | Docs audit: line-by-line accuracy check of the 21 Configuration pages; PAN-5472 merged, so it is unblocked. |
 | 612 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
 | 612 | PAN-5501 | M | medium | ok |  | PAN-5478 | Docs audit: line-by-line accuracy check of the 7 CLI Reference pages; waits on PAN-5478. Lane B item 9. |
 | 613 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
-| 613 | PAN-5499 | S | medium | ok |  | PAN-5480, PAN-5470, PAN-5472 | Docs audit: Getting Started, Vision, Changelog intro (5 pages); waits on PAN-5480/5470/5472. |
+| 613 | PAN-5499 | S | medium | ok |  | PAN-5480, PAN-5470 | Docs audit: Getting Started, Vision, Changelog intro (5 pages); waits on PAN-5480/5470. |
 | 614 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
 | 615 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
 | 616 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
@@ -1072,6 +1071,10 @@ New bug filed from PAN-4222: after all eleven top-level items were closed throug
 
 New this pass and the highest-leverage fix in the batch: the test-role launcher's final exec has no -p, no positional prompt and no piped stdin, so the role boots an interactive REPL and never takes a turn. That single missing argument is the deterministic producer of the zombie test agents tracked in PAN-2706, PAN-3563 and PAN-3274 — three separate hardening issues chasing one root cause. Reproduced across eight session IDs, so there is no diagnosis left to do.
 
+### PAN-5537 (rank 33)
+
+New pipeline bug found while planning PAN-5468: the review.approved event has no producer, so the reactive test-role dispatch is dead and the failed-UAT merge block can never fire. CI tests still gate merge, so it is high rather than critical. It sits beside PAN-3566 (test-role launcher boots an idle REPL), since both must be fixed before the test role does anything; the plan agent picks between re-emitting the event and retiring the step.
+
 ### PAN-3952 (rank 34)
 
 On the default backend the harness TUI renders into a one-line terminal until an operator opens it, so stuck detection, readiness scans, health capture, AUQ/permission detection and screenshots all see nothing. Deterministic pane sizing in the Herdr adapter is a small change with fleet-wide effect.
@@ -1260,10 +1263,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
 
 New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts through a new generation's 138-second boot warm phase and killed it anyway, producing four restarts in ten minutes, racing spawns on port 3012, and a WATCHDOG GIVING UP. Each restart re-triggered docker stack rebuilds, feeding the storm. The probe budget has to know the difference between starved and starting.
 
-### PAN-3314 (rank 81)
-
-New this pass. Every agent pane is a child of one transient tmux-server unit, so agent memory is the unit's memory and systemd-oomd's kill decision is all-or-nothing: one hungry agent takes the entire fleet with it. That has now happened twice, the second time killing seven work agents, four strikes and a live review convoy. Blast-radius containment is a different fix from choosing a better victim.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1271,10 +1270,10 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-18T17:52:42.273176Z",
+  "generatedAt": "2026-11-18T19:27:03.268351Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 936,
+  "openCount": 935,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -1693,6 +1692,19 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "dependsOn": [],
       "why": "Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents.",
       "rationale": "New this pass and the highest-leverage fix in the batch: the test-role launcher's final exec has no -p, no positional prompt and no piped stdin, so the role boots an interactive REPL and never takes a turn. That single missing argument is the deterministic producer of the zombie test agents tracked in PAN-2706, PAN-3563 and PAN-3274 — three separate hardening issues chasing one root cause. Reproduced across eight session IDs, so there is no diagnosis left to do.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5537",
+      "rank": 33,
+      "size": "M",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Nothing emits review.approved, so the test role and browser UAT never run after review approval; re-emit it or retire the step.",
+      "rationale": "New pipeline bug found while planning PAN-5468: the review.approved event has no producer, so the reactive test-role dispatch is dead and the failed-UAT merge block can never fire. CI tests still gate merge, so it is high rather than critical. It sits beside PAN-3566 (test-role launcher boots an idle REPL), since both must be fixed before the test role does anything; the plan agent picks between re-emitting the event and retiring the step.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2330,19 +2342,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "dependsOn": [],
       "why": "A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts.",
       "rationale": "Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5472",
-      "rank": 83,
-      "size": "M",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Docs P1: first-read pages (state branch, Cloister routing, Inspect, phone, concepts) contradict the shipped product. Lane A item 3.",
-      "rationale": "Rank unchanged. introduction.mdx moved to PAN-5505 (comment 2026-11-17), so this issue now covers the other six first-read pages; it is lane A item 3 behind PAN-5505.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7184,19 +7183,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-5476",
-      "rank": 453,
-      "size": "S",
-      "importance": "medium",
-      "score": 48,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Docs P2: conversation search and Ctrl+K palette scopes, semantic search setup, pan conv search. Lane B item 4.",
-      "rationale": "New P2 docs page; banded with mid-medium work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-5322",
       "rank": 454,
       "size": "S",
@@ -7341,11 +7327,9 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "importance": "medium",
       "score": 46,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5472"
-      ],
+      "dependsOn": [],
       "why": "Docs audit: line-by-line accuracy check of the 21 Overdeck Anywhere pages against main. Lane A item 11.",
-      "rationale": "New child of the docs epic: an accuracy audit that runs after the page PRs it names merge, so it ranks just behind the last of them in its order-book lane.",
+      "rationale": "New child of the docs epic: an accuracy audit that runs after the page PRs it names merge, so it ranks just behind the last of them in its order-book lane. PAN-5472 merged (#5535), so that dependency is removed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7369,12 +7353,11 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "score": 45,
       "condition": "ok",
       "dependsOn": [
-        "PAN-5472",
         "PAN-5479",
         "PAN-5482"
       ],
-      "why": "Docs audit: line-by-line accuracy check of the 14 Features pages; waits on PAN-5472/5479/5482.",
-      "rationale": "Rank unchanged; PAN-5471, PAN-5474 closed, so that dependency is removed.",
+      "why": "Docs audit: line-by-line accuracy check of the 14 Features pages; waits on PAN-5479/5482.",
+      "rationale": "Rank unchanged; PAN-5472 merged (#5535), so that dependency is removed. PAN-5537 may change specialists.mdx test-role claims.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7398,11 +7381,10 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "score": 44,
       "condition": "ok",
       "dependsOn": [
-        "PAN-5472",
         "PAN-5482"
       ],
-      "why": "Docs audit: line-by-line accuracy check of the 16 Guides and Reference pages; waits on PAN-5472/5482. Lane A item 13.",
-      "rationale": "New child of the docs epic: an accuracy audit that runs after the page PRs it names merge, so it ranks just behind the last of them in its order-book lane.",
+      "why": "Docs audit: line-by-line accuracy check of the 16 Guides and Reference pages; waits on PAN-5482. Lane A item 13.",
+      "rationale": "New child of the docs epic: an accuracy audit that runs after the page PRs it names merge, so it ranks just behind the last of them in its order-book lane. PAN-5472 merged (#5535), so that dependency is removed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9319,11 +9301,9 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "importance": "medium",
       "score": 42,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5472"
-      ],
-      "why": "Docs audit: line-by-line accuracy check of the 21 Configuration pages; waits on PAN-5472.",
-      "rationale": "Rank unchanged; PAN-5471 closed, so that dependency is removed.",
+      "dependsOn": [],
+      "why": "Docs audit: line-by-line accuracy check of the 21 Configuration pages; PAN-5472 merged, so it is unblocked.",
+      "rationale": "Rank unchanged; PAN-5471 closed, so that dependency is removed. PAN-5472 merged (#5535), so that dependency is removed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9376,11 +9356,10 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "condition": "ok",
       "dependsOn": [
         "PAN-5480",
-        "PAN-5470",
-        "PAN-5472"
+        "PAN-5470"
       ],
-      "why": "Docs audit: Getting Started, Vision, Changelog intro (5 pages); waits on PAN-5480/5470/5472.",
-      "rationale": "Rank unchanged; PAN-5505 closed, so that dependency is removed.",
+      "why": "Docs audit: Getting Started, Vision, Changelog intro (5 pages); waits on PAN-5480/5470.",
+      "rationale": "Rank unchanged; PAN-5472 merged (#5535), so that dependency is removed and only PAN-5480/5470 remain.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14152,13 +14131,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "confidence": 0.6
     },
     {
-      "from": "PAN-5447",
-      "to": "PAN-5476",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
       "from": "PAN-5464",
       "to": "PAN-5465",
       "type": "informs",
@@ -14195,13 +14167,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
     },
     {
       "from": "PAN-5467",
-      "to": "PAN-5472",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5467",
       "to": "PAN-5473",
       "type": "contains",
       "source": "github-ref",
@@ -14210,13 +14175,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
     {
       "from": "PAN-5467",
       "to": "PAN-5475",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5467",
-      "to": "PAN-5476",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
@@ -14315,41 +14273,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
     {
       "from": "PAN-5470",
       "to": "PAN-5499",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5472",
-      "to": "PAN-5499",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5472",
-      "to": "PAN-5500",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5472",
-      "to": "PAN-5502",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5472",
-      "to": "PAN-5503",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5472",
-      "to": "PAN-5504",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
@@ -14479,6 +14402,27 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-5537",
+      "to": "PAN-3566",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-5537",
+      "to": "PAN-5468",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-5537",
+      "to": "PAN-5502",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     },
     {
       "from": "PAN-750",
