@@ -1,133 +1,49 @@
 ---
-title: "Swarm: parallel agents on one issue"
+title: "Swarm: parallel workers on one issue with the foreman"
 sidebarTitle: "Swarm"
-description: "Run one work agent per plan item on the same issue, in parallel, and dispatch each item in dependency order from the plan's blocks edges."
+description: "How a work agent runs plan items in parallel as the foreman, with worker subagents, pan spawn panes, or the gated slot swarm."
 ---
 
-import { ThemedImage } from "/snippets/themed-image.mdx";
+When an xBRIEF plan splits into items that can run at once, the issue's own work agent acts as the foreman: it works a single linear chain of items itself, and dispatches parallel work only when a wave has more than one dispatchable item. There are two ways it can run that parallel work, described below. Neither is ranked over the other; which one an issue gets depends on how it was started.
 
-A swarm runs one work agent per plan item, in parallel, on the same issue. Each agent gets its own git worktree and slot branch. The dispatcher uses the plan's `blocks` edges as a DAG: an item becomes dispatchable the moment every blocking parent has merged or completed, not when its wave does.
+## Foreman workers
 
-## When to Use a Swarm
+### When workers are dispatched
 
-A swarm fits when an issue's [xBRIEF plan](/features/planning) splits into several items that can be implemented independently. If the plan is one linear sequence, a single work agent is faster; there is nothing to parallelize.
+With a single linear chain of items, the foreman works through them itself, one at a time. When a wave has more than one dispatchable item, it dispatches a worker for each one. This only serializes correctly when the plan's `files_scope` on each item is accurate, since overlapping scopes are what keeps two workers from racing the same files.
 
-Use a swarm when:
+### Subagents and pan spawn panes
 
-- The plan has 3+ items with parallel branches in the DAG.
-- Items touch disjoint files (or you have planned `files_scope` so the dispatcher can serialize the overlapping ones).
-- You want a synthesis step at convergence points to brief the downstream work agent.
+The foreman has two ways to dispatch a worker: a same-harness subagent running in-harness, or a separate pane started with `pan spawn` for another harness, or for work the operator should watch directly.
 
-## Mental Model
+### Item worktrees and branches
 
-![Per-item DAG dispatch with synthesis](/images/swarm/dag-dispatch.png)
+A worker runs in its own item worktree, `<workspace>/.swarm/<item>/`, on a branch named `<feature-branch>-<item>`; an existing worktree for the same item is reused rather than recreated.
 
-Items A, B, C, D, E are xBRIEF items wired by `blocks` edges. A has merged into the feature branch. B and D are running in slots 1 and 2. C is ready, but its `files_scope` overlaps B's, so the dispatcher defers it. E has two blocking parents (B and D) — a **synthesis agent** runs at the convergence point, writes a `SynthesisOutput`, and the E work-agent reads that context block from its prompt.
+### How work comes back
 
-| Surface | Single-agent (default) | Swarm slot |
-|---|---|---|
-| Branch | `feature/<issue>` | `feature/<issue>/slot-<N>` |
-| Worktree | `workspaces/feature-<issue>/` | per-slot worktree |
-| tmux session | `agent-<issue>` | per-slot session |
-| Plan visibility | Full plan | Active-slice (bounded) prompt |
+Each worker commits once per item, with `Item: <id>` and one `Item: <id>.acN` line per acceptance criterion. Workers do not push, and they do not run `pan task done` or `pan done` themselves. The foreman integrates each item onto the feature branch, pushes it, runs `pan task done` for the item and its criteria, and runs `pan done` once at the end, after every item is integrated.
 
-## Slot Lifecycle
+## Claims and overlapping files
 
-![Slot lifecycle and auto-advance loopback](/images/swarm/slot-lifecycle.png)
+`pan task claim` refuses to claim an item that a live agent already holds, or whose `files_scope` overlaps an item a live agent holds. An item whose `files_scope_confidence` is `low` refuses any concurrent claim at all. `--steal` overrides this, for the foreman or an operator only.
 
-Every slot-branch merge fires `/api/swarm/slot-merged`. The route marks the slot `merged`, re-runs `getDispatchableItems`, and dispatches any newly-ready items (subject to capacity and file-overlap rules). The per-issue `postMergeLifecycle` only fires when `feature/<issue>` itself merges into `main` — slot merges return early.
+## Who can message a worker
 
-A slot whose status is `'failed'` does **not** unblock its dependents.
+Only the issue's own work pane, the worker's parent, or an operator conversation may send a message to a worker's pane.
 
-Each running slot is a registered work agent, so the dashboard's **Agents** page surfaces every slot in flight alongside its model, runtime, and last activity — the same place you watch any single-agent run. The metric strip (Running, Stuck, Cost 24h, Tokens 24h, Queue) lets you confirm at a glance how many slots a swarm currently occupies.
+## Gated slot swarm
 
-<ThemedImage
-  light="/images/dashboard/agents-light.png"
-  dark="/images/dashboard/agents-dark.png"
-  alt="Agents page: metric strip over agent cards showing model, runtime, and last activity for each running work agent, including swarm slots"
-/>
+A plan is eligible for the gated slot swarm when at least two items are slot-eligible and each one has a `files_scope`. A slot runs on its own branch, `feature/<issue>-slot-<N>`, in its own worktree.
+
+`pan swarm <id>` starts or attaches the foreman; it does not dispatch slot work itself, and it prints that the foreman owns dispatch. The foreman is what drives slots forward, with `pan swarm dispatch`, `pan swarm wait`, `pan swarm merge` and the rest of the `pan swarm` subcommands.
+
+Settings → Swarming holds the swarm policy for this mechanism: "Automatic selection" (Off, Auto, Always), "Maximum slots per issue", and "Advance waves automatically". A project's own "Automatic swarming" select (Inherit, Off, Auto, Always) overrides the global setting for that project.
 
 ## CLI
 
-```bash
-pan swarm <id>                       # Spawn dispatchable items now
-pan swarm <id> --dry-run             # Print dispatch plan; no spawns
-pan swarm <id> --max-slots <n>       # Cap concurrency
-pan swarm <id> --model <model>       # Override slot-agent model
-pan swarm <id> --auto-advance        # Auto-dispatch as slots merge
-pan swarm <id> --no-auto-advance     # Manual mode; explicit per wave
-```
+See [pan swarm](/cli/pipeline-commands#pan-swarm) and [pan spawn](/cli/pipeline-commands#pan-spawn) for the full command and flag tables. `pan task claim --steal` is the foreman or operator override mentioned above under Claims and overlapping files.
 
-### Inspect and Mutate Items
+## Get help
 
-The plan document is the single mutation authority for item status. Every mutation bumps `plan.sequence` (compare-and-set).
-
-```bash
-pan swarm <id> --task next                              # List dispatchable items
-pan swarm <id> --task show   --item <itemId>            # Show one item
-pan swarm <id> --task claim  --item <itemId>            # Mark running
-pan swarm <id> --task done   --item <itemId>            # Mark completed
-pan swarm <id> --task block  --item <itemId> --reason "<text>"
-pan swarm <id> --task unblock --item <itemId>
-pan swarm <id> --task cancel --item <itemId>
-```
-
-Pass `--sequence <n>` to enforce CAS. A mismatch raises `xBRIEF sequence conflict` and the write is rejected.
-
-## HTTP Surface
-
-![Swarm HTTP surface and trust boundary](/images/swarm/http-surface.png)
-
-The two mutating routes require `INTERNAL_TOKEN_HEADER`. `POST /api/swarm` additionally accepts same-origin dashboard requests. `POST /api/swarm/slot-merged` is token-only — the merge-agent is the only legitimate caller.
-
-| Route | Auth | Purpose |
-|---|---|---|
-| `POST /api/swarm` | token **or** same-origin | Dispatch one or more slots |
-| `POST /api/swarm/slot-merged` | token only | Loopback when a slot branch merges |
-| `GET /api/swarm/:issueId` | none (read-only) | Dashboard swarm view |
-
-## Plan Authoring: `files_scope` and Synthesis
-
-Two fields on `XBriefItem.metadata` control swarm behavior.
-
-| Field | Purpose |
-|---|---|
-| `files_scope: string[]` | Globs (`**`, `*`, `?`) of files this item touches. Used by `hasFileOverlap()` to serialize file-conflicting items. Items without a scope are treated as non-overlapping. |
-| `requiresSynthesis: boolean` | Marks a synthesis item. The swarm treats any item with more than one blocking parent as a synthesis item whether or not this is set, so you rarely need it. |
-
-Plans that omit `files_scope` will still run — but every parallel pair is treated as non-overlapping, so two slots could race the same file. Author `files_scope` whenever items can plausibly touch the same code.
-
-## Runtime State
-
-Swarm runtime state lives in `<projectRoot>/.pan/continues/<issue>.xbrief.json` under `ContinueState.swarmRuntime`. The old PAN-970 sidecar (`~/.overdeck/swarms/<id>.json`) is gone.
-
-```ts
-interface SwarmRuntime {
-  model: string;
-  currentWave?: number;
-  totalWaves?: number;
-  autoAdvance?: boolean;
-  deferred?: { itemId: string; itemTitle: string }[];
-  slots: SwarmSlotRuntime[];
-  synthesisOutputs: Record<string, SynthesisOutput>;
-  createdAt: string;
-  updatedAt: string;
-}
-```
-
-## Watching a Swarm in the Pipeline
-
-A swarm is still one issue moving through the pipeline — the parallelism is internal to its work phase. The **Pipeline** page groups every issue by phase (Ship / Review / Verifying) under a metric strip (Active issues, Work running, Review queue, Ship, Spend), with a live activity feed on the right. Once a swarm's slots merge up into `feature/<issue>` and the issue advances, you track its progress here just like any other issue.
-
-<ThemedImage
-  light="/images/dashboard/pipeline-light.png"
-  dark="/images/dashboard/pipeline-dark.png"
-  alt="Pipeline page: metric strip over phase-grouped issue rows (Ship / Review / Verifying) with a live activity feed"
-/>
-
-## Related
-
-- [Convoys](/features/convoys) — multi-agent code review (different orchestration pattern).
-- [Cloister](/features/cloister) — model routing, stuck detection, specialist handoffs.
-- Engineering reference: [`docs/SWARM.md`](https://github.com/eltmon/overdeck/blob/main/docs/SWARM.md) — full library API, route bodies, sequence-number rules.
-
+Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file an issue on [GitHub Issues](https://github.com/eltmon/overdeck/issues).
