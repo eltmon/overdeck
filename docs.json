@@ -105,6 +105,7 @@
             "pages": [
               "features/issue-pipeline",
               "features/planning",
+              "features/flywheel",
               "features/conversations",
               "features/file-explorer",
               "features/mission-control",
