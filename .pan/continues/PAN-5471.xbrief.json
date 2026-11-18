@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5471",
   "created": "2026-11-18T14:58:50.204Z",
-  "updated": "2026-11-18T15:12:49.967Z",
+  "updated": "2026-11-18T15:12:54.063Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,6 +102,11 @@
     "harnesses-role-harness.ac3": {
       "status": "completed",
       "doneAt": "2026-11-18T15:12:49.967Z"
+    },
+    "presets-link": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5471",
+      "claimedAt": "2026-11-18T15:12:54.062Z"
     }
   }
 }
