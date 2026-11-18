@@ -10,12 +10,13 @@ Running Overdeck day to day means knowing how to stop everything in an emergency
 
 Emergency stop kills every running agent across all harnesses right away. Nothing it kills is deleted; work in progress is simply cut off.
 
-You can trigger it four ways:
+You can trigger it five ways:
 
 - The hotkey `Ctrl+Shift+.` (`Cmd+Shift+.` on macOS, see [Keyboard shortcuts](/features/keyboard-shortcuts)), which works even while typing in a text field. It opens a confirm dialog: press Enter to stop all agents, or Esc to cancel.
 - The top bar's Agents menu, "Stop all agents…": kills every agent now, and work in progress is cut off.
 - The command palette's "Emergency Stop All Agents" action.
 - The System Health popover, under System controls: a stop button with an inline "Kill all?" confirm.
+- From a terminal, run `pan admin cloister emergency-stop`. It prints the agents it stopped and warns about any it could not confirm stopped.
 
 Stopping also freezes auto-resume for crashed agents, so nothing restarts on its own while you are dealing with the emergency. The freeze survives a restart. To undo it, click the "Auto-resume frozen" chip (snowflake icon) in the top bar, or use the Auto-resume toggle in the System Health popover.
 
@@ -80,7 +81,7 @@ pan backup clean             # drop old backups, keeping the newest ones
 pan restore                  # pick a backup to restore from, with confirmation
 ```
 
-`pan restore` with no timestamp lists the newest backups to choose from, and always asks for confirmation before replacing the target folder.
+`pan restore` with no timestamp lists the newest backups to choose from, and always asks for confirmation before replacing the target folder. Today it restores the skills and commands folders only: the agents folder is backed up, but `pan restore` does not bring it back.
 
 ## Get help
 

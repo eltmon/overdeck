@@ -8,7 +8,14 @@ Overdeck reads your project's CI through GitHub webhooks: check runs, check suit
 
 ## Run tests on CI
 
-Each project has a `verification.tests` setting in `projects.yaml`, either `ci` or `local`. If it is unset, Overdeck detects it: the project is treated as `tests: ci` when a GitHub Actions workflow in the project, or in a polyrepo member, runs a test job on pull requests to the PR base or on pushes to a feature branch. A job counts as a test job when its check name is `test`, `tests`, `test (...)`, `test-...`, `test:...` or `test / ...`. Detection re-runs when `projects.yaml` or a workflow file changes, and a project with no GitHub repo configured is always `local`.
+Each project has a `verification.tests` setting in `projects.yaml`, either `ci` or `local`:
+
+```yaml
+verification:
+  tests: ci
+```
+
+If it is unset, Overdeck detects it: the project is treated as `tests: ci` when a GitHub Actions workflow in the project, or in a polyrepo member, runs a test job on pull requests to the PR base or on pushes to a feature branch. A job counts as a test job when its check name is `test`, `tests`, `test (...)`, `test-...`, `test_...`, `test:...` or `test / ...`. Detection re-runs when `projects.yaml` or a workflow file changes, and a project with no GitHub repo configured is always `local`.
 
 In `ci` mode, the host's verification gate skips only the check named exactly `test`. `typecheck`, `lint` and any other configured gate still run locally. A custom gate must not be named `test`, or CI mode drops it along with the real one.
 

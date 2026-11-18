@@ -3,8 +3,6 @@ title: "Progressive polyrepo: check out repos on demand"
 description: "Check out only the repos a workspace needs at creation, then add more with pan workspace add-repo as the work requires them."
 ---
 
-# Progressive polyrepo workspaces
-
 For a polyrepo project with many repos, creating every worktree upfront wastes time and disk space when most issues only touch a handful of them. A progressive polyrepo workspace starts with just the repos you name, and adds more on demand as work needs them.
 
 ## When to use progressive mode
@@ -86,7 +84,7 @@ groups:
   payments_api: [billing, ledger]
 ```
 
-A group written as a multi-line block list, or with a hyphen in its name, is not read correctly today: it either parses as empty or is never found. Keep every group on one line, with an underscore in place of any hyphen.
+A group written as a multi-line block list parses as empty, and a hyphenated group name is never found.
 
 ## Adding repos mid-work
 
@@ -129,7 +127,7 @@ pan workspace add-repo int-123 --new git@github.com:acme/new-service.git --proje
 
 `--new` clones the repository under the project root, appends it to the project's `workspace.repos` configuration, and creates the issue's feature worktree for it inside the active workspace. Review, inspection, verification and merge then treat it like any other configured repo. If a repo name is unknown and `--new` is absent, the command fails without changing the workspace. `add-repo` also works on a polyrepo that is not progressive, with a warning.
 
-Run `--new` before manually cloning or committing to the new repository. The command refuses to adopt an existing workspace checkout on the wrong branch, since that would preserve an evidence-blind workflow on the wrong branch.
+Run `--new` before manually cloning or committing to the new repository. The command refuses to adopt an existing workspace checkout that is on the wrong branch, so work never silently continues there.
 
 ### Skill: `/workspace-add-repo`
 
