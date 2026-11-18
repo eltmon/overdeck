@@ -1,6 +1,6 @@
 ---
 title: Cloister
-description: AI lifecycle manager with intelligent model routing
+description: "Cloister, the lifecycle manager that monitors the health of Overdeck's pipeline agents"
 ---
 
 import { ThemedImage } from "/snippets/themed-image.mdx";
@@ -10,7 +10,6 @@ import { ThemedImage } from "/snippets/themed-image.mdx";
 
 Cloister is Overdeck's intelligent agent lifecycle manager. It monitors all running agents and automatically handles:
 
-- **Model Routing** - Routes tasks to appropriate models based on complexity, across multiple providers
 - **Stuck Detection** - Identifies agents that have stopped making progress
 - **Automatic Handoffs** - Escalates to specialists when needed
 - **Specialist Coordination** - Manages review-agent, test-agent, inspect-agent, uat-agent, and merge-agent
@@ -173,7 +172,7 @@ Cloister detects situations that require intervention:
 
 <Note>
 The same lifecycle signals that drive these handoffs also feed the **Fix-All
-Flywheel** orchestrator, which keeps the pipeline turning autonomously —
+Flywheel** orchestrator, which keeps the pipeline turning autonomously,
 prioritizing what to work on next, launching planning and work agents, and
 escalating where Cloister flags a problem. Cloister is the per-agent lifecycle
 layer; the Flywheel is the cross-issue orchestrator built on top of it.
@@ -299,8 +298,8 @@ pan sync  # Syncs all skills, agents, AND hooks
 
 This prevents hook failures from interrupting agent work.
 
-If heartbeats stop arriving — or any other part of the lifecycle plumbing drifts
-— the dashboard's Health page surfaces it. Its system health checks and
+If heartbeats stop arriving, or any other part of the lifecycle plumbing drifts,
+the dashboard's Health page surfaces it. Its system health checks and
 diagnostics cover the same hooks, sockets, and services Cloister depends on, so
 you can confirm the monitoring stack itself is sound before trusting the
 stuck-detection signals it produces.
@@ -336,90 +335,13 @@ Cloister configuration lives in `~/.overdeck/cloister/config.json`:
 }
 ```
 
-## Model Routing & Complexity Detection
+## Model routing
 
-Cloister automatically routes tasks to the appropriate model based on detected complexity, optimizing for cost while ensuring quality. Model routing supports multiple providers: Anthropic, OpenAI, Google, Kimi, and Zhipu.
-
-### Complexity Levels
-
-| Level | Default Model | Use Case |
-|-------|---------------|----------|
-| **trivial** | Haiku | Typos, comments, documentation updates |
-| **simple** | Haiku | Small fixes, test additions, minor changes |
-| **medium** | Kimi | Features, components, integrations |
-| **complex** | Kimi | Refactors, migrations, redesigns |
-| **expert** | Opus | Architecture, security, performance optimization |
-
-The default implementation model is configurable per-project. Kimi is the current default for medium/complex tasks, providing a cost-effective alternative to Sonnet with strong coding performance.
-
-### Complexity Detection Signals
-
-Complexity is detected from multiple signals (in priority order):
-
-1. **Explicit field** - Task has a `complexity` field set (e.g., in beads)
-2. **Labels/tags** - Issue labels like `architecture`, `security`, `refactor`
-3. **Keywords** - Title/description contains keywords like "migration", "overhaul"
-4. **File count** - Number of files changed (>20 files = complex)
-5. **Time estimate** - If estimate exceeds thresholds
-
-**Keyword patterns:**
-```javascript
-{
-  trivial: ['typo', 'rename', 'comment', 'documentation', 'readme'],
-  simple: ['add comment', 'update docs', 'fix typo', 'small fix'],
-  medium: ['feature', 'endpoint', 'component', 'service'],
-  complex: ['refactor', 'migration', 'redesign', 'overhaul'],
-  expert: ['architecture', 'security', 'performance optimization']
-}
-```
-
-### Configuring Model Routing
-
-Model routing is configured via the dashboard Settings page or `~/.overdeck/cloister/config.json`:
-
-```json
-{
-  "model_selection": {
-    "default_model": "kimi-k2.5",
-    "complexity_routing": {
-      "trivial": "haiku",
-      "simple": "haiku",
-      "medium": "kimi-k2.5",
-      "complex": "kimi-k2.5",
-      "expert": "opus"
-    }
-  }
-}
-```
-
-### Supported Providers
-
-| Provider | Models | Use Case |
-|----------|--------|----------|
-| **Anthropic** | Opus, Sonnet, Haiku | Planning (Opus), review, general |
-| **OpenAI** | GPT-4o, o1 | Alternative implementation |
-| **Google** | Gemini | Alternative implementation |
-| **Kimi** | Kimi K2.5 | Cost-effective implementation (default) |
-| **Zhipu** | GLM-4 | Alternative implementation |
-
-### Cost Optimization
-
-Model routing helps optimize costs:
-
-| Model | Relative Cost | Best For |
-|-------|---------------|----------|
-| Haiku | 1x (cheapest) | Simple tasks, bulk operations |
-| Kimi | ~2x | Most implementation work (default) |
-| Sonnet | 3x | Review, complex implementation |
-| Opus | 15x | Planning, architecture, critical fixes |
-
-A typical agent run might:
-1. Plan with Opus (high-quality strategic decisions)
-2. Implement with Kimi (cost-effective coding)
-3. Escalate to Opus only if stuck or complexity detected
+Cloister does not pick models. Roles, workhorse slots and tiered execution do that, configured in Settings → Model Routing; see [Model routing](/configuration/model-routing).
 
 ## Related Guides
 
+- [Model routing](/configuration/model-routing) - Roles, workhorse slots and tiered execution
 - [Specialists](/features/specialists) - Detailed specialist agent documentation
 - [Convoys](/features/convoys) - Multi-agent orchestration
 - [Core Commands](/cli/core-commands) - Cloister CLI commands
