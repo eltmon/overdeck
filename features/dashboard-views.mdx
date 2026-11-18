@@ -225,6 +225,14 @@ Skills, Context and Settings stay available regardless of the switch. In particu
 Skills are not experimental and stay available with the switch off**, even though the toggle's own
 description in Settings currently names them.
 
+## AutoPreso
+
+AutoPreso (`/autopreso`) is a voice-driven whiteboard built on Excalidraw, reached from the left nav's More menu under Operations. It is hidden unless [Experimental features](#experimental-features) is on; a direct link to `/autopreso` goes to Home while the switch is off.
+
+The whiteboard has two modes. In staging, you draw on the canvas yourself. **Go live** sends the staged drawing to the whiteboard agent as context and makes the canvas view-only from then on; **Back to staging** returns to drawing it yourself. Other controls: **Start mic** and **Stop mic**, **Reset session**, and a warmup status (idle, warming, ready, failed).
+
+Once live, each spoken turn is transcribed to a transcript panel and the agent edits the board in response. AutoPreso needs a microphone and browser permission, and it does not speak: there is no text-to-speech output. Speech-to-text comes from Settings → Voice → **STT provider** (Moonshine, a local sidecar, or Google Cloud STT with its own API key), and the whiteboard's own model comes from Settings → Voice → **AutoPreso provider** and **AutoPreso model**.
+
 ## Get help
 
 Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file an issue on
