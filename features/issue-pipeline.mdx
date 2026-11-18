@@ -1,0 +1,25 @@
+---
+title: "Issue pipeline: from issue to merged PR"
+sidebarTitle: "Issue pipeline"
+description: "How an issue moves through Overdeck: pan start, planning, work, verification, review, tests, merge and close-out, and what to do when it stalls."
+---
+
+# Issue pipeline: from issue to merged PR
+
+An issue moves through a fixed sequence of stages: plan, work, verification, review, tests and UAT, merge, close-out. Nothing about an issue's position in that sequence is stored. Overdeck derives it each time from git, the tracker and the pull request, so the state you see is always the state those three sources agree on right now.
+
+## The pipeline at a glance
+
+| Stage | Who runs it | What moves it on |
+| --- | --- | --- |
+| Plan | A planning agent | Finalizing the xBRIEF plan |
+| Work | A work agent | `pan done` |
+| Verification | The dashboard server | All quality gates pass |
+| Review | One or more reviewer agents | An approving verdict at the PR head |
+| Tests and UAT | The test role | A passed tests verdict and no failed UAT verdict |
+| Merge | The dashboard server, or you | The one merge gate passes |
+| Close-out | You, or `pan close` | Every Definition of Done row is satisfied |
+
+## Get help
+
+Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file an issue on [GitHub Issues](https://github.com/eltmon/overdeck/issues).
