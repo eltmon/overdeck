@@ -4,17 +4,17 @@
     "created": "2026-11-18T21:54:50Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5473: docs: desktop app",
-    "updated": "2026-11-18T21:59:20.616Z"
+    "updated": "2026-11-18T21:59:52.614Z"
   },
   "plan": {
     "id": "pan-5473",
     "title": "docs: desktop app",
-    "status": "proposed",
+    "status": "running",
     "uid": "71b80900-18c0-4fa2-be78-8d1ea8f02d14",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-18T21:54:50Z",
-    "updated": "2026-11-18T21:59:20.616Z",
+    "updated": "2026-11-18T21:59:52.614Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5473",
@@ -876,5 +876,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
