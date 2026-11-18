@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5503",
   "created": "2026-11-18T23:39:30.709Z",
-  "updated": "2026-11-18T23:54:24.162Z",
+  "updated": "2026-11-18T23:54:50.351Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -395,6 +395,26 @@
     "audit-appearance.ac3": {
       "status": "completed",
       "doneAt": "2026-11-18T23:54:24.162Z"
+    },
+    "audit-context-layers": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:54:50.351Z"
+    },
+    "audit-context-layers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:54:50.351Z"
+    },
+    "audit-context-layers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:54:50.351Z"
+    },
+    "audit-context-layers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:54:50.351Z"
+    },
+    "audit-context-layers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:54:50.351Z"
     }
   }
 }
