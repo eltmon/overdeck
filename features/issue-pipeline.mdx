@@ -83,7 +83,7 @@ As of this writing, the test role does not start automatically the moment review
 
 **CI failures.** A failed PR check reported by a GitHub webhook is relayed to the work agent with excerpts from the failing log. A failure that also fails on `main` is tagged as inherited from main, so the agent knows it is not its own regression. In CI mode a red test job counts against the same 3-attempt verification budget as any other gate.
 
-**CodeRabbit.** CodeRabbit review is advisory: it never blocks a merge, and nothing waits for it. Its findings are relayed to the work agent, which fixes each one or replies on the thread. Findings still open after merge become a follow-up issue titled "CodeRabbit follow-up for ...".
+**CodeRabbit.** CodeRabbit review is advisory: it never blocks a merge, and nothing waits for it. Its findings are relayed to the work agent, which fixes each one or replies on the thread. Findings still open after merge become a follow-up issue titled "CodeRabbit follow-up for ...". See [CI integrations](/integrations/ci) for setup.
 
 **Merge conflicts.** Three different paths handle a conflict depending on when it appears:
 

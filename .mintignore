@@ -2,8 +2,8 @@
 #
 # This repo is a monorepo; the Mintlify docs site lives at its root and
 # consists of: docs.json, the *.mdx pages (root + cli/, configuration/,
-# features/, guides/, reference/), favicon.svg, logo/, and the image
-# assets under images/ and docs/.
+# features/, guides/, integrations/, reference/), favicon.svg, logo/, and
+# the image assets under images/ and docs/.
 #
 # Without this file Mintlify scans the entire repo and injects stray
 # source CSS/JS into the published site — causing font 404s

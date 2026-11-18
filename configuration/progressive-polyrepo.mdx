@@ -1,28 +1,24 @@
 ---
-title: Progressive Polyrepo Workspaces
-description: Large-scale polyrepo management with on-demand repository checkout
+title: "Progressive polyrepo: check out repos on demand"
+description: "Check out only the repos a workspace needs at creation, then add more with pan workspace add-repo as the work requires them."
 ---
 
-# Progressive Polyrepo Workspaces
+For a polyrepo project with many repos, creating every worktree upfront wastes time and disk space when most issues only touch a handful of them. A progressive polyrepo workspace starts with just the repos you name, and adds more on demand as work needs them.
 
-For projects with 10+ repositories, creating all worktrees upfront wastes time and disk space — most issues only touch 1-3 repos. Progressive polyrepo workspaces solve this by starting with only essential repos (like a meta repo) and adding more on demand during work.
+## When to use progressive mode
 
-## When to Use Progressive Mode
-
-| Project Size | Recommended Mode | Behavior |
-|--------------|-----------------|----------|
-| 1-9 repos | Standard polyrepo | All repos checked out on workspace creation |
-| 10+ repos | Progressive | Only essential repos initially; agents add more as needed |
-| Any project with a meta repo | Progressive | Meta repos symlinked as read-only references |
+Progressive mode helps most once a polyrepo project has ten or more repos, or whenever it includes a meta repo you want symlinked in read-only rather than checked out as a worktree. Below that, a standard polyrepo, which checks out every configured repo at workspace creation, is simpler and usually fast enough. These are guidelines, not a hard threshold the code enforces.
 
 ## Overview
 
-Progressive workspaces are opt-in per-project via the `progressive: true` flag. When enabled:
+Progressive workspaces are opt-in per project, with two keys that are both required together: `progressive: true` and `always_include`. With only `always_include` set, every repo is still created; with only `progressive: true` set, every repo is still created too. Only the combination of both keys limits workspace creation to the `always_include` repos.
 
-1. **Workspace creation is fast** — only `always_include` repos get worktrees/symlinks
-2. **Agents add repos on demand** — using the `/workspace-add-repo` skill or CLI command
-3. **Meta repos stay clean** — they symlink to `main` with no feature branches
-4. **Repo groups simplify addition** — agents can add a named group (`simphony`, `aloha`) instead of individual repos
+1. **Workspace creation is fast.** Only the repos named in `always_include` get a worktree or a symlink.
+2. **Agents add repos on demand.** Using the `/workspace-add-repo` skill or `pan workspace add-repo`.
+3. **Meta repos stay clean.** A repo with `link_type: symlink` links to the project's own checkout, on whatever branch that checkout is currently on, with no feature branch created for it.
+4. **Repo groups simplify addition.** Agents can add a named group instead of listing individual repos.
+
+A workspace with no `progressive` key behaves exactly as before: every configured repo is checked out at creation.
 
 ## Configuration
 
@@ -36,16 +32,16 @@ projects:
     issue_prefixes: [F, US, DE, TA]    # All Rally artifact types → this project
     workspace:
       type: polyrepo
-      progressive: true                  # Opt-in to progressive mode
-      always_include: [meta]           # These repos always exist in workspace
-      groups_file: team-meta/overdeck/repo-groups.yaml  # Repo group definitions
+      progressive: true                  # Needs always_include below to take effect
+      always_include: [meta]             # Only these repos are created at workspace init
+      groups_file: team-meta/overdeck/repo-groups.yaml  # Relative to the project root
       pr_target: qa                     # Default PR target for all repos
 
       repos:
         - name: meta
           path: team-meta
           link_type: symlink            # Symlink, not worktree
-          readonly: true                 # Agents read but never commit
+          readonly: true                 # Agents should not commit here
 
         - name: api-service
           path: HS/api-service
@@ -55,105 +51,83 @@ projects:
           path: HS/int-provider-a
           default_branch: master
 
-        # ... 28 more repos
+        # ... more repos
 ```
 
-## New Configuration Fields
+## Configuration fields
 
-### WorkspaceConfig Additions
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `progressive` | `boolean` | When `true`, only `always_include` repos are created on workspace init |
-| `always_include` | `string[]` | Repo names to always include (typically meta/docs repos) |
-| `groups_file` | `string` | Path (relative to project root) to `repo-groups.yaml` |
-| `pr_target` | `string` | Default PR target branch for all repos (e.g., `'qa'`) |
-
-### RepoConfig Additions
+### Workspace-level
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `pr_target` | `string` | Per-repo PR target branch override |
-| `readonly` | `boolean` | If `true`, agent should not commit to this repo |
-| `link_type` | `'worktree' \| 'symlink'` | How to include repo in workspace (default: `'worktree'`) |
+| `progressive` | `boolean` | Combined with `always_include`, limits workspace creation to those repos |
+| `always_include` | `string[]` | Repo names created at workspace init when `progressive` is also set |
+| `groups_file` | `string` | Path, relative to the project root, to a `repo-groups.yaml` file |
+| `pr_target` | `string` | Default PR target branch for every repo, unless a repo overrides it |
 
-## Repo Groups
+### Per-repo
 
-Repo groups let agents add multiple related repos at once. Groups are defined in a `repo-groups.yaml` file within your meta repo:
+| Field | Type | Description |
+|-------|------|-------------|
+| `pr_target` | `string` | Overrides the workspace's `pr_target` for this one repo |
+| `readonly` | `boolean` | Tells the work agent's prompt not to commit changes to this repo; nothing in the code enforces it |
+| `link_type` | `'worktree' \| 'symlink'` | How the repo is included in the workspace (default: `'worktree'`) |
+
+## Repo groups
+
+Repo groups let agents add several related repos at once, defined in a `repo-groups.yaml` file your `groups_file` key points to. Write each group on one line as a list in square brackets. Group names may use letters, digits and underscores. The group `all` is built in.
 
 ```yaml
 # team-meta/overdeck/repo-groups.yaml
 groups:
-  simphony:
-    - int-micros-simphony
-    - int-micros-simphony-api
-    - micros-symphony-canonical-transform
-    - micros-symphony-job-importschedule
-    - micros-symphony-raw-job
-
-  aloha:
-    - int-aloha
-    - int-aloha-hrbridge
-    - aloha-agent-canonical-transfer
-    - aloha-agent-nrt-canonical-transfer
-
-  agent-infra:
-    - agent-service
-    - agent-cli
-    - agent-installer
-
-  shared-lib:
-    - int-aws-hs-service
-    - int-aws-store-config-labels
-
-  canonical:
-    - int-canonical-to-hs
-    - int-canonical-to-fourth
-
-  toast: [int-toast]
-  brink: [int-brink]
-  square: [int-square]
-
-  all: "*"   # Special: includes every repo
+  frontend: [web-app, design-system]
+  payments_api: [billing, ledger]
 ```
 
-## Adding Repos Mid-Work
+A group written as a multi-line block list parses as empty, and a hyphenated group name is never found.
 
-### CLI Command
+## Adding repos mid-work
+
+### CLI command
 
 ```bash
 # Add specific repos
-pan workspace add-repo <workspace-id> <repo-name> [repo-name...]
+pan workspace add-repo <workspace-id> <repo-name> [repo-name...] --project <key>
 
 # Add a named group
-pan workspace add-repo <workspace-id> --group <group-name>
+pan workspace add-repo <workspace-id> --group <group-name> --project <key>
 
-# Add all configured repos
-pan workspace add-repo <workspace-id> --group all
+# Add every configured repo
+pan workspace add-repo <workspace-id> --group all --project <key>
 
 # Register a repository created during the issue
-pan workspace add-repo <workspace-id> --new <git-url>
+pan workspace add-repo <workspace-id> --new <git-url> --project <key>
+
+# Preview what would be added, without changing anything
+pan workspace add-repo <workspace-id> --group <group-name> --project <key> --dry-run
 ```
+
+Always pass `--project <key>`: without it, the command can only resolve the project from `workspace.workspaces_dir`, which not every project sets. `--group` and `--new` cannot be combined; `--new` takes exactly one repository. Every `--group` form, including `--group all`, needs `groups_file` set in the workspace config and that file to exist; without both, pass repo names directly instead.
 
 **Examples:**
 
 ```bash
 # Add specific repos
-pan workspace add-repo int-123 int-provider-a int-canonical-to-hs
+pan workspace add-repo int-123 int-provider-a int-canonical-to-hs --project enterprise-integration
 
 # Add a named group
-pan workspace add-repo int-123 --group simphony
+pan workspace add-repo int-123 --group frontend --project enterprise-integration
 
-# Add all configured repos
-pan workspace add-repo int-123 --group all
+# Add every configured repo
+pan workspace add-repo int-123 --group all --project enterprise-integration
 
 # Register a new deliverable repository before writing code in it
-pan workspace add-repo int-123 --new git@github.com:acme/new-service.git
+pan workspace add-repo int-123 --new git@github.com:acme/new-service.git --project enterprise-integration
 ```
 
-`--new` clones the repository under the project root, appends it to the project's `workspace.repos` configuration, and creates the issue feature worktree inside the active workspace. Review, inspection, verification, and merge then resolve it through the same configured repo set as every other polyrepo member. If a repo name is unknown and `--new` is absent, the command fails without changing the workspace.
+`--new` clones the repository under the project root, appends it to the project's `workspace.repos` configuration, and creates the issue's feature worktree for it inside the active workspace. Review, inspection, verification and merge then treat it like any other configured repo. If a repo name is unknown and `--new` is absent, the command fails without changing the workspace. `add-repo` also works on a polyrepo that is not progressive, with a warning.
 
-Run `--new` before manually cloning or committing to the new repository. The command refuses to adopt an existing workspace checkout on the wrong branch because that would preserve the evidence-blind `main`-branch workflow.
+Run `--new` before manually cloning or committing to the new repository. The command refuses to adopt an existing workspace checkout that is on the wrong branch, so work never silently continues there.
 
 ### Skill: `/workspace-add-repo`
 
@@ -166,65 +140,52 @@ Agents invoke this skill during work when they need repos not yet in the workspa
 The skill:
 1. Reads `repo-map.md` in the meta repo for architecture context
 2. Reads `repo-groups.yaml` for available group names
-3. Adds only the repos needed — agents can always add more later
+3. Adds only the repos needed; agents can always add more later
 
-## Meta Repos (Symlink Behavior)
+## Meta repos and readonly repos
 
-Meta repos (shared skills, architecture docs, team conventions) use `link_type: symlink`:
+A meta repo (shared skills, architecture docs, team conventions) typically uses `link_type: symlink` together with `readonly: true`:
 
 ```yaml
 - name: meta
   path: team-meta
   link_type: symlink   # No worktree, no feature branch
-  readonly: true       # Agent reads but never commits
+  readonly: true       # Work agent's prompt says not to commit here
 ```
 
-**What happens:**
-- A symlink is created: `workspaces/feature-int-123/meta → /project/team-meta`
-- The symlink always reflects the latest state of the actual repo
-- `readonly: true` tells the agent not to commit changes there
-- No git worktree is created — the meta repo stays on `main`
+What happens:
+- A symlink is created, for example `workspaces/feature-int-123/meta → /project/team-meta`, pointing at the project's own checkout of that repo on whatever branch it currently has, not necessarily `main`.
+- The symlink always reflects the current state of that checkout.
+- No git worktree is created, so the repo is never put on a feature branch for this issue.
+- `readonly: true` adds a line to the work agent's prompt listing this repo under repos it should not commit to. Nothing enforces that at the git level; it relies on the agent following the instruction.
 
-**Generated CLAUDE.md includes:**
-```
-## Readonly Repos
-The following repos are symlinked for reference only — do NOT commit changes to them:
-- meta/ — shared skills and architecture docs
-```
+## PR target branch
 
-## PR Target Branch
+The `pr_target` field reaches the work agent through its prompt, which names the PR target branch directly, and through the polyrepo context the agent reads, which lists every repo with its resolved target. The target for a given repo is resolved in this order: the repo's own `pr_target`, then the workspace's `pr_target`, then the repo's `default_branch`, then the workspace's `default_branch`, then `main`.
 
-The `pr_target` field surfaces in agent context so PRs get created against the right branch:
-
-1. **CLAUDE.md injection** — workspace CLAUDE.md includes:
-   ```
-   ## PR Conventions
-   All PRs in this project target the `qa` branch, NOT main/master.
-   ```
-
-2. **Polyrepo context** — `buildPolyrepoContext()` lists repos with their `pr_target` values
-
-### Per-Repo Override
+### Per-repo override
 
 ```yaml
 repos:
   - name: api-service
     path: HS/api-service
     default_branch: master
-    pr_target: qa                    # Override workspace default
+    pr_target: qa                    # Overrides the workspace's pr_target for this repo
 
   - name: legacy-service
     path: HS/legacy-service
     default_branch: main
-    pr_target: main                  # Uses workspace default
+    pr_target: main                  # Also overrides the workspace's pr_target, here to main
 ```
 
-## Migration from Standard Polyrepo
+A repo's own `pr_target` always wins over the workspace's `pr_target`, even when it happens to match the repo's `default_branch`.
 
-Existing polyrepo projects (no `progressive` field) work identically to before:
+## Migration from standard polyrepo
+
+Existing polyrepo projects with no `progressive` field work exactly as before:
 
 ```yaml
-# Old config — still works, all repos checked out
+# Old config, still works, all repos checked out
 projects:
   myn:
     workspace:
@@ -234,20 +195,20 @@ projects:
           path: packages/frontend
         - name: backend
           path: packages/backend
-        # 4 more repos...
+        # more repos...
 ```
 
 To migrate to progressive mode:
 
-1. Add `progressive: true`
-2. Identify `always_include` repos (typically just the meta repo)
+1. Add `progressive: true` together with `always_include`
+2. Identify the `always_include` repos (typically just the meta repo)
 3. Optionally add `groups_file` for team-defined repo groups
 4. Optionally add `pr_target` if your project uses a non-standard PR target branch
-5. Update meta repo `readonly` repos with `link_type: symlink`
+5. Give the meta repo (or any other read-only repo) `link_type: symlink` plus `readonly: true`
 
-## Related Guides
+## Related guides
 
-- [Polyrepo Configuration](/configuration/polyrepo) — Standard polyrepo setup
-- [Meta Repos](/configuration/meta-repos) — Meta repo pattern and team onboarding
-- [Setup Wizard](/configuration/setup-wizard) — Interactive project setup
-- [Issue Tracker Integration](/configuration/issue-trackers) — Rally and other tracker configuration
+- [Polyrepo configuration](/configuration/polyrepo): standard polyrepo setup
+- [Projects](/configuration/projects): registering and configuring a project
+- [Context layers](/configuration/context-layers): how project conventions reach an agent's prompt
+- [Workspaces](/features/workspaces): the workspace concepts this page builds on

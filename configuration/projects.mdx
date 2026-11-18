@@ -744,7 +744,7 @@ Key progressive fields:
 
 | Field | Description |
 |-------|-------------|
-| `progressive` | When `true`, only `always_include` repos created on workspace init |
+| `progressive` | When `true` together with `always_include`, only the `always_include` repos are created on workspace init |
 | `always_include` | Repo names to always include (typically meta/docs repos) |
 | `groups_file` | Path to `repo-groups.yaml` for named repo groups |
 | `pr_target` | Default PR target branch (e.g., `'qa'`) |
@@ -755,7 +755,5 @@ See [Progressive Polyrepo](/configuration/progressive-polyrepo) for full documen
 
 - [Polyrepo Configuration](/configuration/polyrepo) - Multi-repository workspace setup
 - [Progressive Polyrepo](/configuration/progressive-polyrepo) - Large-scale polyrepo with on-demand checkout
-- [Setup Wizard](/configuration/setup-wizard) - Interactive project configuration
-- [Meta Repos](/configuration/meta-repos) - Team conventions and onboarding kits
 - [Issue Tracker Integration](/configuration/issue-trackers) - Connecting to Linear, GitHub, Rally, Jira, etc.
 - [Workspaces](/features/workspaces) - Workspace management

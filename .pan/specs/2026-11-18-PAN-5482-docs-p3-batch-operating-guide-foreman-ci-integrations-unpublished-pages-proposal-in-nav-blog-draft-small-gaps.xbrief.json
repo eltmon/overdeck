@@ -1,0 +1,1302 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-18T21:29:10Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5482: docs: P3 batch (operating guide, foreman, CI integrations, unpublished pages, proposal in nav, blog draft, small gaps)",
+    "updated": "2026-11-18T21:36:24.126Z"
+  },
+  "plan": {
+    "id": "pan-5482",
+    "title": "docs: P3 batch (operating guide, foreman, CI integrations, unpublished pages, proposal in nav, blog draft, small gaps)",
+    "status": "proposed",
+    "uid": "2204a79c-2177-4b8b-9b31-6f785d9b9e06",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-18T21:29:10Z",
+    "updated": "2026-11-18T21:36:24.126Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5482",
+        "label": "PAN-5482",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5467",
+        "label": "PAN-5467 docs overhaul epic",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docs",
+      "mintlify",
+      "docs-overhaul"
+    ],
+    "metadata": {
+      "prd": ".pan/drafts/PAN-5482.md",
+      "sizeJustification": "Docs-only change across 22 Mintlify files (5 new or rewritten pages, 3 deletions, link lines, docs.json). lintProjectedSurface counts each two-segment doc path (guides/operating.mdx, features/swarm.mdx, ...) and each root file (docs.json, .mintignore) as its own subsystem; the real surface is one docs site. The issue bundles seven independent P3 gaps (G15 to G21) into one PR and allows a split only if large; 22 files stays under the 25-file limit, the items are independent and parallel, and they share one docs.json item and one validation item.",
+      "canonicalFilename": "2026-11-18-PAN-5482-docs-p3-batch-operating-guide-foreman-ci-integrations-unpublished-pages-proposal-in-nav-blog-draft-small-gaps.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The 2026-11-17 feature inventory found seven docs gaps: no page on operating Overdeck (emergency stop, disk alerts, reload vs restart, restart hold, crash auto-resume, backups); a Swarm page that describes a removed design and omits the foreman protocol; no CI integrations page; three unpublished polyrepo pages, two of which document a nonexistent pan setup and one with broken examples; a proposal page in Reference (already fixed by PAN-5483); a stale blog draft; and missing docs for Settings, Markdown preview, Docs RAG, pan artifacts and AutoPreso.",
+      "Proposal": "One docs PR: new guides/operating.mdx, integrations/ci.mdx, reference/settings.mdx and configuration/docs-rag.mdx; rewrite features/swarm.mdx around the foreman protocol; rewrite and publish configuration/progressive-polyrepo.mdx; delete configuration/setup-wizard.mdx, configuration/meta-repos.mdx and blog/standing-crew.mdx with redirects; add Markdown preview and AutoPreso sections to existing pages; link everything from related pages; one docs.json item for nav and redirects; one validation item. Every fact comes from the PRD's verified background, re-grepped at implementation time.",
+      "NonGoals": "- No source, CLI help, UI text, config schema or script changes (the bugs found are filed as PAN-5548, PAN-5549, PAN-5550, PAN-5551, PAN-5552, PAN-5553, PAN-5555)\n- No changelog.d entry\n- No documentation of pan artifacts (PAN-5553)\n- No documentation of pan docs disable/enable session or project scope (PAN-5552)\n- No mention of reload --force, flywheel.globally_paused or the unmounted Deacon banner\n- No claim about what swarm mode Auto does\n- No naming of an assignee for CodeRabbit follow-up issues (PAN-5548)\n- No new or reused screenshots; no reuse of images/dashboard/settings-*.png or images/swarm/*.png\n- No fixes to projects.mdx --issue-prefix, the projects.mdx PRD-generation claim, or the polyrepo.mdx .agent-template example (left to PAN-5503)\n- No edits to developer docs (docs/FOREMAN.md, docs/DOCS-RAG.md, docs/MERGE-TRAIN.md)\n- No change to reference/template-conversations.mdx or the Roadmap group (G19 already done by PAN-5483)\n- No rewrite of the blog post for overdeck.ai\n- No docs.json reordering or reformatting beyond single-line inserts\n- No links to pages that do not exist on the branch (voice, permissions, desktop, costs pages from open sibling issues)\n- No mint validate --fix and no mint@latest"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Ship all seven gaps as one PR of 22 files",
+        "rationale": "The issue allows a split only if large; 22 files is under the 25-file plan limit, the items are independent so the work agent can parallelize, and all pages share one docs.json and one validation step."
+      },
+      {
+        "summary": "G16: rewrite features/swarm.mdx and describe both parallel protocols without ranking them",
+        "rationale": "The current page describes a removed dispatcher design. A pan start work agent gets roles/work.md (gated pan swarm protocol) while the pan-foreman skill and docs/FOREMAN.md describe pan spawn workers as the default; the user page describes both rather than resolve an internal inconsistency. PAN-5502 is told the page is covered here."
+      },
+      {
+        "summary": "G18: delete setup-wizard.mdx and meta-repos.mdx and redirect them",
+        "rationale": "pan setup does not exist and the pages copy an unbuilt plan; every true concept has a current home (Add-a-project dialog, pan project, context layers, symlink readonly repos). Mintlify serves pages outside the nav, so redirects keep old URLs working."
+      },
+      {
+        "summary": "G19 needs no work item",
+        "rationale": "PAN-5483 (d0a8e822282) already moved reference/template-conversations into a Roadmap group; the validation item checks it stays there."
+      },
+      {
+        "summary": "G20: delete blog/standing-crew.mdx and redirect to model routing",
+        "rationale": "It presents standing per-tier sessions, a blocking supervisor and tier promotion as shipped, which PAN-5471 established are not; it cites v0.43 and has an unresolved price marker; the overdeck.ai blog lives in another repo, so a rewrite here would publish nowhere."
+      },
+      {
+        "summary": "G21: do not document pan artifacts",
+        "rationale": "share always fails, the printed /s/ link has no route, and no skill or role uses the command; filed as PAN-5553."
+      },
+      {
+        "summary": "G17 page stays at integrations/ci.mdx in a new Integrations group in the Configuration tab",
+        "rationale": "The issue names that path; .mintignore already excludes the code files in integrations/, and a separate group keeps the Configuration list scannable."
+      },
+      {
+        "summary": "G21 placements: reference/settings.mdx, configuration/docs-rag.mdx, and sections in file-explorer and dashboard-views",
+        "rationale": "A Settings reference is reference material; Docs RAG is configured with config keys; Markdown preview and AutoPreso are features of existing pages that already mention them in fragments."
+      }
+    ],
+    "items": [
+      {
+        "id": "operating-guide",
+        "title": "Write the Operating Overdeck guide page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:29:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "guides/operating.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## ' guides/operating.mdx",
+            "grep -nP '[\\x{2013}\\x{2014}]' guides/operating.mdx",
+            "grep -c -- '--force' guides/operating.mdx"
+          ],
+          "expected_outputs": [
+            "prints 7",
+            "prints nothing",
+            "prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-1",
+            "NFR-4",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item W1 (G15). Create guides/operating.mdx with the exact frontmatter and the eight sections in the order the PRD lists, using only the facts in PRD 'Background: verified facts / G15'. Re-grep each anchor first. Follow the emergency-stop conversation-scope implementation checkpoint and its fallback. Do not mention --force, flywheel.globally_paused or DeaconPauseBanner. Say plainly that Overdeck state is not backed up. Describe pan restore per the PAN-5549 re-check rule. No images. Paraphrase the hold refusal message (it names --force) as the PRD says."
+        },
+        "items": [
+          {
+            "id": "operating-guide.ac1",
+            "title": "When `grep -c '^## ' guides/operating.mdx` runs, then it prints 7 and the headings appear in the PRD order ending with `## Get help`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "operating-guide.ac2",
+            "title": "When `grep -n 'flywheel.globally_paused\\|--force\\|DeaconPauseBanner' guides/operating.mdx` runs, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "operating-guide.ac3",
+            "title": "The page contains each of `disk_warn_gb`, `disk_critical_gb`, `pan restart hold`, `pan restart release`, `pan restart approve`, `pan backup list` and `pan restore`, and states that the Overdeck database and ~/.overdeck state are not backed up",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "operating-guide.ac4",
+            "title": "When the edited file is read, then the frontmatter title is `Operating Overdeck: stop, restart, recover and back up` and the description is 50 to 160 characters with no U+2013 or U+2014 character anywhere in the file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "operating-links",
+        "title": "Link the operating guide from Safe shutdown and Troubleshooting",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:29:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/safe-shutdown.mdx",
+            "reference/troubleshooting.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '/guides/operating' features/safe-shutdown.mdx reference/troubleshooting.mdx"
+          ],
+          "expected_outputs": [
+            "1 match in each file"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item W2. Add the PRD's sentence at the end of '## After the restart' in features/safe-shutdown.mdx, and the PRD's approval-wait sentence after the code block in '### Dashboard slow to load' in reference/troubleshooting.mdx. Change nothing else."
+        },
+        "items": [
+          {
+            "id": "operating-links.ac1",
+            "title": "When `grep -c '/guides/operating' features/safe-shutdown.mdx reference/troubleshooting.mdx` runs, then it prints 1 for each file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "operating-links.ac2",
+            "title": "When the edited file is read, then the troubleshooting section `### Dashboard slow to load` names `Restart now` and `pan restart --now` after its code block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "operating-links.ac3",
+            "title": "When `git diff origin/main --numstat -- features/safe-shutdown.mdx reference/troubleshooting.mdx` runs, then each file shows at most 3 added lines and at most 1 deleted line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-page",
+        "title": "Write the CI integrations page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:29:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "integrations/ci.mdx",
+            ".mintignore"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'name: CI' integrations/ci.mdx",
+            "grep -c eltmon integrations/ci.mdx",
+            "git diff origin/main -- .mintignore | grep -E '^[-+]' | grep -vE '^(\\+\\+\\+|---)' | grep -vE '^[-+]#'"
+          ],
+          "expected_outputs": [
+            "at least 1",
+            "0",
+            "prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "FR-11",
+            "FR-12",
+            "FR-13",
+            "NFR-1",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item W3 (G17). Create integrations/ci.mdx with the exact frontmatter and the sections the PRD lists, from PRD 'Background / G17' only. Include the CI trigger YAML block from the PRD. Never name an assignee for the CodeRabbit follow-up issue (PAN-5548). Paraphrase every em-dash UI or feedback string. In .mintignore change only the header comment so the list of docs page directories includes integrations/; change no ignore pattern."
+        },
+        "items": [
+          {
+            "id": "ci-page.ac1",
+            "title": "The page contains `tests: ci`, `dagger.cloud`, `name: CI`, `uat/**`, `pan semgrep ci-setup` and `Issues: Read and write`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-page.ac2",
+            "title": "When `grep -c eltmon integrations/ci.mdx` runs, then it prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-page.ac3",
+            "title": "When the edited file is read, then the page states that Overdeck has no Dagger config key or token and that a Dagger project must set `verification.tests: ci` itself",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-page.ac4",
+            "title": "When `git diff origin/main -- .mintignore` runs, then only comment lines (starting with `#`) change and the comment names `integrations/`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-links",
+        "title": "Link the CI integrations page from four related pages",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:29:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/semgrep.mdx",
+            "features/merge-batches.mdx",
+            "configuration/auto-merge.mdx",
+            "features/issue-pipeline.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '/integrations/ci' configuration/semgrep.mdx features/merge-batches.mdx configuration/auto-merge.mdx features/issue-pipeline.mdx"
+          ],
+          "expected_outputs": [
+            "1 match in each file"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item W4. Add exactly the one sentence or bullet the PRD gives to each of the four files, at the named place. Change nothing else."
+        },
+        "items": [
+          {
+            "id": "ci-links.ac1",
+            "title": "When `grep -c '/integrations/ci' configuration/semgrep.mdx features/merge-batches.mdx configuration/auto-merge.mdx features/issue-pipeline.mdx` runs, then it prints 1 for each file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-links.ac2",
+            "title": "When the edited file is read, then features/merge-batches.mdx links `/integrations/ci#merge-train-batches-need-a-ci-workflow`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-links.ac3",
+            "title": "When `git diff origin/main --numstat` runs on the four files, then each shows at most 2 added lines and at most 1 deleted line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "swarm-rewrite",
+        "title": "Rewrite the Swarm page around the foreman protocol",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:29:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/swarm.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'api/swarm\\|swarmRuntime\\|images/swarm\\|SWARM.md' features/swarm.mdx",
+            "grep -c '^## CLI$' features/swarm.mdx"
+          ],
+          "expected_outputs": [
+            "prints nothing",
+            "prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15",
+            "FR-16",
+            "NFR-1",
+            "NFR-4",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item W5 (G16). Replace the whole body of features/swarm.mdx with the sections the PRD lists, from PRD 'Background / G16' only. Describe foreman workers (pan-foreman skill: subagents or pan spawn panes) and the gated slot swarm (pan swarm, from roles/work.md) as the two ways a work agent runs parallel items, without calling either the default. Keep a '## CLI' heading that links /cli/pipeline-commands#pan-swarm and #pan-spawn. Remove every removed-design claim, all images/swarm references and the docs/SWARM.md link. Do not claim what swarm mode Auto or Always changes at runtime, and do not claim pan swarm changes the mode. The whole file must be free of U+2013 and U+2014."
+        },
+        "items": [
+          {
+            "id": "swarm-rewrite.ac1",
+            "title": "When `grep -n 'api/swarm\\|swarmRuntime\\|images/swarm\\|SWARM.md\\|--dry-run\\|--max-slots' features/swarm.mdx` runs, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-rewrite.ac2",
+            "title": "When `grep -c '^## CLI$' features/swarm.mdx` runs, then it prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-rewrite.ac3",
+            "title": "The page describes both foreman workers (item worktree `.swarm/<item>`, `pan spawn`, per-item `Item:` commits, the foreman runs `pan task done` and one `pan done`) and the gated slot swarm (`pan swarm`, slot branch `feature/<issue>-slot-<N>`), and contains neither the word `default` applied to either protocol nor a claim about what mode `Auto` or `Always` does",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-rewrite.ac4",
+            "title": "The page links `/cli/pipeline-commands#pan-swarm` and `/cli/pipeline-commands#pan-spawn`, and `grep -cP '[\\x{2013}\\x{2014}]' features/swarm.mdx` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "progressive-polyrepo",
+        "title": "Rewrite the progressive polyrepo page so every example works",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:29:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/progressive-polyrepo.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'setup-wizard\\|meta-repos' configuration/progressive-polyrepo.mdx"
+          ],
+          "expected_outputs": [
+            "prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-17",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item W6 (G18). Rewrite configuration/progressive-polyrepo.mdx with the new frontmatter and every 'Required change' the PRD lists: progressive needs always_include, inline-list repo-groups example with underscore names, --project on every add-repo example, --dry-run listed, prompt text instead of CLAUDE.md sections, the PR target precedence, symlinks follow the checkout's branch, links to setup-wizard/meta-repos removed. Follow the PAN-5555 re-check rule."
+        },
+        "items": [
+          {
+            "id": "progressive-polyrepo.ac1",
+            "title": "When `grep -n 'setup-wizard\\|meta-repos\\|## Readonly Repos\\|## PR Conventions' configuration/progressive-polyrepo.mdx` runs, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "progressive-polyrepo.ac2",
+            "title": "When `awk '/^```/{f=!f;next} f' configuration/progressive-polyrepo.mdx | grep 'pan workspace add-repo' | grep -v -- '--project'` runs, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "progressive-polyrepo.ac3",
+            "title": "When the edited file is read, then the repo-groups YAML example uses only `name: [a, b]` inline lists with group names made of letters, digits and underscores, and the page states that `progressive: true` needs `always_include`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "progressive-polyrepo.ac4",
+            "title": "The page lists the PR target precedence (repo pr_target, workspace pr_target, repo default_branch, workspace default_branch, main), and `grep -cP '[\\x{2013}\\x{2014}]' configuration/progressive-polyrepo.mdx` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delete-wizard-meta",
+        "title": "Delete the setup-wizard and meta-repos pages",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:29:10Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/setup-wizard.mdx",
+            "configuration/meta-repos.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test ! -e configuration/setup-wizard.mdx && test ! -e configuration/meta-repos.mdx && echo gone"
+          ],
+          "expected_outputs": [
+            "gone"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-18"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item W7 (G18). git rm configuration/setup-wizard.mdx and configuration/meta-repos.mdx. Redirects are added by the docs.json item."
+        },
+        "items": [
+          {
+            "id": "delete-wizard-meta.ac1",
+            "title": "When `test -e configuration/setup-wizard.mdx || test -e configuration/meta-repos.mdx` runs, then it exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-wizard-meta.ac2",
+            "title": "When `git diff origin/main --name-status -- configuration/setup-wizard.mdx configuration/meta-repos.mdx` runs, then it prints a `D` line for each file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "polyrepo-inbound-links",
+        "title": "Fix the links into the polyrepo pages from Projects and Polyrepo",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:29:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/projects.mdx",
+            "configuration/polyrepo.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'setup-wizard\\|meta-repos' configuration/projects.mdx configuration/polyrepo.mdx"
+          ],
+          "expected_outputs": [
+            "prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-19",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item W8 (G18). In configuration/projects.mdx, make the Progressive Workspaces field table say progressive needs always_include and delete the Setup Wizard and Meta Repos bullets from Related Guides. In configuration/polyrepo.mdx replace the whole line `- **Cleaner meta repos** — symlinked as read-only, no feature branches` with `- **Cleaner meta repos:** symlinked and marked readonly for agents, with no feature branches`. Do not fix the PAN-5503 items listed in the PRD."
+        },
+        "items": [
+          {
+            "id": "polyrepo-inbound-links.ac1",
+            "title": "When `grep -n 'setup-wizard\\|meta-repos' configuration/projects.mdx configuration/polyrepo.mdx` runs, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "polyrepo-inbound-links.ac2",
+            "title": "When the edited file is read, then configuration/projects.mdx `## Related Guides` still links `/configuration/progressive-polyrepo` and `/configuration/polyrepo`, and its progressive field table states that `progressive` needs `always_include`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "polyrepo-inbound-links.ac3",
+            "title": "When `grep -n 'Cleaner meta repos' configuration/polyrepo.mdx` runs, then it prints the replacement line with no U+2014 character, and `git diff origin/main --numstat -- configuration/polyrepo.mdx` shows 1 added and 1 deleted line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "blog-delete",
+        "title": "Delete the Standing Crew blog draft",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:29:10Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "blog/standing-crew.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test ! -e blog/standing-crew.mdx && echo gone"
+          ],
+          "expected_outputs": [
+            "gone"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-20"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item W9 (G20). git rm blog/standing-crew.mdx. The redirect is added by the docs.json item. Put the PRD's reasons (claims PAN-5471 ruled out, v0.43, VERIFY-PRICE) in the commit body."
+        },
+        "items": [
+          {
+            "id": "blog-delete.ac1",
+            "title": "When `test -e blog/standing-crew.mdx` runs, then it exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "blog-delete.ac2",
+            "title": "The commit that deletes it carries a body naming the unshipped claims (standing per-tier sessions, a blocking supervisor, tier promotion) as the reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "autopreso-section",
+        "title": "Add an AutoPreso section to the Dashboard views page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:29:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/dashboard-views.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## AutoPreso$' features/dashboard-views.mdx",
+            "git diff origin/main...HEAD -U0 -- 'features/dashboard-views.mdx' | grep '^+' | grep -P '[\\x{2013}\\x{2014}]'"
+          ],
+          "expected_outputs": [
+            "prints 1",
+            "prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-24",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item W10 (G21). Add '## AutoPreso' after '## Experimental features' and before '## Get help' in features/dashboard-views.mdx, using PRD 'Background / G21 / AutoPreso'. Change no other section."
+        },
+        "items": [
+          {
+            "id": "autopreso-section.ac1",
+            "title": "When `grep -c '^## AutoPreso$' features/dashboard-views.mdx` runs, then it prints 1 and the heading sits between `## Experimental features` and `## Get help`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autopreso-section.ac2",
+            "title": "When the edited file is read, then the section names `Go live`, `Start mic`, `STT provider` and `AutoPreso model`, links `#experimental-features`, and states that AutoPreso does not speak",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autopreso-section.ac3",
+            "title": "When the dash check runs on the added lines of features/dashboard-views.mdx, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-reference",
+        "title": "Write the Settings reference page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:29:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/settings.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^| ' reference/settings.mdx"
+          ],
+          "expected_outputs": [
+            "prints 31"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-21",
+            "NFR-1",
+            "NFR-5",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item W11 (G21). Create reference/settings.mdx with the exact frontmatter and one table of the 29 Settings sections in the PRD order (Section | What it controls | Where it is saved | More). Link only pages that exist on the branch (rule 4: check configuration/voice.mdx and any desktop page with ls first). Link the Voice row to /features/dashboard-views#autopreso. No screenshot."
+        },
+        "items": [
+          {
+            "id": "settings-reference.ac1",
+            "title": "When the table body rows of reference/settings.mdx are counted (lines starting with `| ` minus the 2 header lines), then the count is 29 and the first row is Model Routing and the last is Experimental",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-reference.ac2",
+            "title": "When `grep -c 'settings-light.png\\|settings-dark.png' reference/settings.mdx` runs, then it prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-reference.ac3",
+            "title": "Every `](/` link target in the page resolves to an existing `.mdx` file in the branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-reference.ac4",
+            "title": "When the edited file is read, then the page states that settings save automatically and that the Experimental switch hides dashboard views, not Settings sections",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-link",
+        "title": "Link the Settings reference from the Dashboard views Settings section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:29:10Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/dashboard-views.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '/reference/settings' features/dashboard-views.mdx"
+          ],
+          "expected_outputs": [
+            "prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-21",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item W12. Append the PRD's one sentence to '## Settings' in features/dashboard-views.mdx. Change nothing else."
+        },
+        "items": [
+          {
+            "id": "settings-link.ac1",
+            "title": "When `grep -c '/reference/settings' features/dashboard-views.mdx` runs, then it prints 1 and the match is inside `## Settings`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-link.ac2",
+            "title": "When `git show --numstat` runs on this item's commit, then features/dashboard-views.mdx shows at most 2 added lines and at most 1 deleted line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "markdown-preview",
+        "title": "Add a Markdown preview section to the File explorer page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:29:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/file-explorer.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## Markdown preview$' features/file-explorer.mdx"
+          ],
+          "expected_outputs": [
+            "prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-22",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item W13 (G21). Add '## Markdown preview' after '## Editing files' in features/file-explorer.mdx. Move (do not copy) the relative-links and front-matter paragraphs into it, add the missing facts from PRD 'Background / G21 / Markdown preview', and link #markdown-preview from the Changes and Editing files mentions."
+        },
+        "items": [
+          {
+            "id": "markdown-preview.ac1",
+            "title": "When `grep -c '^## Markdown preview$' features/file-explorer.mdx` runs, then it prints 1 and the heading sits between `## Editing files` and `## When a file changes on disk`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "markdown-preview.ac2",
+            "title": "When `grep -c 'A file that starts with YAML front matter' features/file-explorer.mdx` runs, then it prints at most 1, and the relative-links paragraph appears only inside `## Markdown preview`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "markdown-preview.ac3",
+            "title": "When the edited file is read, then the section names `.markdown`, the `Diff` / `Preview` switch, `Open file`, the `Edit` / `Preview` code-pane switch and `Link target not found`, and the Changes section links `#markdown-preview`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-rag-page",
+        "title": "Write the Docs RAG configuration page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:29:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/docs-rag.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'promptInjectionEnabled\\|cliEnabled\\|--scope project' configuration/docs-rag.mdx"
+          ],
+          "expected_outputs": [
+            "prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-23",
+            "NFR-1",
+            "NFR-4",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item W14 (G21). Create configuration/docs-rag.mdx with the exact frontmatter and sections the PRD lists, from PRD 'Background / G21 / Docs RAG'. Use snake_case YAML keys only. Document only --scope global for pan docs disable/enable (PAN-5552 re-check rule). Present pan docs reindex as a source-checkout command."
+        },
+        "items": [
+          {
+            "id": "docs-rag-page.ac1",
+            "title": "When `grep -n 'promptInjectionEnabled\\|cliEnabled\\|--scope session\\|--scope project' configuration/docs-rag.mdx` runs, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-rag-page.ac2",
+            "title": "The page contains `docs.enabled`, `docs.prompt_injection`, `pan docs disable --scope global` and `~/.overdeck/docs/index.sqlite`, and lists the nine trigger words",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-rag-page.ac3",
+            "title": "When the edited file is read, then the page states that Docs RAG indexes Overdeck's own docs, skills and rules, not the user's project, and that PRDs are off by default",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-rag-links",
+        "title": "Fix and link the pan docs CLI section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:29:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/memory-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '/configuration/docs-rag' cli/memory-commands.mdx"
+          ],
+          "expected_outputs": [
+            "prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-23",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item W15. In the '## pan docs' section of cli/memory-commands.mdx only: say PRDs are indexed only when turned on, change the two --scope project example lines to --scope global, and append the PRD's link sentence to /configuration/docs-rag."
+        },
+        "items": [
+          {
+            "id": "docs-rag-links.ac1",
+            "title": "When `grep -c '/configuration/docs-rag' cli/memory-commands.mdx` runs, then it prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-rag-links.ac2",
+            "title": "When `sed -n '/^## pan docs/,/^## pan briefing/p' cli/memory-commands.mdx | grep -c -- '--scope project'` runs, then the code example block contains no `--scope project` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-rag-links.ac3",
+            "title": "When `git diff origin/main -- cli/memory-commands.mdx` runs, then every changed line is inside the `## pan docs` section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "nav-redirects",
+        "title": "Add the new pages and three redirects to docs.json",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:29:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "docs lint passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-25",
+            "FR-17",
+            "FR-18",
+            "FR-20",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item W16. Single-line inserts only: guides/operating first in Guides; configuration/docs-rag after configuration/context-layers; configuration/progressive-polyrepo after configuration/polyrepo; a new 'Integrations' group with integrations/ci after the 'Configuration' group in the Configuration tab; reference/settings after reference/architecture; redirects /configuration/setup-wizard -> /configuration/projects, /configuration/meta-repos -> /configuration/polyrepo, /blog/standing-crew -> /configuration/model-routing. Do not reorder or reformat anything else; leave the Roadmap group unchanged."
+        },
+        "items": [
+          {
+            "id": "nav-redirects.ac1",
+            "title": "When `node -e \"JSON.parse(require('fs').readFileSync('docs.json','utf8'))\"` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "nav-redirects.ac2",
+            "title": "When `npm run lint:docs` runs, then it exits 0 and prints `docs lint passed`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "nav-redirects.ac3",
+            "title": "When the edited file is read, then docs.json lists `guides/operating`, `integrations/ci`, `configuration/progressive-polyrepo`, `configuration/docs-rag` and `reference/settings`, and its Roadmap group still lists `reference/template-conversations`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "nav-redirects.ac4",
+            "title": "docs.json `redirects` contains `/configuration/setup-wizard`, `/configuration/meta-repos` and `/blog/standing-crew` sources with the PRD destinations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "validate-and-record",
+        "title": "Run the Mintlify, dash and scope checks and record them",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T21:29:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs.json"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx -y mint@4.3.49 validate",
+            "npx -y mint@4.3.49 broken-links",
+            "git diff origin/main...HEAD -U0 -- '*.mdx' docs.json | grep '^+' | grep -P '[\\x{2013}\\x{2014}]'",
+            "git diff --name-only origin/main...HEAD | grep -E '^(src|scripts|tests|packages|apps|roles|changelog.d)/'",
+            "grep -rn 'setup-wizard\\|meta-repos\\|blog/standing-crew' --include=*.mdx . | grep -v '^./workspaces/' | grep -v node_modules",
+            "for f in $(git diff --name-only --diff-filter=AM origin/main...HEAD -- '*.mdx'); do sed -n '1,/^---$/{p}' \"$f\" | sed -n '2,20p' | grep -E '^(title|sidebarTitle|description):' | grep -P '[\\x{2013}\\x{2014}]' && echo \"$f\"; done"
+          ],
+          "expected_outputs": [
+            "exits 0",
+            "no broken links found",
+            "prints nothing",
+            "prints nothing",
+            "prints nothing",
+            "prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item W17. Run npx -y mint@4.3.49 validate and broken-links, npm run lint:docs, the PRD dash check, scope check, repo-wide deleted-page link check and frontmatter dash check. Never run mint validate --fix or mint@latest. Fix failures only in files this PR touches (commit under the owning item's trailer); report failures in untouched files. Record exit codes and final lines in an allow-empty commit 'chore: record docs site validation for PAN-5482' with this item's Item: trailers. Paste both mint outputs under '## Mintlify checks' and a '## Found, not fixed' list in the PR body."
+        },
+        "items": [
+          {
+            "id": "validate-and-record.ac1",
+            "title": "When `npx -y mint@4.3.49 validate` runs on the branch, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-record.ac2",
+            "title": "When `npx -y mint@4.3.49 broken-links` runs on the branch, then it exits 0 and reports no broken link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-record.ac3",
+            "title": "When the PRD dash check runs over added lines in `*.mdx` and docs.json, and the frontmatter check runs over every added or modified `.mdx` file, then both print nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-record.ac4",
+            "title": "When the scope check and the repo-wide `setup-wizard|meta-repos|blog/standing-crew` link grep run, then both print nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "operating-guide",
+        "to": "operating-links",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-page",
+        "to": "ci-links",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-rag-page",
+        "to": "docs-rag-links",
+        "type": "blocks"
+      },
+      {
+        "from": "autopreso-section",
+        "to": "settings-reference",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-reference",
+        "to": "settings-link",
+        "type": "blocks"
+      },
+      {
+        "from": "autopreso-section",
+        "to": "settings-link",
+        "type": "blocks"
+      },
+      {
+        "from": "operating-guide",
+        "to": "nav-redirects",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-page",
+        "to": "nav-redirects",
+        "type": "blocks"
+      },
+      {
+        "from": "progressive-polyrepo",
+        "to": "nav-redirects",
+        "type": "blocks"
+      },
+      {
+        "from": "delete-wizard-meta",
+        "to": "nav-redirects",
+        "type": "blocks"
+      },
+      {
+        "from": "blog-delete",
+        "to": "nav-redirects",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-reference",
+        "to": "nav-redirects",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-rag-page",
+        "to": "nav-redirects",
+        "type": "blocks"
+      },
+      {
+        "from": "operating-guide",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "operating-links",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-page",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-links",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "swarm-rewrite",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "progressive-polyrepo",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "delete-wizard-meta",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "polyrepo-inbound-links",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "blog-delete",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "autopreso-section",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-reference",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-link",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "markdown-preview",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-rag-page",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-rag-links",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "nav-redirects",
+        "to": "validate-and-record",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
