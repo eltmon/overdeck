@@ -27,6 +27,7 @@ Automatic batches need batch CI: a GitHub Actions workflow named `CI` that runs
 on pushes to `uat/**` branches. Without it, a batch waits at most 10 minutes for
 a CI run, then dissolves, its PRs merge one at a time, and the activity feed
 says batching needs a `uat/**` CI trigger. Batching is tried again a day later.
+See [CI integrations](/integrations/ci#merge-train-batches-need-a-ci-workflow) for a sample workflow.
 </Note>
 
 ## What you see

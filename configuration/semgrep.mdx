@@ -148,6 +148,7 @@ That gate blocks on any finding in the whole tree, and it is not diff-scoped.
 
 `pan semgrep ci-setup <project>` opens a pull request that adds `.github/workflows/semgrep.yml`
 to the project's GitHub repository. Overdeck never rewrites the file; delete it to stop CI scans.
+See [CI integrations](/integrations/ci) for the other CI systems Overdeck reads.
 
 ```bash
 pan semgrep ci-setup myapp --dry-run       # print the target and the workflow; change nothing
