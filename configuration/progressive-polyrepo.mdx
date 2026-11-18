@@ -107,7 +107,7 @@ pan workspace add-repo <workspace-id> --new <git-url> --project <key>
 pan workspace add-repo <workspace-id> --group <group-name> --project <key> --dry-run
 ```
 
-Always pass `--project <key>`: without it, the command can only resolve the project from `workspace.workspaces_dir`, which not every project sets. `--group` and `--new` cannot be combined; `--new` takes exactly one repository.
+Always pass `--project <key>`: without it, the command can only resolve the project from `workspace.workspaces_dir`, which not every project sets. `--group` and `--new` cannot be combined; `--new` takes exactly one repository. Every `--group` form, including `--group all`, needs `groups_file` set in the workspace config and that file to exist; without both, pass repo names directly instead.
 
 **Examples:**
 

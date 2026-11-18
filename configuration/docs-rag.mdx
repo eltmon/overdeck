@@ -14,7 +14,7 @@ The index lives at `~/.overdeck/docs/index.sqlite`, and a prebuilt copy ships as
 
 ## When snippets are added to a prompt
 
-Injection is on by default. When a prompt mentions one of nine trigger words, in any case, Docs RAG adds a block of at most 5 snippets and 3000 tokens to the prompt, at most once every 10 turns:
+Injection is on by default. The trigger is nine case-insensitive patterns, matched as a substring anywhere in the prompt rather than as a whole word: a prompt containing "Japan" matches the `pan` pattern even though it does not contain the word `pan`. When one matches, Docs RAG adds a block of at most 5 snippets and 3000 tokens to the prompt, at most once every 10 turns:
 
 ```text
 pan, overdeck, cloister, deacon, workspace, specialist, harness, vbrief, workhorse
@@ -29,7 +29,9 @@ pan docs query "how does the merge train work"
 pan docs reindex
 ```
 
-`pan docs reindex` rebuilds the index from this package's own `docs/` folder. That folder does not ship in the published npm package, so reindexing only works from a source checkout of Overdeck, not from an installed copy.
+`pan docs reindex` rebuilds the index from this package's own `docs/` folder, using the default corpus and embedding settings rather than your `docs.*` configuration: it does not read `docs.corpus.prds` or any other `docs.corpus.*` key, so turning PRDs on in `config.yaml` does not bring them into a reindex.
+
+That `docs/` folder, `CLAUDE.md` and `.claude/rules/` do not ship in the published npm package. Running `pan docs reindex` from an installed copy does not fail or warn: it silently rebuilds from whatever sources are still present (Overdeck's bundled skills and rules) and replaces your existing index with that smaller one. Only run `pan docs reindex` from a source checkout of Overdeck.
 
 ## Turn it off
 

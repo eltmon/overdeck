@@ -32,7 +32,7 @@ A separate, fixed 10 GiB disk floor refuses new workspace starts, workspace stac
 
 ## pan reload or pan restart
 
-Use `pan reload` to ship new code: it builds from `origin/main`, checks the build, waits for restart approval, then restarts. If the build or health check fails, the old dashboard keeps running. `pan reload` refuses during a safe-shutdown drain and while a restart hold is active.
+Use `pan reload` to ship new code: it builds from `origin/main`, checks the build, waits for restart approval, then restarts. If the build check fails, the old dashboard keeps running untouched. If it passes, the old dashboard stops before the new one starts; if the new dashboard then fails its own startup health check, the old one is not restored, and the new one is either already gone or left running for inspection. `pan reload` refuses during a safe-shutdown drain and while a restart hold is active.
 
 Use `pan restart` to relaunch the build you already have: it never builds. It can target just the dashboard (the default), CLIProxy, Traefik, or the full stack. Only the dashboard and full scopes wait for restart approval and obey a restart hold.
 
@@ -70,7 +70,7 @@ To resume things by hand, see `pan resume` and `pan recover` in [Agent commands]
 
 ## Backups
 
-Overdeck backs up only the `~/.claude/skills`, `~/.claude/commands` and `~/.claude/agents` folders that `pan sync` writes. **Nothing backs up the Overdeck database or the rest of `~/.overdeck` state.**
+Overdeck backs up the `~/.claude/skills`, `~/.claude/commands` and `~/.claude/agents` folders that `pan sync` writes. `pan context detach --apply` backs up each native `CLAUDE.md` or `AGENTS.md` file before it removes a managed region from it. **Nothing backs up the Overdeck database or the rest of `~/.overdeck` state.**
 
 `pan sync` makes a backup of those folders first, unless you have turned that off in `~/.overdeck/config.toml`, and keeps a configurable number of the newest backups. You can also trigger a backup without syncing, and manage backups directly:
 
