@@ -118,6 +118,28 @@ A strike PR still gets one automatic quick review per head. If it approves, the 
 
 `pan done --strike` only checks that the strike branch is already contained in `origin/main`; it opens no PR of its own.
 
+## After merge: close-out
+
+Merging a PR does not close the tracker issue. Overdeck's post-merge lifecycle frees agents, tears down Docker, cleans labels and marks the issue awaiting close-out; closing the issue is a separate, final step.
+
+`pan close <id>` verifies, cleans up, and closes the issue on the tracker. It checks nine Definition of Done rows:
+
+1. Review passed
+2. Tests passed
+3. Verification green on the branch
+4. Merged to main
+5. Post-merge lifecycle ran
+6. Verified on main
+7. Version strings propagated
+8. Deployed
+9. Close-out teardown verified
+
+Rows 1 through 8 each take an `--accept-*` flag (for example `--accept-review`, `--accept-tests`) that records an explicit override in the close-out record when you need to accept a missed row. Row 9 cannot be overridden: close-out teardown has to actually happen.
+
+The dashboard's `Close Out` button asks for confirmation and runs the same close-out. Automatic close-out was removed: the old `close_out.auto` setting is inert.
+
+Once an issue is closed and its branch merged, Overdeck's closed-issue reaper deletes `workspaces/feature-<id>/` and the feature branch, local and remote. Keep nothing you still need inside that workspace once you close the issue.
+
 ## Get help
 
 Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file an issue on [GitHub Issues](https://github.com/eltmon/overdeck/issues).
