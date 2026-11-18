@@ -22,6 +22,7 @@ import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { appendPipelineEntry, readPipelineJournal } from './pipeline-journal.js';
+import { deriveReviewRunHead8 } from './review-run-head.js';
 import { AGENTS_DIR, packageRoot } from '../paths.js';
 import type { RuntimeName } from '../runtimes/types.js';
 
@@ -394,7 +395,6 @@ async function staleReviewRunReason(
   runId: string,
   checkVerdict: boolean,
 ): Promise<string | null> {
-  const { deriveReviewRunHead8 } = await import('./review-agent.js');
   const head8 = await deriveReviewRunHead8(issueId, workspace);
   if (head8 !== 'unknown' && runId !== `agent-${issueId.toLowerCase()}-review-${head8}`) {
     return `it reviews an earlier head, and the workspace head is now ${head8}`;
