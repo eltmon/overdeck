@@ -1,14 +1,16 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-18T23:04:31.511409Z · model: claude-opus-5-5 · open: 944_
+_Last sequenced: 2026-11-18T23:54:11.173212Z · model: claude-opus-5-5 · open: 945_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-5541 | M | high | ok |  |  | Needs-you click on a request_secret lands on a conversation with no secret input; parked agents can't get secrets answered. |
+| 2 | PAN-5564 | XS | high | ok |  |  | Flaky changes-view test: openChanges resolves before the DiffEditor mock's onMount effect; test-only wait fix. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
+| 5 | PAN-5567 | S | high | ok |  |  | Codex app-server threads hardcode on-request/workspace-write, so Read-only and Full access settings never apply. |
 | 6 | PAN-5489 | S | high | ok |  |  | pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause. |
+| 7 | PAN-5566 | M | high | ok |  |  | UI/help text says Auto blocks destructive calls but the hook approves all; repo .pan.yaml can set bypass mode. |
 | 8 | PAN-5385 | S | critical | ok |  |  | Anywhere remote access is down for trickle clients: machine drops ICE candidates sent before session registers; small server fix |
 | 10 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 10 | PAN-5523 | S | high | ok |  |  | pan conversations move/heal send raw fetch with no token, so routes refuse with Missing origin; same fix pattern as in-pipeline PAN-5516. |
@@ -474,7 +476,6 @@ _Last sequenced: 2026-11-18T23:04:31.511409Z · model: claude-opus-5-5 · open: 
 | 448 | PAN-5264 | M | medium | ok |  |  | Attribute the app-rest GitHub caller (1,422 untraced App REST calls/hour), then cut the largest path. |
 | 449 | PAN-5340 | S | medium | ok |  |  | A Preview link to another Markdown file should open it in Preview, not Edit. Follows PAN-5337. |
 | 450 | PAN-5440 | L | medium | ok |  |  | React Compiler burn-down for all remaining components: 78 skips in 42 files, 288 memo sites. Largest group; do last. |
-| 450 | PAN-5473 | S | medium | ok |  |  | Docs P2: features/desktop-app.mdx, downloads, how pan up finds the app, tray. Supersedes PAN-2073. Lane A item 6. |
 | 451 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
 | 451 | PAN-5557 | S | medium | ok |  |  | pan up on Linux treats the overdeck CLI in ~/.local/bin as the desktop app, prints a false launch and skips its own startup path. |
 | 452 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
@@ -482,8 +483,8 @@ _Last sequenced: 2026-11-18T23:04:31.511409Z · model: claude-opus-5-5 · open: 
 | 452 | PAN-5556 | M | medium | ok |  |  | Desktop app tray status, six notification switches, Open Workspace menu and Linux launch-at-login are dead controls; fix or hide. |
 | 453 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
 | 454 | PAN-5322 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5319: unguarded identifier.toUpperCase(), modal focus, needs-you rows that open nothing. |
-| 454 | PAN-5477 | M | medium | ok |  |  | Docs P2: configuration/permissions.mdx, auto-approve hook, --yolo, operator-only labels, git shim. Lane A item 8. |
 | 455 | PAN-5317 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5127: route live Codex app-server sends correctly; no replayable mail for keyed sends. |
+| 455 | PAN-5565 | XS | medium | ok |  |  | CodeRabbit follow-up on merged PAN-5541: close only the answered request; keep seeded queries fresh in a test. |
 | 456 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
 | 456 | PAN-5479 | S | medium | ok |  |  | Docs P2: merge the unpublished workspaces config page into features/workspaces and memory pages. Lane A item 9. |
 | 456 | PAN-5560 | S | medium | ok |  |  | pan docs reindex ignores docs.* config and, from an npm install, silently overwrites a full index with a partial corpus. |
@@ -493,9 +494,9 @@ _Last sequenced: 2026-11-18T23:04:31.511409Z · model: claude-opus-5-5 · open: 
 | 459 | PAN-2469 | S | medium | ok |  |  | Assembly landed (mergeReadySlots + finalization); remaining: alarm when all slots merged but no review requested. Swarm dormant. |
 | 459 | PAN-5500 | L | medium | ok |  |  | Docs audit: line-by-line accuracy check of the 21 Overdeck Anywhere pages against main. Lane A item 11. |
 | 460 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
-| 460 | PAN-5502 | L | medium | ok |  | PAN-5479, PAN-5482 | Docs audit: line-by-line accuracy check of the 14 Features pages; waits on PAN-5479/5482. |
+| 460 | PAN-5502 | L | medium | ok |  | PAN-5479 | Docs audit: line-by-line accuracy check of the 14 Features pages; waits on PAN-5479/5482. |
 | 461 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
-| 461 | PAN-5504 | L | medium | ok |  | PAN-5482 | Docs audit: line-by-line accuracy check of the 16 Guides and Reference pages; waits on PAN-5482. Lane A item 13. |
+| 461 | PAN-5504 | L | medium | ok |  |  | Docs audit: line-by-line accuracy check of the 16 Guides and Reference pages; waits on PAN-5482. Lane A item 13. |
 | 462 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
 | 463 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
 | 464 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
@@ -649,7 +650,6 @@ _Last sequenced: 2026-11-18T23:04:31.511409Z · model: claude-opus-5-5 · open: 
 | 608 | PAN-1550 | M | medium | ok |  |  | BrowserPane half only; the FilesPane half is superseded by the PAN-5183 file explorer, whose children have all closed. |
 | 609 | PAN-1545 | XS | medium | ok |  |  | New Terminal button |
 | 610 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
-| 610 | PAN-5482 | L | medium | ok |  |  | Docs P3 batch: operating guide, foreman, CI integrations, unpublished pages, proposal in nav, blog draft. Lane B item 7. |
 | 611 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
 | 611 | PAN-5503 | L | medium | ok |  |  | Docs audit: line-by-line accuracy check of the 21 Configuration pages; PAN-5472 merged, so it is unblocked. |
 | 612 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
@@ -949,12 +949,13 @@ _Last sequenced: 2026-11-18T23:04:31.511409Z · model: claude-opus-5-5 · open: 
 | 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
 | 903 | PAN-5444 | XS | low | ok |  |  | Two Minor CodeRabbit findings left on merged PR #5443: semgrep repo rules resolve from event cwd; hook tests not isolated from Docker. |
 | 904 | PAN-5405 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus. |
+| 905 | PAN-5541 | M | low | ok |  |  | Merged via PR #5561; awaiting verification on main and close-out. Nothing left to pick up. |
 
 ## Rationale detail
 
-### PAN-5541 (rank 1)
+### PAN-5564 (rank 2)
 
-New in-pipeline substrate bug: the only secret/machine-link input (AgentRequestCard) lives in a sidebar tab no Needs-you path opens, so any agent parked on request_secret or link_machine stays blocked until the operator finds it. In pipeline, so it is pinned in a free top slot rather than ranked against the queue.
+New in-pipeline substrate flake that turned main CI red on a docs-only merge; pinned in a free top slot rather than ranked against the queue.
 
 ### PAN-5013 (rank 3)
 
@@ -964,9 +965,17 @@ Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat 
 
 New issue, sibling of the just-merged front-matter fix PAN-5427, and already queued in the active workflow-redesign order book, so it takes free rank 4 behind critical PAN-5013. It is a small, well-specified MarkdownTab change with named tests, a sanitising allow-list and a concrete acceptance check on the README preview; its parent epic PAN-5284 is closed, so it carries no contains edge.
 
+### PAN-5567 (rank 5)
+
+New bug: on the default Codex transport the permission setting is silently ignored, so a Read-only choice still lets agents write. A safety setting that does nothing ranks with the top substrate fixes; the fix is small and well specified.
+
 ### PAN-5489 (rank 6)
 
 New pipeline-path bug: the CLI result depends on the caller's environment, so Flywheel-launched planning can fail and strand workspaces; it outranks routine work.
+
+### PAN-5566 (rank 7)
+
+New bug: operators choose Auto believing it gates destructive calls, and a project .pan.yaml can switch agents to bypass/full-access. Item 6 needs a decision (strip the keys or document); the text fixes are mechanical.
 
 ### PAN-5385 (rank 8)
 
@@ -1264,14 +1273,6 @@ New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's
 
 New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
 
-### PAN-3543 (rank 79)
-
-New this pass. A completed-handoff agent owed rework after a blocked verdict cannot be started at all: pan start refuses and recommends --fresh, --fresh gives the identical refusal, and reset-session is refused too because the durable plane reconstructs the session pointer. The refusal message names an action the operator cannot take, which is the self-contradictory-deadlock family PAN-3526 opened.
-
-### PAN-3522 (rank 80)
-
-New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts through a new generation's 138-second boot warm phase and killed it anyway, producing four restarts in ten minutes, racing spawns on port 3012, and a WATCHDOG GIVING UP. Each restart re-triggered docker stack rebuilds, feeding the storm. The probe budget has to know the difference between starved and starting.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1279,21 +1280,21 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-18T23:04:31.511409Z",
+  "generatedAt": "2026-11-18T23:54:11.173212Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 944,
+  "openCount": 945,
   "nodes": [
     {
-      "issue": "PAN-5541",
-      "rank": 1,
-      "size": "M",
+      "issue": "PAN-5564",
+      "rank": 2,
+      "size": "XS",
       "importance": "high",
-      "score": 78,
+      "score": 72,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Needs-you click on a request_secret lands on a conversation with no secret input; parked agents can't get secrets answered.",
-      "rationale": "New in-pipeline substrate bug: the only secret/machine-link input (AgentRequestCard) lives in a sidebar tab no Needs-you path opens, so any agent parked on request_secret or link_machine stays blocked until the operator finds it. In pipeline, so it is pinned in a free top slot rather than ranked against the queue.",
+      "why": "Flaky changes-view test: openChanges resolves before the DiffEditor mock's onMount effect; test-only wait fix.",
+      "rationale": "New in-pipeline substrate flake that turned main CI red on a docs-only merge; pinned in a free top slot rather than ranked against the queue.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1324,6 +1325,19 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "planning": "auto"
     },
     {
+      "issue": "PAN-5567",
+      "rank": 5,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Codex app-server threads hardcode on-request/workspace-write, so Read-only and Full access settings never apply.",
+      "rationale": "New bug: on the default Codex transport the permission setting is silently ignored, so a Read-only choice still lets agents write. A safety setting that does nothing ranks with the top substrate fixes; the fix is small and well specified.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-5489",
       "rank": 6,
       "size": "S",
@@ -1333,6 +1347,19 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "dependsOn": [],
       "why": "pan plan from an agent shell fails workspace creation without HUME_API_KEY, leaves a half-built workspace and hides the cause.",
       "rationale": "New pipeline-path bug: the CLI result depends on the caller's environment, so Flywheel-launched planning can fail and strand workspaces; it outranks routine work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5566",
+      "rank": 7,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "UI/help text says Auto blocks destructive calls but the hook approves all; repo .pan.yaml can set bypass mode.",
+      "rationale": "New bug: operators choose Auto believing it gates destructive calls, and a project .pan.yaml can switch agents to bypass/full-access. Item 6 needs a decision (strip the keys or document); the text fixes are mechanical.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7219,19 +7246,6 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "planning": "auto"
     },
     {
-      "issue": "PAN-5473",
-      "rank": 450,
-      "size": "S",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Docs P2: features/desktop-app.mdx, downloads, how pan up finds the app, tray. Supersedes PAN-2073. Lane A item 6.",
-      "rationale": "Rank unchanged; PAN-5483 closed, so that dependency is removed.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1445",
       "rank": 451,
       "size": "S",
@@ -7319,19 +7333,6 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "planning": "auto"
     },
     {
-      "issue": "PAN-5477",
-      "rank": 454,
-      "size": "M",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Docs P2: configuration/permissions.mdx, auto-approve hook, --yolo, operator-only labels, git shim. Lane A item 8.",
-      "rationale": "Rank unchanged; PAN-5483 closed, so that dependency is removed.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-5317",
       "rank": 455,
       "size": "S",
@@ -7340,6 +7341,18 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "condition": "ok",
       "dependsOn": [],
       "why": "CodeRabbit follow-up on PR #5127: route live Codex app-server sends correctly; no replayable mail for keyed sends.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5565",
+      "rank": 455,
+      "size": "XS",
+      "importance": "medium",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CodeRabbit follow-up on merged PAN-5541: close only the answered request; keep seeded queries fresh in a test.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7464,11 +7477,10 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "score": 45,
       "condition": "ok",
       "dependsOn": [
-        "PAN-5479",
-        "PAN-5482"
+        "PAN-5479"
       ],
       "why": "Docs audit: line-by-line accuracy check of the 14 Features pages; waits on PAN-5479/5482.",
-      "rationale": "Rank unchanged; PAN-5472 merged (#5535), so that dependency is removed. PAN-5537 may change specialists.mdx test-role claims.",
+      "rationale": "Rank unchanged; PAN-5482 closed, so that dependency is removed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7491,11 +7503,9 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "importance": "medium",
       "score": 44,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5482"
-      ],
+      "dependsOn": [],
       "why": "Docs audit: line-by-line accuracy check of the 16 Guides and Reference pages; waits on PAN-5482. Lane A item 13.",
-      "rationale": "New child of the docs epic: an accuracy audit that runs after the page PRs it names merge, so it ranks just behind the last of them in its order-book lane. PAN-5472 merged (#5535), so that dependency is removed.",
+      "rationale": "Rank unchanged; PAN-5482 closed, so that dependency is removed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9377,19 +9387,6 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "condition": "ok",
       "dependsOn": [],
       "why": "Spawn-refusal modal: render the three-button workflow on dirty-workspace 409",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5482",
-      "rank": 610,
-      "size": "L",
-      "importance": "medium",
-      "score": 36,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Docs P3 batch: operating guide, foreman, CI integrations, unpublished pages, proposal in nav, blog draft. Lane B item 7.",
-      "rationale": "New P3 docs batch, last in lane B; banded with lower-medium work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13077,6 +13074,19 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "rationale": "New CodeRabbit follow-up from the merged PAN-5295 PR; one Major and four Minor frontend findings, ranked with comparable follow-ups.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-5541",
+      "rank": 905,
+      "size": "M",
+      "importance": "low",
+      "score": 10,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Merged via PR #5561; awaiting verification on main and close-out. Nothing left to pick up.",
+      "rationale": "Moved from rank 1 to the bottom: the fix merged (PR #5561) and the issue left the pipeline, so it is not pickable work.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -14272,21 +14282,7 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     },
     {
       "from": "PAN-5467",
-      "to": "PAN-5473",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5467",
       "to": "PAN-5475",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5467",
-      "to": "PAN-5477",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
@@ -14301,13 +14297,6 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
     {
       "from": "PAN-5467",
       "to": "PAN-5481",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5467",
-      "to": "PAN-5482",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
@@ -14355,29 +14344,8 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "confidence": 1
     },
     {
-      "from": "PAN-5473",
-      "to": "PAN-2073",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.85
-    },
-    {
       "from": "PAN-5479",
       "to": "PAN-5502",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5482",
-      "to": "PAN-5502",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5482",
-      "to": "PAN-5504",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
@@ -14460,81 +14428,18 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "confidence": 0.5
     },
     {
+      "from": "PAN-5541",
+      "to": "PAN-5565",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
       "from": "PAN-5544",
       "to": "PAN-5548",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.7
-    },
-    {
-      "from": "PAN-5548",
-      "to": "PAN-5482",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-5549",
-      "to": "PAN-5482",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-5550",
-      "to": "PAN-5482",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-5551",
-      "to": "PAN-5482",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-5552",
-      "to": "PAN-5482",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-5553",
-      "to": "PAN-5482",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-5555",
-      "to": "PAN-5482",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-5556",
-      "to": "PAN-5473",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-5557",
-      "to": "PAN-5473",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-5560",
-      "to": "PAN-5482",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
     },
     {
       "from": "PAN-5560",
@@ -14549,6 +14454,13 @@ New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts 
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.8
+    },
+    {
+      "from": "PAN-5567",
+      "to": "PAN-5566",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     },
     {
       "from": "PAN-750",
