@@ -206,6 +206,7 @@ src/components/Stage/panes/EditorPane.test.tsx
 src/components/Stage/useStageShortcuts.test.tsx
 src/components/XTerminal.test.tsx
 src/components/__tests__/AgentRequestCard.test.tsx
+src/components/__tests__/AgentRequestDialogHost.test.tsx
 src/components/__tests__/AskUserQuestionDialog.test.tsx
 src/components/__tests__/BackendRestartCard.test.tsx
 src/components/__tests__/DecisionsPanel.test.tsx

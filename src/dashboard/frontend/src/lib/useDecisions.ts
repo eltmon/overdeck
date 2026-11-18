@@ -282,7 +282,7 @@ export function usePendingAgentRequestDecisions(): { decisions: Decision[]; isFe
     refetchInterval: 5000,
     retry: false,
   });
-  const decisions = useMemo(() => agentRequestDecisions(Array.isArray(rows) ? rows : []), [rows]);
+  const decisions = agentRequestDecisions(Array.isArray(rows) ? rows : []);
   return { decisions, isFetched };
 }
 
