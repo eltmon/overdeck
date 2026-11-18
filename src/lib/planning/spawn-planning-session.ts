@@ -472,6 +472,11 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         progress(1, 'Creating workspace', errorMsg, 'error');
         const existingErrState = getAgentState(sessionName);
         if (existingErrState) saveAgentStateSync({ ...existingErrState, status: 'error' });
+        // PAN-5498: a failed --host start must not leave its host override for a later finalize.
+        if (hostOverride === true) {
+          await writeAutoSpawnOnFinalizeFlag(issue.identifier, autoSpawnOnFinalize === true, { hostOverride: null })
+            .catch((clearErr) => console.warn(`[start-planning] Could not clear the ${issue.identifier} host override: ${clearErr instanceof Error ? clearErr.message : String(clearErr)}`));
+        }
         return { success: false, error: errorMsg };
       }
     }

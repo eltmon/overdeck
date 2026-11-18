@@ -865,12 +865,13 @@ export async function completePlanningForIssue(options: {
       autoHandoffError = deferred.error;
       autoHandoffDeaconPaused = deferred.deaconPaused;
     } else if (autoHandoffFailed && autoSpawnResult) {
+      // Journal first: a rejected planning.failed append must not leave the refused request retryable.
+      if (handoffJournaled) journalHandoffFailed(workspacePath, id, autoSpawnResult);
       autoHandoffError = await recordPlanningAutoHandoffFailure({
         issueId: id,
         result: autoSpawnResult,
         eventStore,
       });
-      if (handoffJournaled) journalHandoffFailed(workspacePath, id, autoSpawnResult.workAgentSkipReason ?? 'spawn-failed', autoHandoffError);
     } else {
       if (autoSpawnResult?.workAgentSpawned && workspacePath && existsSync(workspacePath)) {
         appendPipelineEntry(workspacePath, {

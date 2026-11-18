@@ -141,6 +141,13 @@ describe('pendingHandoffHold', () => {
       .toBe('Deferred work-agent start is held: the Deacon is frozen. Unfreeze it or run pan start PAN-3705.');
   });
 
+  it('for a pending start request, says only the automatic retry is held (PAN-5498)', () => {
+    const journal = [entry('handoff.requested', { attempt: 0, reason: 'interrupted' })];
+    const hold = pendingHandoffHold(journal, true, 'PAN-3705');
+    expect(hold).toBe('Work-agent start was requested. If it never answers, its automatic retry is held while the Deacon is frozen; unfreeze the Deacon to keep that retry.');
+    expect(hold).not.toContain('pan start');
+  });
+
   it('says nothing when the Deacon is not frozen', () => {
     const journal = [entry('handoff.deferred', { attempt: 0, reason: 'guardrails' })];
     expect(pendingHandoffHold(journal, false, 'PAN-3705')).toBeNull();

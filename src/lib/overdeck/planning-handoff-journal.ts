@@ -54,7 +54,10 @@ export function journalHandoffRequest(workspacePath: string | null | undefined, 
  * PAN-5498: close a journaled request that failed in a way no wait fixes, so
  * deacon-lite does not retry it. Only guardrail and stack refusals are retried.
  */
-export function journalHandoffFailed(workspacePath: string, issueId: string, skipReason: string, error: string): void {
+export function journalHandoffFailed(workspacePath: string, issueId: string, result: CompletePlanningAutoSpawnResult): void {
+  // Same skip reason and error text as recordPlanningAutoHandoffFailure.
+  const skipReason = result.workAgentSkipReason ?? 'spawn-failed';
+  const error = result.workAgentError ?? `Work agent startup failed: ${skipReason}`;
   appendPipelineEntry(workspacePath, {
     type: 'handoff.abandoned',
     issueId: issueId.toUpperCase(),

@@ -35,6 +35,7 @@ vi.mock('../../workspace/rebuild-stack.js', () => ({
 }));
 
 import { spawnPlanningSession } from '../spawn-planning-session.js';
+import { readAutoSpawnConsentHostOverride, readAutoSpawnOnFinalizeFlagAsync } from '../auto-spawn-consent.js';
 import { assertWorkspaceStackHealthyForSpawn } from '../../agents/spawn-prep.js';
 
 let tempHome: string;
@@ -86,6 +87,32 @@ describe('planning creates no Docker stack (PAN-4961)', () => {
     expect(result.success).toBe(false);
     expect(mocks.createWorkspace).toHaveBeenCalledTimes(1);
     expect(mocks.createWorkspace.mock.calls[0][0].startDocker).toBeFalsy();
+  });
+
+  it('PAN-5498: a --host start whose workspace setup fails leaves no host override on consent', async () => {
+    const result = await spawnPlanningSession({
+      issue: {
+        id: 'PAN-1',
+        identifier: 'PAN-1',
+        title: 'Plan on the host',
+        description: 'test',
+        url: 'https://github.com/eltmon/overdeck/issues/1',
+        source: 'github',
+      },
+      workspacePath: join(tempHome, 'workspaces', 'feature-pan-1'),
+      projectPath: '/projects/test',
+      sessionName: 'planning-pan-1',
+      workspaceLocation: 'local',
+      model: 'claude-sonnet-5',
+      harness: 'claude-code',
+      autoSpawnOnFinalize: true,
+      hostOverride: true,
+      startedBy: 'test',
+    });
+
+    expect(result.success).toBe(false);
+    await expect(readAutoSpawnConsentHostOverride('PAN-1')).resolves.toBe(false);
+    await expect(readAutoSpawnOnFinalizeFlagAsync('PAN-1')).resolves.toBe(true);
   });
 
   it('planning-no-stack-test.ac2: the spawn stack gate returns at once for the plan role', async () => {

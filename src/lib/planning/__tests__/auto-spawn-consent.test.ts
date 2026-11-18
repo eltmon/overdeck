@@ -282,6 +282,18 @@ describe('auto-spawn consent claims', () => {
       await expect(readAutoSpawnConsentHostOverride(issueId)).resolves.toBe(false);
     });
 
+    it('does not carry a spent override into a new generation written without options', async () => {
+      await writeAutoSpawnOnFinalizeFlag(issueId, true, { hostOverride: true });
+      const claim = await claimAutoSpawnConsentForWorkStart(issueId);
+      if (!claim) throw new Error('expected a claim');
+      await completeAutoSpawnConsentClaim(claim);
+
+      await writeAutoSpawnOnFinalizeFlag(issueId, true);
+
+      await expect(readAutoSpawnOnFinalizeFlagAsync(issueId)).resolves.toBe(true);
+      await expect(readAutoSpawnConsentHostOverride(issueId)).resolves.toBe(false);
+    });
+
     it('ignores a stored override that is not the boolean true', async () => {
       await writeAutoSpawnOnFinalizeFlag(issueId, true);
       writeFileSync(autoSpawnOnFinalizeFlagPath(issueId), JSON.stringify({

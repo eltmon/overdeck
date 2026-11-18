@@ -244,7 +244,7 @@ export async function retryDeferredHandoffs(
     inFlight.add(issueId);
     try {
       const outcome = await retryOne({
-        issueId, workspacePath: workspace.path, schedule, now, liveAgentIds, readAgentState, emitActivity, deps,
+        issueId, workspacePath: workspace.path, schedule, lastEntry: last, now, liveAgentIds, readAgentState, emitActivity, deps,
       });
       if (outcome) actions.push(`retryDeferredHandoffs: ${issueId} ${outcome}`);
     } catch (err) {
@@ -260,6 +260,8 @@ async function retryOne(input: {
   issueId: string;
   workspacePath: string;
   schedule: DeferredHandoffSchedule;
+  /** The handoff entry the scan read; a newer one written during the consent await wins. */
+  lastEntry: PipelineJournalEntry;
   now: number;
   liveAgentIds: ReadonlySet<string>;
   readAgentState: typeof getAgentState;
@@ -273,6 +275,10 @@ async function retryOne(input: {
     ?? (await (deps.readConsent ?? readAutoSpawnOnFinalizeFlagAsync)(issueId).catch(() => false)
       ? null
       : 'auto-start consent is no longer granted');
+  // PAN-5498: complete-planning may journal its own outcome while consent is read.
+  // Leave a newer entry to the next scan rather than act on this stale one.
+  const latest = lastPipelineEntry(workspacePath, 'handoff.');
+  if (latest?.at !== input.lastEntry.at || latest?.type !== input.lastEntry.type) return null;
   if (standDown) {
     standDownHandoff(workspacePath, issueId, schedule, standDown, emitActivity);
     return `stood down: ${standDown}`;

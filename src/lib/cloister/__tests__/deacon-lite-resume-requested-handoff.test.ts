@@ -69,6 +69,19 @@ afterEach(() => {
 });
 
 describe('retryDeferredHandoffs with a handoff.requested entry', () => {
+  it('leaves an entry complete-planning journals during the consent read to the next scan', async () => {
+    readConsent.mockImplementationOnce(async () => {
+      appendPipelineEntry(workspace, { type: 'handoff.started', issueId: ISSUE, source: 'complete-planning', data: { agentId: 'agent-pan-5469' } });
+      return true;
+    });
+
+    const actions = await tick(10);
+
+    expect(spawn).not.toHaveBeenCalled();
+    expect(actions).toEqual([]);
+    expect(handoffTypes()).toEqual(['handoff.requested', 'handoff.started']);
+  });
+
   it('waits out the resume delay, then starts the work agent', async () => {
     await tick(9);
     expect(spawn).not.toHaveBeenCalled();

@@ -354,7 +354,15 @@ describe('completePlanningForIssue status event (PAN-3338)', () => {
       deps.body = { noPrd: false, skipKill: false, autoSpawn: true };
 
       completion = completePlanningForIssue(deps);
-      await sent;
+      // Fail at once, with the outcome, if finalize settles without sending the POST.
+      const early = await Promise.race([
+        sent.then(() => null),
+        completion.then(
+          (response) => ({ settled: 'resolved', response }),
+          (error: unknown) => ({ settled: 'rejected', error: String(error) }),
+        ),
+      ]);
+      expect(early).toBeNull();
 
       const entries = readPipelineJournal(workspacePath).filter((entry) => entry.type.startsWith('handoff.'));
       expect(entries).toHaveLength(1);
@@ -369,7 +377,7 @@ describe('completePlanningForIssue status event (PAN-3338)', () => {
     } finally {
       // Settle the request so the finalize lease is released for later tests.
       dropRequest?.(new Error('dashboard restarted'));
-      await completion;
+      await completion?.catch(() => undefined);
       global.fetch = originalFetch;
     }
   });

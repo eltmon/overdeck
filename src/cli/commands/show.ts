@@ -226,8 +226,11 @@ export function pendingHandoffHold(
   if (!deaconPaused) return null;
   const lastHandoff = [...journal].reverse().find((entry) => entry.type.startsWith('handoff.'));
   if (!lastHandoff) return null;
-  if (lastHandoff.type !== 'handoff.deferred' && lastHandoff.type !== 'handoff.retried'
-    && lastHandoff.type !== 'handoff.requested') return null;
+  if (lastHandoff.type === 'handoff.requested') {
+    // The first start request may still be running; only its automatic retry is held.
+    return 'Work-agent start was requested. If it never answers, its automatic retry is held while the Deacon is frozen; unfreeze the Deacon to keep that retry.';
+  }
+  if (lastHandoff.type !== 'handoff.deferred' && lastHandoff.type !== 'handoff.retried') return null;
   return `Deferred work-agent start is held: the Deacon is frozen. Unfreeze it or run pan start ${issueId}.`;
 }
 

@@ -131,7 +131,11 @@ export async function writeAutoSpawnOnFinalizeFlag(
     const workspaceLocation = options.workspaceLocation === null
       ? undefined
       : (options.workspaceLocation ?? prior?.workspaceLocation);
-    const hostOverride = options.hostOverride === undefined ? prior?.hostOverride : (options.hostOverride === true ? true : undefined);
+    // A spent record's override was used by the start it granted; a new generation
+    // must not inherit it without a fresh confirmation.
+    const hostOverride = options.hostOverride === undefined
+      ? (prior?.status === 'spent' ? undefined : prior?.hostOverride)
+      : (options.hostOverride === true ? true : undefined);
     await writeConsentRecord(issueId, {
       version: 2,
       generation: randomUUID(),
