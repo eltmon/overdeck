@@ -102,3 +102,28 @@ The **Machines** tab lists each linked machine's today/week/month spend, with a 
 its age for an offline machine, and an All machines row that counts a request recorded on two
 machines once; see
 [Linked machines](/configuration/linked-machines#fleet-usage).
+
+## pan cost from the terminal
+
+```bash
+pan cost issue PAN-123
+pan cost effort --issue PAN-123
+```
+
+`pan cost issue <id>` prints **Total Cost**, **API Calls** and **Tokens**, then breakdowns
+**By Model**, **By Review Role** and **By Agent**. It prints the issue's all-time total, so
+`--days` has no effect once the issue has recorded any cost.
+
+`pan cost effort` groups spend by reasoning effort, one line per level with cost, calls and
+tokens; `--issue <id>` limits it to one issue, and `--json` prints JSON instead. Rows recorded
+before effort tracking existed show `unrecorded`. See
+[Reasoning effort](/configuration/effort).
+
+`pan cost today`, `week`, `month`, `report` and the `budget` commands currently report zero
+spend ([#5562](https://github.com/eltmon/overdeck/issues/5562)); do not rely on them yet.
+`pan cost sync` imports per-issue event files from each registered project's own events folder.
+
+`pan conv cost` is a separate, estimate-only summary over the sessions `pan conv scan` has
+discovered, not the recorded cost ledger; see
+[Conversation commands](/cli/conversation-commands). See
+[Core commands](/cli/core-commands#pan-cost) for the full `pan cost` option table.
