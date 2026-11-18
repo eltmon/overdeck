@@ -792,3 +792,41 @@ describe('ConversationRow drag onto a pane (PAN-5343 H-D8)', () => {
   });
 });
 
+describe('ConversationRow awaiting-input indicator (PAN-5541 D13)', () => {
+  it('opens the conversation for an agent-request kind, never requestReopen', async () => {
+    const { useAskUserQuestionUiStore } = await import('../../../lib/askUserQuestionUiStore');
+    useAskUserQuestionUiStore.setState({ reopenId: null, reopenNonce: 0 });
+    const onSelect = vi.fn();
+    renderRow({ pendingInputCount: 1, pendingInputKinds: ['secretRequest'] }, { onSelect });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Secret requested — click to answer' }));
+
+    expect(onSelect).toHaveBeenCalledWith(conversation.name);
+    expect(useAskUserQuestionUiStore.getState().reopenId).toBeNull();
+  });
+
+  it('still reopens the dialog for an askUserQuestion kind', async () => {
+    const { useAskUserQuestionUiStore } = await import('../../../lib/askUserQuestionUiStore');
+    useAskUserQuestionUiStore.setState({ reopenId: null, reopenNonce: 0 });
+    const onSelect = vi.fn();
+    renderRow({ pendingInputCount: 1, pendingInputKinds: ['askUserQuestion'] }, { onSelect });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Question waiting — click to answer' }));
+
+    expect(useAskUserQuestionUiStore.getState().reopenId).toBe(conversation.name);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('prefers requestReopen when askUserQuestion is mixed with an agent-request kind', async () => {
+    const { useAskUserQuestionUiStore } = await import('../../../lib/askUserQuestionUiStore');
+    useAskUserQuestionUiStore.setState({ reopenId: null, reopenNonce: 0 });
+    const onSelect = vi.fn();
+    renderRow({ pendingInputCount: 2, pendingInputKinds: ['askUserQuestion', 'secretRequest'] }, { onSelect });
+
+    fireEvent.click(screen.getByTitle(/— click to answer$/));
+
+    expect(useAskUserQuestionUiStore.getState().reopenId).toBe(conversation.name);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+});
+

@@ -8,6 +8,7 @@ import { buildConversationTree, groupSummary, type ConversationTreeNode } from '
 import { partitionConversationSections, SECTION_ORDER, snoozePresets, type ConversationSectionId } from './conversation-triage';
 import { useConversationMutations, type ConversationMutations } from './useConversationMutations';
 import { useDashboardStore } from '../../lib/store';
+import { usePendingAgentRequestDecisions, withPendingAgentRequests } from '../../lib/useDecisions';
 import { useNow } from '../../hooks/useNow';
 import type { ContextUsage } from '../chat/chat-types';
 import styles from './styles/command-deck.module.css';
@@ -541,9 +542,13 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
   // timer, no server job, no write.
   const now = useNow(30_000);
 
+  // PAN-5541 D9: pending agent requests, folded into the owning conversation's
+  // pendingInputKinds locally so it sorts into Needs you (no server change).
+  const { decisions: agentRequests } = usePendingAgentRequestDecisions();
+
   // ── Sorted, grouped, sectioned list ──────────────────────────────────────────
   const sections = useMemo(() => {
-    let filtered = conversations;
+    let filtered = withPendingAgentRequests(conversations, agentRequests);
 
     if (excludeIds && excludeIds.size > 0) {
       filtered = filtered.filter((c) => !excludeIds.has(c.id));
@@ -569,7 +574,7 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
 
     const tree = buildConversationTree([...active, ...inactive]);
     return partitionConversationSections(tree, now.getTime());
-  }, [conversations, sort, tab, excludeIds, includeIds, now]);
+  }, [conversations, agentRequests, sort, tab, excludeIds, includeIds, now]);
 
   // PAN-4223 D18: per-viewer group collapse. Persisted: names the viewer
   // collapsed. Session-only: names the viewer expanded against the default.

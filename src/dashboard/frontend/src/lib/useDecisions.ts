@@ -286,6 +286,30 @@ export function usePendingAgentRequestDecisions(): { decisions: Decision[]; isFe
   return { decisions, isFetched };
 }
 
+/** PAN-5541 D9: the conversation rows with each pending agent request's kind folded in, for local list sectioning only. */
+export function withPendingAgentRequests<C extends { name: string; pendingInputCount?: number; pendingInputKinds?: ReadonlyArray<string> }>(
+  conversations: readonly C[],
+  requests: readonly Decision[],
+): C[] {
+  const kindsByOwner = new Map<string, Set<string>>();
+  for (const decision of requests) {
+    const request = decision.agentRequest;
+    if (!request || request.agentKind !== 'conversation') continue;
+    const kind = request.kind === 'secret' ? 'secretRequest' : 'machineLink';
+    const set = kindsByOwner.get(request.agentId) ?? new Set<string>();
+    set.add(kind);
+    kindsByOwner.set(request.agentId, set);
+  }
+  return conversations.map((conversation) => {
+    const added = kindsByOwner.get(conversation.name);
+    if (!added) return conversation;
+    const existing = conversation.pendingInputKinds ?? [];
+    const kinds = [...new Set([...existing, ...added])];
+    if (kinds.length === existing.length) return conversation;
+    return { ...conversation, pendingInputKinds: kinds, pendingInputCount: kinds.length };
+  });
+}
+
 /** PAN-4946 — pending MCP OAuth sign-ins as blocking decisions, one row per approval. */
 export function mcpSignInDecisions(rows: ReadonlyArray<McpSignInApproval>): Decision[] {
   return rows.map((row) => ({

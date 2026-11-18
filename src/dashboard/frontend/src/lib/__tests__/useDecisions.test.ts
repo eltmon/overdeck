@@ -12,12 +12,14 @@ import { BACKEND_RESTART_RECOVERY_QUERY_KEY } from '../backendRestartRecovery';
 import {
   type AgentRequestRow,
   backendRestartDecisions,
+  type Decision,
   diskAlertDecisions,
   fetchAgentRequests,
   harnessUpdateDecisions,
   isBlockingDecision,
   useDecisions,
   usePendingAgentRequestDecisions,
+  withPendingAgentRequests,
 } from '../useDecisions';
 import type { McpSignInApproval } from '../../components/Settings/anywhere/anywhereApi';
 import type { ConnectorNoticeRow } from '../../components/Settings/anywhere/botsApi';
@@ -565,5 +567,48 @@ describe('usePendingAgentRequestDecisions (PAN-5541 NFR-2)', () => {
     await waitFor(() => expect(pendingHook.result.current.isFetched).toBe(true));
     expect(decisionsHook.result.current).toEqual([]);
     expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/agent-requests'))).toHaveLength(1);
+  });
+});
+
+describe('withPendingAgentRequests (PAN-5541 D9)', () => {
+  function secretDecision(agentId: string): Decision {
+    return {
+      id: 'req-1',
+      source: 'conversation',
+      label: agentId,
+      kinds: ['secretRequest'],
+      since: '',
+      blocking: true,
+      agentRequest: { id: 'req-1', kind: 'secret', name: 'OPENAI_API_KEY', prompt: 'p', agentId, agentKind: 'conversation', issueId: null, expiresAt: '' },
+    };
+  }
+
+  it('folds secretRequest into the owning conversation with pendingInputCount 1 (AC1)', () => {
+    const conversations = [{ name: 'alpha' }, { name: 'beta' }];
+    const result = withPendingAgentRequests(conversations, [secretDecision('alpha')]);
+    expect(result[0]).toEqual({ name: 'alpha', pendingInputKinds: ['secretRequest'], pendingInputCount: 1 });
+    expect(result[1]).toBe(conversations[1]);
+  });
+
+  it('returns conversations without a request as the same objects (AC2)', () => {
+    const conversations = [{ name: 'alpha' }, { name: 'beta' }];
+    const result = withPendingAgentRequests(conversations, []);
+    expect(result[0]).toBe(conversations[0]);
+    expect(result[1]).toBe(conversations[1]);
+  });
+
+  it('does not duplicate a kind already present (AC3)', () => {
+    const conversations = [{ name: 'alpha', pendingInputKinds: ['secretRequest'] as const, pendingInputCount: 1 }];
+    const result = withPendingAgentRequests(conversations, [secretDecision('alpha')]);
+    expect(result[0]).toBe(conversations[0]);
+  });
+
+  it('ignores an agent-owned request (not a conversation owner)', () => {
+    const agentDecision: Decision = {
+      ...secretDecision('agent-pan-7'),
+      agentRequest: { id: 'req-2', kind: 'secret', name: 'K', prompt: 'p', agentId: 'agent-pan-7', agentKind: 'agent', issueId: 'PAN-7', expiresAt: '' },
+    };
+    const conversations = [{ name: 'agent-pan-7' }];
+    expect(withPendingAgentRequests(conversations, [agentDecision])[0]).toBe(conversations[0]);
   });
 });

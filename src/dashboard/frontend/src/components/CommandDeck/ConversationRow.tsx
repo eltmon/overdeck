@@ -568,7 +568,17 @@ export function ConversationRow({
         <AwaitingInputIndicator
           kinds={conv.pendingInputKinds}
           size={spinnerSize}
-          onClick={() => requestAskUserQuestionReopen(conv.name)}
+          onClick={() => {
+            // D13: an agent-request kind has no reopenable dialog payload —
+            // requestAskUserQuestionReopen would be a dead click — so open
+            // the conversation instead, where the pinned card answers it.
+            const kinds = conv.pendingInputKinds ?? [];
+            const isAgentRequest =
+              (kinds.includes('secretRequest') || kinds.includes('machineLink')) &&
+              !kinds.includes('askUserQuestion') && !kinds.includes('exitPlanMode') && !kinds.includes('enterPlanMode');
+            if (isAgentRequest) onSelect(conv.name);
+            else requestAskUserQuestionReopen(conv.name);
+          }}
         />
       ) : conv.stalledSince ? (
         <AlertCircle

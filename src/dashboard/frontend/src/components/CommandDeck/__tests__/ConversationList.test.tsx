@@ -15,6 +15,11 @@ vi.mock('../../Settings/anywhere/machinesApi', () => ({
   loadMachines: async () => ({ links: [] }),
   setMachineHidden: async () => ({ status: 200, body: {} }),
 }));
+// PAN-5541: withPendingAgentRequests polls the shared agent-requests feed; keep it off the fetch these tests count.
+vi.mock('../../../lib/useDecisions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../lib/useDecisions')>()),
+  usePendingAgentRequestDecisions: () => ({ decisions: [], isFetched: true }),
+}));
 vi.mock('../../DialogProvider', () => ({
   DialogProvider: ({ children }: { children: React.ReactNode }) => children,
   useConfirm: () => vi.fn().mockResolvedValue(true),
