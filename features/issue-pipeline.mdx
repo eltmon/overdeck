@@ -50,6 +50,16 @@ When every item is done, the agent runs `pan done`, which refuses to proceed on 
 
 Once preflight passes, `pan done` rebases the branch onto the target branch and pushes, opens or updates the pull request and marks it ready, moves the tracker issue to In Review, and starts verification and review.
 
+## Verification
+
+Once `pan done` pushes, the dashboard runs the project's quality gates against the PR head before review starts. Gates come from `quality_gates` in `projects.yaml` (see [Projects](/configuration/projects)), or default to typecheck, lint and test.
+
+The `verification.tests` setting picks `ci` or `local` test mode, and when it is unset Overdeck detects it: `ci` when a GitHub Actions workflow runs a recognizable test job on pull requests, otherwise `local`. In CI mode the host skips its own test gate, because the CI test job on the PR head is the test gate.
+
+A failed gate sends the work agent a message naming the failed check and asking it to fix, push and request review again. Review never starts until verification passes. Overdeck allows up to 3 attempts per PR head; on the last attempt, or when the same check fails twice in a row, it pauses the work agent with a Needs-you signal instead of retrying further.
+
+A test-skip gate runs alongside the others: an added `.skip`, `.only` or `xit` always fails it, and removing tests fails it too unless the whole diff balances or the tested subject was deleted. An operator can let one net test removal through with `pan review waive-test-removal`.
+
 ## Get help
 
 Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file an issue on [GitHub Issues](https://github.com/eltmon/overdeck/issues).
