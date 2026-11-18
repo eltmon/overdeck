@@ -10,6 +10,37 @@ The Flywheel is a loop that runs in one conversation. Each tick it picks the nex
 The Flywheel is early: today Overdeck uses it to build Overdeck itself. The limits below are known and worth reading before you turn it on. For the roadmap, see [Flywheel vision](/vision).
 </Warning>
 
+## What the loop does
+
+Each tick is one pass through five phases:
+
+1. **Orient**: read the policies, the backlog sequence, the bound order book if any, and the issues already in flight.
+2. **Drain what is already in flight**: walk every in-flight issue first and make the first move each one needs before picking anything new.
+3. **Pick the next item**: choose the next issue from an active order book, or the backlog sequence in rank order.
+4. **Launch**: start the issue with `pan start`, the loop's only launcher. If `pan start` fails with a disk-low error, the loop launches nothing else that tick and raises a Needs-you item instead.
+5. **Watch to landing**: follow the issue's pull request through review, tests and merge.
+
+A fifth step, parking, runs whenever the loop cannot decide something on its own: it parks the issue and moves on rather than blocking the tick on a question only you can answer.
+
+The loop schedules its own next tick with a background sleep: 450 seconds while anything is in flight, 1000 seconds when idle, never longer than 1000 seconds. It stops on its own only when nothing is pickable and nothing is in flight, reporting itself idle with a Needs-you item saying so.
+
+Rails that hold regardless of what it picks:
+
+- It orchestrates and never writes code, specs or plans; the only files it writes are `.pan/flywheel/state.md` and `.pan/flywheel/report.md`.
+- It keeps to `roles.flywheel.maxAgents` (default 30) as its own instruction, not a check `pan start` makes.
+- It never merges or deep-wipes anything itself; merges follow the merge policy, see [Auto-merge](/configuration/auto-merge).
+- It never adds or removes the operator-only labels `released`, `vetoed`, `auto-merge` or `hold-for-uat`; its `gh` access refuses those writes.
+- `vetoed` is absolute: a vetoed issue is never picked up, planned or struck from vetoed by the loop.
+- It does not auto-start changes to pipeline machinery; it marks them `needs-handoff` instead.
+- There is one Flywheel conversation per Overdeck install, and starting a second one while the first is active is refused.
+- After a merge to Overdeck's own main with green CI, it runs `pan reload`; it does not deploy other projects.
+
+Every tick ends with one tick marker line, which is the loop's only status report:
+
+```text
+flywheel-tick: tick=3 pick=PAN-3964 phase=watch in-flight=PAN-3964,PAN-3920 needs-you=none
+```
+
 ## Known limits
 
 - The loop's author gate names fixed GitHub logins: it acts only on issues whose author is `eltmon` (the Overdeck maintainer) or `panopticon-agent[bot]`, or that are assigned to `eltmon`. On any other repo or account the loop skips your issues, and the current GitHub App bot (`overdeck-agent[bot]`) does not pass it either. See [issue #5544](https://github.com/eltmon/overdeck/issues/5544).
