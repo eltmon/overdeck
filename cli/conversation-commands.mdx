@@ -128,6 +128,66 @@ project.
 See [Conversations](/features/conversations) for the dashboard side of session discovery, search
 and scheduled runs.
 
+## pan handoff
+
+Hand off a conversation to a new conversation that continues the work. Omit `<conv>` (or pass
+`self`) to hand off the conversation you are currently running in; any trailing text becomes the
+**focus** for the successor.
+
+```bash
+pan handoff                                            # hand off this conversation, no focus
+pan handoff self wire the Stripe webhook               # hand off this conversation, with focus
+pan handoff source-conv --model claude-sonnet-4-6       # hand off a named conversation
+pan handoff source-conv --hold                          # create it, but don't send the kickoff yet
+pan handoff start source-conv                           # send a held handoff's kickoff
+```
+
+| Option | What it does |
+| --- | --- |
+| `--model <model>` | Model for the new conversation |
+| `--effort <level>` | Reasoning effort for the new conversation: `low`, `medium`, `high`, `xhigh` or `max`; defaults to the source conversation's effort |
+| `--harness <harness>` | Accepted and ignored: the harness is always the provider default |
+| `--cwd <path>` | Working directory for the new conversation |
+| `--allow-primary` | Operator only: allows `--cwd` to be a project's primary checkout |
+| `--project <key>` | Project for the new conversation; defaults to the source conversation's project |
+| `--issue <id>` | Issue to associate with the new conversation; without `--cwd`, it starts in that issue's workspace when one exists |
+| `--role <role>` | Pane role for the new conversation: `conversation` (default), `work`, `review`, `test` or `plan` |
+| `--title <title>` | Title for the new conversation; defaults to a title built from the focus or the source conversation |
+| `--author <who>` | Who authors the handoff doc: `external` (default) or `source` |
+| `--author-model <model>` | Model for the external authoring session (only with `--author external`) |
+| `--author-harness <harness>` | Accepted and ignored: the authoring harness is always the provider default |
+| `--skill <name>` | Turns on one skill for the new conversation only (repeatable) |
+| `--pack <id>` | Turns on every non-opt-in skill of this cached skill pack, for the new conversation only (repeatable) |
+| `--group <name>` | Turns on every cached pack of this pack group, for the new conversation only (repeatable) |
+| `--hold` | Creates and launches the new conversation without sending the kickoff |
+| `--fresh` | Starts a clean conversation: no handoff document, no summary, no parent link; the focus is delivered as its first message |
+
+Focus is capped at 10,000 characters; keep it short and put a longer brief in a file the focus
+points at. A held handoff (`--hold`) waits with its kickoff unsent until you click Send in the
+dashboard, or run `pan handoff start <conv>` from a shell. See
+[Handing off from the CLI](/features/conversations#handing-off-from-the-cli).
+
+## pan fork
+
+Summary fork a conversation: start a new session seeded with a generated summary of the source
+conversation's work, instead of its full history. Omit `<conv>` to fork the conversation you are
+in. Pass `--plain` to skip the summary and copy the raw conversation history instead.
+
+```bash
+pan fork                        # fork this conversation with a generated summary
+pan fork source-conv --plain    # fork with the raw history instead of a summary
+pan fork source-conv --model claude-opus-5-5 --effort high
+```
+
+| Option | What it does |
+| --- | --- |
+| `--model <model>` | Model for the summary-forked session |
+| `--effort <level>` | Reasoning effort for the new conversation: `low`, `medium`, `high`, `xhigh` or `max`; defaults to the source conversation's effort |
+| `--cwd <path>` | Working directory for the summary-forked session |
+| `--allow-primary` | Operator only: allows `--cwd` to be a project's primary checkout |
+| `--project <key>` | Project for the new conversation; defaults to the source conversation's project |
+| `--plain` | Skips summary generation and copies the raw conversation history |
+
 ## Get help
 
 - [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P)
