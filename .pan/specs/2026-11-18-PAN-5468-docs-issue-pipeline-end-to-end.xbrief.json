@@ -4,17 +4,17 @@
     "created": "2026-11-18T19:11:05Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5468: docs: issue pipeline, end to end",
-    "updated": "2026-11-18T19:13:06.198Z"
+    "updated": "2026-11-18T19:13:38.044Z"
   },
   "plan": {
     "id": "pan-5468",
     "title": "docs: issue pipeline, end to end",
-    "status": "proposed",
+    "status": "running",
     "uid": "86737170-30ef-4a8a-b88c-019b1a55eb9d",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-18T19:11:05Z",
-    "updated": "2026-11-18T19:13:06.198Z",
+    "updated": "2026-11-18T19:13:38.044Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5468",
@@ -1185,5 +1185,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
