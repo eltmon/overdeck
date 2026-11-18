@@ -39,3 +39,24 @@ actually pay, and there is no separate plan-cost view.
 A model with no row in the price table records no cost: the Claude Code hook skips the event
 entirely, and Pi and Muse record it with a cost of `0` and (for Pi) an `unpriced-model` warning.
 Mis-priced models are tracked in [#4844](https://github.com/eltmon/overdeck/issues/4844).
+
+## How spend is attributed
+
+Every cost event carries the issue id and agent id that Overdeck set when it launched the agent.
+A Claude Code session with no issue id falls back to its git branch: if the branch name contains
+one of five tracker prefixes (`pan`, `min`, `aud`, `krux`, `cli`) followed by a number, the event
+is recorded against that issue. Do not expect this fallback to work for other prefixes or for
+other harnesses.
+
+Spend with no issue sorts into one of three buckets, shown on the Costs page under the labels
+**Conversations** (the event belongs to a known conversation), **Flywheel orchestration** (the
+Flywheel's own conversation), or an unattributed bucket for everything else. A project's spend
+counts both its issues and the sessions of its own conversations, live or archived.
+
+Spend is also grouped by **stage**, the role the session ran as. Stages observed on this machine
+include `implementation` and `review.security`, among others; this list is not exhaustive.
+
+The today/week/month windows differ by source: Project Home's weekly figure reads the archive and
+starts the day at local midnight on the dashboard machine, the week at the start of the day seven
+days ago, and the month over the last 30 days. The Costs page's issue list reads a separate
+rollup in the database. The two totals are not guaranteed to reconcile exactly.
