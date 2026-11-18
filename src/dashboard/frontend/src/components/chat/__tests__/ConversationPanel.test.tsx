@@ -182,6 +182,8 @@ function defaultConversationResponse(method: string, url: string): Response | un
   if (method === 'GET' && /^\/api\/conversations\/[^/]+\/scheduled-messages$/.test(url)) {
     return Response.json({ supported: true, limit: null, messages: [] });
   }
+  // PAN-5541 — PendingAgentRequestCards polls the shared agent-requests feed.
+  if (method === 'GET' && url === '/api/agent-requests') return Response.json({ requests: [] });
   return undefined;
 }
 

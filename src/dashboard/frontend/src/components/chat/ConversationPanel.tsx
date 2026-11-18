@@ -26,6 +26,7 @@ import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, is
 import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
 import { getHarnessBehavior, type ReviewerRoundMetadata } from '@overdeck/contracts';
 import { acceptsInput, ConversationMachineBanner, conversationHeaderStatus, conversationMachineState } from './ConversationMachineBanner';
+import { PendingAgentRequestCards } from './PendingAgentRequestCard';
 import { ConversationHeader } from './header/ConversationHeader';
 import { ConversationPullRequestProvider } from './TranscriptPullRequestLink';
 import { ConversationBookmarksProvider } from './bookmarks/ConversationBookmarks';
@@ -402,6 +403,7 @@ export function ConversationPanel({
         />
       )}
       {!embedded && <ConversationMachineBanner conversation={conversation} />}
+      <PendingAgentRequestCards owner={{ kind: 'conversation', name: conversation.name }} />
 
       {/* "About this conversation" drawer — collapsible summary beneath the header */}
       {!embedded && aboutOpen && (
