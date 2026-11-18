@@ -115,9 +115,8 @@ pan show PAN-1148 --json
 ## pan staffing
 
 Show the work model and swarm policy currently in effect for an issue. It is read-only: it
-resolves the model from `config.yaml` and the project's `projects.yaml` entry and has no
-`--model` or `--swarm` override. Pass a one-off model at spawn time instead, with
-`pan start --model`.
+resolves the model from `config.yaml` and the project's `projects.yaml` entry and takes no
+override of its own. Pass a one-off model at spawn time instead, with `pan start --model`.
 
 ```bash
 pan staffing PAN-1148
