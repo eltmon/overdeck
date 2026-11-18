@@ -1,0 +1,2143 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-19T00:30:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5503: docs: accuracy audit, Configuration (21 pages)",
+    "updated": "2026-11-18T23:38:35.098Z"
+  },
+  "plan": {
+    "id": "pan-5503",
+    "title": "docs: accuracy audit, Configuration (21 pages)",
+    "status": "proposed",
+    "uid": "0bf19faf-3b71-439c-bbf1-d15a99af321b",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-19T00:30:00Z",
+    "updated": "2026-11-18T23:38:35.098Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5503",
+        "label": "PAN-5503",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5467",
+        "label": "Docs overhaul epic",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docs",
+      "audit",
+      "configuration",
+      "mintlify"
+    ],
+    "metadata": {
+      "sizeJustification": "Every item edits one Mintlify page in the single configuration/ directory; the finalize lint counts each configuration/<page>.mdx as its own subsystem, so 23 pages read as 23 subsystems. The epic (#5467) scopes one audit issue per docs nav group, and the pages share one validation pass and one PR body, so splitting into sibling issues would duplicate the validator and PR-body work without adding review isolation.",
+      "canonicalFilename": "2026-11-18-PAN-5503-docs-accuracy-audit-configuration-21-pages.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The 23 pages in the Configuration docs nav group contain wrong, stale and removed claims: wrong config keys (providerHarnesses), removed features (live harness switching, off-book dispatch, service templates, releaseStatus, project-mappings), reversed behavior (Anthropic auth mode), stub features presented as supported (GitLab issues), and hundreds of en/em dashes that the style rule bans.",
+      "Proposal": "The planning session audited all 23 pages against code and recorded every finding with grep anchor, replacement text and evidence in .pan/drafts/PAN-5503.md. One docs item per page (harnesses.mdx split into four section items chained by blocks edges because they share a file) applies the change table, the residual rule, the dash rule, the frontmatter rule and the link check. A final item runs lint:docs and the Mintlify validators and writes the per-page PR body with Follow-ups for code bugs.",
+      "NonGoals": "- No code, test, rule, docs.json, CLAUDE.md, README.md or changelog.d change; code bugs found go to the PR body's Follow-ups\n- No edits to pages outside the Configuration nav group (the Anywhere pages under configuration/ belong to #5500)\n- No new pages, navigation changes, file renames or slug changes\n- No heading renames; a heading is deleted only where the PRD says so\n- No screenshots or images added or replaced\n- No restoring configuration/state-branch.mdx"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Audit the 23 pages in the Configuration nav group, not only the 21 listed in the issue",
+        "rationale": "The issue's scope sentence is every published page in the group; state-branch.mdx was retired by PAN-5472 and model-routing, docs-rag and progressive-polyrepo are in the group but in no sibling audit issue."
+      },
+      {
+        "summary": "For state-branch.mdx, only verify the PAN-5472 redirect and that no group page links it",
+        "rationale": "The file no longer exists on main; PAN-5472 replaced it with a redirect to /reference/state-model."
+      },
+      {
+        "summary": "Add Discord and GitHub Issues links only to pages with troubleshooting or help sections",
+        "rationale": "The issue asks for the links where a page talks about getting help; adding a help section to every page is not requested."
+      },
+      {
+        "summary": "Retitle generic titles and keep the old title as sidebarTitle",
+        "rationale": "The issue asks for specific searchable titles; sidebarTitle keeps the navigation labels short, matching docs-rag.mdx."
+      },
+      {
+        "summary": "Describe current code behavior where code is buggy and list the bug as a Follow-up",
+        "rationale": "The issue is docs-only; describing intended behavior as current would reintroduce inaccuracy."
+      },
+      {
+        "summary": "Split harnesses.mdx into four section items chained by blocks edges",
+        "rationale": "The page is 1,522 lines with 48 findings; section items stay reviewable, and the edges serialize the shared-file edits."
+      }
+    ],
+    "items": [
+      {
+        "id": "harnesses-intro-to-pi",
+        "title": "harnesses.mdx: fix lines 1-335 (intro table through Pi)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/harnesses.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-A1 (Appendix A part 'lines 1-335') in .pan/drafts/PAN-5503.md to configuration/harnesses.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: harnesses-intro-to-pi, the AC trailers and a 'PR-note: configuration/harnesses.mdx: <one line>' line. Edit only lines 1-335 of the base page (intro, Composer commands, Steering, Claude Code, Muse Code, Pi)."
+        },
+        "items": [
+          {
+            "id": "harnesses-intro-to-pi.ac1",
+            "title": "The intro harness table contains `models.providers.<provider>.harness` and no longer contains `Set `providerHarnesses.<provider>: ohmypi` to keep using it`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harnesses-intro-to-pi.ac2",
+            "title": "The Composer commands section contains `/pan` support for every harness including `opencode` and `grok`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harnesses-intro-to-pi.ac3",
+            "title": "The Claude Code section shows GPT-6.2 Astra and Sol in the 272000-token pin list and shows that Kimi K2.7 Code exports 262144 as both the maximum and the auto-compact window",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harnesses-intro-to-pi.ac4",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]'` over the sections from the intro through `### Pi Coding Agent / pi` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "harnesses-ohmypi-to-opencode",
+        "title": "harnesses.mdx: fix lines 336-748 (oh-my-pi through OpenCode)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/harnesses.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-A2 (Appendix A part 'lines 336-748') in .pan/drafts/PAN-5503.md to configuration/harnesses.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: harnesses-ohmypi-to-opencode, the AC trailers and a 'PR-note: configuration/harnesses.mdx: <one line>' line. Edit only the oh-my-pi, Codex, ACP/Kimi, native Kimi, Kimi picker rows and OpenCode sections."
+        },
+        "items": [
+          {
+            "id": "harnesses-ohmypi-to-opencode.ac1",
+            "title": "The Kimi ACP opt-out snippet shows `models.providers.kimi.harness: acp` and the page contains no top-level `providers:` YAML block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harnesses-ohmypi-to-opencode.ac2",
+            "title": "The ACP section shows the socket lives at `~/.overdeck/sockets/acp-<agentId>.sock` and cites `resolveKimiWirePath` in `src/lib/agents/transcript-resolver.ts`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harnesses-ohmypi-to-opencode.ac3",
+            "title": "The native Kimi section shows that pinned Kimi K2 model ids are remapped to native aliases instead of failing at spawn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harnesses-ohmypi-to-opencode.ac4",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]'` over the sections from `### oh-my-pi / ohmypi (alternative)` through `### OpenCode with Go and Zen` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "harnesses-grok-to-tos",
+        "title": "harnesses.mdx: fix lines 749-1181 (Grok through ToS rules)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/harnesses.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-A3 (Appendix A part 'lines 749-1181') in .pan/drafts/PAN-5503.md to configuration/harnesses.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: harnesses-grok-to-tos, the AC trailers and a 'PR-note: configuration/harnesses.mdx: <one line>' line. Edit only the Grok, Prime Agent, Semgrep in sessions, Installing pi/oh-my-pi, Where you pick the harness, workers and ToS sections. Repoint any in-repo link to the deleted live-switch heading first (PRD WI-A3)."
+        },
+        "items": [
+          {
+            "id": "harnesses-grok-to-tos.ac1",
+            "title": "`grep -c 'Switching harness on a live conversation' configuration/harnesses.mdx` returns 0 and the page shows the server refuses a harness change with 409 once a conversation has started",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harnesses-grok-to-tos.ac2",
+            "title": "The `### Auth mode is exclusive` section shows that `ANTHROPIC_API_KEY` in the dashboard's environment selects API-key mode even when the operator is signed in to the subscription",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harnesses-grok-to-tos.ac3",
+            "title": "The ToS rules section no longer contains `exactly **three blocked combinations**` and shows claude-code refused for `grok/*`, `opencode/*` and Muse models",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harnesses-grok-to-tos.ac4",
+            "title": "`grep -c '~/.omp/agent/settings.json' configuration/harnesses.mdx` returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harnesses-grok-to-tos.ac5",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]'` over the sections from `### Grok Build CLI` through `## ToS rules` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "harnesses-troubleshooting-to-end",
+        "title": "harnesses.mdx: fix lines 1182-1522 and page-wide checks",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/harnesses.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-A4 (Appendix A part 'lines 1182-1522') in .pan/drafts/PAN-5503.md to configuration/harnesses.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: harnesses-troubleshooting-to-end, the AC trailers and a 'PR-note: configuration/harnesses.mdx: <one line>' line. Edit the Troubleshooting through OpenRouter favorites sections, then run the page-wide dash, frontmatter and link checks."
+        },
+        "items": [
+          {
+            "id": "harnesses-troubleshooting-to-end.ac1",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/harnesses.mdx` prints nothing and the frontmatter description contains 50 to 160 characters and the frontmatter shows `title: \"Harnesses: choose the coding agent for each run\"` with `sidebarTitle: \"Harnesses\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harnesses-troubleshooting-to-end.ac2",
+            "title": "The `## Troubleshooting` section contains links to https://discord.gg/ZpHE2ZTv5P and https://github.com/eltmon/overdeck/issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harnesses-troubleshooting-to-end.ac3",
+            "title": "The `## Harness capabilities` heading is preserved and the section shows that Codex also declares `runsOnFlyMachine` and lists `grok` among the `overdeckMcp` harnesses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harnesses-troubleshooting-to-end.ac4",
+            "title": "The OpenRouter favorites section names Settings → Providers and `grep -c 'providerHarnesses.<provider>' configuration/harnesses.mdx` returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-projects",
+        "title": "projects.mdx: correct registration, gates, release and workspace-script claims",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/projects.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/projects.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-B1 in .pan/drafts/PAN-5503.md to configuration/projects.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: audit-projects, the AC trailers and a 'PR-note: configuration/projects.mdx: <one line>' line."
+        },
+        "items": [
+          {
+            "id": "audit-projects.ac1",
+            "title": "`grep -c 'releaseStatus' configuration/projects.mdx` returns 0 and the release section shows a release set moving from `releasing` to `passed`, `failed`, `partial` or `rolled_back`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-projects.ac2",
+            "title": "The quality-gate `phase` row shows that only `pre_push` gates run and a `post_push` gate never runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-projects.ac3",
+            "title": "`grep -c 'project-mappings.json' configuration/projects.mdx` returns 0 and the `## Project Initialization` section contains no PRD generation steps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-projects.ac4",
+            "title": "The Add-a-project paragraph no longer contains `the command palette`, and the no-letters sentence contains `--linear-team` (add) and `--issue-prefix` (clone)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-projects.ac5",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/projects.mdx` prints nothing and the frontmatter description contains 50 to 160 characters and the title is `Project registry: projects.yaml reference` with `sidebarTitle: \"Project Registry\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-polyrepo",
+        "title": "polyrepo.mdx: remove service templates and fix merge, gates and Traefik claims",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/polyrepo.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/polyrepo.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-B2 in .pan/drafts/PAN-5503.md to configuration/polyrepo.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: audit-polyrepo, the AC trailers and a 'PR-note: configuration/polyrepo.mdx: <one line>' line."
+        },
+        "items": [
+          {
+            "id": "audit-polyrepo.ac1",
+            "title": "`grep -c 'spring-boot-maven' configuration/polyrepo.mdx` returns 0 and `grep -c 'CLAUDE.md.template' configuration/polyrepo.mdx` returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-polyrepo.ac2",
+            "title": "The merge section no longer contains `Approve & Merge` and shows that **Merge** handles a polyrepo issue as one merge set while automatic merging skips polyrepo issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-polyrepo.ac3",
+            "title": "The polyrepo quality-gate example uses `path: fe` and contains no `phase: post_push`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-polyrepo.ac4",
+            "title": "The Docker section shows that `docker.traefik` starts Overdeck's own Traefik from `~/.overdeck/traefik/docker-compose.yml`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-polyrepo.ac5",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/polyrepo.mdx` prints nothing and the frontmatter description contains 50 to 160 characters and the title is `Polyrepo configuration: one issue, several repos` with a `sidebarTitle`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-progressive-polyrepo",
+        "title": "progressive-polyrepo.mdx: correct pr_target and readonly claims",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/progressive-polyrepo.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/progressive-polyrepo.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-B3 in .pan/drafts/PAN-5503.md to configuration/progressive-polyrepo.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: audit-progressive-polyrepo, the AC trailers and a 'PR-note: configuration/progressive-polyrepo.mdx: <one line>' line."
+        },
+        "items": [
+          {
+            "id": "audit-progressive-polyrepo.ac1",
+            "title": "`grep -c 'lists every repo with its resolved target' configuration/progressive-polyrepo.mdx` returns 0 and the page shows the prompt names `pr_target` when it is set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-progressive-polyrepo.ac2",
+            "title": "The readonly paragraph shows that a readonly repo is not required in the merge set and that git does not enforce readonly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-progressive-polyrepo.ac3",
+            "title": "The groups section shows that a group value of `*` means every repo and the `--new` section shows the optional name argument",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-issue-trackers",
+        "title": "issue-trackers.mdx: remove dead GitLab, custom-pattern and Rally claims",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/issue-trackers.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/issue-trackers.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-C1 in .pan/drafts/PAN-5503.md to configuration/issue-trackers.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: audit-issue-trackers, the AC trailers and a 'PR-note: configuration/issue-trackers.mdx: <one line>' line."
+        },
+        "items": [
+          {
+            "id": "audit-issue-trackers.ac1",
+            "title": "The supported-trackers table shows that GitLab issue tracking is not supported yet and GitLab works as a code host, and `grep -c 'myproject!23' configuration/issue-trackers.mdx` returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-issue-trackers.ac2",
+            "title": "`grep -c 'issue_pattern' configuration/issue-trackers.mdx` returns 0 and `grep -c 'tracker: custom' configuration/issue-trackers.mdx` returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-issue-trackers.ac3",
+            "title": "`grep -c 'rally_workspace' configuration/issue-trackers.mdx` returns 0, `grep -c 'Test Connection' configuration/issue-trackers.mdx` returns 0, and the page shows `RALLY_WORKSPACE` and `RALLY_SERVER`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-issue-trackers.ac4",
+            "title": "The shadow-mode example shows a top-level `shadow:` block in `~/.overdeck/config.yaml` and the Linear state table contains `Verifying on main`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-issue-trackers.ac5",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/issue-trackers.mdx` prints nothing and the frontmatter description contains 50 to 160 characters and the Troubleshooting section contains the Discord and GitHub Issues links",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-auto-merge",
+        "title": "auto-merge.mdx: correct strike scheduling, merge-train UI and toggle claims",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/auto-merge.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/auto-merge.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-C2 in .pan/drafts/PAN-5503.md to configuration/auto-merge.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: audit-auto-merge, the AC trailers and a 'PR-note: configuration/auto-merge.mdx: <one line>' line."
+        },
+        "items": [
+          {
+            "id": "audit-auto-merge.ac1",
+            "title": "The page shows that strike PRs are scheduled once their expedited review approves the head, and `grep -c 'is never scheduled' configuration/auto-merge.mdx` returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-auto-merge.ac2",
+            "title": "`grep -c 'Pending auto-merges' configuration/auto-merge.mdx` returns 0 and the page names the **Merge train** section with **Cancel** and **Retry**",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-auto-merge.ac3",
+            "title": "The toggle paragraph shows that clicking **Auto** or **Hold** sets the label, and `grep -c '`investigate` suggestion' configuration/auto-merge.mdx` returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-auto-merge.ac4",
+            "title": "The page shows the **Require UAT** switch in the Flywheel header as the way to turn auto-merge on",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-auto-merge.ac5",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/auto-merge.mdx` prints nothing and the frontmatter description contains 50 to 160 characters and the title is `Auto-merge: scheduled merges without UAT` with `sidebarTitle: \"Auto-Merge\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-order-books",
+        "title": "order-books.mdx: remove off-book dispatch and unreached statuses",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/order-books.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/order-books.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-C3 in .pan/drafts/PAN-5503.md to configuration/order-books.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: audit-order-books, the AC trailers and a 'PR-note: configuration/order-books.mdx: <one line>' line."
+        },
+        "items": [
+          {
+            "id": "audit-order-books.ac1",
+            "title": "`grep -c -- '--off-book' configuration/order-books.mdx`, `grep -c 'Intentional off-book work' configuration/order-books.mdx` and `grep -c 'orders-overrides' configuration/order-books.mdx` each returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-order-books.ac2",
+            "title": "The status line shows only `draft` and `ready`, and `grep -c 'server dispatch gate' configuration/order-books.mdx` returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-order-books.ac3",
+            "title": "The start-blocker list contains `empty-book` and `issue-store-unavailable`, and the CLI link resolves to `/cli/pipeline-commands#pan-orders`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-order-books.ac4",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/order-books.mdx` prints nothing and the frontmatter description contains 50 to 160 characters and the title is `Order books: curated Flywheel campaigns` with `sidebarTitle: \"Order Books\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-telemetry",
+        "title": "telemetry.mdx: correct the install-kind sentence",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/telemetry.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/telemetry.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-C4 in .pan/drafts/PAN-5503.md to configuration/telemetry.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: audit-telemetry, the AC trailers and a 'PR-note: configuration/telemetry.mdx: <one line>' line."
+        },
+        "items": [
+          {
+            "id": "audit-telemetry.ac1",
+            "title": "The install-kind sentence contains `CI runs send nothing by default` and no longer claims CI runs can be told apart by install kind",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-telemetry.ac2",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/telemetry.mdx` prints nothing and the frontmatter description contains 50 to 160 characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-model-routing",
+        "title": "model-routing.mdx: correct resolve-route and tier claims",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/model-routing.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/model-routing.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-D1 in .pan/drafts/PAN-5503.md to configuration/model-routing.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: audit-model-routing, the AC trailers and a 'PR-note: configuration/model-routing.mdx: <one line>' line."
+        },
+        "items": [
+          {
+            "id": "audit-model-routing.ac1",
+            "title": "The `GET /api/models/resolve` sentence lists plan, work, strike, review, the four review lanes, test and ship and shows a split role shows its highest-weight entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-model-routing.ac2",
+            "title": "The tiered-execution section contains the `metadata.model` override sentence and `feed.exclude_subjects`, and the harness flag list contains `pan strike --harness`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-model-routing.ac3",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/model-routing.mdx` prints nothing and the frontmatter description contains 50 to 160 characters and the `## Get help` section still contains the Discord link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-model-presets",
+        "title": "model-presets.mdx: correct the trivial-tier effort claim",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/model-presets.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/model-presets.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-D2 in .pan/drafts/PAN-5503.md to configuration/model-presets.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: audit-model-presets, the AC trailers and a 'PR-note: configuration/model-presets.mdx: <one line>' line."
+        },
+        "items": [
+          {
+            "id": "audit-model-presets.ac1",
+            "title": "`grep -c 'runs at its default (medium)' configuration/model-presets.mdx` returns 0 and the page shows the trivial tier falls back to `roles.work.effort`, which the preset sets to `high`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-model-presets.ac2",
+            "title": "`grep -c 'with the install command' configuration/model-presets.mdx` returns 0 and the tier sentence says the preset sets `effort` only where it defines one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-model-presets.ac3",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/model-presets.mdx` prints nothing and the frontmatter description contains 50 to 160 characters and the title is `Model presets: one-click model lineups` with `sidebarTitle: \"Model presets\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-local-models",
+        "title": "local-models.mdx: correct harness refusal and doctor/up scope",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/local-models.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/local-models.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-D3 in .pan/drafts/PAN-5503.md to configuration/local-models.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: audit-local-models, the AC trailers and a 'PR-note: configuration/local-models.mdx: <one line>' line."
+        },
+        "items": [
+          {
+            "id": "audit-local-models.ac1",
+            "title": "The limits list shows that every harness other than `claude-code` is refused for `ollama:` models",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-local-models.ac2",
+            "title": "The `pan doctor` and `pan up` sentences scope to `ollama:` models named in a workhorse slot or role, and the page shows the launch preflight starts the server for a `--model`-only model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-local-models.ac3",
+            "title": "The config table shows the `context_length` minimum of 2048",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-local-models.ac4",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/local-models.mdx` prints nothing and the frontmatter description contains 50 to 160 characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-effort",
+        "title": "effort.mdx: fix the config example, validation rule and escalation label",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/effort.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/effort.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-D4 in .pan/drafts/PAN-5503.md to configuration/effort.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: audit-effort, the AC trailers and a 'PR-note: configuration/effort.mdx: <one line>' line."
+        },
+        "items": [
+          {
+            "id": "audit-effort.ac1",
+            "title": "The validation paragraph shows that an unsupported `tiered_execution.tiers.<name>.effort` turns tiered execution off instead of failing config load",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-effort.ac2",
+            "title": "The example YAML places `sub: security:` under `review:` and contains no tier table that lacks a supervisor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-effort.ac3",
+            "title": "`grep -c 'Roles Models' configuration/effort.mdx` returns 0 and the `xhigh` ceiling sentence contains Grok Build",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-effort.ac4",
+            "title": "The `## Tier escalation` section opens with a Warning that contains `Not active yet` and a link to #4512",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-effort.ac5",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/effort.mdx` prints nothing and the frontmatter description contains 50 to 160 characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-terminal-backend",
+        "title": "terminal-backend.mdx: correct systemd unit, sync and pan start output claims",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/terminal-backend.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/terminal-backend.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-E1 in .pan/drafts/PAN-5503.md to configuration/terminal-backend.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: audit-terminal-backend, the AC trailers and a 'PR-note: configuration/terminal-backend.mdx: <one line>' line."
+        },
+        "items": [
+          {
+            "id": "audit-terminal-backend.ac1",
+            "title": "The systemd paragraph contains `overdeck-herdr.service` for the default home and `OVERDECK_HERDR_PERSISTENT_UNIT=1` for other homes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-terminal-backend.ac2",
+            "title": "The output paragraph shows that an already-running `pan start` prints its pane, a `pan tell` line and an `Attach:` command instead of a `Commands:` block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-terminal-backend.ac3",
+            "title": "The doctor table's Herdr config row shows a warn case for an unparseable file whose `resume_agents_on_restore` line reads false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-terminal-backend.ac4",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/terminal-backend.mdx` prints nothing and the frontmatter description contains 50 to 160 characters and the title is `Terminal backend: Herdr and tmux` with `sidebarTitle: \"Terminal backend\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-memory-governor",
+        "title": "memory-governor.mdx: correct floor, swap and sample-override claims",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/memory-governor.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/memory-governor.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-E2 in .pan/drafts/PAN-5503.md to configuration/memory-governor.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: audit-memory-governor, the AC trailers and a 'PR-note: configuration/memory-governor.mdx: <one line>' line."
+        },
+        "items": [
+          {
+            "id": "audit-memory-governor.ac1",
+            "title": "`grep -c 'the cap and floor never bind' configuration/memory-governor.mdx` returns 0 and the page shows the 4 GB hard floor binds up to about 53 GB",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-memory-governor.ac2",
+            "title": "The swap paragraph shows that low free swap sheds with live PSI stalls and holds spawns where PSI is unavailable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-memory-governor.ac3",
+            "title": "The sample override shows reserves 0.5 / 1 / 1.5 / 2 and the page contains the 5-minute memory head-bypass sentence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-memory-governor.ac4",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/memory-governor.mdx` prints nothing and the frontmatter description contains 50 to 160 characters and the title is `Memory governor: RAM and CPU admission` with a `sidebarTitle`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-jev",
+        "title": "jev.mdx: correct assessment scope, cost and SDK URL claims",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/jev.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/jev.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-E3 in .pan/drafts/PAN-5503.md to configuration/jev.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: audit-jev, the AC trailers and a 'PR-note: configuration/jev.mdx: <one line>' line."
+        },
+        "items": [
+          {
+            "id": "audit-jev.ac1",
+            "title": "The turn-end assessment paragraph shows that it also runs for agents on a parked `idle-running` row and names the four exempt roles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-jev.ac2",
+            "title": "The cost sentence shows that every answered request appends a ledger event and the trim length contains `about 6,000 characters`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-jev.ac3",
+            "title": "The base-URL row contains `TYPESAFE_BASE_URL` as the SDK fallback before `https://api.typesafe.ai`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-jev.ac4",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/jev.mdx` prints nothing and the frontmatter description contains 50 to 160 characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-semgrep",
+        "title": "semgrep.mdx: correct edit-hook scope and remove unmeasured figures",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/semgrep.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/semgrep.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-E4 in .pan/drafts/PAN-5503.md to configuration/semgrep.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: audit-semgrep, the AC trailers and a 'PR-note: configuration/semgrep.mdx: <one line>' line."
+        },
+        "items": [
+          {
+            "id": "audit-semgrep.ac1",
+            "title": "The edit-hook sentence shows that every Claude Code agent that is not a conversation gets findings for edited files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-semgrep.ac2",
+            "title": "The MCP paragraph shows that the scan, findings and supply-chain tools are turned off because they need a login or metrics, and the page shows no MCP server or edit hook runs in Docker workspaces or on Windows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-semgrep.ac3",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/semgrep.mdx` prints nothing and the frontmatter description contains 50 to 160 characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-computer-use",
+        "title": "computer-use.mdx: remove dashes and add help links",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/computer-use.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/computer-use.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-E5 in .pan/drafts/PAN-5503.md to configuration/computer-use.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: audit-computer-use, the AC trailers and a 'PR-note: configuration/computer-use.mdx: <one line>' line."
+        },
+        "items": [
+          {
+            "id": "audit-computer-use.ac1",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/computer-use.mdx` prints nothing and the frontmatter description contains 50 to 160 characters and the title and description are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-computer-use.ac2",
+            "title": "The `## Troubleshooting` section contains links to https://discord.gg/ZpHE2ZTv5P and https://github.com/eltmon/overdeck/issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-context-layers",
+        "title": "context-layers.mdx: correct launch artifacts and pan sync claims",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/context-layers.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/context-layers.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-F1 in .pan/drafts/PAN-5503.md to configuration/context-layers.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: audit-context-layers, the AC trailers and a 'PR-note: configuration/context-layers.mdx: <one line>' line."
+        },
+        "items": [
+          {
+            "id": "audit-context-layers.ac1",
+            "title": "The per-harness table's Claude row shows `~/.overdeck/context/launch/claude-code-<hash>-cli.md` and the table contains rows for ACP, OpenCode, Grok and Muse",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-context-layers.ac2",
+            "title": "The page shows that the next managed launch renders an edited layer and that `pan sync` refreshes the inspectable `*-global.md` renders, and `grep -c 'Edit the source layer or rule, then run' configuration/context-layers.mdx` returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-context-layers.ac3",
+            "title": "The banner sentence names both **Auto-sync failed** and **Setup changed**, and the harness-marker list contains `prime-agent` and `grok`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-context-layers.ac4",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/context-layers.mdx` prints nothing and the frontmatter description contains 50 to 160 characters and the title is `Context layers: rules and guidance for agents` with `sidebarTitle: \"Context Layers\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-docs-rag",
+        "title": "docs-rag.mdx: add embedding keys and query flags",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/docs-rag.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/docs-rag.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-F2 in .pan/drafts/PAN-5503.md to configuration/docs-rag.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: audit-docs-rag, the AC trailers and a 'PR-note: configuration/docs-rag.mdx: <one line>' line. Run the WI-F2 implementation checkpoint and record its outcome."
+        },
+        "items": [
+          {
+            "id": "audit-docs-rag.ac1",
+            "title": "The configuration table contains `docs.embedding.provider` with the default local `gte-small` model at 384 dimensions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-docs-rag.ac2",
+            "title": "The page shows `pan docs query` flags `--top`, `--format` and `--kind` and the `--scope` values for disable and enable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-docs-rag.ac3",
+            "title": "The commit's PR-note records the result of the npm-install index checkpoint and the `## Get help` section still contains the Discord link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-skills",
+        "title": "skills.mdx: correct when conversation skill overrides change",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/skills.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/skills.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-F3 in .pan/drafts/PAN-5503.md to configuration/skills.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: audit-skills, the AC trailers and a 'PR-note: configuration/skills.mdx: <one line>' line."
+        },
+        "items": [
+          {
+            "id": "audit-skills.ac1",
+            "title": "The overrides sentence shows the column is set at creation and later by `pan skills add <conversation>` or **Add skills…**",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-skills.ac2",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/skills.mdx` prints nothing and the frontmatter description contains 50 to 160 characters and the title is `Skill settings: packs, overrides, SageOx and Deft` with `sidebarTitle: \"Skill Settings\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-memory",
+        "title": "memory.mdx: complete harness lists and drop the OKF promotion claim",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/memory.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/memory.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-F4 in .pan/drafts/PAN-5503.md to configuration/memory.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: audit-memory, the AC trailers and a 'PR-note: configuration/memory.mdx: <one line>' line."
+        },
+        "items": [
+          {
+            "id": "audit-memory.ac1",
+            "title": "The intro harness list contains OpenCode and Grok, and the per-turn sentence names Codex app-server",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-memory.ac2",
+            "title": "`grep -c 'can promote a fact' configuration/memory.mdx` returns 0 and the conflict steps contain `pan memory edit <id> --clear-review`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-memory.ac3",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/memory.mdx` prints nothing and the frontmatter description contains 50 to 160 characters and the title is `Project memory: curated facts for every agent` with `sidebarTitle: \"Project Memory\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-knowledge",
+        "title": "knowledge.mdx: drop the version pin and document pan knowledge",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/knowledge.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/knowledge.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-F5 in .pan/drafts/PAN-5503.md to configuration/knowledge.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: audit-knowledge, the AC trailers and a 'PR-note: configuration/knowledge.mdx: <one line>' line."
+        },
+        "items": [
+          {
+            "id": "audit-knowledge.ac1",
+            "title": "`grep -c 'OpenKnowledge v0.34 requires' configuration/knowledge.mdx` returns 0 and the page shows OpenKnowledge requires Node.js 24 or newer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-knowledge.ac2",
+            "title": "The page contains a `pan knowledge <issue-id>` subsection that shows `--focus` and `--retro`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-knowledge.ac3",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/knowledge.mdx` prints nothing and the frontmatter description contains 50 to 160 characters and the title is `Project knowledge: OKF bundles and the viewer` with `sidebarTitle: \"Project Knowledge\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-appearance",
+        "title": "appearance.mdx: correct the font claim and remove the creation-flows section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/appearance.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/appearance.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other page item touches it, and the harnesses section items are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-F6 in .pan/drafts/PAN-5503.md to configuration/appearance.mdx, following the PRD's Common procedure (change table by grep anchor, residual rule, remove every en/em dash, frontmatter rule, link check, MDX safety). Never change code. Commit with Item: audit-appearance, the AC trailers and a 'PR-note: configuration/appearance.mdx: <one line>' line."
+        },
+        "items": [
+          {
+            "id": "audit-appearance.ac1",
+            "title": "`grep -c 'The one exception is' configuration/appearance.mdx` returns 0 and the font paragraph shows display text uses Space Grotesk",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-appearance.ac2",
+            "title": "`grep -c 'out of modal dialogs' configuration/appearance.mdx` returns 0 and the page contains `Ready to Merge shimmer`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-appearance.ac3",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/appearance.mdx` prints nothing and the frontmatter description contains 50 to 160 characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "validate-and-pr-body",
+        "title": "Run the group validators and draft the per-page PR body",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5503",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/projects.mdx",
+            "configuration/telemetry.mdx",
+            "configuration/knowledge.mdx",
+            "configuration/harnesses.mdx",
+            "configuration/model-routing.mdx",
+            "configuration/model-presets.mdx",
+            "configuration/local-models.mdx",
+            "configuration/effort.mdx",
+            "configuration/terminal-backend.mdx",
+            "configuration/memory-governor.mdx",
+            "configuration/jev.mdx",
+            "configuration/semgrep.mdx",
+            "configuration/computer-use.mdx",
+            "configuration/context-layers.mdx",
+            "configuration/docs-rag.mdx",
+            "configuration/skills.mdx",
+            "configuration/memory.mdx",
+            "configuration/appearance.mdx",
+            "configuration/issue-trackers.mdx",
+            "configuration/polyrepo.mdx",
+            "configuration/progressive-polyrepo.mdx",
+            "configuration/auto-merge.mdx",
+            "configuration/order-books.mdx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run lint:docs",
+            "npx -y mint@4.3.49 validate",
+            "npx -y mint@4.3.49 broken-links",
+            "grep -n '\"/configuration/state-branch\"' docs.json"
+          ],
+          "expected_outputs": [
+            "lint:docs prints 'docs lint passed'",
+            "mint validate reports success",
+            "mint broken-links reports no broken links",
+            "the state-branch redirect line prints"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow WI-Z1 in .pan/drafts/PAN-5503.md: run the dash loop over all 23 pages, npm run lint:docs, npx mint validate and npx mint broken-links; fix any failure on a group page in this commit (failures outside the group become Follow-ups); verify the state-branch redirect (D2); then write the PR-body draft (23 ticked page lines from the PR-note commit lines, a state-branch line, validator output, Follow-ups) into this item's commit message above the trailers. After pan done opens the PR, append the draft to the PR body with gh pr edit (PRD WI-Z1 step 7)."
+        },
+        "items": [
+          {
+            "id": "validate-and-pr-body.ac1",
+            "title": "The dash loop over all 23 group pages prints nothing and `npm run lint:docs` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-pr-body.ac2",
+            "title": "`npx -y mint@4.3.49 validate` and `npx -y mint@4.3.49 broken-links` report success, and the validation commit message contains their output (or the exact download error when the CLI cannot be fetched)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-pr-body.ac3",
+            "title": "The validation commit message contains a PR-body draft with 23 ticked `configuration/<page>.mdx` lines with one note each, a `state-branch.mdx` line, and a `## Follow-ups` section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-pr-body.ac4",
+            "title": "`grep -n '\"/configuration/state-branch\"' docs.json` prints the redirect line and `grep -l 'configuration/state-branch' configuration/*.mdx` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "harnesses-intro-to-pi",
+        "to": "harnesses-ohmypi-to-opencode",
+        "type": "blocks"
+      },
+      {
+        "from": "harnesses-ohmypi-to-opencode",
+        "to": "harnesses-grok-to-tos",
+        "type": "blocks"
+      },
+      {
+        "from": "harnesses-grok-to-tos",
+        "to": "harnesses-troubleshooting-to-end",
+        "type": "blocks"
+      },
+      {
+        "from": "harnesses-intro-to-pi",
+        "to": "harnesses-grok-to-tos",
+        "type": "blocks"
+      },
+      {
+        "from": "harnesses-intro-to-pi",
+        "to": "harnesses-troubleshooting-to-end",
+        "type": "blocks"
+      },
+      {
+        "from": "harnesses-ohmypi-to-opencode",
+        "to": "harnesses-troubleshooting-to-end",
+        "type": "blocks"
+      },
+      {
+        "from": "harnesses-intro-to-pi",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "harnesses-ohmypi-to-opencode",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "harnesses-grok-to-tos",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "harnesses-troubleshooting-to-end",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-projects",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-polyrepo",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-progressive-polyrepo",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-issue-trackers",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-auto-merge",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-order-books",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-telemetry",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-model-routing",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-model-presets",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-local-models",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-effort",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-terminal-backend",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-memory-governor",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-jev",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-semgrep",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-computer-use",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-context-layers",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-docs-rag",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-skills",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-memory",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-knowledge",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-appearance",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
