@@ -527,6 +527,15 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   PAN-4724), so a new writer needs nothing there. A new *aggregated* column, a
   changed grain, or any code that DELETEs `cost_events` rows needs a `_v2`
   install: there is no delete trigger.
+- **`src/lib/cost.ts` still holds dead readers** (#5562) — `getDailySummary`,
+  `getWeeklySummary`, `getMonthlySummary`, `generateReport` and `readIssueCosts` read
+  `~/.overdeck/costs/costs-<date>.jsonl`, which nothing writes, so `pan cost
+  today|week|month|report` print `$0`. Budgets in `costs/budgets.json` never get spend
+  added, and `getCostsByIssue` always returns `budgetWarning: false`. Live cost reads go
+  through `cost_events` (`overdeck/cost.ts` `CostResolver`, `overdeck/cost-sync.ts`) or the
+  `events.jsonl` archive (`GET /api/costs/summary`); those two stores can differ slightly.
+  Every dollar figure is tokens times the API price table; nothing writes the
+  `subscription-covered` marker its readers check.
 - Reasoning effort resolves only through `resolveEffort` (`src/lib/agents/resolve-effort.ts`),
   which also clamps to model∩harness levels; `npm run lint:effort` ratchets new
   `?? 'high'` fallbacks and level-list copies. Clamping runs before Kimi K3

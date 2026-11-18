@@ -1,0 +1,164 @@
+---
+title: "Costs and spend: how Overdeck tracks what agents cost"
+description: "See what agents and conversations spend, how Overdeck attributes cost to issues and projects, and how to read it with pan cost and the Costs page."
+---
+
+# Costs and spend
+
+Overdeck records what every agent and conversation spends, down to the request. Most of that is
+priced from its own built-in API price table, so the figures are an estimate of API cost, not a
+bill from your subscription. This page explains how Overdeck counts cost, how it attributes
+spend to issues and projects, and where to read it from the dashboard and the terminal.
+
+## How Overdeck counts cost
+
+Claude Code sessions record a cost event after each tool call: a `PostToolUse` hook
+(`heartbeat-hook`) reads new assistant messages from the session transcript and prices their
+tokens. Pi and Codex sessions do not run this hook, so Overdeck sweeps their transcripts instead,
+once when the dashboard starts and then every 5 minutes while it keeps running; their spend can
+lag the sweep by up to five minutes, and nothing is swept while the dashboard is down.
+
+Every event is written to two places: the append-only archive `~/.overdeck/costs/events.jsonl`
+and the `cost_events` table in `~/.overdeck/overdeck.db`. If history is missing from either one,
+`pan cost backfill` can reconstruct events from the stored Claude Code, Pi and Codex transcripts.
+Run on its own, it only prints what it would import, as a dry run. Run
+`pan cost backfill --write` to persist the events it finds that are not already recorded.
+
+## API prices, not your plan bill
+
+Every dollar figure is tokens multiplied by the published API price for the model, from
+Overdeck's own price table. The same table prices Claude Code, Codex, Kimi, Grok and Muse
+sessions. Pi is the exception: a Pi session uses the cost Pi itself reports for a message when Pi
+reports one, and falls back to Overdeck's price table only when it does not.
+
+This matters most on a subscription plan, such as Claude Max or a ChatGPT plan: Overdeck does not
+know what your plan covers, so it has no way to subtract that from the total. Every figure on this
+page and in `pan cost` is what the same tokens would cost at list API prices, not what you
+actually pay, and there is no separate plan-cost view.
+
+A model with no row in the price table records no cost: the Claude Code hook skips the event
+entirely, and Pi and Muse record it with a cost of `0` and (for Pi) an `unpriced-model` warning.
+Mis-priced models are tracked in [#4844](https://github.com/eltmon/overdeck/issues/4844).
+
+## How spend is attributed
+
+Every cost event carries the issue id and agent id that Overdeck set when it launched the agent.
+A Claude Code session with no issue id falls back to its git branch: if the branch name contains
+one of five tracker prefixes (`pan`, `min`, `aud`, `krux`, `cli`) followed by a number, the event
+is recorded against that issue. Do not expect this fallback to work for other prefixes or for
+other harnesses.
+
+Spend with no issue sorts into one of three buckets, shown on the Costs page under the labels
+**Conversations** (the event belongs to a known conversation), **Flywheel orchestration** (the
+Flywheel's own conversation), or an unattributed bucket for everything else. A project's spend
+counts both its issues and the sessions of its own conversations, live or archived.
+
+Spend is also grouped by **stage**, the role the session ran as, such as `implementation` or
+`review.security`; there are more stages than these two examples.
+
+**Today** starts at local midnight on the dashboard machine, **week** starts at the beginning of
+the day seven days ago, and **month** covers the last 30 days. Project Home's weekly figure reads
+the archive for these windows, while the Costs page's issue list reads a separate rollup in the
+database; the two totals are not guaranteed to reconcile exactly.
+
+## Where to see spend
+
+[Project Home](/features/mission-control#project-home) shows **Spend this week**, with today's
+spend below it. Without an issue prefix configured for the project it shows a dash and says it
+needs an issue prefix; if the read fails or takes more than 20 seconds it shows "unavailable".
+Clicking it opens the Costs page only when Experimental features is on (see
+[Dashboard views](/features/dashboard-views#experimental-features)); with Experimental features
+off, the default, the click lands back on Home with no explanation
+([#5562](https://github.com/eltmon/overdeck/issues/5562) item 4).
+
+The issue drawer's **Details** tab lists each pipeline phase's agent with its cost and a **Total**
+row for the whole issue, including agents not listed above. A **Cost breakdown** expands two
+tables, **By stage** and **By model** (see
+[Dashboard views](/features/dashboard-views#issue-drawer-and-full-issue-view)).
+
+On the board, hovering a card that has recorded cost shows a cost badge; clicking it opens the
+same cost breakdown.
+
+## The Costs page
+
+The Costs page (`/costs`) needs Experimental features turned on; see
+[Dashboard views](/features/dashboard-views#experimental-features). It opens on a header
+**Cost Tracking** with three tabs: **Issues**, **Experiments** and **Machines**.
+
+The **Issues** tab opens with four cards (**Total Cost** with the number of issues tracked,
+**Event Count**, **Budget Warnings** and **Over Budget**), then a **30-Day Cost Trend** chart, a
+**Costs by Issue** list sorted by cost, and a detail panel for the selected row with its token
+usage, by-model and by-stage breakdowns; a chart icon or **Full detail** opens the same breakdowns
+with a 30-day trend for that issue. Three of the four cards do not show real numbers yet:
+**Event Count** shows the number of issue rows, not the number of events, and **Budget Warnings**
+and **Over Budget** always show `0` ([#5562](https://github.com/eltmon/overdeck/issues/5562),
+items 2 and 3).
+
+The **Experiments** tab compares Caveman output-compression variants. With no data it points to
+setting `agents.caveman.enabled: true`; the A/B split itself needs
+`agents.caveman.ab_test: true` as well.
+
+The **Machines** tab lists each linked machine's today/week/month spend, with a cached figure and
+its age for an offline machine, and an All machines row that counts a request recorded on two
+machines once; see
+[Linked machines](/configuration/linked-machines#fleet-usage).
+
+## pan cost from the terminal
+
+```bash
+pan cost issue PAN-123
+pan cost effort --issue PAN-123
+```
+
+`pan cost issue <id>` prints **Total Cost**, **API Calls** and **Tokens**, then breakdowns
+**By Model**, **By Review Role** and **By Agent**. It prints the issue's all-time total, so
+`--days` has no effect once the issue has recorded any cost.
+
+`pan cost effort` groups spend by reasoning effort, one line per level with cost, calls and
+tokens; `--issue <id>` limits it to one issue, and `--json` prints JSON instead. Rows recorded
+before effort tracking existed show `unrecorded`. See
+[Reasoning effort](/configuration/effort).
+
+`pan cost today`, `week`, `month`, `report` and the `budget` commands currently report zero
+spend ([#5562](https://github.com/eltmon/overdeck/issues/5562)); do not rely on them yet.
+`pan cost sync` imports per-issue event files from each registered project's own events folder.
+
+`pan conv cost` is a separate, estimate-only summary over the sessions `pan conv scan` has
+discovered, not the recorded cost ledger; see
+[Conversation commands](/cli/conversation-commands). See
+[Core commands](/cli/core-commands#pan-cost) for the full `pan cost` option table.
+
+## Cost limits
+
+Cost limits are opt-in and warn only. Add a `[cost_limits]` table to `~/.overdeck/cloister.toml`:
+
+```toml
+[cost_limits]
+per_agent_usd = 50
+per_issue_usd = 100
+daily_total_usd = 300
+alert_threshold = 0.8
+```
+
+The numbers above are examples, not defaults: `per_agent_usd`, `per_issue_usd` and
+`daily_total_usd` each check today's spend and are unchecked when unset or `0`, and there is no
+built-in default for any of them. `alert_threshold` is the fraction of a limit (default `0.8`)
+at which Overdeck starts warning before the limit itself is reached.
+
+Crossing a limit writes a single warning line to the dashboard's log. Nothing in the dashboard UI
+surfaces it, and a limit never stops or pauses an agent; it exists for visibility only.
+
+## Get help
+
+Ask in the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P), or file an issue at
+[github.com/eltmon/overdeck/issues](https://github.com/eltmon/overdeck/issues).
+
+## See also
+
+- [Dashboard views](/features/dashboard-views)
+- [Command Deck](/features/mission-control)
+- [Reasoning effort](/configuration/effort)
+- [Linked machines](/configuration/linked-machines)
+- [Core commands](/cli/core-commands)
+- [Conversation commands](/cli/conversation-commands)
+- [Token spend report](/reference/token-spend-report)
