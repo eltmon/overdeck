@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5526",
   "created": "2026-11-18T19:12:30.887Z",
-  "updated": "2026-11-18T19:12:30.887Z",
+  "updated": "2026-11-18T19:19:30.591Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,26 @@
   "sessionHistory": [],
   "items": {
     "cli-stops-sending-autospawn": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5526",
-      "claimedAt": "2026-11-18T19:12:30.887Z"
+      "claimedAt": "2026-11-18T19:12:30.887Z",
+      "doneAt": "2026-11-18T19:19:30.590Z"
+    },
+    "cli-stops-sending-autospawn.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:19:30.590Z"
+    },
+    "cli-stops-sending-autospawn.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:19:30.590Z"
+    },
+    "cli-stops-sending-autospawn.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:19:30.590Z"
+    },
+    "cli-stops-sending-autospawn.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:19:30.590Z"
     }
   }
 }
