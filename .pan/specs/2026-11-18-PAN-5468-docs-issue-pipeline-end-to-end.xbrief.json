@@ -1,0 +1,1189 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-18T19:11:05Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5468: docs: issue pipeline, end to end",
+    "updated": "2026-11-18T19:13:06.198Z"
+  },
+  "plan": {
+    "id": "pan-5468",
+    "title": "docs: issue pipeline, end to end",
+    "status": "proposed",
+    "uid": "86737170-30ef-4a8a-b88c-019b1a55eb9d",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-18T19:11:05Z",
+    "updated": "2026-11-18T19:13:06.198Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5468",
+        "label": "PAN-5468",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5537",
+        "label": "#5537 test role never dispatched",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docs",
+      "pipeline",
+      "mintlify"
+    ],
+    "metadata": {
+      "sizeJustification": "Docs-only change: one new page, its docs.json nav entry, and one-line cross-links in six existing pages across features/, configuration/, cli/ and the repo root. The 'subsystems' are Mintlify doc directories, not code subsystems. The cross-links are meaningless without the page and the page is unfindable without them, so splitting into sibling issues would ship orphaned or broken docs. Items that edit the page are serialized by blocks edges.",
+      "canonicalFilename": "2026-11-18-PAN-5468-docs-issue-pipeline-end-to-end.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "No user page explains how an issue moves through Overdeck from pan start to a closed issue. The facts are spread over developer docs, role prompts and stale user pages, several of which contradict current code (the test agent, the server rebase, Pipeline page groups).",
+      "Proposal": "Add features/issue-pipeline.mdx, built section by section from the verified facts and anchors in .pan/drafts/PAN-5468.md: pipeline at a glance, Start an issue, Plan, Work and pan done, Verification, Review, Tests and UAT (checkpoint on #5537), Feedback the work agent receives, Needs you and pan ask, Merge, Strikes, After merge: close-out, pan show and the pipeline journal, Restart/rerun/reopen, Get help. Put it first in the Features nav, add one link line to six related pages, and record clean Mintlify checks in the PR body.",
+      "NonGoals": "- No changes under src/, scripts/, tests/, packages/, apps/ or roles/; no changelog.d entry\n- No fix for #5537 (test role not dispatched after review)\n- No rewrite of features/specialists.mdx, concepts.mdx, introduction.mdx or other pages beyond the one-line links (owned by #5502, #5499, #5505)\n- No cli/pipeline-commands.mdx and no link to it (#5478)\n- No close-out settings documentation (#5479)\n- No screenshots\n- Never run mint validate --fix"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Page path features/issue-pipeline.mdx, title 'Issue pipeline: from issue to merged PR', first in the Features nav before features/planning",
+        "rationale": "The issue names the path, the example title and 'put it first in Features'; #5469's comment asks to keep issue-pipeline first and planning right after it."
+      },
+      {
+        "summary": "Document the test role as it behaves today and filed #5537 instead of fixing it",
+        "rationale": "Nothing emits review.approved, so the test role never starts after review; none of the last 12 merged PRs has a test or UAT verdict. The issue requires claims to match code and is docs-only, so the page states current behavior behind an implementation checkpoint that switches wording if #5537 lands first."
+      },
+      {
+        "summary": "Code wins over --help text for pan reopen, pan strike and pan start --force",
+        "rationale": "reopen resets no specialist state (it is derived), strikes auto-merge after one quick review (v0.86.0), and --force clears the operator-decision gate only with --fresh; the issue says every claim must match current code."
+      },
+      {
+        "summary": "Review is documented as quick by default with the convoy in full mode",
+        "rationale": "roles.review.mode defaults to 'quick' in src/lib/config-yaml/roles.ts; the issue's phrase 'review convoy' is covered by linking /features/convoys for full mode."
+      },
+      {
+        "summary": "No screenshots",
+        "rationale": "The images/dashboard set dates from June 2026 and shows the old brand; the issue forbids inventing UI. Sibling PAN-5474 made the same call."
+      },
+      {
+        "summary": "One-line cross-links in six pages; stale claims there are reported, not fixed",
+        "rationale": "#5502, #5499 and #5505 own the accuracy audits of specialists, concepts and introduction; comments with the findings were posted on #5502 and #5499 to avoid conflicting rewrites."
+      },
+      {
+        "summary": "No link to cli/pipeline-commands and no close-out settings docs",
+        "rationale": "#5478 creates the CLI page and #5479 owns close-out settings; linking a missing page would fail broken-links."
+      },
+      {
+        "summary": "Pin mint@4.3.49 and never run mint validate --fix",
+        "rationale": "Sibling docs issues standardized on that version; --fix rewrites about 80 files other issues edit in parallel."
+      }
+    ],
+    "items": [
+      {
+        "id": "page-skeleton",
+        "title": "Create the issue pipeline page skeleton and its docs.json nav entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:11:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/issue-pipeline.mdx",
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '\"features/issue-pipeline\"' docs.json",
+            "head -6 features/issue-pipeline.mdx",
+            "npx -y mint@4.3.49 broken-links"
+          ],
+          "expected_outputs": [
+            "grep prints 1",
+            "frontmatter shows the D-1 title, sidebarTitle and description",
+            "broken-links exits 0 and reports no broken links"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-16",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create features/issue-pipeline.mdx with the D-1 frontmatter (title 'Issue pipeline: from issue to merged PR', sidebarTitle 'Issue pipeline', the D-1 description verbatim), an '# Issue pipeline: from issue to merged PR' heading, a 2-3 sentence intro saying state is read from git, the tracker and the PR, a '## The pipeline at a glance' table (columns Stage, Who runs it, What moves it on; rows Plan, Work, Verification, Review, Tests and UAT, Merge, Close-out) and a final '## Get help' section linking https://discord.gg/ZpHE2ZTv5P and https://github.com/eltmon/overdeck/issues. In docs.json insert \"features/issue-pipeline\" as the first page of the Features group, directly before \"features/planning\". Facts, anchors and wording rules are in .pan/drafts/PAN-5468.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and append this section after the previous one. [Decisions D-1, D-7; Page outline]"
+        },
+        "items": [
+          {
+            "id": "page-skeleton.ac1",
+            "title": "Given docs.json, when `grep -c '\"features/issue-pipeline\"' docs.json` runs, then it prints 1 and that entry is the first page of the Features group, directly before features/planning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-skeleton.ac2",
+            "title": "The page frontmatter contains title \"Issue pipeline: from issue to merged PR\", sidebarTitle \"Issue pipeline\" and a description of 50 to 160 characters containing no U+2013 or U+2014",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-skeleton.ac3",
+            "title": "The page contains a '## The pipeline at a glance' table with the rows Plan, Work, Verification, Review, Tests and UAT, Merge and Close-out",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-skeleton.ac4",
+            "title": "The page contains, as its last section, a '## Get help' section that links https://discord.gg/ZpHE2ZTv5P and https://github.com/eltmon/overdeck/issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-start-plan",
+        "title": "Add the Start an issue and Plan sections",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:11:05Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/issue-pipeline.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Start an issue$/{f=1;print;next} /^## /{f=0} f' features/issue-pipeline.mdx",
+            "awk '/^## Plan$/{f=1;print;next} /^## /{f=0} f' features/issue-pipeline.mdx",
+            "pan start --help"
+          ],
+          "expected_outputs": [
+            "both sections print; every flag named appears in pan start --help"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Write '## Start an issue': pan start; a table of --plan interactive|auto|skip and what each does; the default from planning.default_mode with shipped default auto; planning runs only when no plan exists; pan start starts the work agent when planning finalizes; the dashboard Plan dialog waits in Planned unless 'Start work as soon as the plan is ready' is ticked, and the Start work issue action; --plan-model, --fresh and --force (paused and troubled gates only). Then '## Plan': one paragraph linking /features/planning. Facts, anchors and wording rules are in .pan/drafts/PAN-5468.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and append this section after the previous one. [Background: Start an issue; Plan; D-4]"
+        },
+        "items": [
+          {
+            "id": "section-start-plan.ac1",
+            "title": "The Start an issue section contains `--plan interactive`, `--plan auto`, `--plan skip` and `planning.default_mode` and states that the shipped default is auto",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-start-plan.ac2",
+            "title": "The section states that planning runs only when the issue has no plan yet and that pan start then starts the work agent when planning finalizes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-start-plan.ac3",
+            "title": "The section contains a sentence stating that planning started from the dashboard Plan dialog waits in Planned unless the box 'Start work as soon as the plan is ready' is ticked, and names the `Start work` action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-start-plan.ac4",
+            "title": "The Plan section contains a link to /features/planning and does not mention a 'Start Agent' button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-work-done",
+        "title": "Add the Work and pan done section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:11:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/issue-pipeline.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Work and pan done$/{f=1;print;next} /^## /{f=0} f' features/issue-pipeline.mdx",
+            "pan done --help"
+          ],
+          "expected_outputs": [
+            "section prints with pan task, Item:, --test-waived and --force"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Write '## Work and pan done': the per-item loop (pan task claim, one commit per item with an Item: <id> trailer, push, pan task done), the agent runs only touched tests, pan done's three preflight refusals (open plan items or criteria, uncommitted changes, code without tests), --test-waived <reason>, --force, then rebase and push, open or update the PR, tracker to In Review, verification and review start. Facts, anchors and wording rules are in .pan/drafts/PAN-5468.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and append this section after the previous one. [Background: Work and pan done]"
+        },
+        "items": [
+          {
+            "id": "section-work-done.ac1",
+            "title": "The section contains `pan task`, `Item:` and `pan done` and names the three preflight refusals",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-work-done.ac2",
+            "title": "The section contains a sentence stating that `--test-waived <reason>` skips only the test-requirement check and `--force` skips all preflight checks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-work-done.ac3",
+            "title": "The section states that after preflight pan done pushes the branch, opens or updates the PR and starts verification and review",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-verification",
+        "title": "Add the Verification section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:11:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/issue-pipeline.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Verification$/{f=1;print;next} /^## /{f=0} f' features/issue-pipeline.mdx"
+          ],
+          "expected_outputs": [
+            "section prints with verification.tests, the attempt limit and the waiver command"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Write '## Verification': gates from quality_gates in projects.yaml (link /configuration/projects) or typecheck, lint and test by default; verification.tests ci versus local and auto-detection; in CI mode the CI test job on the PR head is the test gate; failures go to the work agent and review waits; 3 attempts per head, and the agent is paused with a Needs-you signal after the last attempt or the same check failing twice; the test-skip gate and pan review waive-test-removal. Facts, anchors and wording rules are in .pan/drafts/PAN-5468.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and append this section after the previous one. [Background: Verification gate]"
+        },
+        "items": [
+          {
+            "id": "section-verification.ac1",
+            "title": "The section contains `quality_gates`, `verification.tests` and a link to /configuration/projects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-verification.ac2",
+            "title": "The section states that review does not start until verification passes and that the work agent is paused after 3 failed attempts on one head or the same check failing twice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-verification.ac3",
+            "title": "The section contains `pan review waive-test-removal` and states that an added .skip or .only always fails",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-review",
+        "title": "Add the Review section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:11:05Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/issue-pipeline.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Review$/{f=1;print;next} /^## /{f=0} f' features/issue-pipeline.mdx",
+            "pan review --help"
+          ],
+          "expected_outputs": [
+            "section prints; every subcommand named appears in pan review --help"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Write '## Review': roles.review.mode quick (default, one reviewer), full (the review convoy, link /features/convoys) and none; the verdict is a PR review that counts only at the head commit; changes requested go back to the work agent as PR comments and a message; pan review request, restart [--role] and abort (link /cli/review-commands); the 25 automatic re-request cap; no round limit but 'Review loop not converging' in Needs you after 3 rounds without progress; a push after approval needs a new review. Facts, anchors and wording rules are in .pan/drafts/PAN-5468.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and append this section after the previous one. [Background: Review]"
+        },
+        "items": [
+          {
+            "id": "section-review.ac1",
+            "title": "The section contains `roles.review.mode` and states that `quick` is the default and `full` runs the review convoy, with a link to /features/convoys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-review.ac2",
+            "title": "The section contains `pan review request`, `pan review restart` and `pan review abort` and a link to /cli/review-commands, and does not contain `pan review reset`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-review.ac3",
+            "title": "The section contains a sentence stating that approval counts only for the head commit and that a push after approval gets a new review",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-review.ac4",
+            "title": "The section contains the text `Review loop not converging` and the cap of 25 automatic re-requests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-tests-uat",
+        "title": "Add the Tests and UAT section using the #5537 checkpoint",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:11:05Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/issue-pipeline.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Tests and UAT$/{f=1;print;next} /^## /{f=0} f' features/issue-pipeline.mdx",
+            "gh issue view 5537 --json state"
+          ],
+          "expected_outputs": [
+            "section prints and matches the D-3 branch for the observed #5537 state"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implementation checkpoint D-3: first run `gh issue view 5537 --json state,closedAt` and `git grep -n \"review\\.approved\" -- src`. If #5537 is open and nothing new emits review.approved, write '## Tests and UAT' saying: in CI mode the CI test job on the PR head is the test gate and the merge gate requires it; the test role runs the gates and browser UAT and records two separate verdicts; a failed UAT verdict at the head blocks merge and a passed UAT is never required; today the test role starts only on pan review request for an approved PR whose checks are not green, or on unpause, and link https://github.com/eltmon/overdeck/issues/5537. If #5537 is closed or an emitter exists, read the fix and describe the test role as starting after review approves, without the #5537 link. Record which branch you took in the commit message. Facts, anchors and wording rules are in .pan/drafts/PAN-5468.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and append this section after the previous one. [Background: Tests and UAT; D-3]"
+        },
+        "items": [
+          {
+            "id": "section-tests-uat.ac1",
+            "title": "The section states that a failed UAT verdict at the PR head blocks merge and that a passed UAT is not required to merge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-tests-uat.ac2",
+            "title": "The section contains a sentence stating that the CI test job on the PR head is the test gate in CI mode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-tests-uat.ac3",
+            "title": "When #5537 is open at writing time, the section links https://github.com/eltmon/overdeck/issues/5537 and does not claim the test role starts automatically after every review; when it is closed, the section describes the fixed trigger and has no #5537 link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-tests-uat.ac4",
+            "title": "The item's commit message contains the D-3 branch taken and the #5537 state observed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-feedback",
+        "title": "Add the section on feedback the work agent receives",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:11:05Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/issue-pipeline.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Feedback the work agent receives$/{f=1;print;next} /^## /{f=0} f' features/issue-pipeline.mdx",
+            "pan sync-main --help"
+          ],
+          "expected_outputs": [
+            "section prints with CodeRabbit, pan sync-main and 45 minutes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Write '## Feedback the work agent receives' with three subsections: CI failures (relayed with failing-log excerpts, failures also on main are tagged as inherited, counts against the verification budget in CI mode); CodeRabbit (advisory, never gates merge, findings relayed to the work agent who fixes or replies, open findings after merge become a 'CodeRabbit follow-up for' issue); merge conflicts (before review a resolver run, after approval one pan sync-main repair per head and Needs you after 45 minutes, at merge the server rebase with agent fallback). Explain that pan sync-main merges main without pushing and aborts on conflicts outside .pan/. Facts, anchors and wording rules are in .pan/drafts/PAN-5468.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and append this section after the previous one. [Background: Feedback that returns to the work agent]"
+        },
+        "items": [
+          {
+            "id": "section-feedback.ac1",
+            "title": "The section contains `CodeRabbit` and states that CodeRabbit never blocks a merge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-feedback.ac2",
+            "title": "The section contains `pan sync-main` and states that it merges main into the branch without pushing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-feedback.ac3",
+            "title": "The section contains `45 minutes` as the conflict-repair wait before Needs you",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-feedback.ac4",
+            "title": "The section contains a sentence stating that a failed CI check is relayed to the work agent with excerpts from the failing log",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-needs-you",
+        "title": "Add the Needs you and pan ask section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:11:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/issue-pipeline.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Needs you and pan ask$/{f=1;print;next} /^## /{f=0} f' features/issue-pipeline.mdx",
+            "pan ask --help",
+            "pan parked --help"
+          ],
+          "expected_outputs": [
+            "section prints; flags named appear in --help"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Write '## Needs you and pan ask': the top bar 'Needs you · N' button plus the project Home and Board panels, what lands there (agent questions, permission prompts, plans to approve, pan ask decisions, stuck verification, non-converging review, conflict repair timeouts), pan ask with --option (2 to 4), --context and --withdraw, the Decision dialog and how the answer returns as a message, pan answer for pane menus and pan parked for parked issues. Facts, anchors and wording rules are in .pan/drafts/PAN-5468.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and append this section after the previous one. [Background: Needs you and pan ask]"
+        },
+        "items": [
+          {
+            "id": "section-needs-you.ac1",
+            "title": "The section contains the label `Needs you · N` and lists at least four kinds of items that appear there",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-needs-you.ac2",
+            "title": "The section contains `pan ask`, `--option`, `--context` and `--withdraw` and states that the answer arrives in the agent's session as a message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-needs-you.ac3",
+            "title": "The section contains `pan answer` and `pan parked`, each with a one-sentence purpose matching its --help text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-merge",
+        "title": "Add the Merge section with the one merge gate",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:11:05Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/issue-pipeline.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Merge$/{f=1;print;next} /^## /{f=0} f' features/issue-pipeline.mdx",
+            "pan merge --help"
+          ],
+          "expected_outputs": [
+            "section prints with the gate conditions, the default and both links"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Write '## Merge': the one merge gate and its conditions (open, not draft, approved at head, no changes requested, checks green, CI test job passed in CI mode, no failed UAT at head, mergeable) asked by every merge path; the Merge button (direct merge for a clean PR, server rebase otherwise with work-agent fallback, squash merge); Awaiting Merge with a link to /features/dashboard-views#awaiting-merge; the merge policy precedence (Auto/Hold label, project auto_merge_default, global require_uat_before_merge defaulting to true) so by default you click Merge; with the hold off ready PRs merge after a 5-minute cooldown and pan merge cancel <id> stops one (link /configuration/auto-merge); the merge train is off by default (link /features/merge-batches); Pipeline Override with Force Approve and Force Merge bypassing the pipeline. Paraphrase the Auto/Hold tooltips (they contain em dashes). Facts, anchors and wording rules are in .pan/drafts/PAN-5468.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and append this section after the previous one. [Background: Merge]"
+        },
+        "items": [
+          {
+            "id": "section-merge.ac1",
+            "title": "The section contains the merge gate conditions including approval at the head commit, green checks, no failed UAT at the head and mergeable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-merge.ac2",
+            "title": "The section contains `require_uat_before_merge` and states that by default a ready PR waits for a person to click Merge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-merge.ac3",
+            "title": "The section contains `pan merge cancel` and a 5-minute cooldown, and links /configuration/auto-merge and /features/merge-batches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-merge.ac4",
+            "title": "The section contains `Force Approve` and `Force Merge` and states that they bypass the pipeline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-merge.ac5",
+            "title": "The section contains links to /features/dashboard-views#awaiting-merge and states that the Merge button squash-merges the PR",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-strikes",
+        "title": "Add the Strikes section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:11:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/issue-pipeline.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Strikes: the short path$/{f=1;print;next} /^## /{f=0} f' features/issue-pipeline.mdx",
+            "pan strike --help"
+          ],
+          "expected_outputs": [
+            "section prints; flags named appear in pan strike --help"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Write '## Strikes: the short path': pan strike <ids...> for small, understood fixes; strike/<id> branch and workspaces/feature-<id>-strike; no plan, no convoy, no test role; one automatic quick review per head and, when it approves, an automatic merge ahead of the queue with the 5-minute cancel window unless the project holds for UAT; a changes-requested verdict stops the strike; cleanup after merge; pan done --strike only checks containment in main. Per D-4, do not quote the help text 'for the operator to merge'. Facts, anchors and wording rules are in .pan/drafts/PAN-5468.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and append this section after the previous one. [Background: Strikes; D-4]"
+        },
+        "items": [
+          {
+            "id": "section-strikes.ac1",
+            "title": "The section contains `pan strike` and `strike/<id>`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-strikes.ac2",
+            "title": "The section contains a sentence stating that an approved strike PR merges itself after the cancel window unless the project holds PRs for UAT",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-strikes.ac3",
+            "title": "The section contains a sentence stating that a strike gets one quick review and that a changes-requested verdict stops it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-closeout",
+        "title": "Add the After merge: close-out section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:11:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/issue-pipeline.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## After merge: close-out$/{f=1;print;next} /^## /{f=0} f' features/issue-pipeline.mdx",
+            "pan close --help"
+          ],
+          "expected_outputs": [
+            "section prints with nine rows and the warning"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Write '## After merge: close-out': the post-merge lifecycle, the PR does not close the issue, pan close and the nine Definition of Done rows by name, --accept-* overrides for rows 1 to 8 recorded in the close-out record, row 9 not overridable, the Close Out button, automatic close-out removed, and a warning that once the issue is closed and the branch merged Overdeck deletes workspaces/feature-<id>/ and the feature branch, so keep nothing you need there. Facts, anchors and wording rules are in .pan/drafts/PAN-5468.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and append this section after the previous one. [Background: After merge: close-out]"
+        },
+        "items": [
+          {
+            "id": "section-closeout.ac1",
+            "title": "The section contains all nine DoD rows from Review passed to Close-out teardown verified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-closeout.ac2",
+            "title": "The section contains `--accept-` and states that row 9 cannot be overridden",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-closeout.ac3",
+            "title": "The section contains `Close Out` and warns that the workspace directory and feature branch are deleted after close",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-show-journal",
+        "title": "Add the pan show and pipeline journal section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:11:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/issue-pipeline.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Watch an issue: pan show and the pipeline journal$/{f=1;print;next} /^## /{f=0} f' features/issue-pipeline.mdx",
+            "pan show --help"
+          ],
+          "expected_outputs": [
+            "section prints with pan show, pipeline.jsonl and the link"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Write '## Watch an issue: pan show and the pipeline journal': pan show <id> output (state values, needs, the last 6 journal entries, health, effort, cv) and --cv/--context/--health/--json; state is derived from git, the tracker and the PR; the journal at <workspace>/.overdeck/pipeline.jsonl is append-only, deleted with the workspace, and when it disagrees with the PR the PR wins; the dashboard has no raw journal view; link /reference/state-model. Facts, anchors and wording rules are in .pan/drafts/PAN-5468.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and append this section after the previous one. [Background: Watch an issue]"
+        },
+        "items": [
+          {
+            "id": "section-show-journal.ac1",
+            "title": "The section contains `pan show` and lists the state values backlog through closed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-show-journal.ac2",
+            "title": "The section contains `pipeline.jsonl` and states that the PR wins when it disagrees with the journal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-show-journal.ac3",
+            "title": "The section contains links to /reference/state-model and names the --json flag as the way to see the whole journal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-restart",
+        "title": "Add the Restart, rerun or reopen section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:11:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/issue-pipeline.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Restart, rerun or reopen$/{f=1;print;next} /^## /{f=0} f' features/issue-pipeline.mdx",
+            "grep -c -E 'resets specialist state|pan review reset' features/issue-pipeline.mdx"
+          ],
+          "expected_outputs": [
+            "section prints; grep prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Write '## Restart, rerun or reopen' as the PRD table (pan recover, pan resume, pan start --fresh, pan unpause / pan untroubled / pan start --force, pan review request, pan review restart, pan review abort, pan reopen), plus one sentence that pan kill stops agents and keeps the workspace. Describe pan reopen per D-4 (reopens the tracker issue, adds in-progress, posts a comment; refuses an open issue unless --force). Do not recommend pan wipe. Facts, anchors and wording rules are in .pan/drafts/PAN-5468.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and append this section after the previous one. [Background: Restart, rerun or reopen; D-4]"
+        },
+        "items": [
+          {
+            "id": "section-restart.ac1",
+            "title": "The section's table contains `pan reopen`, `pan review restart`, `pan recover`, `pan resume` and `--fresh`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-restart.ac2",
+            "title": "The page contains neither `resets specialist state` nor `pan review reset` nor a recommendation to run pan wipe",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-restart.ac3",
+            "title": "The section contains a sentence stating that pan reopen is for closed, completed or cancelled issues and pan review restart is for issues already in progress",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "xlink-features",
+        "title": "Link the page from the specialists, planning and convoys pages",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:11:05Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/specialists.mdx",
+            "features/planning.mdx",
+            "features/convoys.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c /features/issue-pipeline features/specialists.mdx features/planning.mdx features/convoys.mdx",
+            "git diff --numstat origin/main -- features/specialists.mdx features/planning.mdx features/convoys.mdx"
+          ],
+          "expected_outputs": [
+            "each grep count is 1; numstat shows 0 deletions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add one line each, nothing else: features/specialists.mdx a '- [Issue pipeline](/features/issue-pipeline)' bullet at the top of '## Related'; features/planning.mdx one sentence 'See [Issue pipeline](/features/issue-pipeline) for what happens after planning, from work to merge.' appended as its own paragraph directly before '## Get help'; features/convoys.mdx a '- [Issue pipeline](/features/issue-pipeline) - Every stage from start to merge' bullet in '## Related Guides'. Use no dashes other than the ASCII hyphen. Facts, anchors and wording rules are in .pan/drafts/PAN-5468.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and append this section after the previous one."
+        },
+        "items": [
+          {
+            "id": "xlink-features.ac1",
+            "title": "`grep -c /features/issue-pipeline` prints 1 for each of features/specialists.mdx, features/planning.mdx and features/convoys.mdx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xlink-features.ac2",
+            "title": "`git diff --numstat origin/main -- features/specialists.mdx features/planning.mdx features/convoys.mdx` shows at most 2 added lines and 0 deleted lines per file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "xlink-other",
+        "title": "Link the page from concepts, auto-merge and review commands pages",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:11:05Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "concepts.mdx",
+            "configuration/auto-merge.mdx",
+            "cli/review-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c /features/issue-pipeline concepts.mdx configuration/auto-merge.mdx cli/review-commands.mdx",
+            "git diff --numstat origin/main -- concepts.mdx configuration/auto-merge.mdx cli/review-commands.mdx"
+          ],
+          "expected_outputs": [
+            "counts 2, 1, 1; numstat shows 0 deletions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add, nothing else: concepts.mdx one sentence 'See [Issue pipeline](/features/issue-pipeline) for every stage from start to close-out.' at the end of the '## Specialists' paragraph (before the image) and a '- [Issue pipeline](/features/issue-pipeline) - Follow an issue from start to merge' bullet at the top of '## Next Steps'; configuration/auto-merge.mdx a '- [Issue pipeline](/features/issue-pipeline): the one merge gate and the Merge button' bullet at the top of '## Related'; cli/review-commands.mdx a '- [Issue pipeline](/features/issue-pipeline) - Where review sits in the pipeline' bullet in '## Related Commands'. Facts, anchors and wording rules are in .pan/drafts/PAN-5468.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and append this section after the previous one."
+        },
+        "items": [
+          {
+            "id": "xlink-other.ac1",
+            "title": "`grep -c /features/issue-pipeline concepts.mdx` prints 2, and the count is 1 for configuration/auto-merge.mdx and cli/review-commands.mdx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xlink-other.ac2",
+            "title": "`git diff --numstat origin/main -- concepts.mdx configuration/auto-merge.mdx cli/review-commands.mdx` shows 0 deleted lines for each file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "validate-and-record",
+        "title": "Run the Mintlify, dash and scope checks and record them in the PR body",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T19:11:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/issue-pipeline.mdx",
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx -y mint@4.3.49 validate",
+            "npx -y mint@4.3.49 broken-links",
+            "git diff origin/main...HEAD -U0 -- '*.mdx' docs.json | grep '^+' | grep -P '[\\x{2013}\\x{2014}]'",
+            "git diff --name-only origin/main...HEAD | grep -v -E '^\\.pan/'"
+          ],
+          "expected_outputs": [
+            "validate exits 0",
+            "broken-links exits 0 with no broken links",
+            "dash grep prints nothing",
+            "scope lists only the eight docs files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1",
+            "NFR-2",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Documentation work item. The docs files this issue touches are exactly features/issue-pipeline.mdx, docs.json, concepts.mdx, features/specialists.mdx, features/planning.mdx, features/convoys.mdx, configuration/auto-merge.mdx and cli/review-commands.mdx. Run `npx -y mint@4.3.49 validate` and `npx -y mint@4.3.49 broken-links` (never --fix), the dash check `git diff origin/main...HEAD -U0 -- '*.mdx' docs.json | grep '^+' | grep -P '[\\x{2013}\\x{2014}]'`, and the scope check `git diff --name-only origin/main...HEAD | grep -v -E '^\\.pan/' `. Fix anything they report in the page, then put a 'Mintlify checks' section with both outputs in the PR body. Facts, anchors and wording rules are in .pan/drafts/PAN-5468.md (section named in brackets); re-grep every anchor before writing. Obey the dash rule (no U+2013/U+2014) and append this section after the previous one."
+        },
+        "items": [
+          {
+            "id": "validate-and-record.ac1",
+            "title": "When `npx -y mint@4.3.49 validate` runs on the branch, then it exits 0 and reports no error for features/issue-pipeline.mdx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-record.ac2",
+            "title": "When `npx -y mint@4.3.49 broken-links` runs on the branch, then it exits 0 and prints that no broken links were found",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-record.ac3",
+            "title": "When the dash check runs on the final commit, then it prints no lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-record.ac4",
+            "title": "When the scope check runs, then it lists only the eight docs files named in this item",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-record.ac5",
+            "title": "The PR body contains a 'Mintlify checks' section with the final output line of both mint commands",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "page-skeleton",
+        "to": "section-start-plan",
+        "type": "blocks"
+      },
+      {
+        "from": "section-start-plan",
+        "to": "section-work-done",
+        "type": "blocks"
+      },
+      {
+        "from": "section-work-done",
+        "to": "section-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "section-verification",
+        "to": "section-review",
+        "type": "blocks"
+      },
+      {
+        "from": "section-review",
+        "to": "section-tests-uat",
+        "type": "blocks"
+      },
+      {
+        "from": "section-tests-uat",
+        "to": "section-feedback",
+        "type": "blocks"
+      },
+      {
+        "from": "section-feedback",
+        "to": "section-needs-you",
+        "type": "blocks"
+      },
+      {
+        "from": "section-needs-you",
+        "to": "section-merge",
+        "type": "blocks"
+      },
+      {
+        "from": "section-merge",
+        "to": "section-strikes",
+        "type": "blocks"
+      },
+      {
+        "from": "section-strikes",
+        "to": "section-closeout",
+        "type": "blocks"
+      },
+      {
+        "from": "section-closeout",
+        "to": "section-show-journal",
+        "type": "blocks"
+      },
+      {
+        "from": "section-show-journal",
+        "to": "section-restart",
+        "type": "blocks"
+      },
+      {
+        "from": "page-skeleton",
+        "to": "xlink-features",
+        "type": "blocks"
+      },
+      {
+        "from": "page-skeleton",
+        "to": "xlink-other",
+        "type": "blocks"
+      },
+      {
+        "from": "section-restart",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "xlink-features",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "xlink-other",
+        "to": "validate-and-record",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
