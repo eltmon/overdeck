@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5471",
   "created": "2026-11-18T14:58:50.204Z",
-  "updated": "2026-11-18T15:06:13.598Z",
+  "updated": "2026-11-18T15:06:21.738Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,6 +34,11 @@
     "model-routing-page.ac5": {
       "status": "completed",
       "doneAt": "2026-11-18T15:06:13.597Z"
+    },
+    "docs-nav-entry": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5471",
+      "claimedAt": "2026-11-18T15:06:21.738Z"
     }
   }
 }
