@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5478",
   "created": "2026-11-18T19:16:06.870Z",
-  "updated": "2026-11-18T19:35:55.051Z",
+  "updated": "2026-11-18T19:37:24.096Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -266,9 +266,22 @@
       "doneAt": "2026-11-18T19:35:49.177Z"
     },
     "core-cost-models": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5478",
-      "claimedAt": "2026-11-18T19:35:55.051Z"
+      "claimedAt": "2026-11-18T19:35:55.051Z",
+      "doneAt": "2026-11-18T19:37:24.095Z"
+    },
+    "core-cost-models.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:37:24.095Z"
+    },
+    "core-cost-models.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:37:24.095Z"
+    },
+    "core-cost-models.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:37:24.095Z"
     }
   }
 }
