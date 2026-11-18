@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5503",
   "created": "2026-11-18T23:39:30.709Z",
-  "updated": "2026-11-18T23:53:15.398Z",
+  "updated": "2026-11-18T23:53:36.479Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -347,6 +347,22 @@
     "audit-knowledge.ac3": {
       "status": "completed",
       "doneAt": "2026-11-18T23:53:15.397Z"
+    },
+    "audit-semgrep": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:53:36.478Z"
+    },
+    "audit-semgrep.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:53:36.478Z"
+    },
+    "audit-semgrep.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:53:36.478Z"
+    },
+    "audit-semgrep.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:53:36.478Z"
     }
   }
 }
