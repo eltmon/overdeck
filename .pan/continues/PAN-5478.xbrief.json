@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5478",
   "created": "2026-11-18T19:16:06.870Z",
-  "updated": "2026-11-18T19:28:54.392Z",
+  "updated": "2026-11-18T19:29:47.574Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -176,9 +176,18 @@
       "doneAt": "2026-11-18T19:28:48.782Z"
     },
     "pipe-swarm-spawn": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5478",
-      "claimedAt": "2026-11-18T19:28:54.391Z"
+      "claimedAt": "2026-11-18T19:28:54.391Z",
+      "doneAt": "2026-11-18T19:29:47.574Z"
+    },
+    "pipe-swarm-spawn.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:29:47.574Z"
+    },
+    "pipe-swarm-spawn.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T19:29:47.574Z"
     }
   }
 }
