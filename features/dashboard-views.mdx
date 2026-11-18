@@ -1,0 +1,231 @@
+---
+title: "Dashboard views: Home, Board, Pipeline and the Experimental switch"
+sidebarTitle: "Dashboard views"
+description: "Every Overdeck dashboard view, how to reach it from the left nav, and which views the Experimental features setting reveals."
+---
+
+import { ThemedImage } from "/snippets/themed-image.mdx";
+
+The Overdeck dashboard runs at `https://overdeck.localhost` (or `http://localhost:3011` on a plain
+install). This page lists every view, where it lives in the navigation, and what it shows.
+
+## Find a view
+
+The left column holds four always-visible entries: **Project home** (shown only when a project is
+selected), **Flywheel** (shows "running" while a run is active), **Order books**, and **More**, a
+dropdown labeled "More views" with every other view in four groups:
+
+- **Operations**: Backlog, Board, Pipeline, Awaiting Merge, Agents, AutoPreso
+- **Infrastructure**: Resources
+- **Observability**: Activity, Sessions, Metrics, Costs, Health, Deacon
+- **System**: Knowledge, Skills, Context, Settings, God View
+
+The Overdeck brand in the top bar always opens Home. A few views also have a `G` keyboard shortcut
+(press `G`, let go, then the second key); see [Keyboard shortcuts](/features/keyboard-shortcuts) for
+the full list.
+
+Views marked **Experimental** below only appear in the More menu, and only resolve by direct URL,
+once [Experimental features](#experimental-features) is turned on.
+
+| View | Path | Purpose |
+| --- | --- | --- |
+| Home | `/` | The landing page: Simple or Advanced briefing, and the composer. |
+| Project home | `/command-deck/<project>` | A selected project's conversations, issues and workspaces. |
+| Flywheel | `/flywheel` | The autonomous Fix-All loop: order books and its own run state. |
+| Order books | `/orders` | The backlog sequence the Flywheel works from. |
+| Backlog | `/backlog` | The server-ranked dependency graph of not-yet-started work. |
+| Board | `/board` | The kanban view: Backlog, Plan, Work, Review, Done. |
+| Pipeline | `/pipeline` | Every issue by lifecycle phase, across projects. |
+| Awaiting Merge | `/awaiting-merge` | Issues that are approved, green and ready to merge. |
+| Agents | `/agents` | Experimental. Running agents, what needs you, and the pipeline queue. |
+| AutoPreso | `/autopreso` | Experimental. A voice-driven drawing canvas with a live transcript. |
+| Resources | `/resources` | Experimental. Containers and agents grouped by issue, type or status. |
+| Activity | `/activity` | A live feed of agent and system activity. |
+| Sessions | `/sessions` | Experimental. A searchable index of past harness sessions. |
+| Metrics | `/metrics` | Experimental. The metrics dashboard. |
+| Costs | `/costs` | Experimental. Spend by issue, model and stage. |
+| Health | `/health` | Experimental. Host health and agent health. |
+| Deacon | `/deacon` | The patrol process that watches and resumes agents. |
+| Knowledge | `/knowledge` | The project's OKF knowledge bundle, read-only. |
+| Skills | `/skills` | Turn skills on or off for every agent. |
+| Context | `/context` | Edit the machine, project and workspace context layers. |
+| Settings | `/settings` | Every configuration section, autosaving. |
+| God View | `/god-view` | Experimental. A live activity river across agents. |
+
+## Home
+
+Home has two modes, **Simple** and **Advanced**, picked with a two-button switch in the Home header
+in either mode. A fresh browser profile opens in Simple; a browser that has used the dashboard before
+(it already has a last-viewed tab) opens in Advanced. The choice is stored per browser and is not a
+server setting.
+
+**Simple Home** leads with a headline that counts what needs you (or reads "Hello."), three stats
+(`being worked on`, `ready to merge`, `finished this week`), the composer, and the Get set up card.
+Below that, sections appear in order: Needs you, Ready to start (only when non-empty), Having trouble
+(only when non-empty), Just filed, Working now, Ready to merge, and Finished (up to 8 rows). Simple
+Home never merges on its own; you click **Merge to main** yourself.
+
+**Advanced Home** leads with the title "System briefing", the composer and the Get set up card, then
+summary tiles for Agents working, Paused, Ready to merge, Needs you and Cost today, followed by the
+Activity Feed, Workspaces, Knowledge Registry and Projects sections.
+
+Home is the global landing page at `/`. It is not the same thing as **Project home**, which is one
+project's pane inside the Command Deck.
+
+**The Home composer** starts work directly from typed text. Typing anywhere on the page focuses it.
+Once you type, a dropdown offers `Ask <agent>:` (Enter, starts a conversation), `Run in terminal:`
+(`Ctrl+Enter`, opens a terminal in the project's Command Deck), a Codex row when Codex is installed
+and not already selected, and, in Simple mode only, `Talk it through first:` (discusses the task
+before filing anything). A project chip picks which project the work lands in; its menu ends with
+**Add a project…**. Model and effort pickers sit in the same row.
+
+**The Get set up card** is titled "Get set up" with the subtitle "A few things make Overdeck work
+best. Nothing here stops you from starting." Its rows cover signing in to Claude, connecting GitHub,
+getting agents ready (shown only when the terminal backend is not tmux), installing a terminal
+helper, and Docker (optional); Advanced mode adds a row for reaching the machine remotely when no
+machine is linked. A memory line warns that new agents may wait when free memory is low. **Set up**
+expands a row to the commands to run yourself (the card never installs anything for you), and
+**Re-check** re-runs the checks. The **Hide** (×) button dismisses the card for your browser, but it
+comes back while a required check still fails. On every other view, a top banner offers the same
+checklist whenever a required tool is missing.
+
+## Board
+
+The Board (`/board`) shows five columns, in order: **Backlog**, **Plan**, **Work**, **Review**,
+**Done**. Plan holds backlog issues that are being planned or already have a plan; Done shows the 12
+most recent issues with a "show all" toggle. A **Needs you** strip sits above the columns, with item
+kinds Question, Plan ready, Problems found and Stuck.
+
+Each card shows the issue ID, a status badge, the title, labels, task progress, the agent and model,
+runtime and cost, and the same action menu used everywhere else (click, or right-click). Clicking a
+card opens the issue drawer; `j`/`k` move between cards and `Enter` opens one. The filter bar offers a
+`Cycle:` selector (Current, All, Backlog, Canceled), an `Include closed-out` toggle, a force-refresh
+button, and project chips when more than one project is active.
+
+You can drag a card to reorder it inside its column. The order is not saved, and dropping a card on
+another column does nothing. To move an issue forward, use its action menu instead.
+
+## Pipeline
+
+The Pipeline (`/pipeline`) has a `List` / `Board` / `Analytics` switch (Board opens the Board view,
+Analytics opens Metrics) and five metric tiles: Active issues, Work running, Review running, Ship,
+and Spend (24h). Rows are grouped into five lanes, in order: **Ship**, **Review**, **Work**, **Plan**,
+**Ready**. Raw backlog issues are not shown; a backlog issue appears under Ready once it carries the
+`ready` label or the tracker marks it unstarted.
+
+Filters include phase chips (All, Ship, Review, Work, Plan, Ready), project chips, `Blocked` (red
+checks, or a PR that cannot merge), and `No PR`. Filters live in the URL, so a filtered Pipeline view
+can be bookmarked. A row shows priority, issue ID, title, status badge, an auto-merge badge (`auto`,
+`hold` or `default`), project, labels, agent and model, runtime and cost; click or `Enter` opens the
+drawer, right-click opens the action menu, and clicking the auto-merge badge switches it between auto
+and hold.
+
+## Awaiting Merge
+
+Awaiting Merge (`/awaiting-merge`) lists issues that are approved, have green checks and can merge,
+with the empty state "Nothing awaiting merge." At the top sit a **Merge train** switch (see
+[Merge batches](/features/merge-batches)) and a collapsible **Merge policy** summary.
+
+Each row shows the issue ID and title, **View PR**, a **UAT** link that opens the workspace's running
+app (or **Rebuild to UAT** when the stack is down), an Auto/Hold toggle (see
+[Auto-merge](/configuration/auto-merge)), a **Merge** button, and an expandable panel with what to
+test and the expected changes. **Blocked from Merge** lists PRs with failing checks or merge
+conflicts, read only. A collapsed **Pipeline Override** section lists open PRs that are not ready,
+with **Force Approve** and **Force Merge** buttons; both ask for confirmation, and both bypass review
+and checks.
+
+## Issue drawer and full issue view
+
+Clicking any issue, or opening `/issues/<id>` directly, opens the **issue drawer** over whatever view
+you were on (or over Pipeline if you had none). In Simple mode, `/issues/<id>` opens the Simple issue
+page instead. `Escape` or a click outside closes the drawer.
+
+The drawer's header has the title, the issue action strip, a link to the tracker issue, and **Open
+pull request**. Below it, a phase strip shows Plan, Work, Review, Test, Ship, Done. Nine tabs follow:
+Conversation, Tasks, Plan, Changes, Activity, Decisions, Discussion, Skills, Details. Decisions shows
+only for Deft issues, and Skills hides when the issue has no project. Conversation splits into
+Conversation / Terminal; Plan into Map / PRD; Changes into Files / Checks / Artifacts; Activity into
+Feed / Status history.
+
+The same content opens as a full page at `/command-deck/<project>/<issue>`, as a Command Deck tab
+with a breadcrumb and an **Open tracker** link. See [Command Deck](/features/mission-control).
+
+<ThemedImage
+  light="/images/command-deck/issue-cockpit-light.png"
+  dark="/images/command-deck/issue-cockpit-dark.png"
+  alt="The full issue view: phase strip, tabs from Conversation to Details, and the work agent's conversation"
+/>
+
+## Activity
+
+Activity (`/activity`) opens on the **Feed** tab, with scope chips **Needs you**, **Project** (only
+with a project selected) and **Global**, narrowed further by **All**, **Chats** and **Activity**
+tabs. With [Experimental features](#experimental-features) on, three more streams appear: **Activity
+Log**, **Detailed** and **TTS**.
+
+## Knowledge
+
+Knowledge (`/knowledge`) embeds the selected project's OKF knowledge bundle in a read-only viewer.
+With no bundle configured it shows "No knowledge bundle configured" and the command `/okf init`.
+Edits go through `/okf author`; anything typed in the viewer itself is discarded. From the CLI, use
+`pan knowledge` or `pan knowledge open`. See [Knowledge](/configuration/knowledge).
+
+## Context
+
+Context (`/context`) is headed "Agent context". Pick where text applies (Machine context, Project
+context, Workspace context), **Edit source** it, or use **Preview for agent** to see what a given
+harness actually receives, then **Save** or **Save & refresh outputs**. From the CLI, `pan context`
+offers `list`, `edit`, `sync`, `diff`, `validate` and `migrate`. See
+[Context layers](/configuration/context-layers).
+
+## Skills
+
+Skills (`/skills`) lists every skill under groups Core, Overdeck, Personal and Project, with filter
+chips All, Off, Core and Overridden below, plus a search box. Turning a skill on or off here is
+global, and takes effect at each agent's next launch. From the CLI, use `pan skills`. See
+[Skills](/features/skills).
+
+## Settings
+
+Settings (`/settings`) has a left-hand section list: Model Routing, Providers, Permissions,
+Security, Computer Use, Coding Agents, Tiered Execution, Swarming, Cloister, Close-out, Merge Train,
+Session Vault, Anywhere, Remote, Access Tokens, Voice, Conversations, Memory, Background AI,
+Terminal, TTS, Tracker Keys, GitHub Identities, Appearance, Diff, Desktop App, Maintenance,
+Telemetry, and Experimental (last). Every change saves automatically; Desktop App content only
+renders inside the desktop app. See [Model routing](/configuration/model-routing),
+[Appearance](/configuration/appearance), [Issue trackers](/configuration/issue-trackers),
+[Auto-merge](/configuration/auto-merge) and [Anywhere](/anywhere).
+
+## Experimental features
+
+The **Experimental features** switch lives in Settings, in the last section, **Experimental**
+("Research-preview features that may change or be removed without notice."). That section has three
+other toggles (RTK Bash compression, Claude Code Channels, and the Streamdown renderer), which this
+page does not document.
+
+Turning it on reveals eight views in the More menu:
+
+| View | Path | Shows |
+| --- | --- | --- |
+| Agents | `/agents` | Running agents, what needs you, and the pipeline queue; `?view=history` opens the [Agents Directory](/reference/agents-directory). |
+| AutoPreso | `/autopreso` | A voice-driven drawing canvas with a live transcript. |
+| Resources | `/resources` | Containers and agents grouped by issue, type or status. |
+| Sessions | `/sessions` | "Session History": a searchable index of past harness sessions. |
+| Metrics | `/metrics` | "Metrics Dashboard". |
+| Costs | `/costs` | "Cost Tracking": costs by issue, model and stage. |
+| Health | `/health` | Host health and agent health. |
+| God View | `/god-view` | A live activity river across agents; see [God View](/reference/god-view). |
+
+With the switch off, Activity keeps its Feed but loses the Activity Log, Detailed and TTS streams.
+With the switch off, a direct URL to one of the eight views above, a matching command palette entry,
+or its `G` shortcut lands on Home instead of the view.
+
+Flywheel, Order books, Backlog, Board, Pipeline, Awaiting Merge, Activity (Feed), Deacon, Knowledge,
+Skills, Context and Settings stay available regardless of the switch. In particular, **Activity and
+Skills are not experimental and stay available with the switch off**, even though the toggle's own
+description in Settings currently names them.
+
+## Get help
+
+Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file an issue on
+[GitHub Issues](https://github.com/eltmon/overdeck/issues).

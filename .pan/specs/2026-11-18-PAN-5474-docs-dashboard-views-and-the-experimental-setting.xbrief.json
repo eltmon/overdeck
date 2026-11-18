@@ -1,0 +1,1043 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-18T16:25:57Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5474: docs: dashboard views and the Experimental setting",
+    "updated": "2026-11-18T16:29:20.933Z"
+  },
+  "plan": {
+    "id": "pan-5474",
+    "title": "docs: dashboard views and the Experimental setting",
+    "status": "running",
+    "uid": "47f0d2bd-4ad0-4588-8a3b-8dcca9164969",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-18T16:25:57Z",
+    "updated": "2026-11-18T16:29:20.933Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5474",
+        "label": "PAN-5474",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5467",
+        "label": "PAN-5467 docs overhaul epic",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5532",
+        "label": "PAN-5532 UI text/filter bugs found in planning",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docs",
+      "dashboard",
+      "mintlify"
+    ],
+    "narratives": {
+      "Problem": "introduction.mdx still lists '13 views' including removed views (Mission Control, Convoys, Handoffs), and no docs page explains the current dashboard views, the Simple/Advanced Home, the left nav and More menu, or which views the Experimental features switch reveals.",
+      "Proposal": "Add one page, features/dashboard-views.mdx, built section by section from verified code facts in the PRD (.pan/drafts/PAN-5474.md): Find a view, Home, Board, Pipeline, Awaiting Merge, issue drawer and full issue view, Activity, Knowledge, Context, Skills, Settings, Experimental features, Get help. Add it to docs.json after features/mission-control, replace or link from the stale introduction table (checkpoint against PR #5528), add one cross-link line to five related pages, and record clean Mintlify checks in the PR body.",
+      "NonGoals": "- No changes under src/, scripts/, tests/, packages/ or apps/; no changelog.d entry\n- No fixes to the UI bugs filed as #5532 (Experimental description, Cycle filter, No PR chip, Merging label, palette reaching hidden views, dead drag code)\n- No rewrite of docs/KANBAN-MODEL.md (#2344) or docs/ISSUE-VIEW.md\n- No new or refreshed screenshots, and no use of the June images/dashboard/* set\n- No in-depth Flywheel, Order books, Backlog, Costs, command palette or issue pipeline docs (sibling issues own them)\n- No documentation of the other three Experimental toggles or of individual Settings sections\n- No edits to introduction.mdx beyond decision D-5\n- Never run mint validate --fix"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use only the issue-cockpit screenshot; skip the June images/dashboard set",
+        "rationale": "The June PNGs show the old Panopticon v0.21.0 brand and pre-PAN-5293 sidebar; the issue forbids inventing UI and allows only existing real screenshots, and issue-cockpit was captured 2026-11-14 and matches current tabs."
+      },
+      {
+        "summary": "Code wins over the Experimental toggle's own description",
+        "rationale": "EXPERIMENTAL_TAB_IDS omits activity and skills while the Settings text names them; the issue requires claims to match code. The page says once that Activity and Skills stay available, and the text bug is filed as #5532."
+      },
+      {
+        "summary": "Describe buggy controls by label only (Cycle options, No PR chip, pending merge label)",
+        "rationale": "Their behavior does not match their labels; documenting either would be wrong after the #5532 fix. Labels are stable facts."
+      },
+      {
+        "summary": "introduction.mdx edit uses a grep checkpoint against PR #5528",
+        "rationale": "PAN-5505's open PR already deletes the 13 views table; the work agent replaces it only if it still exists after sync-main, otherwise adds one link sentence, avoiding a conflicting rewrite."
+      },
+      {
+        "summary": "Nav slot directly after features/mission-control",
+        "rationale": "Command Deck is the main-view page; dashboard views is its natural neighbor, and inserting avoids reordering pages sibling issues own."
+      },
+      {
+        "summary": "Filed #5532 and commented on #2344 instead of widening scope",
+        "rationale": "The research found UI bugs and dev-doc drift outside a docs-only issue; recording them keeps them tracked without expanding this PR."
+      }
+    ],
+    "items": [
+      {
+        "id": "page-find-a-view",
+        "title": "Create the dashboard views page with its Find a view section and nav entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T16:25:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5474",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/dashboard-views.mdx",
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'features/dashboard-views' docs.json",
+            "head -5 features/dashboard-views.mdx",
+            "npx -y mint@4.3.49 broken-links"
+          ],
+          "expected_outputs": [
+            "grep prints 1",
+            "frontmatter shows the PRD title and sidebarTitle",
+            "broken-links prints 'no broken links found'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-11",
+            "NFR-5",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 1. Create features/dashboard-views.mdx with the exact frontmatter in the PRD (title, sidebarTitle, description 50-160 chars, ThemedImage import, no body H1), a short intro, '## Find a view' (left nav entries, More groups, brand link to Home, G shortcuts linked to /features/keyboard-shortcuts, a View/Path/Purpose table covering Home, Project home, Flywheel, Order books and every MORE_GROUPS item with the eight experimental views marked) and '## Get help' (Discord https://discord.gg/ZpHE2ZTv5P and GitHub Issues). Insert \"features/dashboard-views\" in docs.json directly after \"features/mission-control\". Re-grep every anchor in the PRD Background before writing."
+        },
+        "items": [
+          {
+            "id": "page-find-a-view.ac1",
+            "title": "Given docs.json, when `grep -c features/dashboard-views docs.json` runs, then it prints 1 and the entry sits directly after features/mission-control",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-find-a-view.ac2",
+            "title": "The page frontmatter contains title \"Dashboard views: Home, Board, Pipeline and the Experimental switch\", sidebarTitle \"Dashboard views\" and a description of 50 to 160 characters with no U+2013 or U+2014",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-find-a-view.ac3",
+            "title": "The Find a view table contains a row for every MORE_GROUPS label (Backlog through God View) plus Home, Project home, Flywheel and Order books, each with its URL path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-find-a-view.ac4",
+            "title": "The page contains a Get help line that links https://discord.gg/ZpHE2ZTv5P and https://github.com/eltmon/overdeck/issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-find-a-view.ac5",
+            "title": "`npx -y mint@4.3.49 broken-links` exits 0 and prints 'no broken links found' after this commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-home",
+        "title": "Add the Home section (Simple and Advanced modes, composer, Get set up)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T16:25:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5474",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/dashboard-views.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Home$/,0' features/dashboard-views.mdx | head -80"
+          ],
+          "expected_outputs": [
+            "the Home section prints with Simple, Advanced, Get set up and Project home"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 2. Write '## Home' from Background 'Home (/)': Simple vs Advanced default rule and switch, what each mode shows, the Home composer, the Get set up card and when it returns after Hide, the setup banner on other views (paraphrased), and Home vs Project home. Quote only labels that contain no dash."
+        },
+        "items": [
+          {
+            "id": "section-home.ac1",
+            "title": "The Home section contains the labels `Simple` and `Advanced` and states that a new browser defaults to Simple while a browser that used the dashboard before defaults to Advanced",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-home.ac2",
+            "title": "The Home section contains `Get set up` and states that the card returns after Hide while a required check fails",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-home.ac3",
+            "title": "The Home section contains a sentence saying that Home at / differs from Project home, the per-project Command Deck pane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-home.ac4",
+            "title": "The Home section contains the composer row labels for asking an agent and running in a terminal with their keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-board",
+        "title": "Add the Board section with columns and the drag rule",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T16:25:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5474",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/dashboard-views.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Board$/,0' features/dashboard-views.mdx | head -80"
+          ],
+          "expected_outputs": [
+            "Board section lists Backlog, Plan, Work, Review, Done and the not-saved drag sentence"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 3. Write '## Board' after Home: five columns in order, Needs you strip, card contents, filter labels, and the drag rule sentence from the PRD. Name Cycle options without describing their filtering (D-3)."
+        },
+        "items": [
+          {
+            "id": "section-board.ac1",
+            "title": "The Board section contains the columns Backlog, Plan, Work, Review, Done in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-board.ac2",
+            "title": "The Board section contains a sentence stating that reordering a card inside its column is not saved and dropping on another column does nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-board.ac3",
+            "title": "The Board section contains the Cycle options Current, All, Backlog and Canceled without describing what each filters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-pipeline",
+        "title": "Add the Pipeline section with lanes, tiles and URL-kept filters",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T16:25:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5474",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/dashboard-views.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Pipeline$/,0' features/dashboard-views.mdx | head -80"
+          ],
+          "expected_outputs": [
+            "Pipeline section lists Ship, Review, Work, Plan, Ready and mentions the URL"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 4. Write '## Pipeline' after Board: List/Board/Analytics switch, five metric tiles, lanes Ship, Review, Work, Plan, Ready in order and when a backlog issue shows under Ready, filters kept in the URL, row contents and actions. Name the No PR chip only as a label (D-3)."
+        },
+        "items": [
+          {
+            "id": "section-pipeline.ac1",
+            "title": "The Pipeline section contains the lanes Ship, Review, Work, Plan, Ready in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-pipeline.ac2",
+            "title": "The Pipeline section contains a sentence saying that the filters are kept in the URL so a filtered view can be bookmarked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-pipeline.ac3",
+            "title": "The Pipeline section contains the metric tiles Active issues, Work running, Review running, Ship and Spend",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-awaiting-merge",
+        "title": "Add the Awaiting Merge section with row controls and Pipeline Override",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T16:25:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5474",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/dashboard-views.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Awaiting Merge$/,0' features/dashboard-views.mdx | head -80"
+          ],
+          "expected_outputs": [
+            "Awaiting Merge section contains UAT, Blocked from Merge and Pipeline Override"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 5. Write '## Awaiting Merge' after Pipeline: what it lists, Merge train and Merge policy (link /features/merge-batches), row controls (View PR, UAT, Auto/Hold linked to /configuration/auto-merge, Merge, What to test), Blocked from Merge, and Pipeline Override with confirmation and the bypass warning. Do not quote the pending-merge label."
+        },
+        "items": [
+          {
+            "id": "section-awaiting-merge.ac1",
+            "title": "The Awaiting Merge section contains a sentence saying that it lists issues that are approved, have green checks and can merge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-awaiting-merge.ac2",
+            "title": "The Awaiting Merge section contains the row controls UAT, Auto, Hold and Merge and links /configuration/auto-merge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-awaiting-merge.ac3",
+            "title": "The Awaiting Merge section contains Pipeline Override and states that Force Approve and Force Merge ask for confirmation and bypass review and checks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-issue-view",
+        "title": "Add the issue drawer and full issue view section with the cockpit screenshot",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T16:25:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5474",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/dashboard-views.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Issue drawer and full issue view$/,0' features/dashboard-views.mdx | head -80",
+            "grep -o 'images/[^\"]*' features/dashboard-views.mdx | sort -u"
+          ],
+          "expected_outputs": [
+            "section lists the nine tabs; image grep prints only issue-cockpit files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-3",
+            "NFR-5",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 6. Write '## Issue drawer and full issue view' after Awaiting Merge: how the drawer opens (click, /issues/<id> landing on last view or Pipeline, Simple mode exception) and closes, header controls, phase strip, nine tabs with the two conditional ones, sub-views, and the full issue view at /command-deck/<project>/<issue> linked to /features/mission-control. Embed the issue-cockpit ThemedImage exactly as in the PRD. Put placeholder paths in backticks."
+        },
+        "items": [
+          {
+            "id": "section-issue-view.ac1",
+            "title": "The section lists the tabs Conversation, Tasks, Plan, Changes, Activity, Decisions, Discussion, Skills, Details and states when Decisions and Skills are hidden",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-issue-view.ac2",
+            "title": "The section renders the issue-cockpit ThemedImage with light /images/command-deck/issue-cockpit-light.png and dark /images/command-deck/issue-cockpit-dark.png",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-issue-view.ac3",
+            "title": "`grep -o 'images/[^\"]*' features/dashboard-views.mdx | sort -u` prints only the two issue-cockpit files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-issue-view.ac4",
+            "title": "The section states that /issues/<id> opens the drawer over the last used view, or Pipeline when there is none",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-activity",
+        "title": "Add the Activity section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T16:25:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5474",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/dashboard-views.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Activity$/,0' features/dashboard-views.mdx | head -80"
+          ],
+          "expected_outputs": [
+            "Activity section names Feed, Activity Log, Detailed, TTS"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 7. Write '## Activity' after the issue view section: Feed scope chips and tabs, and the three log streams that need Experimental features, linking #experimental-features."
+        },
+        "items": [
+          {
+            "id": "section-activity.ac1",
+            "title": "The Activity section contains the Feed scope chips Needs you, Project and Global",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-activity.ac2",
+            "title": "The Activity section contains a sentence saying that the Activity Log, Detailed and TTS streams appear only with Experimental features on and contains a link to #experimental-features",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-knowledge-context-skills",
+        "title": "Add the Knowledge, Context and Skills sections",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T16:25:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5474",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/dashboard-views.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Knowledge$/,0' features/dashboard-views.mdx | head -80",
+            "pan knowledge --help",
+            "pan context --help",
+            "pan skills --help"
+          ],
+          "expected_outputs": [
+            "three sections print; each named verb appears in its --help output"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 8. Write '## Knowledge', '## Context' and '## Skills' after Activity, each with path, what the reader sees, CLI verb (confirmed with pan knowledge --help, pan context --help, pan skills --help) and its link (/configuration/knowledge, /configuration/context-layers, /features/skills)."
+        },
+        "items": [
+          {
+            "id": "section-knowledge-context-skills.ac1",
+            "title": "The Knowledge section contains `pan knowledge`, contains a sentence saying that edits go through /okf author, and contains a link to /configuration/knowledge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-knowledge-context-skills.ac2",
+            "title": "The Context section contains the choices Machine context, Project context and Workspace context, contains `pan context`, and contains a link to /configuration/context-layers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-knowledge-context-skills.ac3",
+            "title": "The Skills section contains `pan skills` and contains a link to /features/skills, and every subcommand it names appears in the matching --help output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-settings",
+        "title": "Add the Settings section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T16:25:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5474",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/dashboard-views.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Settings$/,0' features/dashboard-views.mdx | head -80"
+          ],
+          "expected_outputs": [
+            "Settings section lists sections ending with Experimental"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 9. Write '## Settings' after Skills: the section list from SETTINGS_NAV_ITEMS in order, autosave, Desktop App only in the desktop app, links to /configuration/model-routing, /configuration/appearance, /configuration/issue-trackers, /configuration/auto-merge and /anywhere. Do not document individual sections."
+        },
+        "items": [
+          {
+            "id": "section-settings.ac1",
+            "title": "The Settings section contains the settings sections from Model Routing through Experimental in the SETTINGS_NAV_ITEMS order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-settings.ac2",
+            "title": "The Settings section contains a link to /configuration/model-routing and /anywhere and contains a sentence saying that changes save automatically",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "section-experimental",
+        "title": "Add the Experimental features section with the eight revealed views",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T16:25:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5474",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/dashboard-views.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Experimental features$/,0' features/dashboard-views.mdx | head -80"
+          ],
+          "expected_outputs": [
+            "section names the eight views and the Activity/Skills sentence"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 10. Write '## Experimental features' after Settings: where the switch is, a table of the eight views (menu label, path, one line; link /reference/agents-directory and /reference/god-view), the Activity stream rule, the redirect-to-Home rule (direct URL, command palette entry, G A), the always-visible list, the sentence that Activity and Skills stay available with the switch off, and one sentence naming the other three toggles."
+        },
+        "items": [
+          {
+            "id": "section-experimental.ac1",
+            "title": "The Experimental features section contains exactly Agents, AutoPreso, Resources, Sessions, Metrics, Costs, Health and God View as the views the switch reveals",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-experimental.ac2",
+            "title": "The section contains a sentence saying that Activity and Skills stay available with the switch off",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-experimental.ac3",
+            "title": "The section states that a direct URL or shortcut to a hidden view redirects to Home while the switch is off",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "section-experimental.ac4",
+            "title": "The heading produces the #experimental-features anchor that Find a view and reference/god-view.mdx link to",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "intro-link",
+        "title": "Replace the stale 13 views table in introduction.mdx with a link",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T16:25:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5474",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "introduction.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '13 views' introduction.mdx",
+            "grep -c '/features/dashboard-views' introduction.mdx"
+          ],
+          "expected_outputs": [
+            "first grep prints 0",
+            "second grep prints 1 or more"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 11 and decision D-5. This item runs after every other editing item because pan sync-main auto-commits the whole dirty tree. Commit nothing else in flight, run pan sync-main, then grep '13 views' introduction.mdx. If it matches, replace the Dashboard Views heading, sentence and table (keep the ThemedImage below) with the two-sentence section from D-5. If not (PR #5528 merged), append the D-5 sentence after the 'See [Command Deck](/features/mission-control).' sentence, or at the end of the section that mentions the Board."
+        },
+        "items": [
+          {
+            "id": "intro-link.ac1",
+            "title": "`grep -c '13 views' introduction.mdx` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "intro-link.ac2",
+            "title": "`grep -c '/features/dashboard-views' introduction.mdx` prints at least 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "intro-link.ac3",
+            "title": "Lines of introduction.mdx outside the D-5 edit match origin/main, so `git diff origin/main -- introduction.mdx` shows only the D-5 change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "xlink-features",
+        "title": "Link the page from Command Deck and keyboard shortcuts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T16:25:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5474",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/mission-control.mdx",
+            "features/keyboard-shortcuts.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '/features/dashboard-views' features/mission-control.mdx features/keyboard-shortcuts.mdx"
+          ],
+          "expected_outputs": [
+            "one match in each file"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 12. Add the Related Features bullet to features/mission-control.mdx and the one sentence to the 'For the `G` shortcuts' paragraph in features/keyboard-shortcuts.mdx, exactly as worded in the PRD."
+        },
+        "items": [
+          {
+            "id": "xlink-features.ac1",
+            "title": "`grep -c /features/dashboard-views features/mission-control.mdx` prints 1 and the match is a bullet in the Related Features list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xlink-features.ac2",
+            "title": "`grep -c /features/dashboard-views features/keyboard-shortcuts.mdx` prints 1 and the shortcut table rows are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "xlink-config",
+        "title": "Link the page from God View, Knowledge and Context layers pages",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T16:25:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5474",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/god-view.mdx",
+            "configuration/knowledge.mdx",
+            "configuration/context-layers.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '/features/dashboard-views' reference/god-view.mdx configuration/knowledge.mdx configuration/context-layers.mdx"
+          ],
+          "expected_outputs": [
+            "one match in each file"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 13. Append the PRD's one sentence to the first prose paragraph of reference/god-view.mdx (link to #experimental-features), configuration/knowledge.mdx and configuration/context-layers.mdx."
+        },
+        "items": [
+          {
+            "id": "xlink-config.ac1",
+            "title": "`grep -c /features/dashboard-views` prints 1 for each of reference/god-view.mdx, configuration/knowledge.mdx and configuration/context-layers.mdx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xlink-config.ac2",
+            "title": "reference/god-view.mdx contains a link to /features/dashboard-views#experimental-features",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xlink-config.ac3",
+            "title": "`git diff origin/main --stat` for these three files shows at most 2 changed lines each",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "validate-and-record",
+        "title": "Run the Mintlify, dash, image and scope checks and record them in the PR body",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T16:25:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5474",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/dashboard-views.mdx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx -y mint@4.3.49 validate",
+            "npx -y mint@4.3.49 broken-links",
+            "git diff origin/main...HEAD -U0 -- '*.mdx' docs.json | grep '^+' | grep -P '[\\x{2013}\\x{2014}]'",
+            "git diff --name-only origin/main...HEAD | grep -E '^(src|scripts|tests|packages|apps)/'"
+          ],
+          "expected_outputs": [
+            "validate exits 0 with no warning for features/dashboard-views.mdx",
+            "broken-links prints 'no broken links found'",
+            "dash grep prints nothing",
+            "scope grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "FR-15",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD Work item 14. Run npx -y mint@4.3.49 validate and broken-links, the dash check on added lines, the image check and the scope check from the PRD. Do not run mint validate --fix and do not use mint@latest. If a check names a file this PR touches, fix that line (commit under the owning item's trailer). If a failure names only a file this PR does not touch, do not edit it; report it. Record the results in an allow-empty commit (`git commit --allow-empty`) titled 'chore: record docs site validation for PAN-5474' whose message quotes the exit code and final line of each mint command and carries the Item: trailers for this item and its ACs. Paste both full outputs under '## Mintlify checks' in the PR body when the PR is opened."
+        },
+        "items": [
+          {
+            "id": "validate-and-record.ac1",
+            "title": "When npx -y mint@4.3.49 validate runs on the branch, then it exits 0 and reports no warning or error for features/dashboard-views.mdx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-record.ac2",
+            "title": "When npx -y mint@4.3.49 broken-links runs on the branch, then it exits 0 and prints no broken links found",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-record.ac3",
+            "title": "When the PRD dash check and the src/scripts/tests/packages/apps scope check run on the final commit, then each prints no lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-record.ac4",
+            "title": "The validation commit message records the exit code and final output line of both mint commands, and the PR body contains a Mintlify checks section with both outputs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "page-find-a-view",
+        "to": "section-home",
+        "type": "blocks"
+      },
+      {
+        "from": "section-home",
+        "to": "section-board",
+        "type": "blocks"
+      },
+      {
+        "from": "section-board",
+        "to": "section-pipeline",
+        "type": "blocks"
+      },
+      {
+        "from": "section-pipeline",
+        "to": "section-awaiting-merge",
+        "type": "blocks"
+      },
+      {
+        "from": "section-awaiting-merge",
+        "to": "section-issue-view",
+        "type": "blocks"
+      },
+      {
+        "from": "section-issue-view",
+        "to": "section-activity",
+        "type": "blocks"
+      },
+      {
+        "from": "section-activity",
+        "to": "section-knowledge-context-skills",
+        "type": "blocks"
+      },
+      {
+        "from": "section-knowledge-context-skills",
+        "to": "section-settings",
+        "type": "blocks"
+      },
+      {
+        "from": "section-settings",
+        "to": "section-experimental",
+        "type": "blocks"
+      },
+      {
+        "from": "page-find-a-view",
+        "to": "intro-link",
+        "type": "blocks"
+      },
+      {
+        "from": "page-find-a-view",
+        "to": "xlink-features",
+        "type": "blocks"
+      },
+      {
+        "from": "page-find-a-view",
+        "to": "xlink-config",
+        "type": "blocks"
+      },
+      {
+        "from": "section-experimental",
+        "to": "xlink-config",
+        "type": "blocks"
+      },
+      {
+        "from": "section-experimental",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "intro-link",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "xlink-features",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "xlink-config",
+        "to": "validate-and-record",
+        "type": "blocks"
+      },
+      {
+        "from": "section-experimental",
+        "to": "intro-link",
+        "type": "blocks"
+      },
+      {
+        "from": "xlink-features",
+        "to": "intro-link",
+        "type": "blocks"
+      },
+      {
+        "from": "xlink-config",
+        "to": "intro-link",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Docs-only change: one new page plus its docs.json nav entry, a one-sentence link in introduction.mdx, and one-line cross-links in five existing pages. The 8 'subsystems' are 8 Mintlify doc directories/files, not code subsystems; each cross-link is meaningless without the page, and the page is not findable without the nav entry and links, so splitting into sibling issues would ship broken or orphaned docs. Items touching the page are serialized by blocks edges.",
+      "canonicalFilename": "2026-11-18-PAN-5474-docs-dashboard-views-and-the-experimental-setting.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}
