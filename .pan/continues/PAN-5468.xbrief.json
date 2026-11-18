@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5468",
   "created": "2026-11-18T19:13:53.395Z",
-  "updated": "2026-11-18T19:35:08.666Z",
+  "updated": "2026-11-18T19:42:35.882Z",
   "gitState": {},
   "decisions": [
     {
@@ -13,7 +13,13 @@
   ],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-18T19:42Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-18T19:42:35.882Z"
+    }
+  ],
   "items": {
     "page-skeleton": {
       "status": "completed",
@@ -331,5 +337,14 @@
       "status": "completed",
       "doneAt": "2026-11-18T19:33:40.787Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-18T19:42:35Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5468 (PR #5538)\n\nCodeRabbit posted 2 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4619779623 · features/issue-pipeline.mdx:19 [Minor]: Do not require a test-role verdict in the overview.\n  https://github.com/eltmon/overdeck/pull/5538#discussion_r4619779623\n- Thread 4619779637 · features/issue-pipeline.mdx:164 [Minor]: Select the recovery command by the stopped operation.\n  https://github.com/eltmon/overdeck/pull/5538#discussion_r4619779637\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5538/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5468 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5538 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    }
+  ]
 }
