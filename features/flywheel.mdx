@@ -113,6 +113,16 @@ The lane board has seven lanes, in this order: Plan, Build, Checks, Review, Merg
 
 The right column holds the `conv-flywheel` conversation itself, with its own composer so you can talk to the loop directly, or its terminal.
 
+## Needs-you items
+
+Needs-you items come from the tick marker's `needs-you=` field, one item per `; `-separated part. The loop keeps an item's wording identical until it is resolved, because the page matches items by their exact text.
+
+Each card shows the question, why it came up, and when (`tick <n> · HH:MM · <age>`). An issue id opens that issue; text written as `owner/repo#<n>` links to the GitHub pull request or issue; an item ending in a URL inside angle brackets (for example `<https://...>`) renders as a link. A real control appears only where one applies: the test-removal waiver, **Start** then **Confirm start**, or **Open `<ID>`**.
+
+**Show where this was raised** opens the `conv-flywheel` conversation at the message that first raised the item, or reopens a pending question.
+
+The top bar's `Needs you · N` button counts the one shared Needs-you list, which includes Flywheel items, and is always shown. See [Issue pipeline](/features/issue-pipeline) for Needs you in general.
+
 ## Known limits
 
 - The loop's author gate names fixed GitHub logins: it acts only on issues whose author is `eltmon` (the Overdeck maintainer) or `panopticon-agent[bot]`, or that are assigned to `eltmon`. On any other repo or account the loop skips your issues, and the current GitHub App bot (`overdeck-agent[bot]`) does not pass it either. See [issue #5544](https://github.com/eltmon/overdeck/issues/5544).
