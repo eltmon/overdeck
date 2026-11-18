@@ -16,7 +16,7 @@ An issue moves through a fixed sequence of stages: plan, work, verification, rev
 | Work | A work agent | `pan done` |
 | Verification | The dashboard server | All quality gates pass |
 | Review | One or more reviewer agents | An approving verdict at the PR head |
-| Tests and UAT | The test role | A passed tests verdict and no failed UAT verdict |
+| Tests and UAT | The test role, or CI | The applicable test gate passing, and no failed UAT verdict at the head |
 | Merge | The dashboard server, or you | The one merge gate passes |
 | Close-out | You, or `pan close` | Every Definition of Done row is satisfied |
 
@@ -161,7 +161,7 @@ Default output also prints the last few entries from the pipeline journal, an ap
 
 `pan kill <id>` stops agents but keeps the workspace; it is the safe way to pause work without losing anything. Avoid `pan wipe`, which is destructive and not a restart tool.
 
-`pan reopen` is for an issue that is closed, completed or cancelled, not one already in progress; use `pan review restart` for that case instead. Reopening re-enters the pipeline, adds the `in-progress` label and posts a comment, and refuses an already-open issue unless you pass `--force`. Its help text claims it clears old specialist fields, but there is nothing left to clear: that state was never stored in the first place, so the pipeline simply picks the issue back up from its branch and PR.
+`pan reopen` is for an issue that is closed, completed or cancelled, not one already in progress. For an open issue, use whichever row above matches what actually stopped: `pan recover` or `pan resume` for a stopped work agent, `pan review restart` only when reviewers are missing. Reopening re-enters the pipeline, adds the `in-progress` label and posts a comment, and refuses an already-open issue unless you pass `--force`. Its help text claims it clears old specialist fields, but there is nothing left to clear: that state was never stored in the first place, so the pipeline simply picks the issue back up from its branch and PR.
 
 ## Get help
 
