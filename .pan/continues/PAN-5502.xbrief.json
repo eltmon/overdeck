@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5502",
+  "created": "2026-11-19T05:29:14.806Z",
+  "updated": "2026-11-19T05:29:14.806Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "conv-surface": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:29:14.806Z"
+    }
+  }
+}
