@@ -182,3 +182,34 @@ to a primary checkout is refused the same way. `--read-only` workers are not che
 
 The file explorer never writes a project's main checkout either; edits there go to a separate edit workspace. See
 [Edit workspaces](/features/file-explorer#edit-workspaces).
+
+## Other guardrails
+
+`pan task claim` refuses to claim an item a live agent already holds, or one whose files it is likely to overlap; a
+low-confidence scope counts as overlapping. `--steal` claims it anyway and reports what it overrode. See
+[Pipeline commands](/cli/pipeline-commands).
+
+Before an issue agent starts, Overdeck adds deny rules to the workspace's `.claude/settings.local.json`: no edits
+or writes to `.claude/agents/` or `.claude/hooks/`, no `rm` of those folders, of `~/.overdeck/`, or of
+`~/.claude/projects/`, and no `tmux send-keys` or `tmux paste-buffer`. These rules are best effort: they match the
+start of a command, so a roundabout form such as `cd .claude && rm -rf agents/` is not caught.
+
+A work agent cannot type into another session either: the tmux guard rewrites a `tmux send-keys` or
+`tmux paste-buffer` aimed at another session into a failing command. Agents message each other with `pan tell`
+instead.
+
+## Get help
+
+Ask in the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P), or file an issue at
+[GitHub Issues](https://github.com/eltmon/overdeck/issues).
+
+## See also
+
+- [Harnesses](/configuration/harnesses)
+- [Auto-merge](/configuration/auto-merge)
+- [Flywheel](/features/flywheel)
+- [MCP](/configuration/mcp)
+- [Push notifications](/configuration/push-notifications)
+- [Workers](/reference/workers)
+- [Conversation commands](/cli/conversation-commands)
+- [Settings](/reference/settings)
