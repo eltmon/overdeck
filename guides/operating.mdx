@@ -13,12 +13,12 @@ Emergency stop kills every running agent across all harnesses right away. Nothin
 You can trigger it five ways:
 
 - The hotkey `Ctrl+Shift+.` (`Cmd+Shift+.` on macOS, see [Keyboard shortcuts](/features/keyboard-shortcuts)), which works even while typing in a text field. It opens a confirm dialog: press Enter to stop all agents, or Esc to cancel.
-- The top bar's Agents menu, "Stop all agents…": kills every agent now, and work in progress is cut off.
-- The command palette's "Emergency Stop All Agents" action.
+- The top bar's Agents menu, "Stop all agents…", which opens the same confirm dialog. The item is unavailable while no agents are working.
+- The command palette's "Emergency Stop All Agents" action, which opens the same confirm dialog.
 - The System Health popover, under System controls: a stop button with an inline "Kill all?" confirm.
 - From a terminal, run `pan admin cloister emergency-stop`. It prints the agents it stopped and warns about any it could not confirm stopped.
 
-Stopping also freezes auto-resume for crashed agents, so nothing restarts on its own while you are dealing with the emergency. The freeze survives a restart. To undo it, click the "Auto-resume frozen" chip (snowflake icon) in the top bar, or use the Auto-resume toggle in the System Health popover.
+Stopping also freezes auto-resume for crashed agents, so nothing restarts on its own while you are dealing with the emergency. The freeze survives a restart. To undo it, click the "Auto-resume frozen" chip (snowflake icon) in the top bar, or use the Auto-resume toggle in the System Health popover. Emergency stop also stops Cloister's health monitoring: start it again with **Start Cloister** in the System Health popover or the command palette, or with `pan admin cloister start`.
 
 Emergency stop is not the same as [Safe shutdown](/features/safe-shutdown). Safe shutdown lets each agent finish its current step before stopping; emergency stop kills every agent now.
 
@@ -26,7 +26,7 @@ Emergency stop is not the same as [Safe shutdown](/features/safe-shutdown). Safe
 
 Overdeck checks free space on the filesystem holding `~/.overdeck` every 30 seconds. Two thresholds control it: `resources.disk_warn_gb` and `resources.disk_critical_gb` in `~/.overdeck/config.yaml`. See [Memory governor](/configuration/memory-governor) for the keys table and their defaults.
 
-When free space drops below a threshold, Overdeck sends one phone push (titled "Disk low" or "Disk critical", following the phone Failures switch described in [Push notifications](/configuration/push-notifications)) and, at the critical level, a desktop notification too. Needs you shows a Disk low or Disk critical card listing the biggest folders and an Open Resources button. A critical alert only sorts into the Blocking group; it does not stop or hold anything, and the auto-resume freeze from emergency stop does not affect it.
+When free space drops below a threshold, Overdeck sends one phone push (titled "Disk low" or "Disk critical", following the phone Failures switch described in [Push notifications](/configuration/push-notifications)) and, at the critical level, a desktop notification too. Needs you shows a Disk low or Disk critical card listing the biggest folders and an Open Resources button, which opens the Resources view (experimental: turn on Settings → Experimental → **Experimental features** to show it). A critical alert only sorts into the Blocking group; it does not stop or hold anything, and the auto-resume freeze from emergency stop does not affect it.
 
 A separate, fixed 10 GiB disk floor refuses new workspace starts, workspace stack rebuilds and lane launches, regardless of the alert thresholds above. See [Troubleshooting](/reference/troubleshooting) for what gets held and why, and [Lanes](/reference/lanes) for `pan lane disk-check`, which checks the floor before a launch wave or a worktree you create yourself.
 
@@ -36,13 +36,13 @@ Use `pan reload` to ship new code: it builds from `origin/main`, checks the buil
 
 Use `pan restart` to relaunch the build you already have: it never builds. It can target just the dashboard (the default), CLIProxy, Traefik, or the full stack. Only the dashboard and full scopes wait for restart approval and obey a restart hold.
 
-Both commands keep the running dashboard's auto-resume setting unless you pass `--resume` or `--no-resume`. See [Core commands](/cli/core-commands) for the full flag tables.
+`pan reload` keeps the running dashboard's auto-resume setting unless you pass `--resume` or `--no-resume`. `pan restart` turns auto-resume on unless you pass `--no-resume` or the shell running it sets `OVERDECK_NO_RESUME=1`. See [Core commands](/cli/core-commands) for the full flag tables.
 
 ## Restart approval and the restart hold
 
 ### Approving a restart
 
-Every voluntary dashboard restart (`pan reload`, a dashboard or full-scope `pan restart`, and the post-merge deploy) waits for your approval before it runs. One approval satisfies every request waiting at that moment, with a single restart. If the gate is unreachable, or the dashboard's health check keeps failing for 60 seconds, the restart proceeds without approval.
+Every voluntary dashboard restart (`pan reload`, a dashboard or full-scope `pan restart`, and the post-merge deploy) waits for your approval before it runs. One approval satisfies every request waiting at that moment, with a single restart. If the running dashboard build has no restart gate, or its health check keeps failing for 60 seconds, the restart proceeds without approval.
 
 Approve with the "Restart now" button on the dashboard's approval banner, with `pan restart approve`, or with `pan restart --now`, which approves and restarts in one step.
 
@@ -66,13 +66,13 @@ If a resume fails, Needs you reports it and tells you to run `pan resume <id>`. 
 
 Conversations are never auto-resumed. After a terminal-backend restart, Needs you offers to resume the conversations that were running, listed in [Conversations](/features/conversations). After `pan shutdown`, Needs you instead offers to resume the sessions the shutdown drain stopped, described in [Safe shutdown](/features/safe-shutdown).
 
-To resume things by hand, see `pan resume` and `pan recover` in [Agent commands](/cli/agent-commands).
+To resume things by hand, see [`pan resume`](/cli/conversation-commands#pan-resume) and [`pan recover`](/cli/agent-commands#pan-recover).
 
 ## Backups
 
-Overdeck backs up the `~/.claude/skills`, `~/.claude/commands` and `~/.claude/agents` folders that `pan sync` writes. `pan context detach --apply` backs up each native `CLAUDE.md` or `AGENTS.md` file before it removes a managed region from it. **Nothing backs up the Overdeck database or the rest of `~/.overdeck` state.**
+Overdeck backs up the `~/.claude/skills`, `~/.claude/commands` and `~/.claude/agents` folders that `pan sync` writes. `pan context detach --apply` backs up each native `CLAUDE.md` or `AGENTS.md` file before it removes a managed region from it. **Nothing backs up the Overdeck database or the rest of `~/.overdeck` state.** To keep conversation transcripts off this machine, see [Session Vault](/configuration/session-vault).
 
-`pan sync` makes a backup of those folders first, unless you have turned that off in `~/.overdeck/config.toml`, and keeps a configurable number of the newest backups. You can also trigger a backup without syncing, and manage backups directly:
+`pan sync` backs up those folders first and keeps the newest 10 backups. Under `[sync]` in `~/.overdeck/config.toml`, set `backup_before_sync = false` to turn that off, or `backup_keep` to keep a different number. `pan sync --backup-only` makes the backup without syncing, but only while `backup_before_sync` is on: with it off, the flag is ignored and a full sync runs. You can also manage backups directly:
 
 ```bash
 pan sync --backup-only       # back up skills, commands and agents without syncing
