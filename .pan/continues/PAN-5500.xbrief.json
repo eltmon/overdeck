@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5500",
   "created": "2026-11-19T03:34:33.510Z",
-  "updated": "2026-11-19T04:02:36.968Z",
+  "updated": "2026-11-19T04:05:04.007Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -312,9 +312,30 @@
       "doneAt": "2026-11-19T04:02:29.977Z"
     },
     "audit-session-vault": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5500",
-      "claimedAt": "2026-11-19T04:02:36.968Z"
+      "claimedAt": "2026-11-19T04:02:36.968Z",
+      "doneAt": "2026-11-19T04:05:04.006Z"
+    },
+    "audit-session-vault.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:05:04.006Z"
+    },
+    "audit-session-vault.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:05:04.006Z"
+    },
+    "audit-session-vault.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:05:04.006Z"
+    },
+    "audit-session-vault.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:05:04.006Z"
+    },
+    "audit-session-vault.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:05:04.006Z"
     }
   }
 }
