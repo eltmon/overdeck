@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5500",
   "created": "2026-11-19T03:34:33.510Z",
-  "updated": "2026-11-19T03:34:33.510Z",
+  "updated": "2026-11-19T03:37:00.595Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,30 @@
   "sessionHistory": [],
   "items": {
     "anywhere-plans": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5500",
-      "claimedAt": "2026-11-19T03:34:33.510Z"
+      "claimedAt": "2026-11-19T03:34:33.510Z",
+      "doneAt": "2026-11-19T03:37:00.594Z"
+    },
+    "anywhere-plans.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:37:00.594Z"
+    },
+    "anywhere-plans.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:37:00.594Z"
+    },
+    "anywhere-plans.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:37:00.594Z"
+    },
+    "anywhere-plans.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:37:00.594Z"
+    },
+    "anywhere-plans.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:37:00.594Z"
     }
   }
 }
