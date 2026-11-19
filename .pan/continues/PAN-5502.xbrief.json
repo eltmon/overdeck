@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5502",
   "created": "2026-11-19T05:29:14.806Z",
-  "updated": "2026-11-19T05:32:25.556Z",
+  "updated": "2026-11-19T05:34:26.728Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,11 @@
     "conv-handoff.ac5": {
       "status": "completed",
       "doneAt": "2026-11-19T05:32:25.556Z"
+    },
+    "conv-machines-to-end": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:34:26.728Z"
     }
   }
 }
