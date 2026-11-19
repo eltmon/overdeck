@@ -207,6 +207,64 @@ pan workspace destroy MIN-123 --force
 4. Cleans up planning artifacts
 5. Unregisters from Overdeck
 
+## Finding a workspace
+
+- **Left column, Workspaces section**: the selected project's workspaces that you created, plus any you favorited. Favorites come first, then the most recently used. Issue worktrees, Session Vault workspaces and workspaces that agents created stay off this list unless you favorite them; reach issues from the **Issues** section and the Pipeline and Board views. The main checkout appears here only when you favorite it, labelled with the project's name. Archived workspaces leave the list. The section is hidden while the project has nothing to list, and in the All projects view.
+- **A project's Home, More menu, Main checkout**: opens the project's main workspace and creates it the first time.
+- **Cmd-K or Ctrl-K, Workspaces group**: the same workspaces for every project, plus every main checkout, shown under its project's name. Type to filter by name or project. Selecting one opens its view.
+
+Rows in the Workspaces section show a short status. A main or scratch row shows the phase that Overdeck's memory gave it, such as `exploring`, `building` or `shipping`. A favorited issue row shows its pipeline phase and its pull request badge, colored by state and review, with `×` when checks fail.
+
+The workspace view (`/workspace/<id>`) shows one workspace: its conversations and its memory (status headline, phase and recent observations). An issue workspace also shows the agent terminal while an agent runs, the xBRIEF plan and the verification gates.
+
+## Creating a workspace from the dashboard
+
+Open the **New workspace** page from any of these places. Each one opens `/workspaces/new`; the ones that belong to a project add `?project=<key>` so that project starts selected.
+
+- The **+** in the left column's Workspaces header.
+- **New workspace in** your project, in the project switcher menu.
+- **New workspace…** in Cmd-K or Ctrl-K.
+- **More**, then **New workspace**, on a project's Home.
+
+The Workspaces section is hidden while a project has no workspaces to list, so use the project switcher there.
+
+<ThemedImage
+  light="/images/dashboard/new-workspace-page-light.png"
+  dark="/images/dashboard/new-workspace-page-dark.png"
+  alt="New Workspace page with project chips, hero title, target controls, resolved status, and workspace ideas"
+/>
+
+The page shows everything about the new workspace in one view:
+
+- The **project chips** select a registered project. Recently used projects come first. The chip row can also open the **Add a project** dialog over this page (clone a repo, add an existing folder, or start a new project); a project you add there comes back selected.
+- The large **workspace name** field (placeholder "Untitled workspace") is the name of the new workspace. Names allow letters, numbers and hyphens. As you type, it suggests what you probably meant:
+  - An **issue reference** (`#12`, `PAN-12`, or a GitHub issue or pull request URL) offers **Open PAN-12 and start work**, which opens that issue's page. A bare `#12` or a GitHub URL uses the selected project's issue prefix; `PAN-12` works when `PAN` is a registered prefix.
+  - Text that matches **branch names** in the selected project offers **Start from branch** for each match. Picking one sets it as the parent branch and opens **Advanced** so you can see it.
+  - Text that cannot be a name as typed (spaces, punctuation) offers `Use "fix-login-redirect-bug" as the name`.
+
+  The arrow keys move through the suggestions, Enter picks one, and Esc closes the list.
+- **Shared directory** (the default) points the workspace at the project's primary path, another registered target, or a directory you choose with **Browse…**.
+- **Isolated worktree** creates `workspaces/scratch-<name>` on a `scratch/<name>` branch, shown under the name as **Branch:**. It makes its own path, so the target controls are disabled.
+- **Advanced** lets you override the parent branch. Without an override, Overdeck uses the project's current branch.
+
+<Note>
+  The status strip above the buttons shows the final path, branch, parent branch, git posture, and whether a worktree will be created, and it updates as you type. The server runs the same resolution for this preview and for the real create, so what the strip shows is what you get.
+</Note>
+
+That same resolution validates the name, the directory and the project, and shows any problem inline. With no projects registered, the page says **Add a project first.** **Start workspace** stays disabled until the problems are fixed and the status is current. When the workspace is created, Overdeck selects it and opens its view.
+
+The page and `pan workspace new` (below) call the same code, so a workspace created either way is identical.
+
+## Managing a scratch or main workspace
+
+The header of a scratch or main workspace's view has three buttons:
+
+- **Favorite** pins the workspace to the top of the Workspaces section. Press **Unfavorite** to undo it.
+- **Relocate** points the workspace at a new directory after you confirm the resolved path. Relocating the main workspace also asks you to type its name, because it makes the workspace differ from the project's path in `projects.yaml`.
+- **Archive** removes the workspace from the Workspaces section and Cmd-K. Its files, branch and memory stay on disk.
+
+Issue workspaces show none of these, because Overdeck's pipeline owns their worktree. To remove an issue workspace by hand, use `pan workspace destroy <issueId>`; add `--purge-memory` to also delete its memory permanently. The workspace view has no delete button.
+
 ## Main Project Branch Convention
 
 > **CRITICAL:** The main project directory must **ALWAYS** stay on the `main` branch. All feature work happens in workspaces.
