@@ -8,32 +8,32 @@ import { ThemedImage } from "/snippets/themed-image.mdx";
 Overdeck is as much a tool for **managing conversations with agents** as it is a
 workflow engine. Command Deck treats every agent session as a first-class
 conversation: you spawn it, watch it work, talk to it mid-task, branch it to try
-a different approach, and — when it nears the context wall or you want to switch
-models — hand it off to a fresh conversation that inherits the context that
+a different approach, and (when it nears the context wall or you want to switch
+models) hand it off to a fresh conversation that inherits the context that
 matters.
 
 <ThemedImage
   light="/images/dashboard/command-deck-hero-light.png"
   dark="/images/dashboard/command-deck-hero-dark.png"
-  alt="Command Deck with a live conversation: the project's conversations and issues, and the agent's turn-by-turn tool calls"
+  alt="Command Deck on a project's home tab: the conversation list in the left column, and the project's agents, Needs you queue and pipeline in the main pane"
 />
 
 ## The conversation surface
 
 Each conversation has a live **Conversation** view and a **Terminal** view of the
-same session. The conversation pane streams the agent's turns — reasoning, tool
-calls, file reads and edits, command output — as they happen. Below it sits the
+same session. The conversation pane streams the agent's turns (reasoning, tool
+calls, file reads and edits, command output) as they happen. Below it sits the
 composer, where you type to steer the agent the way you'd pair-program with a
 colleague.
 
 | Control | What it does |
 |:--------|:-------------|
-| **Composer** | Send a message to the running agent mid-task — correct its approach, point it at a file, or tell it to stop and rethink |
-| **Model picker** | Hot-swap the model for the next message — Sonnet → Opus → Kimi/GPT/Gemini — without losing the conversation |
-| **Reasoning effort** | Tune how hard the model thinks per message (e.g. *Extra High*) |
-| **Conversation / Terminal toggle** | Switch between the rendered conversation and the raw terminal of the same session (the native CLI for OpenCode and Codex) |
+| **Composer** | Send a message to the running agent mid-task: correct its approach, point it at a file, or tell it to stop and rethink |
+| **Model picker** | Shows the conversation's model. In the dashboard, the model is fixed once a conversation starts; click the button to see why, and hand off to a new conversation to use another model |
+| **Reasoning effort** | The `Thinking: <level>` button changes how hard the model thinks while the session runs (e.g. *Extra High*); see [Changing effort while a conversation runs](#changing-effort-while-a-conversation-runs) |
+| **Conversation / Terminal toggle** | Switch between the rendered conversation and the raw terminal of the same session (the native CLI for OpenCode and Codex). Shown only while the session is live |
 | **Copy link** | ⋯ → Copy link copies the `overdeck.localhost/conv/<id>` URL; ⋯ → Open in new window opens the conversation in its own window |
-| **Context window meter** | See how much of the window is used — your cue that a handoff is coming |
+| **Context window meter** | See how much of the window is used, your cue that a handoff is coming |
 | **Bookmarks** | Mark a message by clicking the icon beside it, then reopen the list from ⋯ → Bookmarks to jump back to it |
 | **Citations** | Select text in a reply (or your own message), click **Cite** (or press `C`), add an optional comment, and it goes out with your next prompt |
 
@@ -48,6 +48,7 @@ Terminal toggle, and three buttons on the right:
 - **Files** opens the side panel on its Files tab. `Ctrl Shift E` (`⌘⇧E`) shows
   or hides it.
 - **⋯** opens the conversation menu. A right-click on the header opens it too.
+- A Pi conversation that is working also shows **Stop**, which stops the current turn.
 
 Changes and Files open the panel for the conversation whose header you click.
 They appear only when the conversation is a tab in the Command Deck; a popped-out
@@ -58,7 +59,8 @@ The second row is the status line. It says, in words and in this order: the
 state (for example "Working"), the machine a linked conversation runs on, the
 folder (with your home directory shortened to `~`), the branch and its pull
 request, **N commits pushed**, **N commits not pushed**, **N files not
-committed**, and the cost. A count of zero is left out. In a Command Deck tab
+committed**, and the cost. The commit and file counts show only in a Command
+Deck tab, and a count of zero is left out. In a Command Deck tab
 the folder opens the Files tab, the commit counts open the Changes tab on
 **This conversation**, and **N files not committed** opens it on **Not
 committed**. In a detached checkout the branch reads **detached**. When the
@@ -80,9 +82,10 @@ The ⋯ menu lists, in groups:
    [diff window](#reviewing-changes-in-the-diff-window) for the conversation.
    A linked conversation or a read-only vault copy does not show it.
 3. **Favorite**, **Regenerate title**, and the pull request items.
-4. **Hand off to new conversation**, **Create summary fork**, **Export
-   transcript**, pulling the conversation here, **Continue on another device**,
-   **Share**, and the handoff doc and target.
+4. **Hand off to new conversation**, **Create summary fork** (not for Pi),
+   **Add skills…** (Claude Code and Codex), **Export transcript**, pulling the
+   conversation here, **Continue on another device**, **Share**, and the
+   handoff doc and target.
 5. **Advanced** → **Delivery method** (Claude Code conversations only).
 6. **Archive conversation** and **Stop the agent**.
 
@@ -104,8 +107,8 @@ not committed, and the `+/−` on the card adds up those rows.
 Inside a Command Deck tab:
 
 - **Review** opens the side panel's Changes tab on the turn's first file. `J`
-  and `K` step through the turn's files, and **Back** shows the This
-  conversation list.
+  and `K` step through the turn's files, and the back arrow (**Back to the
+  list**) shows the This conversation list.
 - **Show in files** opens the Files tab with **Only what this conversation
   changed** selected.
 - Click a row to open that file's diff. Hover a row for **Open the file beside
@@ -114,8 +117,8 @@ Inside a Command Deck tab:
 Outside a Command Deck tab (a popped-out window, a drawer or the phone app),
 the card shows the same files and counts, and **Review** and the rows open the
 [diff window](#reviewing-changes-in-the-diff-window). There is no side panel
-there, so **Show in files** and the row's beside and reveal actions are not
-shown.
+there, so **Show in files** is not shown, and the row's beside and reveal
+actions are greyed out.
 
 ### File paths in replies
 
@@ -188,9 +191,10 @@ default for your own new sessions of that model in `~/.claude/settings.json`;
 Overdeck's sessions always launch with an explicit effort, so they are not
 affected.
 
-The model picker spans the harness (Claude Code, Pi, Codex) and every routed
-provider, each with live per-million pricing — so a mid-conversation swap is one
-click:
+The model and harness picker spans the harness (Claude Code, Pi, Codex) and
+every routed provider, each with live per-million pricing. It picks the model
+for a new conversation (on the Home composer and in the **New conversation**
+caret menu); once a conversation starts, the dashboard keeps its model fixed:
 
 <ThemedImage
   light="/images/dashboard/model-picker-light.png"
@@ -230,6 +234,9 @@ what the next quick create uses. Its fields are:
 - **Project** and **Working directory.** The project starts as the deck's
   project. The working directory starts as the project path, and you can point
   it at any directory inside the project, such as a package in a monorepo.
+- **Machine.** This machine (the default), **Auto**, a linked machine, or
+  **Fly (new VM)**, which needs a project. On another machine, that machine
+  picks the working directory from its copy of the project.
 - **Model** and **Harness.**
 - **Effort.** It lists the levels the model supports and starts at the default
   effort, with its source shown beside it. A model with no effort setting
@@ -265,8 +272,8 @@ Both Simple and Advanced Home carry a composer at the top of the page, so you
 can start a conversation or a terminal without opening the Command Deck or
 picking a project first:
 
-- **Enter** asks the composer's current agent, exactly as typed — no seed
-  prompt, no project required.
+- **Enter** asks the composer's current agent, exactly as typed, with no seed
+  prompt and no project required.
 - **Ctrl+Enter** (or choosing "Run in terminal:") opens the terminal drawer in
   the relevant deck and runs the typed text as a command in a fresh shell.
 - **"Talk it through first:"** (Simple mode only) sends the same text through
@@ -274,8 +281,8 @@ picking a project first:
   issue only once you say it's ready.
 
 The composer's project chip lists every registered project, a **no project**
-choice, and **Add a project…**. Choosing no project — or having none
-registered yet — starts the conversation or terminal in your home folder
+choice, and **Add a project…**. Choosing no project (or having none
+registered yet) starts the conversation or terminal in your home folder
 (`~/Projects` if it exists, otherwise your home directory) instead of blocking
 you. In the Command Deck, that same no-project state is the **No project**
 deck, always reachable from the **No project** item in the project switcher's
@@ -283,8 +290,8 @@ menu, and offered as
 "Start without a project" when nothing else is selected. The app bar reads
 **No project** when the No project deck is selected, never its internal key.
 
-If a conversation ends up outside any project — started from Home before a
-project existed, say — its pane shows a "Not in a project · Move to
+If a conversation ends up outside any project (started from Home before a
+project existed, say), its pane shows a "Not in a project · Move to
 project…" chip so you can attach it to a project later without losing the
 conversation. To move any conversation to another project, open its row menu
 in the left column and pick the project from **Move**.
@@ -374,9 +381,9 @@ When the native CLI is not available, Terminal says why and nothing restarts:
 
 You can attach files to a composer message in three ways:
 
-- **Paperclip button** — click the attach icon in the composer toolbar and select one or more files.
-- **Drag and drop** — drop files directly onto the composer area.
-- **Paste** — paste an image from your clipboard (screenshots, copied files, etc.).
+- **Paperclip button**: click the attach icon in the composer toolbar and select one or more files.
+- **Drag and drop**: drop files directly onto the composer area.
+- **Paste**: paste an image from your clipboard (screenshots, copied files, etc.).
 
 Supported attachments include images (`png`, `jpg`, `gif`, `webp`) and text/code/PDF
 files such as `md`, `json`, `ts`, `py`, `log`, `csv`, `yaml`, and `pdf`. Files are
@@ -407,8 +414,8 @@ vision-capable model (for example, Claude Sonnet 5.5) to include images.
 
 ## Citations
 
-To push back on part of a reply, select the text — in an assistant message or
-your own — and click the **Cite** button that appears over the selection (or
+To push back on part of a reply, select the text (in an assistant message or
+your own) and click the **Cite** button that appears over the selection (or
 press `C` while nothing else has focus). Write an optional comment explaining
 what's wrong or what to change, then save. The citation becomes a chip above
 the composer; the quoted text stays highlighted in its row until the citation
@@ -416,7 +423,7 @@ is sent or removed.
 
 Chips can be expanded to show the full quote and edit the comment, or removed
 with the ✕. Citations persist across switching conversations and reloading the
-page — they live in the browser, not the agent's transcript, so they survive
+page: they live in the browser, not the agent's transcript, so they survive
 until you send or remove them.
 
 On send, every pending citation is prepended to your prompt as a block:
@@ -433,9 +440,9 @@ Please revise.
 
 Numbering follows add order; a quote with no comment gets no comment line. If
 the send fails, the citations stay attached to the retry-outbox entry rather
-than being lost — Retry resends the same block. Typing a slash command (for
+than being lost; Retry resends the same block. Typing a slash command (for
 example `/compact`) sends the bare command and leaves any pending citations
-untouched. You can only cite settled message text — not tool output, plan
+untouched. You can only cite settled message text, not tool output, plan
 cards, choice cards, or a reply still streaming in.
 
 Cite is offered only when the conversation has a composer: it does not appear
@@ -453,7 +460,7 @@ labeled with the file name, and a toast confirms **Citation added** with an
 
 To browse and edit any file of a project, use the [file explorer](/features/file-explorer).
 
-Cite is not offered in **Edit** — only in **Preview** — and not while the
+Cite is not offered in **Edit** (only in **Preview**), and not while the
 file has unsaved changes (save first; the agent reads the file from disk, not
 your draft). It is also not offered for a tab opened from somewhere other
 than a conversation, since there is nowhere for the citation to go. Opening
@@ -478,13 +485,13 @@ URLs) are not included.
 
 Click the icon beside an assistant or user message to bookmark it, using its
 first line as the label. The icon turns into a filled bookmark; clicking it
-again opens a popover to rename or remove the bookmark. ⋯ → **Bookmarks** opens a list showing each bookmark's label and time — clicking
+again opens a popover to rename or remove the bookmark. ⋯ → **Bookmarks** opens a list showing each bookmark's label and time; clicking
 a label scrolls the timeline to that message and outlines it briefly.
 
 Bookmarks survive reloads and new messages because they point at the
 transcript message's stable id, not its position in the list. They are
 stored by Overdeck and never written into the agent's own transcript, and
-they stay with this conversation — a handoff or fork does not copy them. If
+they stay with this conversation; a handoff or fork does not copy them. If
 a bookmarked message is no longer in the loaded transcript, its row in the
 list shows "This message is not in the loaded transcript."
 
