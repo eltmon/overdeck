@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-19T06:49:05.810913Z · model: claude-opus-5-5 · open: 942_
+_Last sequenced: 2026-11-19T08:43:41.055919Z · model: claude-opus-5-5 · open: 941_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -491,7 +491,6 @@ _Last sequenced: 2026-11-19T06:49:05.810913Z · model: claude-opus-5-5 · open: 
 | 459 | PAN-2469 | S | medium | ok |  |  | Assembly landed (mergeReadySlots + finalization); remaining: alarm when all slots merged but no review requested. Swarm dormant. |
 | 460 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
 | 461 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
-| 461 | PAN-5504 | L | medium | ok |  |  | Docs audit: line-by-line accuracy check of the 16 Guides and Reference pages; waits on PAN-5482. Lane A item 13. |
 | 461 | PAN-5582 | S | medium | ok |  |  | 11 CodeRabbit doc findings on merged PAN-5500 PR #5581; 1 Major: push-notifications must enable token sign-in before manual Serve. |
 | 462 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
 | 463 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
@@ -1277,10 +1276,10 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-19T06:49:05.810913Z",
+  "generatedAt": "2026-11-19T08:43:41.055919Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 942,
+  "openCount": 941,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -7426,19 +7425,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "why": "Workspace-spawned dashboards must never claim the canonical dashboard port",
       "gate": "auto",
       "planning": "skip"
-    },
-    {
-      "issue": "PAN-5504",
-      "rank": 461,
-      "size": "L",
-      "importance": "medium",
-      "score": 44,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Docs audit: line-by-line accuracy check of the 16 Guides and Reference pages; waits on PAN-5482. Lane A item 13.",
-      "rationale": "Rank unchanged; PAN-5482 closed, so that dependency is removed.",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-5582",
@@ -14241,13 +14227,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "from": "PAN-5465",
       "to": "PAN-5497",
       "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5467",
-      "to": "PAN-5504",
-      "type": "contains",
       "source": "github-ref",
       "confidence": 1
     },
