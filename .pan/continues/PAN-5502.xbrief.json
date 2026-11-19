@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-5502",
   "created": "2026-11-19T05:29:14.806Z",
-  "updated": "2026-11-19T05:55:29.979Z",
+  "updated": "2026-11-19T06:10:01.437Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-19T06:10Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-19T06:10:01.437Z"
+    }
+  ],
   "items": {
     "conv-surface": {
       "status": "completed",
@@ -473,5 +479,14 @@
       "status": "completed",
       "doneAt": "2026-11-19T05:55:29.979Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-19T06:10:01Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5502 (PR #5583)\n\nCodeRabbit posted 9 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4624988983 · features/costs.mdx:40 [Minor]: Clarify costs for unlisted models with reported costs.\n  https://github.com/eltmon/overdeck/pull/5583#discussion_r4624988983\n- Thread 4624988987 · features/costs.mdx:47 [Minor]: Document the working-directory rule for the Claude Code fallback, not the branch.\n  https://github.com/eltmon/overdeck/pull/5583#discussion_r4624988987\n- Thread 4624988997 · features/desktop-app.mdx:68 [Minor]: Remove the browser claim for the installed-command path.\n  https://github.com/eltmon/overdeck/pull/5583#discussion_r4624988997\n- Thread 4624989002 · features/merge-batches.mdx:85 [Minor]: Qualify the accumulate step for the batch window.\n  https://github.com/eltmon/overdeck/pull/5583#discussion_r4624989002\n- Thread 4624989007 · features/skill-packs.mdx:773 [Minor]: Correct the Atlassian header scope: it is not limited to Cloud base URLs.\n  https://github.com/eltmon/overdeck/pull/5583#discussion_r4624989007\n- Thread 4624989017 · features/skills.mdx:225 [Minor]: Document the `okf` vendored-skill overwrite exception.\n  https://github.com/eltmon/overdeck/pull/5583#discussion_r4624989017\n- Thread 4624989040 · features/skills.mdx:227 [Major]: Document that `pan sync` overwrites any same-path file in `~/.claude/skills`, not only bundled skills.\n  https://github.com/eltmon/overdeck/pull/5583#discussion_r4624989040\n- Thread 4624989047 · features/workspaces.mdx:140 [Minor]: Correct the Docker project-name fallback for `pan workspace create --docker`.\n  https://github.com/eltmon/overdeck/pull/5583#discussion_r4624989047\n- Thread 4624989059 · features/workspaces.mdx:375 [Minor]: Separate cancellation from the transition to work.\n  https://github.com/eltmon/overdeck/pull/5583#discussion_r4624989059\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5583/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5502 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5583 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    }
+  ]
 }
