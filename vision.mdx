@@ -4,9 +4,9 @@ description: "The roadmap for the Overdeck Flywheel: a dev loop that builds Over
 ---
 
 **A living north-star document.** It explains *why* the Flywheel exists and what it is
-becoming. The operational *how* lives in [`roles/flywheel.md`](https://github.com/eltmon/overdeck/blob/main/roles/flywheel.md); the
-per-run *what* lives in `docs/flywheel-brief.md`. When the role or
-the brief ever drifts from this doc, the vision wins — fix the role or the brief.
+becoming. The operational *how* lives in [`roles/flywheel.md`](https://github.com/eltmon/overdeck/blob/main/roles/flywheel.md).
+The loop's operating prompt is the [`pan-flywheel` skill](https://github.com/eltmon/overdeck/blob/main/sync-sources/skills/pan-flywheel/SKILL.md), and a bound order book under `.pan/orders/` sets the scope of a run.
+If the role or the skill drifts from this page, this page wins: fix the role or the skill.
 
 To run the Flywheel today, see [Flywheel](/features/flywheel).
 
@@ -89,15 +89,16 @@ smaller intervention rate.
 ## The autonomy model
 
 Three properties govern how much the Flywheel does on its own. The first is a permanent
-security invariant; the other two are operator toggles (persisted in the `app_settings` SQLite
-table, user-machine level) that move the human checkpoints without changing the substrate.
+security invariant; the other two are operator toggles (persisted as `flywheel.auto_pickup_backlog`
+and `flywheel.require_uat_before_merge` in the `app_settings` SQLite table, user-machine level)
+that move the human checkpoints without changing the substrate.
 
 ### Author + assignee invariant (security-critical, always on)
 
 The Flywheel includes an issue in inventory and suggestions **only if at least one of**:
 
 - `author.login` is `eltmon` (project owner), **OR**
-- `author.login` is `panopticon-agent[bot]` (the Overdeck GitHub App), **OR**
+- `author.login` is `overdeck-agent[bot]` (the Overdeck GitHub App), **OR**
 - `assignees[].login` contains `eltmon` (operator has personally assigned the issue).
 
 Any other state — third-party author and `eltmon` not among assignees — is out of scope. When
@@ -105,39 +106,41 @@ auto-pickup is ON, this filter is the only safeguard between an attacker filing 
 issue and the Flywheel autonomously running an agent against it. It applies *always*,
 regardless of any toggle, and has no relaxation flag.
 
-### Auto-pickup from backlog (`auto_pickup_backlog`, default OFF) — the master autonomy switch
+### Auto-pickup from backlog (`auto_pickup_backlog`, default OFF): the master autonomy switch
 
-- **OFF (dev-loop today):** the Flywheel works only in-flight work plus emergency `blocks-main`
-  unblockers. Routine backlog stays off the start list; the operator feeds specific items in by
-  **Releasing** them. The Flywheel still *plans* ready backlog aggressively, so a deep
-  *awaiting-release* queue is always there for the operator.
+- **OFF (dev-loop today):** the Flywheel works in-flight issues and the issues the operator
+  releases, either with the `released` label or by adding them to the active order book. The
+  Flywheel still *plans* ready backlog aggressively, so a deep *awaiting-release* queue is
+  always there for the operator.
 - **ON (v1.0 posture):** the toggle is a **blanket release**. The Flywheel auto-starts `ready
-  && planned` backlog in **sequencer-priority order**, bounded by `roles.flywheel.maxAgents`.
-  The gates that still apply are `vetoed` (absolute stop), `parked`/`needs-design`/
-  `needs-discussion`, `objection` (an AI relevance hold), and the relevance-vet.
+  && planned` backlog in **sequencer-priority order**, bounded by `roles.flywheel.maxAgents`
+  (default 30). The gates that still apply are `vetoed` (absolute stop), `parked`/`needs-design`/
+  `needs-discussion` (the legacy spellings of `parked`) and `objection` (an AI relevance hold).
 
 A single predicate is the source of truth: `isAutoPickable` in
 [`src/lib/backlog/pickup.ts`](https://github.com/eltmon/overdeck/blob/main/src/lib/backlog/pickup.ts), shared by the dashboard forecast
 and the Flywheel so they can never disagree:
 
-    ready && planned && (released || auto_pickup_backlog) && !parked && !vetoed && !objection && !inPipeline && !epic
+    ready && planned && (released || auto_pickup_backlog || activeBookMember) && !parked && !vetoed && !objection && !inPipeline && !epic
 
 ### UAT-required-before-merge (`require_uat_before_merge`, default ON)
 
-"Human merges" and "human UATs" are independent constraints. When `true` (today's default),
-merge cannot proceed until a human marks UAT passed. When `false`, the merge gate only requires
-the configured CI checks (`overdeck/review` + `overdeck/test`); the human still clicks merge.
-The "auto-merge" side — automatically clicking MERGE after a cooldown when every gate is green
-— composes orthogonally:
+This setting decides whether Overdeck may merge a pull request on its own. When it is on (the default), every issue is
+**held**: Overdeck never merges the PR itself, and a human tests it and clicks Merge. When it is off, issues default to
+**auto**: once the PR is approved at its head commit, every check is green and GitHub says it is mergeable, Overdeck
+waits five minutes, so you can cancel, and then merges it. On a held issue, a failed browser UAT verdict also blocks
+the Merge button.
 
-| `require_uat_before_merge` | auto-merge enabled | Behavior |
-|---|---|---|
-| `true` (default) | `false` (default) | Human UATs, human clicks merge |
-| `true` | `true` | Human UATs, system auto-merges after cooldown |
-| `false` | `false` | Human merges without requiring UAT |
-| `false` | `true` | Unattended merge after cooldown; only for trusted classes of work |
+The setting is the last of three tiers, and the first one that is set wins:
 
-The model we want for v1.0 is "relax UAT for trusted work, but a human always owns the merge."
+1. The issue's `auto-merge` or `hold-for-uat` label (the auto-merge toggle on the issue sets it).
+2. The project's `auto_merge_default` (`auto` or `hold`) in `projects.yaml`.
+3. The global `require_uat_before_merge`.
+
+`OVERDECK_DISABLE_AUTO_MERGE=1` turns automatic merging off on a machine. See [Auto-merge](/configuration/auto-merge).
+
+The model we want for v1.0 is "relax UAT for trusted work, but a human always owns the merge." Auto mode already
+merges without a click, so today that goal holds only for held issues.
 
 ## v1.0 readiness criteria
 
