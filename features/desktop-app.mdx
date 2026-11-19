@@ -65,11 +65,11 @@ If you already installed the app, `pan up` finds and launches it instead of star
 - **macOS**: `/Applications/Overdeck.app` or `~/Applications/Overdeck.app`
 - **Windows**: `%LOCALAPPDATA%\Programs\Overdeck\Overdeck.exe`
 
-On Linux, `pan up` also treats `~/.local/bin/overdeck` as the app. The install script puts the `overdeck` command there, so `pan up` reports `Desktop app launched` and opens the dashboard in your browser instead ([#5557](https://github.com/eltmon/overdeck/issues/5557)).
+On Linux, `pan up` also treats `~/.local/bin/overdeck`, `~/.local/share/applications/overdeck` and `/usr/local/bin/overdeck` as the app, and checks them before `~/Applications/`. The install script puts the `overdeck` command in `~/.local/bin`, so `pan up` reports `Desktop app launched` and opens the dashboard in your browser instead ([#5557](https://github.com/eltmon/overdeck/issues/5557)).
 
 ### What runs where
 
-The app's embedded server listens on port `7825` (it is not the `pan up` dashboard's port). `pan open` always talks to the `pan up` dashboard; see [The desktop app](/features/open-in-overdeck#the-desktop-app) for how it reaches the app's own window. `pan down` stops the `pan up` dashboard only; it does not quit the app, which you quit from its tray or menu.
+The app's embedded server listens on port `7825` (it is not the `pan up` dashboard's port); while it restarts after crashes, the port is `7825` plus the number of consecutive restarts since the last healthy start, at most `7833`. `pan open` always talks to the `pan up` dashboard; see [The desktop app](/features/open-in-overdeck#the-desktop-app) for how it reaches the app's own window. `pan down` stops the `pan up` dashboard only; it does not quit the app, which you quit from its tray or menu.
 
 Only one copy of the app runs at a time: launching it again focuses the existing window, and launching it with `--open <path>` opens that path in the running window. Closing the window keeps the app running in the background on macOS; on Linux and Windows, closing the last window quits the app and stops its embedded server.
 
@@ -107,7 +107,7 @@ Clicking one reopens that question, plan or permission dialog, or brings the das
 
 **Settings → Desktop App → Auto-start → Launch at login** starts the app automatically when you log in. It works on macOS and Windows; on Linux it has no effect yet ([#5556](https://github.com/eltmon/overdeck/issues/5556)).
 
-On the first launch, a dialog asks whether to start Overdeck automatically, with an option to enable it or skip for now. If you skip it, a reminder toast appears on the next few launches with a button to enable it; after five reminders, or once you enable it, the reminders stop. **Reset reminder** in the Auto-start card starts that sequence again.
+On the first launch, a dialog asks whether to start Overdeck automatically, with an option to enable it or skip for now. If you skip it, a reminder toast appears on the next few launches with a button to enable it. The toasts count up to "Reminder 5 of 5" (four toasts after the first dialog). After that, or once you enable it, the reminders stop. **Reset reminder** in the Auto-start card starts that sequence again.
 
 Desktop settings, including this one, save to `desktop-settings.json` in the app's user data folder: `~/.config/Overdeck/` on Linux, `~/Library/Application Support/Overdeck/` on macOS, and `%APPDATA%\Overdeck\` on Windows.
 
@@ -115,7 +115,7 @@ Desktop settings, including this one, save to `desktop-settings.json` in the app
 
 The app checks GitHub Releases 5 seconds after launch and every 4 hours after that, but it never downloads an update on its own. Use **Help → Check for Updates...**, or click the version number at the bottom of the left column, to open the updater, download the update, and restart into it. Once a download finishes, **Install Update and Restart** appears in the Help menu too.
 
-A canary build (a version ending in `-canary`) only offers canary releases; a stable build only offers stable releases.
+A canary build (a version containing `-canary`, such as `1.2.3-canary.1`) only offers canary releases; a stable build only offers stable releases.
 
 If an update cannot install, download the new installer from [GitHub Releases](https://github.com/eltmon/overdeck/releases/latest) and install it over the old one. This is the only way to update on macOS today, since the app is not notarized (see [Download and install](#download-and-install)).
 
