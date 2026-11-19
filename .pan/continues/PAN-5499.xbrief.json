@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5499",
   "created": "2026-11-19T02:52:23.250Z",
-  "updated": "2026-11-19T02:53:25.911Z",
+  "updated": "2026-11-19T02:54:56.189Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,9 +32,30 @@
       "doneAt": "2026-11-19T02:53:21.755Z"
     },
     "quickstart-audit": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5499",
-      "claimedAt": "2026-11-19T02:53:25.911Z"
+      "claimedAt": "2026-11-19T02:53:25.911Z",
+      "doneAt": "2026-11-19T02:54:56.189Z"
+    },
+    "quickstart-audit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:54:56.189Z"
+    },
+    "quickstart-audit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:54:56.189Z"
+    },
+    "quickstart-audit.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:54:56.189Z"
+    },
+    "quickstart-audit.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:54:56.189Z"
+    },
+    "quickstart-audit.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:54:56.189Z"
     }
   }
 }
