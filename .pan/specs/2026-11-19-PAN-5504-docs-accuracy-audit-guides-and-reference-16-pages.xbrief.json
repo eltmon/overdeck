@@ -4,17 +4,17 @@
     "created": "2026-11-19T09:30:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5504: docs: accuracy audit, Guides and Reference (16 pages)",
-    "updated": "2026-11-19T07:13:31.751Z"
+    "updated": "2026-11-19T07:14:05.943Z"
   },
   "plan": {
     "id": "pan-5504",
     "title": "docs: accuracy audit, Guides and Reference (16 pages)",
-    "status": "proposed",
+    "status": "running",
     "uid": "a393212b-dc80-4e80-8b30-16fd8eb07643",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-19T09:30:00Z",
-    "updated": "2026-11-19T07:13:31.751Z",
+    "updated": "2026-11-19T07:14:05.943Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5504",
@@ -2057,5 +2057,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
