@@ -4,17 +4,17 @@
     "created": "2026-11-19T02:28:45Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5499: docs: accuracy audit, Getting Started, Vision and Changelog intro (5 pages)",
-    "updated": "2026-11-19T02:35:19.922Z"
+    "updated": "2026-11-19T02:52:06.404Z"
   },
   "plan": {
     "id": "pan-5499",
     "title": "docs: accuracy audit, Getting Started, Vision and Changelog intro (5 pages)",
-    "status": "proposed",
+    "status": "running",
     "uid": "85f751e9-e8e2-4e10-9b5d-c77f88737711",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-19T02:28:45Z",
-    "updated": "2026-11-19T02:35:19.922Z",
+    "updated": "2026-11-19T02:52:06.404Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5499",
@@ -828,5 +828,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
