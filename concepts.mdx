@@ -1,5 +1,5 @@
 ---
-title: "Overdeck concepts"
+title: "Overdeck concepts: Command Deck, agents, workspaces and the pipeline"
 sidebarTitle: "Concepts"
 description: "The core ideas behind Overdeck: Command Deck, agents, workspaces, the issue pipeline, model routing, skills and issue trackers."
 ---
@@ -49,7 +49,7 @@ Agents are AI coding assistants that work on the tasks you assign. You direct th
 Agent types:
 - **Implementation (work) agents**: work on features, bugs, and refactoring in isolated worktrees
 - **Planning agents**: write a PRD and an xBRIEF plan before work starts
-- **Review and test agents**: check finished work on the pull request
+- **Review agents**: review the pull request. The project's tests run as a check on the PR, on CI for most projects.
 
 You can manage agents via Command Deck, the CLI, or the REST API.
 
@@ -59,7 +59,7 @@ Cloister is the agent watchdog. It checks each running agent's health, pokes or 
 
 ## Planning
 
-`pan start <issue>` plans the issue before work starts: a planning agent writes a PRD and an xBRIEF plan, and they are committed under `.pan/` in your repo. `pan start <issue> --plan skip` skips planning. See [Planning](/features/planning).
+`pan start <issue>` plans the issue before work starts: a planning agent writes a PRD and an xBRIEF plan, and they are committed under `.pan/` in your repo. `pan start <issue> --plan skip` skips the planning agent and builds a minimal xBRIEF from the issue body. See [Planning](/features/planning).
 
 ## Workspaces
 
@@ -73,7 +73,7 @@ Cloister is the agent watchdog. It checks each running agent's health, pokes or 
 
 This allows multiple agents to work on different features simultaneously without conflicts.
 
-Workspaces support both local execution and remote execution via Fly.io for cloud-hosted agent environments.
+Workspaces support both local execution and remote execution via Fly.io for cloud-hosted agent environments. Start a remote one with `pan start <id> --remote`.
 
 ### Main Project Branch Convention
 
@@ -81,20 +81,20 @@ The main project directory should **always** stay on the `main` branch. All feat
 
 ### Docker Integration
 
-Workspaces can include Docker containers for full development environments. Supports both local execution and remote execution via Fly.io.
+Workspaces can include Docker containers for full development environments.
 
 ## Specialists
 
-When a work agent finishes, a review agent and a test agent check the work on the pull request. When the PR is approved and its checks are green, you click **Merge**, or let [auto-merge](/configuration/auto-merge) ship it. See [Specialists](/features/specialists).
+When a work agent finishes, the verification gate runs the project's checks on its pull request and a review agent reviews it. When the PR is approved and its checks are green, you click **Merge**, or let [auto-merge](/configuration/auto-merge) ship it. See [Specialists](/features/specialists).
 See [Issue pipeline](/features/issue-pipeline) for every stage from start to close-out.
 
 <ThemedImage
   light="/images/dashboard/pipeline-light.png"
   dark="/images/dashboard/pipeline-dark.png"
-  alt="Pipeline page: a metric strip (Active issues, Work running, Review queue, Ship, Spend) above phase-grouped issue rows for Ship, Review, and Verifying, with an activity feed on the right"
+  alt="Pipeline page: a metric strip (Active issues, Work running, Review running, Ship, Spend) above issue rows grouped by phase: Ship, Review, Work, Plan and Ready"
 />
 
-The **Pipeline** page is the at-a-glance view of this lifecycle: a metric strip across the top (Active issues, Work running, Review queue, Ship, Spend) sits over issue rows grouped by phase (Ship, Review, Verifying) with a live activity feed alongside. It shows where every issue sits as specialists hand it forward.
+The **Pipeline** page is the at-a-glance view of this lifecycle: a metric strip across the top (Active issues, Work running, Review running, Ship, Spend) sits over issue rows grouped by phase: Ship, Review, Work, Plan and Ready. It shows where every issue sits as specialists hand it forward.
 
 ## Model routing
 
@@ -114,19 +114,20 @@ See [Skills](/features/skills).
 
 ## Convoys
 
-A convoy is the full review mode: four reviewers (security, correctness, performance and requirements) check one pull request in parallel, and a review parent writes the verdict. Turn it on with `roles.review.mode: full`. See [Convoys](/features/convoys).
+A convoy is the full review mode: four reviewers (security, correctness, performance and requirements) check one pull request in parallel, and a review parent writes the verdict. Turn it on with `roles.review.mode: full`; the default, `quick`, runs one review agent. See [Convoys](/features/convoys).
 
 ## Issue Tracker Integration
 
-Overdeck integrates with 5 issue trackers:
+Overdeck integrates with 4 issue trackers:
 
 - **GitHub Issues**: Full integration with PRs and status updates
 - **Linear**: Full integration with cycles, labels, and status updates
-- **GitLab Issues**: Issue tracking and MR management
 - **Rally (CA Agile Central)**: Enterprise issue tracking
 - **Jira (Cloud and Data Center)**: Atlassian issue tracking
 
-The dashboard displays issues from all configured trackers in a unified kanban board with cost badges, agent status indicators, and workspace controls.
+GitLab issue tracking is not supported yet; GitLab works as a code host, and Overdeck opens and merges its merge requests. See [Issue trackers](/configuration/issue-trackers).
+
+The dashboard displays issues from all configured trackers in one kanban board, the **Board**, with cost badges, agent status indicators, and workspace controls.
 
 ## Cost Tracking
 
@@ -134,13 +135,13 @@ Per-issue, per-stage token costs with dashboard analytics. Every agent session i
 
 - Model and provider attribution
 - Token counts (input/output)
-- Dollar costs per stage (planning, work, review, test, merge)
-- Daily cost summaries on the Board view
+- Dollar costs per stage (planning, implementation, review, testing, merge, and interactive conversations)
+- Daily cost trends on the **Costs** page, an experimental view (Settings → Experimental)
 
 ## Next Steps
 
-- [Issue pipeline](/features/issue-pipeline) - Follow an issue from start to merge
-- [CLI Commands](/cli/overview) - Learn about available commands
-- [Command Deck](/features/mission-control) - Deep dive into the dashboard
-- [Cloister](/features/cloister) - Understand the AI lifecycle manager
-- [Specialists](/features/specialists) - Learn about the automated quality pipeline
+- [Issue pipeline](/features/issue-pipeline): Follow an issue from start to merge
+- [CLI Commands](/cli/overview): Learn about available commands
+- [Command Deck](/features/mission-control): Deep dive into the dashboard
+- [Cloister](/features/cloister): How the agent watchdog keeps agents moving
+- [Specialists](/features/specialists): Learn about the automated quality pipeline
