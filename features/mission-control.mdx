@@ -12,7 +12,7 @@ Command Deck is where you work with a project's agents: the project's conversati
 The top bar spans the full window width. It starts with the Overdeck brand, which opens Home. Below it, Command Deck uses a two-panel layout:
 
 - **Left column**: the project switcher, navigation, and the selected project's conversations, issues and workspaces
-- **Main panel (right)**: Feature activity view, planning artifacts, and status reviews
+- **Main panel (right)**: the Stage, with the project's Home pane, conversations, issues and code files in tabs
 
 ## Left column
 
@@ -55,22 +55,13 @@ The **All projects** deck lists the conversations of every project in one place 
 
 **Layout presets.** At the right end of the tab strip, **Layout** has four buttons: **One**, **Two side by side**, **Three columns** and **Grid of four**. They arrange the open conversations into equal panes, starting with the ones on screen. Each split pane's header has a ⤢ button, **Make this the only pane**, which shows just that conversation and keeps the others as tabs (this button is in every deck).
 
-**New conversation** in this deck starts the conversation in the last project you had open and opens it beside the focused pane; the button's second line names that project first. With nothing open, the deck reads "Pick conversations on the left. Ctrl+Click opens one beside another."
+**New conversation** in this deck starts the conversation in the last project you had open and opens it beside the focused pane; the button's second line names that project first. With nothing open, the deck reads "Pick conversations on the left. Ctrl+Click opens one beside another." (Cmd+Click on macOS)
 
 The deck, its open conversations and its layout survive a reload, including a reload on a conversation's own `/conv/<id>` address.
 
 ## Project Tree
 
-The Issues section lists the selected project's active features. Each one shows:
-
-| Element | Description |
-|---------|-------------|
-| Status indicator | Spinner if agent is running, circle if idle |
-| Issue ID | PAN-123, MIN-456, etc. |
-| State label | Idle, Planning, In Progress, In Review, Done, Has Context, Suspended |
-| Pull request | The issue's PR number, colored by state and review; × marks failing checks; click to open |
-
-State labels are computed from multiple signals: tmux session presence, heartbeat freshness (10-minute threshold), review/test status from the central `review-status.json`, and agent state files.
+The Issues section lists the selected project's issues in the pipeline. A collapsed row shows the issue ID, its title and its spend, then a meta line: the stage word (`Not started`, `Planning`, `Building`, `Ready`, `In review` or `Ready to merge`, or `Needs you` when it waits on you), the model of the newest active agent, and task progress such as `3 of 7 items`. Expand the row for its badges, pull request and sessions.
 
 ## Project home
 
@@ -91,7 +82,7 @@ Per-project release resolution lives in `projects.yaml` under `publish` (`npm_pa
 
 **Facts.** Five numbers, each a link:
 
-- **Agents working** counts every agent and conversation working in this project right now, by role (planning, building, reviewing, testing, conversations). It is the same number the project switcher shows. Click it for the Agents page.
+- **Agents working** counts every agent and conversation working in this project right now, by role (planning, building, reviewing, testing, conversations). It is the same number the project switcher shows. Click it for the Agents page, which is experimental: with Experimental features off, the click lands on Home.
 - **Needs you** counts the items waiting on you in this project and shows the first one's question.
 - **In review** counts the issues in the In review lane and names their pull requests.
 - **Landed this week** counts first-parent commits on the default branch in the last 7 days (`500+` at the cap) and how many came through pull requests. Click it for the Changes dock.
@@ -111,30 +102,10 @@ Backlog, queued and merged issues are not listed; **Open the board** shows them.
 
 **Recent changes on main.** Who changed what: today's commits on the default branch when there are at least ten, else the last ten. Each row names the conversation or agent behind the commit, read from its `Overdeck-Conversation` / `Overdeck-Agent` trailers. Click a conversation row to open that conversation, or an agent row to open its issue; commits with no trailer show as `unattributed`. Click a short SHA to copy the full one. The list refreshes every minute.
 
-## Activity View
-
-When you click a feature, the main panel shows all agent sessions unified into one scrollable view. Each session appears as a collapsible section with:
-
-<ThemedImage
-  light="/images/dashboard/activity-light.png"
-  dark="/images/dashboard/activity-dark.png"
-  alt="Activity view: a real-time log of agent command output streaming as agents work"
-/>
-
-- **Type badge**: PLANNING (blue), WORK (green), REVIEW (amber), TEST (indigo), MERGE (pink)
-- **Model**: Which Claude/LLM model the agent used (e.g., Opus 4.6, Sonnet 4.5)
-- **Duration**: How long the session ran
-- **Status dot**: Green pulse (running), gray (completed), red (failed)
-- **Transcript**: Full agent output with tail-anchored auto-scroll for running sessions
-
-### Section Isolation Mode
-
-Click a section header to view it full-screen. Press `Esc` or use the browser back button to return. The isolated view includes model display and a prominent keyboard hint.
-
 ## Decisions
 
 Agents stop and wait for you: a question, a plan to approve, a permission
-request, a rate-limit dialog, or simply a finished turn. **Decisions** is the one
+request, a rate-limit dialog, or simply a finished turn. **Decisions**, the **Needs you** scope of the Activity page (`/activity`), is the one
 place that lists all of them, whether they come from a pipeline agent, a
 conversation, or the flywheel.
 
@@ -143,7 +114,7 @@ carries a pulsing amber indicator; click it to bring the dialog back, including
 one you dismissed with `Esc`, and the whole issue row is shaded so you can spot
 it without opening the tree.
 
-The list separates **Blocking work** from **Waiting**. Blocking means the agent
+The list puts **System** items (Overdeck's own machine needs attention) first, then separates **Blocking work** from **Waiting**. Blocking means the agent
 has stopped until you answer, so it is burning wall-clock and nothing else will
 move; waiting means work continues around your decision. Within each group the
 oldest is first, since that is the one costing the most. Each row shows the
@@ -182,63 +153,18 @@ The **Activity** page (`/activity`) opens on the **Feed** tab. It has three scop
 
 Within a scope, **All**, **Chats** and **Activity** narrow the feed. The page remembers the tab you last picked. The log streams (Activity Log, Detailed and TTS) appear as more tabs only when experimental features are on.
 
-## Badge Bar
+## Issue documents
 
-Quick-access badges appear below the feature header:
-
-| Badge | What it shows |
-|-------|---------------|
-| Tasks | Opens beads task panel for the feature |
-| STATE | Renders STATE.md from the workspace's `.planning/` directory |
-| PRD | Renders PRD.md (grayed out if not generated) |
-| Status | AI-generated progress review comparing code against PRD |
-| Discussions | Synced issue tracker discussions |
-| Transcripts | Uploaded meeting transcripts |
-| Upload | Attach transcripts or notes to the feature |
-| Sync | Pull latest discussions from GitHub/Linear |
-
-## Status Reviews
-
-Click the **Status** badge to generate an AI-powered progress review. The review:
-
-1. Gathers context: PRD, STATE.md, git diff, commit log, file changes, review/test status
-2. Sends everything to the configured LLM (set via **Settings > Workflow Agents > Planning**)
-3. Returns a structured analysis: summary, PRD coverage table, risk assessment, and recommendations
-
-If no API key is configured, a static template with raw data is shown as fallback.
-
-Any configured provider (Anthropic, OpenAI, Google, Kimi, Z.AI) can be used for status reviews.
-
-## Planning Artifacts
-
-Each feature workspace has a `.planning/` directory:
-
-```
-feature-pan-XXX/.planning/
-├── PRD.md                    # Product requirements (generated or manual)
-├── STATE.md                  # Current progress notes
-├── STATUS_REVIEW.md          # Latest AI-generated status review
-├── transcripts/              # Uploaded meeting transcripts
-├── discussions/              # Synced tracker discussions
-└── notes/                    # Ad-hoc notes and documents
-```
-
-### Uploading Artifacts
-
-Use the **Upload** badge to attach markdown or text files. Files are categorized as transcripts or notes and stored in the appropriate subdirectory.
-
-### Syncing Discussions
-
-Click **Sync** to pull the latest comments from GitHub Issues or Linear. Discussions are converted to markdown and stored in `.planning/discussions/`.
+An issue's plan and PRD, tasks, tracker discussion, changes and activity are tabs of the issue drawer and the full issue view. See [Issue drawer and full issue view](/features/dashboard-views#issue-drawer-and-full-issue-view).
 
 ## Pipeline View
 
-Where the project tree organizes work by project and feature, the **Pipeline** page reorganizes the same issues by lifecycle phase. A metric strip (Active issues, Work running, Review queue, Ship, and Spend) sits above phase-grouped rows (Ship, Review, Verifying), with a live activity feed on the right.
+Where the project tree organizes work by project and feature, the **Pipeline** page reorganizes the same issues by lifecycle phase. A metric strip (Active issues, Work running, Review running, Ship and Spend) sits above phase and project filters and the issue rows, grouped by phase: Ship, Review, Work, Plan and Ready.
 
 <ThemedImage
   light="/images/dashboard/pipeline-light.png"
   dark="/images/dashboard/pipeline-dark.png"
-  alt="Pipeline page: a metric strip over phase-grouped issue rows with a live activity feed"
+  alt="Pipeline page: five metric tiles over phase and project filters, with issue rows grouped under Ship, Review and Work"
 />
 
 <Tip>
@@ -249,15 +175,11 @@ Where the project tree organizes work by project and feature, the **Pipeline** p
 
 ### Adding Projects
 
-Projects are configured in `~/.overdeck/config.yaml`. Any project with active workspaces appears in the project switcher.
-
-### Model Selection
-
-The model used for status reviews is configured in **Settings > Workflow Agents > Planning**. See [Configuration](/configuration/projects) for details.
+Projects are registered in `~/.overdeck/projects.yaml`. Add one with **Add a project** in the project switcher or `pan project add <path>`; every registered project appears in the switcher. See [Projects](/configuration/projects).
 
 ## Related Features
 
-- [Specialists](/features/specialists) - Review, test, and merge agents
+- [Specialists](/features/specialists) - Review and test agents
 - [Cloister](/features/cloister) - AI lifecycle management
 - [Workspaces](/features/workspaces) - Feature workspace management
 - [Dashboard views](/features/dashboard-views) - Every view and how to reach it
