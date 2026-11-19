@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5499",
   "created": "2026-11-19T02:52:23.250Z",
-  "updated": "2026-11-19T03:03:22.867Z",
+  "updated": "2026-11-19T03:03:27.022Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -170,6 +170,11 @@
     "changelog-intro.ac4": {
       "status": "completed",
       "doneAt": "2026-11-19T03:03:22.867Z"
+    },
+    "recapture-doc-shots": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5499",
+      "claimedAt": "2026-11-19T03:03:27.022Z"
     }
   }
 }
