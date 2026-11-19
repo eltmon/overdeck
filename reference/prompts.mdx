@@ -1,17 +1,21 @@
 ---
-title: Prompt Templates
-description: "How Overdeck builds the prompts it sends to agents: the Mustache template loader, the frontmatter contract, the template catalog and an authoring guide."
+title: "Prompt Templates and the renderPrompt Loader"
+sidebarTitle: "Prompt Templates"
+description: "How Overdeck builds agent prompts from Mustache templates: the renderPrompt loader, the frontmatter contract, the template catalog and an authoring guide."
 ---
 
-Every prompt that Overdeck sends to Claude — the work agent that implements a
-feature, the review specialist that audits the diff, the merge agent that lands
-a PR, the planning agent that generates an xBRIEF — is built from a versioned
-Markdown template under `src/lib/cloister/prompts/`.
+Overdeck builds four of the prompts it sends to agents from versioned
+Markdown templates under `src/lib/cloister/prompts/`: the work agent's
+kickoff, the Deft work agent's kickoff, the planning agent's discovery prompt
+and the model-to-model handoff prompt.
 
 A single loader, [`renderPrompt`](#the-renderprompt-api) at
-`src/lib/cloister/prompts.ts`, is the **only** sanctioned way to turn one of
-those templates into a finished prompt string. Every specialist, every handoff,
-every resume call goes through it.
+`src/lib/cloister/prompts.ts`, is the only way code turns one of those
+templates into a finished prompt string.
+
+Role definitions are a separate system. They live in `roles/<role>.md`, and
+Overdeck reads them without this loader. See
+[Prompts outside this loader](#prompts-outside-this-loader).
 
 This page is the authoritative guide to that system: what the templates are,
 how the loader works, the frontmatter contract, the full template catalogue,
@@ -19,7 +23,7 @@ and how to add, edit, or migrate a prompt without breaking production.
 
 ## Why templates at all
 
-Before the unified loader, prompts were assembled a dozen different ways —
+Before the unified loader, prompts were assembled a dozen different ways:
 inline template literals in TypeScript, `readFileSync` of raw Markdown files,
 ad-hoc `String.replace` passes, and a pair of home-grown `processIfBlocks` /
 `processEnvBlocks` helpers. Each specialist invented its own variable syntax
@@ -29,7 +33,7 @@ That sprawl produced three recurring failures:
 
 1. **Silent typos.** A variable like `{{issueId}}` referenced in the template
    but named `issue_id` at the call site rendered as the literal string
-   `{{issueId}}` in the prompt sent to Claude. No error, no warning — the
+   `{{issueId}}` in the prompt sent to Claude. No error, no warning: the
    specialist just got a broken prompt and ran on bad context.
 2. **Drift between similar templates.** The merge-agent prompt used by the
    full-push path and the wake-time validation path were two separate string
@@ -39,7 +43,7 @@ That sprawl produced three recurring failures:
 
 The template system fixes all three. Every template declares its variables in
 YAML frontmatter; the loader validates them on every render; missing or
-unknown variables throw a `PromptError` with the exact template path and the
+unknown variables fail with a `PromptError` that names the template path and the
 list of offending keys.
 
 ## Core principles
@@ -51,40 +55,44 @@ Keep these five rules in mind when you touch any prompt template.
 ### 1. Fail loud, fail early
 
 Missing a required variable is a programming error, not a runtime condition to
-recover from. The loader throws `PromptError` with the template path and the
+recover from. The loader fails with `PromptError`, naming the template path and the
 list of missing keys. There is no silent fallback, no empty-string
 substitution, no "render partial output and hope nobody notices". If you see a
-`PromptError` in a log, it means a call site is wrong and needs to be fixed —
+`PromptError` in a log, it means a call site is wrong and needs to be fixed,
 not that the loader needs a guard.
 
 ### 2. One template, one API
 
-Templates are read only via `renderPrompt({ name, vars })`. There is no
-`readFileSync` on a prompt file anywhere in the codebase. If you find one,
-that's a bug — migrate it to `renderPrompt`.
+Code reads a template under `src/lib/cloister/prompts/` only through
+`renderPrompt({ name, vars })`. If you find another read of one of these
+files, migrate it to `renderPrompt`. Role files under `roles/` are read
+directly by design; see
+[Prompts outside this loader](#prompts-outside-this-loader).
 
 ### 3. Composition happens in TypeScript
 
 Mustache is deliberately a small, logic-less templating language. The loader
-disables HTML escaping globally (`Mustache.escape = String`) because we're
-generating prompts for an LLM, not HTML — but everything else is vanilla
+disables HTML escaping globally (`Mustache.escape = (text) => String(text)`) because we're
+generating prompts for an LLM, not HTML. Everything else is vanilla
 Mustache with its usual section syntax.
 
-Any non-trivial composition — choosing between two instruction variants,
-joining an array of file paths, formatting a table of tasks — happens in
+Any non-trivial composition (choosing between two instruction variants,
+joining an array of file paths, formatting a table of tasks) happens in
 TypeScript. The TypeScript builds a string, then passes that string to the
 template as a single variable. This keeps templates readable and keeps
 business logic in a place where `tsc` and your tests can see it.
 
 ### 4. Variables are declared, not discovered
 
-Every variable used by the template's body must appear in the frontmatter as
-either `requires` or `optional`. Undeclared variables are rejected by the
-loader. Undefined required variables are rejected by the loader. Both errors
-point at the template path and name the offending keys.
+Every variable the template's body uses should appear in the frontmatter as
+either `requires` or `optional`. The loader rejects any key in `vars` that
+the frontmatter doesn't declare, and any required key that is missing or
+`undefined`/`null`. Both errors name the template path and the offending
+keys. The loader never scans the body, so a `{{VAR}}` that the frontmatter
+leaves out renders as an empty string when the call site doesn't pass it.
 
-This means reading the frontmatter tells you exactly what a template expects
-— you never have to grep the body to reconstruct the contract.
+This means the frontmatter tells you what a template expects, as long as
+authors keep it in step with the body.
 
 ### 5. Prompts are not docstrings
 
@@ -97,22 +105,27 @@ workspace.
 ## The `renderPrompt` API
 
 ```typescript
+import { Effect } from 'effect';
 import { renderPrompt } from './prompts.js';
 
-const prompt = renderPrompt({
+const prompt = await Effect.runPromise(renderPrompt({
   name: 'work',
   vars: {
     ISSUE_ID: 'PAN-742',
-    BRANCH: 'feature/pan-742',
-    // ...every required variable declared in work.md
+    ISSUE_ID_LOWER: 'pan-742',
+    WORKSPACE_PATH: '/path/to/workspaces/feature-pan-742',
+    BRANCH_NAME: 'feature/pan-742',
+    LOCAL: true,
+    REMOTE: false,
+    // ...plus any optional variables declared in work.md
   },
-});
+}));
 ```
 
 ### Signature
 
 ```typescript
-export function renderPrompt(options: RenderPromptOptions): string;
+export function renderPrompt(options: RenderPromptOptions): Effect.Effect<string, PromptError>;
 
 export interface RenderPromptOptions {
   name: string;                          // template basename without .md
@@ -123,14 +136,17 @@ export interface RenderPromptOptions {
 The `name` is the filename under `src/lib/cloister/prompts/` without the
 `.md` extension. `renderPrompt({ name: 'work' })` loads `work.md`.
 
+`renderPrompt` returns an Effect. Run it with `Effect.runPromise` (as
+`buildWorkAgentPrompt` does), with `Effect.runSync` (as `buildHandoffPrompt`
+does), or `yield*` it inside `Effect.gen`.
+
 ### What happens on every call
 
-1. **Load + cache.** The file is read from disk once and cached in an in-memory
-   `Map` keyed by name. Subsequent calls reuse the parsed `ParsedPrompt`
-   (frontmatter + body + resolved path).
+1. **Load.** The file is read from disk on every call. There is no template
+   cache; only the resolved prompts directory is cached.
 2. **Parse frontmatter.** The leading `---` YAML block is extracted via
    `js-yaml`. Missing frontmatter, invalid YAML, or a missing `name` /
-   `description` field all throw `PromptError`.
+   `description` field all fail with `PromptError`, and so does a `requires` or `optional` value that isn't a list of strings.
 3. **Validate `requires`.** Every key listed in `requires` must be present in
    `vars` and not `undefined`/`null`. Missing keys are collected and reported
    in one error message.
@@ -142,12 +158,14 @@ The `name` is the filename under `src/lib/cloister/prompts/` without the
 
 ### Error handling
 
-Everything throws `PromptError` — a subclass of `Error` exported from the
-module. Typical messages:
+Every failure is a `PromptError`, exported from the module. It's an Effect
+tagged error (`Data.TaggedError('PromptError')`) and also an `Error`.
+`renderPrompt` fails its Effect with it, so `Effect.runPromise` rejects and
+`Effect.runSync` throws. Typical messages:
 
 ```
-Prompt "work" (.../prompts/work.md) requires variables that are missing: BRANCH, DIFFICULTY.
-Provided: ISSUE_ID, XBRIEF_PATH
+Prompt "work" (.../prompts/work.md) requires variables that are missing: WORKSPACE_PATH, BRANCH_NAME.
+Provided: ISSUE_ID, ISSUE_ID_LOWER, LOCAL, REMOTE
 
 Prompt "review" (.../prompts/review.md) was passed unknown variables: DEBUG_MODE.
 Declare them in the template's "requires" or "optional" frontmatter, or remove them from the call site.
@@ -158,26 +176,25 @@ Failed to load prompt template "work" from .../prompts/work.md: ENOENT: no such 
 ```
 
 Do not catch these. They indicate bugs in call sites or templates that must
-be fixed, not runtime conditions. The fail-loud posture is deliberate — if a
+be fixed, not runtime conditions. The fail-loud posture is deliberate: if a
 call site is allowed to silently skip a required variable, the resulting
 prompt silently loses context and the agent silently does the wrong thing.
 
-### Cache invalidation
-
-`clearPromptCache()` is exported for test isolation. Production code never
-calls it — templates are bundled at build time and don't change during a
-dashboard's lifetime.
-
 ### Prompts directory resolution
 
-`resolvePromptsDir()` looks for `prompts/` in two places, in order:
+`resolvePromptsDir()` picks the directory once per process and caches the
+answer:
 
-1. `join(__dirname, 'prompts')` — the expected location in both dev
-   (`src/lib/cloister/prompts`) and production (`dist/dashboard/prompts`).
-2. If `__dirname` contains `/src/`, the resolver strips everything from
-   `/src/` onward and re-anchors to `<package>/src/lib/cloister/prompts`.
-   This is the tsx dev-mode fallback for cases where the module is imported
-   from a nested path that has been re-exported through multiple barrel files.
+1. `join(__dirname, 'prompts')`, next to the module that holds the loader.
+   In dev that's `src/lib/cloister/prompts`. A build copies the templates
+   next to each bundle: `dist/dashboard/prompts` for the dashboard server,
+   `dist/prompts` and `dist/cli/prompts` for the CLI.
+2. If that directory doesn't exist, the resolver finds the package root (it
+   strips everything from `/src/` onward when `__dirname` contains `/src/`,
+   otherwise it goes up two directories) and tries
+   `src/lib/cloister/prompts` under it.
+3. If neither exists, it keeps the first path, and the first render fails
+   with "Failed to load prompt template".
 
 See [BUILD.md](https://github.com/eltmon/overdeck/blob/main/docs/BUILD.md#specialist-prompt-templates)
 for how the build pipeline copies `*.md` from source to `dist/dashboard/prompts/`.
