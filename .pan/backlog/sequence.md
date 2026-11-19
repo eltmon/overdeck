@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-19T01:24:51.406997Z · model: claude-opus-5-5 · open: 943_
+_Last sequenced: 2026-11-19T01:54:59.493461Z · model: claude-opus-5-5 · open: 942_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -478,7 +478,6 @@ _Last sequenced: 2026-11-19T01:24:51.406997Z · model: claude-opus-5-5 · open: 
 | 451 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
 | 451 | PAN-5557 | S | medium | ok |  |  | pan up on Linux treats the overdeck CLI in ~/.local/bin as the desktop app, prints a false launch and skips its own startup path. |
 | 452 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
-| 452 | PAN-5477 | S | medium | ok |  |  | Docs overhaul child, in pipeline: new permissions.mdx page covering auto-approve, --yolo, operator labels and git shim. |
 | 452 | PAN-5556 | M | medium | ok |  |  | Desktop app tray status, six notification switches, Open Workspace menu and Linux launch-at-login are dead controls; fix or hide. |
 | 453 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
 | 454 | PAN-5322 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5319: unguarded identifier.toUpperCase(), modal focus, needs-you rows that open nothing. |
@@ -1278,10 +1277,10 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-19T01:24:51.406997Z",
+  "generatedAt": "2026-11-19T01:54:59.493461Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 943,
+  "openCount": 942,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -7265,19 +7264,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "condition": "ok",
       "dependsOn": [],
       "why": "Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5477",
-      "rank": 452,
-      "size": "S",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Docs overhaul child, in pipeline: new permissions.mdx page covering auto-approve, --yolo, operator labels and git shim.",
-      "rationale": "In-pipeline docs child of epic PAN-5467 that was missing from the prior sequence; pinned in the slot freed by merged sibling PAN-5475.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14257,13 +14243,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "from": "PAN-5465",
       "to": "PAN-5497",
       "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5467",
-      "to": "PAN-5477",
-      "type": "contains",
       "source": "github-ref",
       "confidence": 1
     },
