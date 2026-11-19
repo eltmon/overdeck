@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5502",
   "created": "2026-11-19T05:29:14.806Z",
-  "updated": "2026-11-19T05:45:11.814Z",
+  "updated": "2026-11-19T05:45:17.660Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -290,6 +290,11 @@
     "audit-merge-batches.ac4": {
       "status": "completed",
       "doneAt": "2026-11-19T05:45:11.814Z"
+    },
+    "audit-mission-control": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:45:17.660Z"
     }
   }
 }
