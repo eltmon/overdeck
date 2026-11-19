@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5499",
   "created": "2026-11-19T02:52:23.250Z",
-  "updated": "2026-11-19T02:56:11.513Z",
+  "updated": "2026-11-19T02:57:35.282Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,9 +80,30 @@
       "doneAt": "2026-11-19T02:56:04.875Z"
     },
     "concepts-pipeline-and-rest": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5499",
-      "claimedAt": "2026-11-19T02:56:11.513Z"
+      "claimedAt": "2026-11-19T02:56:11.513Z",
+      "doneAt": "2026-11-19T02:57:35.282Z"
+    },
+    "concepts-pipeline-and-rest.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:57:35.282Z"
+    },
+    "concepts-pipeline-and-rest.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:57:35.282Z"
+    },
+    "concepts-pipeline-and-rest.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:57:35.282Z"
+    },
+    "concepts-pipeline-and-rest.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:57:35.282Z"
+    },
+    "concepts-pipeline-and-rest.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:57:35.282Z"
     }
   }
 }
