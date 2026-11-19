@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5504",
   "created": "2026-11-19T07:15:41.251Z",
-  "updated": "2026-11-19T07:21:38.328Z",
+  "updated": "2026-11-19T07:21:42.362Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,6 +94,11 @@
     "prompts-a.ac4": {
       "status": "completed",
       "doneAt": "2026-11-19T07:21:38.327Z"
+    },
+    "prompts-b": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5504",
+      "claimedAt": "2026-11-19T07:21:42.362Z"
     }
   }
 }
