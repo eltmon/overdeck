@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5500",
   "created": "2026-11-19T03:34:33.510Z",
-  "updated": "2026-11-19T04:01:09.391Z",
+  "updated": "2026-11-19T04:01:16.415Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -292,6 +292,11 @@
     "audit-cli-mcp.ac4": {
       "status": "completed",
       "doneAt": "2026-11-19T04:01:09.390Z"
+    },
+    "audit-token": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T04:01:16.414Z"
     }
   }
 }
