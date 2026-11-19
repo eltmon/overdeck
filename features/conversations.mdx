@@ -568,8 +568,8 @@ on. When the context window fills up, that knowledge is the most expensive thing
 to lose. A naive "summarize and continue" throws away the nuance.
 
 A **handoff** is a deliberate context transfer. Instead of a passive summary, an
-agent reads the conversation and writes a structured Markdown handoff document —
-capturing the dead ends, the important files, and the suggested next steps — and
+agent reads the conversation and writes a structured Markdown handoff document,
+capturing the dead ends, the important files, and the suggested next steps, and
 that document becomes the seed message for a brand-new conversation. The new
 agent starts with a clean context window but inherits what mattered.
 
@@ -585,21 +585,17 @@ Claude-Code-compatible session.
 
 ## Continue: the three ways to start a new conversation
 
-Open the **Continue** dialog from a conversation's action menu, or type
+Open the dialog (titled **Continue in a new conversation**) from a
+conversation's menu: **Hand off to new conversation** opens it on Agent
+handoff, **Create summary fork** on Fresh summary. Or type
 `/handoff` (optionally followed by focus text) in the composer to jump straight
 to handoff mode. The dialog presents three intents, ordered richest to lightest:
 
-<ThemedImage
-  light="/images/handoff/continue-modal-light.png"
-  dark="/images/handoff/continue-modal-dark.png"
-  alt="The Continue dialog with Agent handoff selected, a new-conversation name, harness and launch-model pickers, and a focus field"
-/>
-
 | Intent | What it does | Best for |
 |:-------|:-------------|:---------|
-| **Fresh summary** *(recommended)* | An LLM distills the prior context into a seed message. For very large conversations the history is chunked, each chunk building on the previous summary. | Most cases — a clean, structured starting point |
+| **Fresh summary** *(recommended)* | An LLM distills the prior context into a seed message. For very large conversations the history is chunked, each chunk building on the previous summary. | Most cases: a clean, structured starting point |
 | **Agent handoff** | An agent writes a Markdown handoff document, optionally focused on a specific next task, that becomes the seed message. | Deliberate handoffs where dead ends, key files, and next steps matter |
-| **Exact copy** | Copies the raw conversation history verbatim — no summary generated. | Picking up exactly where you left off, **same model only** |
+| **Exact copy** | Copies the raw conversation history from the last compaction point, with no summary. Only a Claude Code conversation can be copied, and the copy launches under Claude Code. | Picking up exactly where you left off, **same model only** |
 
 The **Project** picker controls where the successor appears in the project tree,
 independently of its working directory. It defaults to **Same as source**, so an
@@ -610,7 +606,7 @@ somewhere else.
 <Note>
 **Fast summary** is an advanced toggle under *Fresh summary* that skips the LLM
 and extracts a bullet list of user messages, files modified, and tools used
-directly from the history — cheaper and instant, but rougher.
+directly from the history. It is cheaper and instant, but rougher.
 </Note>
 
 <Warning>
@@ -623,33 +619,28 @@ signed thinking blocks) that won't validate on a different provider. Use a
 
 Two model choices live in this dialog, and they are independent:
 
-- **Launch model** — the model the *new conversation* will run on. Defaults to the parent conversation's model.
-- **Authoring model** — the model that *writes the summary or handoff document*. Independent of the launch model; cheaper models like Haiku work well for straightforward cases, larger models for nuanced conversations.
+- **Launch model**: the model the *new conversation* will run on. Defaults to the parent conversation's model.
+- **Authoring model**: the model that *writes the summary or handoff document*. Independent of the launch model; cheaper models like Haiku work well for straightforward cases, larger models for nuanced conversations.
 
 ## Progressive disclosure: Advanced options
 
 The dialog keeps the common case to one screen. Everything else lives behind
 **Advanced options**, which expands to reveal the authoring controls:
 
-<ThemedImage
-  light="/images/handoff/continue-modal-advanced-light.png"
-  dark="/images/handoff/continue-modal-advanced-dark.png"
-  alt="The Continue dialog with Advanced options expanded, showing the authored-by choice (external vs source), authoring harness, and authoring model"
-/>
-
 | Authored by | Behavior |
 |:------------|:---------|
-| **External session** *(default)* | A clean session reads the transcript from disk and writes the document. The source conversation is never touched — its context stays clean, and the source can even be ended. Pick the authoring model and harness here. |
-| **Source session** | The live source agent writes the document in-conversation. This adds the prompt and document to the source's context, and uses whatever model the source is running. Right when the source has live state — open files, recent commands, in-flight reasoning — a transcript reader would miss. |
+| **External session** *(default)* | A clean session reads the transcript from disk and writes the document. The source conversation is never touched: its context stays clean, and the source can even be ended. Pick the authoring model here; the dialog has no harness picker. |
+| **Source agent** | The live source agent writes the document in-conversation. This adds the prompt and document to the source's context, and uses whatever model the source is running. Right when the source has live state (open files, recent commands, in-flight reasoning) that a transcript reader would miss. Offered only for a Claude Code source, and Continue stays disabled until the source conversation is running. |
 
-If a source-authored handoff stalls or produces an invalid document, Overdeck
-falls back to a summary fork automatically.
+If authoring fails (the document never arrives or fails validation, or the
+authoring request errors), Overdeck falls back to a summary fork automatically,
+whoever authors it. A missing authoring model is the exception: that handoff fails.
 
 Under **Agent handoff**, a **Fresh start** checkbox sits beside Hold. Checking it skips authoring entirely: the Focus field relabels to "First message", the Authored-by controls disappear, and Continue creates a root conversation with no parent link whose first message is the focus text verbatim.
 
 ## The help panel
 
-Every option in the dialog is explained inline — click the **?** to open the
+Every option in the dialog is explained inline. Click the **?** to open the
 *Continue Options* reference without leaving the flow:
 
 <ThemedImage
@@ -660,22 +651,23 @@ Every option in the dialog is explained inline — click the **?** to open the
 
 ## Handing off from the CLI
 
-The dialog is the visual front-end for `pan handoff`. The CLI does exactly what
-the dialog does, and the two are interchangeable.
+`pan handoff` is the CLI form of the dialog's **Agent handoff**, including Fresh
+start and Hold. Fresh summary is `pan fork <conv>`, and Exact copy is
+`pan fork <conv> --plain`.
 
 ```bash
 pan handoff [conv] [focus...]
 ```
 
-The trailing text after the conversation reference becomes the **focus** — no
+The trailing text after the conversation reference becomes the **focus**, with no
 flag required.
 
 ### Hand off the conversation you're in
 
 If you're an agent inside a conversation and want to hand off *your own*
 conversation, omit `<conv>` (or pass `self`). The command identifies your
-conversation deterministically from the session you're running in — no scanning,
-no guessing.
+conversation deterministically from the session you're running in, with no scanning
+and no guessing.
 
 ```bash
 pan handoff                               # hand off this conversation, no focus
@@ -683,7 +675,7 @@ pan handoff self wire the Stripe webhook  # hand off this conversation, with foc
 ```
 
 Because focus text is positional, prefer the explicit `self` token whenever you
-pass focus — a bare first word like `pan handoff continue the wiring` is read as
+pass focus: a bare first word like `pan handoff continue the wiring` is read as
 a *conversation reference* named "continue", not as focus. `self` removes the
 ambiguity. Run `pan conv current` (alias `pan conv whoami`) to print exactly
 which conversation you resolve to.
@@ -694,9 +686,8 @@ which conversation you resolve to.
 pan handoff 42
 pan handoff source-conv continue the API wiring
 pan handoff source-conv --model claude-sonnet-4-6
-pan handoff source-conv --harness pi
-pan handoff source-conv --cwd /path/to/project
-pan handoff source-conv --cwd ../isolated-worktree --project mind-your-now
+pan handoff source-conv --cwd ~/Projects/myapp/workspaces/feature-myapp-42
+pan handoff source-conv --cwd ~/worktrees/isolated --project mind-your-now
 pan handoff source-conv --author source uses-source-agent-and-pollutes-its-context
 pan handoff source-conv --author external --author-model claude-haiku-4-5 cheap clean handoff
 ```
@@ -706,25 +697,28 @@ pan handoff source-conv --author external --author-model claude-haiku-4-5 cheap 
 | Option | Description |
 |:-------|:------------|
 | `[conv]` | Conversation id or name. Omit (or pass `self`) to hand off the conversation you're in. |
-| `[focus...]` | Positional focus text — what the successor should concentrate on. **≤ 10,000 characters.** |
+| `[focus...]` | Positional focus text: what the successor should concentrate on. **≤ 10,000 characters.** |
 | `--model <model>` | Model for the new (forked) conversation. Defaults to the parent's model. |
 | `--effort <level>` | Reasoning effort for the new conversation (`low`, `medium`, `high`, `xhigh`, `max`). Defaults to the source conversation's effort, clamped to the new model. |
-| `--harness <harness>` | Harness for the new conversation: `claude-code` or `pi`. |
-| `--cwd <path>` | Working directory for the new conversation. |
+| `--harness <harness>` | Accepted and ignored with a printed notice: the new conversation's harness follows its model's provider. |
+| `--cwd <path>` | An absolute path to an existing directory under your home directory and, except with `--fresh`, inside a git working tree. A project's primary checkout is refused: use a worktree, or pass `--allow-primary`. |
 | `--project <key-or-name>` | Registered project for the successor. Defaults to inheriting the source conversation's project, even when `--cwd` points outside that project's directory. |
+| `--allow-primary` | Operator only: allow `--cwd` to be a project's primary checkout. Refused for agent sessions. |
+| `--issue <id>` | Issue ID to associate with the new conversation. Without `--cwd`, the new conversation starts in the issue's workspace when one exists. |
+| `--role <role>` | Pane role for the new conversation: `conversation` (default), `work`, `review`, `test` or `plan`. With `--issue`, `review` makes the handoff the issue's Review row. |
+| `--title <title>` | Title for the new conversation. Defaults to `Handoff: <focus>` (the first ~70 characters of the focus), or `Handoff: <source title>` without focus. |
 | `--author <who>` | Who authors the handoff doc: `external` (default) or `source`. |
-| `--author-model <model>` | Model for the external authoring session (only when `--author=external`). Falls back to `conversations.handoff_author_model` in `config.yaml` when omitted — there is no built-in default, so set one of the two or the handoff fails with a clear error. |
-| `--author-harness <harness>` | Harness for the external authoring session: `claude-code` or `pi` (external only). |
+| `--author-model <model>` | Model for the external authoring session (only when `--author=external`). Falls back to `conversations.handoff_author_model` in `config.yaml` when omitted. There is no built-in default, so set one of the two or the handoff fails with a clear error. |
+| `--author-harness <harness>` | Accepted and ignored with a printed notice; there is no authoring harness choice. |
 | `--skill <name>` | Turn this skill on for the new conversation only (repeatable). `<name>` is a native skill name or a pack skill id `<pack>/<skill>`. Claude Code and Codex only; a Pi successor stores the values but never applies them. |
 | `--pack <id>` | Turn on every non-opt-in skill of this cached skill pack, for the new conversation only (repeatable). Claude Code and Codex only; a Pi successor stores the values but never applies them. The values are a snapshot of the pack at creation. |
 | `--group <name>` | Turn on every cached pack of this [pack group](/features/skill-packs#pack-groups) (for example `video`), for the new conversation only (repeatable). Each member pack that is not added or not cached is skipped with a note. |
 | `--hold` | Create and launch the new conversation without sending the kickoff. Start it with Send in the dashboard composer, or `pan handoff start <conv>`. |
-| `--fresh` | Start a clean conversation: no handoff document, no summary, no parent link. The focus becomes its first message. Project, cwd, model and effort still default from the source. |
+| `--fresh` | Start a clean conversation: no handoff document, no summary, no parent link. The focus becomes its first message. Project, cwd, model and effort still default from the source. Cannot be combined with `--author source` or `--author-model`; with `--hold` it needs focus text. |
 
 <Note>
-**Focus is hard-capped at 10,000 characters** (PAN-3737; multi-line is fine). A longer focus is rejected with
-`focus must be 10000 characters or fewer` and no
-conversation is created. Keep it short and task-oriented — the detail belongs in
+**Focus is hard-capped at 10,000 characters** (PAN-3737; multi-line is fine). `pan handoff` refuses a longer focus before anything is created; the dashboard API refuses it with `focus must be 10000 characters or fewer`. No
+conversation is created. Keep it short and task-oriented: the detail belongs in
 the transcript the author reads; the focus only steers what the author
 emphasizes.
 </Note>
@@ -740,13 +734,13 @@ pan handoff self --hold Read .pan/handoff-brief.md FIRST and follow it exactly.
 
 The successor's dashboard composer shows a waiting notice with the kickoff
 text already filled in; pressing Send there starts it. From the terminal, run
-`pan handoff start <conv>` (id or name) instead — it sends the held kickoff
+`pan handoff start <conv>` (id or name) instead; it sends the held kickoff
 exactly once. A second `pan handoff start` on the same conversation, or one on
 a conversation that was never held, exits 1 with "No held kickoff: the
 conversation was already started or was never held".
 
 If the held conversation's session ends before you start it, its page shows
-**Held handoff — kickoff not sent** with the focus, the working directory, the
+a **Held handoff** notice that the kickoff was not sent, with the focus, the working directory, the
 handoff doc and the kickoff text. **Start** there does the same as
 `pan handoff start <conv>`: it relaunches the session and sends the kickoff.
 Resume Session is not offered, because a resume would start the agent without
@@ -756,51 +750,54 @@ button takes you to the conversation.
 
 ### Starting fresh
 
-`--fresh` starts a clean conversation that takes only the source's project, cwd, model and effort — not its context. No handoff document is authored, no summary is generated, the source transcript is never read, and the successor has no parent link (no `continues ← #<id>`). The focus is delivered verbatim as the successor's first message:
+`--fresh` starts a clean conversation that takes only the source's project, cwd, model and effort, not its context. No handoff document is authored, no summary is generated, the source transcript is never read, and the successor has no parent link (no `continues ← #<id>`). The focus is delivered verbatim as the successor's first message:
 
 ```bash
 pan handoff self --fresh build a new Dwarf Fortress fort
 ```
 
-This is the right tool for starting unrelated work from a conversation you're already in — e.g. kicking off a fort-building session on a cheaper model from a research conversation — without carrying any of that context forward.
+This is the right tool for starting unrelated work from a conversation you're already in (for example, kicking off a fort-building session on a cheaper model from a research conversation) without carrying any of that context forward.
 
 ### Fallback behavior
 
 `pan handoff <conv>` always tries to create a usable new conversation. If the
-live-agent handoff can't complete, Overdeck falls back to a summary fork and
+handoff can't be authored, Overdeck falls back to a summary fork and
 prints the reason:
 
 | Reason | Meaning |
 |:-------|:--------|
-| `source-ended` | The source conversation is already ended. |
-| `handoff-timeout` | The source didn't write both the document and its `.done` sentinel in time. |
-| `handoff-validation` | The document didn't satisfy the handoff contract. |
-| `source-workspace-devcontainer` | The source can't write to the host handoff directory from inside a workspace container. |
+| `source-ended` | The source conversation is already ended (source-authored handoffs only). |
+| `handoff-timeout` | A source-authored handoff: the source didn't write both the document and its `.done` sentinel within 5 minutes. |
+| `handoff-validation` | The document didn't satisfy the handoff contract, or the external authoring session never wrote it. |
+| `handoff-request-failed` | Any other authoring failure, for example the external authoring session erroring or timing out. |
+| `source-workspace-devcontainer` | The source can't write to the host handoff directory from inside a workspace container (source-authored handoffs only). |
 
-A successful handoff prints the new conversation id, tmux session, model,
-harness, dashboard link, and the handoff document path. Fallbacks print the same
+A successful handoff prints the new conversation id, terminal session, model, effort,
+harness, project (when set), issue, handoff document path and dashboard link. Fallbacks print the same
 details plus a yellow fallback notice.
 
 ## Branch to explore
 
-A handoff isn't only for the context wall — it's also how you **branch**. Fork a
+A handoff isn't only for the context wall. It's also how you **branch**. Fork a
 conversation to try an alternative approach, keep the original intact, compare
 both, and continue with the one you like. Cheaper than restarting from scratch,
 and the original's context is never lost.
 
 ## What a conversation changed
 
-Overdeck can list the commits and uncommitted edits each conversation made.
+The work dock's **Changes** tab lists the commits and uncommitted edits each conversation made.
 Commits are tied to a conversation exactly by the `Overdeck-Conversation`
 trailer that Overdeck adds to every commit a conversation makes. Older commits,
 made before the trailer existed, are found from the `git commit` output in the
 conversation's own shell.
 
 Uncommitted edits are best effort. Claude Code conversations get per-line
-counts, for example "4 of 6 uncommitted lines in this file are from this
-conversation", and the other lines name the conversation that wrote them when
-that conversation was opened recently. Conversations on other harnesses list
-the file only. Edits made only through shell commands are not shown.
+attribution: when other sessions also changed a file, its row says how many of
+its uncommitted lines came from elsewhere and names the conversations that wrote
+them when those conversations were opened recently. Conversations on other
+harnesses list the file only, with a note that line attribution needs edit
+records, which only Claude Code writes. Edits made only through shell commands
+are not shown.
 
 A project's spend on its Home page now includes its conversations, and
 "today" follows the clock of the machine the dashboard runs on.
@@ -828,7 +825,7 @@ checkout goes back to the default branch. The same sweep refreshes the stored
 state of linked PRs, so the badge renders without a live GitHub call. Open PRs
 refresh on every sweep, closed PRs at most every 15 minutes, and merged PRs are
 final and never re-read. A linked PR the project listing doesn't include (older
-than its 100 most recent PRs, in another repository, or on a conversation
+than the 100 most recent open and 100 most recent closed PRs it lists, in another repository, or on a conversation
 outside any GitHub project) is read on its own. After three failed reads in a
 row, Overdeck skips that repository for 15 minutes.
 
@@ -864,14 +861,13 @@ pan conv prs <query> [--json]                      # * marks the PR shown
 `link-pr` records the source `agent` when it runs inside an agent
 (`OVERDECK_AGENT_ID` is set) and `manual` otherwise. The verbs go through the
 dashboard, so every open client updates at once. With the dashboard down they
-write the link directly. They exit 2 when no conversation matches, and 1 on any
+write the link directly. They exit 2 when no conversation matches or the match is ambiguous, and 1 on any
 other error.
 
 An Overdeck agent over MCP links a pull request with the `link_pull_request`
 tool instead (source `agent`), and can watch it with `watch_pull_request` to
 get a message here when its checks, review state, mergeability, or merged/closed
-state changes — see [`configuration/mcp.mdx`](../configuration/mcp.mdx)
-("Pull requests").
+state changes. See [MCP server: Pull requests](/configuration/mcp#pull-requests).
 
 Rules:
 
@@ -898,9 +894,9 @@ by hand, linked by an agent, or on the same branch). Click one to open it.
 
 ### Issue links
 
-Clicking an issue link in a conversation transcript — a GitHub issue of a
+Clicking an issue link in a conversation transcript (a GitHub issue of a
 registered project, or a Linear issue whose prefix belongs to a registered
-project — opens that issue's drawer in the dashboard instead of leaving the
+project) opens that issue's drawer in the dashboard instead of leaving the
 page. The drawer still opens old closed issues the dashboard no longer lists,
 loading them on open. If the dashboard cannot load an issue, the drawer still
 shows the Issue button that opens the link's tracker page. Ctrl/Cmd-click,
@@ -916,15 +912,15 @@ opens the tracker in a new tab.
 Inside a conversation transcript, text that names another conversation
 renders as a link once the dashboard resolves it: a name (`20261113-6031`,
 or `conv-20261113-6031`), a numbered form (`conv 3904`, `conversation 3904`,
-`conv #3904`), or a `/conv/<id>` path — written as plain text, as the whole
+`conv #3904`), or a `/conv/<id>` path, written as plain text, as the whole
 value of an inline code span, or as a hand-written Markdown link. The link's
 tooltip is the conversation's title, or its name when it has none. Fenced
 code never links, and a name the dashboard can't resolve (or hasn't resolved
-yet) stays plain text — archived conversations still resolve and link. The
+yet) stays plain text; archived conversations still resolve and link. The
 conversation currently being viewed is never turned into a link.
 
 A plain click opens the conversation in the dashboard, the same way clicking
-its row in the left column does — no page reload. Ctrl/Cmd-click,
+its row in the left column does, with no page reload. Ctrl/Cmd-click,
 middle-click and the browser's right-click menu open it in a new tab
 instead. As with issue links, this in-dashboard behaviour only applies to
 the main layout: in a pop-out window, the mobile app (`/m`), or the issue
@@ -933,8 +929,8 @@ drawer, a plain click opens a new tab too.
 ### On issue and workspace rows
 
 The issue's row in the left column's Issues section (when you expand it), and
-its row in the Workspaces section, show the same badge as a conversation's — the PR's number,
-colored by state and review, with a `×` for failing checks — read from the
+its row in the Workspaces section, show the same badge as a conversation's (the PR's number,
+colored by state and review, with a `×` for failing checks), read from the
 issue's derived state rather than a conversation's link. It appears within
 seconds of `pan done` opening the PR. A PR that closed without merging is not
 shown there.
