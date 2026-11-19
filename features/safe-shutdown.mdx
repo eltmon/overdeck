@@ -1,5 +1,6 @@
 ---
-title: Safe shutdown
+title: "Safe shutdown: drain agents with pan shutdown before a reboot"
+sidebarTitle: "Safe shutdown"
 description: Drain every agent at a tool boundary before a reboot
 ---
 
@@ -7,13 +8,14 @@ description: Drain every agent at a tool boundary before a reboot
 
 `pan shutdown` stops Overdeck without cutting any agent off in the middle of a tool call. Each session finishes the call it is running, ends its turn, and is stopped. Then Overdeck waits for its own server work, checks that nothing is still writing, stops its services, and tells you it is safe to reboot.
 
-A plain reboot gives every session 5 seconds to exit and then kills it, wherever it is. `pan down` stops the dashboard and its services but leaves every agent running. Use `pan shutdown` when you want to reboot the machine or stop everything cleanly.
+A plain reboot stops every session wherever it is: systemd sends each process SIGTERM, then SIGKILL once its stop timeout passes. `pan down` stops the dashboard, its services and any review sessions, but leaves work agents and conversations running. Use `pan shutdown` when you want to reboot the machine or stop everything cleanly.
 
 ```bash
 pan shutdown            # drain, stop everything, report "Safe to reboot."
 pan shutdown --reboot   # the same, then reboot the machine (Linux)
 pan shutdown --status   # print the running drain
 pan shutdown --cancel   # cancel a running drain
+pan shutdown --no-wait  # start the drain and return without following it
 ```
 
 ## What happens, phase by phase
@@ -53,7 +55,7 @@ The dashboard asks for confirmation first. The dialog lists what will stop, show
 
 If an agent or conversation runs `pan shutdown` itself, the command starts the drain and returns at once, so its own tool call can end.
 
-`pan shutdown` needs the dashboard. If the dashboard is not running, start it with `pan up` first.
+`pan shutdown` needs the dashboard. If the dashboard is not running, start it with `pan up` first. It also refuses to start while a `pan reload` or `pan restart` is in progress.
 
 ## After the restart
 

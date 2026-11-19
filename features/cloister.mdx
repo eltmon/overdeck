@@ -6,7 +6,7 @@ description: "Cloister is the Overdeck watchdog. It checks every running agent, 
 
 import { ThemedImage } from "/snippets/themed-image.mdx";
 
-Cloister is Overdeck's agent watchdog. It starts with the dashboard, checks the health of every running agent, and runs a patrol loop that recovers work that has stalled. Cloister does not choose models and does not decide merges.
+Cloister is Overdeck's agent watchdog. It starts with the dashboard, checks the health of every running agent, and runs a patrol loop that recovers work that has stalled. Cloister does not choose the model an agent starts with and does not decide merges.
 
 ## Start, stop and check Cloister
 
@@ -77,7 +77,7 @@ The Agents page shows each running agent's model, runtime and last activity. The
 
 ## Model routing
 
-Cloister does not pick models. Roles, workhorse slots and tiered execution do that, configured in Settings → Model Routing; see [Model routing](/configuration/model-routing).
+Cloister does not pick the model an agent starts with. Roles and workhorse slots (Settings → Model Routing) and tiered execution (Settings → Tiered Execution) do that; see [Model routing](/configuration/model-routing).
 
 ## Related
 

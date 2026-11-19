@@ -1,34 +1,29 @@
 ---
-title: Skills System
-description: "How Overdeck skills work: reusable SKILL.md workflows that pan sync installs for every supported harness, and how to turn each one on or off."
+title: "Skills: bundled workflows, pan sync and on/off overrides"
+sidebarTitle: "Skills System"
+description: "How Overdeck skills work: reusable SKILL.md workflows that pan sync installs for Claude Code, Codex and Pi, and how to turn each one on or off."
 ---
 
 import { ThemedImage } from "/snippets/themed-image.mdx";
 
 Overdeck's skills system provides reusable workflows and best practices for AI agents.
 
-The dashboard's **Skills** page lists every skill side by side per harness — here `Overdeck (108)` and `Claude (123)` — with each skill's on-disk path, internal `name`, and a sync indicator linking to its `SKILL.md`. It's the quickest way to confirm a skill landed where the agent (or the conversation you're driving) can invoke it.
-
-<ThemedImage
-  light="/images/dashboard/skills-light.png"
-  dark="/images/dashboard/skills-dark.png"
-  alt="Skills page: per-harness columns (Overdeck and Claude) listing each skill's path, name, and SKILL.md sync status, with an activity feed on the right"
-/>
+The dashboard's **Skills** page (left column, More, System, Skills) lists every skill with its description and a global on/off switch, grouped as Core (locked on), Overdeck (`~/.overdeck/skills`) and Personal (`~/.claude/skills`, `~/.agents/skills`). Filter by name or description, or narrow the list with **All**, **Off**, **Core** and **Overridden below**. Skill packs are listed below the skills.
 
 ## What Are Skills
 
 Skills are reusable, shareable workflows that encode best practices for common development tasks. They are:
 
-- **Universal** - Work across all AI coding tools (Claude Code, Codex, Cursor, Gemini CLI, Google Antigravity)
-- **Shareable** - Distribute via `pan sync` to sync to all connected AI tools
-- **Contextual** - Invoked with `/skill-name` in AI tool prompts
+- **Multi-harness** - `pan sync` installs them for Claude Code (`~/.claude/skills`) and for Codex and Pi (`~/.agents/skills`)
+- **Shareable** - `pan sync` copies them to every harness skill directory it manages
+- **Contextual** - Invoked with `/skill-name` in an agent's prompt
 - **Best-practice-driven** - Encode proven workflows and checklists
 
 Skills eliminate the need to repeatedly explain how to do common tasks. Instead of telling an agent "please review this code for security issues", you invoke `/code-review-security` and the agent follows the established workflow.
 
 ## Built-In Skills
 
-Overdeck ships with 70+ built-in skills organized by category:
+Overdeck ships more than 120 built-in skills. A selection, by category:
 
 ### Development Workflows
 
@@ -37,7 +32,6 @@ Overdeck ships with 70+ built-in skills organized by category:
 | `feature-work` | Standard feature implementation workflow |
 | `bug-fix` | Systematic bug investigation and fixing |
 | `refactor` | Safe refactoring with tests first |
-| `code-review` | Comprehensive code review checklist |
 | `code-review-security` | OWASP Top 10 security analysis |
 | `code-review-performance` | Algorithm and resource optimization |
 | `release` | Step-by-step release process |
@@ -62,24 +56,21 @@ Overdeck ships with 70+ built-in skills organized by category:
 | `pan-up` | Start dashboard and services |
 | `pan-down` | Stop dashboard and services |
 | `pan-status` | Show running agents |
-| `pan-issue` | Spawn agent for an issue |
+| `pan-start` | Spawn a work agent for an issue |
 | `pan-plan` | Create execution plan for issue |
 | `pan-tell` | Send message to running agent |
 | `pan-kill` | Kill a running agent |
-| `pan-approve` | Approve agent work and merge |
-| `pan-health` | Check system health |
-| `pan-sync` | Sync skills to AI tools |
+| `pan-doctor` | Check system health, dependencies and configuration |
+| `pan-sync` | Sync skills to every harness skill directory |
 | `pan-install` | Install prerequisites |
-| `pan-setup` | Initial setup wizard |
 | `pan-quickstart` | Quick start guide |
 | `pan-projects` | Manage registered projects |
-| `pan-tracker` | Issue tracker operations |
+| `pan-admin-tracker` | Tracker-specific operations (Linear states, cleanup) |
 | `pan-logs` | View agent logs |
-| `pan-rescue` | Recover crashed agents |
 | `pan-diagnose` | Diagnose agent issues |
 | `pan-docker` | Docker operations |
 | `pan-network` | Network diagnostics |
-| `pan-config` | Configuration management |
+| `pan-admin-config` | View and edit project configuration |
 | `pan-restart` | Safely restart Overdeck dashboard and services |
 | `pan-code-review` | Orchestrate parallel code review (3 reviewers + synthesis) |
 | `pan-subagent-creator` | Create specialized subagents |
@@ -94,12 +85,10 @@ Overdeck ships with 70+ built-in skills organized by category:
 
 | Skill | Description |
 |-------|-------------|
-| `beads` | Git-backed issue tracking with dependencies |
 | `claude-skill-creator` | Guide for creating Claude Code skills |
 | `web-design-guidelines` | UI/UX review checklist |
 | `clear-writing` | Proven rules for clearer prose in docs, commits, and UI text |
 | `crash-investigation` | Investigate system crashes, OOM kills, and freezes |
-| `opus-plan` | Opus-driven planning with PRD, STATE.md, and beads |
 | `spec-readiness` | Evaluate issue requirements readiness (scored 0-100) |
 | `check-merged` | Verify if a feature branch has been merged into main |
 | `react-best-practices` | React/Next.js performance optimization from Vercel |
@@ -107,17 +96,17 @@ Overdeck ships with 70+ built-in skills organized by category:
 
 ## Using Skills
 
-Skills are invoked via slash commands in any AI coding tool:
+Skills are invoked as slash commands, for example in Claude Code:
 
 ```
-# In Claude Code, Cursor, Windsurf, etc:
+# In Claude Code:
 /feature-work
 /code-review-security
 /bug-fix
 /pan-help
 ```
 
-When you invoke a skill, the AI tool injects the skill's prompt into the conversation, giving the agent detailed instructions on how to proceed.
+When you invoke a skill, the harness injects the skill's prompt into the conversation, giving the agent detailed instructions on how to proceed.
 
 ## Creating Custom Skills
 
@@ -129,7 +118,11 @@ Skills are markdown files stored in `~/.overdeck/skills/`. Create your own with:
 
 # Or manually create a skill
 mkdir -p ~/.overdeck/skills/my-custom-skill
-cat > ~/.overdeck/skills/my-custom-skill/skill.md <<'EOF'
+cat > ~/.overdeck/skills/my-custom-skill/SKILL.md <<'EOF'
+---
+name: my-custom-skill
+description: One line saying what the skill does and when to use it
+---
 # My Custom Skill
 
 Brief description of what this skill does.
@@ -150,13 +143,18 @@ Describe when this skill should be invoked.
 - Tip 2
 EOF
 
-# Sync to all AI tools
+# Install it for every harness. This overwrites a different file at the same
+# path in ~/.claude/skills, so keep personal skills only in ~/.overdeck/skills.
 pan sync
 ```
 
 **Skill anatomy:**
 
 ```markdown
+---
+name: skill-name
+description: One line saying what the skill does and when to use it
+---
 # Skill Title
 
 One-line description.
@@ -189,25 +187,25 @@ When to invoke this skill (triggers).
 - /complementary-skill - Use together with this
 ```
 
-See the [Claude skill creator](/cli/core-commands) or use `/pan-skill-creator` for guided creation.
+Use `/pan-skill-creator` or `/claude-skill-creator` for guided creation.
 
 ## Skill Distribution
 
 Skills can be distributed via:
 
-1. **Project skills** — commit them to `.pan/skills/<name>/` in the project repo. See [Project skills](#project-skills).
-2. **User-specific** - Store in `~/.overdeck/skills/` (synced to AI tools)
-3. **Third-party skill repositories** — register them as a [skill pack](/features/skill-packs) with `pan skills pack add`; to publish your own, see [Authoring a skill pack](/guides/skill-pack-authoring).
+1. **Project skills**: commit them to `.pan/skills/<name>/` in the project repo. See [Project skills](#project-skills).
+2. **User-specific** - Store in `~/.overdeck/skills/` (installed for every harness by `pan sync`)
+3. **Third-party skill repositories**: register them as a [skill pack](/features/skill-packs) with `pan skills pack add`; to publish your own, see [Authoring a skill pack](/guides/skill-pack-authoring).
 4. **Overdeck's bundled skills** ship in `sync-sources/skills/` and reach every machine through `pan sync`.
 
 ### Project skills
 
-Project skills live at `<projectRoot>/.pan/skills/<name>/` in the project's own repo. The catalog lists them last, so a project skill with the same name as a skill in `~/.overdeck/skills`, `~/.claude/skills` or `~/.agents/skills` is listed as that other skill instead. Project skills never appear on the global Skills page — only in that project's settings and its issues.
+Project skills live at `<projectRoot>/.pan/skills/<name>/` in the project's own repo. The catalog lists them last, so a project skill with the same name as a skill in `~/.overdeck/skills`, `~/.claude/skills` or `~/.agents/skills` is listed as that other skill instead. Project skills never appear on the global Skills page, only in that project's settings and its issues.
 
 Overdeck copies `.pan/skills/<name>/` into `<workspace>/.claude/skills/<name>/` once, when the workspace manager creates an issue workspace (planning, the dashboard, swarm, or PR adoption). Two cases copy nothing:
 
-- `pan workspace create` for a project with no `workspace:` block in `projects.yaml` — the CLI fallback does not copy project skills.
-- An existing workspace — `pan workspace update`, `pan sync-main` and `pan sync` never copy project skills into it.
+- `pan workspace create` for a project with no `workspace:` block in `projects.yaml`: the CLI fallback does not copy project skills.
+- An existing workspace: `pan workspace update`, `pan sync-main` and `pan sync` never copy project skills into it.
 
 A target directory that already exists is never overwritten, and bundled skills are copied first, so a project skill with the same name as a bundled skill is skipped and the bundled skill wins.
 
@@ -224,10 +222,10 @@ pan sync --dry-run
 ```
 
 The `pan sync` command:
-- Copies skills from `~/.overdeck/skills/` to each AI tool's config directory
-- Updates existing skills if versions differ
+- Copies skills from `~/.overdeck/skills/` to `~/.claude/skills` and `~/.agents/skills`
+- Overwrites installed skill files you have not edited; a file you edited since Overdeck installed it is skipped and reported as user-modified (`pan sync --force` overwrites it). The vendored `okf` skill is the exception: when its skill directory is a real directory, not a symlink, `pan sync` replaces edited `okf` files in both targets and reports them as replaced vendored files
 - Removes manifest-managed skills from harness directories after their bundled source is removed
-- Preserves user-owned and user-modified files, reporting modified stale files instead of deleting them
+- Preserves files Overdeck did not install, except that in `~/.claude/skills` a file at the same path as any skill file in `~/.overdeck/skills`, bundled or your own, is overwritten and reported as adopted; when a bundled skill is removed, an installed copy you edited is reported instead of deleted
 - Ignores empty bundled skill directories so they do not reappear in caches or harness targets
 
 ## Turning skills on and off
@@ -238,7 +236,7 @@ Every skill has an on/off state that you can set at three levels: a **global def
 
 A skill with no value at any level is on. The global level is two-state: a skill is either on (no stored value) or off. Project and issue levels are three-state: a skill inherits the level above, or is set on, or is set off, so a project can turn on a skill that is off globally, and an issue can turn off a skill its project turned on.
 
-Conversation values are set only when the conversation is created, in the **New conversation with options…** dialog (see [Conversations](/features/conversations)). They are stored on the conversation row and applied at every launch, resume, restart and fork of that conversation. A conversation value for a pack skill (`pack/skill`) beats every level and every pack toggle, so a conversation can turn on one opt-in pack skill for itself. Core skills ignore conversation values too.
+Conversation values are set when the conversation is created, in the **New conversation with options…** dialog (see [Conversations](/features/conversations)), and later with [`pan skills add`](/cli/skills-commands#pan-skills-add), the `add_skills` MCP tool or **Add skills…** in the conversation menu; a running Claude Code conversation loads added packs in place. They are stored on the conversation row and applied at every launch, resume, restart and fork of that conversation. A conversation value for a pack skill (`pack/skill`) beats every level and every pack toggle, so a conversation can turn on one opt-in pack skill for itself. Core skills ignore conversation values too.
 
 ### Core skills are always on
 
@@ -294,23 +292,11 @@ A **skill pack** is a third-party git repository of skills that Overdeck pins to
 
 ## Subagents
 
-Overdeck includes specialized subagent templates for common development tasks. Subagents are invoked via the Task tool or convoy orchestration for parallel execution.
+Overdeck ships five pipeline agent definitions, `pan-work-agent`, `pan-review-agent`, `pan-test-agent`, `pan-uat-agent` and `pan-merge-agent`, which `pan sync` installs into `~/.claude/agents/` and Cloister uses when it launches the matching specialist. It ships no general-purpose subagent templates.
 
-### Code Review Subagents
+### Code review
 
-| Subagent | Model | Focus | Output |
-|----------|-------|-------|--------|
-| `code-review-correctness` | haiku | Logic errors, edge cases, type safety | `.claude/reviews/<timestamp>-correctness.md` |
-| `code-review-security` | sonnet | OWASP Top 10, vulnerabilities | `.claude/reviews/<timestamp>-security.md` |
-| `code-review-performance` | haiku | Algorithms, N+1 queries, memory | `.claude/reviews/<timestamp>-performance.md` |
-| `code-review-synthesis` | sonnet | Combines all findings into unified report | `.claude/reviews/<timestamp>-synthesis.md` |
-
-**Usage Example:**
-```bash
-/pan-code-review --files "src/auth/*.ts"
-```
-
-This spawns all three reviewers in parallel, then synthesizes their findings into a prioritized report.
+Overdeck ships no code-review subagents. A full review runs as the [review convoy](/features/convoys): four reviewers (correctness, security, performance and requirements) whose prompts live in `roles/review-*.md` and are inlined when the review starts, plus a review parent that combines their findings.
 
 ### Planning & Exploration Subagents
 
@@ -333,6 +319,5 @@ Overdeck ships no custom planning or exploration subagent files. Planning runs a
 
 ## Related Guides
 
-- [Creating Skills](/cli/core-commands#pan-skill-creator) - Detailed skill creation guide
-- [Convoys](/features/convoys) - Parallel subagent execution
-- [Subagents](/cli/core-commands#pan-subagent-creator) - Custom subagent templates
+- [Creating custom skills](#creating-custom-skills) - Write your own SKILL.md
+- [Review convoy](/features/convoys) - Four parallel reviewers and one synthesis parent

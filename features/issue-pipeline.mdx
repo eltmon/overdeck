@@ -55,7 +55,7 @@ Once preflight passes, `pan done` rebases the branch onto the target branch and 
 
 Once `pan done` pushes, the dashboard runs the project's quality gates against the PR head before review starts. Gates come from `quality_gates` in `projects.yaml` (see [Projects](/configuration/projects)), or default to typecheck, lint and test.
 
-The `verification.tests` setting picks `ci` or `local` test mode, and when it is unset Overdeck detects it: `ci` when a GitHub Actions workflow runs a recognizable test job on pull requests, otherwise `local`. In CI mode the host skips its own test gate, because the CI test job on the PR head is the test gate.
+The per-project `verification.tests` setting in `projects.yaml` picks `ci` or `local` test mode, and when it is unset Overdeck detects it: `ci` when a GitHub Actions workflow runs a recognizable test job on pull requests, otherwise `local`. In CI mode the host skips its own test gate, because the CI test job on the PR head is the test gate.
 
 A failed gate sends the work agent a message naming the failed check and asking it to fix, push and request review again. Review never starts until verification passes. Overdeck allows up to 3 attempts per PR head; on the last attempt, or when the same check fails twice in a row, it pauses the work agent with a Needs-you signal instead of retrying further.
 
@@ -73,7 +73,7 @@ There is no hard limit on review rounds, but after at least 3 rounds where the b
 
 ## Tests and UAT
 
-A single test role owns both ordinary test-suite execution and browser-based UAT; there is no separate UAT role. It runs the project's gates, decides from the issue's acceptance criteria whether browser UAT is needed, and when it is, drives the workspace's built dashboard with Playwright. It records two separate verdicts, tests and UAT.
+A single test role owns both ordinary test-suite execution and browser-based UAT; there is no separate UAT role. It runs the project's gates, decides from the issue's acceptance criteria whether browser UAT is needed, and when it is, drives the workspace's own running app with Playwright. It records two separate verdicts, tests and UAT.
 
 For a project in CI mode, the CI test job on the PR head is the test gate, so the merge gate requires it directly. While an issue is held for UAT, the default (see [Merge](#merge)), a failed UAT verdict at the PR head blocks merge: it is treated as evidence the code does not work. With the hold off for that issue, a failed UAT verdict does not block merge.
 
@@ -107,7 +107,7 @@ Every merge path, whether it is Awaiting Merge, the Merge button, auto-merge, th
 
 Clicking Merge asks the gate first. A PR that is already clean merges directly; otherwise the server rebases onto main for you, and if that rebase itself fails, it falls back to asking the work agent to rebase and push. Either way the merge itself is a squash merge. [Awaiting Merge](/features/dashboard-views#awaiting-merge) is where ready issues wait for this click.
 
-By default a ready PR waits for you: the per-issue `auto-merge` or `hold-for-uat` label (set by the Awaiting Merge row's `Auto` / `Hold` toggle) wins if set, otherwise the project's own default, otherwise the global `require_uat_before_merge` setting, which defaults to true. With the hold off for an issue, its ready PR is scheduled and merges itself after a 5-minute cooldown; `pan merge cancel <id>` stops one during that window. See [Auto-merge](/configuration/auto-merge) for the full policy, and [Merge batches](/features/merge-batches) for the merge train, which is off by default.
+By default a ready PR waits for you: the per-issue `auto-merge` or `hold-for-uat` label (set by the Awaiting Merge row's `Auto` / `Hold` toggle) wins if set, otherwise the project's own default, otherwise the global Require UAT switch on the [Flywheel](/features/flywheel) page (app setting `flywheel.require_uat_before_merge`), which defaults to on. With the hold off for an issue, its ready PR is scheduled and merges itself after a 5-minute cooldown; `pan merge cancel <id>` stops one during that window. See [Auto-merge](/configuration/auto-merge) for the full policy, and [Merge batches](/features/merge-batches) for the merge train, which is off by default.
 
 Awaiting Merge also has a Pipeline Override section for PRs that are not yet ready: `Force Approve` and `Force Merge` both bypass the pipeline, behind a confirmation step, for the rare case where you need to move a PR on without waiting for the gate.
 

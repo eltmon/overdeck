@@ -28,7 +28,7 @@ The start screen (`Start Planning Session`) explains that the issue moves to In 
 - `Stay and watch planning`: keeps the dialog open and shows the agent's terminal. Default on.
 - `Start Docker containers`: the workspace is created with Docker started. Default off, and it applies only when planning creates the workspace.
 - `Model`: defaults to the `roles.plan.model` setting.
-- `Effort`: `Low`, `Medium`, `High`, `Xhigh`, `Max`. Default `High`. `Xhigh` and `Max` add the probe pass.
+- `Effort`: `Low`, `Medium`, `High`, `Xhigh`, `Max`. Default `High`. `High` and above add the probe pass, so the default effort runs it.
 
 There is no harness picker: the harness comes from `roles.plan.harness`, or Claude Code if that is unset. There is no probe checkbox either; use `pan plan --probe`, or an effort of `High` or above.
 
@@ -80,11 +80,11 @@ The PRD is a markdown brief at `.pan/drafts/<issue>.md`. A human can write it, o
 
 ## The xBRIEF plan
 
-The plan is an [xBRIEF](https://github.com/deftai/xBRIEF) document (current version 0.8; the old name was vBRIEF). A spec has exactly two top level keys, `xBRIEFInfo` and `plan`. `plan.items[]` is the checklist. Each item has an `id`, `title`, `status`, an optional `narrative.Action`, `metadata`, and nested acceptance criteria.
+The plan is an [xBRIEF](https://github.com/deftai/xBRIEF) document (current version 0.8; the old name was vBRIEF). The planner writes exactly two top level keys, `xBRIEFInfo` and `plan`; the canonical spec in `.pan/specs/` also carries a root `status` field, the lifecycle status described under [Where the plan lives](#where-the-plan-lives). `plan.items[]` is the checklist. Each item has an `id`, `title`, `status`, a `narrative.Action` (finalize's quality lint requires at least 8 words), `metadata`, and nested acceptance criteria.
 
 ### Items and acceptance criteria
 
-An item's acceptance criteria are child items with `metadata.kind: "acceptance_criterion"` and ids like `<item>.ac1`. The verification gate requires every acceptance criterion to be `completed` before review. A small example, two items and one dependency between them:
+An item's acceptance criteria are child items with `metadata.kind: "acceptance_criterion"` and ids like `<item>.ac1`. The verification gate requires every acceptance criterion to be `completed` before review. A small example of the shape, two items and one dependency between them. It is not a finalize-ready plan: the quality lint (exit code `3`) also requires, per item, `metadata.files_scope`, `files_scope_confidence`, `readiness` and `requiresInspection`, a `narrative.Action` of at least 8 words, and 2 to 5 acceptance criteria (or `metadata.acJustification`) whose titles name observable behavior:
 
 ```json
 {
@@ -174,8 +174,8 @@ draft -> proposed -> active -> completed
 | (new) to draft | `pan plan` starts; the PRD is written to `.pan/drafts/` |
 | draft to proposed | Planning completes; the xBRIEF is created in `.pan/specs/` |
 | proposed to active | `pan start` runs |
-| active to completed | The PR merges |
-| active to cancelled | The issue is closed |
+| active to completed | Nothing automatic: close-out leaves the field alone and the merged PR is the evidence; `pan scope complete` sets it by hand |
+| active to cancelled | Only `pan scope cancel` (the dashboard's `Cancel issue` action deletes the workspace first, so it skips the spec) |
 
 ## Finalize the plan
 

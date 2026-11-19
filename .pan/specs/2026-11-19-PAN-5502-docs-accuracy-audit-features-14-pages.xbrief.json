@@ -1,0 +1,1846 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-19T07:00:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5502: docs: accuracy audit, Features (14 pages)",
+    "updated": "2026-11-19T05:28:52.680Z"
+  },
+  "plan": {
+    "id": "pan-5502",
+    "title": "docs: accuracy audit, Features (14 pages)",
+    "status": "running",
+    "uid": "7116823f-d859-4aba-9833-11a97b0fc506",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-19T07:00:00Z",
+    "updated": "2026-11-19T05:28:52.680Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5502",
+        "label": "PAN-5502",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5467",
+        "label": "PAN-5467 (epic)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docs",
+      "audit",
+      "mintlify",
+      "features"
+    ],
+    "narratives": {
+      "Problem": "The Features docs pages describe removed views (mission-control Activity View, Badge Bar, Status Reviews), removed skills and subagents, wrong pan handoff flags, a test agent that is never dispatched, wrong workspace paths and planning artifacts, stale screenshots, and wrong merge-train behavior. Several pages have en/em dashes, generic titles and broken links.",
+      "Proposal": "The planner already audited all 20 pages in the Features nav group against main 2007e9a4d3c; .pan/drafts/PAN-5502.md holds verified change tables (grep anchor, replacement, code evidence) per page in Appendices A to J. One item per page (three section items for conversations.mdx, two for workspaces.mdx) applies its table, removes dashes, fixes frontmatter, deletes images of removed UI and checks links; a final item runs lint:docs and the Mintlify validators and drafts the per-page PR body. One PR.",
+      "NonGoals": "- No code, test, rule, docs.json, CLAUDE.md, README.md or changelog.d change; code bugs become PR-body Follow-ups.\n- No page outside the Features nav group.\n- No new pages, navigation changes, file renames or slug changes.\n- No heading renames or deletions except those listed in the PRD's NFR-2.\n- No screenshots added, replaced or recaptured and no image files deleted; only alt text changes and the ThemedImage removals listed in FR-8.\n- No help section added to pages without a troubleshooting section.\n- No change to the macOS ⌘W/⌘T shortcut lines (needs a real-Mac check).\n- No description of intended behavior as current (for example #5537's test dispatch)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Audit all 20 pages in the Features nav group, not only the 14 listed",
+        "rationale": "The issue's scope sentence is every published page in the group; the six added pages are in no sibling audit issue's body, and PAN-5503 made the same call."
+      },
+      {
+        "summary": "Audit the five prerequisite-PR pages on top of their merged results, including swarm.mdx",
+        "rationale": "All of #5474, #5472, #5471, #5479 and #5482 merged and their commits are in each page's history; PAN-5482 landed, so its result is audited with six small rows."
+      },
+      {
+        "summary": "Add Discord and GitHub Issues links only to pages with troubleshooting sections lacking them",
+        "rationale": "The issue asks for the links where a page talks about getting help; skill-packs, convoys and workspaces are the only such pages without them."
+      },
+      {
+        "summary": "Rewrite wrong alt text, delete ThemedImage blocks that show removed UI, list recaptures as Follow-ups",
+        "rationale": "A screenshot of a removed harness picker is a wrong claim; recapturing images needs a live dashboard and is outside a text audit."
+      },
+      {
+        "summary": "Retitle generic one- or two-word titles and keep the old title as sidebarTitle",
+        "rationale": "The issue asks for specific searchable titles; sidebarTitle keeps navigation labels short, matching PAN-5503."
+      },
+      {
+        "summary": "Describe current code behavior where code is buggy and list the bug as a Follow-up",
+        "rationale": "The issue is docs-only; describing intended behavior (for example test dispatch after approval, #5537) would reintroduce inaccuracy."
+      },
+      {
+        "summary": "Split conversations.mdx into three section items and workspaces.mdx into two, chained by blocks edges",
+        "rationale": "conversations.mdx is 1,346 lines with 48 rows and workspaces.mdx has 35 rows; section items stay reviewable and the edges serialize shared-file edits."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Every item edits one Mintlify page in the single features/ directory; the finalize lint counts each features/<page>.mdx as its own subsystem, so 20 pages read as 20 subsystems. The epic (#5467) scopes one audit issue per docs nav group, and the pages share one validation pass and one PR body, so splitting into sibling issues would duplicate the validator and PR-body work without adding review isolation. The plan touches exactly 20 files, under the 25-file limit.",
+      "canonicalFilename": "2026-11-19-PAN-5502-docs-accuracy-audit-features-14-pages.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "conv-surface",
+        "title": "conversations.mdx: fix lines 1-555 (hero alt, model lock, header menu, Machine field)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Why hand off/{exit} {print}' features/conversations.mdx | grep -cP '[\\x{2013}\\x{2014}]' || true",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the range-bounded dash count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Shares conversations.mdx with conv-handoff and conv-machines-to-end; the blocks edges serialize them.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-A1 (Appendix A, 11 rows) to features/conversations.mdx from the frontmatter to the line before `## Why hand off?` only. Follow the PRD Common procedure in .pan/drafts/PAN-5502.md (apply the change table by grep anchor, residual rule, remove every en/em dash in the range, frontmatter rule, link check, MDX safety). Never change code or images. Commit with Item: conv-surface, the AC trailers and a 'PR-note: features/conversations.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "conv-surface.ac1",
+            "title": "features/conversations.mdx no longer contains `Hot-swap the model for the next message` and contains `the model is fixed once a conversation starts`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-surface.ac2",
+            "title": "The hero ThemedImage alt text contains `Command Deck on a project's home tab` and no longer contains `the agent's turn-by-turn tool calls`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-surface.ac3",
+            "title": "The New conversation with options field list contains a `**Machine.**` bullet naming `**Auto**` and `**Fly (new VM)**`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-surface.ac4",
+            "title": "The header menu step 4 contains `**Add skills…**` and the status-line sentence contains `show only in a Command Deck tab`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-surface.ac5",
+            "title": "`awk '/^## Why hand off/{exit} {print}' features/conversations.mdx | grep -cP '[\\x{2013}\\x{2014}]'` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conv-handoff",
+        "title": "conversations.mdx: fix lines 556-959 (handoff dialog, pan handoff flags, PRs)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "awk '/^## Why hand off/{f=1} /^## Conversations from your other machines/{exit} f' features/conversations.mdx | grep -cP '[\\x{2013}\\x{2014}]' || true",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the range-bounded dash count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Shares conversations.mdx with conv-surface and conv-machines-to-end; the blocks edges serialize them.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-A2 (Appendix B, 28 rows and blocks B5, B6, B13, B19, B24) plus planner rows P1 and P2 (delete the continue-modal and continue-modal-advanced ThemedImage blocks) to features/conversations.mdx from `## Why hand off?` to the line before `## Conversations from your other machines` only. Follow the PRD Common procedure in .pan/drafts/PAN-5502.md (apply the change table by grep anchor, residual rule, remove every en/em dash in the range, frontmatter rule, link check, MDX safety). Never change code or images. Commit with Item: conv-handoff, the AC trailers and a 'PR-note: features/conversations.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "conv-handoff.ac1",
+            "title": "The `pan handoff` option table contains rows for `--allow-primary`, `--issue <id>`, `--role <role>` and `--title <title>`, and the `--harness` row contains `Accepted and ignored`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-handoff.ac2",
+            "title": "The handoff bash example no longer contains `pan handoff source-conv --harness pi` or `--cwd ../isolated-worktree`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-handoff.ac3",
+            "title": "The fallback table contains a `handoff-request-failed` row and the `source-ended` reason contains `(source-authored handoffs only)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-handoff.ac4",
+            "title": "features/conversations.mdx no longer contains `continue-modal-light.png` or `continue-modal-advanced-light.png` and still contains `continue-help-light.png`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-handoff.ac5",
+            "title": "The page no longer contains `](../configuration/mcp.mdx)` and contains `/configuration/mcp#pull-requests`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conv-machines-to-end",
+        "title": "conversations.mdx: fix lines 960-end and run the page-wide checks",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' features/conversations.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Shares conversations.mdx with conv-surface and conv-handoff; the blocks edges serialize them.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-A3 (Appendix C, 9 rows) to features/conversations.mdx from `## Conversations from your other machines` to the end, then run the page-wide dash and link checks for the whole page. Follow the PRD Common procedure in .pan/drafts/PAN-5502.md (apply the change table by grep anchor, residual rule, remove every en/em dash in the range, frontmatter rule, link check, MDX safety). Never change code or images. Commit with Item: conv-machines-to-end, the AC trailers and a 'PR-note: features/conversations.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "conv-machines-to-end.ac1",
+            "title": "features/conversations.mdx no longer contains `Arrives in the next release (v0.65.0)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-machines-to-end.ac2",
+            "title": "The palette sentence contains `⌘K` / `Ctrl+K` and the stop sentence no longer contains `\"Stop agent\" in the row menu`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-machines-to-end.ac3",
+            "title": "The search settings paragraph contains `Session embeddings` and the snooze sentence no longer contains `**Custom…**`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-machines-to-end.ac4",
+            "title": "`grep -cP '[\\x{2013}\\x{2014}]' features/conversations.mdx` prints 0 for the whole page",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-skill-packs",
+        "title": "skill-packs.mdx: fix dashboard add, default refs, MCP harnesses and Atlassian auth",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skill-packs.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' features/skill-packs.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other item touches it.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-D1 (Appendix D, 10 rows), retitle with sidebarTitle 'Skill Packs', and remove all 19 dash lines in features/skill-packs.mdx. Follow the PRD Common procedure in .pan/drafts/PAN-5502.md (apply the change table by grep anchor, residual rule, remove every en/em dash in the range, frontmatter rule, link check, MDX safety). Never change code or images. Commit with Item: audit-skill-packs, the AC trailers and a 'PR-note: features/skill-packs.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-skill-packs.ac1",
+            "title": "features/skill-packs.mdx no longer contains `The dashboard can turn packs on and off but not add them` and contains `Available packs`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-skill-packs.ac2",
+            "title": "The mattpocock sentence contains `has no default ref` and the MCP sentence names `grok` and `pi`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-skill-packs.ac3",
+            "title": "The Atlassian auth sentence contains `*.atlassian.net`, and the page contains `discord.gg/ZpHE2ZTv5P` after `## Troubleshooting`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-skill-packs.ac4",
+            "title": "The frontmatter contains `sidebarTitle: \"Skill Packs\"` and `grep -cP '[\\x{2013}\\x{2014}]' features/skill-packs.mdx` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-skills",
+        "title": "skills.mdx: fix the Skills page, shipped skill list, harness targets and broken links",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skills.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' features/skills.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other item touches it.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-E1 (Appendix E part skills.mdx, 28 rows) plus planner row P3 (delete the skills screenshot block), retitle with sidebarTitle 'Skills System', change the description, and remove all 6 dash lines in features/skills.mdx. Follow the PRD Common procedure in .pan/drafts/PAN-5502.md (apply the change table by grep anchor, residual rule, remove every en/em dash in the range, frontmatter rule, link check, MDX safety). Never change code or images. Commit with Item: audit-skills, the AC trailers and a 'PR-note: features/skills.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-skills.ac1",
+            "title": "features/skills.mdx no longer contains any of `pan-approve`, `pan-rescue`, `opus-plan`, `beads`, `Antigravity` or `Windsurf`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-skills.ac2",
+            "title": "The custom-skill example creates `SKILL.md` (not `skill.md`) and contains `name: my-custom-skill` frontmatter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-skills.ac3",
+            "title": "The page no longer contains `/cli/core-commands` and no longer contains `skills-light.png`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-skills.ac4",
+            "title": "The page no longer contains `### Code Review Subagents` and contains `### Code review` linking `/features/convoys`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-skills.ac5",
+            "title": "The frontmatter contains `sidebarTitle: \"Skills System\"` and a description naming `Claude Code, Codex and Pi`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-safe-shutdown",
+        "title": "safe-shutdown.mdx: correct the reboot timeout, pan down scope and drain flags",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/safe-shutdown.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' features/safe-shutdown.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other item touches it.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-E2 (Appendix E part safe-shutdown.mdx, 4 rows) and retitle with sidebarTitle 'Safe shutdown' in features/safe-shutdown.mdx. Follow the PRD Common procedure in .pan/drafts/PAN-5502.md (apply the change table by grep anchor, residual rule, remove every en/em dash in the range, frontmatter rule, link check, MDX safety). Never change code or images. Commit with Item: audit-safe-shutdown, the AC trailers and a 'PR-note: features/safe-shutdown.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-safe-shutdown.ac1",
+            "title": "features/safe-shutdown.mdx no longer contains `5 seconds to exit` and the `pan down` sentence contains `review sessions`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-safe-shutdown.ac2",
+            "title": "The command block contains `pan shutdown --no-wait` and the dashboard note contains `pan reload` or `pan restart` is in progress",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-safe-shutdown.ac3",
+            "title": "The frontmatter contains `sidebarTitle: \"Safe shutdown\"` and a title that contains `pan shutdown`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-swarm",
+        "title": "swarm.mdx: define slot-eligible and correct steal, Inherit global and defaults",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/swarm.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' features/swarm.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other item touches it.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-E3 (Appendix E part swarm.mdx, 6 rows) to features/swarm.mdx. Follow the PRD Common procedure in .pan/drafts/PAN-5502.md (apply the change table by grep anchor, residual rule, remove every en/em dash in the range, frontmatter rule, link check, MDX safety). Never change code or images. Commit with Item: audit-swarm, the AC trailers and a 'PR-note: features/swarm.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-swarm.ac1",
+            "title": "features/swarm.mdx contains `files_scope_confidence` in the slot-eligible definition and contains `swarm.policy.mode=always`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-swarm.ac2",
+            "title": "The project select sentence contains `Inherit global` and the `--steal` sentence contains `nothing checks who passes it`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-swarm.ac3",
+            "title": "The Settings sentence contains the defaults `Off`, `3 slots` and `1 to 12`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workspaces-layout-to-lifecycle",
+        "title": "workspaces.mdx: fix lines 1-340 (paths, planning artifacts, Docker, destroy)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/workspaces.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' features/workspaces.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Shares workspaces.mdx with workspaces-safeguards-to-end; the blocks edge serializes them.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-F1 (Appendix F rows 1-20 and blocks 6, 7, 20) plus planner row P4 (board alt text) to features/workspaces.mdx from the frontmatter to the line before `## Main Project Branch Convention` only. Follow the PRD Common procedure in .pan/drafts/PAN-5502.md (apply the change table by grep anchor, residual rule, remove every en/em dash in the range, frontmatter rule, link check, MDX safety). Never change code or images. Commit with Item: workspaces-layout-to-lifecycle, the AC trailers and a 'PR-note: features/workspaces.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "workspaces-layout-to-lifecycle.ac1",
+            "title": "features/workspaces.mdx no longer contains `{project}/workspaces/{issue-id}/` and contains `workspaces/feature-<issue>/`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspaces-layout-to-lifecycle.ac2",
+            "title": "The section before `## Main Project Branch Convention` no longer contains `.planning/`, `STATE.md` or `beads`, and the planning section contains `.pan/drafts/<issue>.md`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspaces-layout-to-lifecycle.ac3",
+            "title": "The Docker section no longer contains `docker compose -p \"{project}-feature-{issue}\"` and the checkbox default contains `Off`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspaces-layout-to-lifecycle.ac4",
+            "title": "The destroy block no longer contains `safe - checks for uncommitted changes` or `pan workspace destroy MIN-123 --force`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspaces-layout-to-lifecycle.ac5",
+            "title": "The board alt text contains `Board view:` and no longer contains `cost badges`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workspaces-safeguards-to-end",
+        "title": "workspaces.mdx: fix lines 341-end (roles, safeguards, Fly) and page-wide checks",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/workspaces.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' features/workspaces.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Shares workspaces.mdx with workspaces-layout-to-lifecycle; the blocks edge serializes them.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-F2 (Appendix F rows 21-35 and blocks 22, 23) to features/workspaces.mdx from `## Main Project Branch Convention` to the end, then run the page-wide dash and link checks. Follow the PRD Common procedure in .pan/drafts/PAN-5502.md (apply the change table by grep anchor, residual rule, remove every en/em dash in the range, frontmatter rule, link check, MDX safety). Never change code or images. Commit with Item: workspaces-safeguards-to-end, the AC trailers and a 'PR-note: features/workspaces.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "workspaces-safeguards-to-end.ac1",
+            "title": "features/workspaces.mdx no longer contains `### Specialist Agent Safeguards` and contains `### Agent safeguards` naming `OVERDECK_AUTO_REVERT_CHECKOUT` or the post-checkout hook",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspaces-safeguards-to-end.ac2",
+            "title": "The planning safeguard contains `Cannot start planning: work agent already running` and `**Accept plan**`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspaces-safeguards-to-end.ac3",
+            "title": "The Resources sentence contains `Experimental features` and the page contains `discord.gg/ZpHE2ZTv5P`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspaces-safeguards-to-end.ac4",
+            "title": "The page no longer contains `docs/prds/active/` and `grep -cP '[\\x{2013}\\x{2014}]' features/workspaces.mdx` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-specialists",
+        "title": "specialists.mdx: describe today's test dispatch and merge paths",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/specialists.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' features/specialists.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other item touches it.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-G1 (Appendix G part specialists.mdx, 4 rows) to features/specialists.mdx; the Test step must describe today's behavior and link #5537. Follow the PRD Common procedure in .pan/drafts/PAN-5502.md (apply the change table by grep anchor, residual rule, remove every en/em dash in the range, frontmatter rule, link check, MDX safety). Never change code or images. Commit with Item: audit-specialists, the AC trailers and a 'PR-note: features/specialists.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-specialists.ac1",
+            "title": "features/specialists.mdx contains `Nothing starts a test agent automatically after the review approves` with a link to issue 5537",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-specialists.ac2",
+            "title": "The Merge step contains `hold-for-uat`, `five minutes` and `merges a clean, up-to-date PR as it is`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-specialists.ac3",
+            "title": "The frontmatter description no longer contains `a review agent and a test agent check the work` and is 50 to 160 characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-convoys",
+        "title": "convoys.mdx: fix Role Models, synthesis format, Pipeline prose and labels",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/convoys.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' features/convoys.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other item touches it.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-G2 (Appendix G part convoys.mdx, 7 rows), retitle with sidebarTitle 'Review convoy' and change the description in features/convoys.mdx. Follow the PRD Common procedure in .pan/drafts/PAN-5502.md (apply the change table by grep anchor, residual rule, remove every en/em dash in the range, frontmatter rule, link check, MDX safety). Never change code or images. Commit with Item: audit-convoys, the AC trailers and a 'PR-note: features/convoys.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-convoys.ac1",
+            "title": "features/convoys.mdx no longer contains `Roles panel` and contains `Role Models`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-convoys.ac2",
+            "title": "The synthesis report block no longer contains `# Verdict: APPROVED | CHANGES_REQUESTED | FAILED` and contains `## Blocking Findings`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-convoys.ac3",
+            "title": "The Pipeline paragraph contains `Review running` and no longer contains `Review queue`, and its alt text no longer contains `live activity feed`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-convoys.ac4",
+            "title": "The God View paragraph contains `Experimental features` and the page contains `discord.gg/ZpHE2ZTv5P`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-cloister",
+        "title": "cloister.mdx: narrow the model-choice claim and name Tiered Execution",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/cloister.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' features/cloister.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other item touches it.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-G3 (Appendix G part cloister.mdx, 2 rows) to features/cloister.mdx. Follow the PRD Common procedure in .pan/drafts/PAN-5502.md (apply the change table by grep anchor, residual rule, remove every en/em dash in the range, frontmatter rule, link check, MDX safety). Never change code or images. Commit with Item: audit-cloister, the AC trailers and a 'PR-note: features/cloister.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-cloister.ac1",
+            "title": "features/cloister.mdx no longer contains `Cloister does not choose models and does not decide merges.`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-cloister.ac2",
+            "title": "The model-routing sentence contains `Settings → Tiered Execution`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-merge-batches",
+        "title": "merge-batches.mdx: correct off-switch, batch-of-one, UAT button and host claims",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/merge-batches.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' features/merge-batches.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other item touches it.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-G4 (Appendix G part merge-batches.mdx, 10 rows), retitle with sidebarTitle 'UAT Batch Trains' and remove all 12 dash lines in features/merge-batches.mdx. Follow the PRD Common procedure in .pan/drafts/PAN-5502.md (apply the change table by grep anchor, residual rule, remove every en/em dash in the range, frontmatter rule, link check, MDX safety). Never change code or images. Commit with Item: audit-merge-batches, the AC trailers and a 'PR-note: features/merge-batches.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-merge-batches.ac1",
+            "title": "features/merge-batches.mdx no longer contains `Open UAT frontend` and contains `**Open UAT**`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-merge-batches.ac2",
+            "title": "The off-switch sentence contains `GitLab and polyrepo projects never merge automatically`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-merge-batches.ac3",
+            "title": "The batch paragraph contains `batch_wait_minutes` and the UAT host contains `uat-<label>-<codename>-<mmdd>.overdeck.localhost`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-merge-batches.ac4",
+            "title": "The frontmatter contains `sidebarTitle: \"UAT Batch Trains\"` and `grep -cP '[\\x{2013}\\x{2014}]' features/merge-batches.mdx` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-mission-control",
+        "title": "mission-control.mdx: delete removed views and fix tree, pipeline and projects",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/mission-control.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' features/mission-control.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other item touches it.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-H1 (Appendix H part mission-control.mdx, 14 rows and blocks M2-TEXT, M9-TEXT) to features/mission-control.mdx, deleting the four sections the rows name. Follow the PRD Common procedure in .pan/drafts/PAN-5502.md (apply the change table by grep anchor, residual rule, remove every en/em dash in the range, frontmatter rule, link check, MDX safety). Never change code or images. Commit with Item: audit-mission-control, the AC trailers and a 'PR-note: features/mission-control.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-mission-control.ac1",
+            "title": "features/mission-control.mdx no longer contains `## Activity View`, `## Badge Bar`, `## Status Reviews` or `### Model Selection`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-mission-control.ac2",
+            "title": "The page no longer contains `## Planning Artifacts` and contains `## Issue documents` linking `/features/dashboard-views#issue-drawer-and-full-issue-view`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-mission-control.ac3",
+            "title": "The Pipeline View paragraph contains `Review running`, and neither it nor its alt text contains `live activity feed`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-mission-control.ac4",
+            "title": "The projects sentence contains `~/.overdeck/projects.yaml` and the Agents sentence contains `experimental`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-keyboard-shortcuts",
+        "title": "keyboard-shortcuts.mdx: label experimental keys and add page-only keys",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/keyboard-shortcuts.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' features/keyboard-shortcuts.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other item touches it.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-H2 (Appendix H part keyboard-shortcuts.mdx, 3 rows and block K3-INSERT) and retitle with sidebarTitle 'Keyboard shortcuts' in features/keyboard-shortcuts.mdx; leave the macOS ⌘W and ⌘T lines unchanged. Follow the PRD Common procedure in .pan/drafts/PAN-5502.md (apply the change table by grep anchor, residual rule, remove every en/em dash in the range, frontmatter rule, link check, MDX safety). Never change code or images. Commit with Item: audit-keyboard-shortcuts, the AC trailers and a 'PR-note: features/keyboard-shortcuts.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-keyboard-shortcuts.ac1",
+            "title": "features/keyboard-shortcuts.mdx contains `Go to Agents (experimental` and no longer contains `` `Ctrl+W` go to the shell ``",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-keyboard-shortcuts.ac2",
+            "title": "The page contains a `## Keys on single pages` table with rows for Board undo and voice input `⌘⇧M`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-keyboard-shortcuts.ac3",
+            "title": "The frontmatter contains `title: \"Dashboard keyboard shortcuts\"` and `sidebarTitle: \"Keyboard shortcuts\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-file-explorer",
+        "title": "file-explorer.mdx: add tree keys and the upload limit",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/file-explorer.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' features/file-explorer.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other item touches it.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-H3 (Appendix H part file-explorer.mdx, 2 rows), retitle with sidebarTitle 'File explorer' and change the description in features/file-explorer.mdx. Follow the PRD Common procedure in .pan/drafts/PAN-5502.md (apply the change table by grep anchor, residual rule, remove every en/em dash in the range, frontmatter rule, link check, MDX safety). Never change code or images. Commit with Item: audit-file-explorer, the AC trailers and a 'PR-note: features/file-explorer.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-file-explorer.ac1",
+            "title": "features/file-explorer.mdx contains `F2` renames and `100 MB` for uploads",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-file-explorer.ac2",
+            "title": "The frontmatter contains `title: \"File explorer and code editor\"` and `sidebarTitle: \"File explorer\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-open-in-overdeck",
+        "title": "open-in-overdeck.mdx: add the root-folder message and Windows pan lookup",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/open-in-overdeck.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' features/open-in-overdeck.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other item touches it.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-H4 (Appendix H part open-in-overdeck.mdx, 2 rows) to features/open-in-overdeck.mdx. Follow the PRD Common procedure in .pan/drafts/PAN-5502.md (apply the change table by grep anchor, residual rule, remove every en/em dash in the range, frontmatter rule, link check, MDX safety). Never change code or images. Commit with Item: audit-open-in-overdeck, the AC trailers and a 'PR-note: features/open-in-overdeck.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-open-in-overdeck.ac1",
+            "title": "features/open-in-overdeck.mdx contains `Opened root folder in <project>`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-open-in-overdeck.ac2",
+            "title": "The pan lookup sentence contains `pan.cmd` for Windows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-issue-pipeline",
+        "title": "issue-pipeline.mdx: correct verification.tests location, test target and Require UAT",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/issue-pipeline.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' features/issue-pipeline.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other item touches it.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-I1 (Appendix I part issue-pipeline.mdx, 3 rows) to features/issue-pipeline.mdx. Follow the PRD Common procedure in .pan/drafts/PAN-5502.md (apply the change table by grep anchor, residual rule, remove every en/em dash in the range, frontmatter rule, link check, MDX safety). Never change code or images. Commit with Item: audit-issue-pipeline, the AC trailers and a 'PR-note: features/issue-pipeline.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-issue-pipeline.ac1",
+            "title": "features/issue-pipeline.mdx contains `verification.tests` setting in `projects.yaml`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-issue-pipeline.ac2",
+            "title": "The test sentence no longer contains `built dashboard` and the merge sentence contains `Require UAT switch`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-planning",
+        "title": "planning.mdx: correct probe effort, spec keys, Action rule and status triggers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/planning.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' features/planning.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other item touches it.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-I2 (Appendix I part planning.mdx, 6 rows) to features/planning.mdx. Follow the PRD Common procedure in .pan/drafts/PAN-5502.md (apply the change table by grep anchor, residual rule, remove every en/em dash in the range, frontmatter rule, link check, MDX safety). Never change code or images. Commit with Item: audit-planning, the AC trailers and a 'PR-note: features/planning.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-planning.ac1",
+            "title": "features/planning.mdx no longer contains `` `Xhigh` and `Max` add the probe pass `` and contains `High` and above",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-planning.ac2",
+            "title": "The xBRIEF section contains a root `status` field and `narrative.Action` with `at least 8 words`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-planning.ac3",
+            "title": "The status table no longer contains `The PR merges` as the completed trigger and contains `pan scope complete` and `pan scope cancel`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-flywheel",
+        "title": "flywheel.mdx: correct UAT blocking, sequencer scope and UI labels",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/flywheel.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' features/flywheel.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other item touches it.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-I3 (Appendix I part flywheel.mdx, 10 rows) to features/flywheel.mdx. Follow the PRD Common procedure in .pan/drafts/PAN-5502.md (apply the change table by grep anchor, residual rule, remove every en/em dash in the range, frontmatter rule, link check, MDX safety). Never change code or images. Commit with Item: audit-flywheel, the AC trailers and a 'PR-note: features/flywheel.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-flywheel.ac1",
+            "title": "features/flywheel.mdx no longer contains `does block merge on its own, independent of this switch` and contains `only while the issue is held for UAT`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-flywheel.ac2",
+            "title": "The Known limits contain `PAN-` and the written-files sentence contains `.pan/parked.md`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-flywheel.ac3",
+            "title": "The page contains `merge_train: disabled` and `show message`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-dashboard-views",
+        "title": "dashboard-views.mdx: label Analytics, fix Anywhere row, pan context and Simple Home",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/dashboard-views.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' features/dashboard-views.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other item touches it.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-J1 (Appendix J part dashboard-views.mdx, 4 rows) to features/dashboard-views.mdx. Follow the PRD Common procedure in .pan/drafts/PAN-5502.md (apply the change table by grep anchor, residual rule, remove every en/em dash in the range, frontmatter rule, link check, MDX safety). Never change code or images. Commit with Item: audit-dashboard-views, the AC trailers and a 'PR-note: features/dashboard-views.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-dashboard-views.ac1",
+            "title": "features/dashboard-views.mdx contains `Analytics opens Metrics, which is experimental`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-dashboard-views.ac2",
+            "title": "The pan context sentence contains `detach` and the Anywhere sentence contains `Tailscale is not ready`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-costs",
+        "title": "costs.mdx: correct Grok pricing, branch pattern and UTC windows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/costs.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' features/costs.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other item touches it.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-J2 (Appendix J part costs.mdx, 5 rows) to features/costs.mdx. Follow the PRD Common procedure in .pan/drafts/PAN-5502.md (apply the change table by grep anchor, residual rule, remove every en/em dash in the range, frontmatter rule, link check, MDX safety). Never change code or images. Commit with Item: audit-costs, the AC trailers and a 'PR-note: features/costs.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-costs.ac1",
+            "title": "features/costs.mdx contains `Pi and Grok are the exceptions` and no longer contains `prices Claude Code, Codex, Kimi, Grok and Muse`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-costs.ac2",
+            "title": "The branch sentence contains `a hyphen and a number` and the window sentence contains `UTC day`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-desktop-app",
+        "title": "desktop-app.mdx: correct Linux paths, crash port, reminders and canary",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/desktop-app.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' features/desktop-app.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; no other item touches it.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-J3 (Appendix J part desktop-app.mdx, 4 rows) to features/desktop-app.mdx. Follow the PRD Common procedure in .pan/drafts/PAN-5502.md (apply the change table by grep anchor, residual rule, remove every en/em dash in the range, frontmatter rule, link check, MDX safety). Never change code or images. Commit with Item: audit-desktop-app, the AC trailers and a 'PR-note: features/desktop-app.mdx: <one line>' line, push, then pan task done."
+        },
+        "items": [
+          {
+            "id": "audit-desktop-app.ac1",
+            "title": "features/desktop-app.mdx contains `/usr/local/bin/overdeck` and `7833`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-desktop-app.ac2",
+            "title": "The reminder sentence contains `Reminder 5 of 5` and the canary sentence contains `1.2.3-canary.1`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "validate-and-pr-body",
+        "title": "Run the group validators and draft the per-page PR body",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T07:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5502",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/issue-pipeline.mdx",
+            "features/planning.mdx",
+            "features/flywheel.mdx",
+            "features/conversations.mdx",
+            "features/file-explorer.mdx",
+            "features/mission-control.mdx",
+            "features/dashboard-views.mdx",
+            "features/costs.mdx",
+            "features/convoys.mdx",
+            "features/specialists.mdx",
+            "features/merge-batches.mdx",
+            "features/swarm.mdx",
+            "features/skills.mdx",
+            "features/skill-packs.mdx",
+            "features/workspaces.mdx",
+            "features/cloister.mdx",
+            "features/safe-shutdown.mdx",
+            "features/open-in-overdeck.mdx",
+            "features/desktop-app.mdx",
+            "features/keyboard-shortcuts.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "npx -y mint@4.3.49 validate",
+            "npx -y mint@4.3.49 broken-links --check-anchors"
+          ],
+          "expected_outputs": [
+            "lint:docs prints 'docs lint passed' and exits 0",
+            "mint validate prints 'build passed' with no error in a features/ page",
+            "broken-links lists no features/ file"
+          ],
+          "readiness": "sequential",
+          "parallelSafeReason": "Runs last (blocked by every page item); touches a page only to fix a validator failure.",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Run WI-Z1 in .pan/drafts/PAN-5502.md after every page item: the dash loop over the 20 pages, the frontmatter check, npm run lint:docs, npx -y mint@4.3.49 validate and npx -y mint@4.3.49 broken-links --check-anchors; fix any failure in a features/ page; then write the PR body draft (20 ticked page lines from the PR-note lines, validation output, Follow-ups) into this item's commit message above the trailers. Commit with Item: validate-and-pr-body."
+        },
+        "items": [
+          {
+            "id": "validate-and-pr-body.ac1",
+            "title": "The dash loop over all 20 features pages prints no line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-pr-body.ac2",
+            "title": "`npm run lint:docs` exits 0 and `npx -y mint@4.3.49 validate` prints no error for a features/ page",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-pr-body.ac3",
+            "title": "`npx -y mint@4.3.49 broken-links --check-anchors` prints no broken link in a features/ page",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-pr-body.ac4",
+            "title": "The validate-and-pr-body commit message contains 20 lines starting `- [x] features/` and a `## Follow-ups` section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "conv-surface",
+        "to": "conv-handoff",
+        "type": "blocks"
+      },
+      {
+        "from": "conv-handoff",
+        "to": "conv-machines-to-end",
+        "type": "blocks"
+      },
+      {
+        "from": "workspaces-layout-to-lifecycle",
+        "to": "workspaces-safeguards-to-end",
+        "type": "blocks"
+      },
+      {
+        "from": "conv-surface",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "conv-handoff",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "conv-machines-to-end",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-skill-packs",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-skills",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-safe-shutdown",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-swarm",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "workspaces-layout-to-lifecycle",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "workspaces-safeguards-to-end",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-specialists",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-convoys",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-cloister",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-merge-batches",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-mission-control",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-keyboard-shortcuts",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-file-explorer",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-open-in-overdeck",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-issue-pipeline",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-planning",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-flywheel",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-dashboard-views",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-costs",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-desktop-app",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

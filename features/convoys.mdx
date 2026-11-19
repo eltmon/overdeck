@@ -1,6 +1,7 @@
 ---
-title: "Review convoy"
-description: The review convoy, four parallel reviewers and one synthesis parent
+title: "Review convoy: four parallel reviewers and a synthesis parent"
+sidebarTitle: "Review convoy"
+description: "How Overdeck's review convoy works: four parallel reviewers for security, correctness, performance and requirements, and the synthesis parent."
 ---
 
 import { ThemedImage } from "/snippets/themed-image.mdx";
@@ -97,7 +98,7 @@ Four reviewers run at the same time, each focused on one concern:
 
 `<issue>` is the lowercase issue id, for example `agent-pan-123-review-security`.
 Each reviewer's model comes from `roles.review.sub.<lane>.model`, set in the
-dashboard's Roles panel or in `~/.overdeck/config.yaml`.
+Role Models panel of Settings → Model Routing, or in `~/.overdeck/config.yaml`.
 
 Each reviewer:
 - Reviews the PR's diff independently
@@ -146,21 +147,22 @@ The reports are evidence, not votes. The parent decides the verdict. The
 synthesis report has this shape:
 
 ```markdown
-# Verdict: APPROVED | CHANGES_REQUESTED | FAILED
-
-## Summary
-
-## Blockers
-
-## Evidence
-
-## Convoy Notes
+# Review <issueId>
+## Verdict: APPROVED / CHANGES REQUESTED
+## Context
+## Blocking Findings
+## Non-blocking Findings
+## Coverage
+## Verification
+## Scope Note
 ```
+
+A synthesis report also names each lane's signal and report, including any lane that failed or timed out.
 
 ## Review modes
 
 The review mode decides whether a review runs as a convoy. Set it in the
-dashboard's Roles settings panel, or with `roles.review.mode` in
+**Review mode** field of Settings → Model Routing → Role Models, or with `roles.review.mode` in
 `~/.overdeck/config.yaml`. It applies to every review.
 
 | Mode | What runs |
@@ -226,14 +228,14 @@ the next review runs.
 
 Reviewers appear in the issue view next to the work agent they review, with
 their status, model, cost and verdict. The Pipeline page groups every issue
-and its agents by phase (Ship, Review, Verifying), with a metric strip across
-the top (Active issues, Work running, Review queue, Ship, Spend) and a live
-activity feed on the right.
+and its agents by phase (Ship, Review, Work, Plan, Ready), with a metric strip
+across the top (Active issues, Work running, Review running, Ship, Spend). Its
+List, Board and Analytics buttons switch views.
 
 <ThemedImage
   light="/images/dashboard/pipeline-light.png"
   dark="/images/dashboard/pipeline-dark.png"
-  alt="Pipeline page: a metric strip showing Active issues, Work running, Review queue, Ship, and Spend over phase-grouped issue rows, with a live activity feed on the right."
+  alt="Pipeline page: a metric strip showing Active issues, Work running, Review running, Ship, and Spend over issue rows grouped by phase (Ship, Review, Work), with phase and project filter chips above them."
 />
 
 **CLI:**
@@ -259,7 +261,7 @@ backend. See [Reaching an agent from a shell](/configuration/terminal-backend#re
 - Performance reviews of hot paths
 - Checking a change against its acceptance criteria
 
-When reviews run across several projects at once, the God View gives an
+The God View is experimental: turn on Settings → Experimental → **Experimental features** to see it. When reviews run across several projects at once, the God View gives an
 aggregate cross-project picture of every agent's activity in one place. Review
 convoys orbit their issue, so a convoy whose reviewers have stalled or are
 burning more than expected is easy to spot.
@@ -320,10 +322,14 @@ to post the PR review.
 - Check the lane report for permission or access errors
 - Check that the PR has a diff against its base branch
 
+## Get help
+
+Ask on [Discord](https://discord.gg/ZpHE2ZTv5P) or open an issue on [GitHub Issues](https://github.com/eltmon/overdeck/issues).
+
 ## Related Guides
 
 - [Issue pipeline](/features/issue-pipeline) - Every stage from start to merge
 - [Terminal backend](/configuration/terminal-backend) - Reaching an agent from a shell
 - [Skills](/features/skills) - Subagents and skill system
-- [Specialists](/features/specialists) - Long-running specialist agents
+- [Review and test agents](/features/specialists) - What checks an agent's work after pan done
 - [Cloister](/features/cloister) - AI lifecycle management

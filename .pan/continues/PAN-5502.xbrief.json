@@ -1,0 +1,492 @@
+{
+  "version": "1",
+  "issueId": "PAN-5502",
+  "created": "2026-11-19T05:29:14.806Z",
+  "updated": "2026-11-19T06:10:01.437Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-19T06:10Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-19T06:10:01.437Z"
+    }
+  ],
+  "items": {
+    "conv-surface": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:29:14.806Z",
+      "doneAt": "2026-11-19T05:30:50.813Z"
+    },
+    "conv-surface.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:30:50.813Z"
+    },
+    "conv-surface.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:30:50.813Z"
+    },
+    "conv-surface.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:30:50.813Z"
+    },
+    "conv-surface.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:30:50.813Z"
+    },
+    "conv-surface.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:30:50.813Z"
+    },
+    "conv-handoff": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:31:00.322Z",
+      "doneAt": "2026-11-19T05:32:25.556Z"
+    },
+    "conv-handoff.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:32:25.556Z"
+    },
+    "conv-handoff.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:32:25.556Z"
+    },
+    "conv-handoff.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:32:25.556Z"
+    },
+    "conv-handoff.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:32:25.556Z"
+    },
+    "conv-handoff.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:32:25.556Z"
+    },
+    "conv-machines-to-end": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:34:26.728Z",
+      "doneAt": "2026-11-19T05:35:53.250Z"
+    },
+    "conv-machines-to-end.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:35:53.250Z"
+    },
+    "conv-machines-to-end.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:35:53.250Z"
+    },
+    "conv-machines-to-end.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:35:53.250Z"
+    },
+    "conv-machines-to-end.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:35:53.250Z"
+    },
+    "audit-skill-packs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:36:02.190Z",
+      "doneAt": "2026-11-19T05:37:21.056Z"
+    },
+    "audit-skill-packs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:37:21.056Z"
+    },
+    "audit-skill-packs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:37:21.056Z"
+    },
+    "audit-skill-packs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:37:21.056Z"
+    },
+    "audit-skill-packs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:37:21.056Z"
+    },
+    "audit-skills": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:37:26.348Z",
+      "doneAt": "2026-11-19T05:38:28.565Z"
+    },
+    "audit-skills.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:38:28.565Z"
+    },
+    "audit-skills.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:38:28.565Z"
+    },
+    "audit-skills.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:38:28.565Z"
+    },
+    "audit-skills.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:38:28.565Z"
+    },
+    "audit-skills.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:38:28.565Z"
+    },
+    "audit-safe-shutdown": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:38:34.560Z",
+      "doneAt": "2026-11-19T05:39:10.007Z"
+    },
+    "audit-safe-shutdown.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:39:10.007Z"
+    },
+    "audit-safe-shutdown.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:39:10.007Z"
+    },
+    "audit-safe-shutdown.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:39:10.007Z"
+    },
+    "audit-swarm": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:39:15.938Z",
+      "doneAt": "2026-11-19T05:39:50.442Z"
+    },
+    "audit-swarm.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:39:50.442Z"
+    },
+    "audit-swarm.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:39:50.442Z"
+    },
+    "audit-swarm.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:39:50.442Z"
+    },
+    "workspaces-layout-to-lifecycle": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:39:59.155Z",
+      "doneAt": "2026-11-19T05:40:57.191Z"
+    },
+    "workspaces-layout-to-lifecycle.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:40:57.191Z"
+    },
+    "workspaces-layout-to-lifecycle.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:40:57.191Z"
+    },
+    "workspaces-layout-to-lifecycle.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:40:57.191Z"
+    },
+    "workspaces-layout-to-lifecycle.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:40:57.191Z"
+    },
+    "workspaces-layout-to-lifecycle.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:40:57.191Z"
+    },
+    "workspaces-safeguards-to-end": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:41:10.667Z",
+      "doneAt": "2026-11-19T05:41:55.377Z"
+    },
+    "workspaces-safeguards-to-end.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:41:55.377Z"
+    },
+    "workspaces-safeguards-to-end.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:41:55.377Z"
+    },
+    "workspaces-safeguards-to-end.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:41:55.377Z"
+    },
+    "workspaces-safeguards-to-end.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:41:55.377Z"
+    },
+    "audit-specialists": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:42:00.829Z",
+      "doneAt": "2026-11-19T05:42:43.596Z"
+    },
+    "audit-specialists.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:42:43.596Z"
+    },
+    "audit-specialists.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:42:43.596Z"
+    },
+    "audit-specialists.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:42:43.596Z"
+    },
+    "audit-convoys": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:42:51.843Z",
+      "doneAt": "2026-11-19T05:43:36.873Z"
+    },
+    "audit-convoys.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:43:36.873Z"
+    },
+    "audit-convoys.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:43:36.873Z"
+    },
+    "audit-convoys.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:43:36.873Z"
+    },
+    "audit-convoys.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:43:36.873Z"
+    },
+    "audit-cloister": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:43:42.455Z",
+      "doneAt": "2026-11-19T05:44:09.161Z"
+    },
+    "audit-cloister.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:44:09.161Z"
+    },
+    "audit-cloister.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:44:09.161Z"
+    },
+    "audit-merge-batches": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:44:14.691Z",
+      "doneAt": "2026-11-19T05:45:11.814Z"
+    },
+    "audit-merge-batches.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:45:11.814Z"
+    },
+    "audit-merge-batches.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:45:11.814Z"
+    },
+    "audit-merge-batches.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:45:11.814Z"
+    },
+    "audit-merge-batches.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:45:11.814Z"
+    },
+    "audit-mission-control": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:45:17.660Z",
+      "doneAt": "2026-11-19T05:47:06.151Z"
+    },
+    "audit-mission-control.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:47:06.151Z"
+    },
+    "audit-mission-control.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:47:06.151Z"
+    },
+    "audit-mission-control.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:47:06.151Z"
+    },
+    "audit-mission-control.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:47:06.151Z"
+    },
+    "audit-keyboard-shortcuts": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:47:11.837Z",
+      "doneAt": "2026-11-19T05:47:52.668Z"
+    },
+    "audit-keyboard-shortcuts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:47:52.668Z"
+    },
+    "audit-keyboard-shortcuts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:47:52.668Z"
+    },
+    "audit-keyboard-shortcuts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:47:52.668Z"
+    },
+    "audit-file-explorer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:48:01.111Z",
+      "doneAt": "2026-11-19T05:48:31.955Z"
+    },
+    "audit-file-explorer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:48:31.955Z"
+    },
+    "audit-file-explorer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:48:31.955Z"
+    },
+    "audit-open-in-overdeck": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:48:37.635Z",
+      "doneAt": "2026-11-19T05:49:07.017Z"
+    },
+    "audit-open-in-overdeck.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:49:07.017Z"
+    },
+    "audit-open-in-overdeck.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:49:07.017Z"
+    },
+    "audit-issue-pipeline": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:49:12.788Z",
+      "doneAt": "2026-11-19T05:49:44.752Z"
+    },
+    "audit-issue-pipeline.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:49:44.752Z"
+    },
+    "audit-issue-pipeline.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:49:44.752Z"
+    },
+    "audit-planning": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:49:49.929Z",
+      "doneAt": "2026-11-19T05:50:27.594Z"
+    },
+    "audit-planning.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:50:27.594Z"
+    },
+    "audit-planning.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:50:27.594Z"
+    },
+    "audit-planning.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:50:27.594Z"
+    },
+    "audit-flywheel": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:50:33.210Z",
+      "doneAt": "2026-11-19T05:51:15.313Z"
+    },
+    "audit-flywheel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:51:15.313Z"
+    },
+    "audit-flywheel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:51:15.313Z"
+    },
+    "audit-flywheel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:51:15.313Z"
+    },
+    "audit-dashboard-views": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:51:21.150Z",
+      "doneAt": "2026-11-19T05:51:57.755Z"
+    },
+    "audit-dashboard-views.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:51:57.755Z"
+    },
+    "audit-dashboard-views.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:51:57.755Z"
+    },
+    "audit-costs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:52:03.318Z",
+      "doneAt": "2026-11-19T05:52:37.539Z"
+    },
+    "audit-costs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:52:37.539Z"
+    },
+    "audit-costs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:52:37.539Z"
+    },
+    "audit-desktop-app": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:52:42.945Z",
+      "doneAt": "2026-11-19T05:53:23.897Z"
+    },
+    "audit-desktop-app.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:53:23.897Z"
+    },
+    "audit-desktop-app.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:53:23.897Z"
+    },
+    "validate-and-pr-body": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:53:31.125Z",
+      "doneAt": "2026-11-19T05:55:29.979Z"
+    },
+    "validate-and-pr-body.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:55:29.979Z"
+    },
+    "validate-and-pr-body.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:55:29.979Z"
+    },
+    "validate-and-pr-body.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:55:29.979Z"
+    },
+    "validate-and-pr-body.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:55:29.979Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-19T06:10:01Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5502 (PR #5583)\n\nCodeRabbit posted 9 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4624988983 · features/costs.mdx:40 [Minor]: Clarify costs for unlisted models with reported costs.\n  https://github.com/eltmon/overdeck/pull/5583#discussion_r4624988983\n- Thread 4624988987 · features/costs.mdx:47 [Minor]: Document the working-directory rule for the Claude Code fallback, not the branch.\n  https://github.com/eltmon/overdeck/pull/5583#discussion_r4624988987\n- Thread 4624988997 · features/desktop-app.mdx:68 [Minor]: Remove the browser claim for the installed-command path.\n  https://github.com/eltmon/overdeck/pull/5583#discussion_r4624988997\n- Thread 4624989002 · features/merge-batches.mdx:85 [Minor]: Qualify the accumulate step for the batch window.\n  https://github.com/eltmon/overdeck/pull/5583#discussion_r4624989002\n- Thread 4624989007 · features/skill-packs.mdx:773 [Minor]: Correct the Atlassian header scope: it is not limited to Cloud base URLs.\n  https://github.com/eltmon/overdeck/pull/5583#discussion_r4624989007\n- Thread 4624989017 · features/skills.mdx:225 [Minor]: Document the `okf` vendored-skill overwrite exception.\n  https://github.com/eltmon/overdeck/pull/5583#discussion_r4624989017\n- Thread 4624989040 · features/skills.mdx:227 [Major]: Document that `pan sync` overwrites any same-path file in `~/.claude/skills`, not only bundled skills.\n  https://github.com/eltmon/overdeck/pull/5583#discussion_r4624989040\n- Thread 4624989047 · features/workspaces.mdx:140 [Minor]: Correct the Docker project-name fallback for `pan workspace create --docker`.\n  https://github.com/eltmon/overdeck/pull/5583#discussion_r4624989047\n- Thread 4624989059 · features/workspaces.mdx:375 [Minor]: Separate cancellation from the transition to work.\n  https://github.com/eltmon/overdeck/pull/5583#discussion_r4624989059\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5583/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5502 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5583 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    }
+  ]
+}

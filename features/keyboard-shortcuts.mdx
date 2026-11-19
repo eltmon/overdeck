@@ -1,5 +1,6 @@
 ---
-title: Keyboard shortcuts
+title: "Dashboard keyboard shortcuts"
+sidebarTitle: "Keyboard shortcuts"
 description: "Every Overdeck dashboard keyboard shortcut, with its keys on macOS, Linux and Windows, and the pages where each shortcut works."
 ---
 
@@ -18,7 +19,7 @@ Press `?` anywhere outside a text field to open the **Keyboard shortcuts** sheet
 | Search | `/` | `/` |
 | Go to Pipeline | `G` then `P` | `G` then `P` |
 | Go to Board | `G` then `B` | `G` then `B` |
-| Go to Agents | `G` then `A` | `G` then `A` |
+| Go to Agents (experimental; opens Home while Experimental features is off) | `G` then `A` | `G` then `A` |
 | Go to Command Deck | `G` then `C` | `G` then `C` |
 | Keyboard shortcuts sheet | `?` | `?` |
 | Go to Stage tab 1 to 9 | `⌘1` to `⌘9` | `Ctrl+Alt+1` to `Ctrl+Alt+9` |
@@ -35,6 +36,19 @@ Press `?` anywhere outside a text field to open the **Keyboard shortcuts** sheet
 
 For the `G` shortcuts, press `G`, let go, then press the second key within one and a half seconds.
 For every view these shortcuts reach, see [Dashboard views](/features/dashboard-views).
+
+## Keys on single pages
+
+These keys work only where named, and the `?` sheet does not list them.
+
+| Action | macOS | Linux and Windows | Where |
+| --- | --- | --- | --- |
+| Next or previous issue, then open it | `J` / `K`, then `↵` | `J` / `K`, then `↵` | Board and Pipeline, when you are not typing |
+| Undo the last status move | `⌘Z` | `Ctrl+Z` | Board |
+| Undo the last settle or snooze | `⌘Z` | `Ctrl+Z` | the Conversations list, when it has focus |
+| Open the folder in your preferred editor | `⌘⇧O` | `Ctrl+Shift+O` | a conversation, or an issue's open-in picker |
+| Voice input | `⌘⇧M` | `Ctrl+Shift+M` | the conversation composer |
+| God View help, fullscreen | `H` or `?`, `F` | `H` or `?`, `F` | God View (experimental) |
 
 ## Command palette
 
@@ -85,7 +99,7 @@ ranked.
 
 Single keys such as `N`, `?`, `/`, `[`, `J`, `K` and the `G` shortcuts, and the Stage tab keys, work only when you are not typing. They do nothing while focus is in a text field, a terminal or a code editor, so the key goes to what you are typing in.
 
-Shortcuts with `⌘` or `Ctrl`, such as the command palette, also work in text fields and code editors. In a terminal, the terminal gets the key first: `Ctrl+K`, `Ctrl+J` and `Ctrl+W` go to the shell, as they would in any terminal. The emergency stop works from anywhere outside a terminal, including text fields.
+Shortcuts with `⌘` or `Ctrl`, such as the command palette, also work in text fields and code editors. In a terminal, the terminal gets the key first: `Ctrl+K` and `Ctrl+J` go to the shell, as they would in any terminal. In a Chrome tab, `Ctrl+W` never reaches the terminal: Chrome keeps it and closes the browser tab. The emergency stop works from anywhere outside a terminal, including text fields.
 
 The four Files keys (show or hide Files, show or hide Changes, search file contents and Go to file) work only in the Command Deck, where the work dock is. There they work from anywhere, including text fields and the code editor, where they win over the editor's own keys: on macOS `⌘⇧G` opens Changes instead of Monaco's Find Previous. On other pages, `Ctrl+P` keeps the browser's print dialog. In a conversation, `Ctrl+F` (`⌘F`) without Shift opens the conversation's find bar.
 

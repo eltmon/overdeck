@@ -1,5 +1,6 @@
 ---
-title: Skill Packs
+title: "Skill packs: third-party skill repositories pinned per project, issue or conversation"
+sidebarTitle: "Skill Packs"
 description: Pin third-party skill repositories to a commit and turn them on per project, issue or conversation
 ---
 
@@ -24,7 +25,7 @@ pan skills set --pack mattpocock inherit --project myapp   # turn it off again
 pan skills pack remove mattpocock                    # unregister and delete the cache
 ```
 
-Changes apply at the next launch; a running agent keeps the skills it launched with. See [When pack changes apply](#when-pack-changes-apply).
+Changes apply at the next launch; a running agent keeps the skills it launched with, but a running conversation can load new ones with `pan skills add` (see [Adding skills to a running conversation](#adding-skills-to-a-running-conversation)). See [When pack changes apply](#when-pack-changes-apply).
 
 ## Pack catalog
 
@@ -65,11 +66,11 @@ A conversation value for a pack skill wins first. Whole-pack toggles have no con
 
 | Global | Project | Issue | Result |
 |--------|---------|-------|--------|
-| pack on | `mattpocock/tdd` off | — | `tdd` off (project) |
-| pack on | — | pack off | every skill off (issue pack) |
-| — | `mattpocock/grilling` on | pack off | `grilling` off (the issue level decides first) |
-| `mattpocock/grilling` on | — | — | only `grilling` on |
-| pack on | — | — | `setup-matt-pocock-skills` off (opt-in) |
+| pack on | `mattpocock/tdd` off | unset | `tdd` off (project) |
+| pack on | unset | pack off | every skill off (issue pack) |
+| unset | `mattpocock/grilling` on | pack off | `grilling` off (the issue level decides first) |
+| `mattpocock/grilling` on | unset | unset | only `grilling` on |
+| pack on | unset | unset | `setup-matt-pocock-skills` off (opt-in) |
 
 **Opt-in skills** are skills that change files Overdeck owns, such as `setup-matt-pocock-skills`, which edits `CLAUDE.md`/`AGENTS.md` and writes tracker docs. The pack toggle never turns them on; only a value for that skill does.
 
@@ -77,7 +78,7 @@ A conversation value for a pack skill wins first. Whole-pack toggles have no con
 
 A conversation can carry its own pack values, the narrowest level of all. You can set them when you create the conversation, and you can add more while it runs.
 
-When you create one in the dashboard, open **New conversation with options…**; its **Skills** section shows a summary (`{on} of {total} skills on`) with a **Customize** button. Customizing lists pack skills grouped by pack, each with **Inherit / On / Off** — there is no whole-pack toggle at this level, only per-skill values.
+When you create one in the dashboard, open **New conversation with options…**; its **Skills** section shows a summary (`{on} of {total} skills on`) with a **Customize** button. Customizing lists pack skills grouped by pack, each with **Inherit / On / Off**. There is no whole-pack toggle at this level, only per-skill values.
 
 From the CLI, `pan handoff` has the same reach:
 
@@ -180,7 +181,7 @@ video  remotion, hyperframes, openmontage, video-use  (built-in)
 
 ### Adding packs from the dashboard
 
-The Skills page (`/skills`) lists **Available packs** under Skill packs: each pack group with members you have not added (for example `video · 4 packs not added`), then each known pack you have not added, with its source and disclosure.
+The Skills page (`/skills`) lists **Available packs** under Skill packs: each pack group with members you have not added (for example `video` with `group · 4 packs not added`), then each known pack you have not added, with its source and disclosure.
 
 The dashboard adds a known pack only when it has a default ref and adding it builds nothing. Those packs, `remotion`, `hyperframes`, `openmontage`, `video-use`, `pstack` and `atlassian`, show an **Add…** button, and so does a group whose missing members are all among them. The other known packs show their CLI command instead: `mattpocock`, `deft` and `gstack` need a ref you choose, and adding `sageox` or `gstack` builds code on this machine. A config group member that is not a known pack makes its group CLI-only.
 
@@ -228,7 +229,7 @@ pan skills pack update mattpocock            # re-resolve the ref
 pan skills pack update mattpocock --ref v1.3.0
 ```
 
-`update` prints the preview again with the skills added, removed, and changed since the trusted commit, plus any capabilities that are new. It moves the trusted commit only after you confirm. `pan skills pack list` shows `update available` only for a pack pinned to a tag or branch; a ref that is a 40-character commit never shows it (`packUpdateAvailable` in `src/lib/skill-packs/sources.ts`). `pstack` and `sageox` default to commit refs, so to move them, run `pan skills pack update <id> --ref <new commit or branch>`. `--offline` skips that network check.
+`update` prints the preview again with the skills added, removed, and changed since the trusted commit, plus any capabilities that are new. It moves the trusted commit only after you confirm. `pan skills pack list` shows `update available` only for a pack pinned to a tag or branch; a ref that is a 40-character commit never shows it (`packUpdateAvailable` in `src/lib/skill-packs/sources.ts`). `pstack`, `sageox`, `atlassian` and the four video packs default to commit refs, so to move them, run `pan skills pack update <id> --ref <new commit or branch>`. `--offline` skips that network check.
 
 ### Fork-first policy
 
@@ -277,7 +278,7 @@ pan skills set --group video on --project <key>   # turn all four on for one pro
 
 ### Matt Pocock's skills from a fork
 
-Overdeck's default source for the `mattpocock` pack is the operator-controlled fork `eltmon/skills`, pinned to the `v1.2.3` commit. A fork lets the operator decide when upstream changes arrive: sync the fork on GitHub, then run `pan skills pack update mattpocock --ref <tag>` to preview and re-pin. Any url works here; `KNOWN_PACKS` applies the `mattpocock` defaults by pack id, not by url.
+Overdeck's default url for the `mattpocock` pack is the operator-controlled fork `eltmon/skills`. The pack has no default ref, so `pan skills pack add mattpocock` needs `--ref` (these docs use `--ref v1.2.3`, commit `6acc160`). A fork lets the operator decide when upstream changes arrive: sync the fork on GitHub, then run `pan skills pack update mattpocock --ref <tag>` to preview and re-pin. Any url works here; `KNOWN_PACKS` applies the `mattpocock` defaults by pack id, not by url.
 
 `setup-matt-pocock-skills` is opt-in: turning the pack on never turns it on. Only `pan skills set mattpocock/setup-matt-pocock-skills on [--project <key>|--issue <id>]` does.
 
@@ -294,7 +295,7 @@ pan skills set --pack mattpocock inherit --issue <id>              # issue: undo
 
 ### pstack
 
-`pstack` is poteto's (Lauren Tan's) skill pack for Cursor — `principle-*`, `unslop`, `tdd`, `architect`, `poteto-mode`, and more — mounted from the operator's fork `https://github.com/eltmon/plugins`, pinned to `ae5650f`. Overdeck mounts Cursor's generated Claude Code build at `harness/pstack/claude-code`, not the Cursor source tree; the `KNOWN_PACKS.pstack` entry carries that subfolder as its `pluginRoot`, so the manifest, skill scan, and capability probes all read from inside it. Re-pin with `pan skills pack update pstack --ref <commit-or-branch>`.
+`pstack` is poteto's (Lauren Tan's) skill pack for Cursor (`principle-*`, `unslop`, `tdd`, `architect`, `poteto-mode`, and more), mounted from the operator's fork `https://github.com/eltmon/plugins`, pinned to `ae5650f`. Overdeck mounts Cursor's generated Claude Code build at `harness/pstack/claude-code`, not the Cursor source tree; the `KNOWN_PACKS.pstack` entry carries that subfolder as its `pluginRoot`, so the manifest, skill scan, and capability probes all read from inside it. Re-pin with `pan skills pack update pstack --ref <commit-or-branch>`.
 
 ```bash
 pan skills pack add pstack
@@ -324,14 +325,14 @@ pan skills set --pack pstack inherit --issue <id>              # issue: undo
 
 Most pstack skills set `disable-model-invocation: true`, so the agent picks them up only when you invoke them directly, e.g. `/pstack:principle-laziness-protocol`.
 
-Seven skills are opt-in — turning the pack on never turns them on:
+Seven skills are opt-in; turning the pack on never turns them on:
 
-- `setup-pstack` — writes `~/.claude/rules/pstack-models.md`, which every Claude Code session on the host loads, including sessions outside Overdeck.
-- `automate-me` — writes a personal mode skill, then commits and opens a PR.
-- `reflect` — copies a skill folder into a skills dir and edits it.
-- `create-verification-skill`, `create-formal-verification-skill` — write a project-local skill under `.cursor/skills/` → `.claude/skills/`, an Overdeck sync target in workspaces.
-- `maintain-verification-skill` — opens at most one PR of proven corrections.
-- `make-bot-ui` — builds a webhook UI for a Grok bot and exposes it on Tailscale.
+- `setup-pstack`: writes `~/.claude/rules/pstack-models.md`, which every Claude Code session on the host loads, including sessions outside Overdeck.
+- `automate-me`: writes a personal mode skill, then commits and opens a PR.
+- `reflect`: copies a skill folder into a skills dir and edits it.
+- `create-verification-skill`, `create-formal-verification-skill`: write a project-local skill under `.cursor/skills/` → `.claude/skills/`, an Overdeck sync target in workspaces.
+- `maintain-verification-skill`: opens at most one PR of proven corrections.
+- `make-bot-ui`: builds a webhook UI for a Grok bot and exposes it on Tailscale.
 
 The mount also copies the plugin's `docs/` and `README.md` next to `skills/` (`KnownPack.mountExtras`), so the skills' link to the Claude Code adapter doc (`docs/harness/claude-code.md`) resolves instead of dangling.
 
@@ -385,7 +386,7 @@ Each gstack skill is in one of five classes, fixed in Overdeck's skill map (revi
 | opt-in | autoplan, benchmark-models, captain, careful, codex, cso, document-generate, document-release, eval-plan, freeze, guard, modernize, ubicloud, unfreeze | Only with a per-skill `on`: they send code to OpenAI (`codex`), call paid or cloud APIs, push, or install hooks that block tool calls |
 | browser | benchmark, browse, devex-review, make-pdf, qa, qa-only, scrape, skillify, spec | On with the pack toggle once the browser runtime is built |
 | browser-opt-in | canary, design-consultation, design-html, design-review, design-shotgun, land-and-deploy, office-hours, plan-design-review, ship | Only with the browser runtime and a per-skill `on`: they push, merge, deploy, or call paid image APIs |
-| excluded | connect-chrome, gstack-upgrade, plan-tune, setup-deploy, setup-gbrain, sync-gbrain, open-gstack-browser, pair-agent, setup-browser-cookies | Never: they upgrade the install in place, need setup's hooks, or edit `CLAUDE.md`; `open-gstack-browser` opens a visible browser that writes `~/.gstack/.auth.json`, `pair-agent` exposes the browser through an ngrok tunnel and writes `~/.codex`, and `setup-browser-cookies` reads your real browser cookies and keychain |
+| excluded | connect-chrome, gstack-upgrade, plan-tune, setup-deploy, setup-gbrain, sync-gbrain, open-gstack-browser, pair-agent, setup-browser-cookies | Never: `connect-chrome` is a symlink alias (symlinked skills are never mounted); the others upgrade the install in place, need setup's hooks, or edit `CLAUDE.md`; `open-gstack-browser` opens a visible browser that writes `~/.gstack/.auth.json`, `pair-agent` exposes the browser through an ngrok tunnel and writes `~/.codex`, and `setup-browser-cookies` reads your real browser cookies and keychain |
 
 ```bash
 pan skills set --pack gstack on                           # every default skill, globally
@@ -448,7 +449,7 @@ The browser skills start a browse daemon per project. It keeps its port, token a
 pan skills pack remove gstack
 ```
 
-`remove` deletes `~/.overdeck/packs/gstack/` (renders, state, extractions and the git cache), every mount that contains gstack, the launch links that leaves dangling, and the gstack copy in every Codex agent's plugin cache. `remove` deletes the mounts a running agent is using, and the next launch has no gstack skills either: run `pan skills pack add gstack --ref main` again to get them back. `remove` does not delete the `.gstack/` or `.gstack-worktrees/` dirs that skills wrote in your projects; it prints each one it finds under a registered project, with the `rm -rf` command. `remove` and `pan skills pack browser gstack off` also print each live browse daemon in a registered project as `Browse daemon still running in <project>: pid <n> — stop with: kill -INT <n>` (a headless daemon ignores a plain `kill`); they never stop one. `pan skills pack gc` also removes renders of commits other than the trusted one once no linked launch uses them and they are older than `--max-age-days` (using a render resets its age), and the `render/`, `state/` and `browser/` dirs of packs that are no longer registered once all are older than `--max-age-days`. If `config.yaml` cannot be read or parsed, gc removes nothing and exits 1, because it cannot tell which packs are registered. If removing a mount or cache fails, `remove` names it and exits 1; run it again to retry.
+`remove` deletes `~/.overdeck/packs/gstack/` (renders, state, extractions and the git cache), every mount that contains gstack, the launch links that leaves dangling, and the gstack copy in every Codex agent's plugin cache. `remove` deletes the mounts a running agent is using, and the next launch has no gstack skills either: run `pan skills pack add gstack --ref main` again to get them back. `remove` does not delete the `.gstack/` or `.gstack-worktrees/` dirs that skills wrote in your projects; it prints each one it finds under a registered project, with the `rm -rf` command. `remove` and `pan skills pack browser gstack off` also print each live browse daemon in a registered project, with its path, its pid and the `kill -INT <n>` command that stops it (a headless daemon ignores a plain `kill`); they never stop one. `pan skills pack gc` also removes renders of commits other than the trusted one once no linked launch uses them and they are older than `--max-age-days` (using a render resets its age), and the `render/`, `state/` and `browser/` dirs of packs that are no longer registered once all are older than `--max-age-days`. If `config.yaml` cannot be read or parsed, gc removes nothing and exits 1, because it cannot tell which packs are registered. If removing a mount or cache fails, `remove` names it and exits 1; run it again to retry.
 
 #### Limits
 
@@ -539,7 +540,7 @@ Each Overdeck-managed Claude Code or Codex launch detects a Directive project at
 
 | Directive project | `deft` toggle | Managed mode | Result |
 |-------------------|---------------|--------------|--------|
-| no | any | — | Nothing exported; Claude gets the CLI deny list when deft skills are mounted |
+| no | any | any | Nothing exported; Claude gets the CLI deny list when deft skills are mounted |
 | yes | explicit off (issue or project) | any | Kill switch: `DEFT_DIRECTIVE_DISABLE=1`, the flag file in issue worktrees, and the deposit's `deft-directive-*` pointer skills hidden |
 | yes | on, or default | managed | `DEFT_ORCHESTRATOR=overdeck` |
 | yes | on, or default | not managed | Nothing exported; Deft runs as the project configured it |
@@ -591,7 +592,7 @@ pan skills deft back <ISSUE> [--json]            # save, remove the install exac
 
 **Switching.** `use` stops the issue's agents, writes `pipeline: deft` into `.pan/skill-overrides/<ISSUE>.yaml`, creates the workspace if it is missing, and installs Directive. When the issue has no plan, it writes a one-item stand-in plan, so `pan start` works. `--start` then starts the work agent. That agent gets a Deft kickoff instead of Overdeck's: build with `deft-directive-build`, run `deft-directive-pre-pr` before pushing, run `deft-directive-review-cycle` when a supported bot reviewer exists, save the state archive, use `pan sync-main` instead of a rebase, and never merge. `back` saves the archive, removes the install, restores every file the install changed, and deletes the stand-in plan. `pan start <ISSUE>` then plans the issue the Overdeck way. A project whose default branch already tracks a Directive deposit gets no install: its tracked deposit is used as it is. Overdeck decides this from the default branch's committed files, never from the worktree, because a temporary install leaves the same files on disk.
 
-**What the install writes, and how it is hidden.** npm and pnpm projects run Deft's installer, `npx --yes @deftai/directive install --yes`. Deft's installer refuses Bun projects, so for a project with `bun.lock` or `bun.lockb` Overdeck adds `@deftai/directive-runtime` with `bun add -d --exact` and then runs the runtime's own `setup` step. The deposit (pointer skills, slash wrappers, hook registrations, `.githooks/`, `AGENTS.md`, `Taskfile.yml`, `xbrief/`, `.deft/`, the `package.json` pin, and the lockfile change) stays out of git:
+**What the install writes, and how it is hidden.** npm and pnpm projects run Deft's installer: `directive install --yes` when `directive` is on `PATH`, else `npx --yes @deftai/directive install --yes`. Deft's installer refuses Bun projects, so for a project with `bun.lock` or `bun.lockb` Overdeck adds `@deftai/directive-runtime` with `bun add -d --exact` and then runs the runtime's own `setup` step. The deposit (pointer skills, slash wrappers, hook registrations, `.githooks/`, `AGENTS.md`, `Taskfile.yml`, `xbrief/`, `.deft/`, the `package.json` pin, and the lockfile change) stays out of git:
 
 - New paths go into a `# overdeck:deft begin` … `# overdeck:deft end` block in a per-worktree exclude file, `<git-dir>/info/overdeck-exclude`, which starts with a copy of your global excludes. SageOx keeps its own block in the same file.
 - Tracked files that the install changed, such as `package.json`, `.gitignore`, and the lockfile, get `--skip-worktree`.
@@ -627,7 +628,7 @@ Without a readable snapshot, `back` cannot undo the install exactly. It then cle
 - **Decisions tab.** A Deft issue's view gains a Decisions tab, in the issue drawer and in the Stage issue tab: Deft's escalations, open first, with SLA, due time, `overdue` and `dangerous` marks and a **Resolve** control; Deft's decision records; and Deft's policy, read-only, with `requireHumanMerge` first.
 - **Needs-you.** An open escalation that needs an answer appears in Needs-you and in the question dialog, with its SLA and a `dangerous` chip. Answering it rewrites the escalation file and tells the work agent. An open `external` escalation does not block: it shows as **Deft: waiting on external**. When a Claude Code Deft agent ends its message with one of Deft's numbered menus, the question dialog offers the menu's labels verbatim and sends the exact label. Codex agents keep the menu in the terminal.
 - **Plan tab.** Plan › Tasks lists Deft's scopes by folder (In progress, Planned, Proposed, Done, Cancelled) with each item's evidence and disposition. A disposition Deft will not accept yet (no provenance, or an agent's) gets **Sign off**, which records a human sign-off in Deft's own terms. Plan › Map draws the scopes' swarm dependencies.
-- **Overview tab.** **Deft gates** lists Deft's own gate runs from its run summary. **Deft review cycle** shows Deft's review cycle for the PR: the verdict in Deft's names (`CLEAN`, `NEW_P0_P1`, `PENDING`), the five exit-predicate fields as met, unmet, or unknown, rounds with P0/P1/P2 counts and the fix commit, the review lease, and the `pr:watch` heartbeats and CLEAN records. Deft records no rounds, so the panel rebuilds them from Greptile's comments and the `fix: address Greptile review findings` commits, and says so. Greptile is the only reviewer that can end Deft's cycle: without it the panel says `No supported bot reviewer — Deft review cycle not running`.
+- **Overview tab.** **Deft gates** lists Deft's own gate runs from its run summary. **Deft review cycle** shows Deft's review cycle for the PR: the verdict in Deft's names (`CLEAN`, `NEW_P0_P1`, `PENDING`), the five exit-predicate fields as met, unmet, or unknown, rounds with P0/P1/P2 counts and the fix commit, the review lease, and the `pr:watch` heartbeats and CLEAN records. Deft records no rounds, so the panel rebuilds them from Greptile's comments and the `fix: address Greptile review findings` commits, and says so. Greptile is the only reviewer that can end Deft's cycle: without it the panel says that there is no supported bot reviewer, so the Deft review cycle is not running.
 - **Other surfaces.** The phase rail shows `Deft: <delivery state>`. The project-tree row shows `spec drift <n>` (Deft's ledger of scope work the spec does not cover) and `install drift <n>` (hidden install files edited since the install). Changes › Files checks the changed files against Deft's approved scopes. Activity shows Deft's finish-loop progress. The agents lane lists Deft's subagents from their heartbeats, and a quiet one gets a `quiet` mark. A board card shows a `Deft` chip and its scope counts.
 
 ### SageOx
@@ -769,13 +770,13 @@ pan skills set --pack atlassian on --issue <id>
 
 **Skills.** Three are on with the pack toggle: `atlassian-mcp-code-search`, `jira-sprint-dashboard` (read-only unless you ask it to write), and `search-company-knowledge`. Four are opt-in, because they create or edit Jira or Confluence content, so the pack toggle never turns them on: `capture-tasks-from-meeting-notes`, `generate-status-report`, `spec-to-backlog`, and `triage-issue`.
 
-**Auth.** When your Jira email and API token are set (Settings → Tracker Keys, or `JIRA_EMAIL`/`JIRA_API_TOKEN` in `~/.overdeck.env`), Overdeck sends them to the server as `Authorization: Basic base64(email:token)`. An org admin must have enabled API token auth for the Rovo MCP server, and the token needs MCP scopes.
+**Auth.** When your Jira email and API token are set (Settings → Tracker Keys, or `JIRA_EMAIL`/`JIRA_API_TOKEN` in `~/.overdeck.env`), Overdeck sends them to the server as `Authorization: Basic base64(email:token)`. With a Data Center Jira base URL no header is sent; with a Jira Cloud base URL (`*.atlassian.net`), or no base URL at all, the header is sent. An org admin must have enabled API token auth for the Rovo MCP server, and the token needs MCP scopes.
 
 Without those keys, a Claude Code agent reuses your own sign-in: run `claude mcp add --transport http atlassian https://mcp.atlassian.com/v2/mcp` and `/mcp` once, from your own Claude Code session, with the same server name and URL the launch file uses. Agents cannot complete that interactive sign-in themselves. Codex agents have no such session to reuse, so without the Jira email and API token a Codex launch gets no `atlassian` server at all.
 
 For OAuth with Jira credentials also set, or for a Bearer service-account key, declare a project `mcp_servers` entry named `atlassian` (see [MCP servers](/configuration/mcp)); a project server with that name overrides the pack's.
 
-**Harnesses.** Claude Code and Codex agents get the server (Codex with `defaultToolsApprovalMode: "approve"`, and only when it has an Authorization header). `acp` and `opencode` get no server: the ACP host drops non-`stdio` entries. `ohmypi`, `kimi-code`, `muse` and `prime-agent` provision no MCP at all.
+**Harnesses.** Claude Code and Codex agents get the server (Codex with `defaultToolsApprovalMode: "approve"`, and only when it has an Authorization header). `acp`, `opencode` and `grok` get no server: the ACP host drops non-`stdio` entries. `pi`, `ohmypi`, `kimi-code`, `muse` and `prime-agent` provision no MCP at all.
 
 **`pan doctor`** adds an **Atlassian MCP** row only once the pack is registered; there is no row at all before that. Registered but off everywhere, it reports `ok` with no network request. Otherwise it probes the endpoint: with Jira credentials set, it reports whether the API token was accepted; without them, it reports that no Jira email and API token are configured (so Claude Code falls back to your own `/mcp` sign-in, which the probe cannot see); and either way, an unreachable endpoint reports as such. See [Pack MCP servers](/configuration/mcp#pack-mcp-servers) for consent, precedence, and the full auth rule.
 
@@ -805,7 +806,7 @@ The cache lives in `~/.overdeck/packs/` and can be rebuilt at any time, except t
 
 Packs apply to Overdeck-managed **Claude Code** and **Codex** sessions at their next launch, like other skill changes. A running Claude Code conversation can also load packs in place with `pan skills add` (see [Adding skills to a running conversation](#adding-skills-to-a-running-conversation)). Claude Code receives the pack as `--plugin-dir`; Codex gets a local `overdeck-packs` plugin marketplace in the agent's own `$CODEX_HOME`. Remote (Fly) launches and other harnesses get no packs. Pi gets no packs: it accepts `pan handoff --pack` and the dialog's Skills choices, but never applies them. A launch never touches the network: if the trusted commit is not cached, the launch skips that pack and prints `run pan skills pack sync <id>`. If Claude Code also has the same upstream plugin installed, the dashboard warns that its skills will appear twice. See [Authoring a skill pack](/guides/skill-pack-authoring) for what a mount contains.
 
-In the dashboard, packs appear below the skill list on the Skills page, in project settings, and in the issue view. The dashboard can turn packs on and off but not add them; it shows the `pan skills pack add` command instead. At project and issue level a pack and its skills keep the **Inherit / On / Off** control.
+In the dashboard, packs appear below the skill list on the Skills page, in project settings, and in the issue view. The dashboard turns packs on and off. On the Skills page it can also add the known packs listed under **Available packs** (see [Adding packs from the dashboard](#adding-packs-from-the-dashboard)); for any other pack it shows the `pan skills pack add` command. At project and issue level a pack and its skills keep the **Inherit / On / Off** control.
 
 ## Troubleshooting
 
@@ -815,7 +816,7 @@ In the dashboard, packs appear below the skill list on the Skills page, in proje
 | A pack skill is not visible to the agent | The pack or skill is off at the level that decides, the skill is opt-in, the harness is not Claude Code or Codex, or the launch is remote (Fly) | `pan skills list --project <key> --issue <id>`; turn on the pack (`--pack`) or the opt-in skill (`<pack>/<skill>`); packs apply only to Overdeck-managed Claude Code and Codex launches |
 | A running agent did not pick up a change | Packs resolve at launch | `pan skills add <conversation> --pack <id>` loads them into a running Claude Code conversation in place; for Codex, or for packs that need launch-time settings, add `--restart` |
 | Skills appear twice (`video-edit` and `openmontage:video-edit`) | A copy of the skill is also installed in `~/.claude/skills` (for example a symlink into an OpenMontage clone, or an `npx skills` install), and that copy loads in every session | Remove the global copy, or keep the pack off |
-| The dashboard shows `also installed as a Claude plugin — skills will appear twice` | Claude Code also has the same upstream plugin installed | Uninstall the Claude Code plugin, or keep the pack off |
+| The dashboard says the pack is also installed as a Claude plugin, so its skills will appear twice | Claude Code also has the same upstream plugin installed | Uninstall the Claude Code plugin, or keep the pack off |
 | Launch prints `[launcher] WARNING: gstack browser runtime not built; run pan skills pack sync gstack` | Browser consent is recorded but the runtime for the trusted commit is missing | `pan skills pack sync gstack` |
 | `pack gstack needs bun on PATH (https://bun.sh)` | `bun` is not installed or not on `PATH` | Install bun, then repeat the command |
 | An old gstack render stays after `pan skills pack gc` | A linked mount still uses it, or it is younger than `--max-age-days` (using a mount resets its age and its render's age) | Wait until no launch uses it, or run `pan skills pack gc --max-age-days <n>` with a smaller value |
@@ -823,7 +824,8 @@ In the dashboard, packs appear below the skill list on the Skills page, in proje
 | Launch prints `[launcher] WARNING: SageOx not applied: ox is not built for the sageox pack (<commit>); run pan skills pack sync sageox` | The build for the trusted commit is missing or incomplete; launches never build | `pan skills pack sync sageox` (needs Go), then relaunch |
 | A PR is not mergeable with `PR changes SageOx link files (.sageox/) but <key> has not opted in to committing them; …` | The PR adds or changes `.sageox/`, and the project has not committed its link | Remove `.sageox/` from the PR, or run `pan skills pack sageox commit --project <key>` and merge that PR first |
 | A PR is not mergeable with `SageOx merge guard could not read the PR's changed files: …` | The guard could not read the PR's diff, so it fails closed | Fetch the PR head in the named directory (`git fetch origin <branch>`), then let the gate re-check |
+Still stuck? Ask in [Discord](https://discord.gg/ZpHE2ZTv5P) or open a [GitHub issue](https://github.com/eltmon/overdeck/issues).
 
 ## Terminology: skill packs and skill bundles
 
-The noun "skill bundle" means skill pack, everywhere in Overdeck's docs and skills. The adjective "bundled" (shipped with Overdeck, in `sync-sources/`) is unrelated — a bundled skill or a bundled rule is one Overdeck ships, not a skill pack. [Template Conversations](/reference/template-conversations) describes a separate, unbuilt proposal (PAN-1357) that calls its curated group a "skill set," not a skill bundle. Per-conversation skill values (PAN-4486), set in the **New conversation with options…** dialog or by `pan handoff --skill/--pack`, already cover part of that proposal: a conversation can turn on pack skills for itself. See [Template Conversations](/reference/template-conversations) and [Conversations](/features/conversations).
+The noun "skill bundle" means skill pack, everywhere in Overdeck's docs and skills. The adjective "bundled" (shipped with Overdeck, in `sync-sources/`) is unrelated: a bundled skill or a bundled rule is one Overdeck ships, not a skill pack. [Template Conversations](/reference/template-conversations) describes a separate, unbuilt proposal (PAN-1357) that calls its curated group a "skill set," not a skill bundle. Per-conversation skill values (PAN-4486), set in the **New conversation with options…** dialog or by `pan handoff --skill/--pack`, already cover part of that proposal: a conversation can turn on pack skills for itself. See [Template Conversations](/reference/template-conversations) and [Conversations](/features/conversations).

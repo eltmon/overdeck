@@ -1,19 +1,19 @@
 ---
 title: "Review and test agents: checking an agent's work"
 sidebarTitle: "Specialists"
-description: "After pan done, a review agent and a test agent check the work on the pull request. You click Merge when the PR is approved and its checks are green."
+description: "After pan done, a review agent checks the pull request and its checks must pass. Then you click Merge, or auto-merge or the merge train lands it."
 ---
 
 import { ThemedImage } from "/snippets/themed-image.mdx";
 
-Work agents write the code. Two more agents check it before it can merge: a **review agent** and a **test agent**. The docs call them specialists. They run on the issue's pull request and post their verdicts to it, so GitHub shows the same state the dashboard does.
+Work agents write the code. A **review agent** checks it before it can merge, and a **test agent** can run its tests and browser UAT. The docs call them specialists. They run on the issue's pull request and post their verdicts to it, so GitHub shows the same state the dashboard does.
 
 ## What happens after pan done
 
 1. **Verification gate.** After `pan done`, Overdeck runs the project's quality gates. If a gate fails, the work agent gets the failure and fixes it. See [PIPELINE-GATES.md](https://github.com/eltmon/overdeck/blob/main/docs/PIPELINE-GATES.md).
 2. **Review.** A review agent reads the diff, the plan and the acceptance criteria, then approves the PR or requests changes. By default one reviewer does a combined pass for correctness, security, performance and requirements (`quick` mode, see [Review commands](/cli/review-commands) "Review modes"). Set `roles.review.mode: full` to run the [review convoy](/features/convoys): four reviewers for security, correctness, performance and requirements, and a review parent that writes the verdict.
-3. **Test.** A test agent runs the project's test commands. When the acceptance criteria describe UI behavior, it also drives a browser with Playwright and records a separate UAT verdict. There is no separate UAT agent.
-4. **Merge.** When the PR is approved, its checks are green and GitHub says it can merge, the issue is ready. Overdeck rebases the branch onto `main` on the server. You click **Merge** on the issue, or on the Awaiting Merge page, and Overdeck squash-merges the PR. No agent merges code.
+3. **Test.** Nothing starts a test agent automatically after the review approves ([#5537](https://github.com/eltmon/overdeck/issues/5537)). In a project that runs its tests on CI (`verification.tests: ci`, or a GitHub Actions workflow that runs a test job on pull requests), the CI test job must pass on the PR head before the PR can merge. Running `pan review request` on a PR that is approved at its head but whose checks are not green starts a test agent: it runs the project's test commands and, when the acceptance criteria describe UI behavior, drives a browser with Playwright and records a separate UAT verdict. There is no separate UAT agent.
+4. **Merge.** When the PR is approved at its head commit, its checks are green and GitHub says it can merge, the issue is ready. Whether you click depends on whether the issue is held for UAT: its `hold-for-uat` or `auto-merge` label, else the project's `auto_merge_default`, else the global **Require UAT** switch on the Flywheel page header, which is on by default. A held issue waits for you to click **Merge** on the issue or on the Awaiting Merge page. In a GitHub single-repo project, an issue that is not held merges on its own five minutes after it is ready, or with the next batch while the [merge train](/features/merge-batches) is on; GitLab and polyrepo projects never merge on their own. To merge, the server merges a clean, up-to-date PR as it is; otherwise it rebases the branch onto `main` itself, and when that rebase fails during a merge you started, it asks the work agent to rebase and push. Overdeck then squash-merges the PR. No agent merges it.
 
 To ship without the click, turn on [auto-merge](/configuration/auto-merge). To land several PRs together, use [merge batches](/features/merge-batches).
 
