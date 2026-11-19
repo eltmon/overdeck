@@ -322,8 +322,9 @@ See [Safe shutdown](/features/safe-shutdown) for what happens phase by phase.
 
 ## pan update
 
-Check npm for the latest `@overdeck/core`, install it globally, run an automatic sync, then tell
-you to restart the dashboard and running agents.
+Check npm for the latest `@overdeck/core`, install it (globally, or into `~/.overdeck/runtime` for
+a runtime install), run `pan sync` when `sync.auto_sync` is on (off by default), then tell you to
+restart running agents (global install) or the dashboard (runtime install).
 
 ```bash
 pan update
@@ -430,7 +431,7 @@ pan tts test "deployment finished"
 
 ## pan backup
 
-`pan sync` backs up the synced skill and command directories before each sync and prunes old
+`pan sync` backs up the synced skill, command and agent directories before each sync and prunes old
 backups automatically; backups live in `~/.overdeck/backups/`.
 
 ```bash
@@ -450,7 +451,7 @@ from the 10 newest.
 
 ```bash
 pan restore
-pan restore 2026-11-01T04-52-00
+pan restore 2026-11-01T04-52-00-000Z
 ```
 
 ## pan health
