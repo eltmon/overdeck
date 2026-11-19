@@ -6,7 +6,7 @@ description: Launch, watch, report from and reap gauntlet lanes with pan lane, f
 A **lane** is an ordinary Overdeck conversation that a gauntlet orchestrator
 launches with `pan lane start`. It runs any harness, model and effort, in its
 own working directory, and it nests under the conversation that launched it on
-the Command Deck and the Agents page. A lane carries four facts on its row,
+the Command Deck and the Agents page (experimental: turn on Settings → Experimental → **Experimental features** to show it). A lane carries four facts on its row,
 written once at launch: its parent conversation, its **run key**, its **lane
 key** and its **role**. A **gauntlet run** is the set of lanes that share a run
 key. There is no run table and no stored lane status: every state below is
@@ -34,7 +34,7 @@ and critics.
 ```text
 pan lane start (--key <key> | --for <builder key>) --role <role> (--brief <file> | --prompt <text>)
                [--run <key>] [--parent <conv>] [--project <key>] [--model <m>] [--harness <h>] [--effort <e>]
-               [--title <t>] [--branch <b>] [--from <ref>] [--at <ref>] [--reuse] [--replace] [--no-wait] [--json]
+               [--title <t>] [--branch <b>] [--from <ref>] [--at <ref>] [--reuse] [--replace] [--force] [--no-wait] [--json]
                [--machine <label|environment-id|auto>] [--needs <tag,…>]
 pan lane list  [--run <key>] [--parent <conv>] [--reapable] [--json]
 pan lane show  (<lane> | --run <key> --key <key>) [--json]
@@ -58,7 +58,7 @@ another machine is messaged with `pan tell @<label>/<name>`. See
 | Command | What it does |
 |---------|--------------|
 | `start` | Creates the lane's directory, writes the brief once to `~/.overdeck/agents/conv-<name>/lane-brief.md`, creates the conversation with the lane contract as its first message, and waits up to 180 s until it has started (`--no-wait` returns at once). Prints `Lane <run>/<key> <role> i<n>: conv <id> (<name>) in <cwd>`, or `… : <name> on <machine> in <cwd>` for a lane on another machine. With `--machine auto` it first prints Auto's reason line, and a `Passed over: …` line when Auto skipped machines, on stderr, also when Auto picks this machine. |
-| `list` | Every lane with `ID`, `RUN/KEY`, `ROLE`, `MACHINE`, `ITER`, `ACTIVITY`, `REAPABLE`, `REPORT`, `FOR`, `VERDICT`, `BRANCH@SHA`, `AHEAD`, `DIRTY`, `MODEL` and `COST`. An archived lane reads `archived` in `ACTIVITY`. `MACHINE` is `-` for a lane on this machine. `--reapable` shows only lanes a newer iteration superseded — reap candidates; see [Reap](#reap). |
+| `list` | Every lane with `ID`, `RUN/KEY`, `ROLE`, `MACHINE`, `ITER`, `ACTIVITY`, `REAPABLE`, `REPORT`, `FOR`, `VERDICT`, `BRANCH@SHA`, `AHEAD`, `DIRTY`, `MODEL` and `COST`. An archived lane reads `archived` in `ACTIVITY`. `MACHINE` is `-` for a lane on this machine. `--reapable` shows only lanes a newer iteration superseded (reap candidates); see [Reap](#reap). |
 | `show` | The builder → critic chain of one run and key, then one line per lane. See [Critics and builders](#critics-and-builders). |
 | `wait <lane>` | Waits for the lane's next report, with `pan worker wait` semantics. |
 | `wait --run` / `--parent` | Waits for the next report of any lane in the set after a cursor `<atMs>.<name>.<seq>`, oldest first. Prints the report body on stdout and the next command, with the new cursor, on stderr. When a report arrives, a `reapable: <name>, …` line (see [Reap](#reap)) prints on stderr right before it. |
@@ -73,8 +73,12 @@ verb for it. A lane on another machine is `pan tell @<label>/<name> "<text>"`.
 done report, because a critic is never re-tasked (`--force` overrides).
 
 The HTTP API behind the CLI is `POST /api/lanes` (with `machine` and `needs`),
-`GET /api/lanes?run=&parent=&key=`, `GET /api/lanes/:name`,
+`GET /api/lanes?run=&parent=&key=&role=`, `GET /api/lanes/:name`,
 `POST /api/lanes/:name/stop` and `POST /api/lanes/:name/reap` with `{ park, keep }`.
+
+A managed conversation can use the `overdeck` MCP server's `lane_start`,
+`lane_status`, `lane_wait`, `lane_report` and `lane_stop` tools instead; see
+[MCP](/configuration/mcp#agent-only-tools).
 
 ### Exit codes
 
@@ -85,10 +89,14 @@ The HTTP API behind the CLI is `POST /api/lanes` (with `machine` and `needs`),
 | 0 | A report with status `done` |
 | 4 | A report with status `blocked` or `failed` (the body is still printed) |
 | 2 | The lane exited, or sat idle for 10 minutes, without a report |
-| 3 | Timeout: the lane is still running; run the printed `next:` command |
+| 3 | Timeout: the lane is still running; run the `pan lane wait` command it prints |
 | 1 | A usage or request error (for example a refused launch) |
 
 `start`, `stop` and `reap` exit 0 on success and 1 on any refusal.
+
+`wait --run` and `wait --parent` never exit 2: for a stopped lane that never
+reported they print `lane <run>/<key> (<name>) is stopped and never reported`
+on stderr once and keep waiting.
 
 `disk-check` exits 0 when there is room, 4 when the floor refuses, and 1 on a
 usage or lookup error.
@@ -148,7 +156,7 @@ lane or a root. So a handed-off orchestrator keeps its standing.
 
 | Role | Launched by | Working directory |
 |------|-------------|-------------------|
-| `orchestrator` | a root conversation | detached worktree at `--at` (default: the base ref), `<root>/<run>-<key>-orch` |
+| `orchestrator` | a root conversation | detached worktree at `--at` (default: the base ref), `<root>/<run>-<key>-orch` (i1) or `<root>/<run>-<key>-orch-i<n>` |
 | `builder` | a root or an `orchestrator` lane | worktree on branch `<run>/<key>` (i1) or `<run>/<key>-i<n>`, at `<root>/<run>-<key>` or `<root>/<run>-<key>-i<n>` |
 | `critic` | a root conversation only | detached worktree at `--at`, `<root>/<run>-<key>-critic-i<n>` |
 | `verifier` | a root or an `orchestrator` lane | detached worktree at `--at`, `<root>/<run>-<key>-verify-i<n>` |
@@ -156,17 +164,19 @@ lane or a root. So a handed-off orchestrator keeps its standing.
 
 - `--run` is required from a root; a lane launched by an orchestrator lane
   inherits that lane's run.
-- A builder, critic or verifier lane launches nothing.
+- A builder, critic, verifier or play lane launches nothing.
 - A new builder iteration cuts its branch from the previous iteration's branch
-  (the one its newest report recorded); `--from` overrides the base. A branch
-  that reported `done` is frozen.
+  (the one its newest report recorded); `--from` overrides the base.
 - `--reuse` launches a fresh conversation in the directory of the latest
   earlier lane with the same run, key and role, keeping its iteration; that
   lane must not be live.
 - One live lane per run, key and role: a second launch is refused unless
   `--replace`, which stops the live lane first. A lane that is still starting
   (not ended, created under 3 minutes ago) counts as live.
-- `--effort` accepts `low`, `medium` or `high`.
+- `--effort` accepts `low`, `medium` or `high` (an `opencode` lane also takes
+  opencode's own effort names).
+- While the host is CPU-saturated a launch is refused with 429 `cpu-saturated`;
+  `--force` launches anyway.
 - With no `--model`, the door uses the role's model from the project's
   `gauntlet` config; with none there, the launch is refused. There is no
   hardcoded model fallback.
@@ -193,13 +203,13 @@ This table is implemented once, as `laneActivityOf` in `@overdeck/contracts`;
 
 ### In the Activity feed
 
-The **Feed** tab on `/activity` shows a gauntlet run as **one card**, grouped
+The **Feed** on the Activity page (`/activity`) shows a gauntlet run as **one card**, grouped
 by project and run key. Lane conversations do not get cards of their own.
 
 - **Counts line:** role counts, then activity counts, only when non-zero, for
   example `6 builders · 6 working` or `6 builders · 1 needs you · 5 working`.
 - **Latest event:** the newest lane report, failed start, end or launch, for
-  example `alpha critic i2 reported done · verdict pass`. The card's time is
+  example `alpha critic i2 reported done · verdict PASS`. The card's time is
   that event's time, not transcript activity, so a busy run does not keep
   jumping to the top.
 - **Click** opens the conversation that launched the run.
@@ -253,12 +263,12 @@ A refused reap archives nothing. The brief, the reports and any parked patch in
 ledger stays complete. Reap builders before the orchestrator lane that launched
 them: an archived orchestrator lane leaves its unreaped builders as orphans.
 
-A lane is **reapable** — a candidate for `pan lane reap` right now — when a
+A lane is **reapable** (a candidate for `pan lane reap` right now) when a
 newer iteration of the same run, key and role exists, no row of its own
 iteration is `working`, `needs-you` or `starting`, and either some row of that
 iteration filed a report or none is `idle`. Orchestrator lanes are never
 reapable: archiving one orphans the builders it launched. Being reapable is a
-candidate, not a promise — the reap itself can still refuse (a live process in
+candidate, not a promise: the reap itself can still refuse (a live process in
 the directory, a dirty tree without `--park`).
 
 `pan lane list --run <run> --reapable` lists the candidates; reap each with
@@ -271,9 +281,9 @@ iteration.
 
 A lane launch is admitted against the same 10 GiB safety floor as a workspace
 start (PAN-4961), at the project's lanes root: below the floor, `start`
-refuses with HTTP 507, `code: disk-low`, and the `Disk low — new workspace
-starts are held` text naming free, reserved and needed GiB. `--force` does
-not bypass it — it still bypasses only the CPU check. A lane that creates a
+refuses with HTTP 507, `code: disk-low`, and refusal text that starts with
+`Disk low` and names free, reserved and needed GiB. `--force` does
+not bypass it; it still bypasses only the CPU check. A lane that creates a
 new worktree (a builder, critic, verifier or orchestrator without `--reuse`)
 reserves the project's workspace-start estimate with a 2 GiB minimum; `--reuse`
 and `play` lanes reserve 0 bytes but are still checked. A launched lane's
@@ -290,7 +300,7 @@ every launch wave and before creating one of these worktrees yourself; with
 `--path <dir>` it checks the filesystem holding that directory instead (the
 current directory by default). It exits 0 with a `Disk ok: …` line when there
 is room, 4 with the refusal on stderr when there is not, and with `--project`
-it also lists directories under the lanes root that no lane row claims — not
+it also lists directories under the lanes root that no lane row claims. They are not
 lanes, so `pan lane reap` cannot remove them; remove each with
 `git worktree remove <dir>` once its work is merged or saved.
 
@@ -332,7 +342,7 @@ A critic or verifier lane records the builder row it judges, once, at launch.
   any text of a builder report. Only the commit it judges comes from the
   builder.
 
-On the Command Deck and the Agents page a critic nests under the builder it
+On the Command Deck and the Agents page (experimental) a critic nests under the builder it
 judges, with a verdict badge; a builder shows its newest critic verdict as a
 link to that critic.
 
@@ -372,7 +382,7 @@ projects:
 The lanes root defaults to a sibling of the project checkout named
 `<project dir>-lanes`. It must be under your home directory, outside `/tmp`,
 and must not contain the project checkout. The base ref defaults to
-`origin/<default branch>`, fetched before each git-backed launch.
+`origin/<default branch>` (set `base_ref` to change it), fetched before each launch that creates a worktree. `sparse_checkout` patterns apply to builder worktrees only.
 
 ## Workers or lanes?
 

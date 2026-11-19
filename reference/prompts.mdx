@@ -1,17 +1,21 @@
 ---
-title: Prompt Templates
-description: "How Overdeck builds the prompts it sends to agents: the Mustache template loader, the frontmatter contract, the template catalog and an authoring guide."
+title: "Prompt Templates and the renderPrompt Loader"
+sidebarTitle: "Prompt Templates"
+description: "How Overdeck builds agent prompts from Mustache templates: the renderPrompt loader, the frontmatter contract, the template catalog and an authoring guide."
 ---
 
-Every prompt that Overdeck sends to Claude — the work agent that implements a
-feature, the review specialist that audits the diff, the merge agent that lands
-a PR, the planning agent that generates an xBRIEF — is built from a versioned
-Markdown template under `src/lib/cloister/prompts/`.
+Overdeck builds four of the prompts it sends to agents from versioned
+Markdown templates under `src/lib/cloister/prompts/`: the work agent's
+kickoff, the Deft work agent's kickoff, the planning agent's discovery prompt
+and the model-to-model handoff prompt.
 
 A single loader, [`renderPrompt`](#the-renderprompt-api) at
-`src/lib/cloister/prompts.ts`, is the **only** sanctioned way to turn one of
-those templates into a finished prompt string. Every specialist, every handoff,
-every resume call goes through it.
+`src/lib/cloister/prompts.ts`, is the only way code turns one of those
+templates into a finished prompt string.
+
+Role definitions are a separate system. They live in `roles/<role>.md`, and
+Overdeck reads them without this loader. See
+[Prompts outside this loader](#prompts-outside-this-loader).
 
 This page is the authoritative guide to that system: what the templates are,
 how the loader works, the frontmatter contract, the full template catalogue,
@@ -19,7 +23,7 @@ and how to add, edit, or migrate a prompt without breaking production.
 
 ## Why templates at all
 
-Before the unified loader, prompts were assembled a dozen different ways —
+Before the unified loader, prompts were assembled a dozen different ways:
 inline template literals in TypeScript, `readFileSync` of raw Markdown files,
 ad-hoc `String.replace` passes, and a pair of home-grown `processIfBlocks` /
 `processEnvBlocks` helpers. Each specialist invented its own variable syntax
@@ -29,7 +33,7 @@ That sprawl produced three recurring failures:
 
 1. **Silent typos.** A variable like `{{issueId}}` referenced in the template
    but named `issue_id` at the call site rendered as the literal string
-   `{{issueId}}` in the prompt sent to Claude. No error, no warning — the
+   `{{issueId}}` in the prompt sent to Claude. No error, no warning: the
    specialist just got a broken prompt and ran on bad context.
 2. **Drift between similar templates.** The merge-agent prompt used by the
    full-push path and the wake-time validation path were two separate string
@@ -39,7 +43,7 @@ That sprawl produced three recurring failures:
 
 The template system fixes all three. Every template declares its variables in
 YAML frontmatter; the loader validates them on every render; missing or
-unknown variables throw a `PromptError` with the exact template path and the
+unknown variables fail with a `PromptError` that names the template path and the
 list of offending keys.
 
 ## Core principles
@@ -51,40 +55,44 @@ Keep these five rules in mind when you touch any prompt template.
 ### 1. Fail loud, fail early
 
 Missing a required variable is a programming error, not a runtime condition to
-recover from. The loader throws `PromptError` with the template path and the
+recover from. The loader fails with `PromptError`, naming the template path and the
 list of missing keys. There is no silent fallback, no empty-string
 substitution, no "render partial output and hope nobody notices". If you see a
-`PromptError` in a log, it means a call site is wrong and needs to be fixed —
+`PromptError` in a log, it means a call site is wrong and needs to be fixed,
 not that the loader needs a guard.
 
 ### 2. One template, one API
 
-Templates are read only via `renderPrompt({ name, vars })`. There is no
-`readFileSync` on a prompt file anywhere in the codebase. If you find one,
-that's a bug — migrate it to `renderPrompt`.
+Code reads a template under `src/lib/cloister/prompts/` only through
+`renderPrompt({ name, vars })`. If you find another read of one of these
+files, migrate it to `renderPrompt`. Role files under `roles/` are read
+directly by design; see
+[Prompts outside this loader](#prompts-outside-this-loader).
 
 ### 3. Composition happens in TypeScript
 
 Mustache is deliberately a small, logic-less templating language. The loader
-disables HTML escaping globally (`Mustache.escape = String`) because we're
-generating prompts for an LLM, not HTML — but everything else is vanilla
+disables HTML escaping globally (`Mustache.escape = (text) => String(text)`) because we're
+generating prompts for an LLM, not HTML. Everything else is vanilla
 Mustache with its usual section syntax.
 
-Any non-trivial composition — choosing between two instruction variants,
-joining an array of file paths, formatting a table of tasks — happens in
+Any non-trivial composition (choosing between two instruction variants,
+joining an array of file paths, formatting a table of tasks) happens in
 TypeScript. The TypeScript builds a string, then passes that string to the
 template as a single variable. This keeps templates readable and keeps
 business logic in a place where `tsc` and your tests can see it.
 
 ### 4. Variables are declared, not discovered
 
-Every variable used by the template's body must appear in the frontmatter as
-either `requires` or `optional`. Undeclared variables are rejected by the
-loader. Undefined required variables are rejected by the loader. Both errors
-point at the template path and name the offending keys.
+Every variable the template's body uses should appear in the frontmatter as
+either `requires` or `optional`. The loader rejects any key in `vars` that
+the frontmatter doesn't declare, and any required key that is missing or
+`undefined`/`null`. Both errors name the template path and the offending
+keys. The loader never scans the body, so a `{{VAR}}` that the frontmatter
+leaves out renders as an empty string when the call site doesn't pass it.
 
-This means reading the frontmatter tells you exactly what a template expects
-— you never have to grep the body to reconstruct the contract.
+This means the frontmatter tells you what a template expects, as long as
+authors keep it in step with the body.
 
 ### 5. Prompts are not docstrings
 
@@ -97,22 +105,27 @@ workspace.
 ## The `renderPrompt` API
 
 ```typescript
+import { Effect } from 'effect';
 import { renderPrompt } from './prompts.js';
 
-const prompt = renderPrompt({
+const prompt = await Effect.runPromise(renderPrompt({
   name: 'work',
   vars: {
     ISSUE_ID: 'PAN-742',
-    BRANCH: 'feature/pan-742',
-    // ...every required variable declared in work.md
+    ISSUE_ID_LOWER: 'pan-742',
+    WORKSPACE_PATH: '/path/to/workspaces/feature-pan-742',
+    BRANCH_NAME: 'feature/pan-742',
+    LOCAL: true,
+    REMOTE: false,
+    // ...plus any optional variables declared in work.md
   },
-});
+}));
 ```
 
 ### Signature
 
 ```typescript
-export function renderPrompt(options: RenderPromptOptions): string;
+export function renderPrompt(options: RenderPromptOptions): Effect.Effect<string, PromptError>;
 
 export interface RenderPromptOptions {
   name: string;                          // template basename without .md
@@ -123,14 +136,17 @@ export interface RenderPromptOptions {
 The `name` is the filename under `src/lib/cloister/prompts/` without the
 `.md` extension. `renderPrompt({ name: 'work' })` loads `work.md`.
 
+`renderPrompt` returns an Effect. Run it with `Effect.runPromise` (as
+`buildWorkAgentPrompt` does), with `Effect.runSync` (as `buildHandoffPrompt`
+does), or `yield*` it inside `Effect.gen`.
+
 ### What happens on every call
 
-1. **Load + cache.** The file is read from disk once and cached in an in-memory
-   `Map` keyed by name. Subsequent calls reuse the parsed `ParsedPrompt`
-   (frontmatter + body + resolved path).
+1. **Load.** The file is read from disk on every call. There is no template
+   cache; only the resolved prompts directory is cached.
 2. **Parse frontmatter.** The leading `---` YAML block is extracted via
    `js-yaml`. Missing frontmatter, invalid YAML, or a missing `name` /
-   `description` field all throw `PromptError`.
+   `description` field all fail with `PromptError`, and so does a `requires` or `optional` value that isn't a list of strings.
 3. **Validate `requires`.** Every key listed in `requires` must be present in
    `vars` and not `undefined`/`null`. Missing keys are collected and reported
    in one error message.
@@ -142,12 +158,17 @@ The `name` is the filename under `src/lib/cloister/prompts/` without the
 
 ### Error handling
 
-Everything throws `PromptError` — a subclass of `Error` exported from the
-module. Typical messages:
+Every loading and validation failure is a `PromptError`, exported from the
+module. It's an Effect tagged error (`Data.TaggedError('PromptError')`) and
+also an `Error`. `renderPrompt` fails its Effect with it, so
+`Effect.runPromise` rejects and `Effect.runSync` throws. Rendering is
+different: a body Mustache can't parse, such as an unclosed `{{#VAR}}`
+section, throws Mustache's own `Error`, which the loader does not convert to
+a `PromptError`. Typical `PromptError` messages:
 
 ```
-Prompt "work" (.../prompts/work.md) requires variables that are missing: BRANCH, DIFFICULTY.
-Provided: ISSUE_ID, XBRIEF_PATH
+Prompt "work" (.../prompts/work.md) requires variables that are missing: WORKSPACE_PATH, BRANCH_NAME.
+Provided: ISSUE_ID, ISSUE_ID_LOWER, LOCAL, REMOTE
 
 Prompt "review" (.../prompts/review.md) was passed unknown variables: DEBUG_MODE.
 Declare them in the template's "requires" or "optional" frontmatter, or remove them from the call site.
@@ -158,26 +179,25 @@ Failed to load prompt template "work" from .../prompts/work.md: ENOENT: no such 
 ```
 
 Do not catch these. They indicate bugs in call sites or templates that must
-be fixed, not runtime conditions. The fail-loud posture is deliberate — if a
+be fixed, not runtime conditions. The fail-loud posture is deliberate: if a
 call site is allowed to silently skip a required variable, the resulting
 prompt silently loses context and the agent silently does the wrong thing.
 
-### Cache invalidation
-
-`clearPromptCache()` is exported for test isolation. Production code never
-calls it — templates are bundled at build time and don't change during a
-dashboard's lifetime.
-
 ### Prompts directory resolution
 
-`resolvePromptsDir()` looks for `prompts/` in two places, in order:
+`resolvePromptsDir()` picks the directory once per process and caches the
+answer:
 
-1. `join(__dirname, 'prompts')` — the expected location in both dev
-   (`src/lib/cloister/prompts`) and production (`dist/dashboard/prompts`).
-2. If `__dirname` contains `/src/`, the resolver strips everything from
-   `/src/` onward and re-anchors to `<package>/src/lib/cloister/prompts`.
-   This is the tsx dev-mode fallback for cases where the module is imported
-   from a nested path that has been re-exported through multiple barrel files.
+1. `join(__dirname, 'prompts')`, next to the module that holds the loader.
+   In dev that's `src/lib/cloister/prompts`. A build copies the templates
+   next to each bundle: `dist/dashboard/prompts` for the dashboard server,
+   `dist/prompts` and `dist/cli/prompts` for the CLI.
+2. If that directory doesn't exist, the resolver finds the package root (it
+   strips everything from `/src/` onward when `__dirname` contains `/src/`,
+   otherwise it goes up two directories) and tries
+   `src/lib/cloister/prompts` under it.
+3. If neither exists, it keeps the first path, and the first render fails
+   with "Failed to load prompt template".
 
 See [BUILD.md](https://github.com/eltmon/overdeck/blob/main/docs/BUILD.md#specialist-prompt-templates)
 for how the build pipeline copies `*.md` from source to `dist/dashboard/prompts/`.
@@ -185,23 +205,26 @@ for how the build pipeline copies `*.md` from source to `dist/dashboard/prompts/
 ## Frontmatter contract
 
 Every template starts with a YAML frontmatter block delimited by `---`. The
-loader enforces this structure — a missing or malformed block throws
-`PromptError` before a single byte of the body is read.
+loader enforces this structure: a missing or malformed block fails with
+`PromptError` before the body is rendered.
 
 ```markdown
 ---
 name: work
-description: Work-agent prompt — implementation-phase instructions, per-task workflow, finalization steps.
+description: Primary work-agent prompt that reads the per-issue record, processes feedback, and drives the xBRIEF item loop until pan done.
 requires:
   - ISSUE_ID
-  - ISSUE_TITLE
-  - BRANCH
-  - XBRIEF_PATH
-  - DIFFICULTY
+  - ISSUE_ID_LOWER
+  - WORKSPACE_PATH
+  - BRANCH_NAME
+  - LOCAL
+  - REMOTE
 optional:
-  - SPEC_SECTION
-  - POLYREPO_HEADER
-  - TRACKER_CONTEXT
+  - PROJECT_ROOT
+  - POLYREPO_CONTEXT
+  - PENDING_FEEDBACK
+  - MEMORY_CONTEXT
+  # ...the real file declares more optional variables
 ---
 Body of the prompt starts here...
 ```
@@ -210,10 +233,10 @@ Body of the prompt starts here...
 
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
-| `name` | string | yes | Must match the filename (without `.md`). Used for error messages and cross-references. |
-| `description` | string | yes | One-line summary shown in catalogues and reference docs. Write it for the reader who's scanning a list of templates, not for the one already inside the file. |
-| `requires` | string array | no (defaults to `[]`) | Variables that MUST be provided in `vars`. A missing or `undefined`/`null` value throws `PromptError`. |
-| `optional` | string array | no (defaults to `[]`) | Variables that MAY be provided. Rendering with an optional variable omitted is fine — the corresponding Mustache section simply renders empty. |
+| `name` | string | yes | Non-empty string. Keep it equal to the filename (without `.md`). The loader doesn't check that, and its error messages use the name passed to `renderPrompt`. |
+| `description` | string | yes | One-line summary. The loader requires it but never displays it. Write it for the reader who's scanning a list of templates, not for the one already inside the file. |
+| `requires` | string array | no (defaults to `[]`) | A list of strings: variables that MUST be provided in `vars`. A missing or `undefined`/`null` value fails with `PromptError`. |
+| `optional` | string array | no (defaults to `[]`) | Variables that MAY be provided. Rendering with an optional variable omitted is fine: the corresponding Mustache section simply renders empty. |
 
 ### `requires` vs `optional`
 
@@ -225,10 +248,10 @@ The rule of thumb:
   section out otherwise" case, list it as `optional`.
 
 `requires` is stricter than you might think: passing an empty string
-(`""`) satisfies the check — only `undefined` and `null` fail. This is
-intentional. An empty-string `CURRENT_PHASE` in the resume prompt means
-"STATE.md had no phase", not "the caller forgot to compute one". The
-caller is the one who decides whether "empty" is a legitimate value.
+(`""`) satisfies the check. Only `undefined` and `null` fail. This is
+intentional. `buildWorkAgentPrompt` passes an empty `ISSUE_ID` when a
+recovery path has no issue id, and the prompt still renders. The caller is
+the one who decides whether "empty" is a legitimate value.
 
 ### Unknown keys are an error
 
@@ -267,10 +290,10 @@ a non-empty array, an object). Empty strings and `false` hide the block.
 {{/USER_MESSAGE}}
 ```
 
-Note the pattern `{{#VAR}}{{VAR}}{{/VAR}}` — that's Mustache context
+Note the pattern `{{#VAR}}{{VAR}}{{/VAR}}`: that's Mustache context
 fall-through: inside a truthy section, the variable itself is still
-accessible in the parent scope and gets substituted normally. This is how the
-resume prompt hides entire headings when their content is empty.
+accessible in the parent scope and gets substituted normally. This is how
+`work.md` hides its Specialist Feedback heading when `PENDING_FEEDBACK` is empty.
 
 ### Inverted sections
 
@@ -278,7 +301,7 @@ Render if the variable is falsy/empty.
 
 ```mustache
 {{^DO_PUSH}}
-Do NOT push to main — you are validating only.
+Do NOT push to main; you are validating only.
 {{/DO_PUSH}}
 ```
 
@@ -316,56 +339,59 @@ variable.
 
 ## Template catalogue
 
-The ten templates currently under `src/lib/cloister/prompts/`, grouped by the role they play in the pipeline.
+The eleven templates under `src/lib/cloister/prompts/`. Four have a
+production caller. The other seven still load and some have smoke tests,
+but nothing in `src/` renders them today.
 
-### Work agent templates
+### Templates with a caller
 
-Templates that drive the **work agent** — the specialist that implements xBRIEF checklist items.
+| Template | Rendered by | Purpose |
+|----------|-------------|---------|
+| `work.md` | `buildWorkAgentPrompt` (`src/lib/cloister/work-agent-prompt.ts`) | Work agent kickoff: claim one xBRIEF item, implement it, commit with an `Item:` trailer and push, run `pan task done`, then continue through quality gates and `pan done`. |
+| `work-deft.md` | `buildDeftWorkAgentPrompt` (`src/lib/deft/kickoff.ts`), which `buildWorkAgentPrompt` calls for an issue on Deft Directive's pipeline | Hands the issue to Deft's own build, pre-PR and review-cycle skills. Overdeck runs no review or test agents for these issues. |
+| `planning.md` | `buildPlanningPrompt` (`src/lib/planning/spawn-planning-session.ts`) | Discovery session: explore the codebase, ask questions through AskUserQuestion, write the PRD draft at `.pan/drafts/<ISSUE>.md`, `.overdeck/continue.json` and the xBRIEF at `.overdeck/spec.vbrief.json`, then run `pan plan finalize` to promote it to `.pan/specs/<ISSUE>.xbrief.json` in the plan home. Never implements code. |
+| `handoff-to-work.md` | `buildHandoffPrompt` (`src/lib/cloister/handoff-context.ts`) | Model-to-model handoff: wraps serialized git state, xBRIEF task state, `.overdeck/continue.json` state and summaries with a preamble saying who took over and why. |
 
-| Template | Used by | Purpose |
-|----------|---------|---------|
-| `work.md` | Work agent (`spawnSpecialist`, `buildWorkAgentPrompt`) | Implementation instructions: claim one xBRIEF item, implement it, commit and push, run `pan task done`, then continue through quality gates and finalization. |
-| `resume-work.md` | `buildResumePrompt` | Context-rich restart message sent when a stopped work agent resumes. Includes continue state, open xBRIEF items, pending feedback, and next-step instructions. |
-| `handoff-to-work.md` | `buildHandoffPrompt` | Model-to-model handoff: wraps serialized git state, xBRIEF item state, continue state, and summaries with a preamble explaining who took over and why. |
+### Templates without a caller
 
-### Planning agent templates
+| Template | Purpose |
+|----------|---------|
+| `review.md` | Strict code review, stale-branch check, status reporting through the API. Has smoke tests. |
+| `test.md` | Run all suites, compare against a baseline on main, smoke test containers, write the verdict artifact. |
+| `merge.md` | Unified merge template. `DO_PUSH`, `DO_BUILD` and `SKIP_DONE_REPORT` toggle between validation-only and full push, build and report flows. Has smoke tests. |
+| `uat-agent.md` | Browser-based user acceptance testing. |
+| `resume-work.md` | Restart message for a stopped work agent. |
+| `sync-main.md` | Resolve merge conflicts when syncing `origin/main` into a workspace branch. |
+| `identity-wake.md` | Short identity prompt that tells a newly started specialist its role. |
 
-Templates for the **planning agent**, the discovery-phase agent that converts a PRD or raw issue into an xBRIEF plan.
+### Prompts outside this loader
 
-| Template | Used by | Purpose |
-|----------|---------|---------|
-| `planning.md` | Planning agent (`buildPlanningPrompt`) | Discovery session: explore the codebase, ask questions through AskUserQuestion, write the legacy-compatible workspace draft named by `PAN_SPEC_FILENAME` plus `.pan/continue.json`, then run `pan plan finalize` to create the canonical `specs/*.xbrief.json`. Never implements code. |
+Not every prompt goes through `renderPrompt`:
 
-### Specialist agent templates
+- **Role definitions** live in `roles/<role>.md`. When a Claude Code agent
+  launches with a role file, Overdeck strips its frontmatter and passes the
+  body with `--append-system-prompt-file` (`roleSystemPromptInjection` in
+  `src/lib/agents/runtime-command.ts`).
+- **Review convoy sub-reviewers** (security, correctness, performance,
+  requirements) get `roles/review-<subRole>.md` inlined into their spawn
+  message by `buildConvoyPrompt` (`src/lib/cloister/review-convoy.ts`), so
+  the same text drives every harness.
+- **The review and test spawn messages** are built in TypeScript by
+  `buildReviewRolePrompt` (`src/lib/cloister/review-agent.ts`) and
+  `buildTestRolePrompt` (`src/lib/cloister/test-agent-queue.ts`).
 
-Templates for the **post-work pipeline specialists** (review → test → merge) that run automatically after a work agent signals completion.
-
-| Template | Used by | Purpose |
-|----------|---------|---------|
-| `review.md` | Review specialist (wake path) | Strict code review against xBRIEF acceptance criteria; pass/fail decision posted back to the dashboard. |
-| `test.md` | Test specialist (wake path) | Runs the project's test suite, compares against baseline, posts pass/fail with structured markers. |
-| `merge.md` | Merge specialist (wake path) and `spawnMergeAgentForBranches` (full push flow) | Unified merge template. `DO_PUSH`/`DO_BUILD`/`SKIP_DONE_REPORT` booleans toggle between validation-only and full push + build + report flows. |
-| `sync-main.md` | `syncMainIntoWorkspace` (via merge specialist) | Sync latest main into the workspace's feature branch; abort on conflict and hand back to work agent. |
-
-### Bootstrap templates
-
-Short templates used during specialist **initialization** — not part of any per-issue workflow.
-
-| Template | Used by | Purpose |
-|----------|---------|---------|
-| `identity-wake.md` | `initializeSpecialist` | Short identity prompt — tells a newly-initialized specialist who it is and to wait for tasks. |
+A pull request that changes a `roles/*.md` file needs a commit with a
+`Prompt-Change:` trailer (`scripts/check-prompt-change-trailer.sh`).
 
 ### Deleted (replaced by the loader)
 
-These files used to live under `prompts/` or were built inline by dead code.
-They no longer exist:
+These files used to live under `prompts/`. They no longer exist:
 
 - `inspect-agent.md` → the inspect verb and its inspect specialist were deleted in PAN-3917
 - `merge-agent.md` → replaced by `merge.md` with `DO_PUSH`/`DO_BUILD` flags
 - `review-agent.md` → replaced by `review.md`
 - `test-agent.md` → replaced by `test.md`
-- `uat-agent.md` → uat specialist was removed from the pipeline
-- `work-agent.md` → replaced by `work.md`
+- `work-agent.md` → renamed to `work.md`
 
 If you find references to any of those paths in comments, PRD docs, or old
 commits, they are stale.
@@ -380,13 +406,11 @@ One template wraps its output in HTML comments:
 <!-- overdeck:orchestration-context-end -->
 ```
 
-- `planning.md` — marks the orchestration-context block so that session
-  summarizers and the dashboard know which part of the planning prompt is
-  Overdeck setup vs. the agent's actual work.
+- `planning.md` wraps its whole body in these markers, with an HTML comment
+  that tells session summarizers to skip the block. No code in `src/` parses
+  the markers.
 
-Do **not** add these markers to new templates unless you have a specific
-dashboard-display reason and you've checked the code that consumes them. For
-the vast majority of prompts, unmarked Markdown is the right shape.
+Don't add these markers to new templates: no code reads them. Unmarked Markdown is the right shape.
 
 ## Composition pattern
 
@@ -395,32 +419,45 @@ TypeScript call site composes a multi-line Markdown string based on runtime
 state, and passes that string in as a single optional variable. The template
 then conditionally renders the block via a Mustache section.
 
-### Example: `resume-work.md`
+### Example: the `work.md` feedback block
 
 ```mustache
-{{#PENDING_FEEDBACK_BLOCK}}
-{{PENDING_FEEDBACK_BLOCK}}
-{{/PENDING_FEEDBACK_BLOCK}}
+{{#PENDING_FEEDBACK}}
+## Specialist Feedback (ACTION REQUIRED)
+
+Specialist agents have left feedback that you MUST address:
+
+{{PENDING_FEEDBACK}}
+...
+{{/PENDING_FEEDBACK}}
 ```
 
-And the call site:
+And the call site in `src/lib/cloister/work-agent-prompt.ts`, which lists
+the workspace's feedback files and returns an empty string when there are
+none:
 
 ```typescript
-const pendingFeedbackBlock = ctx.pendingFeedback.length > 0
-  ? `## Pending Feedback (ACTION REQUIRED)\n\nThese feedback files exist in \`.planning/feedback/\` — read and address them:\n${ctx.pendingFeedback.map(f => `- \`.planning/feedback/${f}\``).join('\n')}`
-  : '';
+async function readPendingFeedback(workspacePath: string): Promise<string> {
+  // ...collect feedbackFilePaths
+  if (feedbackFilePaths.length === 0) return '';
 
-return renderPrompt({
-  name: 'resume-work',
+  const lines: string[] = [];
+  lines.push(`**${feedbackFilePaths.length} feedback file(s):**`);
+  // ...one bullet per file, then a "read the latest first" line
+  return lines.join('\n');
+}
+
+return await Effect.runPromise(renderPrompt({
+  name: 'work',
   vars: {
     // ...
-    PENDING_FEEDBACK_BLOCK: pendingFeedbackBlock,
+    PENDING_FEEDBACK: pendingFeedbackStr,
     // ...
   },
-});
+}));
 ```
 
-When `pendingFeedbackBlock` is non-empty, the section renders; when it's
+When `pendingFeedbackStr` is non-empty, the section renders; when it's
 empty, the section disappears entirely. The template stays readable (no
 nested conditionals, no formatting logic) and the TypeScript stays honest
 about what the block looks like.
@@ -432,10 +469,10 @@ about what the block looks like.
   based on a boolean flag. The `merge.md` push/no-push toggles are a good
   example: the alternative paths are both long, both fully specified in the
   template, and both known at template-authoring time.
-- **Pre-built blocks** are right when the block's content is dynamic — it
-  joins a list, formats a table, runs git commands, reads STATE.md — and
+- **Pre-built blocks** are right when the block's content is dynamic: it
+  joins a list, formats a table, runs git commands, reads feedback files, and
   the template's job is just to decide whether to include it. The
-  resume-work feedback list is a good example: the TypeScript knows how to
+  `work.md` feedback list is a good example: the TypeScript knows how to
   format it, the template just needs to show or hide it.
 
 If you're torn, default to pre-built blocks. It's always easier to read a
@@ -449,10 +486,10 @@ into three categories:
 
 ### 1. Loader contract tests
 
-These test the loader itself against small inline fixture templates created
-in a temp directory: missing frontmatter, invalid YAML, missing `requires`,
+These test the loader itself against small fixture templates. Each test writes one as `__test-scratch__.md` in `src/lib/cloister/prompts/` and deletes it afterwards. They cover
+missing frontmatter, invalid YAML, missing `requires`,
 unknown vars, empty strings as `requires`, Mustache section rendering, etc.
-They exercise every error path in `renderPrompt` and every branch of the
+They cover the main error paths in `renderPrompt` and the
 frontmatter parser.
 
 ### 2. Live-template smoke tests
@@ -463,15 +500,15 @@ tests are a good example: four tests covering the push+build flow, the
 validation-only flow, the `SKIP_DONE_REPORT` branch, and the polyrepo
 header.
 
-Smoke tests are load-bearing — they catch cases where someone edits a
+Smoke tests are load-bearing: they catch cases where someone edits a
 template in a way that looks fine to Mustache but breaks a downstream
 specialist's expectations.
 
 ### 3. Caller-side tests
 
 Tests that verify TypeScript call sites pass the right variables, live
-alongside the calling module (e.g., `build-test-prompt.test.ts` for the
-test-specialist dispatch path). These catch the "call site got out of sync
+alongside the calling module (e.g., `work-agent-prompt-tests-mode.test.ts` for
+`buildWorkAgentPrompt`). These catch the "call site got out of sync
 with the frontmatter" class of bug.
 
 ### Writing a new smoke test
@@ -483,8 +520,8 @@ When you add a template, add at least one smoke test that:
 3. Asserts the presence / absence of conditional blocks for each branch the
    template can take.
 
-Keep the fixture `vars` small and local to the test — no shared state, no
-global setup. The loader is pure, so tests can be dead simple.
+Keep the fixture `vars` small and local to the test: no shared state, no
+global setup. The loader caches only the prompts directory, so tests can stay simple.
 
 ## Authoring workflow
 
@@ -498,19 +535,20 @@ global setup. The loader is pure, so tests can be dead simple.
    for optional sections.
 4. Add a caller in TypeScript:
    ```typescript
+   import { Effect } from 'effect';
    import { renderPrompt } from './prompts.js';
 
-   const prompt = renderPrompt({
+   const prompt = await Effect.runPromise(renderPrompt({
      name: '<name>',
      vars: { /* every required variable */ },
-   });
+   }));
    ```
 5. Add at least one smoke test in `prompts.test.ts`.
-6. Run `npx vitest run src/lib/cloister/__tests__/prompts.test.ts` and
-   `npx tsc --noEmit`.
-7. Run `npm run build` — the build pipeline copies `*.md` from
-   `src/lib/cloister/prompts/` to `dist/dashboard/prompts/`. If you skip
-   this step, the production dashboard will throw a `PromptError` at
+6. Run `npx vitest run src/lib/cloister/__tests__/prompts.test.ts`,
+   `npm run typecheck` and `npm run lint`.
+7. Run `npm run build`. The build pipeline copies `*.md` from
+   `src/lib/cloister/prompts/` to `dist/dashboard/prompts/`, `dist/prompts/` and `dist/cli/prompts/`. If you skip
+   this step, the built dashboard and CLI fail with a `PromptError` at
    runtime.
 
 ### Editing an existing template
@@ -519,11 +557,11 @@ global setup. The loader is pure, so tests can be dead simple.
    required variable, remove one, or change the meaning of an existing
    one? If yes, update every call site in the same commit.
 2. Update the frontmatter. Adding a new variable means adding it to
-   `requires` or `optional` — the loader will refuse to render until you
+   `requires` or `optional`. The loader refuses to render until you
    do.
 3. Update the body.
 4. Update or add smoke tests.
-5. Run typecheck + prompts tests.
+5. Run `npm run typecheck`, the prompts tests and `npm run lint:prompts` (it checks required and forbidden strings in `work.md`, `planning.md` and some `roles/*.md` files).
 
 ### Migrating a legacy ad-hoc prompt
 
@@ -545,8 +583,8 @@ migration path is:
 
 The typical commit layout is: template + loader call + tests + deletion
 of the old code, all in one PR. The loader's fail-loud validation makes
-it very hard to leave a half-migrated path in place — either the call
-site works or it throws.
+it very hard to leave a half-migrated path in place: either the call
+site works or it fails.
 
 ## Troubleshooting
 
@@ -558,7 +596,7 @@ Provided: ISSUE_ID, SOURCE_BRANCH, PROJECT_PATH, DO_PUSH, DO_BUILD, API_URL
 ```
 
 The call site isn't passing a variable the template declares as required.
-Fix the call site — don't "fix" the template by moving the variable to
+Fix the call site. Don't "fix" the template by moving the variable to
 `optional`, unless the template genuinely works with it absent.
 
 ### "was passed unknown variables"
@@ -594,38 +632,40 @@ Three likely causes:
    is `work.md`.
 2. **Missing build copy.** You edited or added a template but didn't run
    `npm run build`, so `dist/dashboard/prompts/` is stale. Rebuild.
-3. **Wrong working directory.** The dashboard server resolves prompts
-   relative to `dist/dashboard/` — if you're running a script from some
-   other location and it imports the loader, double-check that the
-   `prompts/` directory actually exists where the loader expects it.
+3. **No `prompts/` next to the bundle.** The loader resolves `prompts/`
+   relative to its own module directory (`__dirname`), not the working
+   directory. If a script bundles the loader somewhere else, check that a
+   `prompts/` directory sits next to that bundle.
 
-### A template renders the literal `{{VAR}}` instead of a value
+### A variable renders as an empty string
 
-Mustache left the variable in place because nothing in `vars` matched that
-name. The loader would normally throw an "unknown variables" error if the
-variable was passed but undeclared — if you're seeing literal braces in the
-output, the variable isn't being passed at all *and* the template doesn't
-list it in `requires`.
+Mustache renders a variable that isn't in `vars` as an empty string, with no
+error. The loader only rejects keys that are passed but undeclared, and
+required keys that are missing. It never scans the body, so a `{{VAR}}` that
+the frontmatter doesn't list renders empty when the call site doesn't pass
+it.
 
-Either add the variable to `requires` (to force the call site to provide
-it) or fix the call site to pass it.
+Declare the variable in the frontmatter (`requires` if the content must be
+there, `optional` if it may be left out) and pass it from the call site.
+Passing it without declaring it fails with "was passed unknown variables".
 
 ### A Mustache section renders when it shouldn't
 
 Check whether the value you're passing is actually falsy by Mustache's
 rules. Empty string: falsy. `0`: falsy. `false`: falsy. `null` /
-`undefined`: falsy. An empty array: falsy. An empty object: **truthy** —
+`undefined`: falsy. An empty array: falsy. An empty object: **truthy**, so
 the section will render. This trips people up when they pass
 `{ some: 'object' }` expecting the section to hide.
 
 If you want a section to hide on "nothing to say", pass an empty string,
 not an empty object.
 
+Still stuck? Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a [GitHub Issue](https://github.com/eltmon/overdeck/issues).
+
 ## Further reading
 
-- **Implementation:** [`src/lib/cloister/prompts.ts`](https://github.com/eltmon/overdeck/blob/main/src/lib/cloister/prompts.ts) — the full loader (~180 lines).
-- **Templates:** [`src/lib/cloister/prompts/`](https://github.com/eltmon/overdeck/tree/main/src/lib/cloister/prompts) — the current catalogue.
-- **Tests:** [`src/lib/cloister/__tests__/prompts.test.ts`](https://github.com/eltmon/overdeck/blob/main/src/lib/cloister/__tests__/prompts.test.ts) — loader contract tests + live smoke tests.
-- **Build pipeline:** [`docs/BUILD.md`](https://github.com/eltmon/overdeck/blob/main/docs/BUILD.md#specialist-prompt-templates) — how templates are copied into the bundled dashboard.
-- **Specialist pipeline:** [`docs/SPECIALIST_WORKFLOW.md`](https://github.com/eltmon/overdeck/blob/main/docs/SPECIALIST_WORKFLOW.md) — where each template sits in the lifecycle (work → review → test → merge).
-- **Mustache.js:** [github.com/janl/mustache.js](https://github.com/janl/mustache.js) — canonical reference for section syntax, context fall-through, and the set of things we deliberately don't use.
+- **Implementation:** [`src/lib/cloister/prompts.ts`](https://github.com/eltmon/overdeck/blob/main/src/lib/cloister/prompts.ts): the full loader (~180 lines).
+- **Templates:** [`src/lib/cloister/prompts/`](https://github.com/eltmon/overdeck/tree/main/src/lib/cloister/prompts): the current catalogue.
+- **Tests:** [`src/lib/cloister/__tests__/prompts.test.ts`](https://github.com/eltmon/overdeck/blob/main/src/lib/cloister/__tests__/prompts.test.ts): loader contract tests + live smoke tests.
+- **Build pipeline:** [`docs/BUILD.md`](https://github.com/eltmon/overdeck/blob/main/docs/BUILD.md#specialist-prompt-templates): how templates are copied into the bundled dashboard.
+- **Mustache.js:** [github.com/janl/mustache.js](https://github.com/janl/mustache.js): canonical reference for section syntax, context fall-through, and the set of things we deliberately don't use.

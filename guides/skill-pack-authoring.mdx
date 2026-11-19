@@ -9,17 +9,19 @@ A skill pack is a plain git repository. Overdeck reads it, trusts one
 commit, and mounts the skills it finds into Overdeck-managed Claude Code
 and Codex launches. This guide covers what makes a repository readable as
 a pack, so you can author one and publish it for others to add with
-`pan skills pack add`. For the operator-facing feature — the quickstart,
-the pack catalog, and the trust model — see [Skill Packs](/features/skill-packs).
+`pan skills pack add`. For the operator-facing feature (the quickstart,
+the pack catalog, and the trust model), see [Skill Packs](/features/skill-packs).
 For every config key, see the [Skill settings reference](/configuration/skills).
 
 ## What Overdeck reads
 
-Overdeck mounts skill directories only. Nothing else in your repository
+Overdeck mounts skill directories. A `claude-plugin` pack can also declare
+remote MCP servers, which apply only after you confirm them (see
+[MCP servers](#mcp-servers) below). Nothing else in your repository
 reaches the agent: see [What is not
 applied](/features/skill-packs#what-is-not-applied) for the full list
-(hooks, MCP servers, commands, agents, context injection, git hooks, and
-more).
+(hooks, other MCP servers, commands, agents, context injection, git hooks,
+and more).
 
 ## Two layouts
 
@@ -36,7 +38,7 @@ my-pack/
 ```
 
 Overdeck scans `skills/` (or `KnownPack.skillsRoot` for a known pack), up
-to four directory levels deep — the deepest skill it can find is
+to four directory levels deep: the deepest skill it can find is
 `skills/a/b/c/d/SKILL.md`. A skill is a directory with a regular-file
 `SKILL.md`. The walk does not descend into a skill once it finds one, so a
 skill nested inside another skill is never found. Symlinked directories
@@ -53,10 +55,10 @@ my-pack/
 A regular file at `.claude-plugin/plugin.json` makes the repository a
 `claude-plugin` pack. Its `skills` field controls what gets scanned:
 
-- **Absent, or any other type** — scan `skills/`, with the same four-level
+- **Absent, or any other type**: scan `skills/`, with the same four-level
   rule as a plain repository.
-- **A string** — scan from that path instead, with the same rule.
-- **An array** — each string names one skill directory, with no scanning
+- **A string**: scan from that path instead, with the same rule.
+- **An array**: each string names one skill directory, with no scanning
   at all. An entry that is not a string, does not exist, or escapes the
   plugin root is dropped silently. An entry with no `SKILL.md` is dropped
   too.
@@ -64,15 +66,15 @@ A regular file at `.claude-plugin/plugin.json` makes the repository a
 Paths resolve against the plugin root. Absolute paths, `.`, `..`, and
 paths that start `../` are rejected. An invalid `plugin.json` makes the
 whole pack fail to read, with the error `invalid .claude-plugin/plugin.json: …`;
-the `plain` adapter ignores a bad `plugin.json` instead, because it never
-reads one. The mounted plugin is named after the pack id you chose at
+the `plain` adapter skips a bad `plugin.json` instead of failing.
+The mounted plugin is named after the pack id you chose at
 `pan skills pack add`, never after `plugin.json`'s own `name` field.
 
 ### Detection order
 
 Overdeck picks the adapter in this order: the `--adapter` flag or a
 registry value you set explicitly, then the pack's `KnownPack` default (if
-it is a known pack), then detection — `claude-plugin` when
+it is a known pack), then detection: `claude-plugin` when
 `.claude-plugin/plugin.json` exists as a regular file, otherwise `plain`.
 Detection never fails; an empty repository is a valid, empty `plain` pack.
 
@@ -88,10 +90,10 @@ The skill's name is the frontmatter `name:`, or the leaf directory name
 when `name:` is absent. The name must match `^[a-z0-9][a-z0-9-]*$`.
 
 <Warning>
-A name that fails that pattern is dropped silently — Overdeck does not
+A name that fails that pattern is dropped silently. Overdeck does not
 fall back to the directory name. `name: My Skill` in `my-skill/SKILL.md`
 drops the skill entirely. A duplicate name is also dropped silently (the
-first one in sorted order wins). Neither case shows up in the `pan skills
+first one found wins, in sorted scan order or in `skills` array order). Neither case shows up in the `pan skills
 pack add` preview, so check your names before you publish.
 </Warning>
 
@@ -101,30 +103,52 @@ under the scan root, and no skill nested inside another skill.
 ## License
 
 Overdeck looks for a license in this order: the `plugin.json` `license`
-string, as written, when one is set; otherwise the first non-blank line of
+string, trimmed, when one is set; otherwise the first non-blank line of
 `LICENSE` at the plugin root, or of `LICENSE.md` when `LICENSE` is absent
-or blank. It checks that line for one of four case-sensitive tokens —
-`MIT`, `Apache`, `BSD`, `GPL` — and stores only the matching token. With
-no match (including an unmatched `LICENSE` whose first line names no
-token), the `pan skills pack add` preview shows `License unknown` — it
-does not fall through to `LICENSE.md` in that case. `LICENSE.txt` and
-`COPYING` are not read.
+or blank. On that line it first looks for a GNU license title, ignoring
+case: `GNU AFFERO GENERAL PUBLIC LICENSE` is stored as `AGPL-3.0`,
+`GNU LESSER GENERAL PUBLIC LICENSE` as `LGPL`, and
+`GNU GENERAL PUBLIC LICENSE` as `GPL`. Otherwise it checks for one of
+four case-sensitive tokens, `MIT`, `Apache`, `BSD`, `GPL`, in that order,
+and stores only the first match. With no match (including an unmatched
+`LICENSE` whose first line names none of them), the `pan skills pack add`
+preview shows `License unknown`; it does not fall through to `LICENSE.md`
+in that case. `LICENSE.txt` and `COPYING` are not read.
 
 Recommend either a `license` string in `plugin.json`, or a `LICENSE` whose
-first line contains one of the four tokens.
+first line contains one of the four tokens or a GNU license title.
+
+## MCP servers
+
+Only a `claude-plugin` pack can bring MCP servers. Overdeck reads them from
+the `mcpServers` field of `plugin.json` (an object of servers, or a path to
+a JSON file with an `mcpServers` key), or from `.mcp.json` at the plugin
+root when `plugin.json` has no `mcpServers` field. It applies an entry only
+when it has `type: "http"`, a `url` starting `https://`, a name matching
+`^[A-Za-z0-9_-]+$` other than `overdeck`, and string header values, with
+no `${...}` reference in the url or any header. The preview lists applied
+servers on an `MCP servers` row; when any other entry is declared, the
+**Not applied** row says `MCP servers`. Applied servers reach Claude Code
+and Codex launches only after the operator confirms that preview. See
+[Pack MCP servers](/configuration/mcp#pack-mcp-servers) for consent, name
+clashes and auth.
 
 ## What is copied and what is not
 
-Every symlink, at any depth, is left out of the mount — the mount's copy
-filter skips anything `lstat` reports as a symbolic link. Every other file
-is copied as is, including hidden files, with no size limit. Scripts
-inside a skill directory are copied with it, so the agent can still run
-them; Overdeck itself never runs them (except for a runtime pack like
-gstack, which is not a layout you can get from a plain repository or a
-plugin — see [What is not
+Overdeck extracts the trusted commit with `git archive`, so Git LFS content
+is never fetched: an LFS file arrives as its small pointer file, and the
+preview counts these under **Not applied** as `LFS objects (N)`. Every
+symlink, at any depth, is left out of the mount: the mount's copy filter
+skips anything `lstat` reports as a symbolic link. Every other file in a
+skill directory is copied as is, including hidden files, with no size
+limit. Scripts inside a skill directory are copied with it, so the agent
+can still run them; Overdeck itself never runs them (except for a runtime
+pack like gstack, which is not a layout you can get from a plain
+repository or a plugin). See [What is not
 applied](/features/skill-packs#what-is-not-applied) for the full table of
-things that do not reach the agent: hooks, MCP servers, commands, agents,
-context injection, git hooks, executables, and project-mutating skills).
+things that do not reach the agent: hooks, MCP servers other than a
+plugin's remote https servers, commands, agents, context injection, git
+hooks, executables, and project-mutating skills.
 
 ## What a custom pack cannot declare
 
@@ -132,8 +156,8 @@ A custom pack (any pack id not in Overdeck's `KNOWN_PACKS`) can set only
 its adapter. Everything else is fixed:
 
 - **No opt-in skills.** Every skill in a custom pack turns on with the
-  pack's toggle. Opt-in skills — ones the pack toggle never turns on by
-  itself — are a `KNOWN_PACKS`-only option.
+  pack's toggle. Opt-in skills (ones the pack toggle never turns on by
+  itself) are a `KNOWN_PACKS`-only option.
 - **Plugin at the repo root.** A custom pack's plugin root is always the
   repository root.
 - **Scan root is always `skills/`.** A custom pack cannot point the plain
@@ -142,7 +166,7 @@ its adapter. Everything else is fixed:
   known pack can default one or both.
 
 If you want opt-in skills, a non-root plugin, or a different scan root for
-your pack, it needs a `KNOWN_PACKS` entry in Overdeck's own source — see
+your pack, it needs a `KNOWN_PACKS` entry in Overdeck's own source; see
 the developer guide, `docs/SKILL-PACKS.md`, for how that works. A pack
 registered under a known id inherits that id's options even when you pass
 a different url.
@@ -151,8 +175,8 @@ a different url.
 
 | Harness | Receives the pack? |
 | --- | --- |
-| Claude Code | Yes — as `--plugin-dir` pointing into the mount, on local launches. |
-| Codex | Yes — a local `overdeck-packs` plugin marketplace block in `$CODEX_HOME/config.toml`, on local launches. |
+| Claude Code | Yes, as `--plugin-dir` pointing into the mount, on local launches. |
+| Codex | Yes, a local `overdeck-packs` plugin marketplace block in `$CODEX_HOME/config.toml`, on local launches. |
 | Pi | No. Pi accepts `pan handoff --pack`/`--skill` and the dialog's Skills choices without a warning, and stores them on the conversation row, but a Pi launch never reads or applies them. |
 | Remote (Fly) launches | No, for any harness. |
 

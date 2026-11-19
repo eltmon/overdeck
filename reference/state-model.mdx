@@ -1,11 +1,12 @@
 ---
-title: State Model
-description: Where Overdeck keeps state, what is durable, and why the local database is a disposable cache.
+title: "Overdeck state model: where state lives"
+sidebarTitle: "State Model"
+description: "Where Overdeck keeps state: git, the tracker, the pull request and the terminal backend, plus what the local database holds."
 ---
 
 # State Model
 
-Overdeck keeps **almost no irreplaceable state of its own**. The durable record of your work lives in systems that already exist for their own reasons (**GitHub and git**), and the local database is a **derived cache**: a fast view over those sources that holds nothing which can't be rebuilt from them.
+Overdeck keeps **almost no irreplaceable state of its own**. The durable record of your work lives in systems that already exist for their own reasons (**GitHub and git**), and the local database is a **derived cache**: a fast view over those sources that holds almost nothing which can't be rebuilt from them.
 
 If you remember one thing from this page: **the database is a cache, not a source of truth.**
 
@@ -17,7 +18,7 @@ Everything Overdeck needs, to show you a board, run the pipeline, or recover aft
 | --- | --- | --- |
 | **GitHub Issues** | What work exists and its lifecycle (todo / in&nbsp;progress / done) | github.com |
 | **Git repo & workspaces** | The plan, the code, the feature branch, the PR, planning artifacts under `.pan/`, task state | Your repo + `origin` |
-| **Agent transcripts** | The conversation history to resume an agent mid-task | On disk, per harness (kept while work is active) |
+| **Agent transcripts** | The conversation history to resume an agent mid-task | On disk, per harness; Overdeck's close-out keeps them |
 | **Terminal backend** | Which agents are alive *right now*, answered by `src/lib/agents/liveness.ts` (session, live pane, and harness process in the pane) | The selected backend's server: Herdr by default, tmux with `terminal.backend: tmux` |
 
 ## The local database is a cache
@@ -27,10 +28,10 @@ Overdeck uses a local SQLite database (`~/.overdeck/overdeck.db`) for two jobs:
 1. **A uniform read/write API** for the dashboard, the deacon, and the CLI, so every component talks to state the same way instead of each parsing files.
 2. **A materialized view of the pipeline**, so the board renders instantly instead of re-scanning every workspace on each page load.
 
-Both are **performance conveniences.** The database stores nothing that cannot be recomputed from the sources of truth above.
+Both are **performance conveniences.** Apart from the few rows marked *database only* in [What lives where](#what-lives-where), the database stores nothing that cannot be recomputed from the sources of truth above.
 
 <Note>
-**The design principle:** the database holds no state that isn't derivable from GitHub + your workspaces. It is a cache in front of those sources, not a system of record, which is what keeps recovery and cross-machine work straightforward. The durable record of your work lives in git, not in a local file you have to back up.
+**The design principle:** the database holds no pipeline state that isn't derivable from GitHub + your workspaces. It is a cache in front of those sources, not a system of record, which is what keeps recovery and cross-machine work straightforward. The durable record of your work lives in git, not in a local file you have to back up.
 </Note>
 
 ## The pipeline is derived, not stored
@@ -39,7 +40,7 @@ An issue's pipeline phase is a **function of GitHub + its workspace**, not a val
 
 | Workspace / GitHub state | Phase |
 | --- | --- |
-| Feature branch + open tasks, no PR | **Work** |
+| No PR for the feature branch yet | **Work** |
 | PR open, not approved | **Review** |
 | PR approved | **Merge** |
 | Issue closed on GitHub | **Done** |
@@ -58,13 +59,15 @@ Overdeck computes this view by walking the workspaces and reading GitHub, then c
 | Order books, notes, backlog sequence | git: `.pan/orders/`, `.pan/notes/`, `.pan/backlog/` on `main` in the plan home | - |
 | Review verdicts | the pull request (a PR review) | - |
 | Pipeline journal (what happened, in order) | `.overdeck/pipeline.jsonl` in the issue's workspace, append-only | - |
-| Conversation transcripts | on disk, per harness (while active) | indexed |
+| Conversation transcripts | on disk, per harness | indexed |
 | Cost | derived from transcripts | ✅ cached |
 | Live activity (who's thinking) | ephemeral | cache only |
 | Retry counters, merge-queue position | ephemeral bookkeeping | cache only (safe to lose) |
-| Pinned document selections, workspace origin | database only | cache only (no other copy) |
+| Pinned document selections, workspace origin, conversation bookmarks and schedules | database only | cache only (no other copy) |
+| Conversation triage: settled and snoozed status, per-conversation auto-settle overrides, idle-reset markers | database only | cache only (no other copy) |
+| Dashboard switches: Merge Train batch size and wait, Conversations auto-settle, Flywheel switches | database only (`app_settings`) | cache only (no other copy) |
 
-Most of what a database loss wipes out are **ephemeral counters**: retry counts, queue positions. They gate loop-prevention, not your work; on a rebuild they reset, and the worst case is an agent gets a fresh set of attempts. Pinned document selections and a workspace's recorded origin (pipeline, operator, or vault) are the exception: they live only in the database, with no other copy to rebuild from, so a database loss drops them for good.
+Most of what a database loss wipes out are **ephemeral counters**: retry counts, queue positions. They gate loop-prevention, not your work; on a rebuild they reset, and the worst case is an agent gets a fresh set of attempts. The **database only** rows are the exception: pinned document selections, a workspace's recorded origin (pipeline, operator, vault or agent), conversation bookmarks and schedules, conversation triage state (settled and snoozed status, per-conversation auto-settle overrides and idle-reset markers), and the dashboard switches kept in `app_settings` have no other copy to rebuild from, so a database loss drops them for good.
 
 ## Planning artifacts under `.pan/`
 
@@ -79,11 +82,11 @@ Overdeck commits planning files to your project repo under `.pan/`. For a polyre
 | `.pan/notes/` | Operator notes and briefs | `main` |
 | `.pan/backlog/sequence.md` | The ranked backlog | `main` |
 
-A workspace also keeps runtime files under `.overdeck/`, such as `continue.json` and the pipeline journal `pipeline.jsonl`. Git ignores those runtime files.
+A workspace also keeps runtime files under `.overdeck/`, such as `continue.json` and the pipeline journal `pipeline.jsonl`. These are runtime files, not plan state, so don't commit them. Overdeck adds `.overdeck/` to a polyrepo workspace's `.gitignore`, but not to a single repo's.
 
 ## The retired `overdeck-state` branch
 
-Before v0.60.0, Overdeck kept pipeline state on a separate `overdeck-state` branch, checked out in a state worktree under `~/.overdeck/state/`. Overdeck no longer reads or writes that branch. Open issues' plans were copied into `.pan/` once, and the branch was archived with the tag `state-final`. Keep the branch: it is the history of closed issues' plans.
+Before v0.60.0, Overdeck kept pipeline state on a separate `overdeck-state` branch, checked out in a state worktree under `~/.overdeck/state/`. Overdeck no longer reads or writes that branch. `pan admin migrate-plan-home <project-key>` copies open issues' plans from the state worktree into `.pan/`. Keep the branch: it is the history of closed issues' plans.
 
 ## Search indexes are the exception
 
@@ -92,11 +95,11 @@ Overdeck also keeps **search indexes** in SQLite: full-text and semantic search 
 ## The rules that keep this true
 
 - **No stored pipeline status.** Where an issue stands is read live from git, the tracker, the pull request and the terminal backend. `npm run lint:no-state-layer` fails CI if code brings back the deleted record store.
-- **The database is reconstructable.** A rebuild path walks every workspace + GitHub and repopulates the cache from scratch.
+- **Derived state is recomputed.** `pan admin db rebuild` walks every workspace and GitHub, then recomputes in-flight issue and agent state in memory and prints the counts. It does not write rebuilt state back to the database; the dashboard derives that state from the same sources when it reads it.
 - **Review verdicts live on the pull request** as PR reviews, so they travel with the PR and survive a database loss.
 
 ## Why it matters
 
-- **Recovery is trivial.** Lost database, corrupted file, fresh machine: `git clone`, start Overdeck, and the board rebuilds. No backups to restore, no event logs to replay.
+- **Recovery is trivial.** Lost database, corrupted file, fresh machine: `git clone`, start Overdeck, and the board rebuilds. No event logs to replay; a lost database drops only the *database only* rows above.
 - **Work is portable.** Because the durable record travels in git, another machine, or another engineer, can pull a branch and continue exactly where the last agent left off.
-- **The system is simple to reason about.** Every piece of state has a clear home: if it isn't derivable from GitHub + the workspaces, it lives in git under `.pan/` or on the pull request, never only in the local cache.
+- **The system is simple to reason about.** Every piece of state has a clear home: if it isn't derivable from GitHub + the workspaces, it lives in git under `.pan/`, on the pull request, or in one of the *database only* rows listed above.

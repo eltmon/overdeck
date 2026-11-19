@@ -17,22 +17,16 @@ Overdeck uses Docker for isolated development environments and Traefik as a reve
 
 - Docker Desktop (macOS/Windows) or Docker Engine (Linux)
 - Docker Compose v2.x
-- `mkcert` for local certificate generation
+- `mkcert` for local certificates (`pan install` installs it if it's missing)
 
 ## Quick Setup
 
 ```bash
-# Install mkcert
-brew install mkcert  # macOS
-# or: sudo apt install mkcert  # Ubuntu/Debian
-
-# Install the local CA
-mkcert -install
-
-# Run Overdeck's setup
-pan install
-pan doctor  # Verify setup
+pan install  # Docker network, mkcert, local CA, certificates and ~/.overdeck/traefik/
+pan doctor   # Verify setup
 ```
+
+`pan install` installs mkcert when it's missing (Homebrew on macOS, a download to `~/.local/bin` on Linux), runs `mkcert -install`, creates the `overdeck` Docker network and writes `~/.overdeck/traefik/`. `--minimal` skips Traefik and mkcert, `--skip-mkcert` skips only the certificates, and `--skip-docker` skips the network.
 
 ## Traefik Configuration
 
@@ -40,12 +34,14 @@ Overdeck manages Traefik configuration in `~/.overdeck/traefik/`:
 
 ```
 ~/.overdeck/traefik/
+├── docker-compose.yml    # Traefik container (traefik:latest, named overdeck-traefik)
 ├── traefik.yml           # Static configuration
-├── dynamic/              # Dynamic route configs (per-workspace)
-│   └── feature-min-123.yml
-└── certs/                # TLS certificates
-    ├── localhost.pem
-    └── localhost-key.pem
+├── dynamic/              # File provider configs
+│   ├── overdeck.yml      # Dashboard routes
+│   └── tls.yml           # Every certificate in certs/
+└── certs/                # mkcert certificates
+    ├── _wildcard.overdeck.localhost.pem
+    └── _wildcard.overdeck.localhost-key.pem
 ```
 
 ### Port Binding
@@ -80,154 +76,129 @@ entryPoints:
           scheme: https
   websecure:
     address: ":443"
+    http:
+      tls: {}
 
 providers:
-  docker:
-    watch: true
-    exposedByDefault: false
   file:
     directory: /etc/traefik/dynamic
     watch: true
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: overdeck
 
-tls:
-  stores:
-    default:
-      defaultCertificate:
-        certFile: /certs/localhost.pem
-        keyFile: /certs/localhost-key.pem
+log:
+  level: INFO
+  format: common
+
+accessLog:
+  format: common
 ```
+
+Certificates aren't in this file: Traefik v3 reads them from `dynamic/tls.yml`. `pan install` copies `traefik.yml` and `docker-compose.yml` only when `~/.overdeck/traefik/docker-compose.yml` doesn't exist yet, so your edits to them are kept.
 
 ### Dynamic Configuration
 
-Each workspace gets a dynamic config file. Example for `feature-min-123`:
-
-```yaml
-http:
-  routers:
-    feature-min-123-frontend:
-      rule: "Host(`feature-min-123.localhost`)"
-      service: feature-min-123-frontend
-      entryPoints:
-        - websecure
-      tls: {}
-
-    feature-min-123-api:
-      rule: "Host(`api-feature-min-123.localhost`)"
-      service: feature-min-123-api
-      entryPoints:
-        - websecure
-      tls: {}
-
-  services:
-    feature-min-123-frontend:
-      loadBalancer:
-        servers:
-          - url: "http://feature-min-123-frontend:3000"
-
-    feature-min-123-api:
-      loadBalancer:
-        servers:
-          - url: "http://feature-min-123-api:8080"
-```
+Overdeck writes two files in `dynamic/`. `overdeck.yml` routes `https://overdeck.localhost` (the `traefik.domain` value in `~/.overdeck/config.toml`) to the dashboard, and `tls.yml` lists every certificate and key pair in `certs/`. `pan install`, `pan up` and `pan dev` regenerate both. Overdeck doesn't write a dynamic file per workspace: route workspace containers with Docker labels, as in the [Docker Compose Template](#docker-compose-template) below. Traefik also picks up any file you add to `dynamic/` yourself.
 
 ## Certificate Generation
 
-### Using mkcert
+`pan install` writes `_wildcard.overdeck.localhost.pem` and its key to `~/.overdeck/traefik/certs/`. The certificate covers `overdeck.localhost`, `*.overdeck.localhost`, `*.localhost`, `localhost`, `127.0.0.1` and `::1`. `pan install`, `pan up` and `pan dev` also create `_wildcard.<domain>.pem` for each project whose `workspace.dns.domain` is set and has no certificate yet, then rewrite `dynamic/tls.yml`. You don't need to run mkcert yourself.
+
+To add a certificate by hand, write the pair into the same folder with the key named `<name>-key.pem`. The next `pan up` adds it to `tls.yml`:
 
 ```bash
-# Generate certificates for localhost domains
 cd ~/.overdeck/traefik/certs
-mkcert localhost "*.localhost" 127.0.0.1 ::1
-
-# Rename to expected names
-mv localhost+3.pem localhost.pem
-mv localhost+3-key.pem localhost-key.pem
-```
-
-### For Custom Domains
-
-If using custom domains like `myapp.test`:
-
-```bash
-# Generate certificates for custom domain
-mkcert myapp.test "*.myapp.test"
+mkcert -cert-file _wildcard.myapp.test.pem -key-file _wildcard.myapp.test-key.pem myapp.test "*.myapp.test"
 ```
 
 ## DNS Configuration
 
 ### Option 1: .localhost (Recommended)
 
-Modern browsers resolve `*.localhost` to `127.0.0.1` automatically. No DNS config needed.
-
-```yaml
-# In projects.yaml
-dns:
-  domain: localhost
-  entries:
-    - "{{FEATURE_FOLDER}}.localhost"
-    - "api-{{FEATURE_FOLDER}}.localhost"
-```
+Modern browsers resolve `*.localhost` to `127.0.0.1` automatically, so `.localhost` hostnames need no `workspace.dns` block. Without one, templates get `{{DOMAIN}}` set to `localhost`.
 
 ### Option 2: /etc/hosts
 
-For custom domains, add entries to `/etc/hosts`:
+For a custom domain, add a `workspace.dns` block to the project in `~/.overdeck/projects.yaml`:
+
+```yaml
+projects:
+  myapp:
+    workspace:
+      dns:
+        domain: myapp.test
+        entries:
+          - "{{FEATURE_FOLDER}}.{{DOMAIN}}"
+          - "api-{{FEATURE_FOLDER}}.{{DOMAIN}}"
+        sync_method: hosts_file
+```
+
+When it creates a workspace, Overdeck adds each entry as a `127.0.0.1` line inside a `# BEGIN overdeck managed entries` block in `/etc/hosts`, and removes it when the workspace is removed. The Overdeck process must be able to write `/etc/hosts`. If it can't, the entry is skipped without an error, so add the lines by hand:
 
 ```bash
-# Add manually or let Overdeck manage it
 127.0.0.1 feature-min-123.myapp.test
 127.0.0.1 api-feature-min-123.myapp.test
 ```
 
+`sync_method: dnsmasq` writes `address=/<host>/127.0.0.1` lines to `overdeck.conf` in `/etc/dnsmasq.d` (Homebrew's `etc/dnsmasq.d` on macOS) instead. When `sync_method` is unset, Overdeck uses `wsl2hosts`.
+
 ### Option 3: WSL2 Hosts Sync (Windows)
 
-For WSL2, use the `wsl2hosts` sync method:
+For WSL2, use the `wsl2hosts` sync method (also the default when `sync_method` is unset):
 
 ```yaml
 dns:
   sync_method: wsl2hosts
 ```
 
-This syncs entries between WSL2's `/etc/hosts` and Windows' hosts file.
+Overdeck appends each hostname to `~/.wsl2hosts` and starts the Windows scheduled task `OverdeckWsl2HostsSync`, which copies the entries into the Windows hosts file. Register that task once, from an Administrator PowerShell, with the scripts in [`infra/wsl2hosts`](https://github.com/eltmon/overdeck/tree/main/infra/wsl2hosts).
 
 ## Starting Traefik
 
-### Via Dashboard
+### With pan up
 
-The dashboard starts Traefik automatically when you run `pan up`:
+`pan up` starts Traefik when `traefik.enabled` is true in `~/.overdeck/config.toml`. `pan install` sets it unless you pass `--minimal`, and `pan up --skip-traefik` skips the start:
 
 ```bash
 pan up
 # Traefik available at http://localhost:8080 (dashboard)
-# HTTPS routing at https://*.localhost
+# Dashboard at https://overdeck.localhost
 ```
 
 ### Manually
 
 ```bash
-# Start Traefik container
-docker run -d \
-  --name overdeck-traefik \
-  --network overdeck \
-  -p 80:80 -p 443:443 -p 8080:8080 \
-  -v /var/run/docker.sock:/var/run/docker.sock:ro \
-  -v ~/.overdeck/traefik:/etc/traefik:ro \
-  -v ~/.overdeck/traefik/certs:/certs:ro \
-  traefik:v2.10
+cd ~/.overdeck/traefik
+docker compose up -d
 ```
+
+`pan restart --traefik` recreates the container with the current compose file.
 
 ## Workspace Container Setup
 
 ### Docker Compose Template
+
+Point `workspace.docker.compose_template` in `~/.overdeck/projects.yaml` at a template folder in your project. When Overdeck creates a workspace, it renders every `*.template` file in that folder into `<workspace>/.devcontainer/` (replacing placeholders such as `{{FEATURE_FOLDER}}`) and copies the other files as they are. It starts the stack only when asked, for example with `pan workspace create <issueId> --docker`. Re-render with `pan workspace render-devcontainer <featureName>`, or tear down, re-render and restart one stack with `pan workspace rebuild <issueId>`.
+
+```yaml
+projects:
+  myapp:
+    workspace:
+      docker:
+        compose_template: infra/.devcontainer-template
+```
 
 ```yaml
 # infra/.devcontainer-template/docker-compose.yml.template
 services:
   frontend:
     build:
-      context: ./fe
+      context: ../fe
       dockerfile: Dockerfile
     volumes:
-      - ./fe:/app
+      - ../fe:/app
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.{{FEATURE_FOLDER}}-fe.rule=Host(`{{FEATURE_FOLDER}}.localhost`)"
@@ -239,10 +210,10 @@ services:
 
   api:
     build:
-      context: ./api
+      context: ../api
       dockerfile: Dockerfile
     volumes:
-      - ./api:/app
+      - ../api:/app
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.{{FEATURE_FOLDER}}-api.rule=Host(`api-{{FEATURE_FOLDER}}.localhost`)"
@@ -259,7 +230,7 @@ networks:
 
 ### Network Setup
 
-Create the shared Overdeck network:
+`pan install` creates the shared `overdeck` network. To create it by hand:
 
 ```bash
 docker network create overdeck
@@ -325,6 +296,8 @@ lsof -i :443
 
 See [Troubleshooting](/reference/troubleshooting#wsl2-stability-issues-windows-users) for WSL2-specific networking and performance issues.
 
+Still stuck? Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a [GitHub Issue](https://github.com/eltmon/overdeck/issues).
+
 ## Best Practices
 
 ### Resource Management
@@ -342,7 +315,7 @@ See [Troubleshooting](/reference/troubleshooting#wsl2-stability-issues-windows-u
 ### Performance
 
 - **Use Docker volumes for node_modules** - Avoid mounting from host
-- **Adjust Vite polling interval** - See [Troubleshooting](/reference/troubleshooting#slow-vitereact-frontend-with-multiple-workspaces)
+- **Adjust Vite polling interval**: see [Troubleshooting](/reference/troubleshooting#slow-vite-and-react-frontend-with-multiple-workspaces)
 - **Monitor container resources** - Use `docker stats`
 
 ## Related Guides

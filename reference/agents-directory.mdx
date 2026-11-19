@@ -1,17 +1,17 @@
 ---
-title: Agents page
+title: "Agents Page and Agents Directory"
+sidebarTitle: "Agents page"
 description: See what is running, what needs you and what is waiting at /agents; browse finished agents in History
 ---
 
 # Agents page
 
-Open `/agents` to see what your agents are doing right now. The **Live** view
+Open `/agents` (experimental: turn on Settings → Experimental → **Experimental features** to show it) to see what your agents are doing right now. The **Live** view
 lists only work that is running or waiting: what is running and making
 progress, what needs you, and what is waiting in the pipeline. Finished work is
-in **History**, one link away in the top bar.
+in **History**, one link away in the top bar. **Start agent** in the top bar opens the Board.
 
-The Agents page is an experimental surface. Turn on **Settings → Experimental
-features** to see it in the navigation.
+With the setting off, the navigation hides the Agents page and `/agents` opens Home.
 
 ## Live
 
@@ -32,7 +32,7 @@ History`; click it to list them in place. The page remembers whether it is open.
 
 When nothing is running or waiting, the list is the whole page: one message,
 **Nothing is running or waiting. Finished work is in History.**, followed by
-the idle footer if any sessions are idle — never a preview pane alongside it.
+the idle footer if any sessions are idle, never a preview pane alongside it.
 
 Each row says in words why it is where it is:
 
@@ -42,15 +42,15 @@ Each row says in words why it is where it is:
 | **permission prompt** | The agent waits for you to allow a tool. |
 | **plan approval** | The agent waits for you to approve its plan. |
 | **paused by you** | You paused it. Your reason shows under the row. |
-| **API error or usage limit** | The provider, not the agent, is failing — including a conversation whose last turn ended in a provider error (billing, a usage limit) even though the session itself now looks idle. |
-| **stuck · idle `<age>`** | The issue's work agent sat idle with unpushed commits past the stuck threshold. |
+| **API error or usage limit** | The provider, not the agent, is failing, including a Claude Code conversation whose last turn ended in a provider error (billing, a usage limit) even though the session itself now looks idle. |
+| **stuck · idle `<age>`** | The issue's work or strike agent sat idle with unpushed commits for 20 minutes or more. |
 | **ready to merge** | The PR is approved with green checks and waits for you to merge. |
-| **`<tool>`**, **thinking**, **working** | The agent is running a turn: the row names the tool it is calling, with the tool's own description under it when it has one — for example, running `Bash`, the second line reads `Bash · Commit WI-7`. A working subagent keeps its parent from reading quiet: **quiet `<age>`** replaces the age, never shows alongside it, once the whole row — the agent and every subagent under it — has been silent five minutes. |
+| **`<tool>`**, **thinking**, **working** | The agent is running a turn: the row names the tool it is calling, with the tool's own description under it when it has one. For example, running `Bash`, the second line reads `Bash · Commit WI-7`. A working subagent keeps its parent from reading quiet: **quiet `<age>`** replaces the age, never shows alongside it, once the whole row (the agent and every subagent under it) has been silent five minutes. |
 | **running on Fly** | The agent runs on a Fly machine, whose terminal is there. |
 | **held by Overdeck** | Overdeck paused it (a scheduler yield or another machine pause). |
 | **CI failed** | The PR's checks failed. The work agent gets the failure, not you. |
 | **changes requested**, **in review**, **CI running** | The PR is in the review pipeline. |
-| **idle — no known blocker** | The agent is alive but idle and nothing known is blocking it (in the idle line). |
+| **idle**, **no known blocker** | The agent is alive but idle and nothing known is blocking it (in the idle line). On screen the two parts are joined by a long dash. |
 | **agent stopped** | The agent's pane is gone (in the idle line). |
 
 An issue's agent is named by its issue id and title; the role shows only when
@@ -68,7 +68,7 @@ it judges, with its verdict badge (`PENDING` until it files one). A lane that
 needs you also gets its own row in **Needs you**. A lane whose
 launcher is not on the page keeps its own row. A handoff or fork successor
 always keeps its own row, with a `continues ← #<id>` link to the conversation
-it continues, so a live successor never hides under an ended predecessor —
+it continues, so a live successor never hides under an ended predecessor,
 except a `pan handoff --fresh` successor, which has no parent link and shows
 no `continues ←` at all.
 
@@ -109,12 +109,12 @@ left pane closed to hide it. **Live** in the top bar goes back.
 | Pane | What it shows |
 | --- | --- |
 | **Locations** (left) | **Local** and, when an agent runs on Fly, **Remote (Fly)**. Under each: your projects, then each issue (newest number first) and one **Conversations** group for work that has no issue. The numbers on the right are live agents of all shown (hover for the words). |
-| **Agents** (middle) | Every entry under the selected place. A subagent or worker sits indented under the agent or conversation that spawned it. When its parent lives somewhere else, the row says **spawned by** that parent instead. Each row shows the id, role, harness, model and — for Overdeck agents — reasoning effort with its source (for example `xhigh (role)`), last activity and age. |
+| **Agents** (middle) | Every entry under the selected place. A subagent or worker sits indented under the agent or conversation that spawned it. When its parent lives somewhere else, the row says **spawned by** that parent instead. Each row shows the id, role, harness, model and (for Overdeck agents) reasoning effort with its source (for example `xhigh (role)`), last activity and age. |
 | **Detail** (right) | The entry's header (id, harness, model, effort, state, when it started and was last active, cost when known, and a **Spawned by** link), the issue's state, PR, checks and branch with the issue's actions, and the transcript. |
 
 Lanes nest under the conversation that launched them, and handoff and fork
 successors nest under their predecessor; a lane shows `<role letter> <lane key>
-i<n>` before its label and a successor shows a `continues ← #<id>` link —
+i<n>` before its label and a successor shows a `continues ← #<id>` link,
 except a `pan handoff --fresh` successor, which has no parent link, nests
 nowhere, and shows no `continues ←` link.
 A critic or verifier lane nests under the builder it judges, not under the
@@ -126,7 +126,7 @@ marker `↳ continued from <parent>` naming its real parent.
 Conversations keep their composer in the detail pane. A subagent's transcript
 is read-only: it has no input channel of its own. So is an external agent's:
 its row says **external**, and the detail pane says which tool launched it.
-See [Workers — Externally spawned agents](/reference/workers#externally-spawned-agents).
+See [Workers: Externally spawned agents](/reference/workers#externally-spawned-agents).
 
 Agents and issue nodes show the issue's title after its id (`work · PAN-3920 · Agents
 page as a directory`). Hover any truncated id, model, branch or title to see it in full.

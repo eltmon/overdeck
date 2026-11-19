@@ -1,13 +1,13 @@
 ---
 title: "Token Spend Report"
-description: "Live analysis of Overdeck's AI token consumption, costs, and codebase evolution"
+description: "Snapshot of Overdeck's tracked AI token spend from the cost event log, published on GitHub Pages, and how to regenerate it"
 ---
 
 import { ThemedImage } from "/snippets/themed-image.mdx";
 
 # Token Spend Report
 
-Overdeck tracks every API call, token, and dollar spent across its AI coding pipeline. This interactive report visualizes that data — from model breakdowns to monthly trajectories to the actual codebase evolution video.
+Overdeck records the cost of its agents' and conversations' API calls in `~/.overdeck/costs/events.jsonl`. This interactive report visualizes that data, from model breakdowns to monthly trajectories to the actual codebase evolution video.
 
 <iframe
   src="https://eltmon.github.io/overdeck/token-spend-report/"
@@ -19,9 +19,10 @@ Overdeck tracks every API call, token, and dollar spent across its AI coding pip
 ## What's Inside
 
 This published report is a point-in-time snapshot. For live spend while agents
-and conversations are running, the dashboard's **Cost Tracking** page tracks the
-same SQLite + JSONL event streams in real time — total cost, event count, budget
-warnings, a 30-day trend chart, and a per-issue breakdown.
+and conversations are running, open the dashboard's **Costs** page, titled
+**Cost Tracking** (experimental: turn on Settings → Experimental →
+**Experimental features** to show it). It shows total cost, event count, budget
+warnings, issues over budget, a 30-day cost trend and costs by issue.
 
 See [Costs and spend](/features/costs) for what the page shows today.
 
@@ -31,65 +32,66 @@ See [Costs and spend](/features/costs) for what the page shows today.
   alt="Cost Tracking page showing total cost, event count, budget warnings, a 30-day cost-trend chart, and per-issue costs"
 />
 
-The report pulls from two data sources:
-
-- **SQLite** (`~/.overdeck/panopticon.db`) — February 2025 through March 2026
-- **JSONL** (`~/.overdeck/costs/events.jsonl`) — Canonical from March 31, 2026 onward (includes OpenAI GPT-5.5/5.4)
+The report reads one data source, the cost event log at
+`~/.overdeck/costs/events.jsonl`, after `pan cost backfill` has rebuilt events
+from stored Claude Code, Pi/ohmypi and Codex session transcripts. It covers
+April 11 to July 6, 2026. The pre-rebrand era (Feb 2025 to Jun 2026: 734,117
+calls, about &#36;54k) was deliberately not imported.
 
 ### Key Sections
 
 | Section | What It Shows |
 |---------|---------------|
-| **Hero Stats** | Total spend, calls, tokens, and commits |
-| **Model Breakdown** | Top 10 models by cost (Claude, GPT, Kimi, MiniMax) |
-| **Provider Split** | Cost distribution across Anthropic, OpenAI, Kimi, MiniMax |
-| **Pipeline Stages** | Cost by session type: work, plan, review, test, merge |
-| **Monthly Trajectory** | Bar chart of spend over time (with Jan 2026 incomplete-data warning) |
-| **Top Issues by Spend** | Which issues consumed the most tokens |
-| **Subscription Comparison** | What pay-per-use would cost vs. actual subscription spend |
+| **Hero Stats** | Total spend, API calls, tokens, and git commits |
+| **Coverage Boundary** | Where each harness's rebuilt data starts: Claude Code, Pi/ohmypi, Codex |
+| **Executive Summary** and **Methodology** | Totals, the data source, and the archival boundary |
+| **Model Breakdown** | Top 10 models by cost (Claude, GPT, Kimi) |
+| **Provider and Pipeline Breakdown** | Cost by provider, cost by session type (implementation, plan, work, flywheel and more), and a monthly spend chart with a coverage note for April and May 2026 |
+| **Archive vs Reconstruction** | Why the report no longer claims continuity with the pre-rebrand total |
 | **Cache Savings** | Tokens and dollars saved from prompt caching |
-| **Cost-Reduction Features** | RTK, Caveman — what's working and what's not |
-| **Codebase Timelapse** | Gource visualization of the entire git history |
+| **Cost Reduction Features** | RTK, Caveman and TLDR: what's working and what's not |
+| **Top Issues by Spend** | The 15 issues that consumed the most tokens |
+| **GitHub Actions CI Cost** | CI runs and their standard-rate equivalent |
+| **Codebase Evolution** | File growth, commits by month, and lines of code |
+| **Cost-Saving Features** | What Overdeck built to spend less |
+| **Codebase Timelapse** | Gource visualization of the git history |
 
-## Beyond Cost: Runtime Metrics
+## Beyond Cost: the Metrics Page
 
-Cost is only half the picture. The dashboard's **Metrics** page pairs the spend
-data above with runtime comparison and performance analytics — useful when
-deciding which model to route a given role to, since the cheapest model per call
-isn't always the cheapest per completed task.
-
-<ThemedImage
-  light="/images/dashboard/metrics-light.png"
-  dark="/images/dashboard/metrics-dark.png"
-  alt="Metrics page showing runtime comparison and performance analytics"
-/>
+The dashboard's **Metrics** page, titled **Metrics Dashboard** (experimental:
+turn on Settings → Experimental → **Experimental features** to show it), shows
+today's cost (UTC), active and stuck agents, and the top agents and issues by
+cost. Its handoff count and historical trend charts are placeholders that say
+coming soon.
 
 ## Regenerating the Report
 
-The report is generated by the `/token-spend-report` skill. To update it:
+The report is regenerated with the `/token-spend-report` developer skill. To update it:
 
 1. Run the skill: `/token-spend-report`
-2. The skill extracts fresh data from SQLite + JSONL
-3. Updates the HTML at `docs/token-spend-report/index.html`
-4. Optionally regenerates the Gource video
-5. Commits and pushes to GitHub Pages
+2. It runs `pan cost backfill` as a dry run, then `pan cost backfill --write` when the summary looks sane
+3. It aggregates `~/.overdeck/costs/events.jsonl` only, sorted by timestamp
+4. It updates `docs/token-spend-report/index.html`, keeping the coverage banner and the note that the pre-rebrand era was not imported
+5. It regenerates the videos only when you ask
 
-The skill lives at `~/.claude/skills/token-spend-report/SKILL.md` and is synced via `pan sync`.
+You don't publish the report by hand. After the change merges to `main`, the GitHub Pages workflow publishes it.
+
+The skill's source is `sync-sources/dev-skills/token-spend-report/SKILL.md`. It's a developer skill, so `pan sync` installs it at `~/.claude/skills/token-spend-report/SKILL.md` only when Overdeck runs from a source checkout.
 
 ## GitHub Pages
 
-The report is hosted directly from the repo's `docs/` folder via GitHub Pages:
+The `.github/workflows/pages.yml` workflow publishes `docs/token-spend-report/` to GitHub Pages:
 
 ```
 https://eltmon.github.io/overdeck/token-spend-report/
 ```
 
-This is a zero-cost static site that updates automatically on every push to `main`.
+The workflow runs on pushes to `main` that change `docs/token-spend-report/` or the workflow file, and when started by hand.
 
 ## Data Freshness
 
-- **Last updated:** 2026-05-25
-- **Data through:** 2026-05-25
-- **Git history through:** 2026-05-25 (6,463 commits)
-- **Total tracked calls:** 734,117
-- **Total spend:** &#36;54,116
+- **Last regenerated:** 2026-07-06
+- **Data through:** 2026-07-06
+- **Git commits counted:** 6,934
+- **Total tracked calls:** 76,462
+- **Total spend:** &#36;15,552

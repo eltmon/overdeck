@@ -48,16 +48,23 @@ channel in the same order and color as the bus. Closely timed events stack into
 brighter ticks, while the aggregate band shows current and peak events per
 second. The box beside it shows the live agent-role mix.
 
-The top bar combines event rate, event ECG, host health, merge queue,
-cost, merges, tokens, stale work, and active agents. A dash placeholder means
-the source is unavailable; it does not mean zero.
+The top bar shows the clock, events per second, an ECG of events per minute,
+**VEL** (stage transitions in the last hour), CPU, MEM and PSI memory-pressure
+meters, load, merge queue depth, spend per minute, merges and tokens today,
+stale and parked counts, the oldest idle age and the active-agent count.
+**? HELP** opens the field guide and the last button toggles fullscreen. A dash
+placeholder means the source is unavailable; it does not mean zero.
+
+The right sidebar holds the activity feed, **Flow / hour** (stage transitions
+in the last hour, by stage), the **Agents** donut of agents the terminal backend
+hosts, and host CPU, MEM and PSI gauges.
 
 ## Inspect and open work
 
-- **Hover an orb** to see issue, stage, role, project, state, model, harness,
+- **Hover an orb** to see issue, title, stage, role, project, state, model, harness,
   hook rate, frost, event count, stale age, yield reason, warnings, and convoy
   members.
-- **Click an orb** to open the issue rail on the canvas. The rail's button
+- **Click an orb** to open the issue rail on the canvas. The rail's **Open issue page** button
   opens the issue page.
 - **Hover an issue-linked activity row** to see its source, full message, and
   timestamp while the matching orb flashes.
@@ -69,7 +76,7 @@ the source is unavailable; it does not mean zero.
 | Key | Action |
 | --- | --- |
 | `h` or `?` | Toggle the Confluence field guide |
-| `Escape` | Close the field guide |
+| `Escape` | Close the field guide or the issue rail |
 | `f` | Toggle God View fullscreen |
 
 God View leaves these shortcuts alone while a text field or another modal has

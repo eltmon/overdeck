@@ -4,40 +4,20 @@ sidebarTitle: "Troubleshooting"
 description: "Fixes for common Overdeck problems, from stuck pull requests and refused starts to a missing pan command and WSL2 issues, plus where to get help."
 ---
 
-import { ThemedImage } from "/snippets/themed-image.mdx";
-
 Solutions to common problems and issues with Overdeck.
 
 ## PR stuck with stale failed checks after main recovers
 
-A pull request may remain `UNSTABLE` with a failed `test` check and
-`ready_for_merge=0` even though its review, test, and verification stages passed
-and `main` is green. `ready_for_merge=0` means the merge gate is deliberately
-holding the pull request out of the merge queue because GitHub still reports a
-required check failure.
-
-This happens when the pull request's check ran while `main` was failing and
-GitHub did not run it again after `main` recovered. The dashboard's stale-check
-re-trigger service detects these inherited failures and re-runs them once. A
-**red window** is the period from a completed failing run on `main` until the
-next completed successful run of the same workflow. The service only acts on a
-pull request run created inside a closed red window, never while that workflow
-is still failing on `main`.
-
-The service also requires the GitHub workflow run to have `attempt: 1`. This
-once-only attempt guard means a run that Overdeck already retriggered, including
-one that failed again, is not put into a retry loop. Decisions and actions are
-logged with the `[stale-check-retrigger]` prefix.
-
-If the dashboard is down, the run predates the available `main` history, or the
-run is already on attempt 2 or later, re-run the failed jobs manually:
+A pull request can keep a failed check that ran while `main` was failing.
+GitHub doesn't run that check again when `main` recovers, so the pull request
+stays blocked even though its own change is fine. Re-run the failed jobs:
 
 ```bash
 gh run rerun <run-id> --failed
 ```
 
-After GitHub reports the new result, the existing merge-blocker reconciliation
-poll clears the stale blocker within about 10 minutes.
+Overdeck reads check state from GitHub each time it shows the pull request, so
+the new result appears as soon as GitHub reports it.
 
 ## pan start refuses: "references files that no longer exist"
 
@@ -47,7 +27,7 @@ workspace's `HEAD` deleted that path *after* the plan was created. If the
 listed files really did move or get deleted since planning, re-plan against
 the current tree with `pan plan <ID>`. If the files are ones the plan
 legitimately creates or restores, the preflight should already let it
-through — `--skip-freshness` spawns the agent anyway without waiting for a
+through. `--skip-freshness` spawns the agent anyway without waiting for a
 re-plan.
 
 ## Local main diverged after a backlog or order-book write
@@ -55,7 +35,7 @@ re-plan.
 `pan backlog write-sequence` and `pan orders` commit their `.pan/` write and
 push it so local `main` doesn't drift ahead of origin. When that push runs
 into trouble, you'll see a `Sequence push: ...` or `Order book push: ...`
-warning — printed to the CLI's stderr and, since PAN-4224, also filed as a
+warning. It's printed to the CLI's stderr and, since PAN-4224, also filed as a
 `plan-artifacts` warning in the dashboard activity feed.
 
 Two causes produce this warning:
@@ -65,7 +45,7 @@ Two causes produce this warning:
   `.pan/` write.
 - **A colliding untracked file.** Origin gained a `.pan/` file (through a
   merge elsewhere) that this checkout already has as an untracked file at the
-  same path — most often a planning-promotion draft. The push moves that file
+  same path, most often a planning-promotion draft. The push moves that file
   aside before it can move local `main` onto the new tip: if its bytes matched
   what's now tracked it's deleted, otherwise it's kept under
   `.overdeck/plan-artifact-backups/<stamp>/<path>` and named in the warning.
@@ -85,17 +65,17 @@ To recover:
 
 ## pan: command not found
 
-A fresh source checkout has no npm-managed bin link for `pan`/`overdeck` — `npm install -g` and `npm link` are the only things that normally create one, and neither runs on its own. Bootstrap with the CLI bundle directly:
+A fresh source checkout has no npm-managed bin link for `pan`/`overdeck`: `npm install -g` and `npm link` are the only things that normally create one, and neither runs on its own. Bootstrap with the CLI bundle directly:
 
 ```bash
 node <your-checkout>/dist/cli/index.js doctor
 ```
 
-`pan doctor`'s "pan on PATH" row reports whether your shell resolves `pan` at all: `ok` with the resolved path (appending `(Overdeck shim)` when it's Overdeck's own copy), or `warn` when nothing on PATH matches. The warning isn't fatal — agents launched by Overdeck get `pan` from `~/.overdeck/cli-bin` regardless, since every non-remote launcher writes that shim at spawn time (PAN-2630) — but it means your own shell still can't run `pan` directly. Three remedies, in the order the warning lists them:
+`pan doctor`'s "pan on PATH" row reports whether your shell resolves `pan` at all: `ok` with the resolved path (appending `(Overdeck shim)` when it's Overdeck's own copy), or `warn` when nothing on PATH matches. The warning isn't fatal: agents launched by Overdeck get `pan` from `~/.overdeck/cli-bin` regardless, since every non-remote launcher writes that shim at spawn time (PAN-2630). But your own shell still can't run `pan` directly. Three remedies, in the order the warning lists them:
 
 1. `npm install -g @overdeck/core`
 2. `npm link` inside your Overdeck checkout, after `npm run build`
-3. Add `export PATH="$HOME/.overdeck/cli-bin:$PATH"` to your shell profile — `pan install` and `pan sync` both write that shim
+3. Add `export PATH="$HOME/.overdeck/cli-bin:$PATH"` to your shell profile. `pan install` and `pan sync` both write that shim
 
 ## WSL2 Stability Issues (Windows Users)
 
@@ -211,7 +191,7 @@ Restart-Computer
 - [WSL GitHub Issues - Networking](https://github.com/microsoft/WSL/issues?q=networking+mirrored)
 - [WSL NAT Fallback Issue #12297](https://github.com/microsoft/WSL/issues/12297)
 
-## Slow Vite/React Frontend with Multiple Workspaces
+## Slow Vite and React Frontend with Multiple Workspaces
 
 If running multiple containerized workspaces with Vite/React frontends, you may notice CPU spikes and slow HMR. This is because Vite's default file watching polls every 100ms, which compounds with multiple instances.
 
@@ -228,15 +208,15 @@ server: {
 
 A 3000ms interval supports 4-5 concurrent workspaces comfortably while maintaining acceptable HMR responsiveness.
 
-## Dev server dies with ENOSPC — inotify watch exhaustion
+## Dev server dies with ENOSPC: inotify watch exhaustion
 
-If a workspace's frontend container crash-loops at startup with `ENOSPC: System limit for number of file watchers reached` while the rest of the host looks healthy, the per-user inotify watch budget (`fs.inotify.max_user_watches`) is exhausted. This budget is a kernel limit shared by **every process and container the user runs** — Docker does not isolate it — so a few heavy file watchers can starve every other workspace on the machine.
+If a workspace's frontend container crash-loops at startup with `ENOSPC: System limit for number of file watchers reached` while the rest of the host looks healthy, the per-user inotify watch budget (`fs.inotify.max_user_watches`) is exhausted. This budget is a kernel limit shared by **every process and container the user runs** (Docker does not isolate it), so a few heavy file watchers can starve every other workspace on the machine.
 
 The dashboard shows a **File watchers running low / exhausted** banner when usage crosses 80% / 90% of the limit, and `pan doctor` reports usage, the top consumers, and whether the configured limit survives a reboot.
 
 **Fix, in order of leverage:**
 
-1. **Shrink the watchers.** The usual culprit is a huge directory inside the watched project root that the watcher does not ignore by default — e.g. pnpm's `.pnpm-store/` (pnpm places it inside the project when installing into a Docker bind mount, and Vite ignores `node_modules` but not `.pnpm-store`). Add it to the watch ignore list:
+1. **Shrink the watchers.** The usual culprit is a huge directory inside the watched project root that the watcher does not ignore by default, for example pnpm's `.pnpm-store/` (pnpm places it inside the project when installing into a Docker bind mount, and Vite ignores `node_modules` but not `.pnpm-store`). Add it to the watch ignore list:
 
    ```javascript
    server: {
@@ -246,7 +226,7 @@ The dashboard shows a **File watchers running low / exhausted** banner when usag
    }
    ```
 
-   In one real incident this cut each dev server from ~157k watches to ~13k — a 12× reduction.
+   In one real incident this cut each dev server from ~157k watches to ~13k, a 12× reduction.
 
 2. **Raise and persist the limit** (requires sudo; Overdeck never runs sudo itself):
 
@@ -259,11 +239,10 @@ The dashboard shows a **File watchers running low / exhausted** banner when usag
 
 ## Corrupted Workspaces
 
-A workspace can become "corrupted" when it exists as a directory but is no longer a valid git worktree. The dashboard will show a yellow "Workspace Corrupted" warning with an option to clean and recreate.
+A workspace can become "corrupted" when it exists as a directory but is no longer a valid git worktree.
 
 ### Symptoms
 
-- Dashboard shows "Workspace Corrupted" warning
 - `git status` in the workspace fails with "not a git repository"
 - The `.git` file is missing from the workspace directory
 
@@ -278,16 +257,6 @@ A workspace can become "corrupted" when it exists as a directory but is no longe
 | **Force-deleted main repo** | The main repository was moved or deleted while workspaces existed |
 
 ### Resolution
-
-**Via Dashboard (recommended):**
-
-1. Click on the issue to open the detail panel
-2. Click "Clean & Recreate" button
-3. Review the files that will be deleted
-4. Check "Create backup" to preserve your work (recommended)
-5. Click "Backup & Recreate"
-
-**Via CLI:**
 
 ```bash
 # Option 1: Manual cleanup
@@ -305,15 +274,11 @@ pan workspace create ISSUE-123
 
 - Don't interrupt `pan workspace create` commands
 - Don't run `git worktree prune` in the main repo without checking for active workspaces
-- Keep free space above the 10 GiB floor: Overdeck holds new workspace starts below it (see "Disk low — new workspace starts are held" below)
+- Keep free space above the 10 GiB floor: Overdeck holds new workspace starts below it (see [Disk low: new workspace starts are held](#disk-low-new-workspace-starts-are-held) below)
 
-## Disk low — new workspace starts are held
+## Disk low: new workspace starts are held
 
-Overdeck refuses a workspace start, or a workspace Docker stack rebuild, with a message that starts:
-
-```text
-Disk low — new workspace starts are held: …
-```
+Overdeck refuses a workspace start, or a workspace Docker stack rebuild, with a message that starts with `Disk low` and says new workspace starts are held.
 
 ### What is held
 
@@ -339,7 +304,7 @@ pan workspace reap --apply
 pan workspace destroy ISSUE-123
 ```
 
-The **Resources** page (`/resources`) shows what is using the disk. Starts resume when you retry them after space returns; nothing needs to be reset.
+The **Resources** page at `/resources` (experimental: turn on Settings → Experimental → **Experimental features** to show it) shows what is using the disk. Starts resume when you retry them after space returns; nothing needs to be reset.
 
 ## Docker Issues
 
@@ -385,7 +350,7 @@ show up instantly everywhere. It looks again within 60 seconds on its own,
 and immediately after any `PUT /api/settings` save (saving settings from the
 UI, even unrelated settings, is a quick way to force a re-check). To see
 exactly what this machine resolves right now, run `pan doctor` and read its
-"Host tools" row — it names each tool's resolved path or `missing`.
+"Host tools" row, which names each tool's resolved path or `missing`.
 
 ## Network Issues
 
@@ -399,7 +364,7 @@ exactly what this machine resolves right now, run `pan doctor` and read its
 2. Regenerate if missing:
    ```bash
    cd ~/.overdeck/traefik/certs
-   mkcert localhost "*.localhost" 127.0.0.1 ::1
+   mkcert -cert-file _wildcard.overdeck.localhost.pem -key-file _wildcard.overdeck.localhost-key.pem overdeck.localhost "*.overdeck.localhost" "*.localhost" localhost 127.0.0.1 ::1
    ```
 
 3. Install the CA:
@@ -439,8 +404,7 @@ pan start MIN-123
 
 To attach from a shell, run the `Attach:` command that `pan start MIN-123`
 prints (it prints it again when the agent is already running), or open the
-agent in the dashboard. See "Reaching an agent from a shell" in
-`docs/TERMINAL-BACKENDS.md`.
+agent in the dashboard. See [Reaching an agent from a shell](/configuration/terminal-backend#reaching-an-agent-from-a-shell).
 
 ### Launches refused: Overdeck is shutting down
 
@@ -455,11 +419,9 @@ See [Safe shutdown](/features/safe-shutdown).
 
 ### Agent keeps failing
 
-Check the handoff count in state.json. If it's high, the task may be too complex:
-
-```bash
-cat ~/.overdeck/agents/agent-min-123/state.json | jq .handoffCount
-```
+Run `pan show MIN-123` to read the issue's derived state, the agent's work
+history and its health (`pan show MIN-123 --health` prints health and heartbeat
+only). If the agent keeps failing on the same work, the task may be too complex.
 
 Consider:
 - Breaking the issue into smaller tasks
@@ -474,8 +436,8 @@ Use the proper messaging API:
 # Correct
 pan tell MIN-123 "Your message"
 
-# NOT this (won't send without Enter)
-tmux send-keys -t agent-min-123 "Your message"
+# NOT this (tmux backend; won't send without Enter)
+tmux -L overdeck send-keys -t agent-min-123 "Your message"
 ```
 
 ## Command Deck Issues
@@ -508,7 +470,7 @@ pan projects list
 
 ### Conversation creation fails from a launcher
 
-When a launcher cannot create a conversation, the failure appears inline beside
+When a launcher cannot create a conversation, the failure appears inline below
 the composer and the typed query remains available for correction or retry. The
 launcher blocks duplicate keyboard and pointer submissions while creation is in
 progress, and it opens a conversation pane only after the server reports a
@@ -580,16 +542,11 @@ docker system prune -a
 
 ### Health page
 
-The dashboard's **Health** page reports live host, admission, agent, and
-optional-service health. Use it when the running fleet looks unhealthy: it
-shows current pressure evidence, spawn headroom, agent/session state, and
-service state without turning unavailable measurements into zeroes.
-
-<ThemedImage
-  light="/images/dashboard/health-light.png"
-  dark="/images/dashboard/health-dark.png"
-  alt="Overdeck Health page showing system health checks and diagnostics"
-/>
+The dashboard's **Health** page (experimental: turn on Settings → Experimental →
+**Experimental features** to show it) shows host health (CPU and memory), the
+Overdeck Anywhere and Deacon status, agent health counts, and reclaimable
+sessions. Use it when the running fleet looks unhealthy. A measurement it can't
+read shows as unavailable, never as zero.
 
 <Tip>
 These surfaces answer different questions. `pan health` reports runtime health
@@ -617,8 +574,8 @@ tail -50 ~/.overdeck/logs/*.log
 
 ### Resources
 
-- **GitHub Issues:** https://github.com/eltmon/overdeck/issues
-- **Discord:** [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P), for questions and help from the community
+Still stuck? Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a [GitHub Issue](https://github.com/eltmon/overdeck/issues).
+
 - **Documentation:** https://docs.overdeck.ai
 - **CLI Help:** `pan --help` or `pan <command> --help`
 

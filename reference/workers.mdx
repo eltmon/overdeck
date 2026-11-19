@@ -14,7 +14,7 @@ report. The worker is a real Overdeck agent with the role `worker`:
 - It runs in a persistent pane on the host's terminal backend (Herdr by
   default, tmux when `terminal.backend: tmux`). It is never a one-shot
   `claude -p` or `codex exec` run.
-- It appears in the [Agents Directory](/reference/agents-directory) under the
+- It appears in the [Agents Directory](/reference/agents-directory) (experimental: turn on Settings → Experimental → **Experimental features** to show it) under the
   agent or conversation that started it and under its issue, and in the
   issue's session tree as **Worker &lt;n&gt;**.
 - `pan tell`, `pan kill`, and the other lifecycle verbs work on it.
@@ -57,15 +57,19 @@ pan worker list [--issue <id>] [--parent <id>] [--json]
 
 Worker ids are `agent-<issue>-worker-<n>`, for example `agent-pan-123-worker-2`.
 
+Agents with the `overdeck` MCP server can use its `delegate_task`,
+`start_worker`, `worker_report` and `list_workers` tools instead; see
+[MCP](/configuration/mcp#tools).
+
 ## Workers on another machine
 
 `--machine <label|environment-id>` starts the worker on a linked machine, and
 `--machine auto` lets [Auto placement](/configuration/linked-machines#auto-placement) pick
 one by load (`--needs docker,gpu` limits the choice to machines with those tags). The other
-machine needs a project for the same repository and a workspace for the issue.
+machine needs a project for the same repository and a workspace for the issue. `--cwd` is refused when placement picks another machine (it works when `--machine auto` picks this one), and `--machine fly` is refused: a new Fly machine has no issue workspace.
 
-This machine keeps a **stand-in** under the local worker id it prints; `wait`, `list` and
-`pan kill` take that id. The stand-in mirrors the remote worker's reports with the same
+This machine keeps a **stand-in** under the local worker id it prints; `wait` takes
+that id. `pan worker list` shows the stand-in without its issue or parent, and its state reads this machine, where the worker has no pane, so it does not show whether the remote worker runs. `pan kill` does not reach the other machine: `--stop-after-report` stops the remote worker, and so does the end of its parent. The stand-in mirrors the remote worker's reports with the same
 sequence numbers, so `wait --after <seq>` works unchanged. While the other machine is
 offline, the wait keeps waiting and the follower retries (1 s, doubling up to 5 minutes);
 it resumes after a dashboard restart. When the parent ends, this machine stops the remote
@@ -84,7 +88,7 @@ stderr.
 | --- | --- |
 | `0` | Report with status `done`. |
 | `4` | Report with status `blocked` or `failed`. The body is still printed. |
-| `2` | The worker exited, or sat idle for 10 minutes, without a report. Its last assistant message is printed, prefixed `[no report — last assistant message]`. When the dashboard cannot be reached, the transcript path is printed instead. |
+| `2` | The worker exited, or sat idle for 10 minutes, without a report. Its last assistant message is printed under a `[no report` header line. When the dashboard cannot be reached, that line names the transcript path instead. |
 | `3` | Timeout. The worker is still running; the hint names the exact `pan worker wait` to run next. |
 | `1` | Usage or spawn error. |
 
@@ -128,7 +132,7 @@ In its own worktree the shim refuses `git commit`, `push`, `merge` and
 refuses them on a detached HEAD.
 
 Every worker commit, read-only or not, carries an `Overdeck-Agent: <agent id>`
-trailer that the shim adds, so Overdeck can tell which agent made it.
+trailer that the shim adds (git 2.32 or newer; a bypassed shim adds none), so Overdeck can tell which agent made it.
 
 `--read-only` puts a `git` shim first on the worker's `PATH`. The shim
 prevents accidental git writes to the issue's repository: the primary
@@ -138,14 +142,14 @@ subdirectories, however the call reaches them (`cd ..`, `-C`, `--git-dir`,
 
 - `status`, `diff`, `log`, `show`, `rev-parse`, `rev-list`, `ls-files`,
   `ls-tree`, `blame`, `cat-file`, `merge-base`, `describe`, `grep`,
-  `shortlog`, `for-each-ref`, `show-ref`;
+  `shortlog`, `for-each-ref`, `show-ref`, `help`, `version`;
 - `config` only when its first argument is `--get`, `--get-all`,
   `--get-regexp`, `--list`/`-l` (or `get`/`list`), and every later option is
   a read option such as `--show-origin` or `--global`;
 - `remote` bare or `-v`, `remote show [-n]` and `remote get-url [--push|--all]`;
 - `branch --show-current`, `branch --list`/`-l` with patterns, a bare `branch`
-  listing, and exactly the listing options `-a`, `-r`, `-v`, `-vv`,
-  `--contains`, `--merged`, `--no-merged`, `--points-at`, `--sort=` and
+  listing, and exactly the listing options `-a`/`--all`, `-r`/`--remotes`, `-v`/`--verbose`, `-vv`,
+  `--contains`, `--no-contains`, `--merged`, `--no-merged`, `--points-at`, `--sort=` and
   `--format=`.
 
 Options are matched as exact tokens: git accepts unique prefixes of long
@@ -214,8 +218,9 @@ whatever `origin/HEAD` names) or in the feature branch while that still
 exists. Any other worker branch is kept, and the cleanup logs its name and its
 unmerged commit count. A branch still checked out in a kept worktree is kept.
 
-`.swarm/` is in the repository's `.gitignore`, so `git add -A` in a workspace
-never commits an embedded worktree.
+Overdeck does not add `.swarm/` to your project's ignore files. Add `.swarm/`
+to the project's `.gitignore` so `git add -A` in a workspace never stages an
+embedded worktree.
 
 ## Where the files are
 
@@ -229,10 +234,10 @@ never commits an embedded worktree.
 
 An **external agent** is one another tool launched: Overdeck did not start it,
 has no pane for it, and cannot steer it. Overdeck can record it so the
-[Agents Directory](/reference/agents-directory) shows it under the agent or
+[Agents Directory](/reference/agents-directory) (experimental) shows it under the agent or
 conversation that spawned it and under its issue, with its transcript when the
-harness writes one Overdeck can read (Claude Code, Codex, Pi, ACP, Kimi Code,
-Muse).
+transcript file is under `~/.claude/projects`, the Codex sessions directory or
+`~/.overdeck/agents` (see `--transcript` below).
 
 | Overdeck can | Overdeck cannot |
 | --- | --- |
@@ -297,12 +302,12 @@ when plugins can call the registration door themselves (PAN-3940).
 Nothing about an external agent's state is stored. Each directory read derives
 it:
 
-- **working** — the recorded process is alive. The pid's start time is
+- **working**: the recorded process is alive. The pid's start time is
   recorded with it, so a reused pid does not count.
-- **done** — otherwise, the transcript's last turn finished.
-- **working** — a registration with no pid whose transcript changed in the last
+- **done**: otherwise, the transcript's last turn finished (only Claude Code and Codex transcripts are read for this).
+- **working**: a registration with no pid whose transcript changed in the last
   two minutes.
-- **stopped** — anything else.
+- **stopped**: anything else.
 
 ### Where the files are
 
@@ -314,4 +319,4 @@ it:
 `pan sync`'s agent-directory cleanup keeps `ext-*` directories, as it keeps
 conversation directories.
 
-See also: [Harnesses — Use Overdeck workers instead of harness plugins](/configuration/harnesses#use-overdeck-workers-instead-of-harness-plugins).
+See also: [Harnesses: Use Overdeck workers instead of harness plugins](/configuration/harnesses#use-overdeck-workers-instead-of-harness-plugins).

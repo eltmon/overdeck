@@ -13,7 +13,7 @@ https://mcp.posthog.com/mcp
 
 Use it when an agent needs to inspect analytics, error groups, feature flags, or
 dashboards while investigating a product question. The MCP connection is
-separate from Overdeck's anonymous product telemetry; it accesses your PostHog
+separate from Overdeck's [anonymous product telemetry](/configuration/telemetry); it accesses your PostHog
 account with the permissions you grant.
 
 ## Connect with OAuth
@@ -96,8 +96,8 @@ npx --no-install posthog-cli sourcemap upload \
   --delete-after
 ```
 
-Injection and upload run against the exact dashboard bundle built by the npm
-release job. Overdeck removes source maps locally after the command, including
+Injection and upload run in the release workflow's `pack` job, against the exact dashboard bundle
+that job packs into the published tarball. Overdeck removes source maps locally after the command, including
 when `POSTHOG_CLI_API_KEY` is absent, so maps cannot enter the published package.
 A missing key prints a warning and lets the release continue without a network call.
 

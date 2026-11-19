@@ -1,6 +1,6 @@
 ---
 title: Legacy Codebase Support
-description: AI-powered development for enterprise legacy systems
+description: "Teach agents your legacy codebase: Knowledge Capture saves corrections as project skills, and Refactor Radar proposes fixes for confusing code."
 ---
 
 # Legacy Codebase Support
@@ -60,12 +60,12 @@ Session 5: Refactor Radar detects: "Same entity called 'user', 'account', 'membe
 
 **When one developer learns, everyone benefits.**
 
-Captured skills live in your project's `.claude/skills/` directory - they're version-controlled alongside your code. When Sarah documents that "we use camelCase columns" after hitting that error, every developer on the team - and every AI session from that point forward - inherits that knowledge automatically.
+Knowledge Capture writes captured skills to `.claude/skills/project-knowledge/SKILL.md` in the repository you're working in. Overdeck adds `.claude/skills/` to a project's `.gitignore` when it creates a workspace, so that file stays on your machine. To share it, move it to `.pan/skills/project-knowledge/SKILL.md` and commit it. Overdeck copies `.pan/skills/` into each new issue workspace, so when Sarah commits that "we use camelCase columns", every developer's next workspace inherits it. See [Project skills](/features/skills#project-skills).
 
 ```
 myproject/
-├── .claude/skills/
-│   └── project-knowledge/     # ← Git-tracked, shared by entire team
+├── .pan/skills/
+│   └── project-knowledge/     # Git-tracked, shared by the team
 │       └── SKILL.md           # "Database uses camelCase, not snake_case"
 ├── src/
 └── ...
@@ -77,11 +77,7 @@ No more repeating the same corrections to AI across 10 different developers. No 
 
 ## For Technical Leaders
 
-**What gets measured gets managed.** Overdeck's Refactor Radar surfaces the specific patterns that are costing you AI productivity:
-
-- "Here are the 5 naming inconsistencies causing 40% of AI errors"
-- "These 3 missing FK constraints led to 12 incorrect deletions last month"
-- "Mixed async patterns in payments module caused 8 rollbacks"
+Refactor Radar names the patterns that keep confusing AI in your codebase: one entity called `user`, `account` and `member` across layers, a relationship with no foreign key constraint, or callbacks, promises and async/await mixed in one module. It doesn't count errors or measure what they cost.
 
 Each proposal includes:
 - **Evidence**: Specific file paths and examples
@@ -100,16 +96,16 @@ Overdeck's learning system:
 - Captures corrections once, applies them forever
 - Identifies root causes (not just symptoms)
 - Creates actionable improvement proposals
-- Works across your entire AI toolchain (Claude, Codex, Cursor, Gemini)
+- Works in every harness `pan sync` installs skills for: Claude Code, plus Codex and Pi through `~/.agents/skills`
 
 **This isn't "AI for greenfield only." This is AI that learns your business.**
 
 ## Configurable Per Team and Per Developer
 
-Different teams have different ownership boundaries. Individual developers have different preferences. Overdeck respects both:
+Each developer lists the categories to skip or welcome in their own global context file, and each project can tune how often the skills ask in `.overdeck/knowledge-capture.json` and `.overdeck/refactor-radar.json`:
 
 ```markdown
-# In ~/.claude/CLAUDE.md (developer's personal config)
+# In ~/.overdeck/context/global.md (open it with: pan context edit)
 
 ## AI Suggestion Preferences
 
@@ -127,8 +123,14 @@ skip: authentication                       # Security team owns this
 
 The AI adapts to your org structure, not the other way around.
 
+## Give agents a map and the rules up front
+
+- **Codebase map.** The `/pan-map` skill writes four orientation files under `.overdeck/context/codebase/`: `architecture.md`, `conventions.md`, `concerns.md` and `stack.md`. Commit them. Planning agents read them first and write them when they're missing; work agents skim them before they start.
+- **Project rules.** `pan context edit --layer project` opens `.overdeck/context/project.md`, the committed project layer. See [Context layers](/configuration/context-layers).
+- **Memory facts.** Record a rule every agent must follow with `pan memory add <id>`; see [Memory](/configuration/memory) for its type, description and body options. Overdeck renders the fact index into each managed agent's launch context.
+
 ## Related Guides
 
 - [Knowledge Capture Skill](/features/skills#ai-self-monitoring) - Capturing learnings automatically
 - [Refactor Radar Skill](/features/skills#ai-self-monitoring) - Detecting systemic issues
-- [Project Skills](/features/skills#creating-custom-skills) - Creating project-specific knowledge
+- [Project Skills](/features/skills#project-skills) - Sharing project-specific knowledge through `.pan/skills/`
