@@ -17,24 +17,31 @@ pan install
 
 # Minimal install (skip Traefik, use ports)
 pan install --minimal
+
+# Check prerequisites only
+pan install --check
 ```
 
 This command:
 - Installs ttyd (web terminal)
+- Installs and verifies Herdr, the default terminal backend (`--skip-herdr` on tmux-only hosts)
 - Installs the tools Overdeck needs for managed workspaces
 - Optionally sets up Traefik and mkcert for HTTPS
 - Creates necessary configuration directories
-- Sets up git hooks for registered projects
+- Installs the Claude Code heartbeat hooks (git hooks for registered projects come from `pan sync`)
 
 The prerequisite gate only fails on Node, git, and (under the tmux backend) tmux. Docker, ast-grep, and (under Herdr) tmux print a yellow warning instead of failing, and installation continues.
 
 ## pan sync
 
-Sync skills and configuration to all AI tools.
+Sync skills and render managed launch context for the harnesses Overdeck runs.
 
 ```bash
 pan sync
+pan sync --dry-run   # show what would be synced
 ```
+
+`--force` overwrites files you modified since Overdeck installed them; `--diff` shows those changes.
 
 This command:
 - Copies skills from `~/.overdeck/skills/` to AI tool directories
@@ -42,7 +49,7 @@ This command:
 - Prunes managed cache and target files when their bundled source is removed
 - Preserves user-owned files and reports user-modified stale files instead of deleting them
 - Skips empty bundled skill directories instead of propagating them into caches
-- Syncs to Codex, Cursor, Gemini CLI, and Google Antigravity
+- Copies native skill bundles to `~/.agents/skills/`, where Codex, Pi and Oh My Pi discover them
 - Installs/updates git hooks in all registered projects
 
 Run this after:
@@ -60,16 +67,17 @@ pan doctor
 ```
 
 Checks:
-- Node.js version (22+ required)
+- Node.js and the Claude CLI are installed (errors when missing; the CLI itself needs Node 22.16 or later)
 - Git installation
-- Docker installation and status
+- Docker installation (an optional warning), its bridge-network pool and compose-label drift
 - tmux installation (a warning, not an error, when Herdr is the terminal backend)
+- Herdr terminal backend: binary, server and config (errors when Herdr is selected but unavailable)
 - Claude Code and GitHub CLI login state (warnings)
-- Required CLI tools (gh, glab)
-- Configuration files
-- API key validity
-- Workspace health
-- Traefik status (if installed)
+- GitHub CLI (an optional warning)
+- Overdeck directories (`~/.overdeck`, skills, commands, agents) and `~/.overdeck.env`
+- Whether `LINEAR_API_KEY` is set (presence only, a warning)
+- Agent and workspace drift: closed-issue agent dirs, stopped-list classification and orphaned proposed specs
+- Traefik port binding (when `traefik.enabled` is true)
 
 Returns a health report with recommendations for any issues found.
 
@@ -98,6 +106,8 @@ pan doctor --json
 
 The exit code matches text mode: `1` when any check is `error`, or when any
 check is `warn` and `--strict` was passed; otherwise `0`.
+
+`pan doctor github-quota` shows GitHub API quota use per caller, active pauses and skipped projects.
 
 ## pan semgrep ci-setup
 
@@ -129,13 +139,13 @@ pan computer get-app-state --app gnome-calculator --query 7
 pan computer click --app gnome-calculator --element-index 12
 ```
 
-It needs `computer_use.enabled: true` (global config only) and a Linux desktop
-with a logged-in session. See [Computer use](/configuration/computer-use).
+It needs `computer_use.enabled: true` (global config only) and a logged-in desktop
+session on Linux, macOS, or Windows through WSL2. See [Computer use](/configuration/computer-use).
 
 ## pan diagnose
 
 Collect a redacted diagnostic bundle and, with your consent, start Claude
-Code or Codex in that bundle's directory to find and fix the problem. It
+Code or Codex, pointed at that bundle, to find and fix the problem. It
 works even when the dashboard, the supervisor, or Herdr is down, which is
 exactly when you need it most.
 
@@ -152,7 +162,7 @@ Flags: `--harness <claude-code|codex>`, `--describe <text>`, `--bundle-only`
 launch confirmation).
 
 Before starting a harness, `pan diagnose` always prints the bundle path and
-its file list, then asks for confirmation; nothing launches without it. See
+its file list, then asks for confirmation unless you pass `--yes`. See
 [DIAGNOSTICS-BUNDLE.md](https://github.com/eltmon/overdeck/blob/main/docs/DIAGNOSTICS-BUNDLE.md)
 for exactly what the bundle holds, what is redacted, and what is never
 collected.
