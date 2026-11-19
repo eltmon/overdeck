@@ -1,0 +1,35 @@
+{
+  "version": "1",
+  "issueId": "PAN-5564",
+  "created": "2026-11-18T23:33:54.570Z",
+  "updated": "2026-11-18T23:49:23.160Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "fix-diff-mock-mount": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5564",
+      "claimedAt": "2026-11-18T23:33:54.570Z",
+      "doneAt": "2026-11-18T23:49:23.159Z"
+    },
+    "fix-diff-mock-mount.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:49:23.159Z"
+    },
+    "fix-diff-mock-mount.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:49:23.159Z"
+    },
+    "fix-diff-mock-mount.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:49:23.159Z"
+    },
+    "fix-diff-mock-mount.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-18T23:49:23.159Z"
+    }
+  }
+}
