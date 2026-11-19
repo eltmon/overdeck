@@ -1,0 +1,1293 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-19T00:59:57Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5501: docs: accuracy audit, CLI Reference (7 pages)",
+    "updated": "2026-11-19T01:04:54.905Z"
+  },
+  "plan": {
+    "id": "pan-5501",
+    "title": "docs: accuracy audit, CLI Reference (7 pages)",
+    "status": "proposed",
+    "uid": "00209371-a9f1-4361-b7b2-b4abf3421a9b",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-19T00:59:57Z",
+    "updated": "2026-11-19T01:04:54.905Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5501",
+        "label": "PAN-5501",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5467",
+        "label": "Docs overhaul epic",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docs",
+      "audit",
+      "cli",
+      "mintlify"
+    ],
+    "metadata": {
+      "sizeJustification": "Every item edits one Mintlify page in the single cli/ directory; the finalize lint counts each cli/<page>.mdx as its own subsystem, so ten pages read as ten subsystems. The epic (#5467) scopes one audit issue per docs nav group, and the pages share one validation pass and one PR body, so splitting into sibling issues would duplicate the validator and PR-body work without adding review isolation.",
+      "canonicalFilename": "2026-11-19-PAN-5501-docs-accuracy-audit-cli-reference-7-pages.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The ten pages in the CLI Reference docs nav group contain wrong, stale and removed claims: flags that do not exist (pan up --minimal, --verbose), wrong ports (3010), sync targets that were retired (Cursor, Gemini, Antigravity), a pan health section describing checks that do not exist, GitLab listed as an issue tracker, bare-number GitHub IDs for pan start, a pan resume --compact that is always refused, deprecated wording for a working --auto-start, wrong workspace paths and Docker flags, missing new flags (--group, waive-test-removal, untroubled, reset-session), and five screenshots of the pre-rebrand Panopticon UI.",
+      "Proposal": "The planning session audited all ten pages against code and pan --help and recorded every finding with grep anchor, replacement text and evidence in .pan/drafts/PAN-5501.md (Appendices B to J2), plus shared facts (S1-S7) and decisions (D1-D10) so parallel items word common facts the same way. One docs item per page (core-commands split into four section items, agent-commands and workspace-commands into two each, chained by blocks edges because they share a file) applies the rows, the residual rule, the dash rule, the frontmatter rule, the screenshot removal and the link check. A final item runs lint:docs, the one test that reads these pages, and the Mintlify validators, and writes the per-page PR body with Follow-ups for code bugs.",
+      "NonGoals": "- No code, test, rule, image, docs.json, CLAUDE.md, README.md or changelog.d change; code bugs found go to the PR body's Follow-ups\n- No edits to pages outside the CLI Reference group (the Anywhere CLI pages belong to #5500; features/skills.mdx broken anchors belong to #5502)\n- No new pages, navigation changes, file renames or slug changes\n- No heading renames; new headings only where the PRD adds one (pan untroubled, pan reset-session, pan review waive-test-removal, Other workspace subcommands)\n- No screenshot recapture and no deletion of image files\n- No documenting hidden options or plumbing verbs\n- Never run mint validate --fix"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Audit the 10 pages in the CLI Reference nav group, not only the 7 listed in the issue",
+        "rationale": "The issue's scope sentence is every published page in the group; PAN-5478 added conversation-, pipeline- and memory-commands after the issue was filed, and no sibling audit issue lists them. PAN-5503 made the same call."
+      },
+      {
+        "summary": "Remove the five stale dashboard screenshots from the CLI pages instead of recapturing them",
+        "rationale": "All five PNGs date from 2026-06-04 and show the pre-rebrand Panopticon v0.21.0 UI; the same files are embedded by pages owned by other audit issues, and recapture needs a running dashboard with representative data. A CLI reference does not need them; recapture is listed as a Follow-up."
+      },
+      {
+        "summary": "Retitle the seven generic CLI page titles with specific searchable titles, keeping the old title as sidebarTitle",
+        "rationale": "The issue asks for specific searchable titles; the sidebarTitle pattern is already used by the three newer CLI pages and keeps the nav short."
+      },
+      {
+        "summary": "Where --help text and code disagree, document what the code does and list the help mismatch as a Follow-up",
+        "rationale": "The issue says to verify against code and --help and never change code in this docs-only issue; the code is what users experience."
+      },
+      {
+        "summary": "Drop the merge agent from the workspace safeguard list but keep merge-agent in the pan admin specialists registry description",
+        "rationale": "Merges run server-side through the forge and no code path spawns a merge agent session, but specialists-registry.ts still registers the merge-agent name that pan admin specialists list prints."
+      },
+      {
+        "summary": "Delete ~/.overdeck/project-mappings.json from the overview's configuration list",
+        "rationale": "PAN-5503 removed the same claim from configuration/projects.mdx because the file is read only as a planning-status fallback."
+      }
+    ],
+    "items": [
+      {
+        "id": "overview-page",
+        "title": "overview.mdx: apply WI-E (Appendix E) and the D4 frontmatter",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:59:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/overview.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/overview.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items in the same file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8"
+          ],
+          "acJustification": "Five checks cover the five independent claim groups on the page (removed flags/files, help links, issue IDs, screenshot/frontmatter, command table)."
+        },
+        "narrative": {
+          "Action": "Apply WI-E in the PRD to cli/overview.mdx: Appendix E rows E.W.1-10, E.R.1-3, E.M.1-8 with the WI-E decisions (remove the stale command-deck-hero screenshot and the ThemedImage import, S1/S2/S3/S7 wording, D9 config list), then D4 frontmatter. Add 'PR-note: cli/overview.mdx: <one line>' to the commit message. Follow the Common procedure in .pan/drafts/PAN-5501.md (grep anchors, code wins, residual rule, dash rule, link check, MDX safety). Never change code. Commit with Item: overview-page and the AC trailers."
+        },
+        "items": [
+          {
+            "id": "overview-page.ac1",
+            "title": "Given the edited page, `grep -nE -- '--verbose|\\.overdeck\\.json|project-mappings|man pan|!42' cli/overview.mdx` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overview-page.ac2",
+            "title": "The Getting Help section renders links to https://discord.gg/ZpHE2ZTv5P and https://github.com/eltmon/overdeck/issues and mentions `pan doctor` and `pan diagnose`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overview-page.ac3",
+            "title": "The Issue identifiers list shows the GitHub form `PAN-42` plus Rally and Jira bullets, and `grep -n 'GitLab' cli/overview.mdx` returns no issue-identifier or issue-tracker line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overview-page.ac4",
+            "title": "`grep -c ThemedImage cli/overview.mdx` prints 0 and the frontmatter has `sidebarTitle: \"CLI Overview\"` with the D4 title",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overview-page.ac5",
+            "title": "Given the edited page, the command table has an Operations row naming `pan hygiene` and a Skills row linking /cli/skills-commands, and Next Steps links /cli/hygiene and /cli/skills-commands",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "core-install-to-hygiene",
+        "title": "core-commands.mdx: fix pan install through pan hygiene (WI-B1)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:59:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/core-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "npx vitest run src/lib/xbrief/__tests__/no-legacy-task-engine.test.ts"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "no-legacy-task-engine.test.ts passes"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items in the same file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-4"
+          ],
+          "acJustification": "Seven sections in one item; five checks cover the high-value rows."
+        },
+        "narrative": {
+          "Action": "Apply WI-B1 in the PRD to cli/core-commands.mdx (sections `## pan install` through `## pan hygiene`): Appendix B rows B.W.1, B.W.2a, B.W.2, B.W.3-12 and B.M.1-5. Edit only those sections. Never write 'bead', 'beads' or 'bd'. Follow the Common procedure in .pan/drafts/PAN-5501.md (grep anchors, code wins, residual rule, dash rule, link check, MDX safety). Never change code. Commit with Item: core-install-to-hygiene and the AC trailers."
+        },
+        "items": [
+          {
+            "id": "core-install-to-hygiene.ac1",
+            "title": "`grep -nE 'Cursor|Antigravity|Gemini CLI|glab|API key validity' cli/core-commands.mdx` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-install-to-hygiene.ac2",
+            "title": "Given the edited page, the `## pan sync` section names `~/.agents/skills/` and documents `--dry-run`, `--force` and `--diff`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-install-to-hygiene.ac3",
+            "title": "The `## pan install` section lists Herdr with `--skip-herdr` and shows `pan install --check`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-install-to-hygiene.ac4",
+            "title": "Given the edited page, the `## pan doctor` checklist names the Herdr terminal backend checks and `pan doctor github-quota`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-install-to-hygiene.ac5",
+            "title": "Given the edited page, the `## pan diagnose` section says it asks for confirmation unless `--yes` is passed, and `## pan computer` names macOS and Windows through WSL2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "core-up-down",
+        "title": "core-commands.mdx: fix pan up and pan down, remove the stale Pipeline screenshot (WI-B2)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:59:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/core-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "npx vitest run src/lib/xbrief/__tests__/no-legacy-task-engine.test.ts"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "no-legacy-task-engine.test.ts passes"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items in the same file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-6",
+            "FR-9",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-B2 in the PRD to cli/core-commands.mdx (`## pan up` and `## pan down`): Appendix B rows B.W.13-19, B.W.21-25 and B.M.6; S1 wording for the dashboard URL; S4 labels; D3: delete the pipeline ThemedImage block and its Tip and replace the Pipeline paragraph with the exact text in WI-B2. Keep the `## pan up` heading text. Follow the Common procedure in .pan/drafts/PAN-5501.md (grep anchors, code wins, residual rule, dash rule, link check, MDX safety). Never change code. Commit with Item: core-up-down and the AC trailers."
+        },
+        "items": [
+          {
+            "id": "core-up-down.ac1",
+            "title": "`grep -nE 'pan up --minimal|localhost:3010|Verifying|pipeline-light.png|activity feed alongside' cli/core-commands.mdx` prints nothing, and `pan up --skip-traefik` appears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-up-down.ac2",
+            "title": "Given the edited page, the Pipeline paragraph names the phases Ship, Review, Work, Plan and Ready and links /features/dashboard-views",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-up-down.ac3",
+            "title": "Given the edited page, the Agents, Costs and Health bullets under `## pan up` carry the Settings → Experimental label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-up-down.ac4",
+            "title": "Given the edited page, the `## pan down` section says review sessions and the CLIProxy sidecar stop, work agents and conversations keep running, and names Herdr as the default terminal backend",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "core-restart-to-restore",
+        "title": "core-commands.mdx: fix pan update, pan backup and pan restore claims (WI-B3)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:59:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/core-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "npx vitest run src/lib/xbrief/__tests__/no-legacy-task-engine.test.ts"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "no-legacy-task-engine.test.ts passes"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items in the same file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-4"
+          ],
+          "acJustification": "The section range has only three wrong rows; two checks cover them."
+        },
+        "narrative": {
+          "Action": "Apply WI-B3 in the PRD to cli/core-commands.mdx (`## pan restart` through `## pan restore`): Appendix B rows B.W.26-28, plus the residual rule over those sections. Keep the `## pan cost` heading text. Follow the Common procedure in .pan/drafts/PAN-5501.md (grep anchors, code wins, residual rule, dash rule, link check, MDX safety). Never change code. Commit with Item: core-restart-to-restore and the AC trailers."
+        },
+        "items": [
+          {
+            "id": "core-restart-to-restore.ac1",
+            "title": "The `## pan update` section says it runs `pan sync` only when `sync.auto_sync` is on, which is off by default, and names the runtime install under `~/.overdeck/runtime`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-restart-to-restore.ac2",
+            "title": "Given the edited page, the `## pan restore` example uses the timestamp `2026-11-01T04-52-00-000Z` and the backup sentence names the skill, command and agent directories",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "core-health-and-page-checks",
+        "title": "core-commands.mdx: rewrite pan health and finish page-wide checks (WI-B4)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:59:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/core-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/core-commands.mdx | wc -l",
+            "grep -c ThemedImage cli/core-commands.mdx",
+            "npm run lint:docs",
+            "npx vitest run src/lib/xbrief/__tests__/no-legacy-task-engine.test.ts"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "the ThemedImage count prints 0",
+            "lint:docs exits 0",
+            "no-legacy-task-engine.test.ts passes"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items in the same file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-B4 in the PRD to cli/core-commands.mdx: Appendix B rows B.W.29-30, B.R.1-2 in `## pan health`; then delete the ThemedImage import, run the whole-file dash rule, apply D4 frontmatter, and run the no-legacy-task-engine test. Add 'PR-note: cli/core-commands.mdx: <one line>' to the commit message. Follow the Common procedure in .pan/drafts/PAN-5501.md (grep anchors, code wins, residual rule, dash rule, link check, MDX safety). Never change code. Commit with Item: core-health-and-page-checks and the AC trailers."
+        },
+        "items": [
+          {
+            "id": "core-health-and-page-checks.ac1",
+            "title": "The `## pan health` section names only the dashboard, the smee-client webhook relay and the CLIProxy sidecar, and `grep -nE 'Exit code 1 if any service is down|Monitoring in automation scripts' cli/core-commands.mdx` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-health-and-page-checks.ac2",
+            "title": "`grep -c ThemedImage cli/core-commands.mdx` prints 0 and the dash grep over the whole file prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-health-and-page-checks.ac3",
+            "title": "The frontmatter has the D4 title and `sidebarTitle: \"Core Commands\"`, and `npx vitest run src/lib/xbrief/__tests__/no-legacy-task-engine.test.ts` passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hygiene-page",
+        "title": "hygiene.mdx: apply WI-C (Appendix C) and the D4 frontmatter",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:59:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/hygiene.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/hygiene.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items in the same file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-C in the PRD to cli/hygiene.mdx: Appendix C rows C.W.1-7 and C.M.1-3, then D4 frontmatter (title, sidebarTitle, quoted 153-character description). Add 'PR-note: cli/hygiene.mdx: <one line>' to the commit message. Follow the Common procedure in .pan/drafts/PAN-5501.md (grep anchors, code wins, residual rule, dash rule, link check, MDX safety). Never change code. Commit with Item: hygiene-page and the AC trailers."
+        },
+        "items": [
+          {
+            "id": "hygiene-page.ac1",
+            "title": "Given the edited page, the frontmatter has the D4 title, `sidebarTitle: \"Hygiene Check\"` and the quoted D4 description of 153 characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hygiene-page.ac2",
+            "title": "Given the edited page, the page lists the skip check names push, tree, prs, agents, sessions, branches and workspaces, and the duration units h, d and w",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hygiene-page.ac3",
+            "title": "The page states the 10 GB disk floor and that `--fix-safe` deletes a branch locally and on origin, and `grep -n 'configured floor' cli/hygiene.mdx` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hygiene-page.ac4",
+            "title": "Given the edited page, the page says to run `pan hygiene` from the project root and that pull-request checks use the GitHub CLI",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-start-to-tell",
+        "title": "agent-commands.mdx: fix pan start through pan tell, remove the stale Agents screenshot (WI-D1)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:59:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/agent-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "sed -n '1,/^## pan pause/p' cli/agent-commands.mdx | grep -cP '[\\x{2013}\\x{2014}]'",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the range-limited dash count prints 0",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items in the same file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-6",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-D1 in the PRD to cli/agent-commands.mdx (frontmatter line through `### A conversation on a linked machine`): Appendix D rows D.W.1-10 and D.M.1-2 with S2/S3/S4 wording; D3: delete the agents ThemedImage block and the import line, keep the reworded Tip. Keep the `## pan tell` heading text. Follow the Common procedure in .pan/drafts/PAN-5501.md (grep anchors, code wins, residual rule, dash rule, link check, MDX safety). Never change code. Commit with Item: agent-start-to-tell and the AC trailers."
+        },
+        "items": [
+          {
+            "id": "agent-start-to-tell.ac1",
+            "title": "`grep -nE 'Linear or GitHub issue|pan start 42|Cost 24h|agents-light.png|ThemedImage' cli/agent-commands.mdx` prints nothing, and `pan start PAN-42` appears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-start-to-tell.ac2",
+            "title": "Given the edited page, the Agents page paragraph carries the Settings → Experimental label and names the Needs you, Live and Waiting sections",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-start-to-tell.ac3",
+            "title": "Given the edited page, the `## pan tell` section documents `--steer`, `--when-limit-resets` and `--force`, and the `## pan start` section lists `--fresh` and `--force`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-start-to-tell.ac4",
+            "title": "The dash grep over the lines before `## pan pause` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-pause-to-end",
+        "title": "agent-commands.mdx: fix pan pause through Next Steps and add untroubled and reset-session (WI-D2)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:59:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/agent-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/agent-commands.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items in the same file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-D2 in the PRD to cli/agent-commands.mdx (`## pan pause` through `## Next Steps`): Appendix D rows D.W.11-16 and D.M.3-9 with S3 and S5 wording; then whole-file dash rule and D4 frontmatter. Add 'PR-note: cli/agent-commands.mdx: <one line>' to the commit message. Follow the Common procedure in .pan/drafts/PAN-5501.md (grep anchors, code wins, residual rule, dash rule, link check, MDX safety). Never change code. Commit with Item: agent-pause-to-end and the AC trailers."
+        },
+        "items": [
+          {
+            "id": "agent-pause-to-end.ac1",
+            "title": "The page contains the headings `## pan untroubled` and `## pan reset-session`, each with a usage example",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-pause-to-end.ac2",
+            "title": "Given the edited page, the `## pan recover` section documents `--compact` and `--model`, and the `## pan issues` sentence names GitHub, Linear, Rally or Jira with no GitLab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-pause-to-end.ac3",
+            "title": "The `## pan kill` section says the workspace Docker stack stops unless another agent of the issue is live, and `grep -n 'MERGE' cli/agent-commands.mdx` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-pause-to-end.ac4",
+            "title": "The dash grep over the whole file prints nothing and the frontmatter has the D4 title and `sidebarTitle: \"Agent Commands\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "review-page",
+        "title": "review-commands.mdx: apply WI-I (Appendix I) and the D4 frontmatter",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:59:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/review-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/review-commands.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items in the same file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-I in the PRD to cli/review-commands.mdx: Appendix I rows I.W.1-4 and I.M.1-2, including the new `## pan review waive-test-removal` section; then D4 frontmatter (quoted 116-character description). Add 'PR-note: cli/review-commands.mdx: <one line>' to the commit message. Follow the Common procedure in .pan/drafts/PAN-5501.md (grep anchors, code wins, residual rule, dash rule, link check, MDX safety). Never change code. Commit with Item: review-page and the AC trailers."
+        },
+        "items": [
+          {
+            "id": "review-page.ac1",
+            "title": "Given the edited page, the page has a `## pan review waive-test-removal` section showing `--reason` and the synopsis lists it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-page.ac2",
+            "title": "`grep -nE 'click \\*\\*Review\\*\\*|Every subcommand calls the running dashboard' cli/review-commands.mdx` prints nothing, and `Request review` appears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-page.ac3",
+            "title": "The Review modes section says a lane model falls back to `roles.review.model` only when set to `parent` and names each lane's built-in default",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-page.ac4",
+            "title": "Given the edited page, the frontmatter has the D4 title, `sidebarTitle: \"Review Commands\"` and the quoted D4 description",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skills-page",
+        "title": "skills-commands.mdx: apply WI-G (Appendix G) and the D4 frontmatter",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:59:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/skills-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/skills-commands.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items in the same file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-G in the PRD to cli/skills-commands.mdx: Appendix G rows G.W.1-5 and G.M.1-8; then D4 frontmatter (quoted 134-character description). Keep the sageox link and commit heading texts. Add 'PR-note: cli/skills-commands.mdx: <one line>' to the commit message. Follow the Common procedure in .pan/drafts/PAN-5501.md (grep anchors, code wins, residual rule, dash rule, link check, MDX safety). Never change code. Commit with Item: skills-page and the AC trailers."
+        },
+        "items": [
+          {
+            "id": "skills-page.ac1",
+            "title": "Given the edited page, `--group <name>` is documented in the `pan skills set` and `pan skills pack add` synopses and flag tables",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-page.ac2",
+            "title": "Given the edited page, the known-packs sentence lists remotion, hyperframes, openmontage and video-use alongside the earlier packs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-page.ac3",
+            "title": "The `pan skills pack list` section says text output lists known packs not yet added and the pack groups, and that `--json` prints only registered packs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-page.ac4",
+            "title": "Every `/features/skill-packs#pack-groups` link resolves to the `### Pack groups` heading and the frontmatter has the D4 title and `sidebarTitle: \"Skills Commands\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workspace-overview-and-docker",
+        "title": "workspace-commands.mdx: fix Overview through Docker Integration, remove the Resources screenshot (WI-H1)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:59:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/workspace-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "npx vitest run src/lib/xbrief/__tests__/no-legacy-task-engine.test.ts"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "no-legacy-task-engine.test.ts passes"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items in the same file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-6",
+            "FR-9",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-H1 in the PRD to cli/workspace-commands.mdx (frontmatter line through `### Docker Integration`): Appendix H rows H.W.1-8 and H.M.1; D3: delete the resources ThemedImage block, apply H.W.3 with the S4 label, rewrite the Tip per H.W.5. Never write 'bead', 'beads' or 'bd'. Follow the Common procedure in .pan/drafts/PAN-5501.md (grep anchors, code wins, residual rule, dash rule, link check, MDX safety). Never change code. Commit with Item: workspace-overview-and-docker and the AC trailers."
+        },
+        "items": [
+          {
+            "id": "workspace-overview-and-docker.ac1",
+            "title": "The Overview names the branch `feature/<issue-id>` and the path `workspaces/feature-{issue-id}/`, and `grep -n 'workspaces/{issue-id}/' cli/workspace-commands.mdx` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-overview-and-docker.ac2",
+            "title": "`grep -nE 'docker compose -p|resources-light.png' cli/workspace-commands.mdx` prints nothing, and the Docker section says the compose file's `name:` or `COMPOSE_PROJECT_NAME` sets the project name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-overview-and-docker.ac3",
+            "title": "The Resources paragraph carries the Settings → Experimental label, and the dash grep over the lines before `## pan workspace list` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workspace-list-to-safeguards",
+        "title": "workspace-commands.mdx: fix list, destroy, hooks and safeguards, add other subcommands (WI-H2)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:59:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/workspace-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/workspace-commands.mdx | wc -l",
+            "grep -c ThemedImage cli/workspace-commands.mdx",
+            "npm run lint:docs",
+            "npx vitest run src/lib/xbrief/__tests__/no-legacy-task-engine.test.ts"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "the ThemedImage count prints 0",
+            "lint:docs exits 0",
+            "no-legacy-task-engine.test.ts passes"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items in the same file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-H2 in the PRD to cli/workspace-commands.mdx (`## pan workspace list` through `### Specialist Agent Safeguards`): Appendix H rows H.W.9-15 and H.M.2-4 with D3 (delete the awaiting-merge ThemedImage block), D6 and D8; add `## Other workspace subcommands`; then delete the import line, run the whole-file dash rule, D4 frontmatter and the no-legacy-task-engine test. Add 'PR-note: cli/workspace-commands.mdx: <one line>' to the commit message. Follow the Common procedure in .pan/drafts/PAN-5501.md (grep anchors, code wins, residual rule, dash rule, link check, MDX safety). Never change code. Commit with Item: workspace-list-to-safeguards and the AC trailers."
+        },
+        "items": [
+          {
+            "id": "workspace-list-to-safeguards.ac1",
+            "title": "Given the edited page, the page has a `## Other workspace subcommands` section that lists `add-repo`, `reap`, `update`, `new` and `archive`, one line each",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-list-to-safeguards.ac2",
+            "title": "Given the edited page, the `## pan workspace destroy` section says the local feature branch is deleted with `git branch -D` and documents `--shape` and `--purge-memory`, and `Force destroy (even with uncommitted changes)` no longer appears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-list-to-safeguards.ac3",
+            "title": "`grep -nE 'merge-agent|Create workspaces if needed|instead of .main.' cli/workspace-commands.mdx` prints nothing, and the warning text `Main project directory is not on 'main' branch!` appears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-list-to-safeguards.ac4",
+            "title": "`grep -c ThemedImage cli/workspace-commands.mdx` prints 0, the whole-file dash grep prints nothing, the frontmatter has `sidebarTitle: \"Workspace Commands\"`, and the no-legacy-task-engine test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-page",
+        "title": "conversation-commands.mdx: apply WI-J1 (Appendix J1)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:59:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/conversation-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/conversation-commands.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items in the same file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-J1 in the PRD to cli/conversation-commands.mdx: Appendix J1 rows J1.W.1-5 and J1.M.1-12 with S5 (document `pan recover --compact`, not `pan resume --compact`) and the S4 label for the Sessions page. Frontmatter stays. Add 'PR-note: cli/conversation-commands.mdx: <one line>' to the commit message. Follow the Common procedure in .pan/drafts/PAN-5501.md (grep anchors, code wins, residual rule, dash rule, link check, MDX safety). Never change code. Commit with Item: conversation-page and the AC trailers."
+        },
+        "items": [
+          {
+            "id": "conversation-page.ac1",
+            "title": "`grep -n 'pan resume PAN-1148 --compact' cli/conversation-commands.mdx` prints nothing and the `## pan resume` section points to `pan recover <id> --compact`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-page.ac2",
+            "title": "Given the edited page, the unarchive example reads `pan unarchive-conversation 20261030-4471` and the handoff start example names `held-conv`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-page.ac3",
+            "title": "The `## pan fork` section says it refuses conversations without a Claude Code transcript and points to `pan handoff`, and the `## pan tell` row for `--steer` says Claude Code and Pi only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-page.ac4",
+            "title": "Given the edited page, the auto-settle rows state their allowed values and defaults (on/off default on, on/off/inherit, 0 to 365 default 3)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "memory-page",
+        "title": "memory-commands.mdx: apply WI-J2 (Appendix J2)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:59:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/memory-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/memory-commands.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items in the same file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-J2 in the PRD to cli/memory-commands.mdx: Appendix J2 rows J2.W.1-2 and J2.M.1-4. Keep the `## pan memory` heading text. Frontmatter stays. Add 'PR-note: cli/memory-commands.mdx: <one line>' to the commit message. Follow the Common procedure in .pan/drafts/PAN-5501.md (grep anchors, code wins, residual rule, dash rule, link check, MDX safety). Never change code. Commit with Item: memory-page and the AC trailers."
+        },
+        "items": [
+          {
+            "id": "memory-page.ac1",
+            "title": "The `## pan briefing` section names `~/.overdeck/session-context.md` and `--cwd`, and `grep -n 'the same context a managed session receives at' cli/memory-commands.mdx` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-page.ac2",
+            "title": "Given the edited page, in the `### pan memory add` table the `--type` and `--description` cells begin with `Required.`, and the reset row says `--reason` is required",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-page.ac3",
+            "title": "A line after the Pins table says `--project` defaults to `overdeck` for pin, unpin and pins, and the docs index sentence names the root `CLAUDE.md`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipeline-page",
+        "title": "pipeline-commands.mdx: apply WI-F (Appendix F)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:59:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/pipeline-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/pipeline-commands.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items in the same file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply WI-F in the PRD to cli/pipeline-commands.mdx: Appendix F rows F.W.1-11 (F.W.11 decided in WI-F) and F.M.1-5. Keep the `## pan orders`, `## pan spawn` and `## pan swarm` heading texts. Frontmatter stays. Add 'PR-note: cli/pipeline-commands.mdx: <one line>' to the commit message. Follow the Common procedure in .pan/drafts/PAN-5501.md (grep anchors, code wins, residual rule, dash rule, link check, MDX safety). Never change code. Commit with Item: pipeline-page and the AC trailers."
+        },
+        "items": [
+          {
+            "id": "pipeline-page.ac1",
+            "title": "`grep -nE 'it used to start the work agent automatically|Flywheel auto-merge' cli/pipeline-commands.mdx` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-page.ac2",
+            "title": "Given the edited page, the `## pan strike` section says a strike PR gets one automatic quick review per head and merges after the 5-minute cancel window unless the project holds for UAT",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-page.ac3",
+            "title": "The `pan ask` example passes two `--option` values and the `pan task next` row says it prints every item ready to dispatch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-page.ac4",
+            "title": "Given the edited page, the `## pan swarm` table has a `pan swarm <id>` row and the `## pan close` section names the ninth row, Close-out teardown verified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "validate-and-pr-body",
+        "title": "Run the group validators and draft the per-page PR body",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T00:59:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5501",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/overview.mdx",
+            "cli/core-commands.mdx",
+            "cli/hygiene.mdx",
+            "cli/agent-commands.mdx",
+            "cli/workspace-commands.mdx",
+            "cli/review-commands.mdx",
+            "cli/skills-commands.mdx",
+            "cli/conversation-commands.mdx",
+            "cli/pipeline-commands.mdx",
+            "cli/memory-commands.mdx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run lint:docs",
+            "npx vitest run src/lib/xbrief/__tests__/no-legacy-task-engine.test.ts",
+            "npx -y mint@4.3.49 validate",
+            "npx -y mint@4.3.49 broken-links",
+            "grep -l ThemedImage cli/overview.mdx cli/core-commands.mdx cli/agent-commands.mdx cli/workspace-commands.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs prints 'docs lint passed'",
+            "no-legacy-task-engine.test.ts passes",
+            "mint validate reports success",
+            "mint broken-links reports no broken links",
+            "the ThemedImage grep prints nothing"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-10",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow WI-Z1 in .pan/drafts/PAN-5501.md: run the dash loop over all ten pages, the ThemedImage check, the frontmatter check, npm run lint:docs, the no-legacy-task-engine vitest file, npx -y mint@4.3.49 validate and broken-links (never --fix); fix any failure on a group page in this commit (failures outside the group become Follow-ups after confirming them on origin/main); then write the PR-body draft (ten ticked page lines from the PR-note commit lines, validator output, Follow-ups from the PRD) into this item's commit message above the trailers. After pan done opens the PR, append the draft to the PR body with gh pr edit (WI-Z1 step 7). Commit with Item: validate-and-pr-body."
+        },
+        "items": [
+          {
+            "id": "validate-and-pr-body.ac1",
+            "title": "The dash loop over all ten group pages prints nothing, the ThemedImage grep prints nothing, and `npm run lint:docs` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-pr-body.ac2",
+            "title": "`npx -y mint@4.3.49 validate` and `npx -y mint@4.3.49 broken-links` report success, and the validation commit message contains their output (or the exact download error when the CLI cannot be fetched)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-pr-body.ac3",
+            "title": "The validation commit message contains a PR-body draft with ten ticked `cli/<page>.mdx` lines with one note each and a `## Follow-ups` section listing the PRD's follow-ups",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-pr-body.ac4",
+            "title": "Each of the seven retitled pages renders a `sidebarTitle`, and every group page's `description` is 50 to 160 characters with no U+2013/U+2014",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "core-install-to-hygiene",
+        "to": "core-up-down",
+        "type": "blocks"
+      },
+      {
+        "from": "core-up-down",
+        "to": "core-restart-to-restore",
+        "type": "blocks"
+      },
+      {
+        "from": "core-restart-to-restore",
+        "to": "core-health-and-page-checks",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-start-to-tell",
+        "to": "agent-pause-to-end",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-overview-and-docker",
+        "to": "workspace-list-to-safeguards",
+        "type": "blocks"
+      },
+      {
+        "from": "overview-page",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "core-health-and-page-checks",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "hygiene-page",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-pause-to-end",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "review-page",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "skills-page",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-list-to-safeguards",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-page",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "memory-page",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "pipeline-page",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
