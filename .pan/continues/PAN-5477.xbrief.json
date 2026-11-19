@@ -1,0 +1,230 @@
+{
+  "version": "1",
+  "issueId": "PAN-5477",
+  "created": "2026-11-19T00:10:58.762Z",
+  "updated": "2026-11-19T00:46:46.234Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-19T00:46Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-19T00:46:46.234Z"
+    }
+  ],
+  "items": {
+    "page-claude-modes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5477",
+      "claimedAt": "2026-11-19T00:10:58.762Z",
+      "doneAt": "2026-11-19T00:12:46.599Z"
+    },
+    "page-claude-modes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:12:46.599Z"
+    },
+    "page-claude-modes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:12:46.599Z"
+    },
+    "page-claude-modes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:12:46.599Z"
+    },
+    "page-claude-modes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:12:46.599Z"
+    },
+    "page-yolo": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5477",
+      "claimedAt": "2026-11-19T00:13:02.224Z",
+      "doneAt": "2026-11-19T00:14:06.798Z"
+    },
+    "page-yolo.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:14:06.798Z"
+    },
+    "page-yolo.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:14:06.798Z"
+    },
+    "page-yolo.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:14:06.798Z"
+    },
+    "page-codex": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5477",
+      "claimedAt": "2026-11-19T00:14:16.678Z",
+      "doneAt": "2026-11-19T00:15:16.842Z"
+    },
+    "page-codex.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:15:16.842Z"
+    },
+    "page-codex.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:15:16.842Z"
+    },
+    "page-codex.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:15:16.842Z"
+    },
+    "page-codex.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:15:16.842Z"
+    },
+    "page-prompts": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5477",
+      "claimedAt": "2026-11-19T00:15:27.175Z",
+      "doneAt": "2026-11-19T00:16:04.891Z"
+    },
+    "page-prompts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:16:04.891Z"
+    },
+    "page-prompts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:16:04.891Z"
+    },
+    "page-prompts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:16:04.891Z"
+    },
+    "page-labels": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5477",
+      "claimedAt": "2026-11-19T00:16:14.265Z",
+      "doneAt": "2026-11-19T00:16:53.307Z"
+    },
+    "page-labels.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:16:53.307Z"
+    },
+    "page-labels.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:16:53.307Z"
+    },
+    "page-labels.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:16:53.307Z"
+    },
+    "page-git-shim": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5477",
+      "claimedAt": "2026-11-19T00:17:01.115Z",
+      "doneAt": "2026-11-19T00:17:43.616Z"
+    },
+    "page-git-shim.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:17:43.616Z"
+    },
+    "page-git-shim.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:17:43.616Z"
+    },
+    "page-git-shim.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:17:43.616Z"
+    },
+    "page-primary-checkout": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5477",
+      "claimedAt": "2026-11-19T00:17:53.209Z",
+      "doneAt": "2026-11-19T00:18:36.598Z"
+    },
+    "page-primary-checkout.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:18:36.598Z"
+    },
+    "page-primary-checkout.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:18:36.598Z"
+    },
+    "page-primary-checkout.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:18:36.598Z"
+    },
+    "page-other-guardrails": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5477",
+      "claimedAt": "2026-11-19T00:18:47.324Z",
+      "doneAt": "2026-11-19T00:19:36.530Z"
+    },
+    "page-other-guardrails.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:19:36.530Z"
+    },
+    "page-other-guardrails.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:19:36.530Z"
+    },
+    "page-other-guardrails.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:19:36.530Z"
+    },
+    "docs-nav": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5477",
+      "claimedAt": "2026-11-19T00:19:41.315Z",
+      "doneAt": "2026-11-19T00:22:16.071Z"
+    },
+    "docs-nav.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:22:16.071Z"
+    },
+    "docs-nav.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:22:16.071Z"
+    },
+    "related-links": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5477",
+      "claimedAt": "2026-11-19T00:22:25.642Z",
+      "doneAt": "2026-11-19T00:23:42.545Z"
+    },
+    "related-links.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:23:42.545Z"
+    },
+    "related-links.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:23:42.545Z"
+    },
+    "related-links.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:23:42.545Z"
+    },
+    "validate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5477",
+      "claimedAt": "2026-11-19T00:23:53.411Z",
+      "doneAt": "2026-11-19T00:26:06.982Z"
+    },
+    "validate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:26:06.982Z"
+    },
+    "validate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:26:06.982Z"
+    },
+    "validate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T00:26:06.982Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-19T00:46:46Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5477 (PR #5570)\n\nCodeRabbit posted 1 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4622883594 · configuration/mcp.mdx:616 [Minor]: Correct the Auto-mode prompt claim for role allow-lists.\n  https://github.com/eltmon/overdeck/pull/5570#discussion_r4622883594\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5570/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5477 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5570 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    }
+  ]
+}

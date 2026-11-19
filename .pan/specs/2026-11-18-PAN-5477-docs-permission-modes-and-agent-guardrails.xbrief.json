@@ -1,0 +1,854 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-18T23:45:47Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5477: docs: permission modes and agent guardrails",
+    "updated": "2026-11-19T00:10:34.603Z"
+  },
+  "plan": {
+    "id": "pan-5477",
+    "title": "docs: permission modes and agent guardrails",
+    "status": "running",
+    "uid": "72e002b9-f2c0-4846-9911-2b1777fb24b0",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-18T23:45:47Z",
+    "updated": "2026-11-19T00:10:34.603Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5477",
+        "label": "PAN-5477",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5467",
+        "label": "Docs overhaul epic",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5566",
+        "label": "Stale permission-mode text bug",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5567",
+        "label": "Codex app-server ignores codex.permissionMode bug",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docs",
+      "permissions",
+      "guardrails",
+      "mintlify"
+    ],
+    "narratives": {
+      "Problem": "Overdeck has no user page about permissions. Facts are scattered across reference/settings.mdx, configuration/mcp.mdx, configuration/auto-merge.mdx and cli/conversation-commands.mdx. Planning also found that the Settings Auto description and pan --help say Auto blocks destructive commands, while the auto-approve hook approves every tool call except AskUserQuestion for sessions Overdeck launches (filed as #5566).",
+      "Proposal": "Add configuration/permissions.mdx with sections on Claude Code permission modes, the --yolo/PAN_YOLO override, Codex modes, answering permission prompts from the dashboard, operator-only labels, the agent git shim, primary checkout refusals, other guardrails and getting help, every fact taken from code per PRD facts F-1 to F-36. Document what the code does and link #5566 once where UI and help text disagree. Add the page to docs.json after configuration/harnesses, change one link or add one sentence in four related pages, and validate with mint@4.3.49 and lint:docs.",
+      "NonGoals": "- No code change: the Settings Auto and Codex descriptions, the pan --help --yolo text, tests/fixtures/pan-help.txt, the settings-api.ts comment, docs/CONFIGURATION.md and the project .pan.yaml permission override are fixed in #5566\n- No claim that Auto blocks, filters or classifies destructive commands, and no mention of --dangerously-skip-permissions\n- No code change for the Codex app-server permission mode (#5567); the page describes today's behavior and links it\n- No mention of the answer_agent_permission MCP tool (it serves the excluded legacy Channels relay)\n- No screenshots and no change to images/\n- No HTTP route reference, no legacy Channels Tool Permission Required dialog, no IS_SANDBOX, no per-project .pan.yaml override, no pan shutdown deny, no Deft permission rules\n- No claim about whether pan reload or pan restart keeps a --yolo override\n- No sentence changes in the four linking pages beyond one added sentence or the one Settings row link\n- No changelog.d entry"
+    },
+    "autoDecisions": [
+      {
+        "summary": "One new page configuration/permissions.mdx placed right after configuration/harnesses in the Configuration group",
+        "rationale": "The issue names configuration/permissions.mdx, and permission modes are configured per harness."
+      },
+      {
+        "summary": "Where code and the Settings or --help text disagree, document the code and link the filed bug #5566 once",
+        "rationale": "The issue requires every claim to match current code; the same pattern was used for #5562 in the merged costs page (PAN-5475)."
+      },
+      {
+        "summary": "Describe the git and gh shims and deny rules as accident prevention, not a sandbox",
+        "rationale": "launcher-git-guard.ts and claude-settings-overlay.ts state this themselves; readers must not over-trust them."
+      },
+      {
+        "summary": "Repoint the reference/settings.mdx Permissions row link from Harnesses to the new page; other linking pages get one added sentence",
+        "rationale": "The new page is the dedicated page for that Settings section; one-change edits avoid conflicts with sibling docs issues."
+      },
+      {
+        "summary": "Cover Codex modes and pan task claim guardrails alongside the issue-listed topics",
+        "rationale": "Codex shares the Settings Permissions section, and #4357 (task claim) is in the v0.64.0 changelog entry the issue lists."
+      },
+      {
+        "summary": "Leave out the legacy Channels permission dialog and the per-project .pan.yaml override",
+        "rationale": "Channels is an opt-in legacy transport; the .pan.yaml override depends on the launching process cwd and is under review in #5566."
+      }
+    ],
+    "items": [
+      {
+        "id": "page-claude-modes",
+        "title": "Create configuration/permissions.mdx with frontmatter, intro and the Claude Code permission modes section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T23:45:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5477",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/permissions.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## Claude Code permission modes$' configuration/permissions.mdx",
+            "awk '/^## Claude Code permission modes$/{f=1;next} /^## /{f=0} f' configuration/permissions.mdx | grep -c 'issues/5566'",
+            "! grep -qiE 'classifier|blocks destructive|exfiltrat|dangerously-skip-permissions' configuration/permissions.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 1",
+            "the 5566 grep prints at least 1",
+            "the stale-claim check exits 0",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2",
+            "NFR-5",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5477.md work item 1, decisions D-1, D-2, D-3 and facts F-1 to F-9. Create configuration/permissions.mdx with the exact D-1 frontmatter (title, sidebarTitle, description; all quoted) and an H1 'Permissions and agent guardrails', a 2 to 4 sentence intro, then '## Claude Code permission modes': a two-row Auto/Bypass table with the flags each passes (--permission-mode default, --permission-mode bypassPermissions); the auto-approve hook approves every tool call except AskUserQuestion for sessions Overdeck launches (issue agents including review, test and workers, planning agents, conversations, the Flywheel, strike and inspect agents, the backlog sequencer) and leaves a claude session you start yourself with normal prompts (F-4); the practical comparison and 'neither mode is a sandbox' (F-5); one sentence that the Settings description and pan --help currently say Auto stops dangerous commands and it does not (the caveat must not contain 'classifier', 'blocks destructive' or 'exfiltration', because the page-wide stale-claim grep forbids them), linking https://github.com/eltmon/overdeck/issues/5566 (first run 'gh issue view 5566 --json state'; if closed, describe the fixed state per D-3 instead); the new-install default and the one-time existing-install pin recorded in ~/.overdeck/.claude-permission-mode-pin.json (F-2); Settings > Permissions > Claude Code with **Auto (recommended)** and **Bypass (yolo)** plus the YAML block (F-3); the launch guard and the pan doctor 'Claude Permission Mode' row, paraphrased, mentioning pan sync and jq (F-6, F-7); remote Fly agents need Bypass (F-8); a change applies to new launches only (F-9). Never write that Auto blocks, filters or classifies commands. Re-grep every cited anchor in .pan/drafts/PAN-5477.md before writing the sentence that depends on it; never copy from other docs pages or from the stale strings named in issue 5566. Obey NFR-2 (no U+2013/U+2014 on any added line) and NFR-5 (quoted frontmatter, <word> placeholders in backticks, no bare $, a bare < before a digit as &lt;)."
+        },
+        "items": [
+          {
+            "id": "page-claude-modes.ac1",
+            "title": "Given the new page, when 'awk '/^## Claude Code permission modes$/{f=1;next} /^## /{f=0} f' configuration/permissions.mdx' runs, then its output contains '--permission-mode default', 'bypassPermissions', 'auto-approve', 'pan doctor', 'jq', '.claude-permission-mode-pin.json' and 'Fly'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-claude-modes.ac2",
+            "title": "The page's frontmatter description is quoted, 50 to 160 characters long and contains no U+2013 or U+2014 character",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-claude-modes.ac3",
+            "title": "A case-insensitive grep for 'classifier|blocks destructive|exfiltrat|dangerously-skip-permissions' in configuration/permissions.mdx returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-claude-modes.ac4",
+            "title": "The Claude Code section contains a link to https://github.com/eltmon/overdeck/issues/5566 and a sentence that a claude session started outside Overdeck keeps Claude Code's normal prompts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-yolo",
+        "title": "Add the Override the mode for one command section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T23:45:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5477",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/permissions.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## Override the mode for one command$' configuration/permissions.mdx",
+            "awk '/^## Override the mode for one command$/{f=1;next} /^## /{f=0} f' configuration/permissions.mdx | grep -oE 'PAN_YOLO|--no-yolo' | sort -u | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 1",
+            "the PAN_YOLO count prints 2",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5477.md work item 2 and facts F-10 to F-13. Add '## Override the mode for one command': a code block with 'pan start PAN-12 --yolo', 'pan up --no-yolo' and 'PAN_YOLO=true pan start PAN-12'; the --yolo forms and that it works in any argv position (F-10); the accepted PAN_YOLO values (F-11); precedence as a three-step numbered list: PAN_YOLO or --yolo, then claude.permissionMode, then auto (F-12); reach: the pan process and what it starts, pan start --yolo affects that agent, pan up --yolo makes the dashboard it starts launch agents and conversations in bypass for as long as that dashboard process runs, running agents are unchanged, and Settings > Permissions is the lasting change (F-13). Do not claim anything about pan reload or pan restart. Re-grep every cited anchor in .pan/drafts/PAN-5477.md before writing the sentence that depends on it; never copy from other docs pages or from the stale strings named in issue 5566. Obey NFR-2 (no U+2013/U+2014 on any added line) and NFR-5 (quoted frontmatter, <word> placeholders in backticks, no bare $, a bare < before a digit as &lt;)."
+        },
+        "items": [
+          {
+            "id": "page-yolo.ac1",
+            "title": "The section contains '--yolo', '--no-yolo' and 'PAN_YOLO', and lists the precedence as a numbered list whose first step names PAN_YOLO and whose last step is auto",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-yolo.ac2",
+            "title": "The section contains a sentence that 'pan up' with '--yolo' makes agents launched by that dashboard use Bypass while that dashboard process runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-yolo.ac3",
+            "title": "The section contains **Permissions** in a sentence naming Settings as the way to change the mode for good",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-codex",
+        "title": "Add the Codex permission modes section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T23:45:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5477",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/permissions.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## Codex permission modes$' configuration/permissions.mdx",
+            "awk '/^## Codex permission modes$/{f=1;next} /^## /{f=0} f' configuration/permissions.mdx | grep -oE 'read-only|workspace|auto-review|full-access|issues/5567' | sort -u | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 1",
+            "the mode count prints 5",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5477.md work item 3 and facts F-14, F-15, F-15a. Add '## Codex permission modes': a four-row table with the Settings option names (**Read-only**, **Workspace**, **Auto-review (recommended)**, **Full access (yolo)**), the codex.permissionMode value, and what Codex does, paraphrasing the Auto-review description (its UI string has an em dash); the default auto-review; the mode applies to Codex conversations and to Codex work, planning and recovery launches; it takes effect on the next new or resumed session; --yolo and PAN_YOLO do not change it; the default-transport caveat: on codex.transport app-server (the default) Overdeck starts every thread with approval on request and the workspace-write sandbox, so Workspace and Auto-review behave as described while Read-only and Full access take effect only with codex.transport: tui, linking https://github.com/eltmon/overdeck/issues/5567 (first run 'gh issue view 5567 --json state'; if closed, re-read app-server-host.ts and app-server-manager.ts and describe the fixed behavior); one sentence linking /configuration/harnesses for the ACP harness. Re-grep every cited anchor in .pan/drafts/PAN-5477.md before writing the sentence that depends on it; never copy from other docs pages or from the stale strings named in issue 5566. Obey NFR-2 (no U+2013/U+2014 on any added line) and NFR-5 (quoted frontmatter, <word> placeholders in backticks, no bare $, a bare < before a digit as &lt;)."
+        },
+        "items": [
+          {
+            "id": "page-codex.ac1",
+            "title": "The section renders a table containing 'read-only', 'workspace', 'auto-review' and 'full-access'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-codex.ac2",
+            "title": "The section contains a sentence that the Codex mode applies to Codex agents as well as Codex conversations, and a sentence that --yolo does not change it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-codex.ac3",
+            "title": "The section contains a link to /configuration/harnesses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-codex.ac4",
+            "title": "The section contains 'transport' and a link to https://github.com/eltmon/overdeck/issues/5567 next to a sentence that Read-only and Full access take effect only with the tui transport",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-prompts",
+        "title": "Add the Answer permission prompts from the dashboard section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T23:45:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5477",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/permissions.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## Answer permission prompts from the dashboard$' configuration/permissions.mdx",
+            "awk '/^## Answer permission prompts from the dashboard$/{f=1;next} /^## /{f=0} f' configuration/permissions.mdx | grep -oE 'Permission needed|Needs you' | sort -u | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 1",
+            "the label count prints 2",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5477.md work item 4 and facts F-16 to F-19. Add '## Answer permission prompts from the dashboard': a conversation stopped at a Claude Code permission prompt opens the **Permission needed** dialog showing conversation, agent, tool and command, with **Allow once**, **Allow always** and **Deny**, or **Open terminal** when the prompt is not on screen (F-16); waiting prompts, questions and plans appear under **Needs you** on the Activity page and you can open or answer them from there; do not claim every row has both buttons (F-17); one sentence linking /configuration/push-notifications for phone notifications (F-18); one sentence linking /configuration/mcp for the answer_permission tool and its approve scope, naming no other tool (F-19). Do not document HTTP routes or the legacy Channels dialog (D-5). Re-grep every cited anchor in .pan/drafts/PAN-5477.md before writing the sentence that depends on it; never copy from other docs pages or from the stale strings named in issue 5566. Obey NFR-2 (no U+2013/U+2014 on any added line) and NFR-5 (quoted frontmatter, <word> placeholders in backticks, no bare $, a bare < before a digit as &lt;)."
+        },
+        "items": [
+          {
+            "id": "page-prompts.ac1",
+            "title": "The section contains 'Permission needed', 'Allow once', 'Allow always', 'Deny' and 'Open terminal'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-prompts.ac2",
+            "title": "The section contains 'Needs you' and links to /configuration/push-notifications and /configuration/mcp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-prompts.ac3",
+            "title": "A grep for 'Tool Permission Required', 'answer_agent_permission' and '/api/' in the section returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-labels",
+        "title": "Add the Operator-only labels section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T23:45:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5477",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/permissions.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## Operator-only labels$' configuration/permissions.mdx",
+            "awk '/^## Operator-only labels$/{f=1;next} /^## /{f=0} f' configuration/permissions.mdx | grep -oE 'released|vetoed|auto-merge|hold-for-uat' | sort -u | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 1",
+            "the label count prints 4",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5477.md work item 5 and facts F-20 to F-23. Add '## Operator-only labels': a four-row table (Label, What it means, More) for released and vetoed (link /features/flywheel) and auto-merge and hold-for-uat (link /configuration/auto-merge); the agent gh refuses adding or removing them and tells the agent to ask you, for work agents, conversations and the Flywheel (F-21); the dashboard routes that write them need admin access, which no agent token holds (F-22); one sentence that this is a PATH shim against accidents, not a sandbox, because an absolute /usr/bin/gh bypasses it (F-23). Keep 'gh issue|pr edit|create' and any other text containing a pipe out of table cells; describe the refused commands in prose below the table. Re-grep every cited anchor in .pan/drafts/PAN-5477.md before writing the sentence that depends on it; never copy from other docs pages or from the stale strings named in issue 5566. Obey NFR-2 (no U+2013/U+2014 on any added line) and NFR-5 (quoted frontmatter, <word> placeholders in backticks, no bare $, a bare < before a digit as &lt;)."
+        },
+        "items": [
+          {
+            "id": "page-labels.ac1",
+            "title": "The section renders a table containing 'released', 'vetoed', 'auto-merge' and 'hold-for-uat' with links to /features/flywheel and /configuration/auto-merge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-labels.ac2",
+            "title": "The section contains a sentence that an agent's gh refuses to add or remove these labels",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-labels.ac3",
+            "title": "The section contains a sentence that the gh shim is not a sandbox and an absolute gh path bypasses it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-git-shim",
+        "title": "Add The agent git shim section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T23:45:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5477",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/permissions.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## The agent git shim$' configuration/permissions.mdx",
+            "awk '/^## The agent git shim$/{f=1;next} /^## /{f=0} f' configuration/permissions.mdx | grep -oE 'git rebase|git stash|reset --hard|detached|--read-only|Overdeck-Agent' | sort -u | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 1",
+            "the shim count prints 6",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5477.md work item 6 and facts F-24 to F-28. Add '## The agent git shim': a bullet list of refused commands (git rebase with the pan sync-main / pan done suggestion, state-moving git stash with stash list and show allowed, git reset --hard) (F-24); commit, push, merge and cherry-pick are refused on the wrong branch or a detached HEAD, with the workspaces/feature-<name> on feature/<name> example and the instruction to report through pan tell (F-25); it acts only on the agent's own worktree (F-26); pan worker run --read-only workers get git writes blocked in the repository while status, diff, log and show still work (F-27); the Overdeck-Agent and Overdeck-Conversation commit trailers, and the not-a-sandbox sentence (F-28). Put every <name> placeholder in backticks. Re-grep every cited anchor in .pan/drafts/PAN-5477.md before writing the sentence that depends on it; never copy from other docs pages or from the stale strings named in issue 5566. Obey NFR-2 (no U+2013/U+2014 on any added line) and NFR-5 (quoted frontmatter, <word> placeholders in backticks, no bare $, a bare < before a digit as &lt;)."
+        },
+        "items": [
+          {
+            "id": "page-git-shim.ac1",
+            "title": "The section contains 'git rebase', 'git stash', 'reset --hard' and 'detached'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-git-shim.ac2",
+            "title": "The section contains '--read-only' with a sentence that read-only workers cannot write with git",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-git-shim.ac3",
+            "title": "The section contains 'Overdeck-Agent' and a sentence that an absolute git path bypasses the shim",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-primary-checkout",
+        "title": "Add the Primary checkout refusals section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T23:45:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5477",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/permissions.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## Primary checkout refusals$' configuration/permissions.mdx",
+            "awk '/^## Primary checkout refusals$/{f=1;next} /^## /{f=0} f' configuration/permissions.mdx | grep -oE 'allow-primary|use a worktree|pan worker run|/features/file-explorer' | sort -u | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 1",
+            "the refusal count prints 4",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5477.md work item 7 and facts F-29 to F-32. Add '## Primary checkout refusals': pan fork and pan handoff --cwd must be an absolute existing directory inside your home directory with no '..' (F-29); a primary checkout is refused with the message in a code span, ending 'use a worktree', and --allow-primary overrides it only for the operator, never for an agent session (F-30); read-write pan worker run --cwd inside a primary checkout is refused, --read-only workers are not checked (F-31); one sentence that the file explorer never writes the main checkout, linking /features/file-explorer#edit-workspaces (F-32). Re-grep every cited anchor in .pan/drafts/PAN-5477.md before writing the sentence that depends on it; never copy from other docs pages or from the stale strings named in issue 5566. Obey NFR-2 (no U+2013/U+2014 on any added line) and NFR-5 (quoted frontmatter, <word> placeholders in backticks, no bare $, a bare < before a digit as &lt;)."
+        },
+        "items": [
+          {
+            "id": "page-primary-checkout.ac1",
+            "title": "The section contains '--allow-primary' and a sentence that agent sessions are refused even with it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-primary-checkout.ac2",
+            "title": "The section contains the refusal text ending 'use a worktree' inside a code span",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-primary-checkout.ac3",
+            "title": "The section contains 'pan worker run' and a link to /features/file-explorer#edit-workspaces",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "page-other-guardrails",
+        "title": "Add the Other guardrails, Get help and See also sections",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T23:45:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5477",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/permissions.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -cE '^## (Other guardrails|Get help|See also)$' configuration/permissions.mdx",
+            "grep -c 'https://discord.gg/ZpHE2ZTv5P' configuration/permissions.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the heading grep prints 3",
+            "the Discord grep prints at least 1",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5477.md work item 8 and facts F-33 to F-35. Add '## Other guardrails': pan task claim refuses an item a live agent holds or an overlapping one, a low-confidence scope counts as overlapping, --steal overrides and reports what it overrode, link /cli/pipeline-commands (F-33); issue agents get deny rules in the workspace .claude/settings.local.json for .claude/agents/, .claude/hooks/, ~/.overdeck/, ~/.claude/projects/ and tmux send-keys/paste-buffer, described as best effort with the 'cd .claude && rm -rf agents/' example (F-34); a work agent cannot type into another session, agents use pan tell (F-35). Then '## Get help' with https://discord.gg/ZpHE2ZTv5P and https://github.com/eltmon/overdeck/issues, and '## See also' with the eight links listed in work item 8. Re-grep every cited anchor in .pan/drafts/PAN-5477.md before writing the sentence that depends on it; never copy from other docs pages or from the stale strings named in issue 5566. Obey NFR-2 (no U+2013/U+2014 on any added line) and NFR-5 (quoted frontmatter, <word> placeholders in backticks, no bare $, a bare < before a digit as &lt;)."
+        },
+        "items": [
+          {
+            "id": "page-other-guardrails.ac1",
+            "title": "The Other guardrails section contains 'pan task claim', '--steal', 'settings.local.json' and 'pan tell'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-other-guardrails.ac2",
+            "title": "The Get help section contains https://discord.gg/ZpHE2ZTv5P and https://github.com/eltmon/overdeck/issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-other-guardrails.ac3",
+            "title": "The See also section contains links to /configuration/harnesses, /configuration/auto-merge and /reference/workers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-nav",
+        "title": "Add configuration/permissions to the docs.json Configuration group after configuration/harnesses",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T23:45:47Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5477",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '\"configuration/permissions\"' docs.json",
+            "grep -A1 '\"configuration/harnesses\",' docs.json | grep -c '\"configuration/permissions\"'",
+            "node -e \"JSON.parse(require('fs').readFileSync('docs.json','utf8'))\""
+          ],
+          "expected_outputs": [
+            "the entry grep prints 1",
+            "the adjacency grep prints 1",
+            "docs.json parses without error"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5477.md work item 9. Run 'pan sync-main' right before the edit (sibling docs issues edit docs.json). In the \"group\": \"Configuration\" pages list insert \"configuration/permissions\" on its own line directly after \"configuration/harnesses\". Change nothing else in docs.json. Re-grep every cited anchor in .pan/drafts/PAN-5477.md before writing the sentence that depends on it; never copy from other docs pages or from the stale strings named in issue 5566. Obey NFR-2 (no U+2013/U+2014 on any added line) and NFR-5 (quoted frontmatter, <word> placeholders in backticks, no bare $, a bare < before a digit as &lt;)."
+        },
+        "items": [
+          {
+            "id": "docs-nav.ac1",
+            "title": "docs.json contains '\"configuration/permissions\"' exactly once, on the line right after '\"configuration/harnesses\",'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-nav.ac2",
+            "title": "git diff on docs.json shows exactly one added line and no removed lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "related-links",
+        "title": "Link the new page from reference/settings, harnesses, auto-merge and mcp pages",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T23:45:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5477",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/settings.mdx",
+            "configuration/harnesses.mdx",
+            "configuration/auto-merge.mdx",
+            "configuration/mcp.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -l \"/configuration/permissions\" reference/settings.mdx configuration/harnesses.mdx configuration/auto-merge.mdx configuration/mcp.mdx | wc -l",
+            "grep -c '^| Permissions |.*\\[Permissions\\](/configuration/permissions)' reference/settings.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the file count prints 4",
+            "the Settings row grep prints 1",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-2",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5477.md work item 10, decisions D-6 and D-7. reference/settings.mdx: in the row starting '| Permissions | Claude Code's Auto or Bypass', change only the last cell's link from [Harnesses](/configuration/harnesses) to [Permissions](/configuration/permissions). configuration/harnesses.mdx: after the paragraph starting 'Version one supports only `acp.permissionMode: auto`' add the paragraph 'For Claude Code and Codex permission modes, see [Permissions and agent guardrails](/configuration/permissions).'. configuration/auto-merge.mdx: after the paragraph containing 'their `gh` refuses the write' add the paragraph '[Permissions and agent guardrails](/configuration/permissions) lists the other actions agents are refused.'. configuration/mcp.mdx: append to the paragraph ending 'where a tool outside the list asks first.' the sentence 'See [Permissions and agent guardrails](/configuration/permissions) for both modes.'. Change no other sentence (NFR-7). No U+2013/U+2014 on any added line. Re-grep every cited anchor in .pan/drafts/PAN-5477.md before writing the sentence that depends on it; never copy from other docs pages or from the stale strings named in issue 5566. Obey NFR-2 (no U+2013/U+2014 on any added line) and NFR-5 (quoted frontmatter, <word> placeholders in backticks, no bare $, a bare < before a digit as &lt;)."
+        },
+        "items": [
+          {
+            "id": "related-links.ac1",
+            "title": "Each of reference/settings.mdx, configuration/harnesses.mdx, configuration/auto-merge.mdx and configuration/mcp.mdx contains '/configuration/permissions'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "related-links.ac2",
+            "title": "The reference/settings.mdx Permissions row contains [Permissions](/configuration/permissions) and no /configuration/harnesses link; git diff shows every other row unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "related-links.ac3",
+            "title": "git diff on the four files shows only added lines plus the one changed Settings row, and no added line contains U+2013 or U+2014",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "validate",
+        "title": "Run the Mintlify validator, link check, lint:docs and dash checks and record the clean output in the PR body",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-18T23:45:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5477",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/permissions.mdx",
+            "docs.json",
+            "reference/settings.mdx",
+            "configuration/harnesses.mdx",
+            "configuration/auto-merge.mdx",
+            "configuration/mcp.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx -y mint@4.3.49 validate",
+            "npx -y mint@4.3.49 broken-links",
+            "npm run lint:docs",
+            "! grep -nP '[\\x{2013}\\x{2014}]' configuration/permissions.mdx",
+            "grep -cE '^## (Claude Code permission modes|Override the mode for one command|Codex permission modes|Answer permission prompts from the dashboard|Operator-only labels|The agent git shim|Primary checkout refusals|Other guardrails|Get help|See also)$' configuration/permissions.mdx"
+          ],
+          "expected_outputs": [
+            "mint validate reports success with no new errors",
+            "mint broken-links reports no broken links",
+            "lint:docs exits 0",
+            "the dash grep exits 0 with no output",
+            "the heading check prints 10"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5477.md work item 11. Run every command in that work item from the workspace root, including the diff dash check over docs.json and the four linking pages and the stale-claim grep. Never run 'mint validate --fix'. Fix anything they report in the files this issue touches; pre-existing validate warnings elsewhere are not this issue's. Paste the clean outputs of both mint commands into the PR body. Re-grep every cited anchor in .pan/drafts/PAN-5477.md before writing the sentence that depends on it; never copy from other docs pages or from the stale strings named in issue 5566. Obey NFR-2 (no U+2013/U+2014 on any added line) and NFR-5 (quoted frontmatter, <word> placeholders in backticks, no bare $, a bare < before a digit as &lt;)."
+        },
+        "items": [
+          {
+            "id": "validate.ac1",
+            "title": "npx -y mint@4.3.49 broken-links prints no broken links and npx -y mint@4.3.49 validate exits 0 with no new errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate.ac2",
+            "title": "npm run lint:docs exits 0, both dash checks exit 0, and the stale-claim grep exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate.ac3",
+            "title": "The heading check prints 10 and the PR body contains the output of both mint commands",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "page-claude-modes",
+        "to": "page-yolo",
+        "type": "blocks"
+      },
+      {
+        "from": "page-yolo",
+        "to": "page-codex",
+        "type": "blocks"
+      },
+      {
+        "from": "page-codex",
+        "to": "page-prompts",
+        "type": "blocks"
+      },
+      {
+        "from": "page-prompts",
+        "to": "page-labels",
+        "type": "blocks"
+      },
+      {
+        "from": "page-labels",
+        "to": "page-git-shim",
+        "type": "blocks"
+      },
+      {
+        "from": "page-git-shim",
+        "to": "page-primary-checkout",
+        "type": "blocks"
+      },
+      {
+        "from": "page-primary-checkout",
+        "to": "page-other-guardrails",
+        "type": "blocks"
+      },
+      {
+        "from": "page-other-guardrails",
+        "to": "validate",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-nav",
+        "to": "validate",
+        "type": "blocks"
+      },
+      {
+        "from": "related-links",
+        "to": "validate",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-18-PAN-5477-docs-permission-modes-and-agent-guardrails.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

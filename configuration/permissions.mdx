@@ -1,0 +1,218 @@
+---
+title: "Permissions and agent guardrails: what Overdeck agents may do"
+sidebarTitle: "Permissions"
+description: "Choose Auto or Bypass for Claude Code and a Codex mode, answer permission prompts, and see what agents are refused."
+---
+
+# Permissions and agent guardrails
+
+Every agent Overdeck launches runs under a permission mode that decides whether a tool call stops for your approval.
+This page covers the Claude Code and Codex modes, how to override the mode for a single command, how to answer a
+permission prompt from the dashboard, and the separate guardrails (operator-only labels, the agent `git` shim,
+primary checkout refusals, and a few others) that apply no matter which mode is active.
+
+## Claude Code permission modes
+
+Claude Code sessions run in one of two modes (`claude.permissionMode` in `~/.overdeck/config.yaml`):
+
+| Mode | What Overdeck passes to Claude Code | Effect |
+| --- | --- | --- |
+| **Auto** | `--permission-mode default` | Claude Code's normal gating stays on; the auto-approve hook approves tool calls for Overdeck's own sessions. |
+| **Bypass** | `--permission-mode bypassPermissions` | Claude Code's own gating is off; no hook is needed. |
+
+Every launch path that starts a Claude Code session uses this same resolver, including work agents, resumed
+sessions, planning, conversations, smart compaction, and remote agents.
+
+New installations default to Auto. An installation that already existed before Overdeck v0.80.0 was pinned once to
+Bypass: the first time that version ran, if `claude.permissionMode` was absent or invalid, Overdeck wrote
+`claude.permissionMode: bypass` into `~/.overdeck/config.yaml` and recorded the decision in
+`~/.overdeck/.claude-permission-mode-pin.json` so it never repeats. An existing install can move to Auto at any time
+by choosing it in Settings.
+
+**Where to set it:** Settings > **Permissions** > **Claude Code** offers **Auto (recommended)** and **Bypass (yolo)**. It
+writes `claude.permissionMode` into `~/.overdeck/config.yaml`:
+
+```yaml
+claude:
+  permissionMode: auto # or bypass
+```
+
+**What Auto actually does.** Under Auto, Claude Code keeps its normal permission gating, and a `PreToolUse` hook
+(the auto-approve hook, installed by `pan sync`) approves tool calls for the sessions Overdeck launches: issue agents
+such as work, review, test and worker agents, planning agents, conversations, the Flywheel, strike and inspect
+agents, and the backlog sequencer. It approves every tool call for those sessions except `AskUserQuestion`, which
+always keeps its own dialog. It does not inspect the command, the path, or anything else. A `claude` session you
+start yourself, outside Overdeck, has no Overdeck agent id, so the hook leaves it alone and it keeps Claude Code's
+normal prompts.
+
+The Settings description and `pan --help` currently say Auto stops dangerous commands; it does not
+([#5566](https://github.com/eltmon/overdeck/issues/5566)).
+
+**So, in practice**, a session Overdeck launches runs without stopping for routine approval under either mode.
+Bypass gets there by turning off Claude Code's own gating; Auto keeps that gating on and relies on the hook, which
+approves only sessions carrying an Overdeck agent id. Neither mode is a sandbox: see the guardrail sections below for
+what actually stops specific mistakes.
+
+**Launch guard under Auto.** Before starting a Claude Code session under Auto, Overdeck checks that the auto-approve
+hook is registered in `~/.claude/settings.json` and tries to register it if not; if it still cannot register the
+hook (registering it needs `jq`), the launch is refused rather than starting a session that would stop at every tool
+call. The error names `pan sync` and the Bypass option. Under Bypass this check does nothing.
+
+`pan doctor` reports a **Claude Permission Mode** row. Under Auto, it is an error when the hook is not registered,
+and the fix is to run `pan sync` (which needs `jq`) or switch to Bypass in Settings.
+
+**Remote Fly agents need Bypass.** A Fly VM has no Overdeck auto-approve hook installed, so starting a remote agent
+there under Auto is refused; the error points you to Bypass in Settings > **Permissions**, or to starting with
+`PAN_YOLO=true`.
+
+A mode change applies to new launches only. A Claude Code process already running keeps the flags it started with;
+agents and conversations already running keep their old mode until they are restarted or resumed.
+
+## Override the mode for one command
+
+A global `--yolo` flag overrides the permission mode for the current `pan` command only, in any argv position:
+
+```bash
+pan start PAN-12 --yolo        # this agent runs in Bypass
+pan up --no-yolo               # dashboard and everything it launches run in Auto
+PAN_YOLO=true pan start PAN-12 # same effect as --yolo, set as an environment variable
+```
+
+`--yolo` and `--yolo=true` switch to Bypass; `--yolo=false` and `--no-yolo` force Auto. `PAN_YOLO` accepts the same
+true-ish values (`1`, `true`, `yes`, `y`, `on`) and false-ish values (`0`, `false`, `no`, `n`, `off`); anything else
+is ignored.
+
+The mode for a command is resolved in this order:
+
+1. `PAN_YOLO` (which `--yolo` sets on the current process).
+2. `claude.permissionMode` from `~/.overdeck/config.yaml`.
+3. Auto, if the config cannot be read.
+
+**Reach.** `PAN_YOLO` affects the `pan` process you ran and whatever it starts. `pan start PAN-12 --yolo` launches
+that one work agent in Bypass. `pan up --yolo` starts the dashboard server with Bypass in its environment, so every
+agent and conversation that dashboard process launches runs in Bypass for as long as that dashboard process keeps
+running. Agents and conversations already running when you set the flag are unchanged. For a change that outlives a
+single command, use Settings > **Permissions**.
+
+## Codex permission modes
+
+Settings > **Permissions** > **Codex** has four options, saved as `codex.permissionMode`:
+
+| Option | `codex.permissionMode` | What Codex does |
+| --- | --- | --- |
+| **Read-only** | `read-only` | Codex can browse files but asks before making any change or running a command. |
+| **Workspace** | `workspace` | Codex works freely inside the working directory, but asks before going outside it or using the network. |
+| **Auto-review (recommended)** | `auto-review` | A sub-agent reviews and answers approval requests instead of prompting you; Codex still runs inside the workspace sandbox, and the reviewer decides whether to allow an escape. |
+| **Full access (yolo)** | `full-access` | No approval prompts; Codex has full filesystem and network access. |
+
+The default is **Auto-review**. The mode applies to Codex conversations and to Codex work, planning and recovery
+agents, and it takes effect on the next new or resumed session. `--yolo` and `PAN_YOLO` have no effect on Codex: they
+only feed Claude Code's `resolvePermissionMode`, and no Codex launch path reads them.
+
+**Default-transport caveat.** `codex.transport` defaults to `app-server`, and on that transport Overdeck starts every
+Codex thread with on-request approval and the workspace-write sandbox, whatever `codex.permissionMode` says. So today
+**Workspace** and **Auto-review** behave as described above, while **Read-only** and **Full access** take effect only
+with `codex.transport: tui`
+([#5567](https://github.com/eltmon/overdeck/issues/5567)).
+
+For the ACP harness, see [Harnesses](/configuration/harnesses).
+
+## Answer permission prompts from the dashboard
+
+When a Claude Code conversation stops at a permission prompt, the dashboard parses it from the terminal and opens a
+**Permission needed** dialog showing the conversation, agent, tool and command, with **Allow once**, **Allow
+always** and **Deny**. If the prompt is not visible on screen, the dialog offers **Open terminal** instead.
+
+Waiting prompts, questions and plans appear under **Needs you** on the Activity page, and you can open or answer
+them from there.
+
+Permission prompts can also reach your phone; see [Push notifications](/configuration/push-notifications). An MCP
+client with the `approve` scope can answer a conversation's permission prompt with the `answer_permission` tool; see
+[MCP](/configuration/mcp).
+
+## Operator-only labels
+
+Four GitHub Issue labels carry operator decisions. No agent may add or remove them.
+
+| Label | What it means | More |
+| --- | --- | --- |
+| `released` | Lets the Flywheel pick the issue up. | [Flywheel](/features/flywheel) |
+| `vetoed` | Stops the Flywheel from ever picking the issue up, planning it, or striking it. | [Flywheel](/features/flywheel) |
+| `auto-merge` | Overrides the merge policy for this one issue. | [Auto-merge](/configuration/auto-merge) |
+| `hold-for-uat` | Overrides the merge policy for this one issue. | [Auto-merge](/configuration/auto-merge) |
+
+Work agents, conversations, and the Flywheel launch with a `gh` shim on their `PATH`. It refuses any command that
+would add or remove one of these labels, in any case or list form, whether through an issue or PR edit, an issue or
+PR create, or a non-GET `gh api` call that writes a label, and it tells the agent to ask the operator instead. The
+dashboard routes that write these labels also need `admin` access, which no agent token holds.
+
+This is a `PATH` shim that stops accidents, not a sandbox: an absolute `/usr/bin/gh` bypasses it.
+
+## The agent git shim
+
+Agents on an issue get a `git` shim on their `PATH` that refuses:
+
+- `git rebase`, which tells the agent to use `pan sync-main` to sync main or `pan done` to submit instead.
+- A state-moving `git stash` (`git stash list` and `git stash show` stay allowed).
+- `git reset --hard`.
+- `commit`, `push`, `merge` and `cherry-pick` when the worktree is not on its expected branch, or is on a detached
+  HEAD. For example, a worktree named `workspaces/feature-<name>` must be on `feature/<name>`. The refusal tells the
+  agent to stop and report through `pan tell` rather than commit or push from that worktree.
+
+The shim only acts on the agent's own worktree; running `git rebase` inside a test fixture repository elsewhere
+passes through untouched.
+
+A `pan worker run --read-only` worker gets a stricter shim: any git write in the workspace's repository is blocked,
+while reads such as `status`, `diff`, `log` and `show` still work.
+
+Each agent commit gets an `Overdeck-Agent` trailer naming the agent id; a conversation's commits get an
+`Overdeck-Conversation` trailer instead and are not otherwise restricted. This is accident prevention, not a
+sandbox: an absolute `/usr/bin/git` bypasses it, and file-system and network writes are not restricted at all.
+
+## Primary checkout refusals
+
+`pan fork` and `pan handoff` take a `--cwd <path>`. The path must be absolute, contain no `..`, exist as a
+directory, and resolve inside your home directory, or the dashboard answers `Invalid cwd`.
+
+A `--cwd` inside a project's primary checkout is refused with
+`Invalid cwd: <path> is the primary checkout of <project>; use a worktree`.
+
+`--allow-primary` overrides that refusal only when the caller is the operator; an agent session is refused even
+with the flag.
+
+`pan worker run --cwd <path>` must stay inside the issue workspace, and a read-write worker whose `--cwd` resolves
+to a primary checkout is refused the same way. `--read-only` workers are not checked.
+
+The file explorer never writes a project's main checkout either; edits there go to a separate edit workspace. See
+[Edit workspaces](/features/file-explorer#edit-workspaces).
+
+## Other guardrails
+
+`pan task claim` refuses to claim an item a live agent already holds, or one whose files it is likely to overlap; a
+low-confidence scope counts as overlapping. `--steal` claims it anyway and reports what it overrode. See
+[Pipeline commands](/cli/pipeline-commands).
+
+Before an issue agent starts, Overdeck adds deny rules to the workspace's `.claude/settings.local.json`: no edits
+or writes to `.claude/agents/` or `.claude/hooks/`, no `rm` of those folders, of `~/.overdeck/`, or of
+`~/.claude/projects/`, and no `tmux send-keys` or `tmux paste-buffer`. These rules are best effort: they match the
+start of a command, so a roundabout form such as `cd .claude && rm -rf agents/` is not caught.
+
+A work agent cannot type into another session either: the tmux guard rewrites a `tmux send-keys` or
+`tmux paste-buffer` aimed at another session into a failing command. Agents message each other with `pan tell`
+instead.
+
+## Get help
+
+Ask in the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P), or file an issue at
+[GitHub Issues](https://github.com/eltmon/overdeck/issues).
+
+## See also
+
+- [Harnesses](/configuration/harnesses)
+- [Auto-merge](/configuration/auto-merge)
+- [Flywheel](/features/flywheel)
+- [MCP](/configuration/mcp)
+- [Push notifications](/configuration/push-notifications)
+- [Workers](/reference/workers)
+- [Conversation commands](/cli/conversation-commands)
+- [Settings](/reference/settings)

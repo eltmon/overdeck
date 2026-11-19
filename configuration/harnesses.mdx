@@ -501,6 +501,9 @@ allow option the ACP agent actually advertised, preferring a session-scoped
 allow and then a one-shot allow. A configured ACP route fails loudly when its
 binary or saved authentication is missing; it never falls back to Claude Code.
 
+For Claude Code and Codex permission modes, see
+[Permissions and agent guardrails](/configuration/permissions).
+
 Each session runs through the authenticated `acp-host` process, with its token
 (`acp-token`), ACP session id (`acp-session-id`) and append-only transcript
 (`acp-session.jsonl`) under `~/.overdeck/agents/<agentId>/`, and its socket at
