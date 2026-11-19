@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5502",
   "created": "2026-11-19T05:29:14.806Z",
-  "updated": "2026-11-19T05:29:14.806Z",
+  "updated": "2026-11-19T05:30:50.814Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,30 @@
   "sessionHistory": [],
   "items": {
     "conv-surface": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5502",
-      "claimedAt": "2026-11-19T05:29:14.806Z"
+      "claimedAt": "2026-11-19T05:29:14.806Z",
+      "doneAt": "2026-11-19T05:30:50.813Z"
+    },
+    "conv-surface.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:30:50.813Z"
+    },
+    "conv-surface.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:30:50.813Z"
+    },
+    "conv-surface.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:30:50.813Z"
+    },
+    "conv-surface.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:30:50.813Z"
+    },
+    "conv-surface.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T05:30:50.813Z"
     }
   }
 }
