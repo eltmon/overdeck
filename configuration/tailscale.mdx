@@ -1,5 +1,6 @@
 ---
-title: Tailscale
+title: "Tailscale: reach your dashboard over HTTPS from your devices"
+sidebarTitle: Tailscale
 description: Install Tailscale, sign in, turn on protected HTTPS access to the dashboard, and find other Overdeck machines on your tailnet
 ---
 
@@ -11,14 +12,19 @@ private network (a **tailnet**), gives each machine a name such as
 `desk.tailnet-1234.ts.net` (its **MagicDNS name**), and can serve the dashboard
 over HTTPS at that name with **Tailscale Serve**.
 
-Overdeck sets this up for you in **Settings → Anywhere → Set up Tailscale**, or
-in a terminal with [`pan tailscale setup`](/cli/tailscale). Both walk the same
-steps. **Set up Tailscale** appears only in a browser on this machine (the root
+Overdeck sets this up for you in **Settings → Anywhere → Set up Tailscale**, also in the
+command palette, or in a terminal with [`pan tailscale setup`](/cli/tailscale). Both walk
+the same steps. **Set up Tailscale** appears only in a browser on this machine (the root
 session); a paired device cannot change Tailscale settings.
 
-Overdeck stores nothing about Tailscale. Every step reads the live state from
-the `tailscale` command, so you can also make any change by hand and Overdeck
-picks it up.
+Overdeck keeps no copy of Tailscale's state. The only things setup saves are
+**Require a token to sign in** and the trusted address `https://<MagicDNS name>`. Every
+step reads the live state from the `tailscale` command, so you can also make any change by
+hand and Overdeck picks it up.
+
+<Note>Set up Tailscale is new. Its guided steps were not run end to end on a real machine
+before release. If a step does not work for you, report it on
+[GitHub Issues](https://github.com/eltmon/overdeck/issues).</Note>
 
 ## What Set up Tailscale does
 
@@ -29,18 +35,20 @@ Setup reads Tailscale's state and shows the first step that is not done yet:
 | Install | No `tailscale` command is found. | Runs the installer for your platform (see [Per platform](#per-platform)). |
 | Start the daemon | The `tailscale` command cannot reach `tailscaled`. | Linux: runs `sudo systemctl enable --now tailscaled` in a terminal. macOS: asks you to open the Tailscale app. |
 | Operator | Linux, Tailscale installed as root, and this user is not the Tailscale operator. | Runs `sudo tailscale set --operator=<you>` in a terminal, so Overdeck can sign in and turn on Serve without `sudo`. |
-| Sign in | Tailscale is signed out or stopped. | Starts sign-in and shows **Open sign-in**. The step finishes when Tailscale reports `Running`. |
+| Sign in | Tailscale is not signed in and running. | In the dashboard, click **Sign in**, then **Open sign-in**. `pan tailscale setup` prints the sign-in link. The step finishes when Tailscale reports `Running`. |
 | Turn on HTTPS | MagicDNS or HTTPS certificates are off for the tailnet. | Links to [the tailnet DNS settings](https://login.tailscale.com/admin/dns). |
 | Turn on HTTPS access | Serve does not yet send `https://<MagicDNS name>` to this dashboard. | Turns on protected Serve HTTPS (see [Serve HTTPS and token sign-in](#serve-https-and-token-sign-in)). |
 | Protect the dashboard | Serve already sends visitors here, but a token is not required to sign in. | Turns on token sign-in without changing Serve. |
-| Ready | Everything above is done. | Shows the Serve address, the phone app QR code and the other Overdeck machines on the tailnet. |
+| Ready | Everything above is done. | Shows the Serve address and the phone app QR code. Settings → Anywhere then lists the other Overdeck machines on the tailnet (see [Discovering other machines](#discovering-other-machines)). |
 
 Any command that may need an administrator password runs in a terminal inside
 the dialog (or in your own terminal for `pan tailscale setup`). You type the
 password there. Overdeck never asks for it, sees it or stores it.
 
 If the sign-in attempt says access is denied, this user is not the Tailscale
-operator. Setup then shows the operator step and tries sign-in again once.
+operator. The dashboard then shows the operator step with a **Try signing in again**
+button; `pan tailscale setup` runs the operator command and retries sign-in once by
+itself.
 
 ## Per platform
 
@@ -52,7 +60,7 @@ operator. Setup then shows the operator step and tries sign-in again once.
 | macOS | Homebrew is installed | `brew install --cask tailscale-app && open -a Tailscale` in a terminal. |
 | macOS | No Homebrew | Download and open the [Tailscale package](https://pkgs.tailscale.com/stable/#macos), open Tailscale, allow its VPN configuration, then press **Check again**. |
 | WSL2 | Always | Install Tailscale on Windows (not inside WSL) from the [Windows download page](https://tailscale.com/download/windows). Then run `tailscale serve --bg --https=443 http://127.0.0.1:<port>` in Windows PowerShell, where `<port>` is the dashboard port. |
-| Windows | Always | `winget install tailscale.tailscale`, or the [Windows download page](https://tailscale.com/download/windows). |
+| Windows | Always | Overdeck shows `winget install tailscale.tailscale` and the [Windows download page](https://tailscale.com/download/windows). You run the install, sign in, then press **Check again**. |
 
 If your user name contains characters that are unsafe in a shell command,
 Overdeck shows the Linux installer command and the operator step as text
@@ -164,6 +172,15 @@ Overdeck identity. It shows each machine's label, host name, Overdeck version
 and address, and counts the other tailnet devices. The list loads when the page
 opens and on **Refresh**. `pan tailscale status` prints the same list.
 
-Linking machines arrives with machine links
-([PAN-4645](https://github.com/eltmon/overdeck/issues/4645)). Until then the
-list has no **Link** action.
+The list has no **Link** action. To link one of these machines, use **Link a machine** in
+Settings → Anywhere or `pan machines link <pairing-url>`; see
+[Linked machines](/configuration/linked-machines).
+
+## Get help
+
+Tailscale Serve may refuse to start with "Tailscale Serve already serves something else on
+port 443" or "Update Tailscale to 1.52 or later." The self-check that confirms Serve is
+working waits up to 15 seconds.
+
+Still stuck? Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a
+[GitHub Issue](https://github.com/eltmon/overdeck/issues).
