@@ -62,8 +62,8 @@ The **Get set up** card on Home lists what is still missing and shows the comman
 1. **The dashboard opens on Home, in Simple mode.** No project is required to start.
 2. **Type what you want.** Press Enter to ask an agent, or Ctrl+Enter to run it in a terminal. You still need no project.
 3. **Add a project** from the composer's project chip, or from **Add a project** in the left column's project switcher, when you want an agent working in a repo.
-4. **Pick an issue and start work.** Select an open issue on the kanban board, and Overdeck creates an isolated workspace for the agent.
-5. **Stay in control.** Watch diffs land as the agent works, send messages to steer it, and fork the conversation to explore alternatives. A conversation keeps its model once it starts. To use another model, [hand off to a new conversation](/features/conversations#why-hand-off).
+4. **Pick an issue and start work.** Open an issue from the **Board**. If it has no plan yet, choose **Plan…** first; once it is planned, start it from the **▶ Start** chip on its card or the start button in its issue view. Or run `pan start <id>`, which plans the issue if needed and then starts work. Starting creates an isolated workspace and a work agent.
+5. **Stay in control.** Watch diffs land as the agent works, send messages to steer it, and fork the conversation to explore alternatives. A conversation keeps its model once it starts, except a Pi conversation, which can switch model while it runs. To use another model, [hand off to a new conversation](/features/conversations#why-hand-off).
 
 <ThemedImage
   light="/images/dashboard/board-light.png"
@@ -71,7 +71,7 @@ The **Get set up** card on Home lists what is still missing and shows the comman
   alt="The kanban board: issue columns with per-issue cost badges, agent status dots, and inline workspace controls."
 />
 
-The board is the usual place to pick an issue. Each card carries a cost badge, a live agent status dot and workspace controls, so you can start or check in on an agent without leaving the column it lives in.
+The Board is the usual place to pick an issue. Each card carries a cost badge, its pipeline phase and a **▶ Start** or **▶ Resume** chip when the agent can start or resume, so you can start or check in on an agent without leaving the column it lives in.
 
 Work at whatever level of involvement you want. Pair-program hands-on with a single agent in the conversation view above, or let the specialist pipeline take issues from plan to merged PR while you focus elsewhere. Command Deck is built to manage both the agents and the workflow they move through.
 
@@ -110,7 +110,7 @@ See [Desktop app](/features/desktop-app) for setup on each system, the tray, not
 
 ## Architecture at a glance
 
-Overdeck started as a CLI and grew into **Command Deck**, a desktop-class development environment. The CLI, the GUI and any script that can make an HTTP request all drive the same REST surface, so you can start an agent from a kanban card, a terminal or a webhook without switching tools. Under the hood: an Effect.js and TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch with `npx @overdeck/core` or the `overdeck` command (`pan` is its short alias); use `@overdeck/desktop` for the packaged desktop app.
+Overdeck started as a CLI and grew into a dashboard, with **Command Deck** as its main view. The CLI, the GUI and any script that can make an HTTP request all drive the same REST surface, so you can start an agent from a kanban card, a terminal or a webhook without switching tools. Under the hood: an Effect.js and TypeScript server, a React frontend over typed WebSocket RPC, SQLite for local data such as conversations and settings, and Electron for the desktop app. Launch with `npx @overdeck/core` or the `overdeck` command (`pan` is its short alias); use `@overdeck/desktop` for the packaged desktop app.
 
 ## Get help
 
