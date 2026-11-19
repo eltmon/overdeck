@@ -110,3 +110,16 @@ with `codex.transport: tui`
 
 For the ACP harness (Kimi Code, OpenCode, Grok Build and the others), see
 [Harnesses](/configuration/harnesses).
+
+## Answer permission prompts from the dashboard
+
+When a Claude Code conversation stops at a permission prompt, the dashboard parses it from the terminal and opens a
+**Permission needed** dialog showing the conversation, agent, tool and command, with **Allow once**, **Allow
+always** and **Deny**. If the prompt is not visible on screen, the dialog offers **Open terminal** instead.
+
+Waiting prompts, questions and plans appear under **Needs you** on the Activity page, and you can open or answer
+them from there.
+
+Permission prompts can also reach your phone; see [Push notifications](/configuration/push-notifications). An MCP
+client with the `approve` scope can answer a conversation's permission prompt with the `answer_permission` tool; see
+[MCP](/configuration/mcp).
