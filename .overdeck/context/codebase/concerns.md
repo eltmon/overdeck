@@ -933,4 +933,19 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   (`/api/health` has no `agentCount`), the six notification switches (no caller of
   `overdeckBridge.notify`; real notifications are the frontend's web `Notification` calls), the
   Open Workspace submenu, and Launch at login on Linux (`setLoginItemSettings` is darwin/win32 only).
+- **Claude Code Auto permission mode filters nothing** (verified 2026-11-18) —
+  `sync-sources/hooks/auto-approve-hook` returns `allow` for every tool but `AskUserQuestion` when
+  `OVERDECK_AGENT_ID` starts with `agent-`, `planning-`, `flywheel-`, `strike-`, `inspect-`,
+  `sequencer-` or `conv-`; sessions without an agent id keep normal prompts. The Settings Auto
+  description, the `pan --help` `--yolo` text and `docs/CONFIGURATION.md` still say it blocks
+  destructive commands (#5566). The real guardrails are the agent `git`/`gh` PATH shims
+  (`launcher-git-guard.ts`), the workspace deny rules (`claude-settings-overlay.ts`), the
+  tmux-send-keys guard and the primary-checkout `--cwd` refusals; none is a sandbox. A project's
+  `.pan.yaml` can also set `claude.permissionMode` / `codex.permissionMode` (`stripProjectSecurity`
+  keeps them), resolved from the launching process's cwd.
+- **Codex app-server threads ignore `codex.permissionMode`** (verified 2026-11-18, #5567) —
+  `codex/app-server-host.ts` `threadOptions` always passes `runtimeMode: 'default'`, which
+  `app-server-manager.ts` `mapRuntimeMode` turns into on-request approval and `workspace-write`;
+  the setting only reaches `config.toml` (`initCodexHome`), so Read-only and Full access apply
+  only on `codex.transport: tui`. `PAN_YOLO` never reaches Codex launches.
 <!-- last-verified: 2026-11-04 -->
