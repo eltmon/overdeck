@@ -1,0 +1,832 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-19T02:28:45Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5499: docs: accuracy audit, Getting Started, Vision and Changelog intro (5 pages)",
+    "updated": "2026-11-19T02:35:19.922Z"
+  },
+  "plan": {
+    "id": "pan-5499",
+    "title": "docs: accuracy audit, Getting Started, Vision and Changelog intro (5 pages)",
+    "status": "proposed",
+    "uid": "85f751e9-e8e2-4e10-9b5d-c77f88737711",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-19T02:28:45Z",
+    "updated": "2026-11-19T02:35:19.922Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5499",
+        "label": "PAN-5499",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5467",
+        "label": "PAN-5467 (epic)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docs",
+      "accuracy-audit",
+      "mintlify",
+      "screenshots"
+    ],
+    "metadata": {
+      "sizeJustification": "Docs-only audit of five root-level Mintlify pages plus three shared screenshot pairs. The finalize lint counts each root .mdx page and the images directory as separate subsystems, but they form one nav-group audit that shares one validation pass and one PR body, as the epic (#5467) scopes one audit issue per nav group.",
+      "canonicalFilename": "2026-11-19-PAN-5499-docs-accuracy-audit-getting-started-vision-and-changelog-intro-5-pages.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The five first pages a new user reads (introduction, quickstart, concepts, the Flywheel vision and the changelog intro) still make claims the product no longer matches: a test agent on every PR, GitLab issue tracking, wrong Pipeline lanes and metric, a Home stuck count, Deacon health pills, deleted vision files and commands, a wrong merge and UAT model, an old bot login, and screenshots that still show the Panopticon v0.21.0 brand.",
+      "Proposal": "Apply the per-page change tables in .pan/drafts/PAN-5499.md, each row carrying a grep anchor, replacement text and code evidence; remove en and em dashes; fix frontmatter; recapture the three stale screenshot pairs with scripts/capture-doc-shot.mjs; run the Mintlify validators; write a PR body with one note per page and a Follow-ups list for the code and prompt bugs found.",
+      "NonGoals": "- Rewriting changelog <Update> release records, including the em dash inside the quoted UI string at changelog.mdx line 611\n- Changing vision v1.0 targets, thresholds, definitions, industry anchors or still-open questions\n- Editing any page outside the five audited pages, including alt text on other pages that use the recaptured images\n- Fixing code or prompt bugs the audit found (roles/flywheel.md bot login and UAT text, roles/review.md test dispatch, scripts/install.sh Node check, #5537); they go to Follow-ups\n- Auditing reference/template-conversations.mdx (owned by #5504)\n- Adding help sections to concepts.mdx, vision.mdx or changelog.mdx\n- Any docs.json, CLAUDE.md, rule, role or changelog.d change\n- Editing image pixels by hand"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Audit only the changelog intro (frontmatter, two paragraphs, RELEASE STEP comment), not the <Update> release records.",
+        "rationale": "The issue title says 'Changelog intro'; release records are dated history written by pan release stable, and rewriting them would change history."
+      },
+      {
+        "summary": "On introduction and concepts, drop the 'test agent checks every PR' claim and state only what holds whether or not #5537 lands, linking /features/issue-pipeline.",
+        "rationale": "#5537 is open and its fix direction is undecided; features/issue-pipeline.mdx already documents current behavior, so the overview pages should not repeat a caveat that may soon change."
+      },
+      {
+        "summary": "On vision.mdx, correct current-state facts only and keep the operator's targets, thresholds and definitions.",
+        "rationale": "The vision page is operator direction; an accuracy audit fixes what the page says the product does today, not what the operator wants v1.0 to be."
+      },
+      {
+        "summary": "Recapture the hero, board and pipeline screenshot pairs in place, with a keep-old-images fallback when no dashboard is reachable.",
+        "rationale": "All three are from 2026-06-04 and show the Panopticon v0.21.0 brand on the landing page and quickstart; scripts/capture-doc-shot.mjs exists, and same-name files fix every page that uses them."
+      },
+      {
+        "summary": "Retitle concepts, vision and changelog with specific searchable titles and keep short sidebarTitles.",
+        "rationale": "The issue's frontmatter rule asks for specific searchable titles; 'Changelog' and 'Flywheel Vision' are generic, and sidebarTitle keeps the nav labels short."
+      },
+      {
+        "summary": "Treat GitLab as a code host only on introduction and concepts.",
+        "rationale": "src/lib/tracker/gitlab.ts returns notImplemented for every method, and configuration/issue-trackers.mdx already says GitLab issue tracking is not supported."
+      }
+    ],
+    "items": [
+      {
+        "id": "intro-audit",
+        "title": "introduction.mdx: fix Node version, test-agent, tracker and pipeline claims",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T02:28:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "introduction.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "! grep -nP '[\\x{2013}\\x{2014}]' introduction.mdx",
+            "! grep -q 'a test agent' introduction.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash check prints nothing and exits 0",
+            "the test-agent check exits 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "Edits only introduction.mdx; no other page item touches it."
+        },
+        "narrative": {
+          "Action": "Apply WI-1 rows 1 to 3 of .pan/drafts/PAN-5499.md to introduction.mdx (leave the hero alt text to recapture-doc-shots). Follow the PRD's Common procedure (.pan/drafts/PAN-5499.md): find each row by grep anchor, apply the change, code wins over the PRD (skip and note a row a primary source contradicts), residual rule, dash rule, frontmatter rule, link check, MDX safety. Never change code. Commit with 'Item: intro-audit', the AC trailers and a 'PR-note: introduction.mdx: <one line>' line; push; then pan task done."
+        },
+        "items": [
+          {
+            "id": "intro-audit.ac1",
+            "title": "introduction.mdx contains 'It needs Node.js 22.16 or later' and no longer contains 'Node.js 22 or later.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "intro-audit.ac2",
+            "title": "The issue pipeline paragraph renders 'Review agents check the work' and `grep -c 'a test agent' introduction.mdx` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "intro-audit.ac3",
+            "title": "The issue pipeline paragraph renders 'Issues come from GitHub, Linear, Rally or Jira' and links /features/issue-pipeline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "intro-audit.ac4",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' introduction.mdx` prints nothing and the '## Get help' section still links https://discord.gg/ZpHE2ZTv5P and GitHub Issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "quickstart-audit",
+        "title": "quickstart.mdx: fix start-work step, model lock, board card and architecture claims",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T02:28:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "quickstart.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "! grep -nP '[\\x{2013}\\x{2014}]' quickstart.mdx",
+            "! grep -qE 'SQLite for state|Select an open issue on the kanban board' quickstart.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash check prints nothing and exits 0",
+            "the stale-claim check exits 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "Edits only quickstart.mdx; no other page item touches it."
+        },
+        "narrative": {
+          "Action": "Apply WI-2 rows 1 to 5 of .pan/drafts/PAN-5499.md to quickstart.mdx (leave hero and board alt text to recapture-doc-shots). Follow the PRD's Common procedure (.pan/drafts/PAN-5499.md): find each row by grep anchor, apply the change, code wins over the PRD (skip and note a row a primary source contradicts), residual rule, dash rule, frontmatter rule, link check, MDX safety. Never change code. Commit with 'Item: quickstart-audit', the AC trailers and a 'PR-note: quickstart.mdx: <one line>' line; push; then pan task done."
+        },
+        "items": [
+          {
+            "id": "quickstart-audit.ac1",
+            "title": "Step 4 of 'What happens next' renders 'choose **Plan…** first', the '**▶ Start** chip' and 'run `pan start <id>`', and the page no longer contains 'Select an open issue on the kanban board'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quickstart-audit.ac2",
+            "title": "Step 5 renders the exception 'except a Pi conversation, which can switch model while it runs'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quickstart-audit.ac3",
+            "title": "The board paragraph renders 'a **▶ Start** or **▶ Resume** chip' and no longer contains 'workspace controls'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quickstart-audit.ac4",
+            "title": "'Architecture at a glance' renders 'SQLite for local data such as conversations and settings' and `grep -c 'SQLite for state' quickstart.mdx` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quickstart-audit.ac5",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' quickstart.mdx` prints nothing and the '## Get help' section still links the Discord and GitHub Issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "concepts-command-deck",
+        "title": "concepts.mdx: fix the Command Deck section (app bar, tab menu, Home, tabs, feed)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T02:28:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "concepts.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "! grep -qE 'Deacon health|No more persistent banners|stuck count' concepts.mdx",
+            "test \"$(grep -c 'Decisions (Deft projects only)' concepts.mdx)\" = 2",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the stale-claim check exits 0",
+            "the Decisions count test exits 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "Edits only the Command Deck section of concepts.mdx; the second concepts item is serialized after it by a blocks edge."
+        },
+        "narrative": {
+          "Action": "Apply WI-3 rows 1 to 6 of .pan/drafts/PAN-5499.md to concepts.mdx: the '## Command Deck' section through '### What You Can Do From Command Deck'. Leave image alt text alone. Follow the PRD's Common procedure (.pan/drafts/PAN-5499.md): find each row by grep anchor, apply the change, code wins over the PRD (skip and note a row a primary source contradicts), residual rule, dash rule, frontmatter rule, link check, MDX safety. Never change code. Commit with 'Item: concepts-command-deck', the AC trailers and a 'PR-note: concepts.mdx: <one line>' line; push; then pan task done."
+        },
+        "items": [
+          {
+            "id": "concepts-command-deck.ac1",
+            "title": "The app bar bullet renders 'an **N agents working** menu' and `grep -cE 'Deacon health|No more persistent banners' concepts.mdx` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "concepts-command-deck.ac2",
+            "title": "The tab strip bullet renders 'split it right or down' and 'Pop out to window', and no longer contains 'right-click to pop out'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "concepts-command-deck.ac3",
+            "title": "The pane body bullet renders 'landed this week and spend this week' and `grep -c 'stuck count' concepts.mdx` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "concepts-command-deck.ac4",
+            "title": "`grep -c 'Decisions (Deft projects only)' concepts.mdx` prints 2 and the feed bullet renders '**Needs you / Project / Global**'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "concepts-pipeline-and-rest",
+        "title": "concepts.mdx: fix test agent, pipeline lanes, trackers, costs and Next Steps",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T02:28:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "concepts.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "! grep -nP '[\\x{2013}\\x{2014}]' concepts.mdx",
+            "! grep -qE 'Review queue|Verifying|5 issue trackers|GitLab Issues|Board view|a test agent' concepts.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash check prints nothing and exits 0",
+            "the stale-claim grep prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "Same file as concepts-command-deck, so a blocks edge serializes them; no other item edits concepts.mdx text before recapture-doc-shots."
+        },
+        "narrative": {
+          "Action": "Apply WI-3 rows 8 to 18 of .pan/drafts/PAN-5499.md to concepts.mdx (from '## Agents' to the end, including the pipeline image alt text in row 11), then the page-wide dash, frontmatter (retitle to 'Overdeck concepts: Command Deck, agents, workspaces and the pipeline', keep sidebarTitle 'Concepts') and link checks. Follow the PRD's Common procedure (.pan/drafts/PAN-5499.md): find each row by grep anchor, apply the change, code wins over the PRD (skip and note a row a primary source contradicts), residual rule, dash rule, frontmatter rule, link check, MDX safety. Never change code. Commit with 'Item: concepts-pipeline-and-rest', the AC trailers and a 'PR-note: concepts.mdx: <one line>' line; push; then pan task done."
+        },
+        "items": [
+          {
+            "id": "concepts-pipeline-and-rest.ac1",
+            "title": "`grep -cE 'a test agent|Review and test agents' concepts.mdx` prints 0 and the Specialists section renders 'the verification gate runs the project's checks'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "concepts-pipeline-and-rest.ac2",
+            "title": "The Pipeline paragraph renders 'issue rows grouped by phase: Ship, Review, Work, Plan and Ready' and `grep -cE 'Review queue|Verifying|activity feed alongside' concepts.mdx` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "concepts-pipeline-and-rest.ac3",
+            "title": "The tracker section renders 'Overdeck integrates with 4 issue trackers' with no GitLab Issues row, plus the sentence that GitLab works as a code host linking /configuration/issue-trackers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "concepts-pipeline-and-rest.ac4",
+            "title": "The Cost Tracking list renders 'Daily cost trends on the **Costs** page, an experimental view' and no longer contains 'Board view'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "concepts-pipeline-and-rest.ac5",
+            "title": "The frontmatter title is 'Overdeck concepts: Command Deck, agents, workspaces and the pipeline' and `grep -nP '[\\x{2013}\\x{2014}]' concepts.mdx` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vision-autonomy-and-merge",
+        "title": "vision.mdx: fix file references, author gate, pickup gates and the merge and UAT model",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T02:28:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "vision.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "! grep -qE 'panopticon-agent|relevance-vet|marks UAT passed|blocks-main' vision.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the stale-claim check exits 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "Edits only the first half of vision.mdx; the second vision item is serialized after it by a blocks edge."
+        },
+        "narrative": {
+          "Action": "Apply WI-4 rows 1 to 9 and row 20 of .pan/drafts/PAN-5499.md to vision.mdx: the intro paragraph, the author gate login, the auto-pickup bullets, gates and predicate, the setting keys, and replace the body of '### UAT-required-before-merge' with 'Vision replacement V1' after re-checking its five facts. Keep targets, thresholds and definitions (Decision D3). Follow the PRD's Common procedure (.pan/drafts/PAN-5499.md): find each row by grep anchor, apply the change, code wins over the PRD (skip and note a row a primary source contradicts), residual rule, dash rule, frontmatter rule, link check, MDX safety. Never change code. Commit with 'Item: vision-autonomy-and-merge', the AC trailers and a 'PR-note: vision.mdx: <one line>' line; push; then pan task done."
+        },
+        "items": [
+          {
+            "id": "vision-autonomy-and-merge.ac1",
+            "title": "The intro paragraph links the pan-flywheel SKILL.md and `.pan/orders/`, `grep -cE 'panopticon-agent|relevance-vet' vision.mdx` prints 0, and the author gate names `overdeck-agent[bot]`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vision-autonomy-and-merge.ac2",
+            "title": "The predicate line contains `ready && planned && (released || auto_pickup_backlog || activeBookMember) && !parked && !vetoed && !objection && !inPipeline && !epic`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vision-autonomy-and-merge.ac3",
+            "title": "The UAT section renders the three-tier list (issue label, project `auto_merge_default`, global `require_uat_before_merge`), the five-minute wait and a link to /configuration/auto-merge, and no longer contains 'marks UAT passed' or '`overdeck/review` + `overdeck/test`'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vision-autonomy-and-merge.ac4",
+            "title": "The OFF bullet renders 'released label or by adding them to the active order book' and no longer contains 'blocks-main'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vision-criteria-and-appendix",
+        "title": "vision.mdx: fix pipeline pass, criteria measurement, path, open questions and appendix",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T02:28:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "vision.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "! grep -nP '[\\x{2013}\\x{2014}]' vision.mdx",
+            "! grep -qE 'Flywheel-Affects-Criterion|flywheel weights|FLYWHEEL-STATE|flywheel-brief' vision.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash check prints nothing and exits 0",
+            "the removed-feature check exits 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "Same file as vision-autonomy-and-merge, serialized by a blocks edge."
+        },
+        "narrative": {
+          "Action": "Apply WI-4 rows 10 to 19 of .pan/drafts/PAN-5499.md to vision.mdx, then remove every remaining en and em dash on the page ('80–94%' becomes '80 to 94%'), retitle to 'Flywheel vision and v1.0 readiness criteria' with sidebarTitle 'Flywheel Vision', and check links. Run the row 12 implementation checkpoint (gh issue list --label v1.0-required --state open). Follow the PRD's Common procedure (.pan/drafts/PAN-5499.md): find each row by grep anchor, apply the change, code wins over the PRD (skip and note a row a primary source contradicts), residual rule, dash rule, frontmatter rule, link check, MDX safety. Never change code. Commit with 'Item: vision-criteria-and-appendix', the AC trailers and a 'PR-note: vision.mdx: <one line>' line; push; then pan task done."
+        },
+        "items": [
+          {
+            "id": "vision-criteria-and-appendix.ac1",
+            "title": "`grep -cE 'Flywheel-Affects-Criterion|flywheel weights|FLYWHEEL-STATE|flywheel-brief|bypass-uat' vision.mdx` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vision-criteria-and-appendix.ac2",
+            "title": "After the readiness table the page renders 'Overdeck measures criteria 1 and 2 today with `pan flywheel stats`' and the seven targets are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vision-criteria-and-appendix.ac3",
+            "title": "The appendix contains `.pan/flywheel/state.md`, the pan-flywheel SKILL.md link and `packages/contracts/src/flywheel-derived.ts`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vision-criteria-and-appendix.ac4",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' vision.mdx` prints nothing and the frontmatter title is 'Flywheel vision and v1.0 readiness criteria' with sidebarTitle 'Flywheel Vision'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "changelog-intro",
+        "title": "changelog.mdx intro: fix the upgrade sentence and retitle the page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T02:28:45Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "changelog.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "! sed -n '1,/^<Update/p' changelog.mdx | grep -nP '[\\x{2013}\\x{2014}]'",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the intro dash grep prints nothing",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ],
+          "parallelSafeReason": "Edits only the intro of changelog.mdx; no other item touches it."
+        },
+        "narrative": {
+          "Action": "Apply WI-5 of .pan/drafts/PAN-5499.md: replace the upgrade sentence in the intro, retitle to 'Overdeck changelog: release notes since v0.60.0' and add sidebarTitle 'Changelog'. Touch nothing at or below the first '<Update' line; keep the RELEASE STEP comment and 'rss: true' (Decision D1). Follow the PRD's Common procedure (.pan/drafts/PAN-5499.md): find each row by grep anchor, apply the change, code wins over the PRD (skip and note a row a primary source contradicts), residual rule, dash rule, frontmatter rule, link check, MDX safety. Never change code. Commit with 'Item: changelog-intro', the AC trailers and a 'PR-note: changelog.mdx: <one line>' line; push; then pan task done."
+        },
+        "items": [
+          {
+            "id": "changelog-intro.ac1",
+            "title": "The intro renders 'The next `pan up` runs `pan sync` in the background' and no longer says `pan install` makes synced skills match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changelog-intro.ac2",
+            "title": "The frontmatter contains title 'Overdeck changelog: release notes since v0.60.0' and sidebarTitle 'Changelog', and preserves 'rss: true'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changelog-intro.ac3",
+            "title": "`git diff origin/main -- changelog.mdx` shows changes only above the first `<Update` line, and the RELEASE STEP comment is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changelog-intro.ac4",
+            "title": "`sed -n '1,/^<Update/p' changelog.mdx | grep -nP '[\\x{2013}\\x{2014}]'` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "recapture-doc-shots",
+        "title": "Recapture the hero, board and pipeline doc shots and update their alt text",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T02:28:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "images/dashboard/command-deck-hero-light.png",
+            "images/dashboard/command-deck-hero-dark.png",
+            "images/dashboard/board-light.png",
+            "images/dashboard/board-dark.png",
+            "images/dashboard/pipeline-light.png",
+            "images/dashboard/pipeline-dark.png",
+            "introduction.mdx",
+            "quickstart.mdx",
+            "concepts.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git diff --stat origin/main -- images/dashboard",
+            "grep -n 'alt=' introduction.mdx quickstart.mdx concepts.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the stat lists the six PNGs, or none under the D5 fallback",
+            "each alt line describes the current UI",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "Shares alt-text lines with the intro, quickstart and concepts items, so it runs after them."
+        },
+        "narrative": {
+          "Action": "Apply WI-6 of .pan/drafts/PAN-5499.md: check a dashboard is reachable, capture the three pairs with node scripts/capture-doc-shot.mjs (its own Playwright browser), Read every PNG and check the brand reads Overdeck and no secret, token, email or private message is visible (NFR-4), then update the hero alt text on introduction, quickstart and concepts and the board alt text on quickstart. If no dashboard is reachable or Playwright cannot launch, apply the Decision D5 fallback: keep the old PNGs and record the Follow-up for WI-7. Commit with 'Item: recapture-doc-shots', AC trailers and 'PR-note: images: <one line>'; push; pan task done."
+        },
+        "items": [
+          {
+            "id": "recapture-doc-shots.ac1",
+            "title": "Either the six PNG files are re-committed and each one, when read, shows the 'Overdeck' brand and not 'Panopticon v0.21.0', or (D5 fallback) they are unchanged and the commit message carries 'Follow-up: recapture hero, board and pipeline doc shots'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recapture-doc-shots.ac2",
+            "title": "Either the new pipeline capture shows the phase groups the concepts.mdx pipeline alt text names, or (D5 fallback) concepts.mdx no longer contains a pipeline-light.png image",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recapture-doc-shots.ac3",
+            "title": "Either the hero alt text on introduction.mdx, quickstart.mdx and concepts.mdx and the board alt text on quickstart.mdx contains a description of what the new image shows, or (D5 fallback) each page preserves its old alt text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recapture-doc-shots.ac4",
+            "title": "No committed PNG shows a secret, token, email address or private message text (each new PNG was read in both themes before commit)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "validate-and-pr-body",
+        "title": "Run the Mintlify validators and write the PR body with page notes and Follow-ups",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T02:28:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "introduction.mdx",
+            "quickstart.mdx",
+            "concepts.mdx",
+            "vision.mdx",
+            "changelog.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx -y mint@4.3.49 validate",
+            "npx -y mint@4.3.49 broken-links",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "validate reports success and exits 0",
+            "broken-links reports no broken links and exits 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-7",
+            "FR-8",
+            "NFR-1"
+          ],
+          "parallelSafeReason": "Runs last; blocked by every other item."
+        },
+        "narrative": {
+          "Action": "Apply WI-7 of .pan/drafts/PAN-5499.md: run the dash greps, npm run lint:docs, npx -y mint@4.3.49 validate and npx -y mint@4.3.49 broken-links; fix anything the five pages caused; write the PR body ticking the five pages with their PR-note lines, pasting the three validator outputs and listing every Follow-up in WI-7 step 3; post one comment each on #5501 and #5502 naming the recaptured images and their pages that use them (Decision D8). Commit any fix with 'Item: validate-and-pr-body'."
+        },
+        "items": [
+          {
+            "id": "validate-and-pr-body.ac1",
+            "title": "`npx -y mint@4.3.49 validate` and `npx -y mint@4.3.49 broken-links` each exits 0 on the branch, and the PR body contains their output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-pr-body.ac2",
+            "title": "The PR body contains a ticked entry with a one-line note for each of introduction, quickstart, concepts, vision and changelog",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-pr-body.ac3",
+            "title": "The PR body's Follow-ups list contains the roles/flywheel.md bot login, the install.sh Node check, features/specialists.mdx and roles/review.md test-agent text, and the other pages that use the recaptured images",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-pr-body.ac4",
+            "title": "Issues #5501 and #5502 each shows one new comment that contains the recaptured image file names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "concepts-command-deck",
+        "to": "concepts-pipeline-and-rest",
+        "type": "blocks"
+      },
+      {
+        "from": "vision-autonomy-and-merge",
+        "to": "vision-criteria-and-appendix",
+        "type": "blocks"
+      },
+      {
+        "from": "intro-audit",
+        "to": "recapture-doc-shots",
+        "type": "blocks"
+      },
+      {
+        "from": "quickstart-audit",
+        "to": "recapture-doc-shots",
+        "type": "blocks"
+      },
+      {
+        "from": "concepts-pipeline-and-rest",
+        "to": "recapture-doc-shots",
+        "type": "blocks"
+      },
+      {
+        "from": "intro-audit",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "quickstart-audit",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "concepts-command-deck",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "concepts-pipeline-and-rest",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "vision-autonomy-and-merge",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "vision-criteria-and-appendix",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "changelog-intro",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "recapture-doc-shots",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
