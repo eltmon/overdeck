@@ -1,7 +1,7 @@
 ---
-title: "Workspaces: git worktrees per issue"
+title: "Workspaces: issue worktrees, scratch work and the main checkout"
 sidebarTitle: "Workspaces"
-description: Git worktree-based isolated development environments
+description: "How Overdeck workspaces work: one git worktree per issue, scratch workspaces, the main checkout, creating workspaces and close-out cleanup."
 ---
 
 import { ThemedImage } from "/snippets/themed-image.mdx";
@@ -15,6 +15,16 @@ Each workspace is where an agent's conversation and its work live together: the 
   dark="/images/dashboard/board-dark.png"
   alt="Kanban board: issue columns with cost badges, agent status dots, and workspace controls, one card per issue/workspace"
 />
+
+## Workspace kinds
+
+A workspace is one directory that Overdeck tracks for a registered project. Every workspace has one of three kinds:
+
+- **Issue**: one git worktree per tracked issue, at `workspaces/feature-<issue>` on the branch `feature/<issue>` (for example `feature/pan-123`). Planning, work and review agents run here. Overdeck's pipeline creates and removes issue workspaces, and most of this page is about them.
+- **Scratch**: any number per project, not tied to an issue. A scratch workspace shares the project directory by default, or gets its own worktree on a `scratch/<name>` branch. Create one from the dashboard or with `pan workspace new`.
+- **Main**: the project's primary checkout. A project has exactly one. Overdeck creates it when you add the project or the first time you open it.
+
+Memory is kept per workspace, so a scratch or main workspace collects memory from the conversations that run in it. See [Workspace observation memory](/configuration/memory#workspace-observation-memory).
 
 ## What Are Workspaces?
 
@@ -197,6 +207,137 @@ pan workspace destroy MIN-123 --force
 4. Cleans up planning artifacts
 5. Unregisters from Overdeck
 
+After an issue's pull request merges, close it out with `pan close <id>` or the **Close Out** button; [Cleaning up after close-out](#cleaning-up-after-close-out) explains what that removes.
+
+## Finding a workspace
+
+- **Left column, Workspaces section**: the selected project's workspaces that you created, plus any you favorited. Favorites come first, then the most recently used. Issue worktrees, Session Vault workspaces and workspaces that agents created stay off this list unless you favorite them; reach issues from the **Issues** section and the Pipeline and Board views. The main checkout appears here only when you favorite it, labelled with the project's name. Archived workspaces leave the list. The section is hidden while the project has nothing to list, and in the All projects view.
+- **A project's Home, More menu, Main checkout**: opens the project's main workspace and creates it the first time.
+- **Cmd-K or Ctrl-K, Workspaces group**: the same workspaces for every project, plus every main checkout, shown under its project's name. Type to filter by name or project. Selecting one opens its view.
+
+Rows in the Workspaces section show a short status. A main or scratch row shows the phase that Overdeck's memory gave it, such as `exploring`, `building` or `shipping`. A favorited issue row shows its pipeline phase and its pull request badge, colored by state and review, with `×` when checks fail.
+
+The workspace view (`/workspace/<id>`) shows one workspace: its conversations and its memory (status headline, phase and recent observations). An issue workspace also shows the agent terminal while an agent runs, the xBRIEF plan and the verification gates.
+
+## Creating a workspace from the dashboard
+
+Open the **New workspace** page from any of these places. Each one opens `/workspaces/new`; the ones that belong to a project add `?project=<key>` so that project starts selected.
+
+- The **+** in the left column's Workspaces header.
+- **New workspace in** your project, in the project switcher menu.
+- **New workspace…** in Cmd-K or Ctrl-K.
+- **More**, then **New workspace**, on a project's Home.
+
+The Workspaces section is hidden while a project has no workspaces to list, so use the project switcher there.
+
+<ThemedImage
+  light="/images/dashboard/new-workspace-page-light.png"
+  dark="/images/dashboard/new-workspace-page-dark.png"
+  alt="New Workspace page with project chips, hero title, target controls, resolved status, and workspace ideas"
+/>
+
+The page shows everything about the new workspace in one view:
+
+- The **project chips** select a registered project. Recently used projects come first. The chip row can also open the **Add a project** dialog over this page (clone a repo, add an existing folder, or start a new project); a project you add there comes back selected.
+- The large **workspace name** field (placeholder "Untitled workspace") is the name of the new workspace. Names allow letters, numbers and hyphens. As you type, it suggests what you probably meant:
+  - An **issue reference** (`#12`, `PAN-12`, or a GitHub issue or pull request URL) offers **Open PAN-12 and start work**, which opens that issue's page. A bare `#12` or a GitHub URL uses the selected project's issue prefix; `PAN-12` works when `PAN` is a registered prefix.
+  - Text that matches **branch names** in the selected project offers **Start from branch** for each match. Picking one sets it as the parent branch and opens **Advanced** so you can see it.
+  - Text that cannot be a name as typed (spaces, punctuation) offers `Use "fix-login-redirect-bug" as the name`.
+
+  The arrow keys move through the suggestions, Enter picks one, and Esc closes the list.
+- **Shared directory** (the default) points the workspace at the project's primary path, another registered target, or a directory you choose with **Browse…**.
+- **Isolated worktree** creates `workspaces/scratch-<name>` on a `scratch/<name>` branch, shown under the name as **Branch:**. It makes its own path, so the target controls are disabled.
+- **Advanced** lets you override the parent branch. Without an override, Overdeck uses the project's current branch.
+
+<Note>
+  The status strip above the buttons shows the final path, branch, parent branch, git posture, and whether a worktree will be created, and it updates as you type. The server runs the same resolution for this preview and for the real create, so what the strip shows is what you get.
+</Note>
+
+That same resolution validates the name, the directory and the project, and shows any problem inline. With no projects registered, the page says **Add a project first.** **Start workspace** stays disabled until the problems are fixed and the status is current. When the workspace is created, Overdeck selects it and opens its view.
+
+The page and `pan workspace new` (below) call the same code, so a workspace created either way is identical.
+
+## Managing a scratch or main workspace
+
+The header of a scratch or main workspace's view has three buttons:
+
+- **Favorite** pins the workspace to the top of the Workspaces section. Press **Unfavorite** to undo it.
+- **Relocate** points the workspace at a new directory after you confirm the resolved path. Relocating the main workspace also asks you to type its name, because it makes the workspace differ from the project's path in `projects.yaml`.
+- **Archive** removes the workspace from the Workspaces section and Cmd-K. Its files, branch and memory stay on disk.
+
+Issue workspaces show none of these, because Overdeck's pipeline owns their worktree. To remove an issue workspace by hand, use `pan workspace destroy <issueId>`; add `--purge-memory` to also delete its memory permanently. The workspace view has no delete button.
+
+## Scratch and main workspaces from the CLI
+
+`pan workspace new`, `main`, `get`, `activate`, `archive`, `relocate` and `list --kind` manage scratch and main workspaces. The older `pan workspace create` and `destroy` handle issue workspaces (see [Workspace Lifecycle](#workspace-lifecycle)).
+
+```bash
+# Create a scratch workspace that shares the project directory (the default)
+pan workspace new my-scratch-notes
+
+# --isolated creates its own git worktree on a scratch/<name> branch
+pan workspace new my-experiment --isolated --parent-branch main
+
+# --target-path points the workspace at any existing directory
+pan workspace new vendor-lens --target-path ~/code/some-vendored-repo
+
+# --dry-run prints the resolved intent as JSON and creates nothing
+pan workspace new my-scratch-notes --dry-run
+
+# Inside an Overdeck agent or conversation the default origin is agent, which
+# keeps the workspace off the Workspaces section; --origin operator keeps it on
+pan workspace new my-notes --origin operator
+
+# Point a workspace (by id or name) at another existing directory
+pan workspace relocate vendor-lens --path ~/code/moved-vendored-repo
+
+# Resolve the project's main workspace, creating it if needed
+pan workspace main
+
+# Show, activate or archive a workspace by id
+pan workspace get <id>
+pan workspace activate <id>
+pan workspace archive <id>
+
+# List one kind; --archived includes archived workspaces and needs --kind
+pan workspace list --kind scratch --archived
+```
+
+`pan workspace new` uses the project that owns your current directory, or the only registered project; pass `--project <key>` to choose another.
+
+### Targeting and relocating
+
+A workspace points at a directory, so more than one workspace can point at the same repository, and you can move a workspace later. The rules:
+
+- `--target-path` and `--isolated` cannot be combined, because an isolated worktree already decides its own path.
+- `pan workspace relocate` refuses issue workspaces, because the pipeline owns their path. It needs `--force` for the main workspace, because moving it makes the workspace differ from `projects.yaml`. The new path must be an existing directory.
+- `pan workspace archive` refuses the main workspace.
+
+Relocating never moves memory. A workspace's memory is stored by its id, not by its path or name.
+
+## Cleaning up after close-out
+
+**Settings → Close-out** controls what `pan close <id>` and the dashboard's **Close Out** button do to an issue's workspace and feature branch after its pull request has merged. The settings are saved to the `[close_out]` table in `~/.overdeck/cloister.toml`.
+
+<ThemedImage
+  light="/images/dashboard/close-out-settings-light.png"
+  dark="/images/dashboard/close-out-settings-dark.png"
+  alt="Settings Close-out section with the four controls, the closed-issue disk line, and the Clean up now button"
+/>
+
+| Control | Key | Default | What it does |
+| --- | --- | --- | --- |
+| Remove the workspace when an issue is closed out | `remove_workspace` | on | Stops the workspace's Docker stack and stray processes and removes the worktree. Branches and memory are kept. |
+| Delete the feature branch at close-out | `delete_feature_branch` | off | Deletes the local and remote feature branch. |
+| Close out merged issues automatically | `auto` | shown disabled | Not in effect. Automatic close-out was removed, and nothing reads this key. |
+| Automatic close-out delay (minutes) | `auto_delay_minutes` | shown disabled | Not in effect, for the same reason. |
+
+Below the first control, a line reports how many closed issues still have a workspace on disk and their total size. **Clean up now** runs `pan workspace destroy` (which also deletes the local branch) for each closed issue whose branch is merged and whose workspace has no uncommitted changes. Untracked files count as uncommitted. It lists each issue it removed, and each issue it skipped with the reason: a polyrepo project (destroy those by hand), uncommitted changes, a branch that is not merged, or a merge state it cannot read.
+
+<Note>
+  These settings apply to close-out only. Overdeck's closed-issue reaper also runs when an issue closes and on the Deacon's background patrol. For a closed issue whose branch is merged, or no longer exists, it removes the workspace and deletes the local and remote feature branch, whatever these two settings say. The patrol stops while the Deacon is paused (the dashboard then shows **Resume Deacon**), so closed-issue workspaces can pile up. The disk line and **Clean up now** cover that case. While GitHub reads are paused, the line says the count may be incomplete, and issues it cannot confirm as closed are not counted or removed.
+</Note>
+
 ## Main Project Branch Convention
 
 > **CRITICAL:** The main project directory must **ALWAYS** stay on the `main` branch. All feature work happens in workspaces.
@@ -311,15 +452,15 @@ pan workspace create MIN-999-hotfix
 - STATE.md and beads persist the important context
 - Feature PRD goes to `docs/prds/active/` for permanent storage
 
-## Remote Workspaces (Fly.io)
+## Remote workspaces on Fly
 
 Overdeck supports remote workspace execution via Fly.io Machines. Remote workspaces provide cloud-hosted agent environments without local resource constraints.
 
 ### Why Remote Workspaces?
 
-- **Resource isolation** — Heavy builds and tests don't compete with your local machine
-- **On-demand provisioning** — Machines spin up per workspace and shut down after merge
-- **Same workflow** — CLI and dashboard work identically for local and remote workspaces
+- **Resource isolation**: heavy builds and tests don't compete with your local machine.
+- **On-demand provisioning**: machines spin up per workspace and shut down after merge.
+- **Same workflow**: the CLI and dashboard work the same for local and remote workspaces.
 
 ### Setup
 

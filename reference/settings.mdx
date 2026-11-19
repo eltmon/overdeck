@@ -17,7 +17,7 @@ Settings is one scrolling page at `/settings`, with every section listed in a le
 | Tiered Execution | "Route work by difficulty" and the tier crews | `tiered_execution` in `config.yaml` | [Model routing](/configuration/model-routing#tiered-execution) |
 | Swarming | "Automatic selection", "Maximum slots per issue", "Advance waves automatically" | `swarm.*` in `config.yaml` | [Swarm](/features/swarm) |
 | Cloister | "Max work agents" (default 6), "Reserved advancing slots" (default 3) | `~/.overdeck/cloister.toml` | [Cloister](/features/cloister) |
-| Close-out | "Remove the workspace when an issue is closed out", "Delete the feature branch at close-out" | `cloister.toml` | [Workspaces](/configuration/workspaces) |
+| Close-out | "Remove the workspace when an issue is closed out", "Delete the feature branch at close-out" | `cloister.toml` | [Workspaces](/features/workspaces#cleaning-up-after-close-out) |
 | Merge Train | "Batch size", "Batch wait (minutes)" | Overdeck database | [Merge batches](/features/merge-batches) |
 | Session Vault | Cross-machine conversation backup | `~/.overdeck/vault/config.json` | [Session Vault](/configuration/session-vault) |
 | Anywhere | Account, Status, Devices, Machines, Directory, Fleet versions, Bots, Triggers, Public MCP, Push, Tailscale peers | Split across the account service and local device and link state | [Anywhere](/anywhere) |

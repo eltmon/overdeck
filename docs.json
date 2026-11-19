@@ -294,6 +294,10 @@
       "destination": "/configuration/polyrepo"
     },
     {
+      "source": "/configuration/workspaces",
+      "destination": "/features/workspaces"
+    },
+    {
       "source": "/blog/standing-crew",
       "destination": "/configuration/model-routing"
     }

@@ -1,0 +1,208 @@
+{
+  "version": "1",
+  "issueId": "PAN-5479",
+  "created": "2026-11-19T01:28:31.320Z",
+  "updated": "2026-11-19T01:55:21.397Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-19T01:55Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-19T01:55:21.397Z"
+    }
+  ],
+  "items": {
+    "w1-features-kinds": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5479",
+      "claimedAt": "2026-11-19T01:28:31.320Z",
+      "doneAt": "2026-11-19T01:29:39.079Z"
+    },
+    "w1-features-kinds.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:29:39.079Z"
+    },
+    "w1-features-kinds.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:29:39.079Z"
+    },
+    "w1-features-kinds.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:29:39.079Z"
+    },
+    "w2-features-dashboard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5479",
+      "claimedAt": "2026-11-19T01:29:45.248Z",
+      "doneAt": "2026-11-19T01:31:11.019Z"
+    },
+    "w2-features-dashboard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:31:11.019Z"
+    },
+    "w2-features-dashboard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:31:11.019Z"
+    },
+    "w2-features-dashboard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:31:11.019Z"
+    },
+    "w3-features-cli": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5479",
+      "claimedAt": "2026-11-19T01:31:17.236Z",
+      "doneAt": "2026-11-19T01:32:27.213Z"
+    },
+    "w3-features-cli.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:32:27.213Z"
+    },
+    "w3-features-cli.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:32:27.213Z"
+    },
+    "w3-features-cli.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:32:27.213Z"
+    },
+    "w4-features-closeout": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5479",
+      "claimedAt": "2026-11-19T01:32:33.203Z",
+      "doneAt": "2026-11-19T01:33:32.714Z"
+    },
+    "w4-features-closeout.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:33:32.714Z"
+    },
+    "w4-features-closeout.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:33:32.714Z"
+    },
+    "w4-features-closeout.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:33:32.714Z"
+    },
+    "w5-remote-heading-dashes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5479",
+      "claimedAt": "2026-11-19T01:33:39.384Z",
+      "doneAt": "2026-11-19T01:35:01.327Z"
+    },
+    "w5-remote-heading-dashes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:35:01.327Z"
+    },
+    "w5-remote-heading-dashes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:35:01.327Z"
+    },
+    "w5-remote-heading-dashes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:35:01.327Z"
+    },
+    "w6-memory-core": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5479",
+      "claimedAt": "2026-11-19T01:35:07.840Z",
+      "doneAt": "2026-11-19T01:36:16.716Z"
+    },
+    "w6-memory-core.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:36:16.716Z"
+    },
+    "w6-memory-core.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:36:16.716Z"
+    },
+    "w6-memory-core.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:36:16.716Z"
+    },
+    "w7-memory-providers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5479",
+      "claimedAt": "2026-11-19T01:36:22.803Z",
+      "doneAt": "2026-11-19T01:37:17.874Z"
+    },
+    "w7-memory-providers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:37:17.874Z"
+    },
+    "w7-memory-providers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:37:17.874Z"
+    },
+    "w7-memory-providers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:37:17.874Z"
+    },
+    "w8-memory-rag-logs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5479",
+      "claimedAt": "2026-11-19T01:37:23.821Z",
+      "doneAt": "2026-11-19T01:38:23.227Z"
+    },
+    "w8-memory-rag-logs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:38:23.227Z"
+    },
+    "w8-memory-rag-logs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:38:23.227Z"
+    },
+    "w8-memory-rag-logs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:38:23.227Z"
+    },
+    "w10-settings-link": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5479",
+      "claimedAt": "2026-11-19T01:38:31.159Z",
+      "doneAt": "2026-11-19T01:39:15.862Z"
+    },
+    "w10-settings-link.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:39:15.862Z"
+    },
+    "w10-settings-link.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:39:15.862Z"
+    },
+    "w9-delete-redirect": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5479",
+      "claimedAt": "2026-11-19T01:41:01.319Z",
+      "doneAt": "2026-11-19T01:43:37.551Z"
+    },
+    "w9-delete-redirect.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:43:37.551Z"
+    },
+    "w9-delete-redirect.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:43:37.551Z"
+    },
+    "w9-delete-redirect.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:43:37.551Z"
+    },
+    "w9-delete-redirect.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:43:37.551Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-19T01:55:21Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5479 (PR #5572)\n\nCodeRabbit posted 2 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4623371436 · configuration/memory.mdx:320 [Minor]: Qualify partial environment overrides for query expansion.\n  https://github.com/eltmon/overdeck/pull/5572#discussion_r4623371436\n- Thread 4623371443 · configuration/memory.mdx:326 [Minor]: Correct the documented spending-cap scope.\n  https://github.com/eltmon/overdeck/pull/5572#discussion_r4623371443\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5572/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5479 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5572 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    }
+  ]
+}

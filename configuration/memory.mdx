@@ -1,10 +1,8 @@
 ---
-title: "Project memory: curated facts for every agent"
-sidebarTitle: "Project Memory"
-description: Curated facts stored in your repository and injected into every managed agent session
+title: "Agent memory: curated facts and workspace observations"
+sidebarTitle: "Agent Memory"
+description: "Curated memory facts for every agent, plus the workspace observation memory Overdeck extracts from sessions: search, pins, providers and logs."
 ---
-
-# Project Memory
 
 Curated memory facts are short, human-reviewable truths committed in your repository: operator
 corrections, working agreements, non-obvious project facts. They are repo-owned, so every managed
@@ -262,7 +260,120 @@ workspace row for a registered project, so older projects (imported before works
 identity too.
 
 Every call (hit, miss or error) is logged to
-`~/.overdeck/memory/<project>/<workspace>/rag-runs/<date>.jsonl`.
+`~/.overdeck/memory/<project>/<workspace>/rag-runs/<date>.jsonl`; see [Reading RAG decision logs](#reading-rag-decision-logs).
+
+## Workspace observation memory
+
+Besides curated facts, Overdeck extracts observations from every session automatically. They are stored per workspace, not per issue, under `~/.overdeck/memory/<project>/<workspaceId>/` (observations, status, summaries and logs). A scratch or main workspace with no issue agent still collects memory from the conversations that run in it. Relocating a workspace never moves its memory.
+
+### Searching and pinning
+
+```bash
+# Search one workspace (id or name), one project, or every registered project
+pan memory search "auth refactor" --workspace <id>
+pan memory search "auth refactor" --project myproject
+pan memory search "auth refactor" --global
+
+# Search every workspace that points at a directory (bare flag = current directory)
+pan memory search "auth refactor" --target
+pan memory search "auth refactor" --target ~/code/some-repo
+
+# Pin a doc into prompt-time memory for one workspace (by id) or a whole project
+pan memory pin docs/ARCHITECTURE.md --workspace <id>
+pan memory pin docs/ARCHITECTURE.md --project myproject
+pan memory pins --workspace <id>
+pan memory unpin docs/ARCHITECTURE.md --workspace <id>
+
+# Backfill observations from older Claude Code sessions, matched by working directory
+pan memory backfill --dry-run
+pan memory backfill --workspace <id>
+```
+
+`--target` cannot be combined with `--workspace`, `--issue` or `--global`. A pinned path must resolve to a file inside the project, and it is stored relative to the project root. Always pass `--workspace` or `--project` to `pin`, `pins` and `unpin`; without either, `pin` uses the project `overdeck`. A project pin lasts as long as the project; a workspace pin is deleted with its workspace.
+
+### Reading a workspace's memory back
+
+`status` and `summary` take an issue, `--workspace`, or neither. With neither, they use the workspace that owns your current directory.
+
+```bash
+# Current status by issue, by workspace, or from inside the workspace
+pan memory status PAN-123 --project myproject
+pan memory status --workspace my-scratch-notes
+pan memory status
+
+# The current status plus earlier archived statuses, newest first
+pan memory status --workspace my-scratch-notes --history 3
+
+# Observations, oldest first; the last 7 days (today counts as day 1) and 50 rows by default
+pan memory timeline --workspace my-scratch-notes
+pan memory timeline --days 2 --limit 20 --json
+
+# Print a file from the workspace's memory home, or a slice of it (--from is 1-based)
+pan memory read summaries/2026-07-30.md
+pan memory read summaries/2026-07-30.md --from 10 --lines 20
+```
+
+An issue id from a project other than `overdeck` needs `--project <key>`. `--history` is capped at 50, but Overdeck keeps only the three most recent archived statuses, so a larger number returns what is kept. `pan memory read` reaches only inside the workspace's own memory home: it refuses absolute paths, `../` and symlinks that point outside, so your session transcripts stay out of reach.
+
+### Extraction providers
+
+An LLM call turns each raw session into searchable observations. `memory.extraction.provider` and `memory.extraction.model` in `~/.overdeck/config.yaml` choose it, or **Settings → Memory → Extraction provider**. The default is `anthropic` with `claude-haiku-5-5`. The environment variables `OVERDECK_MEMORY_PROVIDER` and `OVERDECK_MEMORY_MODEL` override the config, but setting only one does not merge with it: the unset variable does not fall back to the YAML provider or model, so (for example) setting only `OVERDECK_MEMORY_MODEL` resets the provider to `anthropic` and drops the configured fallback chain. Set both variables together when overriding. Query expansion, which turns a prompt into a few search terms, uses the same provider and fallback but skips any provider that is too slow for prompt time.
+
+- **`anthropic`** needs `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` in the environment of both the dashboard service and agent sessions, because hooks that call memory run inside the agent's own process. A Claude subscription login does not authenticate it: the Anthropic SDK reads only API keys and auth tokens from the environment.
+- **`claude-cli`** (**Claude Code (subscription)** in Settings) is for a host with only a Claude subscription login. It runs `claude -p` with the Claude Code login of the user that runs the dashboard, so run `claude` as that user and complete `/login` once. It starts a process per call, so it is a background provider: query expansion never calls it, and `memory.worker_concurrency` (default 4) limits how many calls run at once.
+- **`cliproxy`** routes through the CLIProxy sidecar and is fast enough for query expansion.
+
+`memory.extraction.fallback_chain` names fallback providers, but only its first entry is tried. Settings shows it as one **Fallback provider**. Each call, including the notional cost of a `claude-cli` call, counts toward `memory.extraction.per_day_cost_cap_usd` (default 5, in US dollars per day, tracked separately for each issue or scratch/main workspace rather than summed across a project; 0 disables the cap). Applying the Anthropic model preset sets the provider back to `anthropic` and the model to `claude-haiku-5-5`.
+
+### Extraction health
+
+`pan memory doctor --project <key>` prints memory health for that project's issue workspaces, one line per issue. A line with failures ends with `failures=<reason>:<count>`, followed by an indented `cause:` line once a failure has a detail. `pan doctor` shows one **Memory extraction** row for the newest success or failure across all memory. Both read the `health.json` evidence that extraction writes; they never test your own shell's environment, so they catch a missing key even when your shell has one set.
+
+Provider and parse failures use these reasons:
+
+| Reason | Meaning | What to do |
+| --- | --- | --- |
+| `provider-auth-failed` | The provider has no working credentials. | For `anthropic`, export `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` for the dashboard service and agent sessions. For `claude-cli`, run `claude` as the dashboard's user and complete `/login`. Or switch to a provider that can authenticate on this host. |
+| `extraction-failed` | The provider call failed for another reason (network, rate limit, unexpected reply). | Read the `cause:` line in `pan memory doctor`, then retry when the problem clears. |
+| `malformed-response` | The provider replied, but not with the expected JSON. | Usually transient. If it keeps happening with one model, that model may not follow the extraction format. |
+| `cost-cap` | Today's extraction spend reached `memory.extraction.per_day_cost_cap_usd`. | Raise the cap, or wait for the next local day. |
+| `timeout` (query expansion only) | Query expansion did not answer within 750 ms. | None needed. Prompt-time memory still runs with a keyword query built from the prompt. |
+| `provider-non-interactive` (query expansion only) | The provider and its fallback are background providers such as `claude-cli`, so query expansion did not call them. | None needed. Make `anthropic` or `cliproxy` the first fallback if you want expanded queries. |
+
+`timeout` and `provider-non-interactive` appear in the logs below, not in `health.json`. `health.json` also records failures in later pipeline stages, such as `write-failed` or `rollup-failed`.
+
+### Reading RAG decision logs
+
+Every prompt-time memory attempt, hit or miss, is logged to `~/.overdeck/memory/<project>/<workspaceId>/rag-runs/<date>.jsonl`, one JSON object per line. Two line types appear:
+
+- **`query-expansion`**: one per expansion attempt, with `outcome` (`expanded`, `cache-hit` or `expansion-failed`), the expanded `query` and `expandedTerms`, and `reason` (one of the reasons above, or `null` on success). No line is written while query expansion is turned off.
+- **`rag-decision`**: one per injection attempt: whether anything was injected, and why not.
+
+An annotated `rag-decision` line, trimmed to the fields that explain a decision:
+
+```json
+{
+  "id": "8f2c1e4a-...",
+  "type": "rag-decision",
+  "outcome": "injected",           // injected | skipped | no-hits | expansion-failed | context-too-large | budget-truncated
+  "reason": "provider-auth-failed", // see the rules below
+  "query": "verification gate block review findings", // the keyword query actually searched, not the raw prompt
+  "hitCounts": { "status": 1, "observations": 2, "summaries": 0, "sibling": 1, "knowledgeIndex": 0, "facts": 0 },
+  "expansion": { "status": "fallback", "reason": "provider-auth-failed", "cacheKey": "..." }
+}
+```
+
+This example is a failed expansion (`expansion.status: "fallback"`) that still injected memory (`hitCounts.observations: 2`). When expansion fails, prompt-time retrieval searches a keyword query built from the prompt (stopwords and short words removed) and matches any of its words, so it still finds observations that share words with the prompt.
+
+`reason` depends on `outcome`:
+
+| `outcome` | `reason` |
+| --- | --- |
+| `injected` | The expansion's reason, or `null` when expansion succeeded. |
+| `skipped` | `prompt-time-injection-disabled` |
+| `no-hits`, `expansion-failed` | The expansion's reason, else `no-memory-hits`. |
+| `context-too-large` | `memory-context-exceeds-token-budget` |
+| `budget-truncated` | `memory-context-truncated-to-budget` |
 
 ## Previewing
 
