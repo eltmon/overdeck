@@ -1,5 +1,6 @@
 ---
-title: "Connect a bot"
+title: "Connect a bot: give Hermes, OpenClaw or Grok scoped MCP access"
+sidebarTitle: "Connect a bot"
 description: Give a chat bot or a hosted assistant scoped, revocable access to Overdeck through the Overdeck connector, Tailscale or public MCP
 ---
 
@@ -8,12 +9,13 @@ description: Give a chat bot or a hosted assistant scoped, revocable access to O
 A bot is an MCP client that Overdeck did not launch: Hermes, OpenClaw, Grok
 Build, Grok Bot, or a script that calls the xAI API. It uses the same
 [MCP server](/configuration/mcp) and tools as everything else, with a token
-you can scope and revoke.
+you can scope and revoke. Overdeck has no native Slack, Discord or Telegram
+bot integration; this page covers MCP clients only.
 
 There are two ways in, and both keep the traffic encrypted until it reaches
 hardware you control:
 
-- **A bot with a shell** — Hermes, OpenClaw, Grok Build, Grok Bot — runs the
+- **A bot with a shell** (Hermes, OpenClaw, Grok Build, Grok Bot) runs the
   Overdeck connector next to it. The connector pairs with one machine and
   reaches it over an end-to-end encrypted channel, directly or through the
   relay. You can use Tailscale instead.
@@ -26,7 +28,8 @@ Nothing on overdeck.ai ever sees a tool call in plain text.
 
 ## Connect in one paste
 
-Pick the bot in **Connect a bot**, pick its access (default Read + Tell), and
+Pick the bot in **Connect a bot**, pick its access (by default Read state, Read
+conversations and Send messages), and
 click **Copy for &lt;bot&gt;**. Paste the copied message into the bot's chat.
 The bot runs the command inside it, shows you one link, and you click it and
 **Authorize**; the bot runs the command again and reports it is ready.
@@ -58,9 +61,11 @@ connects, when dismissed, or when the connector is removed.
 
 ## The Connect a bot dialog
 
-Give an outside MCP client — Hermes, OpenClaw, Grok Build, Grok Bot, or a script
-calling the xAI API — scoped, revocable access to this machine. Open **Connect a
-bot** from **Settings → Anywhere → Bots**, or from the command palette.
+Give an outside MCP client (Hermes, OpenClaw, Grok Build, Grok Bot, or a script
+calling the xAI API) scoped, revocable access to this machine. Open **Connect a
+bot** from **Settings → Anywhere → Bots**, or from the command palette. Only a
+browser on this machine can connect or manage bots; a paired device sees "Only
+a browser on this machine can manage bots."
 
 The dialog picks a reach by platform:
 
@@ -73,22 +78,23 @@ The dialog picks a reach by platform:
 
 Access defaults to `read:state`, `read:conversations` and `tell`; `read:state`
 is always on. `operate` and `approve` are off by default. A bot never gets
-`admin`, `forward`, `read:settings` or `read:costs`, regardless of what is
-ticked.
+`admin`, `forward`, `read:settings`, `read:costs` or `read:events`, regardless
+of what is ticked.
 
 Each reach produces a different setup:
 
-- **Overdeck connector** — a message to paste into the bot, built around a
+- **Overdeck connector**: a message to paste into the bot, built around a
   pairing code that works once, within 30 minutes. It runs
   `pan mcp connector connect` for you; the manual pairing string and commands
   (`login`, `pair`, `serve`) live under "Set up by hand instead" in the
   dialog's output.
-- **Tailscale, This computer** — an access token, shown once. The config
+- **Tailscale, This computer**: an access token, shown once. The config
   snippet never carries it: it goes only into the one-time "Token setup"
   field, kept out of the config through `OVERDECK_MCP_TOKEN` or
   `OVERDECK_MCP_TOKEN_FILE`.
-- **Public MCP** — the public URL plus, for the xAI API, the
-  `pan mcp oauth issue` command that mints its token.
+- **Public MCP**: the public URL plus, for the xAI API, the
+  `pan mcp oauth issue` command that mints its token. Public MCP must be on
+  first; while it is off the dialog shows **Show Public MCP settings** instead.
 
 ## Platforms
 
@@ -97,7 +103,7 @@ Each reach produces a different setup:
 The Hermes connector config, for example:
 
 ```yaml
-# ~/.hermes/config.yaml — connector route (default)
+# ~/.hermes/config.yaml: connector route (default)
 mcp_servers:
   overdeck:
     url: "http://127.0.0.1:7466/mcp"
@@ -114,11 +120,13 @@ plugins:
 ```
 
 The plugin reads `summary` and `allow_answers` from `settings`; `mcp_allowlist`
-grants it the `overdeck` server. See `integrations/hermes/README.md` for the
-`/overdeck` commands.
+grants it the `overdeck` server. See
+[`integrations/hermes/README.md`](https://github.com/eltmon/overdeck/tree/main/integrations/hermes)
+for the `/overdeck` commands.
 
 Connect in one paste registers the connector as a stdio server in
-`mcp_servers` instead of this HTTP entry; see `integrations/hermes/README.md`.
+`mcp_servers` instead of this HTTP entry; see
+[`integrations/hermes/README.md`](https://github.com/eltmon/overdeck/tree/main/integrations/hermes).
 
 ### OpenClaw
 
@@ -145,7 +153,7 @@ plugins: { entries: { overdeck: { config: { localToken: "${OVERDECK_CONNECTOR_LO
 
 Connect in one paste registers the connector with `openclaw mcp set` as a
 stdio server, which gives the agents the Overdeck tools; the plugin's
-summary and chat tools still need the HTTP config below.
+summary and chat tools still need the HTTP config above.
 
 ### Grok Build
 
@@ -168,7 +176,7 @@ plugin's own `overdeck` server also loads into those sessions.
 
 ### Grok Bot
 
-Pick **Grok Bot** in Connect a bot and click **Copy for Grok Bot** — see
+Pick **Grok Bot** in Connect a bot and click **Copy for Grok Bot**; see
 [Connect in one paste](#connect-in-one-paste). Paste the message into Grok
 Bot's chat; it runs `pan mcp connector connect` itself, shows you a link to
 click and **Authorize**, then reports it is ready.
@@ -215,6 +223,7 @@ shows the exact version.
 
 | Command | What it does |
 | --- | --- |
+| `pan mcp connector connect '<pairing string>' [--name <bot>] [--platform <id>] [--wait <seconds>] [--account-url <url>] [--directory-url <url>]` | Signs in, pairs, verifies and prints the MCP registration in one command a bot can run again; the message from Connect a bot runs it. `--platform` is `grok-bot`, `grok-build`, `hermes`, `openclaw` or `other` (default). See [`pan mcp connector connect`](/cli/mcp#connect). |
 | `pan mcp connector login [--account-url <url>] [--directory-url <url>]` | Signs the connector in to overdeck.ai with the device flow: open the URL it prints and enter the code. |
 | `pan mcp connector pair '<pairing string>' [--label <name>]` | Pairs with the machine named in the string from "Connect a bot". `--label` names the connector on the machine (default: the host name). |
 | `pan mcp connector serve [--port <port>] [--stdio] [--label <name>]` | Serves the tools on `127.0.0.1:<port>` (default 7466) until stopped, or one stdio session with `--stdio`. |
@@ -224,10 +233,11 @@ shows the exact version.
 ### The connector home
 
 All connector state lives in `$OVERDECK_CONNECTOR_HOME`, default
-`~/.overdeck-connector`, mode 0700. It holds four files, each mode 0600:
+`~/.overdeck-connector`, mode 0700. It holds up to five files, each mode 0600:
 `account.json` (the overdeck.ai sign-in), `identity.json` (the connector id and
 its keys), `pairing.json` (the paired machine and its connector token) and
-`local-token`. The connector never reads or writes `~/.overdeck`, so it can run
+`local-token`, plus `pending-signin.json` while a `connect` sign-in waits for
+approval. The connector never reads or writes `~/.overdeck`, so it can run
 on an Overdeck machine without touching that machine's sign-in or keys. A file
 that other users can read is refused with a `chmod 600` hint.
 
@@ -286,7 +296,7 @@ the machine and keeps `local-token`, so the bot's config keeps working. Restart
 
 `logout` does four steps in order: it removes the connector from the machine
 (`DELETE /api/connectors/self`), removes it from the overdeck.ai directory,
-revokes its overdeck.ai sign-in, and deletes the four files. A step that fails
+revokes its overdeck.ai sign-in, and deletes its files. A step that fails
 prints one line and the next step still runs; the files are always deleted. If
 the machine was unreachable, remove the connector there under **Settings →
 Anywhere → Bots**.
@@ -301,8 +311,8 @@ ticked and shows it once in the "Token setup" field. The bot then calls
 
 For a bot in a container, run Tailscale inside the container with an
 ephemeral, tagged auth key, and give the tag an ACL that reaches only the
-dashboard host on port 443. Each integration README has a "Tailscale route"
-section with the exact config. Grok Build's Tailscale route is not working yet
+dashboard host on port 443. The Hermes and OpenClaw READMEs have a "Tailscale
+route" section with the exact config. Grok Build's Tailscale route is not working yet
 ([#5029](https://github.com/eltmon/overdeck/issues/5029)); use the connector
 or "This computer" for Grok Build.
 
@@ -318,11 +328,15 @@ result, so check that first (next point).
 
 What to do: use [Public MCP](/configuration/mcp#public-mcp-for-hosted-bots)
 (see Grok Bot above), or run the connector on a host with WebRTC egress, or
-use Tailscale instead (`#tailscale-instead-of-the-connector`).
+use [Tailscale instead of the connector](#tailscale-instead-of-the-connector).
 
 How to tell a relay outage from a blocked bot: run `pan doctor` on the
-machine. If its `TURN relay` row is `ok`, the block is on the bot's side; if
-it warns, the relay or the machine's own network is the problem.
+machine. The `TURN relay` row appears only when the machine is signed in to
+overdeck.ai with the relay plan. If the row is `ok`, the block is on the bot's
+side; if it warns, the relay or the machine's own network is the problem.
+
+Still stuck? Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a
+[GitHub Issue](https://github.com/eltmon/overdeck/issues).
 
 ## Remove a bot
 
