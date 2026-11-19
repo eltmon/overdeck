@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5504",
   "created": "2026-11-19T07:15:41.251Z",
-  "updated": "2026-11-19T07:45:33.241Z",
+  "updated": "2026-11-19T07:46:36.608Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -506,9 +506,26 @@
       "doneAt": "2026-11-19T07:45:28.982Z"
     },
     "audit-token-spend-report": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5504",
-      "claimedAt": "2026-11-19T07:45:33.240Z"
+      "claimedAt": "2026-11-19T07:45:33.240Z",
+      "doneAt": "2026-11-19T07:46:36.607Z"
+    },
+    "audit-token-spend-report.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:46:36.607Z"
+    },
+    "audit-token-spend-report.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:46:36.607Z"
+    },
+    "audit-token-spend-report.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:46:36.607Z"
+    },
+    "audit-token-spend-report.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:46:36.607Z"
     }
   }
 }
