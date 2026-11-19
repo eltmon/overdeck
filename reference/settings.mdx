@@ -9,7 +9,7 @@ Settings is one scrolling page at `/settings`, with every section listed in a le
 | Section | What it controls | Where it is saved | More |
 | --- | --- | --- | --- |
 | Model Routing | Presets, Workhorse Models, Role Models | `workhorses`, `roles` in `config.yaml` | [Model routing](/configuration/model-routing), [Model presets](/configuration/model-presets) |
-| Providers | Provider API keys, "Show all harness/model permutations", "Default harness" | `models.providers`, `api_keys` in `config.yaml` | [Model routing](/configuration/model-routing), [Harnesses](/configuration/harnesses) |
+| Providers | Provider API keys, "Show all harness/model permutations", "Default harness" | `models.providers` (including each provider's default harness), `api_keys` and `experimental.showHarnessModelPermutations` in `config.yaml` | [Model routing](/configuration/model-routing), [Harnesses](/configuration/harnesses) |
 | Permissions | Claude Code's Auto or Bypass mode; Codex's Read-only, Workspace, Auto-review or Full access mode | `claude.permissionMode`, `codex.permissionMode` in `config.yaml` | [Permissions](/configuration/permissions) |
 | Security | Semgrep switches | `security.semgrep` in `config.yaml` | [Semgrep](/configuration/semgrep) |
 | Computer Use | "Allow agents to use the desktop" | `computer_use.enabled` in `config.yaml` | [Computer use](/configuration/computer-use) |
@@ -20,20 +20,20 @@ Settings is one scrolling page at `/settings`, with every section listed in a le
 | Close-out | "Remove the workspace when an issue is closed out", "Delete the feature branch at close-out" | `cloister.toml` | [Workspaces](/features/workspaces#cleaning-up-after-close-out) |
 | Merge Train | "Batch size", "Batch wait (minutes)" | Overdeck database | [Merge batches](/features/merge-batches) |
 | Session Vault | Cross-machine conversation backup | `~/.overdeck/vault/config.json` | [Session Vault](/configuration/session-vault) |
-| Anywhere | Account, Status, Devices, Machines, Directory, Fleet versions, Bots, Triggers, Public MCP, Push, Tailscale peers | Split across the account service and local device and link state | [Anywhere](/anywhere) |
-| Remote | "Resiliency tier" (Ephemeral or Durable), "Max concurrent remote agents" | `remote.*` in `config.yaml` | [Linked machines](/configuration/linked-machines) |
-| Access Tokens | Token table, "Require a token to sign in" | `dashboard.require_token_mint` in `config.yaml` | [Remote access](/configuration/remote-access) |
-| Voice | "STT provider", "AutoPreso provider", "AutoPreso model", devices and volume | `~/.overdeck/voice-settings.json`; device and volume choice stays in the browser | [Voice and TTS](/configuration/voice#choose-the-speech-to-text-provider); see also [AutoPreso](/features/dashboard-views#autopreso) |
-| Conversations | Compaction, title and handoff models, "/compact handling", "Rich summaries", "Auto-settle on merge", Conversation Search | `conversations.*` in `config.yaml`; Conversation Search needs its own **Save embeddings** click | [Conversations](/features/conversations) |
+| Anywhere | Status card, Account, Paired devices, Machines, Directory, Fleet versions, Overdeck on your tailnet (once Tailscale is ready), Triggers, Access tokens, Bots, Public MCP for hosted bots, Phone notifications | Split across the account service and local device and link state | [Anywhere](/anywhere) |
+| Remote | "Resiliency tier" (Ephemeral or Durable), "Max concurrent remote agents" | `remote.*` in `config.yaml` | [Remote workspaces on Fly](/features/workspaces#remote-workspaces-on-fly) |
+| Access Tokens | Token table, "Require a token to sign in" | Tokens in `~/.overdeck/access-tokens.json`; "Require a token to sign in" in `dashboard.require_token_mint` in `config.yaml` | [Remote access](/configuration/remote-access) |
+| Voice | "STT provider", "AutoPreso provider", "AutoPreso model", devices and volume | `~/.overdeck/voice-settings.json`; device and volume choice stays in the browser | [Voice and TTS](/configuration/voice#choose-the-speech-to-text-provider); see also [AutoPreso](/features/dashboard-views#autopreso) (experimental: turn on Settings → Experimental → **Experimental features** to show it) |
+| Conversations | Compaction, title and handoff models, "/compact handling", "Rich summaries", "Auto-settle on merge", "Auto-settle idle conversations", Conversation Search | `conversations.*` in `config.yaml`, except "Auto-settle on merge" and "Auto-settle idle conversations", which the Overdeck database holds; Conversation Search needs its own **Save embeddings** click | [Conversations](/features/conversations) |
 | Memory | Extraction provider and model, "Daily cost cap", "Disable observations", "Prompt-time injection" | `memory.*` in `config.yaml` | [Memory](/configuration/memory) |
-| Background AI | "Low-cost mode", per-feature rows, "TypeSafe API key (Jev)" | `background_ai.*` in `config.yaml` | [Jev](/configuration/jev) |
-| Terminal | "tmux configuration" (Managed or Inherit user) | `tmux.config_mode` in `config.yaml` | No page documents this setting |
+| Background AI | "Low-cost mode", per-feature rows, "TypeSafe API key (Jev)" | `background_ai.*` in `config.yaml`; the TypeSafe key in `api_keys.typesafe` and the Jev panel in `jev.*` | [Jev](/configuration/jev) |
+| Terminal | "tmux configuration" (Managed or Inherit user) | `tmux.config_mode` in `config.yaml` | No page documents this setting; it applies only to the tmux backend ([Terminal backend](/configuration/terminal-backend#opting-into-tmux)) |
 | TTS | "Enable TTS", "Daemon", "Volume", "Rate" | `tts.*` in `config.yaml` | [Voice and TTS](/configuration/voice#control-what-is-spoken) |
 | Tracker Keys | Linear, GitHub, GitLab, Rally and Jira keys | `tracker_keys.*` in `config.yaml`, overriding the environment variables | [Issue trackers](/configuration/issue-trackers) |
 | GitHub Identities | Read-only table: Owner, Project, Repository, Acts as, Why | Nothing; this section only displays existing state | [Issue trackers](/configuration/issue-trackers) |
 | Appearance | "Overdeck Theme", "Color theme", "Ready to Merge shimmer" | "Overdeck Theme" in `ui.theme` and "Color theme" in `ui.color_theme` in `config.yaml` (theme files live in `~/.overdeck/themes/`); "Ready to Merge shimmer" in this browser's `localStorage` only | [Appearance](/configuration/appearance) |
 | Diff | "Diff style", "Line wrapping" and other diff display options | This browser only | No page |
-| Desktop App | Tray badge, notifications, launch at login (desktop app only) | Desktop app local settings | Not documented yet |
+| Desktop App | Tray badge, notifications, launch at login (desktop app only) | Desktop app local settings | [Desktop app](/features/desktop-app) |
 | Maintenance | "Issue cache" clear | Not persisted; it clears a runtime cache | No page |
 | Telemetry | "Share anonymous usage data", "Group my installs (pseudonymous)" | `telemetry.*` in `config.yaml` | [Telemetry](/configuration/telemetry) |
 | Experimental | "Experimental features", "RTK Bash compression", "Claude Code Channels", "Streamdown renderer" | `experimental.*` in `config.yaml` (RTK writes `agents.rtk.enabled`) | [Experimental features](/features/dashboard-views#experimental-features) |
@@ -42,4 +42,4 @@ Diff preferences and the Ready to Merge shimmer toggle are the exceptions to the
 
 ## Get help
 
-Join the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file an issue on [GitHub Issues](https://github.com/eltmon/overdeck/issues).
+Still stuck? Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a [GitHub Issue](https://github.com/eltmon/overdeck/issues).
