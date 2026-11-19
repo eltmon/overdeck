@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5499",
   "created": "2026-11-19T02:52:23.250Z",
-  "updated": "2026-11-19T02:53:21.755Z",
+  "updated": "2026-11-19T02:53:25.911Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "intro-audit.ac4": {
       "status": "completed",
       "doneAt": "2026-11-19T02:53:21.755Z"
+    },
+    "quickstart-audit": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5499",
+      "claimedAt": "2026-11-19T02:53:25.911Z"
     }
   }
 }
