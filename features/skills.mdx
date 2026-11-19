@@ -16,7 +16,7 @@ Skills are reusable, shareable workflows that encode best practices for common d
 
 - **Multi-harness** - `pan sync` installs them for Claude Code (`~/.claude/skills`) and for Codex and Pi (`~/.agents/skills`)
 - **Shareable** - `pan sync` copies them to every harness skill directory it manages
-- **Contextual** - Invoked with `/skill-name` in AI tool prompts
+- **Contextual** - Invoked with `/skill-name` in an agent's prompt
 - **Best-practice-driven** - Encode proven workflows and checklists
 
 Skills eliminate the need to repeatedly explain how to do common tasks. Instead of telling an agent "please review this code for security issues", you invoke `/code-review-security` and the agent follows the established workflow.
@@ -61,7 +61,7 @@ Overdeck ships more than 120 built-in skills. A selection, by category:
 | `pan-tell` | Send message to running agent |
 | `pan-kill` | Kill a running agent |
 | `pan-doctor` | Check system health, dependencies and configuration |
-| `pan-sync` | Sync skills to AI tools |
+| `pan-sync` | Sync skills to every harness skill directory |
 | `pan-install` | Install prerequisites |
 | `pan-quickstart` | Quick start guide |
 | `pan-projects` | Manage registered projects |
@@ -106,7 +106,7 @@ Skills are invoked as slash commands, for example in Claude Code:
 /pan-help
 ```
 
-When you invoke a skill, the AI tool injects the skill's prompt into the conversation, giving the agent detailed instructions on how to proceed.
+When you invoke a skill, the harness injects the skill's prompt into the conversation, giving the agent detailed instructions on how to proceed.
 
 ## Creating Custom Skills
 
@@ -143,7 +143,7 @@ Describe when this skill should be invoked.
 - Tip 2
 EOF
 
-# Sync to all AI tools
+# Install it for every harness
 pan sync
 ```
 
@@ -193,7 +193,7 @@ Use `/pan-skill-creator` or `/claude-skill-creator` for guided creation.
 Skills can be distributed via:
 
 1. **Project skills**: commit them to `.pan/skills/<name>/` in the project repo. See [Project skills](#project-skills).
-2. **User-specific** - Store in `~/.overdeck/skills/` (synced to AI tools)
+2. **User-specific** - Store in `~/.overdeck/skills/` (installed for every harness by `pan sync`)
 3. **Third-party skill repositories**: register them as a [skill pack](/features/skill-packs) with `pan skills pack add`; to publish your own, see [Authoring a skill pack](/guides/skill-pack-authoring).
 4. **Overdeck's bundled skills** ship in `sync-sources/skills/` and reach every machine through `pan sync`.
 
@@ -221,7 +221,7 @@ pan sync --dry-run
 ```
 
 The `pan sync` command:
-- Copies skills from `~/.overdeck/skills/` to each AI tool's config directory
+- Copies skills from `~/.overdeck/skills/` to `~/.claude/skills` and `~/.agents/skills`
 - Overwrites installed skill files you have not edited; a file you edited since Overdeck installed it is skipped and reported as user-modified (`pan sync --force` overwrites it)
 - Removes manifest-managed skills from harness directories after their bundled source is removed
 - Preserves files Overdeck did not install, except that in `~/.claude/skills` a file at the same path as a bundled skill file is overwritten and reported as adopted; when a bundled skill is removed, an installed copy you edited is reported instead of deleted
