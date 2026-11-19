@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5499",
   "created": "2026-11-19T02:52:23.250Z",
-  "updated": "2026-11-19T02:54:56.189Z",
+  "updated": "2026-11-19T02:55:05.339Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
     "quickstart-audit.ac5": {
       "status": "completed",
       "doneAt": "2026-11-19T02:54:56.189Z"
+    },
+    "concepts-command-deck": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5499",
+      "claimedAt": "2026-11-19T02:55:05.339Z"
     }
   }
 }
