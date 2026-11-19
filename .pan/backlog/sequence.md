@@ -1,11 +1,10 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-19T00:23:49.005346Z · model: claude-opus-5-5 · open: 944_
+_Last sequenced: 2026-11-19T00:27:00.657390Z · model: claude-opus-5-5 · open: 943_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 2 | PAN-5564 | XS | high | ok |  |  | Flaky changes-view test: openChanges resolves before the DiffEditor mock's onMount effect; test-only wait fix. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5430 | S | medium | ok |  |  | Markdown Preview prints raw HTML (README logo <div>/<picture>) as text; render it via rehype-raw + rehype-sanitize in doc previews. |
 | 5 | PAN-5567 | S | high | ok |  |  | Codex app-server threads hardcode on-request/workspace-write, so Read-only and Full access settings never apply. |
@@ -952,10 +951,6 @@ _Last sequenced: 2026-11-19T00:23:49.005346Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
-### PAN-5564 (rank 2)
-
-New in-pipeline substrate flake that turned main CI red on a docs-only merge; pinned in a free top slot rather than ranked against the queue.
-
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
@@ -1272,6 +1267,10 @@ New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's
 
 New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
 
+### PAN-3543 (rank 79)
+
+New this pass. A completed-handoff agent owed rework after a blocked verdict cannot be started at all: pan start refuses and recommends --fresh, --fresh gives the identical refusal, and reset-session is refused too because the durable plane reconstructs the session pointer. The refusal message names an action the operator cannot take, which is the self-contradictory-deadlock family PAN-3526 opened.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1279,24 +1278,11 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-19T00:23:49.005346Z",
+  "generatedAt": "2026-11-19T00:27:00.657390Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 944,
+  "openCount": 943,
   "nodes": [
-    {
-      "issue": "PAN-5564",
-      "rank": 2,
-      "size": "XS",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Flaky changes-view test: openChanges resolves before the DiffEditor mock's onMount effect; test-only wait fix.",
-      "rationale": "New in-pipeline substrate flake that turned main CI red on a docs-only merge; pinned in a free top slot rather than ranked against the queue.",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-5013",
       "rank": 3,
