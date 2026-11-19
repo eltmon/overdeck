@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5504",
   "created": "2026-11-19T07:15:41.251Z",
-  "updated": "2026-11-19T07:38:49.519Z",
+  "updated": "2026-11-19T07:38:56.168Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -376,6 +376,11 @@
     "audit-legacy-codebases.ac4": {
       "status": "completed",
       "doneAt": "2026-11-19T07:38:49.518Z"
+    },
+    "audit-operating": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5504",
+      "claimedAt": "2026-11-19T07:38:56.168Z"
     }
   }
 }
