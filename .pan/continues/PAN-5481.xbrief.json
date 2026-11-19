@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5481",
   "created": "2026-11-19T02:37:48.826Z",
-  "updated": "2026-11-19T02:41:23.007Z",
+  "updated": "2026-11-19T02:41:26.321Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,11 @@
       "claimedBy": "agent-pan-5481",
       "claimedAt": "2026-11-19T02:40:52.812Z",
       "doneAt": "2026-11-19T02:41:23.007Z"
+    },
+    "autopreso-link": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5481",
+      "claimedAt": "2026-11-19T02:41:26.320Z"
     }
   }
 }
