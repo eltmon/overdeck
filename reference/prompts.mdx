@@ -202,23 +202,26 @@ for how the build pipeline copies `*.md` from source to `dist/dashboard/prompts/
 ## Frontmatter contract
 
 Every template starts with a YAML frontmatter block delimited by `---`. The
-loader enforces this structure — a missing or malformed block throws
-`PromptError` before a single byte of the body is read.
+loader enforces this structure: a missing or malformed block fails with
+`PromptError` before the body is rendered.
 
 ```markdown
 ---
 name: work
-description: Work-agent prompt — implementation-phase instructions, per-task workflow, finalization steps.
+description: Primary work-agent prompt that reads the per-issue record, processes feedback, and drives the xBRIEF item loop until pan done.
 requires:
   - ISSUE_ID
-  - ISSUE_TITLE
-  - BRANCH
-  - XBRIEF_PATH
-  - DIFFICULTY
+  - ISSUE_ID_LOWER
+  - WORKSPACE_PATH
+  - BRANCH_NAME
+  - LOCAL
+  - REMOTE
 optional:
-  - SPEC_SECTION
-  - POLYREPO_HEADER
-  - TRACKER_CONTEXT
+  - PROJECT_ROOT
+  - POLYREPO_CONTEXT
+  - PENDING_FEEDBACK
+  - MEMORY_CONTEXT
+  # ...the real file declares more optional variables
 ---
 Body of the prompt starts here...
 ```
@@ -227,10 +230,10 @@ Body of the prompt starts here...
 
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
-| `name` | string | yes | Must match the filename (without `.md`). Used for error messages and cross-references. |
-| `description` | string | yes | One-line summary shown in catalogues and reference docs. Write it for the reader who's scanning a list of templates, not for the one already inside the file. |
-| `requires` | string array | no (defaults to `[]`) | Variables that MUST be provided in `vars`. A missing or `undefined`/`null` value throws `PromptError`. |
-| `optional` | string array | no (defaults to `[]`) | Variables that MAY be provided. Rendering with an optional variable omitted is fine — the corresponding Mustache section simply renders empty. |
+| `name` | string | yes | Non-empty string. Keep it equal to the filename (without `.md`). The loader doesn't check that, and its error messages use the name passed to `renderPrompt`. |
+| `description` | string | yes | One-line summary. The loader requires it but never displays it. Write it for the reader who's scanning a list of templates, not for the one already inside the file. |
+| `requires` | string array | no (defaults to `[]`) | A list of strings: variables that MUST be provided in `vars`. A missing or `undefined`/`null` value fails with `PromptError`. |
+| `optional` | string array | no (defaults to `[]`) | Variables that MAY be provided. Rendering with an optional variable omitted is fine: the corresponding Mustache section simply renders empty. |
 
 ### `requires` vs `optional`
 
@@ -242,10 +245,10 @@ The rule of thumb:
   section out otherwise" case, list it as `optional`.
 
 `requires` is stricter than you might think: passing an empty string
-(`""`) satisfies the check — only `undefined` and `null` fail. This is
-intentional. An empty-string `CURRENT_PHASE` in the resume prompt means
-"STATE.md had no phase", not "the caller forgot to compute one". The
-caller is the one who decides whether "empty" is a legitimate value.
+(`""`) satisfies the check. Only `undefined` and `null` fail. This is
+intentional. `buildWorkAgentPrompt` passes an empty `ISSUE_ID` when a
+recovery path has no issue id, and the prompt still renders. The caller is
+the one who decides whether "empty" is a legitimate value.
 
 ### Unknown keys are an error
 
@@ -284,10 +287,10 @@ a non-empty array, an object). Empty strings and `false` hide the block.
 {{/USER_MESSAGE}}
 ```
 
-Note the pattern `{{#VAR}}{{VAR}}{{/VAR}}` — that's Mustache context
+Note the pattern `{{#VAR}}{{VAR}}{{/VAR}}`: that's Mustache context
 fall-through: inside a truthy section, the variable itself is still
-accessible in the parent scope and gets substituted normally. This is how the
-resume prompt hides entire headings when their content is empty.
+accessible in the parent scope and gets substituted normally. This is how
+`work.md` hides its Specialist Feedback heading when `PENDING_FEEDBACK` is empty.
 
 ### Inverted sections
 
@@ -295,7 +298,7 @@ Render if the variable is falsy/empty.
 
 ```mustache
 {{^DO_PUSH}}
-Do NOT push to main — you are validating only.
+Do NOT push to main; you are validating only.
 {{/DO_PUSH}}
 ```
 
@@ -333,56 +336,59 @@ variable.
 
 ## Template catalogue
 
-The ten templates currently under `src/lib/cloister/prompts/`, grouped by the role they play in the pipeline.
+The eleven templates under `src/lib/cloister/prompts/`. Four have a
+production caller. The other seven still load and some have smoke tests,
+but nothing in `src/` renders them today.
 
-### Work agent templates
+### Templates with a caller
 
-Templates that drive the **work agent** — the specialist that implements xBRIEF checklist items.
+| Template | Rendered by | Purpose |
+|----------|-------------|---------|
+| `work.md` | `buildWorkAgentPrompt` (`src/lib/cloister/work-agent-prompt.ts`) | Work agent kickoff: claim one xBRIEF item, implement it, commit with an `Item:` trailer and push, run `pan task done`, then continue through quality gates and `pan done`. |
+| `work-deft.md` | `buildDeftWorkAgentPrompt` (`src/lib/deft/kickoff.ts`), which `buildWorkAgentPrompt` calls for an issue on Deft Directive's pipeline | Hands the issue to Deft's own build, pre-PR and review-cycle skills. Overdeck runs no review or test agents for these issues. |
+| `planning.md` | `buildPlanningPrompt` (`src/lib/planning/spawn-planning-session.ts`) | Discovery session: explore the codebase, ask questions through AskUserQuestion, write the PRD draft at `.pan/drafts/<ISSUE>.md`, `.overdeck/continue.json` and the xBRIEF at `.overdeck/spec.vbrief.json`, then run `pan plan finalize` to promote it to `.pan/specs/<ISSUE>.xbrief.json` in the plan home. Never implements code. |
+| `handoff-to-work.md` | `buildHandoffPrompt` (`src/lib/cloister/handoff-context.ts`) | Model-to-model handoff: wraps serialized git state, xBRIEF task state, `.overdeck/continue.json` state and summaries with a preamble saying who took over and why. |
 
-| Template | Used by | Purpose |
-|----------|---------|---------|
-| `work.md` | Work agent (`spawnSpecialist`, `buildWorkAgentPrompt`) | Implementation instructions: claim one xBRIEF item, implement it, commit and push, run `pan task done`, then continue through quality gates and finalization. |
-| `resume-work.md` | `buildResumePrompt` | Context-rich restart message sent when a stopped work agent resumes. Includes continue state, open xBRIEF items, pending feedback, and next-step instructions. |
-| `handoff-to-work.md` | `buildHandoffPrompt` | Model-to-model handoff: wraps serialized git state, xBRIEF item state, continue state, and summaries with a preamble explaining who took over and why. |
+### Templates without a caller
 
-### Planning agent templates
+| Template | Purpose |
+|----------|---------|
+| `review.md` | Strict code review, stale-branch check, status reporting through the API. Has smoke tests. |
+| `test.md` | Run all suites, compare against a baseline on main, smoke test containers, write the verdict artifact. |
+| `merge.md` | Unified merge template. `DO_PUSH`, `DO_BUILD` and `SKIP_DONE_REPORT` toggle between validation-only and full push, build and report flows. Has smoke tests. |
+| `uat-agent.md` | Browser-based user acceptance testing. |
+| `resume-work.md` | Restart message for a stopped work agent. |
+| `sync-main.md` | Resolve merge conflicts when syncing `origin/main` into a workspace branch. |
+| `identity-wake.md` | Short identity prompt that tells a newly started specialist its role. |
 
-Templates for the **planning agent**, the discovery-phase agent that converts a PRD or raw issue into an xBRIEF plan.
+### Prompts outside this loader
 
-| Template | Used by | Purpose |
-|----------|---------|---------|
-| `planning.md` | Planning agent (`buildPlanningPrompt`) | Discovery session: explore the codebase, ask questions through AskUserQuestion, write the legacy-compatible workspace draft named by `PAN_SPEC_FILENAME` plus `.pan/continue.json`, then run `pan plan finalize` to create the canonical `specs/*.xbrief.json`. Never implements code. |
+Not every prompt goes through `renderPrompt`:
 
-### Specialist agent templates
+- **Role definitions** live in `roles/<role>.md`. When a Claude Code agent
+  launches with a role file, Overdeck strips its frontmatter and passes the
+  body with `--append-system-prompt-file` (`roleSystemPromptInjection` in
+  `src/lib/agents/runtime-command.ts`).
+- **Review convoy sub-reviewers** (security, correctness, performance,
+  requirements) get `roles/review-<subRole>.md` inlined into their spawn
+  message by `buildConvoyPrompt` (`src/lib/cloister/review-convoy.ts`), so
+  the same text drives every harness.
+- **The review and test spawn messages** are built in TypeScript by
+  `buildReviewRolePrompt` (`src/lib/cloister/review-agent.ts`) and
+  `buildTestRolePrompt` (`src/lib/cloister/test-agent-queue.ts`).
 
-Templates for the **post-work pipeline specialists** (review → test → merge) that run automatically after a work agent signals completion.
-
-| Template | Used by | Purpose |
-|----------|---------|---------|
-| `review.md` | Review specialist (wake path) | Strict code review against xBRIEF acceptance criteria; pass/fail decision posted back to the dashboard. |
-| `test.md` | Test specialist (wake path) | Runs the project's test suite, compares against baseline, posts pass/fail with structured markers. |
-| `merge.md` | Merge specialist (wake path) and `spawnMergeAgentForBranches` (full push flow) | Unified merge template. `DO_PUSH`/`DO_BUILD`/`SKIP_DONE_REPORT` booleans toggle between validation-only and full push + build + report flows. |
-| `sync-main.md` | `syncMainIntoWorkspace` (via merge specialist) | Sync latest main into the workspace's feature branch; abort on conflict and hand back to work agent. |
-
-### Bootstrap templates
-
-Short templates used during specialist **initialization** — not part of any per-issue workflow.
-
-| Template | Used by | Purpose |
-|----------|---------|---------|
-| `identity-wake.md` | `initializeSpecialist` | Short identity prompt — tells a newly-initialized specialist who it is and to wait for tasks. |
+A pull request that changes a `roles/*.md` file needs a commit with a
+`Prompt-Change:` trailer (`scripts/check-prompt-change-trailer.sh`).
 
 ### Deleted (replaced by the loader)
 
-These files used to live under `prompts/` or were built inline by dead code.
-They no longer exist:
+These files used to live under `prompts/`. They no longer exist:
 
 - `inspect-agent.md` → the inspect verb and its inspect specialist were deleted in PAN-3917
 - `merge-agent.md` → replaced by `merge.md` with `DO_PUSH`/`DO_BUILD` flags
 - `review-agent.md` → replaced by `review.md`
 - `test-agent.md` → replaced by `test.md`
-- `uat-agent.md` → uat specialist was removed from the pipeline
-- `work-agent.md` → replaced by `work.md`
+- `work-agent.md` → renamed to `work.md`
 
 If you find references to any of those paths in comments, PRD docs, or old
 commits, they are stale.
@@ -397,13 +403,11 @@ One template wraps its output in HTML comments:
 <!-- overdeck:orchestration-context-end -->
 ```
 
-- `planning.md` — marks the orchestration-context block so that session
-  summarizers and the dashboard know which part of the planning prompt is
-  Overdeck setup vs. the agent's actual work.
+- `planning.md` wraps its whole body in these markers, with an HTML comment
+  that tells session summarizers to skip the block. No code in `src/` parses
+  the markers.
 
-Do **not** add these markers to new templates unless you have a specific
-dashboard-display reason and you've checked the code that consumes them. For
-the vast majority of prompts, unmarked Markdown is the right shape.
+Don't add these markers to new templates: no code reads them. Unmarked Markdown is the right shape.
 
 ## Composition pattern
 
