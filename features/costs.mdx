@@ -27,8 +27,8 @@ Run on its own, it only prints what it would import, as a dry run. Run
 ## API prices, not your plan bill
 
 Every dollar figure is tokens multiplied by the published API price for the model, from
-Overdeck's own price table. The same table prices Claude Code, Codex, Kimi, Grok and Muse
-sessions. Pi is the exception: a Pi session uses the cost Pi itself reports for a message when Pi
+Overdeck's own price table. The same table prices Claude Code, Codex, Kimi and Muse
+sessions. Pi and Grok are the exceptions: a Pi or Grok session uses the cost the harness itself reports when it
 reports one, and falls back to Overdeck's price table only when it does not.
 
 This matters most on a subscription plan, such as Claude Max or a ChatGPT plan: Overdeck does not
@@ -37,14 +37,14 @@ page and in `pan cost` is what the same tokens would cost at list API prices, no
 actually pay, and there is no separate plan-cost view.
 
 A model with no row in the price table records no cost: the Claude Code hook skips the event
-entirely, and Pi and Muse record it with a cost of `0` and (for Pi) an `unpriced-model` warning.
+entirely, and Pi, Grok and Muse record it with a cost of `0` and (for Pi) an `unpriced-model` warning.
 Mis-priced models are tracked in [#4844](https://github.com/eltmon/overdeck/issues/4844).
 
 ## How spend is attributed
 
 Every cost event carries the issue id and agent id that Overdeck set when it launched the agent.
 A Claude Code session with no issue id falls back to its git branch: if the branch name contains
-one of five tracker prefixes (`pan`, `min`, `aud`, `krux`, `cli`) followed by a number, the event
+one of five tracker prefixes (`pan`, `min`, `aud`, `krux`, `cli`) followed by a hyphen and a number (for example `feature/pan-123`), the event
 is recorded against that issue. Do not expect this fallback to work for other prefixes or for
 other harnesses.
 
@@ -57,7 +57,7 @@ Spend is also grouped by **stage**, the role the session ran as, such as `implem
 `review.security`; there are more stages than these two examples.
 
 **Today** starts at local midnight on the dashboard machine, **week** starts at the beginning of
-the day seven days ago, and **month** covers the last 30 days. Project Home's weekly figure reads
+the UTC day seven days ago, and **month** starts at the beginning of the UTC day 30 days ago. Project Home's weekly figure reads
 the archive for these windows, while the Costs page's issue list reads a separate rollup in the
 database; the two totals are not guaranteed to reconcile exactly.
 
