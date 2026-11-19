@@ -1,9 +1,8 @@
 ---
-title: Core Commands
+title: "Core pan commands: install, sync, doctor, up, restart and reload"
+sidebarTitle: "Core Commands"
 description: "Core pan commands to install, sync, run, reload, restart, shut down, update and check Overdeck, plus costs and presets."
 ---
-
-import { ThemedImage } from "/snippets/themed-image.mdx";
 
 Core system management commands for Overdeck.
 
@@ -456,27 +455,19 @@ pan restore 2026-11-01T04-52-00-000Z
 
 ## pan health
 
-Check the health of all Overdeck services.
+Check whether the dashboard, the smee-client webhook relay and the CLIProxy sidecar are running.
 
 ```bash
 pan health
 ```
 
 Shows status of:
-- Dashboard (frontend) - Running/stopped
-- API server - Running/stopped + health endpoint check
-- Traefik - Running/stopped (if installed)
-- Running agents - Count and session IDs
-- Workspaces - Count and disk usage
-- Docker containers - Count and status
-
-Returns:
-- Exit code 0 if all services healthy
-- Exit code 1 if any service is down
+- Dashboard - running, or not running (`/api/health` check)
+- smee-client webhook relay - running, configured but not running, or not configured
+- CLIProxy sidecar - running or not running
 
 Useful for:
 - Pre-flight checks before spawning agents
-- Monitoring in automation scripts
 - Troubleshooting issues
 
 ## Next Steps
