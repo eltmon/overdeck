@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5477",
   "created": "2026-11-19T00:10:58.762Z",
-  "updated": "2026-11-19T00:19:36.530Z",
+  "updated": "2026-11-19T00:19:41.315Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -160,6 +160,11 @@
     "page-other-guardrails.ac3": {
       "status": "completed",
       "doneAt": "2026-11-19T00:19:36.530Z"
+    },
+    "docs-nav": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5477",
+      "claimedAt": "2026-11-19T00:19:41.315Z"
     }
   }
 }
