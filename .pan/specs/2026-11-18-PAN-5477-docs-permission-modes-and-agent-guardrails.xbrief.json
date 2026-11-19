@@ -4,17 +4,17 @@
     "created": "2026-11-18T23:45:47Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5477: docs: permission modes and agent guardrails",
-    "updated": "2026-11-18T23:52:07.770Z"
+    "updated": "2026-11-19T00:10:34.603Z"
   },
   "plan": {
     "id": "pan-5477",
     "title": "docs: permission modes and agent guardrails",
-    "status": "proposed",
+    "status": "running",
     "uid": "72e002b9-f2c0-4846-9911-2b1777fb24b0",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-18T23:45:47Z",
-    "updated": "2026-11-18T23:52:07.770Z",
+    "updated": "2026-11-19T00:10:34.603Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5477",
@@ -850,5 +850,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
