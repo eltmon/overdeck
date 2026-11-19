@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-19T05:39:37.620595Z · model: claude-opus-5-5 · open: 943_
+_Last sequenced: 2026-11-19T06:49:05.810913Z · model: claude-opus-5-5 · open: 942_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -490,7 +490,6 @@ _Last sequenced: 2026-11-19T05:39:37.620595Z · model: claude-opus-5-5 · open: 
 | 458 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
 | 459 | PAN-2469 | S | medium | ok |  |  | Assembly landed (mergeReadySlots + finalization); remaining: alarm when all slots merged but no review requested. Swarm dormant. |
 | 460 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
-| 460 | PAN-5502 | L | medium | ok |  |  | Docs audit: line-by-line accuracy check of the 14 Features pages; PAN-5479/5482 merged, so it can run. |
 | 461 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
 | 461 | PAN-5504 | L | medium | ok |  |  | Docs audit: line-by-line accuracy check of the 16 Guides and Reference pages; waits on PAN-5482. Lane A item 13. |
 | 461 | PAN-5582 | S | medium | ok |  |  | 11 CodeRabbit doc findings on merged PAN-5500 PR #5581; 1 Major: push-notifications must enable token sign-in before manual Serve. |
@@ -1278,10 +1277,10 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-19T05:39:37.620595Z",
+  "generatedAt": "2026-11-19T06:49:05.810913Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 943,
+  "openCount": 942,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -7413,19 +7412,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "condition": "ok",
       "dependsOn": [],
       "why": "Conversation agents can leave host main repo in abandoned git rebase state for hours",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5502",
-      "rank": 460,
-      "size": "L",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Docs audit: line-by-line accuracy check of the 14 Features pages; PAN-5479/5482 merged, so it can run.",
-      "rationale": "Rank unchanged; all page PRs it waited on have merged, and a PAN-5499 comment flags recaptured screenshots whose alt text may need updating.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14260,13 +14246,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
     },
     {
       "from": "PAN-5467",
-      "to": "PAN-5502",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5467",
       "to": "PAN-5504",
       "type": "contains",
       "source": "github-ref",
@@ -14341,13 +14320,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-5537",
-      "to": "PAN-5502",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
     },
     {
       "from": "PAN-5544",
