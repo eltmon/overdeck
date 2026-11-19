@@ -613,8 +613,8 @@ for every server in the file, so a project tool call does not stop at a
 permission prompt. Roles with a `tools:` allow-list (review, test) keep their
 own list and do not get the project tools added. That matters only under
 `claude.permissionMode: auto` (the default for new installations), where a tool
-outside the list asks first. See
-[Permissions and agent guardrails](/configuration/permissions) for both modes.
+outside the list asks first.
+See [Permissions and agent guardrails](/configuration/permissions) for both modes.
 
 **Strict mode.** `mcp_strict: true` adds `--strict-mcp-config` to that
 project's Claude Code launches. Claude Code then loads only the servers from
