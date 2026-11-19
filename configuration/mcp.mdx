@@ -1,5 +1,6 @@
 ---
-title: "MCP server"
+title: "Overdeck MCP server: tools, scopes and agent tokens"
+sidebarTitle: "MCP server"
 description: "Overdeck's MCP server: the tools every managed agent gets, and scoped, revocable access for outside tools and bots"
 ---
 
@@ -461,8 +462,8 @@ sign-in under **Settings → Access Tokens → Sign-ins** or with
 
 ## Agents get these tools
 
-Every Claude Code, Codex, Kimi Code ACP (`acp`) and OpenCode (`opencode`) agent
-that Overdeck launches on this machine starts with the `overdeck` server: work
+Every Claude Code, Codex, Kimi Code ACP (`acp`), OpenCode (`opencode`) and Grok Build
+(`grok`) agent that Overdeck launches on this machine starts with the `overdeck` server: work
 agents, role runs (plan, review, test, ship, worker and the others), planning
 sessions and conversations. You do not create a token for them.
 
@@ -476,7 +477,7 @@ launcher script holds the token. The launcher passes
 prompt. Roles with a `tools:` list (review, test) get `mcp__overdeck` in that
 list instead.
 
-An ACP agent gets the same `overdeck-mcp.json`. The launcher passes
+An ACP-hosted agent (`acp`, `opencode` or `grok`) gets the same `overdeck-mcp.json`. The launcher passes
 `--mcp-config <file>` to the ACP host, which sends the server to the agent in
 `session/new` and `session/load`. The ACP host approves the agent's permission
 requests itself, so no allow-list is needed.
@@ -489,7 +490,7 @@ MCP allow-list, so instead of a launcher flag it gets an
 conversation), alongside any MCP servers the role itself declares. The table
 names only the token file in its `env`, never the token. It also carries
 `default_tools_approval_mode = "approve"`, because Overdeck's MCP tools carry
-no `readOnlyHint` annotations — without that key, Codex refuses every
+no `readOnlyHint` annotations: without that key, Codex refuses every
 model-initiated call with "MCP tool call requires approval, but approval
 policy is never" under `approval_policy = "never"`.
 
@@ -506,6 +507,9 @@ The token's scopes follow the agent's role:
 A resumed, recovered or relaunched agent keeps the same server and reuses its
 live token. Stopping the agent revokes the token.
 
+Work agents and the review security lane also get a `semgrep` MCP server when
+Semgrep's MCP server is on; see [Semgrep](/configuration/semgrep#semgrep-mcp-server).
+
 To turn injection off, set this in `config.yaml`:
 
 ```yaml
@@ -515,7 +519,7 @@ mcp:
 
 These launches get no server: Docker workspaces (`OVERDECK_DOCKER_WORKSPACE=1`
 or `PAN_DOCKER=1`), bare conversations, Fly machines, and harnesses other than
-Claude Code, Codex, `acp` and `opencode`. When the token cannot be
+Claude Code, Codex, `acp`, `opencode` and `grok`. When the token cannot be
 minted or the config cannot be written, the agent starts without the server and
 the log shows one `[agent-injection] overdeck MCP skipped for <id>: <reason>`
 warning. The agent can still reach Overdeck through `pan`.
@@ -529,9 +533,9 @@ the MCP tools to `pan`; never poll, call `next` again when a wait tool answers
 `running` or `pending`; checklist with `task_claim`/`task_done`, finish with
 `done`; get a secret with `request_secret`; link a machine the operator names
 with `link_machine`; link a PR with `link_pull_request`/`watch_pull_request`.
-Every other agent — `kimi-code`, `ohmypi`, `muse`, `prime-agent`, any agent in
-a Docker workspace, and every agent when `mcp.agents` is `false` — is told
-"Overdeck commands" instead, with the `pan` equivalent for each of those.
+Every other agent is told "Overdeck commands" instead, with the `pan` equivalent for
+each: `pi`, `kimi-code`, `ohmypi`, `muse`, `prime-agent`, any agent in a Docker
+workspace, and every agent when `mcp.agents` is `false`.
 
 ## Project MCP servers
 
@@ -598,8 +602,8 @@ never in `projects.yaml` or the repo.
 | --- | --- |
 | `claude-code` | stdio and http, in the same `overdeck-mcp.json` as the `overdeck` server |
 | `codex` | stdio and http (`url` plus `http_headers`) in `codex-home-v2/config.toml`, each with `default_tools_approval_mode = "approve"`. Codex skips an `npx` server whose package has no exact version, the same rule as role servers (PAN-2698). |
-| `acp`, `opencode` | stdio only, through the same `overdeck-mcp.json`. The ACP host drops http entries with a warning. |
-| `ohmypi`, `kimi-code`, `muse`, `prime-agent` | not provisioned. Each launch logs one warning naming the harness and the servers it cannot use. |
+| `acp`, `opencode`, `grok` | stdio only, through the same `overdeck-mcp.json`. The ACP host drops http entries with a warning. |
+| `pi`, `ohmypi`, `kimi-code`, `muse`, `prime-agent` | not provisioned. Each launch logs one warning naming the harness and the servers it cannot use. |
 
 The launch file is written whenever at least one server resolves, so project
 servers still load when `mcp.agents` is `false` or the agent token could not be
@@ -665,8 +669,9 @@ of its skills resolves on for that launch, including the conversation layer.
 A pack that is off contributes nothing, consented or not.
 
 **Precedence.** Names are claimed in this order: `overdeck`, then the
-launching role's own servers, then the project's `mcp_servers`, then pack
-servers, lowest pack id first. A later source's server with a name an earlier
+launching role's own servers, then the `semgrep` server when Semgrep's MCP
+server is on (see [Semgrep](/configuration/semgrep#semgrep-mcp-server)), then
+the project's `mcp_servers`, then pack servers, lowest pack id first. A later source's server with a name an earlier
 source already claimed is skipped with one warning,
 `[pack-mcp] <pack>: server <name> skipped: <reason>`. A project `mcp_servers`
 entry named `atlassian` therefore overrides the `atlassian` pack's own server,
@@ -679,8 +684,8 @@ which is the escape for an OAuth-only or Bearer-key setup (see
 | --- | --- |
 | `claude-code` | the same `overdeck-mcp.json` as `overdeck` and project servers, after them; `--allowedTools=` gains each pack server name |
 | `codex` | `codex-home-v2/config.toml`, each with `default_tools_approval_mode = "approve"` |
-| `acp`, `opencode` | none: the ACP host drops http entries |
-| `ohmypi`, `kimi-code`, `muse`, `prime-agent` | not provisioned |
+| `acp`, `opencode`, `grok` | none: the ACP host drops http entries |
+| `pi`, `ohmypi`, `kimi-code`, `muse`, `prime-agent` | not provisioned |
 
 ### Atlassian auth
 
@@ -698,7 +703,7 @@ gets no `atlassian` server at all, with one warning naming it. See
 
 An MCP token is an ordinary access token. Copy MCP URL gives it `read:state`,
 `read:conversations` and `operate` by default. `operate` covers `tell`, the
-start tools and the stop and interrupt tools.
+start tools, the stop, resume and interrupt tools, and `add_skills`.
 
 The box **Allow answering questions and approving permissions** adds
 `approve`. It is off by default, and only `approve` or `admin` satisfies it.
@@ -711,7 +716,7 @@ for the full scope table.
 <Warning>
 `approve` does not stop text from reaching a conversation that waits on a
 question. A token with `tell` can still send any message with `send_message`.
-What `approve` gates is the keystroke-driven answers and the two answer tools.
+What `approve` gates is the keystroke-driven answers and the eight answer tools.
 </Warning>
 
 MCP never accepts an `admin` token, the machine's internal token or the
@@ -740,7 +745,7 @@ tokens; click it to reveal and revoke an individual agent's token.
 
 Hermes, OpenClaw, Grok Build, Grok Bot and the xAI API reach this server
 through **Connect a bot** in Settings → Anywhere → Bots. A bot with a shell
-connects in one paste with **Copy for &lt;bot&gt;** — see
+connects in one paste with **Copy for &lt;bot&gt;**; see
 [Connect in one paste](/configuration/bots#connect-in-one-paste); the xAI API
 uses Public MCP above, and Grok Bot can too. See
 [Connect a bot](/configuration/bots) for each platform's setup and
@@ -757,7 +762,8 @@ One MCP URL reaches every machine this one is linked to (see
   A conversation on another machine is named `@<label|environment-id>/<name>`; pass that
   name to `read_conversation`, `send_message`, the `answer_*` tools, and `schedule_message`,
   `schedule_recurring`, `list_scheduled`, `update_scheduled` and `delete_scheduled`.
-- `start_conversation` and `start_worker` take `machine`: omit it for this machine, give a
+- `start_conversation`, `start_worker` and `start_issue` take `machine`, and so do the
+  agent tools `delegate_task` and `lane_start`: omit it for this machine, give a
   linked machine's label or environment id, or `auto` to place the work by load. With
   `auto`, `needs` (a list of capability tags such as `docker`) limits the choice.
 
@@ -782,3 +788,13 @@ agents `remote: true`.
 
 The linked machine must run a version with the schedule scopes (PAN-4939); an older one
 answers `403 insufficient_scope` for recurring schedules.
+
+## Get help
+
+A tool the token's scopes hide answers `Unknown tool <name>`. A tool the token's scopes
+do not cover answers `HTTP 403: insufficient_scope (missingScope: ...)`. A launch that
+could not get the `overdeck` server logs `[agent-injection] overdeck MCP skipped for
+<id>: <reason>`.
+
+Still stuck? Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a
+[GitHub Issue](https://github.com/eltmon/overdeck/issues).
