@@ -1,7 +1,7 @@
 ---
-title: "Workspaces: git worktrees per issue"
+title: "Workspaces: issue worktrees, scratch work and the main checkout"
 sidebarTitle: "Workspaces"
-description: Git worktree-based isolated development environments
+description: "How Overdeck workspaces work: one git worktree per issue, scratch workspaces, the main checkout, creating workspaces and close-out cleanup."
 ---
 
 import { ThemedImage } from "/snippets/themed-image.mdx";
@@ -15,6 +15,16 @@ Each workspace is where an agent's conversation and its work live together: the 
   dark="/images/dashboard/board-dark.png"
   alt="Kanban board: issue columns with cost badges, agent status dots, and workspace controls, one card per issue/workspace"
 />
+
+## Workspace kinds
+
+A workspace is one directory that Overdeck tracks for a registered project. Every workspace has one of three kinds:
+
+- **Issue**: one git worktree per tracked issue, at `workspaces/feature-<issue>` on the branch `feature/<issue>` (for example `feature/pan-123`). Planning, work and review agents run here. Overdeck's pipeline creates and removes issue workspaces, and most of this page is about them.
+- **Scratch**: any number per project, not tied to an issue. A scratch workspace shares the project directory by default, or gets its own worktree on a `scratch/<name>` branch. Create one from the dashboard or with `pan workspace new`.
+- **Main**: the project's primary checkout. A project has exactly one. Overdeck creates it when you add the project or the first time you open it.
+
+Memory is kept per workspace, so a scratch or main workspace collects memory from the conversations that run in it. See [Workspace observation memory](/configuration/memory#workspace-observation-memory).
 
 ## What Are Workspaces?
 

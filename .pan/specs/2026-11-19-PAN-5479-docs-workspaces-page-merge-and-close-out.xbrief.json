@@ -4,17 +4,17 @@
     "created": "2026-11-19T01:21:32Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5479: docs: workspaces page merge and close-out",
-    "updated": "2026-11-19T01:27:42.922Z"
+    "updated": "2026-11-19T01:28:14.714Z"
   },
   "plan": {
     "id": "pan-5479",
     "title": "docs: workspaces page merge and close-out",
-    "status": "proposed",
+    "status": "running",
     "uid": "e2ff9f2f-de54-4046-b623-dfbfd38bc102",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-19T01:21:32Z",
-    "updated": "2026-11-19T01:27:42.922Z",
+    "updated": "2026-11-19T01:28:14.714Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5479",
@@ -787,5 +787,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
