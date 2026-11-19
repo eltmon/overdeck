@@ -4,17 +4,17 @@
     "created": "2026-11-19T03:25:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5500: docs: accuracy audit, Overdeck Anywhere (21 pages)",
-    "updated": "2026-11-19T03:33:49.242Z"
+    "updated": "2026-11-19T03:34:21.927Z"
   },
   "plan": {
     "id": "pan-5500",
     "title": "docs: accuracy audit, Overdeck Anywhere (21 pages)",
-    "status": "proposed",
+    "status": "running",
     "uid": "241bbda8-2ad9-4df4-8576-0a1a11ed2789",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-19T03:25:00Z",
-    "updated": "2026-11-19T03:33:49.242Z",
+    "updated": "2026-11-19T03:34:21.927Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5500",
@@ -2252,5 +2252,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
