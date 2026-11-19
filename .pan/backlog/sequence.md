@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-18T23:54:11.173212Z · model: claude-opus-5-5 · open: 945_
+_Last sequenced: 2026-11-19T00:23:49.005346Z · model: claude-opus-5-5 · open: 944_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -479,7 +479,7 @@ _Last sequenced: 2026-11-18T23:54:11.173212Z · model: claude-opus-5-5 · open: 
 | 451 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
 | 451 | PAN-5557 | S | medium | ok |  |  | pan up on Linux treats the overdeck CLI in ~/.local/bin as the desktop app, prints a false launch and skips its own startup path. |
 | 452 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
-| 452 | PAN-5475 | S | medium | ok |  |  | Docs P2: features/costs.mdx, attribution, pan cost verbs, API-rate vs plan costs. Lane A item 7. |
+| 452 | PAN-5477 | S | medium | ok |  |  | Docs overhaul child, in pipeline: new permissions.mdx page covering auto-approve, --yolo, operator labels and git shim. |
 | 452 | PAN-5556 | M | medium | ok |  |  | Desktop app tray status, six notification switches, Open Workspace menu and Linux launch-at-login are dead controls; fix or hide. |
 | 453 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
 | 454 | PAN-5322 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5319: unguarded identifier.toUpperCase(), modal focus, needs-you rows that open nothing. |
@@ -949,7 +949,6 @@ _Last sequenced: 2026-11-18T23:54:11.173212Z · model: claude-opus-5-5 · open: 
 | 902 | PAN-5305 | XS | low | ok |  |  | Main build break already fixed: needsYou.ts imports from needsYouRows and main CI is green. Verify and close. |
 | 903 | PAN-5444 | XS | low | ok |  |  | Two Minor CodeRabbit findings left on merged PR #5443: semgrep repo rules resolve from event cwd; hook tests not isolated from Docker. |
 | 904 | PAN-5405 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5403: changes-query refetch after turns, Send menu keyboard/scheduling guard, tab-menu focus. |
-| 905 | PAN-5541 | M | low | ok |  |  | Merged via PR #5561; awaiting verification on main and close-out. Nothing left to pick up. |
 
 ## Rationale detail
 
@@ -1280,10 +1279,10 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-18T23:54:11.173212Z",
+  "generatedAt": "2026-11-19T00:23:49.005346Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 945,
+  "openCount": 944,
   "nodes": [
     {
       "issue": "PAN-5564",
@@ -7283,15 +7282,15 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "planning": "auto"
     },
     {
-      "issue": "PAN-5475",
+      "issue": "PAN-5477",
       "rank": 452,
       "size": "S",
       "importance": "medium",
-      "score": 49,
+      "score": 45,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Docs P2: features/costs.mdx, attribution, pan cost verbs, API-rate vs plan costs. Lane A item 7.",
-      "rationale": "Rank unchanged; PAN-5483 closed, so that dependency is removed.",
+      "why": "Docs overhaul child, in pipeline: new permissions.mdx page covering auto-approve, --yolo, operator labels and git shim.",
+      "rationale": "In-pipeline docs child of epic PAN-5467 that was missing from the prior sequence; pinned in the slot freed by merged sibling PAN-5475.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13074,19 +13073,6 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "rationale": "New CodeRabbit follow-up from the merged PAN-5295 PR; one Major and four Minor frontend findings, ranked with comparable follow-ups.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-5541",
-      "rank": 905,
-      "size": "M",
-      "importance": "low",
-      "score": 10,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Merged via PR #5561; awaiting verification on main and close-out. Nothing left to pick up.",
-      "rationale": "Moved from rank 1 to the bottom: the fix merged (PR #5561) and the issue left the pipeline, so it is not pickable work.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -14282,7 +14268,7 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
     },
     {
       "from": "PAN-5467",
-      "to": "PAN-5475",
+      "to": "PAN-5477",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
@@ -14428,13 +14414,6 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "confidence": 0.5
     },
     {
-      "from": "PAN-5541",
-      "to": "PAN-5565",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
       "from": "PAN-5544",
       "to": "PAN-5548",
       "type": "informs",
@@ -14447,13 +14426,6 @@ New this pass. Post-merge label application has no retry, so a rate-limited 403 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
-    },
-    {
-      "from": "PAN-5562",
-      "to": "PAN-5475",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
     },
     {
       "from": "PAN-5567",
