@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5500",
   "created": "2026-11-19T03:34:33.510Z",
-  "updated": "2026-11-19T04:14:36.734Z",
+  "updated": "2026-11-19T04:15:52.649Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -452,9 +452,26 @@
       "doneAt": "2026-11-19T04:14:30.055Z"
     },
     "audit-share": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5500",
-      "claimedAt": "2026-11-19T04:14:36.734Z"
+      "claimedAt": "2026-11-19T04:14:36.734Z",
+      "doneAt": "2026-11-19T04:15:52.649Z"
+    },
+    "audit-share.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:15:52.649Z"
+    },
+    "audit-share.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:15:52.649Z"
+    },
+    "audit-share.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:15:52.649Z"
+    },
+    "audit-share.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:15:52.649Z"
     }
   }
 }
