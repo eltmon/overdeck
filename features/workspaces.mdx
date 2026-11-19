@@ -207,6 +207,8 @@ pan workspace destroy MIN-123 --force
 4. Cleans up planning artifacts
 5. Unregisters from Overdeck
 
+After an issue's pull request merges, close it out with `pan close <id>` or the **Close Out** button; [Cleaning up after close-out](#cleaning-up-after-close-out) explains what that removes.
+
 ## Finding a workspace
 
 - **Left column, Workspaces section**: the selected project's workspaces that you created, plus any you favorited. Favorites come first, then the most recently used. Issue worktrees, Session Vault workspaces and workspaces that agents created stay off this list unless you favorite them; reach issues from the **Issues** section and the Pipeline and Board views. The main checkout appears here only when you favorite it, labelled with the project's name. Archived workspaces leave the list. The section is hidden while the project has nothing to list, and in the All projects view.
@@ -312,6 +314,29 @@ A workspace points at a directory, so more than one workspace can point at the s
 - `pan workspace archive` refuses the main workspace.
 
 Relocating never moves memory. A workspace's memory is stored by its id, not by its path or name.
+
+## Cleaning up after close-out
+
+**Settings → Close-out** controls what `pan close <id>` and the dashboard's **Close Out** button do to an issue's workspace and feature branch after its pull request has merged. The settings are saved to the `[close_out]` table in `~/.overdeck/cloister.toml`.
+
+<ThemedImage
+  light="/images/dashboard/close-out-settings-light.png"
+  dark="/images/dashboard/close-out-settings-dark.png"
+  alt="Settings Close-out section with the four controls, the closed-issue disk line, and the Clean up now button"
+/>
+
+| Control | Key | Default | What it does |
+| --- | --- | --- | --- |
+| Remove the workspace when an issue is closed out | `remove_workspace` | on | Stops the workspace's Docker stack and stray processes and removes the worktree. Branches and memory are kept. |
+| Delete the feature branch at close-out | `delete_feature_branch` | off | Deletes the local and remote feature branch. |
+| Close out merged issues automatically | `auto` | shown disabled | Not in effect. Automatic close-out was removed, and nothing reads this key. |
+| Automatic close-out delay (minutes) | `auto_delay_minutes` | shown disabled | Not in effect, for the same reason. |
+
+Below the first control, a line reports how many closed issues still have a workspace on disk and their total size. **Clean up now** runs `pan workspace destroy` (which also deletes the local branch) for each closed issue whose branch is merged and whose workspace has no uncommitted changes. Untracked files count as uncommitted. It lists each issue it removed, and each issue it skipped with the reason: a polyrepo project (destroy those by hand), uncommitted changes, a branch that is not merged, or a merge state it cannot read.
+
+<Note>
+  These settings apply to close-out only. Overdeck's closed-issue reaper also runs when an issue closes and on the Deacon's background patrol. For a closed issue whose branch is merged, or no longer exists, it removes the workspace and deletes the local and remote feature branch, whatever these two settings say. The patrol stops while the Deacon is paused (the dashboard then shows **Resume Deacon**), so closed-issue workspaces can pile up. The disk line and **Clean up now** cover that case. While GitHub reads are paused, the line says the count may be incomplete, and issues it cannot confirm as closed are not counted or removed.
+</Note>
 
 ## Main Project Branch Convention
 
