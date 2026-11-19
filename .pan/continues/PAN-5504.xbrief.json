@@ -1,0 +1,33 @@
+{
+  "version": "1",
+  "issueId": "PAN-5504",
+  "created": "2026-11-19T07:15:41.251Z",
+  "updated": "2026-11-19T07:15:41.252Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "troubleshooting-a": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:15:41.251Z"
+    },
+    "troubleshooting-a.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:15:41.251Z"
+    },
+    "troubleshooting-a.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:15:41.251Z"
+    },
+    "troubleshooting-a.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:15:41.251Z"
+    },
+    "troubleshooting-a.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:15:41.251Z"
+    }
+  }
+}
