@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-19T01:22:34.036723Z · model: claude-opus-5-5 · open: 942_
+_Last sequenced: 2026-11-19T01:24:51.406997Z · model: claude-opus-5-5 · open: 943_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -505,6 +505,7 @@ _Last sequenced: 2026-11-19T01:22:34.036723Z · model: claude-opus-5-5 · open: 
 | 468 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
 | 469 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
 | 470 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
+| 470 | PAN-5571 | XS | medium | ok |  |  | Archived (N) expander never renders: list fetch omits includeArchived, so archived workspaces vanish with no UI way back. |
 | 471 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
 | 472 | PAN-5174 | XS | medium | ok |  |  | Flaky CI test: share/rate-limit.test.ts flips 201/429 under CI timing; quarantine or make deterministic. |
 | 473 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
@@ -1277,10 +1278,10 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-19T01:22:34.036723Z",
+  "generatedAt": "2026-11-19T01:24:51.406997Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 942,
+  "openCount": 943,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -7608,6 +7609,19 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "planning": "skip"
     },
     {
+      "issue": "PAN-5571",
+      "rank": 470,
+      "size": "XS",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Archived (N) expander never renders: list fetch omits includeArchived, so archived workspaces vanish with no UI way back.",
+      "rationale": "New issue; ranked beside PAN-3354 (archive door with no unarchive path), a related small archive-visibility bug.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3017",
       "rank": 471,
       "size": "S",
@@ -13559,6 +13573,13 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.7
+    },
+    {
+      "from": "PAN-3354",
+      "to": "PAN-5571",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     },
     {
       "from": "PAN-3454",
