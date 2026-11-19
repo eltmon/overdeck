@@ -4,17 +4,17 @@
     "created": "2026-11-19T02:30:30Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5481: docs: voice and text-to-speech",
-    "updated": "2026-11-19T02:36:50.662Z"
+    "updated": "2026-11-19T02:37:28.446Z"
   },
   "plan": {
     "id": "pan-5481",
     "title": "docs: voice and text-to-speech",
-    "status": "proposed",
+    "status": "running",
     "uid": "0c9b08de-10b7-47e7-a470-856f5eeece3e",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-19T02:30:30Z",
-    "updated": "2026-11-19T02:36:50.662Z",
+    "updated": "2026-11-19T02:37:28.446Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5481",
@@ -475,5 +475,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
