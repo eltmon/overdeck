@@ -4,7 +4,7 @@ sidebarTitle: "Pipeline Commands"
 description: "Reference for the pan commands that plan issues, track checklists, inspect and close issues, and run the Flywheel, swarms and strikes."
 ---
 
-An Overdeck issue moves through plan, work, review, test and merge before it ships. These
+An Overdeck issue moves through plan, work, review, test, ship and merge. These
 commands drive and inspect that pipeline from a shell; see [Review convoy](/features/convoys) for
 more on how a change moves through review on its way to merge.
 
@@ -23,7 +23,7 @@ pan plan done PAN-1148                  # complete planning and transition the i
 | Option | What it does |
 | --- | --- |
 | `--auto` | Runs non-interactive planning; inferred choices are recorded in `plan.autoDecisions[]` |
-| `--auto-start` | Deprecated: use `pan start <id>` instead. After planning completes, it used to start the work agent automatically |
+| `--auto-start` | After planning completes, it starts the work agent automatically; the flag keeps working through the deprecation window |
 | `--probe` | Adds an adversarial pre-finalize probe pass to the planning prompt |
 | `--model <model>` | Model to use for the planning role |
 | `--harness <harness>` | Coding-agent harness for planning (defaults to role or provider settings) |
@@ -33,7 +33,7 @@ pan plan done PAN-1148                  # complete planning and transition the i
 
 | Command | What it does |
 | --- | --- |
-| `pan plan finalize` | Marks the workspace plan as proposed and promotes it to canonical state; `-w, --workspace <path>`, `--json`, `--no-promote` (leaves the spec at `status=proposed` for a manual Done), `--no-quality-lint`, `--no-prd`, `--critic` (requires an independent plan critique before promotion) |
+| `pan plan finalize` | Marks the workspace plan as proposed and promotes it to canonical state; `-w, --workspace <path>`, `--json`, `--no-promote` (leaves the spec at `status=proposed` for a manual Done), `--no-quality-lint`, `--no-prd`, `--critic` (requires an independent, different-family plan critique before promotion; automatic for issues labelled architecture, substrate-improvement or security) |
 | `pan plan done <id>` | Completes planning: promotes the xBRIEF and transitions the issue to Planned; `--no-prd` |
 
 See [Planning](/features/planning) for what planning produces and when to skip it.
@@ -44,7 +44,7 @@ Read and update xBRIEF item state for one issue: claim an item, mark it done, or
 lifecycle.
 
 ```bash
-pan task next PAN-1148                               # find the next unblocked item
+pan task next PAN-1148                               # list the items ready to claim
 pan task claim PAN-1148 conv-page                     # claim it
 pan task done PAN-1148 conv-page conv-page.ac1        # record the item and its ACs as done
 pan task block PAN-1148 conv-page --on PAN-1200        # wait on another issue
@@ -52,13 +52,13 @@ pan task block PAN-1148 conv-page --on PAN-1200        # wait on another issue
 
 | Command | What it does |
 | --- | --- |
-| `pan task next <issue>` | Prints the next unblocked item; `--json` |
+| `pan task next <issue>` | Prints every item ready to dispatch: unblocked and not running, blocked, completed or cancelled; `--json` |
 | `pan task show <issue> <item>` | Shows one item's detail; `--json` |
 | `pan task claim <issue> <item>` | Claims an item; `--json`, `--steal` (claims even when a running agent holds this item or an overlapping one; foreman or operator only) |
 | `pan task done <issue> <items...>` | Records one or more items as done in one continue commit; `--json` |
 | `pan task block <issue> <item>` | Marks an item blocked; `--json`, `--on <refs...>` (issues or PRs it waits on; Overdeck wakes the agent once they all merge) |
 | `pan task unblock <issue> <item>` | Clears a block; `--json` |
-| `pan task reopen <issue> <item>` | Reopens a terminal item; `--json` |
+| `pan task reopen <issue> <item>` | Sets an item back to pending (the same write as unblock); `--json` |
 | `pan task cancel <issue> <item>` | Cancels an item; `--json` |
 
 `pan task done` only records an item once every id passed to it has a commit on the pushed branch
@@ -69,7 +69,8 @@ carrying the body line `Item: <id>`; if any id lacks one, nothing is written. Se
 
 Move an xBRIEF plan's lifecycle status. Every subcommand rewrites status fields on the spec file
 in place; none of them moves the file between directories, even though some help text still
-describes it that way.
+describes it that way. When the issue's workspace no longer exists, the change is made on the
+primary checkout, then committed and pushed.
 
 ```bash
 pan scope list                     # list every registered project's xBRIEFs
@@ -88,7 +89,8 @@ pan scope approve PAN-1148
 | `pan scope cancel <issueId>` | Sets the xBRIEF status to cancelled; `--project <path>` |
 | `pan scope restore <issueId>` | Restores a completed or cancelled xBRIEF back to active; `--project <path>` |
 
-Every `--project <path>` defaults to the project resolved from the issue. See
+On every subcommand except `list`, `--project <path>` defaults to the project resolved from the
+issue; `pan scope list` without it lists every registered project. See
 [Change lifecycle status with pan scope](/features/planning#change-lifecycle-status-with-pan-scope).
 
 ## pan show
@@ -115,8 +117,9 @@ pan show PAN-1148 --json
 ## pan staffing
 
 Show the work model and swarm policy currently in effect for an issue. It is read-only: it
-resolves the model from `config.yaml` and the project's `projects.yaml` entry and takes no
-override of its own. Pass a one-off model at spawn time instead, with `pan start --model`.
+reads the work model from `config.yaml` (`roles.work`) and the swarm policy from `config.yaml`
+plus the project's `projects.yaml` entry, and takes no override of its own. Pass a one-off model
+at spawn time instead, with `pan start --model`.
 
 ```bash
 pan staffing PAN-1148
@@ -144,7 +147,7 @@ arrives as a message in the agent's own session.
 
 ```bash
 pan ask PAN-1148 "Keep the old endpoint or remove it?" --option "Keep it" --option "Remove it"
-pan ask PAN-1148 "..." --context "Tried X, got Y; removing breaks the legacy client"
+pan ask PAN-1148 "Keep the old endpoint or remove it?" --option "Keep it" --option "Remove it" --context "Tried X, got Y; removing breaks the legacy client"
 pan ask PAN-1148 --withdraw
 ```
 
@@ -175,7 +178,8 @@ terminal).
 Verify an issue's Definition of Done, clean up its workspace residue, and close the issue on the
 tracker. It checks eight rows, in order: Review passed, Tests passed, Verification green on the
 branch, Merged to main, Post-merge lifecycle ran, Verified on main, Version strings propagated,
-and Deployed.
+and Deployed. After teardown it records a ninth row, Close-out teardown verified, which no flag
+overrides.
 
 ```bash
 pan close PAN-1148
@@ -199,12 +203,17 @@ pan close PAN-1148 --abandon "superseded by PAN-1200"
 | `--residue <reason>` | Records a residue disposition: closes a stale convention PR or MR, skips the gate with verified evidence, and marks the issue terminal without a merge claim |
 
 `--abandon` and `--residue` are operator-conversation only, and neither combines with each other
-or with any `--accept-*` flag.
+or with any `--accept-*` flag. Both require the tracker issue to be closed already. From inside
+an agent, only operator conversations (`conv-*`) and the Flywheel may run `pan close`, and the
+Flywheel cannot pass `--accept-*` flags.
 
 ## pan strike
 
 Spawn a strike agent that implements a fix on a strike branch and opens a pull request against
-main for the operator to merge. A strike bypasses plan, review, test and ship.
+the base branch. A strike skips planning, the review convoy, test and ship: on GitHub its PR gets
+one automatic quick review per head, and once that review approves, the merge train merges it
+ahead of the queue after the 5-minute cancel window. In a project that holds for UAT, it waits for
+your Merge click.
 
 ```bash
 pan strike PAN-1148
@@ -282,13 +291,13 @@ pan backlog write-sequence sequence.json
 
 | Command | What it does | Options |
 | --- | --- | --- |
-| `pan backlog write-sequence <file>` | Validates a SequenceDoc JSON file, writes it to `.pan/backlog/sequence.md`, and commits it | `--project-root <path>` (default cwd) |
+| `pan backlog write-sequence <file>` | Validates a SequenceDoc JSON file, writes it to `.pan/backlog/sequence.md` in the plan home, then commits and pushes it | `--project-root <path>` (default cwd) |
 
 See [Flywheel](/features/flywheel) for the Backlog Sequencer page and its passes.
 
 ## pan merge
 
-Cancel a pending Flywheel auto-merge.
+Cancel a pending auto-merge.
 
 ```bash
 pan merge cancel PAN-1148
@@ -296,7 +305,7 @@ pan merge cancel PAN-1148
 
 | Command | What it does | Options |
 | --- | --- | --- |
-| `pan merge cancel <id>` | Cancels a pending Flywheel auto-merge during its cooldown window | none |
+| `pan merge cancel <id>` | Cancels a pending auto-merge (feature or strike PR) during its 5-minute cooldown window | none |
 
 See [Cancelling](/configuration/auto-merge#cancelling) for what the cooldown window is and what
 cancelling changes.
@@ -315,6 +324,7 @@ pan swarm merge PAN-1148 2
 
 | Command | What it does | Options |
 | --- | --- | --- |
+| `pan swarm <id>` | Starts the swarm foreman for an eligible planned issue; when the effective swarm mode is off, it records the issue's opt-in first. The foreman owns dispatch | none |
 | `pan swarm dispatch <id>` | Runs one gated swarm dispatch pass | `--json` |
 | `pan swarm merge <id> <slotIndex>` | Verifies and merges one completed swarm slot | `--json` |
 | `pan swarm recover <id> <slotIndex>` | Recovers a failed swarm slot | `--action retry\|drop\|handoff\|reclaim` (default `retry`), `--operator` (overrides the three-intervention limit for this failure class) |
@@ -323,7 +333,7 @@ pan swarm merge PAN-1148 2
 | `pan swarm status <id>` | Reads reconciled swarm state: per-slot rows, hold state, and capacity | `--json` |
 | `pan swarm wait <id>` | Waits for a slot, foreman, or hold state transition | `--timeout <seconds>` (default 300), `--json` |
 | `pan swarm stop <id>` | Freezes coordination, then stops all live slot agents; branches and worktrees are kept | `--reason <text>` |
-| `pan swarm reset <id>` | Work-preserving reset: stops slots, pushes unmerged slot branches to origin, removes slot worktrees and branches, clears recorded slot state (the hold stays set) | `--force` (keeps deleting even when a push fails), `--reason <text>` |
+| `pan swarm reset <id>` | Work-preserving reset: stops slots, pushes unmerged slot branches to origin, removes slot worktrees and branches, retires dead slot records, clears recorded slot state (the hold stays set) | `--force` (keeps deleting even when a push fails), `--reason <text>` |
 
 See [CLI](/features/swarm#cli) for the gated dispatch protocol these commands drive.
 
