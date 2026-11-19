@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5499",
   "created": "2026-11-19T02:52:23.250Z",
-  "updated": "2026-11-19T02:59:33.526Z",
+  "updated": "2026-11-19T02:59:40.259Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,6 +126,11 @@
     "vision-autonomy-and-merge.ac4": {
       "status": "completed",
       "doneAt": "2026-11-19T02:59:33.525Z"
+    },
+    "vision-criteria-and-appendix": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5499",
+      "claimedAt": "2026-11-19T02:59:40.259Z"
     }
   }
 }
