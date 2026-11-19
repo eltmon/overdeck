@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5504",
   "created": "2026-11-19T07:15:41.251Z",
-  "updated": "2026-11-19T07:27:45.554Z",
+  "updated": "2026-11-19T07:29:18.236Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -184,9 +184,26 @@
       "doneAt": "2026-11-19T07:27:40.672Z"
     },
     "harness-landscape-c": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5504",
-      "claimedAt": "2026-11-19T07:27:45.554Z"
+      "claimedAt": "2026-11-19T07:27:45.554Z",
+      "doneAt": "2026-11-19T07:29:18.236Z"
+    },
+    "harness-landscape-c.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:29:18.236Z"
+    },
+    "harness-landscape-c.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:29:18.236Z"
+    },
+    "harness-landscape-c.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:29:18.236Z"
+    },
+    "harness-landscape-c.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:29:18.236Z"
     }
   }
 }
