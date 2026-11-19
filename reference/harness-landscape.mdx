@@ -1,51 +1,51 @@
 ---
-title: Harness Landscape
-description: A survey of coding-agent harnesses Overdeck could drive, and how each one handles skills, MCP, and AGENTS.md
+title: "Coding agent harness survey: skills, MCP and AGENTS.md"
+sidebarTitle: "Harness Landscape"
+description: "Survey of coding agent harnesses: which ones Overdeck drives today and how each handles skills, MCP and AGENTS.md."
 ---
 
 # Harness Landscape
 
-A survey of the AI coding-agent harnesses Overdeck could drive, the skill /
+A survey of the AI coding-agent harnesses Overdeck drives or could drive, the skill /
 extensibility mechanism each one exposes, and what that means for future
 features.
 
 <Note>
-**This is a planning survey, not a support matrix.** Overdeck's supported
-harnesses include `claude-code`, `pi` (the default for non-Anthropic,
-non-OpenAI providers), `ohmypi`, `codex`, native `acp`, and native
-`kimi-code` (see [Harnesses](/configuration/harnesses) for the operational
-guide). Kimi Code CLI is wired two ways: as the first agent through the `acp`
-protocol harness, and natively through `kimi-code`, which drives Kimi's own
-terminal UI directly with no ACP host in between. Other tools on this page
-remain surveyed for evaluation until their provider adapters land. Facts are
-current as of May 2026 unless a profile says otherwise and should be
-re-verified before any decision. Items flagged **⚠ verify** could not be
-cleanly confirmed.
+**This is a planning survey, not a support matrix.** Overdeck drives ten
+harnesses today: `claude-code` (the default), `pi`, `ohmypi`, `codex`, `acp`,
+`kimi-code`, `opencode`, `grok`, `muse` and `prime-agent` (see
+[Harnesses](/configuration/harnesses) for the operational guide). Kimi Code
+CLI is wired two ways: through the `acp` protocol harness, and natively
+through `kimi-code`, which drives Kimi's own terminal UI directly with no ACP
+host in between. The other tools on this page are surveyed for evaluation and
+aren't selectable. Facts are current as of May 2026 unless a profile says
+otherwise and should be re-verified before any decision. Items flagged
+**⚠ verify** could not be cleanly confirmed.
 </Note>
 
 ## Why this document exists
 
 The field is now large enough, and converging fast enough on shared standards,
 that "which harness next?" is a real product question. It is also entangled with
-a specific feature request — [template conversations](/reference/template-conversations),
+a specific feature request: [template conversations](/reference/template-conversations),
 the ability to load a curated *group* of skills into one conversation. Some
 harnesses have a native primitive for exactly that; others would need Overdeck
-to synthesize it. This survey records the facts needed to weigh both.
+to synthesize it. This survey records the facts needed to weigh both. Overdeck already ships [skill packs](/features/skill-packs), which turn pinned third-party skill sets on per project, issue or conversation; template conversations remain a separate, unbuilt proposal.
 
 ## Harness vs. model
 
-A **harness** is the binary that runs in tmux and drives a workspace — it owns
+A **harness** is the binary that runs in a terminal pane (Herdr by default, or tmux) and drives a workspace. It owns
 the agent loop, tool calls, context management, and the on-disk extensibility
 surface. A **model** is the LLM the harness calls. They are chosen
 independently. "Adding a harness" means teaching Overdeck a new
-`AgentRuntime` adapter (`src/lib/runtimes/`): how to spawn it, deliver prompts,
+`AgentRuntimeSync` adapter (`src/lib/runtimes/`): how to spawn it, deliver prompts,
 detect readiness/heartbeat/completion, and parse cost. "Adding a model" is a
-routing-table change. This document is about **harnesses**.
+routing-table change. This document is about **harnesses**; [Adding a harness](/configuration/harnesses#adding-a-harness) lists the steps.
 
 ## The three extensibility layers
 
 Every modern harness exposes some subset of three *complementary* layers. They
-are not competitors — a mature setup uses all three.
+are not competitors: a mature setup uses all three.
 
 | Layer | Answers | Form | When loaded |
 | --- | --- | --- | --- |
@@ -53,28 +53,28 @@ are not competitors — a mature setup uses all three.
 | **Agent Skills** (`SKILL.md`) | "How do I do task X?" | Versioned folder, may bundle scripts/assets | Name+description always; body on-demand |
 | **MCP** (Model Context Protocol) | "How do I reach external system Y?" | Running JSON-RPC server | Connect-time, persistent |
 
-- **AGENTS.md** — an open, tool-agnostic standard (a "README for agents"):
+- **AGENTS.md**: an open, tool-agnostic standard (a "README for agents"):
   setup commands, conventions, build/test instructions. Emerged 2025 from a
   cross-vendor effort (OpenAI Codex, Amp, Cursor, Factory, Google Jules), now
   stewarded by the **Agentic AI Foundation** under the Linux Foundation. Read by
   25+ tools.
-- **Agent Skills / `SKILL.md`** — originated in Claude Code; Anthropic released
+- **Agent Skills / `SKILL.md`**: originated in Claude Code; Anthropic released
   the spec as an **open standard** (most sources: 2025-12-18). A skill is a
   directory with a required `SKILL.md` (YAML frontmatter: `name` +
   `description` required) plus optional `scripts/`, `references/`, `assets/`,
   `templates/`. Three-stage progressive disclosure: discovery (load
   name+description) → activation (load body on task match) → execution (run
-  bundled code). By early 2026, ~32 tools read `SKILL.md` — skills are portable
+  bundled code). By early 2026, ~32 tools read `SKILL.md`, so skills are portable
   across harnesses with no modification.
-- **MCP** — the live-tool-connection protocol. Near-universal, with one notable
+- **MCP**: the live-tool-connection protocol. Near-universal, with one notable
   holdout (pi and its fork ohmypi/omp).
 
 <Info>
 **Why this matters for Overdeck:** `SKILL.md` portability means Overdeck's
-own `skills/` tree is *already* harness-agnostic. The same skill directories
-`pan sync` writes to `~/.claude/skills/` are loadable, unmodified, by Codex,
+own `sync-sources/skills/` tree is *already* harness-agnostic. The same skill directories
+`pan sync` writes to `~/.claude/skills/` and `~/.agents/skills/` are loadable, unmodified, by Codex,
 Gemini CLI, Cursor, OpenCode, Goose, Amp, Crush, pi and ohmypi. Adding a harness does
-**not** mean re-authoring skills — it means teaching that harness where to read
+**not** mean re-authoring skills; it means teaching that harness where to read
 them.
 </Info>
 
@@ -82,14 +82,16 @@ them.
 
 | Harness | Status | Runtime adapter |
 | --- | --- | --- |
-| `claude-code` | **Supported** (default) | none needed — drop-in `claude` |
-| `pi` | **Supported** (default for non-Anthropic, non-OpenAI providers) | `src/lib/runtimes/pi.ts` (shared pi-family adapter in `ohmypi.ts`) + vendored `packages/pi-extension/` |
+| `claude-code` | **Supported** (default; built-in harness for Anthropic models) | `src/lib/runtimes/claude-code.ts` (drives the `claude` CLI) |
+| `pi` | **Supported** (default for Google, xAI, MiniMax, Z.AI, MiMo, OpenRouter, Nous, DashScope, Groq, Cerebras and Mistral models) | `src/lib/runtimes/pi.ts` (shared pi-family adapter in `ohmypi.ts`) + vendored `packages/pi-extension/` |
 | `ohmypi` | **Supported** (alternative) | `src/lib/runtimes/ohmypi.ts` + vendored `packages/ohmypi-extension/` |
-| `codex` | **Supported** (alternative) | `src/lib/runtimes/codex.ts` |
-| `acp` | **Supported** (Kimi first) | `src/lib/runtimes/acp.ts` + vendored `packages/effect-acp/` |
-| `kimi-code` | **Supported** (native, Kimi-only) | `src/lib/runtimes/kimi-code.ts` |
+| `codex` | **Supported** (default for OpenAI models) | `src/lib/runtimes/codex.ts` |
+| `acp` | **Supported** (Kimi only) | `src/lib/runtimes/acp.ts` + vendored `packages/effect-acp/` |
+| `kimi-code` | **Supported** (native, Kimi only; default for Kimi models) | `src/lib/runtimes/kimi-code.ts` |
 | `opencode` | **Supported** (Go and Zen) | `src/lib/acp/opencode.ts` + shared ACP runtime |
 | `grok` | **Supported** (Grok Build sign-in) | `src/lib/acp/grok.ts` + shared ACP runtime |
+| `muse` | **Supported** (Meta Muse models only) | `src/lib/runtimes/muse.ts` |
+| `prime-agent` | **Supported** (alternative; Anthropic models need API-key auth) | `src/lib/runtimes/prime-agent.ts` |
 
 The native `acp` harness is a reusable protocol integration, but version one
 uses the `acp` harness name for Kimi Code CLI. OpenCode Go and Zen use the
@@ -97,8 +99,7 @@ uses the `acp` harness name for Kimi Code CLI. OpenCode Go and Zen use the
 CLI uses the `grok` harness name with the same transport. `kimi-code` is a
 separate, capability-layer harness: it drives Kimi's own terminal UI and wire
 protocol directly, reaching Kimi-specific behavior the ACP lowest-common-
-denominator surface can't. The remaining profiles are surveyed for planning
-unless their status explicitly says supported.
+denominator surface can't. The remaining profiles are surveyed for planning unless their status explicitly says supported. Muse Code and Prime Agent have no profile here; see [Muse Code](/configuration/harnesses#muse-code) and [Prime Agent](/configuration/harnesses#prime-agent).
 
 ## ACP-capable agents
 
@@ -124,7 +125,7 @@ selected. Native launches use the per-process `KIMI_MODEL_THINKING_EFFORT`
 override; ACP sets the session's `thinking` option after selecting the model.
 Overdeck does not edit the shared Kimi configuration. Saved Medium maps to High,
 and Extra High maps to Max. K2.7 Code Highspeed always thinks and does not
-offer adjustable effort; K2.8 Preview (`kimi-for-coding`) offers low/high/max. Overdeck stores canonical levels for K3 (`kimi-code/k3`
+offer adjustable effort; K2.8 Preview (`kimi-code/kimi-for-coding`) offers Low, High and Max. Overdeck stores canonical levels for K3 (`kimi-code/k3`
 included) and translates at launch, so a saved Medium launches as High and
 Extra High as Max on both routes.
 
@@ -143,9 +144,10 @@ windows of 1,048,576 and 262,144 tokens, respectively. K2.8 Preview has
 1,048,576 tokens and K2.7 Code Highspeed has 262,144. K3's full 1M window requires the corresponding membership
 entitlement. See the [official Kimi model reference](https://www.kimi.com/code/docs/en/kimi-code/models.html).
 
-Kimi is therefore a supported agent through the `acp` harness. Cursor, Grok,
-and Gemini remain candidates: their ACP support reduces the adapter to
-provider-specific startup and auth, but they are not selectable until those
+Kimi is therefore a supported agent through the `acp` harness, and OpenCode
+and Grok Build run on the same ACP transport under their own harness names.
+Cursor and Gemini remain candidates: their ACP support reduces the adapter to
+provider-specific startup and auth, but they aren't selectable until those
 adapters and probes land.
 
 ## Harness profiles
