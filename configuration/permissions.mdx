@@ -86,3 +86,27 @@ that one work agent in Bypass. `pan up --yolo` starts the dashboard server with 
 agent and conversation that dashboard process launches runs in Bypass for as long as that dashboard process keeps
 running. Agents and conversations already running when you set the flag are unchanged. For a change that outlives a
 single command, use Settings > **Permissions**.
+
+## Codex permission modes
+
+Settings > Permissions > Codex has four options, saved as `codex.permissionMode`:
+
+| Option | `codex.permissionMode` | What Codex does |
+| --- | --- | --- |
+| **Read-only** | `read-only` | Codex can browse files but asks before making any change or running a command. |
+| **Workspace** | `workspace` | Codex works freely inside the working directory, but asks before going outside it or using the network. |
+| **Auto-review (recommended)** | `auto-review` | A sub-agent reviews and answers approval requests instead of prompting you; Codex still runs inside the workspace sandbox, and the reviewer decides whether to allow an escape. |
+| **Full access (yolo)** | `full-access` | No approval prompts; Codex has full filesystem and network access. |
+
+The default is **Auto-review**. The mode applies to Codex conversations and to Codex work, planning and recovery
+agents, and it takes effect on the next new or resumed session. `--yolo` and `PAN_YOLO` have no effect on Codex: they
+only feed Claude Code's `resolvePermissionMode`, and no Codex launch path reads them.
+
+**Default-transport caveat.** `codex.transport` defaults to `app-server`, and on that transport Overdeck starts every
+Codex thread with on-request approval and the workspace-write sandbox, whatever `codex.permissionMode` says. So today
+**Workspace** and **Auto-review** behave as described above, while **Read-only** and **Full access** take effect only
+with `codex.transport: tui`
+([#5567](https://github.com/eltmon/overdeck/issues/5567)).
+
+For the ACP harness (Kimi Code, OpenCode, Grok Build and the others), see
+[Harnesses](/configuration/harnesses).
