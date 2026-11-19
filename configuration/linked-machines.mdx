@@ -36,7 +36,8 @@ or **Settings → Anywhere → Machines → Link a machine** (also the command p
 **Link a machine**). The dialog takes the pairing
 link, the access level and the **Link both ways** checkbox. Linking takes a few seconds:
 the two machines prove their keys to each other through the pairing code, exchange
-tokens, and the new link shows up as **Online** on both sides.
+tokens, and the new link shows up as **Online** on both sides. `pan machines link --one-way`
+is the CLI form of unticking **Link both ways**.
 
 Both servers on one host (for a test) need `--allow-loopback`, because a `localhost`
 pairing link only works on the machine that printed it.
@@ -69,6 +70,9 @@ so it works from any browser that can open this dashboard:
 **Test** in the dialog (or `pan machines test-ssh <host>`) runs only steps 1 and 2: it
 connects over SSH and compares the `pan` versions. The host field
 suggests the concrete `Host` aliases of this machine's `~/.ssh/config`.
+
+The dialog has no access-level choice; the CLI does: `pan machines add-ssh --agent-fenced`
+and `--one-way`.
 
 To set a server up from the server itself instead (a lasting service that survives
 logout and reboot), use [Link a fresh server](#link-a-fresh-server).
@@ -160,6 +164,10 @@ This one command, which takes a few minutes:
 4. With `--project`, clones that project onto the VM (GitHub projects only).
 5. With `--message` (which needs `--project`), starts a Claude Code or Codex conversation (`--harness`) there and
    prints its URL.
+
+`pan machines add-fly` also takes `--region` (default `remote.fly.region`, else `iad`),
+`--image` (default `registry.fly.io/<app>:latest`) and `--effort`, which the page does not
+otherwise name; see [`pan machines add-fly`](/cli/machines#add-fly).
 
 The conversation then streams in this dashboard like any linked conversation: use
 [Remote control](#remote-control) to steer it, or [Pull here](#pull-here) to bring it home.
@@ -326,7 +334,9 @@ it answered last time.
 **Through the overdeck.ai directory.** When both machines are signed in to the same
 overdeck.ai account, you can also link them without a pairing link: click **Link** in
 **Settings → Anywhere → Directory** (or run `pan machines join`), then approve on the other
-machine after checking that both screens show the same six-digit code. The directory also adds
+machine after checking that both screens show the same six-digit code. The full CLI verb
+set is `directory`, `join`, `accept`, `reject`, `approve` and `forget`; see
+[the CLI page](/cli/machines#through-the-overdeck-ai-directory). The directory also adds
 `direct` routes (`rtc://<environment id>`, a peer-to-peer WebRTC path) and, on the relay plan
 (paid plans are invite-only for now), `relay` routes (`rtc+turn://<environment id>`, through a
 TURN relay). The relay tries the TURN server over TLS on port 443 first, so a network that
@@ -346,8 +356,10 @@ never saved with the link. See
 | **Unsupported** | The other machine runs an Overdeck without machine links, or another link protocol. The state names the exact version, where to install it, and the `npm install -g @overdeck/core@<version>` command. It is not retried until **Reconnect** or a restart. |
 | **Revoked** | The other machine removed this machine's access. Link again with a new pairing link. |
 
-**On a Mac**, a route stuck in **Offline** can say "macOS is blocking local network access for Overdeck."
-instead of the raw connection error. The dashboard only shows this when two signals agree:
+**On a Mac**, a route stuck in **Offline** can say "macOS is blocking local network access for
+Overdeck. Open System Settings → Privacy & Security → Local Network and turn on node
+(&lt;path&gt;)." instead of the raw connection error. The dashboard only shows this when two
+signals agree:
 every LAN route to the peer failed with the same `EHOSTUNREACH` errno, and a probe of this
 process's own network access confirms macOS denied it. A powered-off peer, which also fails
 fast with `EHOSTUNREACH`, keeps the raw error instead, since turning on Local Network access
@@ -441,7 +453,8 @@ conversation runs on one machine at a time. The pull has four steps:
 
 1. **Release.** The owner settles the conversation, with its uncommitted and unpushed
    code changes, and stops its harness. If a turn is running you choose **Wait for this
-   turn** (up to 30 minutes) or **Stop it now**.
+   turn** (up to 30 minutes) or **Stop it now** (`pan conv pull --stop-turn` is the CLI
+   form of stopping a running turn instead of waiting for it).
 2. **Transfer.** The settled conversation crosses the encrypted channel.
 3. **Adopt.** This machine continues it in its own checkout and resumes the harness. It
    keeps the title it had on the owner.
@@ -472,7 +485,7 @@ dashboard port) are refused with `port-refused`. A forward closes when you stop 
 the link goes away, or after 30 minutes with no open connection. It needs an
 operator-level link.
 
-Escape closes the Preview popover. A running forward keeps running until you stop it —
+Escape closes the Preview popover. A running forward keeps running until you stop it:
 Escape never stops it.
 
 ## Open in editor
@@ -491,8 +504,9 @@ shown disabled: their remote-SSH launch could not be verified.
 
 **Settings → Anywhere → Fleet versions** (or `pan machines versions`) shows one row per
 machine, this machine first: the Overdeck version and the version of each harness CLI
-installed there (Claude Code, Codex CLI, Kimi Code CLI, OpenCode, Muse Code, Prime Agent,
-OhMyPi). A linked machine that is not online shows its last known Overdeck version. A
+installed there (Claude Code, Codex CLI, Kimi Code CLI, OpenCode, Grok Build, Muse Code,
+Prime Agent, OhMyPi, Pi). A linked machine that is not online shows its last known Overdeck
+version. A
 linked machine on an Overdeck from before fleet updates shows the version to install and
 its command.
 
@@ -521,9 +535,11 @@ latest version; it never lets anyone pick a version.
 | Codex CLI | `codex update` | npm installs: `npm install -g --prefix <prefix> @openai/codex@latest` |
 | Kimi Code CLI | `kimi upgrade --yes` | |
 | OpenCode | `opencode upgrade` | npm installs: `npm install -g --prefix <prefix> opencode-ai@latest` |
+| Grok Build | `grok update` | npm installs: `npm install -g --prefix <prefix> @xai-official/grok@latest` |
 | Muse Code | none | Listed with its version; Overdeck does not update it. |
 | Prime Agent | none | Overdeck pins it to 0.8, so it is not updated to latest. |
 | OhMyPi | none | Listed with its version; Overdeck does not update it. |
+| Pi | none | npm installs: `npm install -g --prefix <prefix> @earendil-works/pi-coding-agent@latest`; other installs are listed with their version only. |
 
 Homebrew installs, Windows, and an npm prefix Overdeck cannot write show the command to
 run yourself instead of running it. Offline, connecting, unsupported and revoked machines
@@ -536,11 +552,12 @@ The new-conversation dialog has a **Machine** field: **This machine** (the defau
 **Auto**, each online linked machine by label, and **Fly (new VM)**. **Fly (new VM)** is
 enabled once the dialog has a project (it needs one to clone) and needs an admin
 credential; choosing it starts a new Fly machine, clones the project, runs the conversation
-there and takes a few minutes — the dialog shows "Starting a Fly machine." while it works.
+there and takes a few minutes: the dialog shows "Starting a Fly machine." while it works.
 The machine is destroyed, like any Fly machine, once no conversation on it has been active
 for `[remote.fly] machine_idle_minutes` (see [Lifetime and cost](#lifetime-and-cost)). The
-CLI takes the same per-machine choice for a conversation, but `--machine fly` refuses on
-`pan start`, `pan worker run` and `pan lane start` (see [Fly machines](#fly-machines) and
+CLI takes the same per-machine choice for a conversation. `--machine fly` refuses on
+`pan worker run` and `pan lane start`; on `pan start` it starts the issue's work agent on a
+new Fly machine, the same as `--remote` (see [Work agents on Fly](#work-agents-on-fly) and
 [`pan machines add-fly`](/cli/machines#add-fly)):
 
 ```bash
@@ -583,9 +600,10 @@ remote worker's reports exactly like a local worker's.
 ## Auto placement
 
 **Auto** (`--machine auto`) picks a machine for you and prints why, for example
-`Auto → desk (CPU pressure 3%, 41 GB free, 2 agents)`. When Auto passed over other machines it
-adds a second line, for example `Passed over: laptop: no docker; desk: offline`. It prints both
-lines when it picks this machine too.
+`Auto → desk (CPU pressure 3%, 41 GB free, 2 agents)`. `pan lane start` adds a second line
+when Auto passed over other machines, for example `Passed over: laptop: no docker; desk:
+offline`, and prints both lines when it picks this machine too. `pan start` and
+`pan worker run` print only the first line.
 
 1. Candidates are this machine and every online, visible linked machine.
 2. A machine is skipped when it is offline, has no project for the repository, lacks a
@@ -610,7 +628,7 @@ machines with every listed tag. The Machines list (`pan machines list`, Settings
 Machines) shows each machine's load and tags.
 
 For a **conversation**, when nothing fits, `remote.auto_fly = true` lets Auto create a Fly
-machine instead of answering "no machine fits" — only when the project is on GitHub and
+machine instead of answering "no machine fits", only when the project is on GitHub and
 `needs` stays within what a Fly machine can have (`linux`, `docker`). It is off by default,
 and it never applies to a worker, an issue start or a lane:
 
@@ -648,6 +666,11 @@ pan machines add-project desk overdeck            # desk's overdeck, cloned here
 pan machines add-project laptop overdeck --to desk   # this machine's overdeck, cloned on desk
 ```
 
+The CLI also takes `--file`, `--no-env` and `--parent-dir`. Each Online row in Settings →
+Anywhere → Machines also has **Add a project** (operator-level links only), which pushes
+this machine's project to that machine; **Compare settings** and **Add a project** show
+only on Online rows.
+
 ## Fleet Needs-You and search
 
 **Needs you** lists questions and permission prompts waiting on every online linked
@@ -662,8 +685,10 @@ machine is switched off.
 
 ## Fleet usage
 
-The Costs page's **Machines** tab shows today, week and month spend for each machine and an
-**All machines** total. An offline machine shows its last known numbers with "cached &lt;time&gt;".
+The Costs page's **Machines** tab (Costs is an experimental view: turn on
+**Settings → Experimental → Experimental features** to see it) shows today, week and month
+spend for each machine and an **All machines** total. An offline machine shows its last known
+numbers with "cached &lt;time&gt;".
 A provider request recorded on two machines (for example a conversation pulled from one to the
 other) is counted once in All machines.
 
@@ -707,7 +732,7 @@ connections.
 - **"Secure channel to … did not open within 10000 ms" while the machine shows Online**: the route reached
   the other machine but the connection and handshake took longer than 10 seconds. This is usually a slow
   moment on the route (for example the public Fly edge); run the command again. If it keeps happening, the
-  route itself is congested: check the machine's routes in Settings → Machines.
+  route itself is congested: check the machine's routes in Settings → Anywhere → Machines.
 - **`add-fly` fails with `unreachable`**: the Fly app has no public IPs. Run
   `fly ips allocate-v4 --shared -a <app>` and `fly ips allocate-v6 -a <app>` once, then
   try again. The failed VM was already destroyed.
@@ -724,3 +749,5 @@ connections.
   `fly tokens create deploy -a <app>` (PAN-4748).
 - The link exists but `require_token_mint` turned itself on: that is expected. Any remote
   access turns it on; see [Remote access](/configuration/remote-access#local-reverse-proxies-require_token_mint).
+- **Still stuck?** Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a
+  [GitHub Issue](https://github.com/eltmon/overdeck/issues).
