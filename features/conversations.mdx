@@ -962,7 +962,7 @@ GitLab merge request status, the Pull requests page, and search by PR number.
 
 ## Conversations from your other machines
 
-Arrives in the next release (v0.65.0), and needs Session Vault set up on this machine
+Needs Session Vault set up on this machine
 ([Session Vault](/configuration/session-vault)).
 
 Claude Code and Codex conversations that another machine saved to the vault appear in the
@@ -995,7 +995,7 @@ for the CLI path instead of repeating it.
 ### Conversations that run on a linked machine
 
 With a [machine link](/configuration/linked-machines), the conversations another machine
-runs appear in the list live, with an "on `<machine>`" chip, and open at
+runs appear in the list live, with a chip naming the machine (tooltip "Runs on `<machine>`"), and open at
 `/conv/@<environment-id>/<name>`. You control them as if they ran here; the title bar
 shows which machine owns each one.
 
@@ -1031,9 +1031,9 @@ main** and the per-turn chips, the window has a **Compare…** view for any two
 points in the conversation's repository. It works in a local-only repository
 too: no remote and no pull request are needed.
 
-**All turns** lists the files this conversation changed — its own commits and
+**All turns** lists the files this conversation changed (its own commits and
 the uncommitted files its edits touched, the same list as the Changes tab's
-**This conversation** — and nothing other agents changed in the same
+**This conversation**) and nothing other agents changed in the same
 checkout; **vs main** and **Compare…** show the wider comparisons. A file
 changed only through a shell command without a commit made by this
 conversation is not listed under All turns. Opening a file under All turns
@@ -1067,30 +1067,30 @@ current file", since Compare can point at an arbitrary ref the window cannot
 read directly. A deleted file has no Preview. The bar's **Open file** action
 is not available in the diff window; inside a Command Deck tab, use the turn
 card's rows or a file path in the reply to open a file beside the chat.
-Relative links in the preview show as plain text for now, until they resolve
-to files.
+Relative links in the preview show as plain text in the diff window, which has
+no pane to open a file in; a link to a file that does not exist shows as not found.
 
 ## Settling and snoozing conversations
 
 The conversation list groups rows into four sections, top to bottom: **Needs
 you**, **Inbox**, **Snoozed**, and **Settled**. A group with any pending
 question, plan-mode prompt, or approval request always shows in Needs you,
-regardless of its stored settle or snooze state — the group returns to
+regardless of its stored settle or snooze state; the group returns to
 Snoozed or Settled once the question is answered. Inbox has no header.
 Snoozed and Settled each show a count and are collapsed by default; click
 the header to expand.
 
-**Settling** marks a conversation done for now without stopping it — the
+**Settling** marks a conversation done for now without stopping it: the
 session keeps running, and nothing about it changes except where it sits in
 the list. This is different from [stopping or archiving](#stopping-or-archiving-a-conversation),
 which end the session. Settle (and Unsettle) are available from the row's
 checkbox, the row's overflow menu, and the tab menu.
 
 **Snoozing** hides a conversation until a chosen time, after which it moves
-back to Inbox on its own — there is no server timer and no dashboard restart
+back to Inbox on its own. There is no server timer and no dashboard restart
 can lose or delay it, since the wake check runs on the client against the
 stored time. Choose **Snooze** from either menu for presets (1 hour, this
-evening, tomorrow morning, next week) or **Custom…** for any future date and
+evening, tomorrow morning, next week) or the date and time field under them, then **Snooze**, for any future date and
 time; **Unsnooze** clears it early. A snoozed row shows when it comes back,
 such as "back tomorrow 09:00".
 
@@ -1130,22 +1130,22 @@ it off. Conversations also settle themselves when their pull requests merge
 [Pull requests on conversations](#pull-requests-on-conversations).
 
 A [scheduled run](#scheduled-runs) delivering its prompt also clears any
-settle or snooze on that conversation — settling or snoozing never buries a
+settle or snooze on that conversation, so settling or snoozing never buries a
 conversation past its next scheduled run.
 
 ## Stopping or archiving a conversation
 
-Stop is the `X` on the row, "Stop agent" in the row menu or the tab menu, or
-"Stop the agent" in the conversation header menu; Archive is in those same menus. After you stop
+Stop is the `X` on the row, "Stop agent" in the tab menu, or
+"Stop the agent" in the conversation header menu; Archive is in the row menu, the tab menu, and the header menu ("Archive conversation"). After you stop
 or confirm archive, the row dims and stops responding to clicks, and its
 second line reads "Stopping…" or "Archiving…" (a nested row shows the label
 after the title instead); the row's `X` becomes a spinner. The conversation
 header shows the same status. The row stays dimmed until the conversation
-list has refreshed — then a stopped row shows its stopped (gray) dot, and an
+list has refreshed. Then a stopped row shows its stopped (gray) dot, and an
 archived row leaves the list with a toast reading `Archived "<title>"` and
 its tab closes. On failure, an error toast shows the server's message and
-the row returns to normal. Both end the session; settling (above) does not
-— a settled conversation keeps running and can still be unsettled back to
+the row returns to normal. Both end the session; settling (above) does not:
+a settled conversation keeps running and can still be unsettled back to
 Inbox.
 
 ## Resuming a stopped conversation
@@ -1193,9 +1193,11 @@ conversations stay stopped and you can still resume each one. It covers
 Herdr hosts, where the dashboard sees the backend's event stream drop and come
 back. See [Terminal backends](https://github.com/eltmon/overdeck/blob/main/docs/TERMINAL-BACKENDS.md#after-a-session-server-restart-pan-5091) for the details.
 
+After `pan shutdown`, the same Needs you row offers the sessions the shutdown stopped (`Resume the <N> sessions shutdown stopped`), and Resume all resumes those conversations, then the work agents.
+
 ## Search your conversations
 
-The command palette (`⌘J` / `Ctrl+J`, see [Command palette](/features/keyboard-shortcuts#command-palette))
+The command palette (`⌘K` / `Ctrl+K`, or `⌘J` / `Ctrl+J` to open it on conversations; see [Command palette](/features/keyboard-shortcuts#command-palette))
 searches conversation titles and transcript text. From the command line, `pan conv` searches a
 separate catalog instead, built by scanning and enriching your sessions; see
 [Search from the command line](#search-from-the-command-line) below.
@@ -1311,7 +1313,7 @@ The Settings → Conversations card also has a **Semantic embeddings** switch, o
 **Embedding provider** (OpenAI, Voyage AI or Ollama), **Embedding model**, **Auto-embed after deep
 enrichment** and **Test connection**. `conversations.embeddings` turns this on; with
 `embedding_auto_on_deep` also on, it embeds a session right after a tier 2 or 3 `pan conv enrich`
-run. In `~/.overdeck/config.yaml` under `conversations:`, the matching keys are `embeddings`
+run. The automatic embed also needs **Settings → Background AI → Session embeddings** on (off by default) and low-cost mode off. In `~/.overdeck/config.yaml` under `conversations:`, the matching keys are `embeddings`
 (defaults to `false`), `embedding_provider` (`openai`, `voyage` or `ollama`), `embedding_model` and
 `embedding_auto_on_deep`.
 
@@ -1323,11 +1325,11 @@ for every `pan conv` command too.
 ## See also
 
 - [Conversation Commands](/cli/conversation-commands): full CLI reference for `pan conv`, `pan handoff`, `pan fork`, `pan tell`, `pan resume`, `pan unarchive-conversation`, `pan open` and `pan share`
-- [Mission Control](/features/mission-control) — the project tree and activity timeline around your conversations
-- [Cloister](/features/cloister) — model routing, stuck-agent detection, and lifecycle management
-- [Harnesses](/configuration/harnesses) — `claude-code` vs `pi`, and the ToS rules that gate them
-- `pan conv current` (alias `pan conv whoami`) — print the conversation you're running inside
-- `pan fork [conv]` — create a summary or plain fork without asking the source agent to author a handoff
+- [Command Deck](/features/mission-control): the deck, panes and project tree around your conversations
+- [Cloister](/features/cloister): model routing, stuck-agent detection, and lifecycle management
+- [Harnesses](/configuration/harnesses): `claude-code` vs `pi`, and the ToS rules that gate them
+- `pan conv current` (alias `pan conv whoami`): print the conversation you're running inside
+- `pan fork [conv]`: create a summary or plain fork without asking the source agent to author a handoff
 - [Session Vault](/configuration/session-vault): save conversations off-machine and continue them elsewhere
 - [Command palette](/features/keyboard-shortcuts#command-palette): find actions, issues, files and conversations with Ctrl+K
 
