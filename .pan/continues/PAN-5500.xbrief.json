@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5500",
   "created": "2026-11-19T03:34:33.510Z",
-  "updated": "2026-11-19T04:05:04.007Z",
+  "updated": "2026-11-19T04:05:11.378Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -336,6 +336,11 @@
     "audit-session-vault.ac5": {
       "status": "completed",
       "doneAt": "2026-11-19T04:05:04.006Z"
+    },
+    "audit-vault": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T04:05:11.377Z"
     }
   }
 }
