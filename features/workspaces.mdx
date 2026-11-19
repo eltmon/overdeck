@@ -13,7 +13,7 @@ Each workspace is where an agent's conversation and its work live together: the 
 <ThemedImage
   light="/images/dashboard/board-light.png"
   dark="/images/dashboard/board-dark.png"
-  alt="Kanban board: issue columns with cost badges, agent status dots, and workspace controls, one card per issue/workspace"
+  alt="Board view: Backlog, Plan, Work, Review and Done columns of issue cards showing task progress, agent activity and actions such as Start work, under cycle and project filters and a Needs you strip"
 />
 
 ## Workspace kinds
@@ -30,10 +30,10 @@ Memory is kept per workspace, so a scratch or main workspace collects memory fro
 
 **Workspaces are git worktrees** - isolated working directories for each issue/feature. Each workspace:
 
-- Has its own feature branch (e.g., `feature/min-123-add-login`)
+- Has its own feature branch, named `feature/<issue>` (e.g., `feature/min-123`)
 - Shares git history with the main repo (no separate clone)
 - Can run independently (separate node_modules, builds, containers)
-- Is located at `{project}/workspaces/{issue-id}/`
+- Is located at `{project}/workspaces/feature-<issue>/` (lowercase, e.g. `workspaces/feature-min-123/`)
 
 This architecture allows multiple agents to work simultaneously without stepping on each other's toes.
 
@@ -60,14 +60,14 @@ project/
 ├── package.json
 └── workspaces/
     ├── feature-min-123/   # Workspace for MIN-123
-    │   ├── .git           # Symlink to ../.git
-    │   ├── .planning/     # Planning artifacts (ephemeral)
+    │   ├── .git           # File pointing at the shared ../../.git
+    │   ├── .overdeck/     # Workspace runtime state (plan copy, continue file, pipeline journal)
     │   ├── src/           # Feature branch code
     │   ├── node_modules/  # Independent dependencies
     │   └── docker-compose.yml
     └── feature-min-456/   # Workspace for MIN-456
         ├── .git
-        ├── .planning/
+        ├── .overdeck/
         └── src/
 ```
 
@@ -94,35 +94,27 @@ Git worktrees allow multiple working directories to share a single git repositor
 
 ```
 workspaces/feature-min-123/
-├── .planning/                 # Planning artifacts (ephemeral)
-│   ├── STATE.md               # Current planning state
-│   ├── output.jsonl           # Full conversation history
-│   ├── PLANNING_PROMPT.md     # Initial planning prompt
-│   ├── CONTINUATION_PROMPT.md # Context for continued sessions
-│   └── output-*.jsonl         # Backup of previous rounds
+├── .overdeck/                 # Workspace runtime state
+│   ├── spec.vbrief.json       # Working copy of the xBRIEF plan
+│   ├── continue.json          # Item progress
+│   ├── sessions.jsonl         # Agent sessions in this workspace
+│   └── pipeline.jsonl         # Pipeline journal
+├── .pan/                      # Committed planning artifacts (drafts/, specs/, continues/)
 ├── src/                       # Feature branch code
 ├── node_modules/              # Independent dependencies
 ├── package.json
 └── docker-compose.yml         # Workspace-specific containers
 ```
 
-### Planning Artifacts
+### Planning artifacts
 
-> ⚠️ **Note: `.planning/` is currently ephemeral (not tracked in git)**
->
-> The `.planning/` directory is listed in `.gitignore` to prevent cross-contamination between issues. When branches merge, planning state from issue A could contaminate issue B's workspace, causing agents to work on the wrong tasks.
->
-> **Current behavior:** Planning state is local to your machine only. If you switch machines, you'll need to re-run the planning session.
+Planning writes its artifacts under `.pan/` in the project repo and commits them on the feature branch, so they travel with the branch. A polyrepo project can name one sub-repo as the plan home with `pan_records.repo` in `projects.yaml`.
 
-When planning completes, the AI generates:
-- **STATE.md** - Current understanding, decisions made, and implementation plan
-- **Beads tasks** - Trackable sub-tasks with dependencies
-- **Feature PRD** - Copied to `docs/prds/active/{issue}-plan.md` for documentation
+- `.pan/drafts/<issue>.md`: the PRD draft
+- `.pan/specs/`: the xBRIEF plan
+- `.pan/continues/`: the continue files that record item progress
 
-**What persists:**
-1. **Context recovery** - STATE.md and beads preserve planning decisions
-2. **Audit trail** - See decisions made in STATE.md
-3. **Beads tasks** - Sub-tasks ARE persisted (beads uses label-based isolation)
+The workspace's `.overdeck/` directory holds runtime state: a working copy of the plan (`spec.vbrief.json`), `continue.json`, `sessions.jsonl`, `context.md`, `feedback/` and the pipeline journal `pipeline.jsonl`. Work items are xBRIEF items; agents claim and complete them with `pan task`.
 
 ## Docker Integration
 
@@ -140,22 +132,21 @@ pan workspace create MIN-123 --docker
 
 **What happens:**
 1. Creates the workspace (git worktree)
-2. Looks for docker-compose files in workspace
-3. Runs `docker compose -p "{project}-feature-{issue}" up -d --build`
+2. Looks for a compose file in the workspace root or `.devcontainer/`, and regenerates `.devcontainer/` from the project template when none exists
+3. Runs `docker compose -f <compose file> up -d --build` without `-p`, so the compose file names the stack
 
 **Docker Project Naming:**
 
-Each workspace gets a unique Docker Compose project name:
-- Format: `{project-name}-feature-{issue-id}`
-- Example: `mind-your-now-feature-min-123`
-- Container names: `{project}-{service}-1`
+Each workspace's Docker Compose project name is the one its compose file declares in its top-level `name:` field, or `COMPOSE_PROJECT_NAME` in the workspace's `dev` script. With neither, Overdeck uses `overdeck-feature-<issue>`.
+- Example: a compose file with `name: myn-feature-min-123`
+- Container names: `{compose-project}-{service}-1`
 
 This prevents conflicts when running multiple workspaces simultaneously.
 
 ### Dashboard Integration
 
 The planning dialog includes a "Start Docker containers" checkbox:
-- **Default:** Enabled (containers start automatically)
+- **Default:** Off (planning agents don't need Docker)
 - **Preference saved:** Your choice is remembered in browser localStorage
 
 **Why this helps:**
@@ -177,35 +168,31 @@ pan workspace create MIN-123 --docker
 
 **What happens:**
 1. Creates git worktree at `{project}/workspaces/feature-min-123/`
-2. Checks out feature branch `feature/min-123-*`
+2. Creates and checks out the branch `feature/min-123`
 3. Optionally starts Docker containers
 4. Registers workspace in Overdeck registry
 
 ### 2. Usage
 
 Agents work inside the workspace:
-- **Planning agents** - Explore codebase, create STATE.md and beads tasks
+- **Planning agents** - Explore the codebase and write the PRD draft and the xBRIEF plan
 - **Work agents** - Implement features, run tests, commit changes
-- **Specialists** - Review code, run tests, merge changes
+- **Review and test agents** - Review the code and run the tests
 
 All activity isolated to the workspace directory.
 
 ### 3. Cleanup
 
 ```bash
-# Destroy workspace (safe - checks for uncommitted changes)
+# Destroy workspace (uncommitted changes are discarded, so commit and push first)
 pan workspace destroy MIN-123
-
-# Force destroy (even with uncommitted changes)
-pan workspace destroy MIN-123 --force
 ```
 
 **What happens:**
-1. Stops and removes Docker containers (if any)
-2. Checks for uncommitted changes (unless --force)
-3. Removes git worktree
-4. Cleans up planning artifacts
-5. Unregisters from Overdeck
+1. Stops the workspace's Docker stack (projects with a `workspace` block in `projects.yaml`)
+2. Removes every worktree for the issue (base, strike and slot; limit with `--shape`) with `git worktree remove --force`, so uncommitted changes are lost
+3. Deletes the local feature branch
+4. Removes the workspace's record; `--purge-memory` also deletes its memory
 
 After an issue's pull request merges, close it out with `pan close <id>` or the **Close Out** button; [Cleaning up after close-out](#cleaning-up-after-close-out) explains what that removes.
 
