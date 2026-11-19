@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5504",
   "created": "2026-11-19T07:15:41.251Z",
-  "updated": "2026-11-19T07:39:46.546Z",
+  "updated": "2026-11-19T07:40:47.910Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -400,9 +400,26 @@
       "doneAt": "2026-11-19T07:39:42.000Z"
     },
     "audit-skill-pack-authoring": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5504",
-      "claimedAt": "2026-11-19T07:39:46.546Z"
+      "claimedAt": "2026-11-19T07:39:46.546Z",
+      "doneAt": "2026-11-19T07:40:47.910Z"
+    },
+    "audit-skill-pack-authoring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:40:47.910Z"
+    },
+    "audit-skill-pack-authoring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:40:47.910Z"
+    },
+    "audit-skill-pack-authoring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:40:47.910Z"
+    },
+    "audit-skill-pack-authoring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:40:47.910Z"
     }
   }
 }
