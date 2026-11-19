@@ -186,44 +186,36 @@ Start the Overdeck dashboard and services.
 # Start with default settings
 pan up
 
-# Minimal mode (without Traefik)
-pan up --minimal
+# Skip Traefik startup
+pan up --skip-traefik
+
+# Run in the background
+pan up --detach
 ```
 
+`pan up` runs in the foreground by default.
+
 Starts:
-- **Frontend** - React dashboard (default: http://localhost:3010)
-- **API Server** - Backend API (default: http://localhost:3011)
-- **Traefik** - Reverse proxy (if installed)
+- **Dashboard** - the React dashboard and its API, served by one Node server (default: http://localhost:3011)
+- **Traefik** - Reverse proxy (when `traefik.enabled` is true; skip with `--skip-traefik`)
 
 With HTTPS enabled:
 - Dashboard: https://overdeck.localhost
-- Traefik UI: https://traefik.overdeck.localhost:8080
+- Traefik UI: https://traefik.overdeck.localhost (or http://localhost:8080)
 
 The dashboard provides:
-- Kanban board of issues
-- Agent monitoring
-- Real-time activity logs
-- Cost tracking
+- Board (Kanban view of issues)
+- Agent monitoring (Agents page, behind Settings → Experimental)
+- Real-time activity logs (behind Settings → Experimental)
+- Cost tracking (Costs page, behind Settings → Experimental)
 - Skills browser
-- Health checks
+- Health checks (Health page, behind Settings → Experimental)
 
 Beyond the board, the dashboard is where you watch and steer live agent
 conversations and the work moving through the pipeline. The Pipeline page
-groups every active issue by phase (Ship, Review, and Verifying) above a
-metric strip tracking active issues, work running, the review queue, ship
-count, and spend, with a live activity feed alongside.
-
-<ThemedImage
-  light="/images/dashboard/pipeline-light.png"
-  dark="/images/dashboard/pipeline-dark.png"
-  alt="Pipeline page: a metric strip (Active issues, Work running, Review queue, Ship, Spend) over phase-grouped issue rows for Ship, Review, and Verifying, with an activity feed on the right"
-/>
-
-<Tip>
-  The metric strip is the fastest way to answer "where are we?" at a glance:
-  it surfaces how many agents are working, how deep the review queue is, and
-  the running spend without opening any individual issue.
-</Tip>
+groups every active issue by phase (Ship, Review, Work, Plan and Ready) under
+a metric strip of active issues, work running, review running, ready to ship
+and 24-hour spend. See [Dashboard views](/features/dashboard-views).
 
 ## pan down
 
@@ -234,12 +226,12 @@ pan down
 ```
 
 This command:
-- Stops the frontend and API server
-- Optionally stops Traefik
-- Does NOT stop running agents (use `pan kill` for that)
+- Stops the dashboard, the supervisor sidecar, the smee-client relay, review sessions and the CLIProxy sidecar
+- Stops Traefik when it is enabled, unless you pass `--skip-traefik`
+- Does NOT stop work agents or conversations (use `pan kill` for that); review sessions are stopped
 - Does NOT affect workspaces or containers
 
-Agents continue running independently in tmux sessions.
+Agents keep running in their terminal-backend sessions (Herdr by default).
 
 ## pan restart
 
