@@ -162,3 +162,23 @@ while reads such as `status`, `diff`, `log` and `show` still work.
 Each agent commit gets an `Overdeck-Agent` trailer naming the agent id; a conversation's commits get an
 `Overdeck-Conversation` trailer instead and are not otherwise restricted. This is accident prevention, not a
 sandbox: an absolute `/usr/bin/git` bypasses it, and file-system and network writes are not restricted at all.
+
+## Primary checkout refusals
+
+`pan fork` and `pan handoff` take a `--cwd <path>`. The path must be absolute, contain no `..`, exist as a
+directory, and resolve inside your home directory, or the dashboard answers `Invalid cwd`.
+
+A `--cwd` inside a project's primary checkout is refused:
+
+```text
+Invalid cwd: <path> is the primary checkout of <project>; use a worktree
+```
+
+`--allow-primary` overrides that refusal only when the caller is the operator; an agent session is refused even
+with the flag.
+
+`pan worker run --cwd <path>` must stay inside the issue workspace, and a read-write worker whose `--cwd` resolves
+to a primary checkout is refused the same way. `--read-only` workers are not checked.
+
+The file explorer never writes a project's main checkout either; edits there go to a separate edit workspace. See
+[Edit workspaces](/features/file-explorer#edit-workspaces).
