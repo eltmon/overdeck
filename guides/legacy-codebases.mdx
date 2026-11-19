@@ -127,7 +127,7 @@ The AI adapts to your org structure, not the other way around.
 
 - **Codebase map.** The `/pan-map` skill writes four orientation files under `.overdeck/context/codebase/`: `architecture.md`, `conventions.md`, `concerns.md` and `stack.md`. Commit them. Planning agents read them first and write them when they're missing; work agents skim them before they start.
 - **Project rules.** `pan context edit --layer project` opens `.overdeck/context/project.md`, the committed project layer. See [Context layers](/configuration/context-layers).
-- **Memory facts.** Record a rule every agent must follow with `pan memory add`. Overdeck renders the fact index into each managed agent's launch context. See [Memory](/configuration/memory).
+- **Memory facts.** Record a rule every agent must follow with `pan memory add <id>`; see [Memory](/configuration/memory) for its type, description and body options. Overdeck renders the fact index into each managed agent's launch context.
 
 ## Related Guides
 

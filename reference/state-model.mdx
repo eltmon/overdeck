@@ -64,9 +64,10 @@ Overdeck computes this view by walking the workspaces and reading GitHub, then c
 | Live activity (who's thinking) | ephemeral | cache only |
 | Retry counters, merge-queue position | ephemeral bookkeeping | cache only (safe to lose) |
 | Pinned document selections, workspace origin, conversation bookmarks and schedules | database only | cache only (no other copy) |
+| Conversation triage: settled and snoozed status, per-conversation auto-settle overrides, idle-reset markers | database only | cache only (no other copy) |
 | Dashboard switches: Merge Train batch size and wait, Conversations auto-settle, Flywheel switches | database only (`app_settings`) | cache only (no other copy) |
 
-Most of what a database loss wipes out are **ephemeral counters**: retry counts, queue positions. They gate loop-prevention, not your work; on a rebuild they reset, and the worst case is an agent gets a fresh set of attempts. The **database only** rows are the exception: pinned document selections, a workspace's recorded origin (pipeline, operator, vault or agent), conversation bookmarks and schedules, and the dashboard switches kept in `app_settings` have no other copy to rebuild from, so a database loss drops them for good.
+Most of what a database loss wipes out are **ephemeral counters**: retry counts, queue positions. They gate loop-prevention, not your work; on a rebuild they reset, and the worst case is an agent gets a fresh set of attempts. The **database only** rows are the exception: pinned document selections, a workspace's recorded origin (pipeline, operator, vault or agent), conversation bookmarks and schedules, conversation triage state (settled and snoozed status, per-conversation auto-settle overrides and idle-reset markers), and the dashboard switches kept in `app_settings` have no other copy to rebuild from, so a database loss drops them for good.
 
 ## Planning artifacts under `.pan/`
 
@@ -94,7 +95,7 @@ Overdeck also keeps **search indexes** in SQLite: full-text and semantic search 
 ## The rules that keep this true
 
 - **No stored pipeline status.** Where an issue stands is read live from git, the tracker, the pull request and the terminal backend. `npm run lint:no-state-layer` fails CI if code brings back the deleted record store.
-- **The database is reconstructable.** `pan admin db rebuild` walks every workspace + GitHub and repopulates the cache from scratch.
+- **Derived state is recomputed.** `pan admin db rebuild` walks every workspace and GitHub, then recomputes in-flight issue and agent state in memory and prints the counts. It does not write rebuilt state back to the database; the dashboard derives that state from the same sources when it reads it.
 - **Review verdicts live on the pull request** as PR reviews, so they travel with the PR and survive a database loss.
 
 ## Why it matters

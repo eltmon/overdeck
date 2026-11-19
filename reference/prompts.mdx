@@ -158,10 +158,13 @@ does), or `yield*` it inside `Effect.gen`.
 
 ### Error handling
 
-Every failure is a `PromptError`, exported from the module. It's an Effect
-tagged error (`Data.TaggedError('PromptError')`) and also an `Error`.
-`renderPrompt` fails its Effect with it, so `Effect.runPromise` rejects and
-`Effect.runSync` throws. Typical messages:
+Every loading and validation failure is a `PromptError`, exported from the
+module. It's an Effect tagged error (`Data.TaggedError('PromptError')`) and
+also an `Error`. `renderPrompt` fails its Effect with it, so
+`Effect.runPromise` rejects and `Effect.runSync` throws. Rendering is
+different: a body Mustache can't parse, such as an unclosed `{{#VAR}}`
+section, throws Mustache's own `Error`, which the loader does not convert to
+a `PromptError`. Typical `PromptError` messages:
 
 ```
 Prompt "work" (.../prompts/work.md) requires variables that are missing: WORKSPACE_PATH, BRANCH_NAME.
@@ -642,8 +645,9 @@ required keys that are missing. It never scans the body, so a `{{VAR}}` that
 the frontmatter doesn't list renders empty when the call site doesn't pass
 it.
 
-Either add the variable to `requires` (to force the call site to provide
-it) or fix the call site to pass it.
+Declare the variable in the frontmatter (`requires` if the content must be
+there, `optional` if it may be left out) and pass it from the call site.
+Passing it without declaring it fails with "was passed unknown variables".
 
 ### A Mustache section renders when it shouldn't
 

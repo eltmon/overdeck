@@ -281,9 +281,11 @@ Non-negotiables:
   injection.
 - **Version pinning.** `git`/`registry` sources should pin a ref/SHA so a bundle
   is reproducible.
-- **Workspace isolation.** Local work agents and conversations are not
-  sandboxed: Overdeck's launcher starts the harness directly, with no
-  container step, so nothing contains third-party skill code. Consider
+- **Workspace isolation.** Overdeck does not run local work agents or
+  conversations in containers: its launcher starts the harness directly, so
+  no container step contains third-party skill code. Codex agents still get
+  Codex's own `sandbox_mode` setting from Overdeck (`workspace-write` by
+  default), but a git worktree is not a boundary. Consider
   restricting templated agents and conversations to `local`-only bundles, or
   surfacing a clear trust prompt.
 

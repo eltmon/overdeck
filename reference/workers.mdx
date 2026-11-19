@@ -66,7 +66,7 @@ Agents with the `overdeck` MCP server can use its `delegate_task`,
 `--machine <label|environment-id>` starts the worker on a linked machine, and
 `--machine auto` lets [Auto placement](/configuration/linked-machines#auto-placement) pick
 one by load (`--needs docker,gpu` limits the choice to machines with those tags). The other
-machine needs a project for the same repository and a workspace for the issue. `--cwd` does not work with `--machine`, and `--machine fly` is refused: a new Fly machine has no issue workspace.
+machine needs a project for the same repository and a workspace for the issue. `--cwd` is refused when placement picks another machine (it works when `--machine auto` picks this one), and `--machine fly` is refused: a new Fly machine has no issue workspace.
 
 This machine keeps a **stand-in** under the local worker id it prints; `wait` takes
 that id. `pan worker list` shows the stand-in without its issue or parent, and its state reads this machine, where the worker has no pane, so it does not show whether the remote worker runs. `pan kill` does not reach the other machine: `--stop-after-report` stops the remote worker, and so does the end of its parent. The stand-in mirrors the remote worker's reports with the same

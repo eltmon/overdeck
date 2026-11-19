@@ -72,7 +72,7 @@ To resume things by hand, see [`pan resume`](/cli/conversation-commands#pan-resu
 
 Overdeck backs up the `~/.claude/skills`, `~/.claude/commands` and `~/.claude/agents` folders that `pan sync` writes. `pan context detach --apply` backs up each native `CLAUDE.md` or `AGENTS.md` file before it removes a managed region from it. **Nothing backs up the Overdeck database or the rest of `~/.overdeck` state.** To keep conversation transcripts off this machine, see [Session Vault](/configuration/session-vault).
 
-`pan sync` backs up those folders first and keeps the newest 10 backups. Under `[sync]` in `~/.overdeck/config.toml`, set `backup_before_sync = false` to turn that off, or `backup_keep` to keep a different number. `pan sync --backup-only` makes the backup without syncing, but only while `backup_before_sync` is on: with it off, the flag is ignored and a full sync runs. You can also manage backups directly:
+`pan sync` backs up those folders first and keeps the newest 10 backups. Under `[sync]` in `~/.overdeck/config.toml`, set `backup_before_sync = false` to turn that off, or `backup_keep` to keep a different number. `pan sync --backup-only` makes the backup without syncing, but only while `backup_before_sync` is on: with it off, the flag is ignored and a full sync runs. Every `pan sync` run, `--backup-only` included, first removes the skills that the 0.7.0 upgrade renamed or deleted from `~/.claude/skills/`, before the backup is taken, so copy a customized version of one of them elsewhere first. You can also manage backups directly:
 
 ```bash
 pan sync --backup-only       # back up skills, commands and agents without syncing
