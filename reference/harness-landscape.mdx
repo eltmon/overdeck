@@ -155,22 +155,22 @@ adapters and probes land.
 Each profile follows the same shape. Versions are "latest observed, May 2026"
 and should be re-checked before any decision.
 
-### Claude Code — Supported (default)
+### Claude Code: Supported (default)
 
-- **Vendor / model:** Anthropic. Anthropic models; non-Anthropic via CLIProxy.
+- **Vendor / model:** Anthropic. Anthropic models; other providers' models through their Anthropic-compatible endpoints (Kimi, MiniMax, Z.AI, MiMo, OpenRouter, local Ollama) or through the CLIProxy sidecar (GPT, Gemini).
 - **OSS / license:** Proprietary (binary distribution).
 - **Auth:** Claude Code OAuth subscription **or** Anthropic API key (exclusive).
-- **Extensibility:** The richest surface in the field —
+- **Extensibility:** The richest surface in the field:
   - **Skills** at enterprise / personal (`~/.claude/skills/`) / project
     (`.claude/skills/`) / plugin scope, with name-conflict precedence
     enterprise > personal > project; plugin skills are namespaced and cannot
     conflict.
-  - **Plugins** — distributable bundles (`.claude-plugin/plugin.json`) that can
+  - **Plugins**: distributable bundles (`.claude-plugin/plugin.json`) that can
     carry skills, subagents, commands, hooks, MCP servers, LSP servers,
     monitors, binaries, and output styles. **Marketplaces**
     (`.claude-plugin/marketplace.json`) catalog them; `/plugin marketplace add`,
     `/plugin install`.
-  - **Session-scoped loading** — `--plugin-dir <path>`, `--plugin-url <url>`,
+  - **Session-scoped loading**: `--plugin-dir <path>`, `--plugin-url <url>`,
     `--agents '<json>'`, `--mcp-config` (+`--strict-mcp-config`),
     `--settings <file|json>`. This is the basis for
     [template conversations](/reference/template-conversations).
@@ -181,7 +181,7 @@ and should be re-checked before any decision.
 - **Why it's the default:** required for Anthropic-subscription users; the
   largest agent/skill/plugin surface; Overdeck's pipeline prompts assume it.
 
-### Pi Coding Agent (pi) — Supported (default for non-Anthropic, non-OpenAI providers)
+### Pi Coding Agent (pi): Supported (default for many API-key providers)
 
 - **Vendor / model:** Pi Coding Agent (`@earendil-works/pi-coding-agent`,
   binary `pi`, verified 0.85.0 and 1.5.2). oh-my-pi is its fork. ~40 providers in its
@@ -191,49 +191,49 @@ and should be re-checked before any decision.
 - **OSS / license:** MIT. TypeScript, runs on Node (omp needs Bun).
 - **Install:** `npm install -g @earendil-works/pi-coding-agent`.
 - **Extensibility:**
-  - **Skills** — reads `SKILL.md`; the `settings.json` `skills` array takes
+  - **Skills**: reads `SKILL.md`; the `settings.json` `skills` array takes
     arbitrary directories, and `pan sync` adds `~/.claude/skills`.
-  - **Extensions** — TypeScript modules on the same lifecycle-event bus as omp
+  - **Extensions**: TypeScript modules on the same lifecycle-event bus as omp
     (`session_start`, `turn_end`, `agent_settled`, `tool_execution_end`, …),
     loaded with `--extension`. Overdeck vendors one at `packages/pi-extension/`.
     pi's `session_start` carries only `{ reason }`; the session id and file
     come from `ctx.sessionManager`.
-  - **No MCP** — a deliberate design stance, the same as omp.
+  - **No MCP**: pi has no MCP client, so Overdeck's MCP server stays off for pi.
   - **AGENTS.md / CLAUDE.md** read by default; project-local `.pi/` resources
     need project trust (Overdeck launches with `--no-approve`).
-- **Headless:** `pi --mode rpc` — the same JSONL command/event protocol as omp
+- **Headless:** `pi --mode rpc`, the same JSONL command/event protocol as omp
   (Overdeck delivers commands via the `rpc.in` named pipe). Resume is
   `--session <id>`.
-- **Why it's the default:** multi-provider without CLIProxy, Node-only install,
+- **Why it's the default** for Google, xAI, MiniMax, Z.AI, MiMo, OpenRouter, Nous, DashScope, Groq, Cerebras and Mistral models: multi-provider without CLIProxy, Node-only install,
   and the same named-pipe RPC as omp; the only ToS-blocked cell is `pi` +
   Anthropic model + Anthropic subscription auth.
 - **Implementation files:** `src/lib/runtimes/pi.ts`, `src/lib/runtimes/pi-family.ts`,
   `src/lib/launcher-pi-command.ts`, `src/lib/pi-models.ts`, `packages/pi-extension/`.
   The full pi-vs-omp comparison is `.pan/pi-vs-omp.md` in the repo.
 
-### oh-my-pi (ohmypi) — Supported (alternative)
+### oh-my-pi (ohmypi): Supported (alternative)
 
 - **Vendor / model:** oh-my-pi project (`@oh-my-pi/pi-coding-agent`, binary `omp`). **30+ providers** via its
-  `pi-ai` layer — subscription auth for Anthropic, OpenAI, GitHub Copilot;
+  `pi-ai` layer: subscription auth for Anthropic, OpenAI, GitHub Copilot;
   API-key for ~25 more (Gemini, Vertex, Bedrock, Groq, Cerebras, xAI,
   OpenRouter, MiniMax, DashScope, …).
-- **OSS / license:** MIT. TypeScript / Node.
-- **Install:** `npm install -g @oh-my-pi/pi-coding-agent` — provides the `omp` binary.
+- **OSS / license:** MIT. TypeScript; the `omp` binary runs on Bun 1.3.14 or later.
+- **Install:** `npm install -g @oh-my-pi/pi-coding-agent` (provides the `omp` binary).
 - **Extensibility:**
-  - **Skills** — reads `SKILL.md`. Discovery: `~/.omp/agent/skills/`,
+  - **Skills**: reads `SKILL.md`. Discovery: `~/.omp/agent/skills/`,
     `.omp/skills/`, `~/.agents/skills/`, `.agents/skills/`, `skills/` in
     `package.json`, the `skills` array in `settings.json`, **and the repeatable
-    `--skill <path>` CLI flag.** The `settings.json` `skills` array accepts
-    arbitrary directories — Overdeck exploits this by writing
-    `~/.omp/agent/settings.json` with `"skills": ["~/.claude/skills"]`.
-  - **Extensions** — TypeScript modules subscribing to a rich lifecycle-event
+    `--skill <path>` CLI flag.** Overdeck doesn't write omp's settings:
+    `pan sync` installs its skills into `~/.agents/skills/`, which omp
+    discovers.
+  - **Extensions**: TypeScript modules subscribing to a rich lifecycle-event
     bus (`session_start`, `tool_execution_end`, `agent_start/end`, …); loaded by
     auto-discovery, `settings.json`, or `--extension`. Overdeck vendors one at
     `packages/ohmypi-extension/`.
-  - **No MCP** — a deliberate design stance. omp tells users to wrap CLI tools as
+  - **No MCP**: a deliberate design stance. omp tells users to wrap CLI tools as
     skills instead. The only path to MCP is a custom extension.
   - **AGENTS.md** read by default.
-- **Headless:** `omp --mode rpc` — JSONL command/event protocol over stdin/stdout
+- **Headless:** `omp --mode rpc`: JSONL command/event protocol over stdin/stdout
   (Overdeck delivers commands via a named-pipe `mkfifo`).
 - **Why it's supported:** multi-provider without CLIProxy; named-pipe RPC is
   faster than tmux paste-buffer; the only ToS-blocked cell is `ohmypi` + Anthropic
@@ -241,7 +241,7 @@ and should be re-checked before any decision.
 - **Implementation files:** `src/lib/runtimes/ohmypi.ts`, `src/lib/runtimes/ohmypi-fifo.ts`,
   `src/lib/cost-parsers/ohmypi-parser.ts`, `packages/ohmypi-extension/`.
 
-### OpenAI Codex CLI — Supported
+### OpenAI Codex CLI: Supported
 
 - **Vendor / model:** OpenAI. OpenAI-centric (GPT-5.4, GPT-5.3-Codex); `--oss`
   flag runs open-weight models on local Ollama/LM Studio/MLX. Non-OpenAI cloud
@@ -249,24 +249,25 @@ and should be re-checked before any decision.
 - **OSS / license:** Open source, **Apache-2.0**. Written in **Rust**. Install
   via `npm i -g @openai/codex` or Homebrew. v0.133.0 (2026-05-21).
 - **Auth:** Sign in with ChatGPT (Plus/Pro/Business/Edu/Enterprise) **or** API
-  key. Overdeck's CLIProxy already mints ChatGPT-subscription tokens.
+  key. Overdeck's Codex harness uses the host's `codex login` sign-in: each agent's `CODEX_HOME/auth.json` links to `~/.codex/auth.json`.
 - **Extensibility:**
-  - **Skills — yes**, `SKILL.md`, Claude Code-compatible. `~/.codex/skills/`,
+  - **Skills: yes**, `SKILL.md`, Claude Code-compatible. `~/.codex/skills/`,
     `.codex/skills/`.
-  - **AGENTS.md — yes**, native and layered (root-down concatenation,
+  - **AGENTS.md: yes**, native and layered (root-down concatenation,
     closer-file-overrides, 32 KiB cap).
-  - **MCP — yes**; Codex can also *run as* an MCP server (`codex mcp-server`).
+  - **MCP: yes**; Codex can also *run as* an MCP server (`codex mcp-server`).
   - Profiles in `config.toml` selected via `--profile`.
 - **Headless / RPC:** `codex exec` non-interactive; `--json` newline-delimited
   event stream; `--output-schema` for validated output; `codex mcp-server` for
   stdio orchestration. Among the strongest headless interfaces in the field.
 - **Why it's supported:** Apache-2.0, native AGENTS.md + skills, excellent
-  headless story, and Overdeck's ChatGPT-subscription auth already exists. The
+  headless story, and it accepts a ChatGPT-subscription sign-in. The
   Codex harness gives GPT-subscription users a first-party OpenAI agent loop
-  (GPT-5.6 Sol as the current flagship, GPT-5.5 as the previous flagship and still
-  supported, and the rest of the GPT model family) instead of CLIProxy-routing GPT
-  into Claude Code. Work agents run as live, attachable TUI sessions
-  (`codexMode: work-tui`) under the PTY supervisor — never one-shot `codex exec`.
+  (the GPT-5.6 and GPT-6 models in the OpenAI provider) instead of
+  CLIProxy-routing GPT into Claude Code. It's the built-in harness for OpenAI
+  models. Work agents run under Overdeck's Codex app-server host by default;
+  set `codex.transport: tui` to run them as live TUI sessions under the PTY
+  supervisor instead. Neither mode uses one-shot `codex exec`.
 - **Native terminal:** a conversation's app-server listens on a private Unix
   socket, and the Terminal view runs `codex resume --remote unix://… <threadId>`
   as a second client on the same thread (verified on 0.153.4), next to the
@@ -275,30 +276,30 @@ and should be re-checked before any decision.
   `src/lib/cost-parsers/codex-parser.ts` (per-agent thread-id pinning at
   `~/.overdeck/agents/<id>/codex-thread-id` for session introspection).
 
-### Google Gemini CLI — Not supported (candidate)
+### Google Gemini CLI: Not supported (candidate)
 
 - **Vendor / model:** Google. Gemini 3 models, 1M-token context. Google-locked.
 - **OSS / license:** Open source, **Apache-2.0**. TypeScript. v0.43.0
   (2026-05-22).
 - **Auth:** Google OAuth (free tier) / Gemini API key / Vertex AI (enterprise).
 - **Extensibility:**
-  - **Skills — yes**, `SKILL.md`, four discovery tiers (built-in →
+  - **Skills: yes**, `SKILL.md`, four discovery tiers (built-in →
     extension-bundled → user `~/.gemini/skills/` or `~/.agents/skills/` →
     workspace). Activated via an `activate_skill` tool with a confirmation
     prompt.
-  - **⭐ Per-session skill toggling** — `/skills enable <name>` /
+  - **⭐ Per-session skill toggling**: `/skills enable <name>` /
     `/skills disable <name>` turn skills on/off **for the current session**.
     This is a *native* primitive close to what template conversations want.
   - **GEMINI.md** context file; **AGENTS.md** opt-in via `contextFileName`.
   - **Extensions** bundle MCP servers + context file + custom TOML commands.
-  - **MCP — yes**.
+  - **MCP: yes**.
 - **Headless / RPC:** `-p`/`--prompt`; `--output-format json` or
   `stream-json` (typed JSONL events); documented exit codes.
 - **Why a candidate:** the `/skills enable/disable` primitive is a working
   reference for per-session skill curation; generous free tier; clean headless
   JSONL stream.
 
-### GitHub Copilot CLI — Not supported (candidate)
+### GitHub Copilot CLI: Not supported (candidate)
 
 - **Vendor / model:** GitHub (Microsoft). Runs the *same agentic harness as the
   Copilot coding agent*. Defaults to **Claude Sonnet 4.5**; `/model` switches to
@@ -307,108 +308,108 @@ and should be re-checked before any decision.
   bundled through the Copilot subscription, not direct provider keys.
 - **OSS / license:** **Proprietary.** The CLI ships as a closed binary via
   `npm i -g @github/copilot`. The public `github/copilot-cli` repo is install
-  scripts (Shell) + issue tracker + docs only — its `LICENSE.md` resolves to
+  scripts (Shell) + issue tracker + docs only. Its `LICENSE.md` resolves to
   `NOASSERTION` ("Other"), and it is **not** the agent source. Node.js 22+.
   v1.0.40 (2026-05, ~4 days before survey). Also installable via
   `curl … gh.io/copilot-install`, Homebrew (`copilot-cli`), WinGet.
 - **Auth:** GitHub Copilot subscription (Pro / Pro+ / Business / Enterprise) via
-  GitHub OAuth — no separate provider API keys. This is GitHub's own model
+  GitHub OAuth, with no separate provider API keys. This is GitHub's own model
   bundling, so the Pi-style "subscription + Anthropic model" ToS bar does **not**
   apply (the Claude access is sold *as* Copilot).
 - **Extensibility:**
-  - **Skills — yes** (since 2025-12-18), `SKILL.md`, Claude Code-compatible
+  - **Skills: yes** (since 2025-12-18), `SKILL.md`, Claude Code-compatible
     frontmatter. Discovery: `~/.copilot/skills/`, **`~/.agents/skills/`**, plus
     project skills; `/skills reload` re-scans mid-session. Does **not** read
-    `.claude/skills/` natively — but Overdeck already writes the open
+    `.claude/skills/` natively, but Overdeck already writes the open
     `~/.agents/skills/` tree, so portability holds.
-  - **Custom agents** — `.agent.md` files in `.github/agents/` (repo) and
+  - **Custom agents**: `.agent.md` files in `.github/agents/` (repo) and
     `~/.copilot/agents/` (user, wins on name conflict), selected via `--agent`.
     Ships built-in **Explore / Ask / Task** agents.
-  - **AGENTS.md — yes**, native and layered (root + cwd +
+  - **AGENTS.md: yes**, native and layered (root + cwd +
     `COPILOT_CUSTOM_INSTRUCTIONS_DIRS`); merges with
     `.github/copilot-instructions.md` when both exist.
-  - **MCP — yes**; ships with the GitHub MCP server pre-configured.
+  - **MCP: yes**; ships with the GitHub MCP server pre-configured.
 - **Headless / RPC:** `copilot --prompt "…"` non-interactive; `--agent <name>`;
   `--allow-all` / `--yolo` for unattended tool use; `--resume` / `--continue`.
-  **⚠ No documented JSON or stream-json output** — interactive terminal text
+  **⚠ No documented JSON or stream-json output**: interactive terminal text
   only. This is the load-bearing gap for Overdeck, which parses a
   machine-readable event/cost stream to drive readiness, heartbeat, and spend.
 - **Why a candidate:** same harness as the Copilot coding agent, native
-  AGENTS.md + `SKILL.md` + MCP, and it *defaults to Claude Sonnet 4.5* — a
+  AGENTS.md + `SKILL.md` + MCP, and it *defaults to Claude Sonnet 4.5*, so a
   Copilot-subscription user could run a first-party GitHub agent loop on Claude
   without an Anthropic subscription. **Why not yet:** proprietary closed binary,
-  GitHub-subscription-locked auth, and — most importantly — no machine-readable
+  GitHub-subscription-locked auth, and, most importantly, no machine-readable
   headless output, which makes cost/heartbeat parsing expensive to drive
   compared with Codex (`exec --json`) or Gemini (`stream-json`). Re-verify the
-  headless surface (`copilot help`) before any decision — a JSON mode landing
+  headless surface (`copilot help`) before any decision: a JSON mode landing
   would materially change the calculus.
 
-### Cursor CLI (`cursor-agent`) — Not supported
+### Cursor CLI (`cursor-agent`): Not supported
 
-- **Vendor / model:** Anysphere. Multi-provider — Anthropic, OpenAI, Gemini,
-  plus Cursor's in-house Composer model; `auto` selection.
+- **Vendor / model:** Anysphere. Multi-provider (Anthropic, OpenAI, Gemini,
+  plus Cursor's in-house Composer model); `auto` selection.
 - **OSS / license:** Proprietary, no public license. Standalone CLI (beta) plus
   the Cursor IDE.
 - **Auth:** Cursor subscription; headless via `CURSOR_API_KEY`.
 - **Extensibility:**
-  - **Skills — yes** (Cursor 2.4+), `SKILL.md`. Reads `.cursor/skills/`,
-    `.agents/skills/`, **and `.claude/skills/`** for compatibility — a Claude
+  - **Skills: yes** (Cursor 2.4+), `SKILL.md`. Reads `.cursor/skills/`,
+    `.agents/skills/`, **and `.claude/skills/`** for compatibility, so a Claude
     Code skill runs in Cursor unmodified.
-  - **Rules** — `.cursor/rules/*.mdc` with four activation modes (always /
+  - **Rules**: `.cursor/rules/*.mdc` with four activation modes (always /
     intelligent / auto-attached by glob / manual `@rule`).
-  - **AGENTS.md — yes**; **MCP — yes**; Claude Code-compatible **hooks**.
+  - **AGENTS.md: yes**; **MCP: yes**; Claude Code-compatible **hooks**.
 - **Headless / RPC:** `cursor-agent -p`; `--output-format text|json|stream-json`.
 - **Why not yet:** proprietary with no license clarity; its differentiators
-  (Composer model, IDE) are weak fits for a tmux-driven orchestrator. Skill
+  (Composer model, IDE) are weak fits for a terminal-driven orchestrator. Skill
   portability means little integration cost if priorities change.
 
-### Warp / Oz — Not supported (notable for skill interop)
+### Warp / Oz: Not supported (notable for skill interop)
 
 - **Vendor / model:** Warp.dev. Multi-provider hosted models (OpenAI, Anthropic,
   Google) on a credit system; BYOK supported.
-- **OSS / license:** **⚠ verify** — the terminal client went open source
+- **OSS / license:** **⚠ verify**: the terminal client went open source
   April 2026; sources disagree (AGPL-3.0, or dual MIT + AGPL-3.0). The **Oz**
   cloud orchestrator is reported MIT. Rust client.
 - **Auth:** Warp account + credits; BYOK provider keys; `WARP_API_KEY` for
   headless Oz.
 - **Extensibility:**
-  - **Skills — yes**, and the **most aggressive cross-tool reader in the
+  - **Skills: yes**, and the **most aggressive cross-tool reader in the
     field**: Warp loads skills from `.agents/skills/`, `.warp/skills/`, **and
     `.claude/skills/`, `.codex/skills/`, `.cursor/skills/`, `.gemini/skills/`**
     and more. It directly consumes every other harness's skill directory.
   - **Rules** (persistent guidelines, distinct from skills), stored in-repo or
     in **Warp Drive** (shared team config).
-  - **AGENTS.md / WARP.md — yes**; **MCP — yes**, and Warp *imports* MCP config
+  - **AGENTS.md / WARP.md: yes**; **MCP: yes**, and Warp *imports* MCP config
     from Claude Code and Codex.
-- **Headless / RPC:** **Oz CLI** — `oz agent run` / `run-cloud`, `--profile`,
+- **Headless / RPC:** **Oz CLI**: `oz agent run` / `run-cloud`, `--profile`,
   `--mcp`, `--output-format json`. **⚠ verify** depth of the Oz API/SDK.
 - **Why notable:** Warp's "read everyone's skill directory" model is the
-  end-state of skill portability — a useful design reference even if Warp itself
+  end-state of skill portability: a useful design reference even if Warp itself
   is never adopted.
 
-### Amp (Sourcegraph) — Not supported
+### Amp (Sourcegraph): Not supported
 
-- **Vendor / model:** Sourcegraph. Multi-model behind named **modes** —
+- **Vendor / model:** Sourcegraph. Multi-model behind named **modes**:
   `smart` (Claude Opus 4.7), `deep` (GPT-5.5 reasoning), `rush` (fast GPT-5.5);
   users pick a mode, not a raw model.
 - **OSS / license:** Proprietary. CLI-first (`amp`), plus IDE integrations.
   Consumption/credits billing, no subscription.
 - **Auth:** ampcode.com sign-in; `AMP_API_KEY` for headless.
-- **Extensibility:** Among the richest non-Anthropic surfaces —
-  - **Skills — yes**, `SKILL.md`; a skill can **bundle its own MCP server**
+- **Extensibility:** Among the richest non-Anthropic surfaces:
+  - **Skills: yes**, `SKILL.md`; a skill can **bundle its own MCP server**
     (`mcp.json` inside the skill folder, tools hidden until the skill
     activates). `amp.skills.path` adds extra skill dirs.
-  - **AGENTS.md — yes** (also reads `AGENT.md`, `CLAUDE.md`).
-  - **Plugins** — event-driven **TypeScript** extensions (`.amp/plugins/*.ts`)
+  - **AGENTS.md: yes** (also reads `AGENT.md`, `CLAUDE.md`).
+  - **Plugins**: event-driven **TypeScript** extensions (`.amp/plugins/*.ts`)
     with `session.start`/`tool.call`/… hooks, `registerCommand`,
-    `registerTool` — the most powerful programmatic extension surface surveyed.
-  - **Toolboxes** (script-based tools, no MCP server); **MCP — yes**.
+    `registerTool`, the most powerful programmatic extension surface surveyed.
+  - **Toolboxes** (script-based tools, no MCP server); **MCP: yes**.
 - **Headless / RPC:** `amp -x`; `--stream-json` output, `--stream-json-input`
   for multi-turn stdin, mid-run steering.
 - **Why notable:** skill-bundled MCP and the TS plugin API are design ideas
   worth borrowing regardless of adoption.
 
-### OpenCode — Supported through ACP (Go and Zen)
+### OpenCode: Supported through ACP (Go and Zen)
 
 Overdeck supports persistent OpenCode ACP sessions with the `opencode` (Zen)
 and `opencode-go` provider namespaces. Verified version: 1.18.29. See
@@ -416,20 +417,20 @@ and `opencode-go` provider namespaces. Verified version: 1.18.29. See
 model discovery, resume behavior, and current transport limitations.
 
 
-- **Vendor / model:** SST / Anomaly. Provider-agnostic — any LLM provider via
+- **Vendor / model:** SST / Anomaly. Provider-agnostic: any LLM provider via
   configurable keys; ships a curated "OpenCode Zen" model list.
 - **OSS / license:** Open source (**⚠ verify exact license**). The live repo is
-  `anomalyco/opencode` — distinct from the archived Go `opencode-ai/opencode`.
+  `anomalyco/opencode`, distinct from the archived Go `opencode-ai/opencode`.
 - **Auth:** native saved credentials; OpenCode Go subscription or OpenCode Zen billing.
 - **Extensibility:**
-  - **Skills — yes**, `SKILL.md`; reads `.opencode/skills/`, `.claude/skills/`,
+  - **Skills: yes**, `SKILL.md`; reads `.opencode/skills/`, `.claude/skills/`,
     `.agents/skills/` (and `~/` equivalents). Pattern-based per-agent skill
     permissions in `opencode.json`.
-  - **⭐ Custom Agents** — primary agents (Build / Plan) and subagents
+  - **⭐ Custom Agents**: primary agents (Build / Plan) and subagents
     (General / Explore / Scout), each a markdown file or `opencode.json` entry
     with its own `model`, `prompt`, `permission`, `temperature`, `tools`. The
     closest thing OpenCode has to a loadable per-session profile.
-  - **AGENTS.md — yes**; **MCP — yes**.
+  - **AGENTS.md: yes**; **MCP: yes**.
 - **Transport:** persistent `opencode acp`, verified with session creation,
   message delivery, and resume on 1.18.29. Overdeck reuses its ACP transcript and
   message transport while retaining the OpenCode harness identity.
@@ -438,7 +439,7 @@ model discovery, resume behavior, and current transport limitations.
   Runtime log.
 - **Provider scope:** Go and Zen. Other OpenCode providers are outside this integration.
 
-### Grok Build — Supported through ACP
+### Grok Build: Supported through ACP
 
 Overdeck supports xAI's Grok Build CLI as the `grok` harness, with persistent
 ACP sessions on the operator's Grok Build sign-in. Verified version: 1.0.77.
@@ -453,7 +454,7 @@ models, effort, cost and known behavior.
   An `XAI_API_KEY` would take precedence, so Overdeck removes it from the agent
   environment.
 - **Extensibility:** loads the operator's `~/.grok` MCP servers, plugins, hooks
-  and skills, plus `CLAUDE.md`/`AGENTS.md` files; **MCP — yes**, including MCP
+  and skills, plus `CLAUDE.md`/`AGENTS.md` files; **MCP: yes**, including MCP
   servers passed over ACP.
 - **Transport:** persistent `grok agent --always-approve --no-leader stdio`,
   verified with session creation, model and reasoning-effort options, message
