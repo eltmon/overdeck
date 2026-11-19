@@ -18,7 +18,7 @@ The foreman has two ways to dispatch a worker: a same-harness subagent running i
 
 ### Item worktrees and branches
 
-Ordinarily, a worker runs in its own item worktree, `<workspace>/.swarm/<item>/`, on a branch named `<feature-branch>-<item>`; an existing worktree for the same item is reused rather than recreated. `pan spawn --shared` is the one exception: it runs the worker directly in the issue's own workspace, on the feature branch, with no item worktree or item branch. It is for the foreman or an operator only, and is meant for strictly serial use: run at most one `--shared` worker at a time, since nothing enforces that.
+A `pan spawn` worker runs in its own item worktree, `<workspace>/.swarm/<item>/`, on a branch named `<feature-branch>-<item>`; an existing worktree for the same item is reused rather than recreated. `pan spawn --shared` is the one exception: it runs the worker directly in the issue's own workspace, on the feature branch, with no item worktree or item branch. It is for the foreman or an operator only, and is meant for strictly serial use: run at most one `--shared` worker at a time, since nothing enforces that.
 
 ### How work comes back
 
@@ -26,7 +26,7 @@ Each worker commits once per item, with `Item: <id>` and one `Item: <id>.acN` li
 
 ## Claims and overlapping files
 
-`pan task claim` refuses to claim an item that a live agent already holds, or whose `files_scope` overlaps an item a live agent holds. An item whose `files_scope_confidence` is `low` refuses any concurrent claim at all. `--steal` overrides this, for the foreman or an operator only.
+`pan task claim` refuses to claim an item that a live agent already holds, or whose `files_scope` overlaps an item a live agent holds. An item whose `files_scope_confidence` is `low` refuses any concurrent claim at all. `--steal` overrides this. It is meant for the foreman or an operator; nothing checks who passes it.
 
 ## Who can message a worker
 
@@ -34,11 +34,11 @@ Only the issue's own work pane, the worker's parent, or an operator conversation
 
 ## Gated slot swarm
 
-A plan is eligible for the gated slot swarm when at least two items are slot-eligible, each one has a `files_scope`, and at least one slot-eligible item is currently dispatchable (not waiting on an unfinished dependency). A plan with two slot-eligible items that both depend on the same unfinished, unscoped item is not eligible until that blocker clears. A slot runs on its own branch, `feature/<issue>-slot-<N>`, in its own worktree.
+A plan is eligible for the gated slot swarm when at least two items are slot-eligible (readiness `ready`, a non-empty `files_scope` whose `files_scope_confidence` is not `low`, and at least one `verify_commands` and one `expected_outputs` entry), and at least one slot-eligible item is currently dispatchable (not waiting on an unfinished dependency). A plan with two slot-eligible items that both depend on the same unfinished, unscoped item is not eligible until that blocker clears. A slot runs on its own branch, `feature/<issue>-slot-<N>`, in its own worktree.
 
-`pan swarm <id>` starts or attaches the foreman; it does not dispatch slot work itself, and it prints that the foreman owns dispatch. The foreman is what drives slots forward, with `pan swarm dispatch`, `pan swarm wait`, `pan swarm merge` and the rest of the `pan swarm` subcommands.
+`pan swarm <id>` starts or attaches the foreman; it does not dispatch slot work itself, and it prints that the foreman owns dispatch. It refuses a plan that is not eligible and lists the reasons. When the effective swarm mode is Off, it first stores `swarm.policy.mode=always` for that issue, so the foreman stays managed. The foreman is what drives slots forward, with `pan swarm dispatch`, `pan swarm wait`, `pan swarm merge` and the rest of the `pan swarm` subcommands.
 
-Settings → Swarming holds the swarm policy for this mechanism: "Automatic selection" (Off, Auto, Always), "Maximum slots per issue", and "Advance waves automatically". A project's own "Automatic swarming" select (Inherit, Off, Auto, Always) overrides the global setting for that project.
+Settings → Swarming holds the swarm policy for this mechanism: "Automatic selection" (Off, Auto, Always), "Maximum slots per issue", and "Advance waves automatically" (defaults: Off, 3 slots with a range of 1 to 12, advance on). A project's own "Automatic swarming" select (Inherit global, Off, Auto, Always) overrides the global setting for that project.
 
 ## CLI
 
