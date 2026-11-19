@@ -28,7 +28,7 @@ Try Overdeck without installing anything. This starts Overdeck and opens the das
 npx @overdeck/core
 ```
 
-To install the `overdeck` and `pan` commands, run the install script. It needs Node.js 22 or later, installs with npm into `~/.local`, and does not use sudo:
+To install the `overdeck` and `pan` commands, run the install script. It needs Node.js 22.16 or later, installs with npm into `~/.local`, and does not use sudo:
 
 ```bash
 curl -fsSL https://overdeck.ai/install | sh
@@ -44,7 +44,7 @@ Start a conversation with an agent in any project and steer it while it works. E
 
 ### The issue pipeline
 
-`pan start <issue>` plans the issue, makes an isolated workspace for it, and starts a work agent. Review agents and a test agent check the work, and the pull request waits for you to click Merge unless you turn on auto-merge. Issues come from GitHub, Linear, GitLab, Rally or Jira. See [Planning](/features/planning), [the review convoy](/features/convoys), [merge batches](/features/merge-batches), [auto-merge](/configuration/auto-merge) and [issue trackers](/configuration/issue-trackers).
+`pan start <issue>` plans the issue, makes an isolated workspace for it, and starts a work agent. Review agents check the work. The pull request merges when it is approved and its checks are green: you click Merge, or auto-merge does it for you. Issues come from GitHub, Linear, Rally or Jira, and code can live on GitHub or GitLab. See [the issue pipeline](/features/issue-pipeline), [Planning](/features/planning), [the review convoy](/features/convoys), [merge batches](/features/merge-batches), [auto-merge](/configuration/auto-merge) and [issue trackers](/configuration/issue-trackers).
 
 ### Order books and the Flywheel (early)
 
