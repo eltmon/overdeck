@@ -12,42 +12,57 @@ commands and `skill-bundles/` files name a curated skill set. They are not
 skill packs, and they do not exist.
 </Note>
 
-Loading a curated *group* of skills into one conversation — including skills
+Loading a curated *group* of skills into one conversation, including skills
 that are not in Overdeck's global skill set.
 
 <Warning>
-**This is a proposal, not a shipped feature.** Nothing on this page is
+**This is a proposal, not a shipped feature.** The design on this page is not
 implemented yet. It documents a design under consideration so the idea is
 recorded, reviewable, and open to feedback. Commands like `pan bundle` and
-`pan template` do **not** exist today. Status: research / proposal — not
+`pan template` do **not** exist today, and neither do `pan conv new` or a `--template` flag on `pan start`. Status: research / proposal, not
 scheduled.
 </Warning>
+
+## What has shipped since this proposal
+
+Several parts of this proposal now exist under other names. The rest is not built.
+
+| Proposal part | Status |
+| --- | --- |
+| Per-conversation skill choices | Shipped. **New conversation with options…** has a **Skills** section that turns each non-core skill on or off for one conversation, ahead of issue, project and global settings. See [Skills System](/features/skills). |
+| Third-party skills without a global install | Shipped as skill packs: `pan skills pack add` pins a git repository at a commit, and Overdeck mounts the enabled pack skills for one launch. See [Skill Packs](/features/skill-packs). |
+| Loading skills into one running conversation | Shipped: `pan skills add <conversation> --pack <id>`, the `add_skills` MCP tool, and **Add skills…** in the conversation menus. `pan handoff --skill` and `--pack` turn skills on for the new conversation only. |
+| A named group of skill sources | Partly shipped as pack groups: `skills.pack_groups` in `config.yaml` names a list of packs, and `pan skills set --group <name> on` turns them all on. A group lists whole packs, not single skills. |
+| Hiding globally installed skills (open question 1) | Shipped, except for 11 core workflow skills (such as `pan-done` and `pan-task`) that always stay on. Overdeck passes per-launch `skillOverrides` to Claude Code through `--settings`, and writes the same on/off choices into a managed block of Codex's `config.toml`. |
+| Harness support | Skill packs load only into Claude Code (`--plugin-dir`) and Codex (a local plugin marketplace). Per-conversation Pi `--skill` loading is not built. |
+| `pan bundle`, `pan template`, `skill-bundles/` and `conversation-templates/` YAML, a **Template** selector, `registry` sources resolved through the `skills` CLI | Not built. |
 
 ## The idea in one paragraph
 
 A **template conversation** is a conversation (or agent run) you start by
-picking a named **skill set** — a curated group of skills — instead of
+picking a named **skill set** (a curated group of skills) instead of
 inheriting whatever the global `pan sync` happens to have installed. The bundle
-can contain skills that are **not** in Overdeck's `skills/` tree and are
+can contain skills that are **not** in Overdeck's `sync-sources/skills/` tree and are
 **not** synced to every agent: a Stripe-integration skill pulled from a public
 registry, a client's house-style skill, an experimental skill you're trialing.
 The bundle loads into *that one conversation* using the harness's
 session-scoped loading mechanism, and is gone when the conversation ends. The
 global skill set is untouched.
 
-## Why today's model is not enough
+## Why this was proposed
 
 `pan sync` is a **global, all-or-nothing** distribution path:
 
 ```
-skills/pan-*/SKILL.md  ──pan sync──►  ~/.overdeck/skills/  ──►  ~/.claude/skills/
-                                                              └─►  ~/.pi/agent/settings.json
+sync-sources/skills/*/SKILL.md  ──pan sync──►  ~/.overdeck/skills/  ──►  ~/.claude/skills/
+                                                                     ├─►  ~/.agents/skills/
+                                                                     └─►  ~/.pi/agent/settings.json
 ```
 
-Every Claude Code session and every Pi agent on the machine then sees the **same
-skill set** (~60 skills today). That is correct for the `pan-*` workflow skills —
-every Overdeck agent needs `pan-done`, `pan-workflow`, `rebase-and-submit`.
-But it has three limits:
+Without per-level overrides, every Claude Code session and every Pi agent on the machine sees the **same
+skill set** (126 bundled skills today). That is correct for the `pan-*` workflow skills:
+every Overdeck agent needs `pan-done`, `pan-task`, `pan-sync-main`.
+When this proposal was written, it had three limits. Overdeck has since addressed the first two; see [What has shipped since this proposal](#what-has-shipped-since-this-proposal).
 
 1. **No per-conversation curation.** A conversation doing MYN frontend work and
    a conversation doing Overdeck infra work load an identical skill set. There
@@ -55,7 +70,7 @@ But it has three limits:
    `react-best-practices` + `web-design-guidelines`, that one does not."
 2. **Third-party skills require a global install.** To use a skill from
    `vercel-labs/agent-skills`, `mattpocock/skills`, or `agentskills.io`, you
-   must copy it into the global skills tree — where it then loads into *every*
+   must copy it into the global skills tree, where it then loads into *every*
    session and spends *every* session's skill-listing context budget, forever,
    for one conversation's benefit.
 3. **Context budget is a shared, finite resource.** Claude Code keeps every
@@ -67,7 +82,7 @@ But it has three limits:
 The request is the **runtime, per-conversation** version of what `npx skills add`
 does at **install time**.
 
-## Prior art — `mattpocock/skills` and the `skills` CLI
+## Prior art: `mattpocock/skills` and the `skills` CLI
 
 [`github.com/mattpocock/skills`](https://github.com/mattpocock/skills) is a
 curated collection of ~20 agent skills (engineering / productivity / misc),
@@ -77,22 +92,24 @@ installed with:
 npx skills@latest add mattpocock/skills
 ```
 
-The `skills` CLI itself is **`vercel-labs/skills`** (MIT, ~19k★ — *not* an
+Overdeck ships this collection as the known `mattpocock` skill pack, sourced from the `eltmon/skills` fork. See [Skill Packs](/features/skill-packs).
+
+The `skills` CLI itself is **`vercel-labs/skills`** (MIT, ~19k★, *not* an
 Anthropic project), billed as "the CLI for the open agent skills ecosystem." Its
 relevant capabilities:
 
-- **Selective install** — `--skill <name>` (repeatable) installs a *subset*;
+- **Selective install**: `--skill <name>` (repeatable) installs a *subset*;
   `--skill '*'` installs all; `--list` previews without installing.
-- **Multi-agent targeting** — `-a claude-code -a opencode …` installs into one
+- **Multi-agent targeting**: `-a claude-code -a opencode …` installs into one
   or more agents' skill directories.
-- **Scope** — project or `--global`; `--copy` to copy instead of symlink.
-- **Sources** — `owner/repo`, a full git URL, a path to a single skill in a
+- **Scope**: project or `--global`; `--copy` to copy instead of symlink.
+- **Sources**: `owner/repo`, a full git URL, a path to a single skill in a
   repo, GitLab, or a local path.
 
 What it **does not** have: any **bundle / collection / group / profile**
 primitive. Selection is per-skill or wildcard. `mattpocock/skills` organizes
 skills into `engineering` / `productivity` / `misc` *directories*, but that is a
-repo convention — the CLI cannot install "the engineering group" as a unit.
+repo convention: the CLI cannot install "the engineering group" as a unit.
 
 <Info>
 **Takeaway.** The `skills` ecosystem has solved *selective, multi-target
@@ -124,7 +141,7 @@ nothing written to the persistent skill tree:
 | `--add-dir <dir>` | A `.claude/skills/` **inside** an added dir is auto-loaded. |
 
 **The clean primitive: a per-conversation plugin.** Overdeck can materialize a
-bundle as a throwaway plugin directory —
+bundle as a throwaway plugin directory:
 
 ```
 <staging>/
@@ -135,10 +152,12 @@ bundle as a throwaway plugin directory —
     ...
 ```
 
-— and spawn `claude --plugin-dir <staging>`. The bundle's skills load,
+Then it spawns `claude --plugin-dir <staging>`. The bundle's skills load,
 **namespaced** (`pan-bundle-<id>:stripe-integration`, so they cannot collide
 with global skills), scoped to that one agent, and `~/.claude/skills/` is never
 touched.
+
+Skill packs already work this way. Overdeck builds a mount under `~/.overdeck/packs/mounts/` with one plugin per enabled pack and passes a per-launch link to it as `--plugin-dir`, so pack skills are namespaced by pack id (for example `/pstack:<name>`). See [Skill Packs](/features/skill-packs).
 
 ### Pi
 
@@ -149,22 +168,22 @@ per-conversation form is the same mechanism, narrower in scope.
 
 ### Other harnesses (for completeness)
 
-If Overdeck ever adds these, the same feature has a native or near-native
-landing spot — see the [Harness Landscape](/reference/harness-landscape):
+Overdeck already supports Codex. For the others, the same feature would have a native or near-native
+landing spot; see the [Harness Landscape](/reference/harness-landscape):
 
-- **Gemini CLI** — `/skills enable|disable <name>` toggles skills **per
+- **Gemini CLI**: `/skills enable|disable <name>` toggles skills **per
   session**. The closest thing to a native template-conversation control.
-- **Goose** — **Recipes**: portable YAML bundling prompt + required extensions +
+- **Goose**: **Recipes**: portable YAML bundling prompt + required extensions +
   parameters + subrecipes. Structurally *is* a conversation template.
-- **Continue** — **Continue Agents**: `config.yaml` bundles of models + rules +
+- **Continue**: **Continue Agents**: `config.yaml` bundles of models + rules +
   tools.
-- **Codex CLI** — `--profile` selects a named `config.toml` profile.
+- **Codex CLI**: `--profile` selects a named `config.toml` profile.
 
 <Note>
 **Strategic note.** Goose Recipes and Continue Agents are *native* loadable
 bundles. If Overdeck wants the bundle to be a real object the harness
-understands — rather than something Overdeck synthesizes — that is a concrete
-reason to add Goose or Continue. For the two harnesses we support today, the
+understands (rather than something Overdeck synthesizes), that is a concrete
+reason to add Goose or Continue. For Claude Code and Pi, the
 bundle is **synthesized** (Claude Code plugin / Pi `--skill`), which keeps the
 feature available now.
 </Note>
@@ -173,14 +192,14 @@ feature available now.
 
 ### Two new concepts
 
-**Skill set** — a named, declarative list of skill *sources*:
+**Skill set**: a named, declarative list of skill *sources*:
 
 ```yaml
 # ~/.overdeck/skill-bundles/myn-frontend.yaml
 name: myn-frontend
-description: MYN React frontend work — house standards + perf + design review
+description: MYN React frontend work, house standards + perf + design review
 skills:
-  - local: myn-standards            # from Overdeck's own skills/ tree
+  - local: myn-standards            # from Overdeck's own sync-sources/skills/ tree
   - local: react-best-practices
   - local: web-design-guidelines
   - local: clear-writing
@@ -188,11 +207,11 @@ skills:
   - git: github.com/acme/house-skills//stripe-checkout    # arbitrary git repo + subdir
 ```
 
-A `local` source is a directory already in `skills/`. A `registry` source is
+A `local` source is a directory already in `sync-sources/skills/`. A `registry` source is
 resolved through the `skills` CLI. A `git` source is a clone + subdir checkout.
 None of these require the skill to be globally synced.
 
-**Conversation template** — a bundle plus the rest of a conversation's starting
+**Conversation template**: a bundle plus the rest of a conversation's starting
 posture:
 
 ```yaml
@@ -223,27 +242,27 @@ pan start <ISSUE> --template myn-frontend   # templated work agent
 The conversation panel and the work-agent **Start** menu already carry
 harness + model selectors. Add a **Template** selector beside them. Picking a
 template pre-fills harness/model and shows the resolved skill list before
-launch — so the operator sees exactly what context the conversation pays for.
+launch, so the operator sees exactly what context the conversation pays for.
 
 ### Materialization & spawn
 
 A new `materializeBundle(bundleName, destDir)`:
 
-1. Resolve every source — copy `local` dirs from `skills/`; `npx skills add
+1. Resolve every source: copy `local` dirs from `sync-sources/skills/`; `npx skills add
    --copy` for `registry`; shallow git clone + subdir for `git`.
 2. Validate each `SKILL.md` (required `name` + `description`).
 3. For Claude Code: write `<destDir>/.claude-plugin/plugin.json` and arrange
    skills under `<destDir>/skills/`.
 4. Return the staging path.
 
-Spawn then becomes harness-specific — Claude Code adds `--plugin-dir <staging>`;
+Spawn then becomes harness-specific: Claude Code adds `--plugin-dir <staging>`;
 Pi adds `--skill` per skill. Staging lives under the agent/conversation state
 dir and is removed with the conversation. No global state mutates; `pan sync` is
 never involved.
 
 ### Relationship to `pan sync`
 
-`pan sync` stays the **global baseline** — the `pan-*` workflow skills every
+`pan sync` stays the **global baseline**: the `pan-*` workflow skills every
 agent needs to move work through the pipeline. Bundles are **additive and
 per-conversation**. The two never fight: bundle skills are namespaced, so a
 bundle skill named `clear-writing` and a globally-synced `clear-writing` coexist
@@ -262,17 +281,18 @@ Non-negotiables:
   injection.
 - **Version pinning.** `git`/`registry` sources should pin a ref/SHA so a bundle
   is reproducible.
-- **Workspace isolation.** Templated *work agents* already run in
-  Docker-isolated workspaces — third-party skill code is contained there.
-  Templated *conversations* on the host are higher-risk; consider restricting
-  host conversations to `local`-only bundles, or surfacing a clear trust prompt.
+- **Workspace isolation.** Local work agents and conversations are not
+  sandboxed: Overdeck's launcher starts the harness directly, with no
+  container step, so nothing contains third-party skill code. Consider
+  restricting templated agents and conversations to `local`-only bundles, or
+  surfacing a clear trust prompt.
 
 ## Open questions
 
 1. **Subtracting global skills.** A template may want *fewer* skills than the
    global sync, not more. Claude Code has no per-session way to hide a
    globally-installed personal skill except `skillOverrides` injected via
-   `--settings`. Worth scoping separately — harder than the additive case.
+   `--settings`. Overdeck now passes `skillOverrides` through `--settings` when it launches Claude Code; see [What has shipped since this proposal](#what-has-shipped-since-this-proposal).
 2. **Registry choice.** Lean on `vercel-labs/skills` as the resolver, or also
    index `agentskills.io` / `skills.sh`? Start with the `skills` CLI only.
 3. **Bundle authoring UX.** File-based YAML is enough to ship; a dashboard
@@ -285,7 +305,7 @@ Non-negotiables:
 
 ## Recommendation
 
-Ship the **additive** case first, for the two supported harnesses:
+Ship the **additive** case first, for Claude Code and Pi:
 
 1. `skill-bundle` + `conversation-template` YAML formats.
 2. `materializeBundle()` + Claude Code `--plugin-dir` / Pi `--skill` spawn
@@ -295,18 +315,19 @@ Ship the **additive** case first, for the two supported harnesses:
    Start menu.
 
 Defer global-skill *subtraction* and the harness-native-bundle question to
-follow-ups. This delivers the requested capability — pick a curated skill group,
-load it into one conversation, including skills outside `pan sync` — without
+follow-ups. This delivers the requested capability (pick a curated skill group,
+load it into one conversation, including skills outside `pan sync`) without
 touching global state and without blocking on a new harness.
 
 ## See also
 
-- [Harness Landscape](/reference/harness-landscape) — full harness survey;
+- [Harness Landscape](/reference/harness-landscape): full harness survey;
   per-harness dynamic-loading mechanisms and native bundle primitives
-- [Harnesses](/configuration/harnesses) — operational guide for supported
+- [Harnesses](/configuration/harnesses): operational guide for supported
   harnesses
-- [Skills System](/features/skills) — current skill distribution
-- [SKILLS-CONVENTION.md](https://github.com/eltmon/overdeck/blob/main/docs/SKILLS-CONVENTION.md)
-  — skills ↔ `pan` CLI convention (engineering docs)
-- [SKILL-DISTRIBUTION-ANALYSIS.md](https://github.com/eltmon/overdeck/blob/main/docs/SKILL-DISTRIBUTION-ANALYSIS.md)
-  — current skill distribution architecture (engineering docs)
+- [Skills System](/features/skills): current skill distribution
+- [Skill Packs](/features/skill-packs): third-party skill repositories pinned to a commit and loaded per launch
+- [SKILLS-CONVENTION.md](https://github.com/eltmon/overdeck/blob/main/docs/SKILLS-CONVENTION.md):
+  skills ↔ `pan` CLI convention (engineering docs)
+- [SKILL-DISTRIBUTION-ANALYSIS.md](https://github.com/eltmon/overdeck/blob/main/docs/SKILL-DISTRIBUTION-ANALYSIS.md):
+  current skill distribution architecture (engineering docs)
