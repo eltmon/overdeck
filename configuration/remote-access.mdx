@@ -1,5 +1,6 @@
 ---
-title: Remote access
+title: "Remote access: pair devices, scoped tokens and network exposure"
+sidebarTitle: Remote access
 description: Pair another device with a machine's dashboard, revoke it, and keep the LAN out
 ---
 
@@ -11,12 +12,6 @@ state. Another device (a laptop, a tablet, a second desktop) reaches a machine
 by **pairing** with it. Pairing gives that device its own revocable session.
 The machine's root internal token never leaves the machine.
 
-<Note>
-Pairing from the terminal (`pan pair`, `pan devices`) is in v0.64.0. Settings → Anywhere,
-Settings → Access Tokens and scoped API tokens (`pan token`) arrive in the next release
-(v0.65.0).
-</Note>
-
 Every machine has a stable public identity. `GET /api/environment` returns it
 without a credential:
 
@@ -26,18 +21,23 @@ without a credential:
   "environmentId": "3f0c…",
   "label": "desk",
   "platform": { "os": "linux", "arch": "x64" },
-  "serverVersion": "0.63.0",
+  "serverVersion": "0.89.1",
   "protocolVersion": 1,
-  "capabilities": { "pairing": true, "deviceSessions": true, "terminalAuth": true }
+  "capabilities": { "pairing": true, "deviceSessions": true, "terminalAuth": true, "machineLinks": true, "phoneApp": true, "connector": true },
+  "machineKey": "<64 hex>",
+  "linkProtocol": 1,
+  "endpoints": [{ "kind": "tailnet", "url": "wss://desk.tailnet-1234.ts.net/ws/link" }]
 }
 ```
 
-The descriptor contains no paths, usernames or tokens.
+The descriptor contains no paths, usernames or tokens. `machineKey` is this machine's
+public key, and `endpoints` lists the LAN and Tailscale addresses that linked machines can
+use.
 
 <Warning>
-Do not expose a dashboard on a network until `GET /api/environment` reports
-`capabilities.terminalAuth: true`. That value means every `/ws/*` connection
-(terminals, RPC, voice) requires a credential.
+Every `/ws/*` connection (terminals, RPC, voice) requires a credential, and
+`GET /api/environment` reports this as `capabilities.terminalAuth: true`. A dashboard
+older than v0.64.0 does not, so do not expose one on a network.
 </Warning>
 
 ## Reach this machine with Tailscale
@@ -171,8 +171,13 @@ export OVERDECK_TRUSTED_ORIGINS=https://desk.tailnet.ts.net
 pan up
 ```
 
-A later release discovers and advertises endpoints automatically
-([PAN-4403](https://github.com/eltmon/overdeck/issues/4403)).
+The dashboard also trusts `https://<OVERDECK_TRAEFIK_DOMAIN>` when
+`OVERDECK_TRAEFIK_ENABLED=1` (or the `config.yaml` Traefik domain when no origin
+environment variable is set), and `localhost:3010`, by default.
+
+Machines advertise their LAN and Tailscale addresses to linked machines on their own (see
+[Linked machines](/configuration/linked-machines)), but browser addresses are still added
+by hand as described above.
 
 ## List and revoke devices
 
@@ -198,7 +203,7 @@ dashboard accepts no device session and logs an error naming the file.
 ## Anywhere status
 
 The **Anywhere** card shows whether other devices can use this machine. It
-appears in **Settings → Anywhere** and on the **Health** page, and shows:
+appears in **Settings → Anywhere** and on the experimental **Health** page, and shows:
 
 - **This machine:** its label and the start of its environment id.
 - **Reachable at:** the trusted addresses another device can open, or "Only
@@ -209,10 +214,10 @@ appears in **Settings → Anywhere** and on the **Health** page, and shows:
   Serve address, or "Set up unfinished". See [Tailscale](/configuration/tailscale).
 - **Session Vault:** "Not set up", "Locked on this machine", "Key rotation
   unfinished", or "Ready" with its backend. **Set up** opens Settings → Session
-  Vault, which shows the `pan vault setup <git-url>` command to run in a
-  terminal. Setting up from the dashboard is planned
-  ([PAN-4446](https://github.com/eltmon/overdeck/issues/4446)). Not using the
-  vault is a valid choice, not a problem.
+  Vault, where **Set up a new vault** creates a vault and **Join an existing
+  vault** joins one. Not using the vault is a valid choice, not a problem.
+- **Directory:** "Connected (free account)", "Connected", "Connecting", "Refused" or "Off".
+- **Relay:** this month's relay use, or that the relay is not available.
 
 Below that, the card lists each problem with its fix:
 
@@ -220,12 +225,12 @@ Below that, the card lists each problem with its fix:
 | --- | --- |
 | Tailscale Serve sends tailnet visitors to this dashboard, but a token is not required to sign in. | **Protect the dashboard** opens Set up Tailscale, which turns on token sign-in. |
 | No address another device can reach is trusted yet. | **Add an address** opens the pair dialog, where you can add one. |
-| Session Vault is set up, but this machine cannot open it. | **Open Session Vault** goes to Settings → Session Vault, which shows the command to run in a terminal on this machine: `pan vault join <backend>`, then the vault passphrase or the recovery phrase. Unlocking from the dashboard is planned: [PAN-4446](https://github.com/eltmon/overdeck/issues/4446). |
+| Session Vault is set up, but this machine cannot open it. | **Open Session Vault** goes to Settings → Session Vault, where **Unlock this machine** takes the vault passphrase or the recovery phrase. |
 | A vault key rotation started on this machine has not finished. | **How to fix** links to [Session Vault](/configuration/session-vault). Finish the rotation on this machine before syncing again. |
 | This machine's identity file is unreadable. | **How to fix** links to this page. Repair or restore `~/.overdeck/environment-id.json`; it is never re-created automatically. |
 
-The card reads `GET /api/anywhere/status`, which any dashboard credential may
-call.
+The card reads `GET /api/anywhere/status`. The root session, a paired device and an
+`admin` scoped token may call it; a narrower scoped token gets `403`.
 
 ## Scoped API tokens
 
@@ -253,8 +258,11 @@ The scopes:
 | `read:state` | Issue, agent, agent-directory, Flywheel and pipeline reads. |
 | `read:conversations` | Conversation lists, one conversation, its messages and its summary, conversation search, and a conversation's scheduled messages and schedules. |
 | `tell` | Sending a message to an agent or a conversation, and creating, changing and deleting a conversation's scheduled messages and schedules. |
-| `operate` | Everything `tell` allows, plus terminal WebSockets (`/ws/terminal`) and starting a conversation or a worker. |
+| `operate` | Everything `tell` allows, plus terminal WebSockets (`/ws/terminal`), starting a conversation, worker or lane, stopping or resuming a conversation, and changing a conversation's model, effort or compaction. |
 | `approve` | Answering blocking prompts: permission prompts, menus, pi asks, Codex approvals, plan approvals and agent questions. Off unless you add it. |
+| `read:costs` | Cost summaries, the request digest and one issue's costs. |
+| `read:settings` | The resolved settings (`GET /api/settings/resolved`, secrets shown only as set or not set). |
+| `forward` | Port forwards (`/ws/forward`) for **Open preview**. Only a linked machine's credential uses it. |
 | `admin` | Everything, like a paired device. |
 
 Anything not in the table needs `admin`. A request whose token lacks the scope
@@ -289,7 +297,7 @@ confirmation. A browser signed in as a paired device can see the list but
 cannot create or revoke tokens; the section explains why. The table folds the
 one access token each running agent holds behind a collapsed **Show agent
 tokens (N)** toggle, and a **Sign-ins** list follows it with every MCP OAuth
-client currently signed in — its access level, timestamps and a Revoke button
+client currently signed in: its access level, timestamps and a Revoke button
 that ends the sign-in at once.
 
 ## What the LAN can reach
@@ -299,7 +307,9 @@ does not come from this machine must carry a credential (the root session, a
 device session, a scoped API token, or the internal token), or it gets `401`.
 A scoped token is always judged by its scopes, even from this machine. "From this machine"
 means a loopback address, or the host-local Traefik and Docker networks that
-front `overdeck.localhost`.
+front `overdeck.localhost`. Paired [phones](/configuration/phone), [machine
+links](/configuration/linked-machines) and [Overdeck connectors](/configuration/bots) are
+also credentials in the same registry.
 
 These routes answer without a credential:
 
@@ -365,7 +375,8 @@ dashboard, a Settings save that turns it off keeps it on; turn Serve off first
 ### On automatically
 
 Since v0.73.0 `require_token_mint` is on by itself whenever this machine has any
-remote access: a trusted address that is not loopback, an active paired device, or
+remote access: a trusted address you added that is not loopback (only an address saved
+in `trusted-origins.json`, not `OVERDECK_TRUSTED_ORIGINS`), an active paired device, or
 a [machine link](/configuration/linked-machines) in either direction. The toggle in
 Settings then shows **On automatically because this machine has …** and cannot be
 turned off. A `false` in `config.yaml` cannot turn it off either while remote access
@@ -394,10 +405,12 @@ Tailscale. A machine that is not signed in opens no connection and nothing else 
   addresses it advertises. It also passes the short connection setup messages between two of
   your machines. It never carries your conversations and never vouches for a key.
 - **The Account card** (**Settings → Anywhere → Account**) shows the GitHub account this machine
-  is signed in as, the plan (Free account or Tester), this month's relay use against the 50 GB
-  allowance with its reset date, and **Manage account**, which opens your account page at
-  overdeck.ai. **Sign in** appears only in a browser on this machine; it opens overdeck.ai in a
-  new tab and returns to `http://127.0.0.1:<port>/oauth/account/callback`. Other devices see the
+  is signed in as, the plan (Free account or Tester), the relay line ("Not included in the free
+  account" on the free plan, otherwise this month's relay use against the 50 GB allowance with
+  its reset date in UTC), and **Manage account**, which opens your account page at
+  overdeck.ai. **Sign in** appears only in a browser on this machine, and only while the machine
+  is not signed in. Click it, then click **Open overdeck.ai sign-in**, which opens overdeck.ai in
+  a new tab and returns to `http://127.0.0.1:<port>/oauth/account/callback`. Other devices see the
   `pan account login` hint.
 - **See your machines:** **Settings → Anywhere → Directory**, or `pan machines directory`.
 - **Link two machines (approval):** on the new machine, click **Link** on the other machine's
@@ -412,7 +425,8 @@ Tailscale. A machine that is not signed in opens no connection and nothing else 
   crosses the network.
 - **The free account includes 3 machines.** A fourth machine is refused with "The free account
   includes 3 machines". **Remove from directory** (or `pan machines forget`) frees a slot.
-- **The relay plan.** When no direct path exists (for example strict firewalls on both sides),
+- **The relay plan (invite-only).** Paid plans, the relay plan among them, are invite-only
+  for now. When no direct path exists (for example strict firewalls on both sides),
   a relay plan connects the two machines through a Cloudflare TURN relay, still carrying the
   same secure channel. Without it, the link says "No direct path; install Tailscale or use the
   relay plan". Relay traffic counts against a 50 GB monthly allowance per account (UTC calendar
@@ -442,13 +456,7 @@ Tailscale. A machine that is not signed in opens no connection and nothing else 
   device use a machine's dashboard. To resume a conversation on a different
   machine, use [Session Vault](/configuration/session-vault).
 
-## What comes next
+## Get help
 
-- A desktop connection list, environment switcher and version gating:
-  [PAN-4402](https://github.com/eltmon/overdeck/issues/4402).
-- Discovered LAN and Tailscale endpoints shipped with machine links in v0.73.0
-  ([PAN-4403](https://github.com/eltmon/overdeck/issues/4403),
-  [PAN-4645](https://github.com/eltmon/overdeck/issues/4645)); see
-  [Linked machines](/configuration/linked-machines).
-- Launching Overdeck on an SSH host from the desktop app:
-  [PAN-4404](https://github.com/eltmon/overdeck/issues/4404).
+Still stuck? Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a
+[GitHub Issue](https://github.com/eltmon/overdeck/issues).
