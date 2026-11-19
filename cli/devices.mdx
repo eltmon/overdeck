@@ -1,12 +1,13 @@
 ---
-title: pan devices
+title: "pan devices: list and revoke paired devices"
+sidebarTitle: pan devices
 description: List or revoke the devices paired with this machine's dashboard
 ---
 
 # `pan devices`
 
-Manage the devices paired with this machine's dashboard. Released in v0.64.0. Settings →
-Anywhere's **Revoke** has the same effect (next release, v0.65.0). See
+Manage the devices paired with this machine's dashboard. Released in v0.64.0. The
+**Revoke** button in **Settings → Anywhere → Paired devices** does the same. See
 [Remote access](/configuration/remote-access#list-and-revoke-devices).
 
 ## list
@@ -15,15 +16,19 @@ Anywhere's **Revoke** has the same effect (next release, v0.65.0). See
 pan devices list [--json]
 ```
 
-Lists paired devices with columns `ID NAME CREATED LAST USED REVOKED`.
+Lists paired browser devices and paired phones (the Overdeck app) with columns
+`ID NAME CREATED LAST USED REVOKED`.
 
 | Flag | Effect |
 | --- | --- |
-| `--json` | Print the device array as JSON. |
+| `--json` | Print the device array as JSON; each entry has `id`, `name`, `kind` (`device` or `phone`), `scopes`, `createdAt`, `lastUsedAt` and `revokedAt`. |
 
 With no paired devices: `` `No paired devices. Pair one with `pan pair`.` ``
 
 It needs the running dashboard: without one it prints the not-running message and exits 1.
+A dashboard that rejects the internal token prints the same token message as `pan pair`
+and exits 1. Any other dashboard error prints `pan devices list failed: <message>` and
+exits 1.
 
 ## revoke
 
@@ -31,7 +36,8 @@ It needs the running dashboard: without one it prints the not-running message an
 pan devices revoke <id>
 ```
 
-Revoke a paired device and close its live connections.
+Revoke a paired device and close its live connections. Revoking a phone also closes its
+secure-channel connections.
 
 Through the dashboard it prints:
 
@@ -39,11 +45,21 @@ Through the dashboard it prints:
 Revoked device "<name>" (<id>); its live connections were closed.
 ```
 
-With no dashboard running it writes the revocation into `~/.overdeck/access-tokens.json`
-and prints:
+With no dashboard running it writes the revocation of a paired browser device into
+`~/.overdeck/access-tokens.json` and prints:
 
 ```
 Dashboard not running; revoked in the registry. No live connections were open.
 ```
 
-An unknown id prints `No paired device with id <id>.` and exits 1.
+A phone cannot be revoked this way: with the dashboard down, a phone's id prints
+`No paired device with id <id>.` Start the dashboard and run the command again.
+
+An unknown id prints `No paired device with id <id>.` and exits 1. A dashboard that
+rejects the internal token prints the same token message as `pan pair` and exits 1. Any
+other dashboard error prints `pan devices revoke failed: <message>` and exits 1.
+
+## Get help
+
+Still stuck? Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a
+[GitHub Issue](https://github.com/eltmon/overdeck/issues).
