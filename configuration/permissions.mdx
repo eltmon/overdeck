@@ -141,3 +141,24 @@ PR create, or a non-GET `gh api` call that writes a label, and it tells the agen
 dashboard routes that write these labels also need `admin` access, which no agent token holds.
 
 This is a `PATH` shim that stops accidents, not a sandbox: an absolute `/usr/bin/gh` bypasses it.
+
+## The agent git shim
+
+Agents on an issue get a `git` shim on their `PATH` that refuses:
+
+- `git rebase`, which tells the agent to use `pan sync-main` to sync main or `pan done` to submit instead.
+- A state-moving `git stash` (`git stash list` and `git stash show` stay allowed).
+- `git reset --hard`.
+- `commit`, `push`, `merge` and `cherry-pick` when the worktree is not on its expected branch, or is on a detached
+  HEAD. For example, a worktree named `workspaces/feature-<name>` must be on `feature/<name>`. The refusal tells the
+  agent to stop and report through `pan tell` rather than commit or push from that worktree.
+
+The shim only acts on the agent's own worktree; running `git rebase` inside a test fixture repository elsewhere
+passes through untouched.
+
+A `pan worker run --read-only` worker gets a stricter shim: any git write in the workspace's repository is blocked,
+while reads such as `status`, `diff`, `log` and `show` still work.
+
+Each agent commit gets an `Overdeck-Agent` trailer naming the agent id; a conversation's commits get an
+`Overdeck-Conversation` trailer instead and are not otherwise restricted. This is accident prevention, not a
+sandbox: an absolute `/usr/bin/git` bypasses it, and file-system and network writes are not restricted at all.
