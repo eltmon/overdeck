@@ -315,6 +315,33 @@ pan memory read summaries/2026-07-30.md --from 10 --lines 20
 
 An issue id from a project other than `overdeck` needs `--project <key>`. `--history` is capped at 50, but Overdeck keeps only the three most recent archived statuses, so a larger number returns what is kept. `pan memory read` reaches only inside the workspace's own memory home: it refuses absolute paths, `../` and symlinks that point outside, so your session transcripts stay out of reach.
 
+### Extraction providers
+
+An LLM call turns each raw session into searchable observations. `memory.extraction.provider` and `memory.extraction.model` in `~/.overdeck/config.yaml` choose it, or **Settings → Memory → Extraction provider**. The default is `anthropic` with `claude-haiku-5-5`. The environment variables `OVERDECK_MEMORY_PROVIDER` and `OVERDECK_MEMORY_MODEL` override the config. Query expansion, which turns a prompt into a few search terms, uses the same provider and fallback but skips any provider that is too slow for prompt time.
+
+- **`anthropic`** needs `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` in the environment of both the dashboard service and agent sessions, because hooks that call memory run inside the agent's own process. A Claude subscription login does not authenticate it: the Anthropic SDK reads only API keys and auth tokens from the environment.
+- **`claude-cli`** (**Claude Code (subscription)** in Settings) is for a host with only a Claude subscription login. It runs `claude -p` with the Claude Code login of the user that runs the dashboard, so run `claude` as that user and complete `/login` once. It starts a process per call, so it is a background provider: query expansion never calls it, and `memory.worker_concurrency` (default 4) limits how many calls run at once.
+- **`cliproxy`** routes through the CLIProxy sidecar and is fast enough for query expansion.
+
+`memory.extraction.fallback_chain` names fallback providers, but only its first entry is tried. Settings shows it as one **Fallback provider**. Each call, including the notional cost of a `claude-cli` call, counts toward `memory.extraction.per_day_cost_cap_usd` (default 5, in US dollars per project per day; 0 disables the cap). Applying the Anthropic model preset sets the provider back to `anthropic` and the model to `claude-haiku-5-5`.
+
+### Extraction health
+
+`pan memory doctor --project <key>` prints memory health for that project's issue workspaces, one line per issue. A line with failures ends with `failures=<reason>:<count>`, followed by an indented `cause:` line once a failure has a detail. `pan doctor` shows one **Memory extraction** row for the newest success or failure across all memory. Both read the `health.json` evidence that extraction writes; they never test your own shell's environment, so they catch a missing key even when your shell has one set.
+
+Provider and parse failures use these reasons:
+
+| Reason | Meaning | What to do |
+| --- | --- | --- |
+| `provider-auth-failed` | The provider has no working credentials. | For `anthropic`, export `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` for the dashboard service and agent sessions. For `claude-cli`, run `claude` as the dashboard's user and complete `/login`. Or switch to a provider that can authenticate on this host. |
+| `extraction-failed` | The provider call failed for another reason (network, rate limit, unexpected reply). | Read the `cause:` line in `pan memory doctor`, then retry when the problem clears. |
+| `malformed-response` | The provider replied, but not with the expected JSON. | Usually transient. If it keeps happening with one model, that model may not follow the extraction format. |
+| `cost-cap` | Today's extraction spend reached `memory.extraction.per_day_cost_cap_usd`. | Raise the cap, or wait for the next local day. |
+| `timeout` (query expansion only) | Query expansion did not answer within 750 ms. | None needed. Prompt-time memory still runs with a keyword query built from the prompt. |
+| `provider-non-interactive` (query expansion only) | The provider and its fallback are background providers such as `claude-cli`, so query expansion did not call them. | None needed. Make `anthropic` or `cliproxy` the first fallback if you want expanded queries. |
+
+`timeout` and `provider-non-interactive` appear in the logs below, not in `health.json`. `health.json` also records failures in later pipeline stages, such as `write-failed` or `rollup-failed`.
+
 ## Previewing
 
 The dashboard's **Context** page preview shows the same Project / Operator / Machine memory sections the
