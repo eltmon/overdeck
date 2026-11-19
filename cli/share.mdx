@@ -1,5 +1,6 @@
 ---
-title: pan share and pan join
+title: "pan share and pan join: share a live conversation by link"
+sidebarTitle: "pan share and pan join"
 description: Share a conversation by link and join one from the terminal
 ---
 
@@ -37,9 +38,11 @@ JSON and nothing else.
 `pan share` exits 1 with a one-line reason when:
 
 - no conversation matches the id or name;
-- the dashboard is not running (`Start it with pan up`);
-- the dashboard refuses the share, for example `Sign in with pan account login to share
-  conversations.` or a conversation that was released to another machine.
+- the dashboard is not running (`The Overdeck dashboard is not running. Start it with pan
+  up, then run pan share again.`);
+- the dashboard refuses the share. The line reads `Cannot share <name>: <reason>`, for
+  example `Sign in with pan account login to share conversations.`, or a refusal for a
+  conversation that was released to another machine.
 
 ## pan join
 
@@ -57,8 +60,9 @@ pan join <link-or-code> [--no-open]
    agents. A later `pan up` replaces it. Auto-start runs only for a local `http://` API URL with a
    port; otherwise `pan join` asks you to run `pan up`.
 3. Asks the dashboard to join and waits up to 15 seconds for the share service to answer.
-4. Opens `http://localhost:<port>/#/shared/<CODE>` in your browser, where you wait in the lobby
-   until the host lets you in.
+4. Opens `<dashboard URL>/#/shared/<CODE>` (for example `http://localhost:3011/#/shared/BCDFGHJK`)
+   in your browser and prints it as `Shared conversation: <url>`. You wait in the lobby
+   there until the host lets you in.
 
 | State | Message | Browser | Exit |
 | --- | --- | --- | --- |
@@ -75,6 +79,9 @@ pan join <link-or-code> [--no-open]
 | disconnected | `Cannot reach the share service (<reason>).` | no | 1 |
 | any other | `The join ended (<state>). Run pan join again.` | no | 1 |
 
+A target that is neither a share link nor a join code exits 1 with
+`Not a share link or join code: <target>. A join code looks like BCDF-GHJK.`
+
 ### Without Overdeck installed
 
 On a computer with Node 22 or newer and no Overdeck, run:
@@ -87,10 +94,19 @@ It does the same four steps. It needs no global install, tmux or Herdr.
 
 ### Headless machines
 
-`--no-open` prints the URL instead of opening a browser. With no page open, the join closes after
-about 60 seconds. Opening the URL later rejoins automatically.
+`--no-open` prints the URL instead of opening a browser, followed by `Opening the page
+later rejoins automatically.` With no page open, the join closes after about 60 seconds.
+Opening the URL later rejoins automatically.
 
 ### Token-mint lockdown
 
-With `dashboard.require_token_mint: true`, the browser must already be signed in to the dashboard;
-the URL `pan join` opens carries no token.
+The URL `pan join` opens carries no token. A browser on this machine still signs in by
+itself with `dashboard.require_token_mint: true`, so the lobby opens normally. Only a
+browser that reaches the dashboard through a reverse proxy must already hold a dashboard
+session or be paired; see
+[Remote access](/configuration/remote-access#local-reverse-proxies-require_token_mint).
+
+## Get help
+
+Still stuck? Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a
+[GitHub Issue](https://github.com/eltmon/overdeck/issues).

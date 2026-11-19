@@ -1,0 +1,617 @@
+{
+  "version": "1",
+  "issueId": "PAN-5500",
+  "created": "2026-11-19T03:34:33.510Z",
+  "updated": "2026-11-19T04:30:37.690Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "anywhere-plans": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T03:34:33.510Z",
+      "doneAt": "2026-11-19T03:37:00.594Z"
+    },
+    "anywhere-plans.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:37:00.594Z"
+    },
+    "anywhere-plans.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:37:00.594Z"
+    },
+    "anywhere-plans.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:37:00.594Z"
+    },
+    "anywhere-plans.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:37:00.594Z"
+    },
+    "anywhere-plans.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:37:00.594Z"
+    },
+    "anywhere-shipped-roadmap": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T03:37:06.337Z",
+      "doneAt": "2026-11-19T03:39:22.672Z"
+    },
+    "anywhere-shipped-roadmap.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:39:22.672Z"
+    },
+    "anywhere-shipped-roadmap.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:39:22.672Z"
+    },
+    "anywhere-shipped-roadmap.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:39:22.672Z"
+    },
+    "anywhere-shipped-roadmap.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:39:22.672Z"
+    },
+    "anywhere-reasoning-and-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T03:39:28.774Z",
+      "doneAt": "2026-11-19T03:41:15.584Z"
+    },
+    "anywhere-reasoning-and-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:41:15.584Z"
+    },
+    "anywhere-reasoning-and-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:41:15.584Z"
+    },
+    "anywhere-reasoning-and-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:41:15.584Z"
+    },
+    "anywhere-reasoning-and-page.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:41:15.584Z"
+    },
+    "audit-account": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T03:41:22.454Z",
+      "doneAt": "2026-11-19T03:43:14.193Z"
+    },
+    "audit-account.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:43:14.193Z"
+    },
+    "audit-account.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:43:14.193Z"
+    },
+    "audit-account.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:43:14.193Z"
+    },
+    "audit-account.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:43:14.193Z"
+    },
+    "audit-account.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:43:14.193Z"
+    },
+    "linked-machines-top": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T03:43:20.891Z",
+      "doneAt": "2026-11-19T03:45:35.867Z"
+    },
+    "linked-machines-top.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:45:35.867Z"
+    },
+    "linked-machines-top.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:45:35.867Z"
+    },
+    "linked-machines-top.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:45:35.867Z"
+    },
+    "linked-machines-top.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:45:35.867Z"
+    },
+    "linked-machines-top.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:45:35.867Z"
+    },
+    "linked-machines-bottom": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T03:45:43.557Z",
+      "doneAt": "2026-11-19T03:49:00.910Z"
+    },
+    "linked-machines-bottom.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:49:00.910Z"
+    },
+    "linked-machines-bottom.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:49:00.910Z"
+    },
+    "linked-machines-bottom.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:49:00.910Z"
+    },
+    "linked-machines-bottom.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:49:00.910Z"
+    },
+    "audit-machines": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T03:49:07.643Z",
+      "doneAt": "2026-11-19T03:51:45.647Z"
+    },
+    "audit-machines.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:51:45.647Z"
+    },
+    "audit-machines.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:51:45.647Z"
+    },
+    "audit-machines.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:51:45.647Z"
+    },
+    "audit-machines.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:51:45.647Z"
+    },
+    "audit-machines.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:51:45.647Z"
+    },
+    "audit-pair": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T03:51:53.269Z",
+      "doneAt": "2026-11-19T03:53:37.217Z"
+    },
+    "audit-pair.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:53:37.217Z"
+    },
+    "audit-pair.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:53:37.217Z"
+    },
+    "audit-pair.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:53:37.217Z"
+    },
+    "audit-pair.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:53:37.217Z"
+    },
+    "audit-devices": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T03:53:43.677Z",
+      "doneAt": "2026-11-19T03:54:40.529Z"
+    },
+    "audit-devices.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:54:40.529Z"
+    },
+    "audit-devices.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:54:40.529Z"
+    },
+    "audit-devices.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:54:40.529Z"
+    },
+    "audit-devices.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:54:40.529Z"
+    },
+    "mcp-top": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T03:54:47.158Z",
+      "doneAt": "2026-11-19T03:56:51.523Z"
+    },
+    "mcp-top.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:56:51.523Z"
+    },
+    "mcp-top.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:56:51.523Z"
+    },
+    "mcp-top.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:56:51.523Z"
+    },
+    "mcp-top.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:56:51.523Z"
+    },
+    "mcp-bottom": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T03:56:58.778Z",
+      "doneAt": "2026-11-19T03:59:29.325Z"
+    },
+    "mcp-bottom.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:59:29.325Z"
+    },
+    "mcp-bottom.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:59:29.325Z"
+    },
+    "mcp-bottom.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:59:29.325Z"
+    },
+    "mcp-bottom.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:59:29.325Z"
+    },
+    "mcp-bottom.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T03:59:29.325Z"
+    },
+    "audit-cli-mcp": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T03:59:36.428Z",
+      "doneAt": "2026-11-19T04:01:09.390Z"
+    },
+    "audit-cli-mcp.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:01:09.390Z"
+    },
+    "audit-cli-mcp.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:01:09.390Z"
+    },
+    "audit-cli-mcp.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:01:09.390Z"
+    },
+    "audit-cli-mcp.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:01:09.390Z"
+    },
+    "audit-token": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T04:01:16.414Z",
+      "doneAt": "2026-11-19T04:02:29.977Z"
+    },
+    "audit-token.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:02:29.977Z"
+    },
+    "audit-token.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:02:29.977Z"
+    },
+    "audit-token.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:02:29.977Z"
+    },
+    "audit-session-vault": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T04:02:36.968Z",
+      "doneAt": "2026-11-19T04:05:04.006Z"
+    },
+    "audit-session-vault.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:05:04.006Z"
+    },
+    "audit-session-vault.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:05:04.006Z"
+    },
+    "audit-session-vault.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:05:04.006Z"
+    },
+    "audit-session-vault.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:05:04.006Z"
+    },
+    "audit-session-vault.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:05:04.006Z"
+    },
+    "audit-vault": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T04:05:11.377Z",
+      "doneAt": "2026-11-19T04:06:48.038Z"
+    },
+    "audit-vault.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:06:48.038Z"
+    },
+    "audit-vault.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:06:48.038Z"
+    },
+    "audit-vault.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:06:48.038Z"
+    },
+    "audit-vault.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:06:48.038Z"
+    },
+    "audit-tailscale": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T04:06:54.994Z",
+      "doneAt": "2026-11-19T04:08:17.731Z"
+    },
+    "audit-tailscale.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:08:17.731Z"
+    },
+    "audit-tailscale.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:08:17.731Z"
+    },
+    "audit-tailscale.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:08:17.731Z"
+    },
+    "audit-tailscale.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:08:17.731Z"
+    },
+    "audit-tailscale.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:08:17.731Z"
+    },
+    "audit-cli-tailscale": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T04:08:25.302Z",
+      "doneAt": "2026-11-19T04:09:45.640Z"
+    },
+    "audit-cli-tailscale.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:09:45.640Z"
+    },
+    "audit-cli-tailscale.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:09:45.640Z"
+    },
+    "audit-cli-tailscale.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:09:45.640Z"
+    },
+    "audit-remote-access": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T04:09:59.586Z",
+      "doneAt": "2026-11-19T04:12:40.472Z"
+    },
+    "audit-remote-access.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:12:40.472Z"
+    },
+    "audit-remote-access.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:12:40.472Z"
+    },
+    "audit-remote-access.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:12:40.472Z"
+    },
+    "audit-remote-access.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:12:40.472Z"
+    },
+    "audit-remote-access.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:12:40.472Z"
+    },
+    "audit-shared-sessions": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T04:12:47.587Z",
+      "doneAt": "2026-11-19T04:14:30.055Z"
+    },
+    "audit-shared-sessions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:14:30.055Z"
+    },
+    "audit-shared-sessions.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:14:30.055Z"
+    },
+    "audit-shared-sessions.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:14:30.055Z"
+    },
+    "audit-shared-sessions.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:14:30.055Z"
+    },
+    "audit-share": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T04:14:36.734Z",
+      "doneAt": "2026-11-19T04:15:52.649Z"
+    },
+    "audit-share.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:15:52.649Z"
+    },
+    "audit-share.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:15:52.649Z"
+    },
+    "audit-share.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:15:52.649Z"
+    },
+    "audit-share.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:15:52.649Z"
+    },
+    "audit-triggers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T04:16:00.558Z",
+      "doneAt": "2026-11-19T04:17:49.762Z"
+    },
+    "audit-triggers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:17:49.762Z"
+    },
+    "audit-triggers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:17:49.762Z"
+    },
+    "audit-triggers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:17:49.762Z"
+    },
+    "audit-triggers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:17:49.762Z"
+    },
+    "audit-triggers.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:17:49.762Z"
+    },
+    "audit-cli-triggers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T04:17:58.919Z",
+      "doneAt": "2026-11-19T04:19:25.134Z"
+    },
+    "audit-cli-triggers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:19:25.134Z"
+    },
+    "audit-cli-triggers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:19:25.134Z"
+    },
+    "audit-cli-triggers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:19:25.134Z"
+    },
+    "audit-cli-triggers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:19:25.134Z"
+    },
+    "audit-bots": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T04:19:32.212Z",
+      "doneAt": "2026-11-19T04:21:56.265Z"
+    },
+    "audit-bots.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:21:56.265Z"
+    },
+    "audit-bots.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:21:56.265Z"
+    },
+    "audit-bots.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:21:56.265Z"
+    },
+    "audit-bots.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:21:56.265Z"
+    },
+    "audit-bots.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:21:56.265Z"
+    },
+    "audit-phone": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T04:22:04.010Z",
+      "doneAt": "2026-11-19T04:24:25.756Z"
+    },
+    "audit-phone.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:24:25.756Z"
+    },
+    "audit-phone.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:24:25.756Z"
+    },
+    "audit-phone.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:24:25.756Z"
+    },
+    "audit-phone.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:24:25.756Z"
+    },
+    "audit-push": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T04:24:33.726Z",
+      "doneAt": "2026-11-19T04:26:56.129Z"
+    },
+    "audit-push.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:26:56.129Z"
+    },
+    "audit-push.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:26:56.129Z"
+    },
+    "audit-push.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:26:56.129Z"
+    },
+    "audit-push.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:26:56.129Z"
+    },
+    "validate-and-pr-body": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T04:27:05.917Z",
+      "doneAt": "2026-11-19T04:30:37.689Z"
+    },
+    "validate-and-pr-body.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:30:37.689Z"
+    },
+    "validate-and-pr-body.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:30:37.689Z"
+    },
+    "validate-and-pr-body.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:30:37.689Z"
+    },
+    "validate-and-pr-body.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T04:30:37.689Z"
+    }
+  }
+}

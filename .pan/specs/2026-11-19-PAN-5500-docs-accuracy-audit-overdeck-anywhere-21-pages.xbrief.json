@@ -1,0 +1,2256 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-19T03:25:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5500: docs: accuracy audit, Overdeck Anywhere (21 pages)",
+    "updated": "2026-11-19T03:34:21.927Z"
+  },
+  "plan": {
+    "id": "pan-5500",
+    "title": "docs: accuracy audit, Overdeck Anywhere (21 pages)",
+    "status": "running",
+    "uid": "241bbda8-2ad9-4df4-8576-0a1a11ed2789",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-19T03:25:00Z",
+    "updated": "2026-11-19T03:34:21.927Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5500",
+        "label": "PAN-5500",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5467",
+        "label": "Docs overhaul epic",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docs",
+      "audit",
+      "anywhere",
+      "mintlify"
+    ],
+    "metadata": {
+      "sizeJustification": "Every item edits one Mintlify page in the two Overdeck Anywhere nav groups (anywhere.mdx, ten configuration/ pages, ten cli/ pages); the finalize lint counts each page as its own subsystem, so 21 pages read as many subsystems. The epic (#5467) scopes one audit issue per docs nav group, and the pages share one validation pass and one PR body, so splitting into sibling issues would duplicate the validator and PR-body work without adding review isolation.",
+      "canonicalFilename": "2026-11-19-PAN-5500-docs-accuracy-audit-overdeck-anywhere-21-pages.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The 21 pages in the Overdeck Anywhere docs nav groups describe features shipped in v0.64.0 to v0.74.0 as 'next release' or 'planned' (about 40 stale labels, including the known triggers note), sell add-ons that do not exist, omit Grok from the MCP harness list, misstate CLI output, error texts and limits, and lack help links and searchable titles.",
+      "Proposal": "The planning session audited all 21 pages against code and recorded every finding with grep anchor, replacement text and evidence in .pan/drafts/PAN-5500.md (Appendices A to U), with planner overrides (anchor slug probe, billing wording). One docs item per page (anywhere.mdx split into three section items, linked-machines.mdx and mcp.mdx into two, chained by blocks edges because they share a file) applies the change table, the Missing bullets, the dash rule, the D4 title, the help sentence and the link check. A final item runs lint:docs and the Mintlify validators and writes the per-page PR body with Follow-ups for code bugs.",
+      "NonGoals": "- No code, test, rule, docs.json, CLAUDE.md, README.md, docs/*.md or changelog.d change; code bugs found go to the PR body's Follow-ups\n- No edits to pages outside the two Overdeck Anywhere nav groups\n- No new pages, navigation changes, file renames or slug changes\n- No heading renames except `## Before you start` on phone.mdx (Appendix T row 2); a heading is deleted only where the PRD says so (`## What comes next` on remote-access.mdx)\n- No screenshots or images added or replaced\n- No changes to prices, plan limits, fee tables or competitor figures beyond the listed rows\n- No claim that production billing is on or off\n- No change to the `#find-your-machines-through-overdeck-ai` anchors (they resolve)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The page asserts neither 'billing is on' nor 'billing is off'; it uses the account page's own wording 'Paid plans are invite-only for now.'",
+        "rationale": "Creem billing is built but gated on CREEM_* deployment config that is not in the repo (services/account/wrangler.jsonc:30), so production state cannot be verified from code; the invite-only message is code-backed (services/account/src/account-page/page.ts:23)."
+      },
+      {
+        "summary": "Keep the existing #find-your-machines-through-overdeck-ai anchors and drop the rows that changed them",
+        "rationale": "Probe with npx mint@4.3.49 broken-links --check-anchors on a scratch site: the -overdeck-ai form resolves and the -overdeckai form is reported broken."
+      },
+      {
+        "summary": "Every one of the 21 pages gets the same help sentence linking Discord and GitHub Issues",
+        "rationale": "The issue asks for help links where a page talks about getting help; Anywhere pages are setup pages where failure is the common case, and one sentence keeps the group consistent."
+      },
+      {
+        "summary": "Retitle 19 generic titles with a sidebarTitle keeping the old nav label; anywhere and phone keep theirs",
+        "rationale": "The issue requires specific searchable titles; PAN-5501 and PAN-5503 used the same sidebarTitle pattern."
+      },
+      {
+        "summary": "Add every non-optional Missing bullet briefly; skip bullets the research marked Optional",
+        "rationale": "The issue asks to add what a user needs that is missing, kept short; Optional bullets are nice-to-have detail."
+      }
+    ],
+    "items": [
+      {
+        "id": "anywhere-plans",
+        "title": "anywhere.mdx: fix the Note, plans and account claims (lines 1-173)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "anywhere.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'Paid plans are invite-only for now' anywhere.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the count prints 1 or more",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-A1: apply Appendix A rows 1 to 14 with override O2 (billing wording) to lines 1 to 173. Do not run the whole-page dash or help checks; WI-A3 does."
+        },
+        "items": [
+          {
+            "id": "anywhere-plans.ac1",
+            "title": "The opening Note names v0.64.0, v0.73.0 and v0.74.0 and contains `Paid plans are invite-only for now.`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-plans.ac2",
+            "title": "`grep -c 'We plan to sell through' anywhere.mdx` returns 0 and the page shows `Paid plans are sold through [Creem](https://www.creem.io) as merchant of record.`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-plans.ac3",
+            "title": "The Plans section shows invited accounts get the **Tester** plan, and the command palette sentence contains **Connect a bot**",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-plans.ac4",
+            "title": "The page shows the hosted vault and `pan vault migrate` as planned with a link to #4297, and the Extra storage line contains `(planned with the hosted vault)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-plans.ac5",
+            "title": "The deletion paragraph shows that deleting an account cancels any subscription",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "anywhere-shipped-roadmap",
+        "title": "anywhere.mdx: date every shipped row and roadmap step (lines 175-321)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "anywhere.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "tr '\\n' ' ' < anywhere.mdx | grep -c 'next release'",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the next-release count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-A2: apply Appendix A rows 15 to 44 with overrides O1 (keep the -overdeck-ai anchors) and O2 (row 44 wording)."
+        },
+        "items": [
+          {
+            "id": "anywhere-shipped-roadmap.ac1",
+            "title": "`tr '\\n' ' ' < anywhere.mdx | grep -c 'next release'` returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-shipped-roadmap.ac2",
+            "title": "The What has shipped table contains a row for the native iPhone and Android apps with v0.74.0 and a row for the account page at account.overdeck.ai",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-shipped-roadmap.ac3",
+            "title": "The MCP server row names the `grok` harness, and `grep -c 'remote-access#find-your-machines-through-overdeck-ai' anywhere.mdx` returns 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-shipped-roadmap.ac4",
+            "title": "The Roadmap account-service step contains `Paid plans are invite-only for now` and no longer contains `(next`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "anywhere-reasoning-and-page",
+        "title": "anywhere.mdx: fix the pricing reasoning and run page-wide checks (lines 323-516)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "anywhere.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' anywhere.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-A3: apply Appendix A rows 45 to 48 and the `[ADD]` Missing bullets, add `## Get help` with the help sentence only (D3), then run the dash rule, frontmatter check and link check over the whole file. The title stays."
+        },
+        "items": [
+          {
+            "id": "anywhere-reasoning-and-page.ac1",
+            "title": "`grep -c 'It used to end' anywhere.mdx` returns 0 and the Add 50 GB sentence shows the one-time top-up is planned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-reasoning-and-page.ac2",
+            "title": "The page ends with a `## Get help` section that contains https://discord.gg/ZpHE2ZTv5P and https://github.com/eltmon/overdeck/issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-reasoning-and-page.ac3",
+            "title": "The relay-cap paragraph contains `the Anywhere status card in Settings → Anywhere`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-reasoning-and-page.ac4",
+            "title": "`npx -y mint@4.3.49 broken-links --check-anchors --files anywhere.mdx` returns no broken links and the frontmatter still contains `title: \"Overdeck Anywhere: plans and pricing\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-account",
+        "title": "cli/account.mdx: correct base URL, failure messages, JSON output and token file",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/account.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/account.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-B1: apply Appendix B rows 1 to 7 and the `[ADD]` Missing bullets."
+        },
+        "items": [
+          {
+            "id": "audit-account.ac1",
+            "title": "The base-URL paragraph shows `http` is allowed on `localhost`, `127.0.0.1` or `[::1]`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-account.ac2",
+            "title": "The failure list contains `Cannot start sign-in at <baseUrl>: HTTP <status>` and `Sign-in failed: <error>`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-account.ac3",
+            "title": "The `--json` row shows `{\"signedIn\":false}` for a signed-out machine and the token file section lists the version field `v`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-account.ac4",
+            "title": "The frontmatter shows `title: \"pan account: sign this machine in to overdeck.ai\"` with `sidebarTitle: \"pan account\"`, and the page ends with a `## Get help` section containing the Discord link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-account.ac5",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' cli/account.mdx` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "linked-machines-top",
+        "title": "linked-machines.mdx: fix link request, SSH test, Fly message, fingerprint and remote-control claims (lines 1-425)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/linked-machines.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'Decisions panel' configuration/linked-machines.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-C1: apply Appendix C rows 1 to 7, 17 and 18 to lines 1 to 425 (row 16 is dropped by O1). Remove the dashes inside this range."
+        },
+        "items": [
+          {
+            "id": "linked-machines-top.ac1",
+            "title": "The frontmatter shows `title: \"Linked machines: pair Overdeck machines and work across them\"` with `sidebarTitle: \"Linked machines\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linked-machines-top.ac2",
+            "title": "`grep -c 'Decisions panel' configuration/linked-machines.mdx` returns 0 and the link-request paragraph names **Needs you**",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linked-machines-top.ac3",
+            "title": "The add-fly `--message` step contains `needs \\`--project\\``, and the fingerprint sentence names `pan machines list` and **Inbound** rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linked-machines-top.ac4",
+            "title": "The Remote control section shows that an agent may message and stop work its own machine started on the other machine",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linked-machines-top.ac5",
+            "title": "The Link a fresh server section contains a Note linking #4863, and the relay TLS sentence is followed by `This TCP fallback is covered by tests but has not yet connected on a live Fly VM.`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "linked-machines-bottom",
+        "title": "linked-machines.mdx: fix fleet versions, --machine fly, placement output and page-wide checks (lines 426-716)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/linked-machines.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/linked-machines.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-C2: apply Appendix C rows 8 to 15 and the `[ADD]` Missing bullets to lines 426 to 716, add the help sentence at the end of `## Troubleshooting` (O4), and run the dash rule and link check over the whole file."
+        },
+        "items": [
+          {
+            "id": "linked-machines-bottom.ac1",
+            "title": "The Fleet versions table contains a Grok Build row with `grok update` and a Pi row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linked-machines-bottom.ac2",
+            "title": "The CLI paragraph shows `--machine fly` refuses on `pan worker run` and `pan lane start` and starts a Fly work agent on `pan start`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linked-machines-bottom.ac3",
+            "title": "The `Passed over:` line is attributed to `pan lane start`, and the Fleet usage paragraph shows the Costs page is experimental behind Settings → Experimental",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linked-machines-bottom.ac4",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/linked-machines.mdx` prints nothing and the `## Troubleshooting` section contains https://discord.gg/ZpHE2ZTv5P and https://github.com/eltmon/overdeck/issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-machines",
+        "title": "cli/machines.mdx: correct error remedies, reboot timing, Update all and directory output",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/machines.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/machines.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-D1: apply Appendix D rows 1 to 6 and 8 to 16 (row 7 is dropped by O1; row 16 is the #4863 connect Note) and the `[ADD]` Missing bullets."
+        },
+        "items": [
+          {
+            "id": "audit-machines.ac1",
+            "title": "The add-fly error table contains a `fly-token-rejected` row and the `auth-failed` remedy names `pan machines test-ssh <host>`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-machines.ac2",
+            "title": "`grep -c 'within about 15 minutes' cli/machines.mdx` returns 0 and the reboot paragraph shows a back-off of at most about 45 seconds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-machines.ac3",
+            "title": "The Update all sentence names Pi and Grok Build and shows npm installs update through npm, and the watchdog sentence contains `within five minutes`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-machines.ac4",
+            "title": "The `## connect` section contains a Note that links #4863 and says the systemd service has not been tested end to end on a real VPS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-machines.ac5",
+            "title": "The frontmatter shows `title: \"pan machines: link, list and update your machines\"` with `sidebarTitle: \"pan machines\"`, `### Troubleshooting` contains the Discord link, `grep -nP '[\\x{2013}\\x{2014}]' cli/machines.mdx` prints nothing, and `grep -c 'remote-access#find-your-machines-through-overdeck-ai' cli/machines.mdx` returns 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-pair",
+        "title": "cli/pair.mdx: replace the stale release note and correct error texts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/pair.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/pair.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-E1: apply Appendix E rows 1 to 4 (row 3 evidence per O3) and the `[ADD]` Missing bullets."
+        },
+        "items": [
+          {
+            "id": "audit-pair.ac1",
+            "title": "`tr '\\n' ' ' < cli/pair.mdx | grep -c 'next release'` returns 0 and the page names **Settings → Anywhere → Pair a device**",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-pair.ac2",
+            "title": "The loopback warning sentence contains `OVERDECK_TRUSTED_ORIGINS`, and the Errors list contains `pan pair failed: <message>`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-pair.ac3",
+            "title": "The page shows the same pairing link also links a machine with `pan machines link`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-pair.ac4",
+            "title": "The frontmatter shows `title: \"pan pair: pair a device with your dashboard\"` with `sidebarTitle: \"pan pair\"`, and `## Errors` ends with the Discord help sentence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-devices",
+        "title": "cli/devices.mdx: remove the stale release note and cover paired phones",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/devices.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/devices.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-F1: apply Appendix F rows 1 to 5 and the `[ADD]` Missing bullets."
+        },
+        "items": [
+          {
+            "id": "audit-devices.ac1",
+            "title": "`tr '\\n' ' ' < cli/devices.mdx | grep -c 'next release'` returns 0 and the page names **Settings → Anywhere → Paired devices**",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-devices.ac2",
+            "title": "The `list` row shows paired phones too and the `--json` row lists the `kind` field (`device` or `phone`)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-devices.ac3",
+            "title": "The revoke section shows a phone cannot be revoked while the dashboard is down",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-devices.ac4",
+            "title": "The frontmatter shows `title: \"pan devices: list and revoke paired devices\"` with `sidebarTitle: \"pan devices\"`, and the page ends with `## Get help` containing the Discord link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-top",
+        "title": "mcp.mdx: fix harness list, tool parameters and agent-only routes (lines 1-460)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/mcp.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'within a minute' configuration/mcp.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the count prints 1 or more",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-G1: apply Appendix G rows 1 to 12 to lines 1 to 460. Remove the dashes inside this range."
+        },
+        "items": [
+          {
+            "id": "mcp-top.ac1",
+            "title": "The agents sentence near the top contains Claude Code, Codex, `acp`, `opencode` and `grok`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-top.ac2",
+            "title": "The `schedule_message` row contains `within a minute` and the `answer_permission` row names the `signature` parameter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-top.ac3",
+            "title": "The `worker_report` row contains the Markdown `report` parameter and the `memory_search` row contains `query`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-top.ac4",
+            "title": "The agent-only routes sentence names `lane_status`, `lane_stop` and `task_cancel`, and the page links `#fleet-reach` and `#revoking`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-bottom",
+        "title": "mcp.mdx: fix provisioning tables, scopes and fleet reach, then page-wide checks (lines 461-782)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/mcp.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/mcp.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-G2: apply Appendix G rows 13 to 24 and the `[ADD]` Missing bullets to lines 461 to 782, add `## Get help` after `## Fleet reach` (D3), apply the D4 title, and run the dash rule and link check over the whole file."
+        },
+        "items": [
+          {
+            "id": "mcp-bottom.ac1",
+            "title": "Every provisioned-harness table row and list in the section contains `grok`, and both not-provisioned rows contain `pi` as the first harness",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-bottom.ac2",
+            "title": "`grep -c 'the two answer tools' configuration/mcp.mdx` returns 0 and the page contains `the eight answer tools`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-bottom.ac3",
+            "title": "The precedence sentence contains the `semgrep` server and the fleet-reach list contains `start_issue`, `delegate_task` and `lane_start`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-bottom.ac4",
+            "title": "The frontmatter shows `title: \"Overdeck MCP server: tools, scopes and agent tokens\"` with `sidebarTitle: \"MCP server\"`, and `## Get help` contains the Discord link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-bottom.ac5",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/mcp.mdx` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-cli-mcp",
+        "title": "cli/mcp.mdx: correct refusal kinds, URL variables, Hermes key and relay advice",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/mcp.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/mcp.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-H1: apply Appendix H rows 1 to 7 and the `[ADD]` Missing bullets."
+        },
+        "items": [
+          {
+            "id": "audit-cli-mcp.ac1",
+            "title": "The refusal row shows any token that is not an API token is refused",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-cli-mcp.ac2",
+            "title": "The page contains `plugins.entries.overdeck.mcp_allowlist` and the URL variable rows name both `login` and `connect`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-cli-mcp.ac3",
+            "title": "The `no-webrtc-egress` advice covers the relay-down case and links `/configuration/bots#no-webrtc-egress`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-cli-mcp.ac4",
+            "title": "The frontmatter shows `title: \"pan mcp: serve MCP, manage OAuth sign-ins and run the connector\"` with `sidebarTitle: \"pan mcp\"`, and `## Get help` contains the Discord link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-token",
+        "title": "cli/token.mdx: list scope, revoke refusal and internal name",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/token.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/token.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-I1: apply Appendix I rows 1 to 3 and the `[ADD]` Missing bullets (the create output sample is optional; skip it)."
+        },
+        "items": [
+          {
+            "id": "audit-token.ac1",
+            "title": "The `list` sentence shows only API tokens are listed and paired devices, machines, phones and connectors are not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-token.ac2",
+            "title": "The revoke section shows the refusal from a dashboard not started by `pan up`, and `grep -c pruneEndedAccessTokens cli/token.mdx` returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-token.ac3",
+            "title": "The frontmatter shows `title: \"pan token: create, list and revoke scoped API tokens\"` with `sidebarTitle: \"pan token\"`, and `## Get help` contains the Discord link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-session-vault",
+        "title": "session-vault.mdx: remove stale release notes and limit harness claims",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/session-vault.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/session-vault.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-J1: apply Appendix J rows 1 to 13 and the `[ADD]` Missing bullets. Keep the heading `## Save and sync`."
+        },
+        "items": [
+          {
+            "id": "audit-session-vault.ac1",
+            "title": "`tr '\\n' ' ' < configuration/session-vault.mdx | grep -c 'next release'` returns 0 and `grep -c 4446 configuration/session-vault.mdx` returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-session-vault.ac2",
+            "title": "`grep -c 'exclude --path' configuration/session-vault.mdx` returns 0 and `grep -c 'markdown digest' configuration/session-vault.mdx` returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-session-vault.ac3",
+            "title": "The save section contains `every Claude Code and Codex transcript`, and both rotate-key passphrase lines contain `turns passphrase unlock on if it was off`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-session-vault.ac4",
+            "title": "The Where things live section contains `debounceSec` and `wipMaxBytes` with defaults, and the page preserves the heading `## Save and sync`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-session-vault.ac5",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/session-vault.mdx` prints nothing, the frontmatter shows the D4 title with `sidebarTitle: \"Session Vault\"`, and `## Get help` contains the Discord link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-vault",
+        "title": "cli/vault.mdx: describe the shipped dashboard features and correct save, exclude and status",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/vault.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/vault.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-K1: apply Appendix K rows 1 to 6 and the `[ADD]` Missing bullets."
+        },
+        "items": [
+          {
+            "id": "audit-vault.ac1",
+            "title": "`tr '\\n' ' ' < cli/vault.mdx | grep -c 'next release'` returns 0 and the In the dashboard paragraph names **Continue on another device** and **Continue here**",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-vault.ac2",
+            "title": "The `--harness` row shows `claude-code` or `codex` and the exclude section shows a tombstone only with `--session`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-vault.ac3",
+            "title": "The `status` row names the key-rotation date, listed records and eviction state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-vault.ac4",
+            "title": "The frontmatter shows `title: \"pan vault: back up and resume agent conversations across machines\"` with `sidebarTitle: \"pan vault\"`, and `## Get help` contains the Discord link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-tailscale",
+        "title": "tailscale.mdx: correct the setup steps, stored state and machine-link note, and add the maturity note",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/tailscale.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/tailscale.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-L1: apply Appendix L rows 1 to 8 (including 2b) and the `[ADD]` Missing bullets."
+        },
+        "items": [
+          {
+            "id": "audit-tailscale.ac1",
+            "title": "The Ready step no longer claims to list other machines and points to Settings → Anywhere, and the sign-in step names **Sign in** then **Open sign-in**",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-tailscale.ac2",
+            "title": "`grep -c 'Linking machines arrives with machine links' configuration/tailscale.mdx` returns 0 and `grep -c 'Overdeck stores nothing about Tailscale' configuration/tailscale.mdx` returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-tailscale.ac3",
+            "title": "The page contains a Note that Set up Tailscale was not run end to end on a real machine before release, and the operator step names **Try signing in again**",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-tailscale.ac4",
+            "title": "The Windows row shows Overdeck shows the `winget` command and you run it yourself",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-tailscale.ac5",
+            "title": "The frontmatter shows `title: \"Tailscale: reach your dashboard over HTTPS from your devices\"` with `sidebarTitle: \"Tailscale\"`, and `## Get help` contains the Discord link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-cli-tailscale",
+        "title": "cli/tailscale.mdx: correct status output and exit cases, add missing errors",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/tailscale.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/tailscale.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-M1: apply Appendix M rows 1 to 3 and the `[ADD]` Missing bullets."
+        },
+        "items": [
+          {
+            "id": "audit-cli-tailscale.ac1",
+            "title": "The not-installed sentence contains `Without \\`--json\\``, and the exit-code list contains the case where setup does not reach ready within 8 steps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-cli-tailscale.ac2",
+            "title": "The Errors list contains `Setup stopped at`, `Setup did not finish within 8 steps` and the `--userspace` not-available message, and ends with the Discord help sentence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-cli-tailscale.ac3",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' cli/tailscale.mdx` prints nothing and the frontmatter shows the D4 title with `sidebarTitle: \"pan tailscale\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-remote-access",
+        "title": "remote-access.mdx: remove stale notes and roadmap, update the descriptor and scope table",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/remote-access.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/remote-access.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-N1: apply Appendix N rows 1 to 14 and the `[ADD]` Missing bullets. Keep every heading other pages link to (listed in the PRD)."
+        },
+        "items": [
+          {
+            "id": "audit-remote-access.ac1",
+            "title": "`tr '\\n' ' ' < configuration/remote-access.mdx | grep -c 'next release'` returns 0 and `grep -c '\"serverVersion\": \"0.63.0\"' configuration/remote-access.mdx` returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-remote-access.ac2",
+            "title": "The scope table contains rows for `read:costs`, `read:settings` and `forward`, and the status-card paragraph shows a scoped token needs `admin` for `GET /api/anywhere/status`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-remote-access.ac3",
+            "title": "The page names the **Health** page as experimental, shows the relay plan is invite-only, and describes Session Vault setup and unlock from the dashboard",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-remote-access.ac4",
+            "title": "`grep -c '## What comes next' configuration/remote-access.mdx` returns 0 and the page ends with `## Get help` containing the Discord link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-remote-access.ac5",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/remote-access.mdx` prints nothing and the frontmatter shows the D4 title with `sidebarTitle: \"Remote access\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-shared-sessions",
+        "title": "shared-sessions.mdx: date the release and correct harness and terminal claims",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/shared-sessions.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/shared-sessions.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-O1: apply Appendix O rows 1 to 5 and the `[ADD]` Missing bullets."
+        },
+        "items": [
+          {
+            "id": "audit-shared-sessions.ac1",
+            "title": "`grep -c 'In this release:' configuration/shared-sessions.mdx` returns 0 and the page contains `Shared sessions shipped in v0.74.0`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-shared-sessions.ac2",
+            "title": "The page shows that only Claude Code conversations stream and that other harnesses show `The host's conversation transcript is not available.`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-shared-sessions.ac3",
+            "title": "The page shows a browser viewer gets no Terminal view and the share step names the ⋮ menu in the conversation header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-shared-sessions.ac4",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/shared-sessions.mdx` prints nothing, the frontmatter shows the D4 title with `sidebarTitle: \"Shared sessions\"`, and `## Get help` contains the Discord link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-share",
+        "title": "cli/share.mdx: correct messages, join URL and token-mint behavior",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/share.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/share.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-P1: apply Appendix P rows 1 to 5 (evidence per O3) and the `[ADD]` Missing bullets."
+        },
+        "items": [
+          {
+            "id": "audit-share.ac1",
+            "title": "The error list contains `The Overdeck dashboard is not running. Start it with pan up, then run pan share again.` and `Cannot share <name>: <reason>`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-share.ac2",
+            "title": "The join steps contain `<dashboard URL>/#/shared/<CODE>` and shows it is printed as `Shared conversation: <url>`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-share.ac3",
+            "title": "The token-mint paragraph shows a browser on this machine signs in by itself with `dashboard.require_token_mint: true`, and the page contains `Not a share link or join code`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-share.ac4",
+            "title": "The frontmatter shows `title: \"pan share and pan join: share a live conversation by link\"` with `sidebarTitle: \"pan share and pan join\"`, and `## Get help` contains the Discord link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-triggers",
+        "title": "triggers.mdx: date the release and correct rate-limit, Funnel and inbox claims",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/triggers.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/triggers.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-Q1: apply Appendix Q rows 1 to 11 (row 5 evidence per O3) and the `[ADD]` Missing bullets."
+        },
+        "items": [
+          {
+            "id": "audit-triggers.ac1",
+            "title": "`grep -c 'Available from the next release' configuration/triggers.mdx` returns 0 and the Note contains `Added in v0.73.0.`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-triggers.ac2",
+            "title": "The rate-limit bullet shows refused events count toward the 6 and 60 per-hour limits, and the Funnel bullet names the Public MCP paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-triggers.ac3",
+            "title": "The removal bullet shows `pan triggers remove` keeps the inbox and only the dashboard's Remove deletes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-triggers.ac4",
+            "title": "The inbox bullet shows the `429` limits (200 events, 64 MiB, 120 events a minute)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-triggers.ac5",
+            "title": "The frontmatter shows the D4 title with `sidebarTitle: \"Webhook triggers\"`, and `## Get help` contains the Discord link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-cli-triggers",
+        "title": "cli/triggers.mdx: date the release and correct inbox, JSON and remove behavior",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/triggers.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' cli/triggers.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-R1: apply Appendix R rows 1 to 9 (row 7 uses the appendix's 'CLI row 7 replacement' text) and the `[ADD]` Missing bullets."
+        },
+        "items": [
+          {
+            "id": "audit-cli-triggers.ac1",
+            "title": "`grep -c 'Available from the next release' cli/triggers.mdx` returns 0 and the page contains `Added in v0.73.0.`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-cli-triggers.ac2",
+            "title": "The intro shows `add --inbox` needs the running dashboard, and the `--json` row shows the `--inbox` output with `inboxUrl`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-cli-triggers.ac3",
+            "title": "The `remove` section shows it does not delete a directory inbox, and the empty-list line renders without nested backticks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-cli-triggers.ac4",
+            "title": "The frontmatter shows `title: \"pan triggers: create and manage webhook triggers\"` with `sidebarTitle: \"pan triggers\"`, and `## Get help` contains the Discord link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-bots",
+        "title": "bots.mdx: correct default access, connector files and troubleshooting",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/bots.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/bots.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-S1: apply Appendix S rows 1 to 11 (row 6 uses the appendix's 'Bots row 6 insert' text) and the `[ADD]` Missing bullets. Keep the heading `### no-webrtc-egress`."
+        },
+        "items": [
+          {
+            "id": "audit-bots.ac1",
+            "title": "The setup sentence names Read state, Read conversations and Send messages as the default access, and the never-gets list contains `read:events`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-bots.ac2",
+            "title": "The command table contains a `connect` row and `grep -c 'four files' configuration/bots.mdx` returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-bots.ac3",
+            "title": "`grep -c 'HTTP config below' configuration/bots.mdx` returns 0 and the page states there is no Slack, Discord or Telegram integration",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-bots.ac4",
+            "title": "The page preserves the heading `### no-webrtc-egress`, and `## Troubleshooting` contains the Discord help sentence as its last paragraph",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-bots.ac5",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/bots.mdx` prints nothing and the frontmatter shows the D4 title with `sidebarTitle: \"Connect a bot\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-phone",
+        "title": "phone.mdx: describe both phone setups and remove transitional notes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/phone.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/phone.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-T1: apply Appendix T rows 1 to 12 and the `[ADD]` Missing bullets on top of PAN-5472's result. Row 2 renames `## Before you start`; first run `grep -rn 'phone#before-you-start' --include=*.mdx .` (empty on the base) and repoint any hit."
+        },
+        "items": [
+          {
+            "id": "audit-phone.ac1",
+            "title": "The intro describes the browser phone view at `/m` and the Overdeck app, and the page shows `## Before you start (browser phone view)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-phone.ac2",
+            "title": "`grep -c 'as soon as the machine runs the new' configuration/phone.mdx` returns 0 and **Install app** is placed in the banner below the header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-phone.ac3",
+            "title": "The token sign-in paragraph shows the setting turns on by itself once the machine has a trusted remote address, a paired device or a machine link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-phone.ac4",
+            "title": "The store-status sentence still names TestFlight and Play internal testing, the title is still `Use Overdeck on your phone`, and `## Get help` contains the Discord link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-push",
+        "title": "push-notifications.mdx: remove stale ship notes and correct config and failure behavior",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/push-notifications.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -nP '[\\x{2013}\\x{2014}]' configuration/push-notifications.mdx | wc -l",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash grep count prints 0",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Edits only its own page file; items that share a file are serialized by blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-U1: apply Appendix U rows 1 to 12 and the `[ADD]` Missing bullets."
+        },
+        "items": [
+          {
+            "id": "audit-push.ac1",
+            "title": "`grep -c 'action ships' configuration/push-notifications.mdx` returns 0 and `grep -c 'Once the phone shell' configuration/push-notifications.mdx` returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-push.ac2",
+            "title": "The config section names `~/.overdeck/config.yaml`, and the `enabled` row shows **Send test** still works when `enabled` is false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-push.ac3",
+            "title": "The disk bullet names `resources.disk_warn_gb` and `resources.disk_critical_gb`, and `grep -c 'Notifications stopped after many failures' configuration/push-notifications.mdx` returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-push.ac4",
+            "title": "`grep -nP '[\\x{2013}\\x{2014}]' configuration/push-notifications.mdx` prints nothing, the frontmatter shows the D4 title with `sidebarTitle: \"Push notifications\"`, and `## Troubleshooting` ends with the Discord help sentence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "validate-and-pr-body",
+        "title": "Run the group validators and draft the per-page PR body",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-19T03:25:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "anywhere.mdx",
+            "configuration/session-vault.mdx",
+            "configuration/remote-access.mdx",
+            "configuration/linked-machines.mdx",
+            "configuration/shared-sessions.mdx",
+            "configuration/triggers.mdx",
+            "configuration/tailscale.mdx",
+            "configuration/mcp.mdx",
+            "configuration/bots.mdx",
+            "configuration/phone.mdx",
+            "configuration/push-notifications.mdx",
+            "cli/vault.mdx",
+            "cli/pair.mdx",
+            "cli/tailscale.mdx",
+            "cli/account.mdx",
+            "cli/share.mdx",
+            "cli/devices.mdx",
+            "cli/machines.mdx",
+            "cli/token.mdx",
+            "cli/mcp.mdx",
+            "cli/triggers.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for f in anywhere configuration/{session-vault,remote-access,linked-machines,shared-sessions,triggers,tailscale,mcp,bots,phone,push-notifications} cli/{vault,pair,tailscale,account,share,devices,machines,token,mcp,triggers}; do grep -HnP '[\\x{2013}\\x{2014}]' \"$f.mdx\"; done | wc -l",
+            "npx -y mint@4.3.49 broken-links --check-anchors",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the dash loop count prints 0",
+            "mint prints 'success no broken links found'",
+            "lint:docs prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "sequential",
+          "parallelSafeReason": "Runs after every page item; touches a page only to fix a validator failure.",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow the PRD .pan/drafts/PAN-5500.md: Common procedure steps 0 to 9, the Overrides section (O1 to O4, which win over appendix rows), D3 help sentence placement, D4 title table, D9 Missing-bullet rule. WI-Z1: run steps 1 to 6 over the 21 pages, fix any failure on a group page in this item's commit, and write the PR body draft (21 page lines, validation output, Follow-ups) into this item's commit message above the trailers. After `pan done`, append the draft to the PR body (step 8)."
+        },
+        "items": [
+          {
+            "id": "validate-and-pr-body.ac1",
+            "title": "The dash loop over all 21 group pages prints nothing and `npm run lint:docs` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-pr-body.ac2",
+            "title": "`tr '\\n' ' '` piped to `grep -c 'next release'` returns 0 for every group page, and `grep -L 'discord.gg/ZpHE2ZTv5P'` over the 21 pages prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-pr-body.ac3",
+            "title": "`npx -y mint@4.3.49 validate` and `npx -y mint@4.3.49 broken-links --check-anchors` report success, and the validation commit message contains their output (or the exact download error when the CLI cannot be fetched)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validate-and-pr-body.ac4",
+            "title": "The validation commit message contains a PR-body draft with 21 ticked `<page>.mdx` lines with one note each and a `## Follow-ups` section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "anywhere-plans",
+        "to": "anywhere-shipped-roadmap",
+        "type": "blocks"
+      },
+      {
+        "from": "anywhere-shipped-roadmap",
+        "to": "anywhere-reasoning-and-page",
+        "type": "blocks"
+      },
+      {
+        "from": "anywhere-plans",
+        "to": "anywhere-reasoning-and-page",
+        "type": "blocks"
+      },
+      {
+        "from": "linked-machines-top",
+        "to": "linked-machines-bottom",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-top",
+        "to": "mcp-bottom",
+        "type": "blocks"
+      },
+      {
+        "from": "anywhere-plans",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "anywhere-shipped-roadmap",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "anywhere-reasoning-and-page",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-account",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "linked-machines-top",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "linked-machines-bottom",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-machines",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-pair",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-devices",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-top",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-bottom",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-cli-mcp",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-token",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-session-vault",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-vault",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-tailscale",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-cli-tailscale",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-remote-access",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-shared-sessions",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-share",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-triggers",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-cli-triggers",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-bots",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-phone",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-push",
+        "to": "validate-and-pr-body",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

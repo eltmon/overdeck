@@ -6,12 +6,14 @@ description: "What Overdeck Anywhere is, what has shipped, what stays free and o
 
 <Note>
 Everything Anywhere does on your own machines is free and open source. Session Vault and
-device pairing shipped in v0.64.0. Linked machines, Tailscale setup, the phone app, push
-notifications, webhook triggers and the MCP server ship in the next release. overdeck.ai
-accounts are invite-only for now, and nothing on this page can be bought yet: the paid tiers
-are available to invite-allowlisted accounts until billing
-([PAN-4294](https://github.com/eltmon/overdeck/issues/4294)) ships. We publish the prices now,
-with the reasoning, so you can see how we got there and tell us where we are wrong.
+device pairing shipped in v0.64.0. Linked machines, Tailscale setup, the phone web app, push
+notifications, webhook triggers and the MCP server shipped in v0.73.0. The native phone apps
+(in TestFlight and Play internal testing), shared sessions and bot connections followed in
+v0.74.0. overdeck.ai accounts are invite-only for now, and invited accounts get the Tester
+plan: no machine limit, with the relay and the webhook inbox included.
+Paid plans are invite-only for now.
+We publish the prices now, with the reasoning, so you can see how we got there and tell us
+where we are wrong.
 </Note>
 
 Overdeck runs on your own machine. Your agents, workspaces and conversations live there.
@@ -42,11 +44,11 @@ Everything Anywhere does on this machine is in **Settings → Anywhere**. The qu
 there is **Machines** in the left column footer; its tooltip says how many linked machines
 are online now.
 
-The command palette (Cmd/Ctrl+K) has an **Anywhere** group: **Link a machine**,
+The command palette (Cmd/Ctrl+K) has an **Anywhere** group. **Link a machine**,
 **Add a Fly machine**, **Add an SSH machine**, **Set up a phone**, **Pair a device**,
-**Set up Tailscale** open the same dialogs as the Settings buttons, over the page you are
-on; **Open Anywhere settings** goes to the section. **Set up Tailscale** works only in a
-browser on this machine.
+**Set up Tailscale** and **Connect a bot** open the same dialogs as the Settings buttons,
+over the page you are on. **Open Anywhere settings** goes to the section. **Set up Tailscale**
+works only in a browser on this machine.
 
 Until a machine is linked or Tailscale is set up, the Home page's **Get set up** card shows
 **Reach this machine from anywhere**, which opens the same section.
@@ -74,7 +76,8 @@ Links: [Remote access](/configuration/remote-access),
     - The directory and direct connections for up to 3 machines
     - 1 GB of hosted vault storage, synced on 2 machines, when the hosted vault ships (planned)
     - End-to-end encrypted
-    - Invite-only for now
+    - Invite-only for now. Invited accounts get the Tester plan instead (no machine limit, with
+      the relay and the webhook inbox).
   </Card>
   <Card title="Anywhere" icon="globe">
     <div style={{ fontSize: '1.75rem', fontWeight: 600, lineHeight: 1.2, margin: '0.25rem 0' }}>&#36;8 / month</div>
@@ -97,60 +100,69 @@ Links: [Remote access](/configuration/remote-access),
 </CardGroup>
 
 **Relay add-on:** +&#36;3 a month or +&#36;30 a year on the Anywhere subscription (&#36;13 a month
-or &#36;126 a year in all), billed in the same charge. When two of your machines find no direct
-path, the relay connects them, still end-to-end encrypted. It includes 50 GB of relay traffic a
-month; at 50 GB the relay stops until the next month, and an extra 50 GB is a one-time &#36;3
-purchase. There is no per-gigabyte billing. The relay also carries an [Overdeck connector](/configuration/bots#run-the-overdeck-connector)'s traffic when a bot has no direct path to your machine; it relays only encrypted bytes.
+or &#36;126 a year in all, or &#36;90 a year at the founding price), billed in the same charge.
+When two of your machines find no direct path, the relay connects them, still end-to-end
+encrypted. It includes 50 GB of relay traffic a month. At 50 GB the relay stops until the next
+month. An extra 50 GB for a one-time &#36;3 is planned but cannot be bought yet. There is no
+per-gigabyte billing. The relay also carries an [Overdeck connector](/configuration/bots#run-the-overdeck-connector)'s traffic when a bot has no direct path to your machine; it relays only encrypted bytes.
 
-**Availability:** the paid tiers (Anywhere, the founding price and the relay add-on) are sold to
-invited accounts on the [account page](https://account.overdeck.ai/account). Creem handles the
-payment as merchant of record; Overdeck never sees your card details. Sign-up is still
-invite-only.
+**Availability:** paid plans are invite-only for now. When the account page's Billing section
+offers the paid tiers (Anywhere, the founding price and the relay add-on), invited accounts
+subscribe there, on the [account page](https://account.overdeck.ai/account). Creem handles the
+payment as merchant of record; Overdeck never sees your card details. Sign-up is invite-only.
 
 **Your account page:** [account.overdeck.ai/account](https://account.overdeck.ai/account)
-shows your plan, this month's relay use and your machines. From it you can subscribe, add or
-remove the relay, open **Manage billing** (card, invoices, cancel), remove a machine (which signs
-it out and frees its place) or delete your account.
+shows your plan, this month's relay use and your machines. From it you can remove a machine
+(which signs it out and frees its place) or delete your account. When billing is available, it
+also lets you subscribe, add or remove the relay, open **Manage billing** (card, invoices,
+cancel) and see how many founding places are left.
 
-In the dashboard, **Settings → Anywhere → Account** shows the same plan and relay use and links
-to the account page with **Manage account**; **Sign in** there replaces `pan account login`.
+In the dashboard, the **Account** card in **Settings → Anywhere** shows the signed-in GitHub
+account, the plan (**Free account** or **Tester**) and this month's relay use. It links to the
+account page with **Manage account**. In a browser on this machine, its **Sign in** button
+signs the machine in without `pan account login`; other viewers see a `pan account login` hint.
 
 ### When a subscription ends
 
-If you cancel, or a payment keeps failing (Creem retries a failed payment for 7 days), your plan
-returns to the free account when the paid period ends:
+If you cancel, or a renewal payment keeps failing (the plan keeps paid access for 7 days past
+its paid-through date while Creem retries the card), your plan changes when the paid period
+ends. While your invite is active you return to the Tester plan. Without an active invite you
+return to the free account:
 
 - The relay and the webhook inbox stop at once. Machines already in the directory stay; you only
   cannot add more than 3.
-- For 30 days your hosted vault data stays readable and you can export it with
-  `pan vault migrate`. Writes follow the free 1 GB, so a larger vault is read-only.
+- For 30 days your hosted vault data stays readable, and you can export it with
+  `pan vault migrate` once that command ships with the hosted vault. Writes follow the free
+  1 GB, so a larger vault is read-only.
 - For 30 more days the same holds, and the account page warns of the deletion date.
 - After 60 days, hosted vault data above the free 1 GB is deleted, and the account continues as a
   free account. A vault within 1 GB is kept.
 
-`pan vault migrate` works throughout. Subscribing again before the deletion date restores
-everything.
+The hosted vault and `pan vault migrate` are planned
+([PAN-4297](https://github.com/eltmon/overdeck/issues/4297)); once they ship, `pan vault migrate`
+works throughout. Subscribing again before the deletion date restores everything.
 
-**Extra storage:** +&#36;3 a month or +&#36;30 a year per 100 GB of hosted vault, for the few who
-pass 100 GB and prefer not to prune old records.
+**Extra storage (planned with the hosted vault):** +&#36;3 a month or +&#36;30 a year per 100 GB
+of hosted vault, for the few who pass 100 GB and prefer not to prune old records.
 
 **Team:** not at launch. A team plan needs a key-sharing design first (see
 [why there is no team plan yet](#how-we-arrived-at-these-prices)).
 
 <CardGroup cols={3}>
   <Card title="Encryption" icon="lock">
-    Transcripts are encrypted on your machine before upload, with a key only you hold. The
-    hosted service stores ciphertext it cannot read, and your account never gains the ability
-    to decrypt it. This also means we cannot recover your vault if you lose every device and
-    your recovery phrase.
+    The hosted vault is planned. When it ships, transcripts are encrypted on your machine
+    before upload, with a key only you hold. The hosted service stores ciphertext it cannot
+    read, and your account never gains the ability to decrypt it. This also means we cannot
+    recover your vault if you lose every device and your recovery phrase.
   </Card>
   <Card title="Deletion" icon="trash">
-    Deleting your account deletes all of your hosted vault data within 24 hours, and removes
-    your machines and phones from the connect directory.
+    Deleting your account signs out every device, cancels any subscription, deletes all of
+    your hosted data within 24 hours, and removes your machines and phones from the connect
+    directory.
   </Card>
   <Card title="Payments" icon="credit-card">
-    We plan to sell through [Creem](https://www.creem.io) as merchant of record. Creem is the
-    legal seller, so it collects and remits VAT, GST and sales tax where they apply.
+    Paid plans are sold through [Creem](https://www.creem.io) as merchant of record. Creem is
+    the legal seller, so it collects and remits VAT, GST and sales tax where they apply.
   </Card>
 </CardGroup>
 
@@ -184,30 +196,32 @@ to add one.
 | Settings → Anywhere: pair dialog, paired devices, status card | v0.65.0 | [Remote access](/configuration/remote-access) |
 | Scoped API tokens (`pan token`, Settings → Access Tokens) | v0.65.0 | [Remote access](/configuration/remote-access) |
 | **Continue on another device** from a conversation: open it on another screen, or hand it off through the vault | v0.65.0 | [Remote access](/configuration/remote-access#open-one-conversation-on-another-screen) |
-| The overdeck.ai directory: your machines in Settings → Anywhere → Directory, linking by two-screen approval, the free account's 3 machines | next release | [Remote access](/configuration/remote-access#find-your-machines-through-overdeck-ai) |
-| Direct connections between your machines with no Tailscale (`direct` routes) | next release | [Linked machines](/configuration/linked-machines) |
-| The relay add-on: relay routes, **Using relay**, the 50 GB monthly allowance | next release | [Remote access](/configuration/remote-access#find-your-machines-through-overdeck-ai) |
-| The webhook inbox: triggers that hold events for 24 hours while a machine is offline | next release | [Triggers](/configuration/triggers#hold-events-with-the-directory-inbox) |
-| Linked machines: link your machines over an end-to-end encrypted channel on LAN, Tailscale, direct or relay routes | next release | [Linked machines](/configuration/linked-machines) |
-| Conversations across machines: one shared list, remote control, **Pull here**, **Open preview** | next release | [Linked machines](/configuration/linked-machines#sharing-conversations) |
-| Work across machines: the Machine field, **Auto** placement, delegation, fleet Needs-You, usage and **Compare settings** | next release | [Linked machines](/configuration/linked-machines#start-work-on-another-machine) |
-| Gauntlet lanes on any linked machine (`pan lane start --machine`) | next release | [Lanes](/reference/lanes#lanes-on-other-machines) |
-| SSH machines: Overdeck starts or adopts `pan up` over SSH and links it | next release | [Linked machines](/configuration/linked-machines#ssh-machines) |
-| `pan connect`: one command turns a fresh server into a lasting linked machine | next release | [pan machines](/cli/machines#connect) |
-| Fly VMs as machines (`pan machines add-fly`) | next release | [Linked machines](/configuration/linked-machines#fly-machines) |
-| Fleet versions and **Update all**, including harness CLIs | next release | [Linked machines](/configuration/linked-machines#fleet-versions-and-update-all) |
-| The desktop app opens a chosen machine's dashboard with no local server | next release | [Remote access](/configuration/remote-access#from-the-desktop-app) |
-| **Set up Tailscale**: install, sign in, Serve HTTPS and peer discovery | next release | [Tailscale](/configuration/tailscale) |
-| The phone app over Tailscale Serve: answer a question in three taps | next release | [Phone](/configuration/phone) |
-| Push notifications sent from your machine with Web Push, optional ntfy | next release | [Push notifications](/configuration/push-notifications) |
-| Webhook triggers (`pan triggers`), published through Tailscale Funnel | next release | [Webhook triggers](/configuration/triggers) |
-| The MCP server (`pan mcp serve`, **Copy MCP URL**), with its tools in every Claude Code, Codex, `acp` and `opencode` agent | next release | [MCP server](/configuration/mcp) |
-| OAuth sign-in for MCP clients, approved in your dashboard (`pan mcp oauth`) | next release | [MCP server](/configuration/mcp#sign-in-with-oauth) |
-| Public MCP for hosted bots through Tailscale Funnel | next release | [MCP server](/configuration/mcp#public-mcp-for-hosted-bots) |
-| Connect a bot: Hermes, OpenClaw, Grok Build, Grok Bot and the xAI API, and the Overdeck connector (`pan mcp connector`) | next release | [Connect a bot](/configuration/bots) |
-| Sign in to overdeck.ai (`pan account login`, `status`, `logout`, or **Sign in** on the dashboard Account card) | next release | [pan account](/cli/account) |
-| Pipeline agents' transcripts saved to the Session Vault automatically | next release | [Session Vault](/configuration/session-vault) |
-| Shared sessions: share a conversation by link, viewers watch it live in their own Overdeck | next release | [Shared sessions](/configuration/shared-sessions) |
+| The overdeck.ai directory: your machines in Settings → Anywhere → Directory, linking by two-screen approval, the free account's 3 machines | v0.73.0 | [Remote access](/configuration/remote-access#find-your-machines-through-overdeck-ai) |
+| Direct connections between your machines with no Tailscale (`direct` routes) | v0.73.0 | [Linked machines](/configuration/linked-machines) |
+| The relay add-on: relay routes, **Using relay**, the 50 GB monthly allowance | v0.73.0 | [Remote access](/configuration/remote-access#find-your-machines-through-overdeck-ai) |
+| The webhook inbox: triggers that hold events for 24 hours while a machine is offline | v0.73.0 | [Triggers](/configuration/triggers#hold-events-with-the-directory-inbox) |
+| Linked machines: link your machines over an end-to-end encrypted channel on LAN, Tailscale, direct or relay routes | v0.73.0 | [Linked machines](/configuration/linked-machines) |
+| Conversations across machines: one shared list, remote control, **Pull here**, **Open preview** | v0.73.0 | [Linked machines](/configuration/linked-machines#sharing-conversations) |
+| Work across machines: the Machine field, **Auto** placement, delegation, fleet Needs-You, usage and **Compare settings** | v0.73.0 | [Linked machines](/configuration/linked-machines#start-work-on-another-machine) |
+| Gauntlet lanes on any linked machine (`pan lane start --machine`) | v0.73.0 | [Lanes](/reference/lanes#lanes-on-other-machines) |
+| SSH machines: Overdeck starts or adopts `pan up` over SSH and links it | v0.73.0 | [Linked machines](/configuration/linked-machines#ssh-machines) |
+| `pan connect`: one command turns a fresh server into a lasting linked machine | v0.73.0 | [pan machines](/cli/machines#connect) |
+| Fly VMs as machines (`pan machines add-fly`) | v0.73.0 | [Linked machines](/configuration/linked-machines#fly-machines) |
+| Fleet versions and **Update all**, including harness CLIs | v0.73.0 | [Linked machines](/configuration/linked-machines#fleet-versions-and-update-all) |
+| The desktop app opens a chosen machine's dashboard with no local server | v0.73.0 | [Remote access](/configuration/remote-access#from-the-desktop-app) |
+| **Set up Tailscale**: install, sign in, Serve HTTPS and peer discovery | v0.73.0 | [Tailscale](/configuration/tailscale) |
+| The phone app over Tailscale Serve: answer a question in three taps | v0.73.0 | [Phone](/configuration/phone) |
+| Native iPhone and Android apps: pair by QR code, answer questions, push notifications sealed to each phone (TestFlight and Play internal testing) | v0.74.0 | [Phone](/configuration/phone) |
+| Push notifications sent from your machine with Web Push, optional ntfy | v0.73.0 | [Push notifications](/configuration/push-notifications) |
+| Webhook triggers (`pan triggers`), published through Tailscale Funnel | v0.73.0 | [Webhook triggers](/configuration/triggers) |
+| The MCP server (`pan mcp serve`, **Copy MCP URL**), with its tools in every Claude Code, Codex, `acp`, `opencode` and `grok` agent | v0.73.0; agent tools v0.74.0 | [MCP server](/configuration/mcp) |
+| OAuth sign-in for MCP clients, approved in your dashboard (`pan mcp oauth`) | v0.74.0 | [MCP server](/configuration/mcp#sign-in-with-oauth) |
+| Public MCP for hosted bots through Tailscale Funnel | v0.74.0 | [MCP server](/configuration/mcp#public-mcp-for-hosted-bots) |
+| Connect a bot: Hermes, OpenClaw, Grok Build, Grok Bot and the xAI API, and the Overdeck connector (`pan mcp connector`) | v0.74.0 | [Connect a bot](/configuration/bots) |
+| Sign in to overdeck.ai (`pan account login`, `status`, `logout`, or **Sign in** on the dashboard Account card) | v0.73.0; dashboard **Sign in** v0.74.0 | [pan account](/cli/account) |
+| The account page at account.overdeck.ai/account: plan, relay use, machines, delete account | v0.74.0 | [pan account](/cli/account) |
+| Pipeline agents' transcripts saved to the Session Vault automatically | v0.73.0 | [Session Vault](/configuration/session-vault) |
+| Shared sessions: share a conversation by link, viewers watch it live in their own Overdeck | v0.74.0 | [Shared sessions](/configuration/shared-sessions) |
 
 ## Roadmap
 
@@ -224,7 +238,7 @@ consists of hosted services.
     [PAN-2609](https://github.com/eltmon/overdeck/issues/2609)
   </Step>
   <Step title="One Overdeck server per machine, linked">
-    **Shipped (next release). Free, open source.**
+    **Shipped (v0.73.0). Free, open source.**
 
     Each machine runs its own Overdeck server with its own identity, and your machines link
     over an end-to-end encrypted channel on any route: LAN, Tailscale, a direct connection or
@@ -244,12 +258,14 @@ consists of hosted services.
     [PAN-4654](https://github.com/eltmon/overdeck/issues/4654)
   </Step>
   <Step title="Notifications, remote access and a mobile web app">
-    **Shipped (next release). Free, open source.**
+    **Shipped (v0.73.0). Free, open source.**
 
     Needs-you notifications are sent from your own machine with Web Push, encrypted so the
     push service cannot read them, with ntfy as an option. Remote access goes through
     Tailscale Serve, which Overdeck installs and sets up for you, instead of a tunnel. The
-    phone app is an installable web app reached over Tailscale. See
+    phone app is an installable web app reached over Tailscale. Native iPhone and Android
+    apps that use the same end-to-end encrypted channel as linked machines followed in
+    v0.74.0 and are in TestFlight and Play internal testing. See
     [Push notifications](/configuration/push-notifications),
     [Tailscale](/configuration/tailscale) and [Phone](/configuration/phone).
     [PAN-2354](https://github.com/eltmon/overdeck/issues/2354),
@@ -257,7 +273,7 @@ consists of hosted services.
     [PAN-1254](https://github.com/eltmon/overdeck/issues/1254)
   </Step>
   <Step title="Fly VMs as machines">
-    **Shipped (next release). Free, open source; you pay Fly directly.**
+    **Shipped (v0.73.0). Free, open source; you pay Fly directly.**
 
     `pan machines add-fly` starts a Fly.io VM that runs Overdeck and links to your machine,
     so it runs conversations and gauntlet lanes like any other linked machine. `pan start <id>
@@ -272,7 +288,7 @@ consists of hosted services.
     ([PAN-1676](https://github.com/eltmon/overdeck/issues/1676)).
   </Step>
   <Step title="Webhook triggers and the MCP server">
-    **Shipped (next release). Free, open source.**
+    **Shipped (v0.73.0). Free, open source.**
 
     Webhook triggers start or message a conversation when a service such as GitHub or Stripe
     posts to it, published through Tailscale Funnel or held by the directory inbox while a
@@ -286,16 +302,16 @@ consists of hosted services.
     ([PAN-2353](https://github.com/eltmon/overdeck/issues/2353)).
   </Step>
   <Step title="Hosted services on overdeck.ai">
-    **Account service, directory, relay add-on, webhook inbox and shared sessions built (next
-    release, invite-only); billing and the hosted vault planned. This is the paid plan
-    above.**
+    **Account service, directory, relay add-on and webhook inbox shipped in v0.73.0, and
+    shared sessions and the account page in v0.74.0, all invite-only. Paid plans are
+    invite-only for now; the hosted vault is planned. This is the paid plan above.**
 
     The account service, the directory with direct connections, the relay add-on and the
-    webhook inbox are built and ship in the next release. overdeck.ai accounts are invite-only:
-    testers are added by the operator. A machine signs in with
-    [`pan account login`](/cli/account), which runs once per machine and is optional. Still
-    planned: billing and the hosted Session Vault. Shared sessions are built:
-    a host shares a conversation by link and viewers watch it live in their own Overdeck
+    webhook inbox shipped in v0.73.0. overdeck.ai accounts are invite-only: testers are added
+    by the operator. A machine signs in with [`pan account login`](/cli/account), which runs
+    once per machine and is optional. Paid plans are invite-only for now. The hosted Session
+    Vault is still planned. Shared sessions shipped in v0.74.0: a host shares a conversation by
+    link and viewers watch it live in their own Overdeck
     ([Shared sessions](/configuration/shared-sessions)); viewers can suggest prompts, and
     contributors can send them.
 
@@ -436,7 +452,7 @@ The full reasoning, section by section. Open any one that interests you.
 
     What the vault does that nothing else does is let your work follow you: continue on your
     laptop while your desktop is off, from any saved version, across harnesses, with a key
-    only you hold. That is the same promise as the relay, push notifications and, later,
+    only you hold. That is the same promise as the relay, push notifications and
     shared sessions. So the vault anchors one Anywhere subscription instead of being a
     separate product.
 
@@ -444,8 +460,7 @@ The full reasoning, section by section. Open any one that interests you.
     the hosted vault does not yet. The founding price addresses that: &#36;60 a year, locked
     for as long as you stay subscribed, for the first 500 subscribers or 90 days after the
     Anywhere release, whichever comes first. Founders add the relay at the normal &#36;30 a
-    year. (It used to end "when the relay ships", which would have ended it on launch day,
-    because the relay ships in the same release.)
+    year.
   </Accordion>
 
   <Accordion title="7. Why self-hosting stays ungated" icon="lock-open">
@@ -492,9 +507,10 @@ The full reasoning, section by section. Open any one that interests you.
     - The relay is billed inside the Anywhere charge, never as a charge of its own. Creem's
       &#36;0.40 fixed fee would take about 17% of a separate &#36;3 charge.
     - The 50 GB monthly cap bounds what one user can cost us and means we need no usage
-      billing. At the cap the relay stops until the next month and the Anywhere card says
-      "Relay allowance used; install Tailscale or add 50 GB". An extra 50 GB is a one-time
-      &#36;3 purchase.
+      billing. At the cap the relay stops until the next month and the Anywhere status card in
+      Settings → Anywhere says "Relay allowance used; install Tailscale or add 50 GB". An extra
+      50 GB for a one-time &#36;3 is planned; until it ships, the card's **Add 50 GB** link opens
+      overdeck.ai/anywhere.
     - We will check the allowance against the real monthly use of the first relay users. If
       dev-server previews push typical use near the cap, we will lower the allowance or keep
       previews off the relay.
@@ -514,3 +530,8 @@ If you have a view on any of this, comment on
 [PAN-4294](https://github.com/eltmon/overdeck/issues/4294) (subscription and billing) or
 [PAN-4297](https://github.com/eltmon/overdeck/issues/4297) (hosted Session Vault).
 </Info>
+
+## Get help
+
+Still stuck? Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a
+[GitHub Issue](https://github.com/eltmon/overdeck/issues).

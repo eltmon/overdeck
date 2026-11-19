@@ -1,5 +1,6 @@
 ---
-title: pan pair
+title: "pan pair: pair a device with your dashboard"
+sidebarTitle: pan pair
 description: Print a one-time URL that pairs another device with this machine's dashboard
 ---
 
@@ -10,13 +11,18 @@ pan pair [--label <name>] [--url <base>] [--json]
 ```
 
 Prints a one-time URL that pairs another device (a laptop, a tablet, a second desktop) with
-this machine's dashboard. Released in v0.64.0. The dashboard's **Pair a device** dialog is
-in the next release (v0.65.0). See [Remote access](/configuration/remote-access) and
-[pan devices](/cli/devices).
+this machine's dashboard. Released in v0.64.0. **Settings → Anywhere → Pair a device** in
+the dashboard does the same and also shows a QR code. See
+[Remote access](/configuration/remote-access) and [pan devices](/cli/devices).
+
+The same link also links a machine: run `pan machines link '<url>'` on the other machine
+(the first use wins, browser or machine). See [`pan machines link`](/cli/machines#link).
+The credential is always in the URL fragment (`#pair=`), never a query string, so it never
+reaches a server log.
 
 | Flag | Effect |
 | --- | --- |
-| `--label <name>` | Name recorded for the pairing in the activity log. |
+| `--label <name>` | Name recorded for the pairing in the activity log. Must be a non-empty string of at most 200 characters, or the dashboard answers 400. |
 | `--url <base>` | Base URL the other device can reach (default: this dashboard's API URL). |
 | `--json` | Print `{ url, credential, expiresAt }` as JSON. |
 
@@ -35,14 +41,20 @@ The credential works once, expires 10 minutes after it is created, and a dashboa
 invalidates every credential that has not been used yet.
 
 When the base is `localhost`, `127.0.0.1`, `::1` or `*.localhost`, `pan pair` warns that the
-URL only works on this machine. With `--json` the warning goes to stderr; the JSON itself
-still goes to stdout.
+URL only works on this machine and tells you to pass `--url` with an address the other
+device can reach and add that origin to `OVERDECK_TRUSTED_ORIGINS`. With `--json` the
+warning goes to stderr; the JSON itself still goes to stdout.
 
 ## Errors
 
 - No running dashboard: `` `Overdeck dashboard is not running; start it with `pan up`.` ``,
   exit 1.
-- A dashboard that rejects this machine's internal token (for example a `pan serve` server,
-  which does not share it): `` `The dashboard rejected this machine's internal token. `pan
-  pair` needs a dashboard started by `pan up` (a `pan serve` server does not share
-  it).` ``, exit 1.
+- A dashboard that rejects this machine's internal token: `` The dashboard rejected this
+  machine's internal token (from &#36;OVERDECK_HOME/internal-token, default
+  ~/.overdeck/internal-token). The running dashboard holds a different token: it uses
+  another OVERDECK_HOME, or it was started before that file existed. Restart it with
+  `pan up` or `npx @overdeck/core`, then run this command again. ``, exit 1.
+- Any other dashboard error: `pan pair failed: <message>`, exit 1.
+
+Still stuck? Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a
+[GitHub Issue](https://github.com/eltmon/overdeck/issues).

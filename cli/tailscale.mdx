@@ -1,5 +1,6 @@
 ---
-title: pan tailscale
+title: "pan tailscale: check and set up Tailscale access from the terminal"
+sidebarTitle: pan tailscale
 description: Show Tailscale state and set up protected HTTPS access to this machine's dashboard
 ---
 
@@ -38,14 +39,14 @@ Tailscale
   HTTPS certificates: on
   Serve:              https://desk.tailnet-1234.ts.net
   Token sign-in:      required
-  Next step:          ready — New browsers must pair: run `pan pair --url https://desk.tailnet-1234.ts.net`.
+  Next step:          ready: New browsers must pair: run `pan pair --url https://desk.tailnet-1234.ts.net`.
 
 Overdeck on your tailnet
   HOST    LABEL   VERSION  URL
   laptop  laptop  0.72.0   https://laptop.tailnet-1234.ts.net
 ```
 
-When Tailscale is not installed it prints
+Without `--json`, when Tailscale is not installed it prints
 `` Tailscale is not installed. Run `pan tailscale setup`. `` and exits 0.
 `status` always exits 0; it only reads.
 
@@ -87,7 +88,7 @@ userspace mode is off until it passes a live check (see
 | Code | Meaning |
 | --- | --- |
 | 0 | `status` printed, or `setup` reached ready. |
-| 1 | `setup` stopped: a command failed, a step needs you (tailnet DNS settings, a manual install, opening the Tailscale app), a step did not move on after one retry, sign-in did not finish within 10 minutes, or the dashboard is not running. |
+| 1 | `setup` stopped: a command failed, a step needs you (tailnet DNS settings, a manual install, opening the Tailscale app), a step did not move on after one retry, sign-in did not finish within 10 minutes, the dashboard is not running, or setup did not reach ready within 8 steps. |
 
 ## Errors
 
@@ -98,3 +99,14 @@ userspace mode is off until it passes a live check (see
   `pan tailscale setup` needs a dashboard started by `pan up`. ``, exit 1.
 - A step that stays the same after its action and one retry:
   `Setup is still at "<step>".` with what to do, exit 1.
+- Any other stop: `` Setup stopped at "<step>". Run `pan tailscale setup` again after fixing
+  it. ``, exit 1.
+- Setup does not reach ready within 8 steps:
+  `` Setup did not finish within 8 steps. Run `pan tailscale status` to see where it
+  stands. ``, exit 1.
+- `--userspace` in this release:
+  `` Installing Tailscale without an administrator password is not available yet. Run `pan
+  tailscale setup` without --userspace to use the installer. ``, exit 1.
+
+Still stuck? Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a
+[GitHub Issue](https://github.com/eltmon/overdeck/issues).

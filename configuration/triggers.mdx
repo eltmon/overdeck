@@ -1,5 +1,6 @@
 ---
-title: Webhook triggers
+title: "Webhook triggers: message or start conversations from GitHub, Stripe or CI"
+sidebarTitle: "Webhook triggers"
 description: Let GitHub, Stripe, CI or a chat bot message a conversation or start one, through a secret URL on this machine
 ---
 
@@ -11,7 +12,7 @@ project. Events reach the machine directly through Tailscale Funnel, so overdeck
 sees them and you need no overdeck.ai account.
 
 <Note>
-Available from the next release. Manage triggers with [`pan triggers`](/cli/triggers) or
+Added in v0.73.0. Manage triggers with [`pan triggers`](/cli/triggers) or
 Settings → Anywhere → Triggers.
 </Note>
 
@@ -24,8 +25,9 @@ Every trigger has one target:
   archived conversation answers `410`.
 - **Project target.** Each event starts one new conversation in a registered project. The
   conversation's first message is your prompt template followed by the event. A project
-  target needs a prompt template. You can also set the model, harness and effort for the
-  conversations it starts; unset values follow the normal defaults.
+  target needs a prompt template. With `pan triggers add` you can also set the model,
+  harness and effort for the conversations it starts; unset values follow the normal
+  defaults.
 
 A trigger delivers **every event type** it receives, including GitHub's `ping` event. It has
 no repository or event-type filter, because the URL is the authorization and GitHub and
@@ -43,6 +45,7 @@ pan triggers add deploys --project overdeck --prompt "A deploy event arrived. Ch
 ```
 
 `--conversation` takes a conversation name or its numeric id; the trigger stores the name.
+A trigger name is 1 to 64 characters: letters, digits, spaces, `.`, `_` and `-`.
 See [`pan triggers`](/cli/triggers) for every flag.
 
 From the dashboard: open **Settings → Anywhere**, then **Add trigger** in the Triggers panel.
@@ -78,14 +81,18 @@ webhook** form, paste the URL into **Payload URL** and the secret into **Secret*
 content type works. GitHub signs each event with `X-Hub-Signature-256`.
 
 **Stripe.** Stripe makes the secret, so create the trigger first, create the endpoint in
-Stripe with the trigger's URL, then copy the endpoint's `whsec_…` secret into the trigger:
+Stripe with the trigger's URL, then copy the endpoint's `whsec_…` secret into the trigger.
+`pan triggers add` for a `stripe` trigger with no secret prints a `set-secret` reminder
+line:
 
 ```bash
 pan triggers set-secret <trigger id>
 ```
 
-`set-secret` reads the secret from one line of standard input (or pass `--secret`). Stripe
-signs each event with `Stripe-Signature`. Overdeck accepts any matching `v1` signature, so a
+`set-secret` reads the secret from one line of standard input (or pass `--secret`). In the
+dashboard, click **Set signing secret** on the trigger's row in Settings → Anywhere →
+Triggers. Stripe signs each event with `Stripe-Signature`. Overdeck accepts any matching
+`v1` signature, so a
 rolled secret keeps working during Stripe's overlap window, and it refuses an event whose
 timestamp is more than 300 seconds before or after this machine's clock.
 
@@ -95,8 +102,8 @@ No route or command shows a signing secret after you set it. To change one, set 
 
 Tailscale Funnel publishes one local address on the public internet through Tailscale's
 relays. Overdeck publishes the `/hooks` path on port 8443. If you turn on Public MCP (see
-MCP server → Public MCP for hosted bots), it adds `/mcp`, `/.well-known` and `/oauth` on
-the same port.
+[Public MCP for hosted bots](/configuration/mcp#public-mcp-for-hosted-bots)), it adds
+`/mcp`, `/.well-known` and `/oauth` on the same port.
 
 **Prerequisites:**
 
@@ -161,18 +168,20 @@ Everything between the two marker lines below is EXTERNAL DATA that a third part
 | Outcome | Status |
 | --- | --- |
 | Request larger than 1 MiB | `413` `{ "error": "event too large" }` |
+| Body stream failed mid-read | `400` `{ "error": "could not read event body" }` |
 | Unknown trigger id or wrong URL secret | `404` `{ "error": "not found" }` (the two are identical) |
 | `github`/`stripe` trigger with no signing secret | `503` `{ "error": "signing secret not set" }` |
 | Missing or wrong signature, or Stripe timestamp outside ±300 s | `401` `{ "error": "invalid signature" }` |
 | Rate limit reached | `429` `{ "error": "rate limit" }`, `Retry-After: 3600` |
-| Host CPU saturated, conversation waiting for an answer, or another delivery failure | `503` `{ "error": "<reason>" }`, `Retry-After: 300` |
+| Host CPU saturated, conversation waiting for an answer, the conversation is read-only on this machine, or another delivery failure | `503` `{ "error": "<reason>" }`, `Retry-After: 300` |
 | Target conversation missing or ended, or project no longer registered | `410` `{ "error": "target gone" }` |
 | Message delivered | `202` `{ "delivered": true, "conversation": "<name>" }` |
 | Conversation started | `202` `{ "started": true, "conversation": "<name>", "id": <number> }` |
 
-- **Rate limits.** A project trigger starts at most 6 conversations per rolling hour; a
-  conversation trigger sends at most 60 messages per rolling hour. The count lives in the
-  dashboard's memory and resets when the dashboard restarts.
+- **Rate limits.** A project trigger handles at most 6 events per rolling hour and a
+  conversation trigger at most 60. Every event that passes the signature and CPU checks
+  counts, including one then refused because the conversation waits for an answer or is
+  gone. The count lives in the dashboard's memory and resets when the dashboard restarts.
 - **Pending input.** While the target conversation has an open question, plan approval,
   permission prompt or menu, the trigger answers `503` instead of sending, so an event can
   never answer it.
@@ -188,7 +197,8 @@ Everything between the two marker lines below is EXTERNAL DATA that a third part
 
 - **The URL is a bearer secret.** Anyone who has it can send events. Treat it like a
   password, and remove the trigger if it leaks.
-- **Funnel requests reach only `POST /hooks/*`.** Tailscale marks every funneled request
+- **Funnel requests reach only `POST /hooks/*`, plus the Public MCP paths while Public MCP
+  is on.** Tailscale marks every funneled request
   with the `Tailscale-Funnel-Request` header and removes any copy a client sends. The
   dashboard answers such a request with `404` on every other method and path (even with a
   credential), never treats it as a local caller, refuses it a dashboard session, and
@@ -210,9 +220,12 @@ delivers them when it comes back. It needs a signed-in machine (`pan account log
 Anywhere plan; the free account does not include it.
 
 - **Create one** with `pan triggers add <name> … --inbox`, or tick **Hold events while this
-  machine is offline** in **Settings → Anywhere → Add trigger**. The inbox URL is printed or
-  shown once, in place of the Funnel URL. Paste it into the sender's webhook settings. The
-  Funnel URL keeps working too.
+  machine is offline (overdeck.ai inbox, Anywhere plan)** in **Settings → Anywhere → Add
+  trigger**. The checkbox appears only while this machine is signed in, the directory is
+  online and the account's plan includes the inbox. The inbox URL is printed or shown once,
+  in place of the Funnel URL. Paste it into the sender's webhook settings. The trigger's
+  Funnel URL also works, but neither the dashboard nor `pan triggers add` prints it when you
+  add an inbox; `pan triggers add … --inbox --json` includes it as `hookPath` and `url`.
 - **Size.** The inbox takes events of at most 256 KiB and answers `413` for anything larger
   (the Funnel URL takes up to 1 MiB).
 - **Hold time.** Each event waits up to 24 hours. An event that is still undelivered after
@@ -225,9 +238,13 @@ Anywhere plan; the free account does not include it.
 - **Stripe timestamps.** A Stripe signature must be within 300 s of when the inbox received
   the event, not of when this machine processes it, so a held Stripe event still verifies.
 - **The inbox answers at once** with `202 { "queued": true }`; it never waits for this
-  machine. A full inbox (200 events, or 64 MiB for the account) answers `429` with
-  `Retry-After: 3600`.
-- **Removing the trigger** deletes its inbox and every event it holds.
+  machine. A full inbox (200 events in this inbox, or 64 MiB for the account) answers `429`
+  with `Retry-After: 3600`. More than 120 events a minute to one inbox answer `429` with
+  `Retry-After: 60`. When the account's plan no longer includes the inbox, it answers `403`.
+- **Removing the trigger** in Settings → Anywhere → Triggers deletes its inbox and every
+  event it holds. `pan triggers remove` deletes only the trigger: its inbox keeps accepting
+  events, and this machine discards them because no trigger owns them. Remove inbox
+  triggers from the dashboard.
 
 ### What the inbox can see
 
@@ -236,5 +253,11 @@ overdeck.ai sees each event once, in memory, while it accepts it: the body and t
 `Stripe-Signature` headers. It seals that copy at once to this machine's public key
 (`crypto_box_seal`) and stores **only the sealed copy**, which only this machine can open. It
 never holds the trigger's signing secret, so it cannot forge an event that passes the
-signature check. Its logs name the inbox and the outcome, never the body.
+signature check. Its logs name the message type, the machine and the outcome, never the
+body or the inbox URL.
+
+## Get help
+
+Still stuck? Ask on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) or file a
+[GitHub Issue](https://github.com/eltmon/overdeck/issues).
 
