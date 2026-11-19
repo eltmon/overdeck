@@ -1,0 +1,107 @@
+{
+  "version": "1",
+  "issueId": "PAN-5481",
+  "created": "2026-11-19T02:37:48.826Z",
+  "updated": "2026-11-19T02:43:50.916Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "voice-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5481",
+      "claimedAt": "2026-11-19T02:37:48.826Z",
+      "doneAt": "2026-11-19T02:39:34.469Z"
+    },
+    "voice-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:39:34.469Z"
+    },
+    "voice-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:39:34.469Z"
+    },
+    "voice-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:39:34.469Z"
+    },
+    "voice-page.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:39:34.469Z"
+    },
+    "voice-page.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:39:34.469Z"
+    },
+    "docs-nav": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5481",
+      "claimedAt": "2026-11-19T02:39:40.149Z",
+      "doneAt": "2026-11-19T02:40:12.612Z"
+    },
+    "settings-links": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5481",
+      "claimedAt": "2026-11-19T02:40:18.109Z",
+      "doneAt": "2026-11-19T02:40:49.710Z"
+    },
+    "cli-tts-link": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5481",
+      "claimedAt": "2026-11-19T02:40:52.812Z",
+      "doneAt": "2026-11-19T02:41:23.007Z"
+    },
+    "autopreso-link": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5481",
+      "claimedAt": "2026-11-19T02:41:26.320Z",
+      "doneAt": "2026-11-19T02:41:54.221Z"
+    },
+    "docs-nav.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:43:50.916Z"
+    },
+    "docs-nav.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:43:50.916Z"
+    },
+    "docs-nav.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:43:50.916Z"
+    },
+    "docs-nav.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:43:50.916Z"
+    },
+    "settings-links.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:43:50.916Z"
+    },
+    "settings-links.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:43:50.916Z"
+    },
+    "settings-links.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:43:50.916Z"
+    },
+    "cli-tts-link.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:43:50.916Z"
+    },
+    "cli-tts-link.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:43:50.916Z"
+    },
+    "autopreso-link.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:43:50.916Z"
+    },
+    "autopreso-link.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T02:43:50.916Z"
+    }
+  }
+}

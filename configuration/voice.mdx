@@ -1,0 +1,217 @@
+---
+title: "Voice and text-to-speech: dictation and spoken agent activity"
+sidebarTitle: "Voice and TTS"
+description: "Dictate into the composer with Moonshine or Google Cloud STT, and hear agent activity spoken through the local Qwen3-TTS daemon and saved voices."
+---
+
+Overdeck has two voice features, and they work on their own:
+
+- **Dictation** turns your speech into text in the conversation composer.
+- **Text-to-speech (TTS)** speaks short announcements about agent activity, such as "Work agent started for pan 123" or "pan 123 merged to main".
+
+You can use either one without the other.
+
+## Dictate into the composer
+
+1. Open a conversation whose session is running.
+2. Click the microphone button at the right of the composer, next to **Send**. Or press **Ctrl+Shift+M** (**Cmd+Shift+M** on macOS), which opens the **Voice input** panel and starts listening at once.
+3. Click **Start** if the panel is not listening yet. Pick a microphone in the **Mic** list first if you do not want the default one.
+4. Speak. The waveform moves and the live transcript appears in the preview box.
+5. Finish with **Insert transcript**, or click **Listening** to stop. Click **Discard** to throw the transcript away.
+
+The panel has two modes:
+
+| Mode | What happens to your words |
+| --- | --- |
+| **Edit** (default) | When you stop, the transcript is added to the composer. You review and edit it, then send it yourself. |
+| **Direct** | Each finished sentence is sent to the agent as soon as you say it. |
+
+Some limits apply:
+
+- The microphone button is disabled while the conversation's session is not running and while a message is being sent.
+- The phone app has no microphone button.
+- Only one voice session runs at a time across the whole dashboard. A second one fails with "Another voice transcription session is already active". AutoPreso uses the same voice connection, so close it before you dictate.
+- Your browser asks for microphone permission the first time. Browsers allow the microphone only on `https://` pages and on `localhost`.
+
+## Choose the speech-to-text provider
+
+Open **Settings → Voice**. The **STT provider** setting picks the engine that turns speech into text, for dictation and for AutoPreso. Overdeck saves these settings in `~/.overdeck/voice-settings.json` and applies a change to an open voice session right away.
+
+| Setting | Values | Notes |
+| --- | --- | --- |
+| **STT provider** | **Moonshine** (default) or **Google Cloud STT** | Moonshine runs on the dashboard machine. Google Cloud STT sends your audio to Google. |
+| **Moonshine model** | **Tiny** or **Base** (default) | Shown for Moonshine. Tiny is faster; Base is more accurate. |
+| **Google Cloud API key** | Your key | Shown for Google Cloud STT. Required for that provider. |
+| **Google Cloud model** | **Latest long** (default), **Latest short** or **Command and search** | Shown for Google Cloud STT. |
+| **AutoPreso provider** and **AutoPreso model** | OpenAI, Codex or Ollama, and a model name | Used only by the experimental [AutoPreso](/features/dashboard-views#autopreso) whiteboard. |
+| **Input device**, **Output device** and **Voice volume** | Device IDs and a volume | Saved in this browser only. Dictation does not read them yet; choose the microphone in the panel's **Mic** list. |
+
+### Moonshine needs a sidecar
+
+Moonshine runs as a small sidecar program on the dashboard machine. The sidecar exists only for Linux on x64. `pan install` builds it when you run it from an Overdeck source checkout and `python3` is installed; the first build takes 2 to 3 minutes. Add `--skip-moonshine` to skip it.
+
+If you installed Overdeck with npm or the install script, `pan install` cannot build the sidecar yet ([#5576](https://github.com/eltmon/overdeck/issues/5576)). Dictation then shows "Moonshine sidecar binary not found". Choose **Google Cloud STT** instead. On macOS and Windows, Google Cloud STT is the only provider.
+
+## How text-to-speech works
+
+Overdeck components emit a short announcement when something happens: a planning session starts, a work agent finishes, a pull request merges, an agent waits for your input. Issue IDs are rewritten so they read well aloud: `PAN-123` becomes "pan 123".
+
+When **Enable TTS** is on, the dashboard server queues each announcement and sends it to the local Qwen3-TTS daemon. The daemon keeps the `Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice` model loaded on the GPU, turns the text into speech, and plays it through the default PipeWire output with `pw-play`. The sound comes from the speakers of the machine that runs the daemon. The browser plays nothing.
+
+The daemon needs:
+
+- Linux on x64.
+- An NVIDIA GPU with CUDA that `nvidia-smi` can see.
+- PipeWire, for `pw-play`.
+
+## Set up text-to-speech
+
+1. **Install the daemon.** Run `pan install`. On Linux x64 with a CUDA GPU it creates a Python environment for the daemon and downloads PyTorch for CUDA, which is a large download. On other machines it skips this step and says why. Add `--skip-tts-daemon` to skip it on purpose.
+2. **Start the daemon.** Run `pan tts start`. It waits until the daemon answers its health check. You can also click **Start daemon** in **Settings → TTS**. The **Daemon status** badge at the top of that section shows whether the daemon is running.
+3. **Check the audio.** Run `pan tts test`. It speaks a test phrase with your System Voice, or with the built-in **Vivian** preset if you have not chosen one. Pass your own text in quotes to speak something else, and add `--status` to use the Status Voice.
+4. **Save a voice and make it the System Voice.** In **Settings → TTS**, open **CustomVoice Presets**, select a preset, and click **Save Selected Preset…**. Then select the saved voice under **System Voice**. From the terminal, `pan tts voices set-default "<name>"` does the same, but a running dashboard picks it up only after a restart (see [When changes apply](#when-changes-apply)).
+5. **Turn it on.** Switch on **Enable TTS**. This sets `tts.enabled: true` in `~/.overdeck/config.yaml`.
+
+<Note>
+`pan tts test` falls back to the Vivian preset, so a working test does not prove that announcements will play. The dashboard speaks nothing until a saved voice is set as the System Voice.
+</Note>
+
+## Keep the daemon running
+
+The daemon does not start with the dashboard unless you ask, because loading the model is slow and uses GPU memory.
+
+- Set `tts.daemon.autoStart: true` in `~/.overdeck/config.yaml` and `pan up` starts the daemon too.
+- The Overdeck supervisor restarts a crashed daemon, up to 3 times in 10 minutes. It does this when `tts.daemon.autoStart` is true or when Overdeck started the daemon, and never after you stop it with `pan tts stop`. Set `OVERDECK_TTS_WATCHDOG=0` to turn this off.
+- `pan tts install-systemd` writes the user unit `~/.config/systemd/user/overdeck-qwen-tts.service`. Turn it on with `systemctl --user enable --now overdeck-qwen-tts.service`.
+- `pan tts status` shows the daemon's state, `pan tts restart` restarts it, and `pan tts stop` stops it. See [pan tts](/cli/core-commands#pan-tts) for every option.
+
+## Voices
+
+Overdeck keeps your saved voices in `~/.overdeck/tts-voices.json`. **Settings → TTS** lists them under **My Saved Voices**. A saved voice has one of three kinds:
+
+| Kind | How you make it |
+| --- | --- |
+| **Preset** | Pick one of the nine built-in Qwen3-TTS presets in **CustomVoice Presets** (Aiden, Dylan, Eric, Ono Anna, Ryan, Serena, Sohee, Uncle Fu and Vivian), preview it, and click **Save Selected Preset…**. |
+| **Design** | In **VoiceDesign**, describe the voice in **Voice description**, add speaking notes in **Instruct prompt**, preview it with **Test text**, and click **Save This Design…**. The daemon generates the voice from the description each time it speaks. |
+| **Clone** | In **VoiceDesign**, click **Clone to Exact Voice…**. The daemon generates one sample from the description and stores its speaker embedding, so the voice sounds the same every time. |
+
+### System Voice and Status Voice
+
+Each announcement has a priority. Merges, merge failures, auto-merge changes, finalized plans and requests for your input are high priority. Planning sessions and work agents starting or finishing, and the dashboard starting or stopping, are status priority.
+
+- The **System Voice** (`tts.voice`) speaks high-priority announcements.
+- The **Status Voice** (`tts.statusVoice`) speaks status announcements. If you leave it unset, the System Voice speaks them too.
+- A voice-map entry for the announcement's event type overrides both. See [Control what is spoken](#control-what-is-spoken).
+
+### Manage voices from the terminal
+
+```bash
+pan tts voices list
+pan tts voices show "Vivian Voice"
+pan tts voices play "Vivian Voice" "Build is green"
+pan tts voices set-default "Vivian Voice"
+pan tts voices map workAgent.finished "Vivian Voice"
+pan tts voices delete "Vivian Voice"
+```
+
+`set-default` sets the System Voice. The Status Voice has no terminal command; set it in **Settings → TTS** or with `tts.statusVoice`.
+
+## Control what is spoken
+
+These settings are in **Settings → TTS** and in the `tts` block of `~/.overdeck/config.yaml`:
+
+| Setting | Key | Default | Effect |
+| --- | --- | --- | --- |
+| **Enable TTS** | `tts.enabled` | `false` | Speaks announcements when on. |
+| **Volume** | `tts.volume` | `1` | Playback volume from 0 to 1. |
+| **Max chars** | `tts.maxChars` | `140` | Cuts each announcement to this many characters. |
+| **Drop info when queue full** | `tts.dropInfoWhenFull` | `true` | When 20 announcements are waiting, new status announcements are dropped first. When off, the oldest waiting announcement is dropped. |
+| **Rate** | `tts.rate` | `1` | Saved and sent with each announcement, but the bundled daemon does not change the speed yet ([#5574](https://github.com/eltmon/overdeck/issues/5574)). |
+| **Muted Sources** | `tts.mutedSources` | none | Silences every announcement from the checked sources, such as `merge-agent` or `work-agent`. |
+| (config file only) | `tts.mutedIssues` | none | Silences announcements about the listed issues, for example `[PAN-123]`. |
+| (config file only) | `tts.lifecycle` | `true` | Set `false` to silence the planning and work agent start and finish announcements. |
+
+### Voices and wording per event type
+
+Every announcement carries an event type. Map an event type to a saved voice with `tts.voiceMap`, or replace its words with `tts.utteranceTemplates`. A template can include `{issueId}`, which becomes the issue ID.
+
+These are the event types Overdeck emits:
+
+| Event type | When |
+| --- | --- |
+| `planning.started` | A planning session starts. |
+| `planning.finalized`, `planning.complete` | A plan is finalized and promoted. |
+| `planning.promotion-unconfirmed` | Overdeck could not confirm that a finalized plan was promoted. |
+| `workAgent.started`, `workAgent.finished` | A work agent starts, or signals that its work is done. |
+| `awaiting_input` | An agent is waiting for your answer. |
+| `mergeOutcome.merging`, `mergeOutcome.merged`, `mergeOutcome.failed` | The merge step starts, succeeds or fails. |
+| `merge.approved`, `forgeMerge.merged` | A merge is approved, or a pull request is merged on the forge. |
+| `auto-merge-scheduled`, `auto-merge-cancelled`, `auto-merge-failed` | An auto-merge is scheduled, cancelled or fails. |
+| `dashboard.started`, `dashboard.stopping` | The dashboard starts or stops. |
+| `ttsSummary.generated` | The TTS summarizer produced a summary (see below). |
+
+Set these with `pan tts voices map <event> <name>` or in the config file:
+
+```yaml
+tts:
+  enabled: true
+  voice: <id of a saved voice>
+  voiceMap:
+    mergeOutcome.failed: <id of a saved voice>
+  utteranceTemplates:
+    workAgent.finished: "{issueId} is ready for review"
+  mutedSources: [dashboard]
+  mutedIssues: [PAN-123]
+```
+
+`voice` and the `voiceMap` values are voice IDs, which `pan tts voices show "<name>"` prints. The **Voice Map** and **Utterance Templates** controls in **Settings → TTS** offer event keys that Overdeck does not emit yet ([#5575](https://github.com/eltmon/overdeck/issues/5575)), so set these two from the terminal or the config file.
+
+### When changes apply
+
+The dashboard reads the `tts` settings when it starts and each time you save a change in **Settings**. A change made with `pan tts voices set-default`, `pan tts voices map` or by editing `~/.overdeck/config.yaml` reaches a running dashboard only after you restart it with `pan restart`. New saved voices work at once, because the dashboard reads `~/.overdeck/tts-voices.json` for each announcement.
+
+## Spoken summaries
+
+The TTS summarizer batches recent activity log entries and asks an OpenAI model for a one-sentence spoken summary. It emits the result as an announcement with the source `tts-summarizer`. It needs all of these:
+
+- `tts.summarizer.enabled: true` in `~/.overdeck/config.yaml`. The dashboard reads this when it starts.
+- **TTS activity narration** switched on in **Settings → Background AI**, and **Low-cost mode** off.
+- An OpenAI API key, from `api_keys.openai` in the config file or the `OPENAI_API_KEY` environment variable.
+
+`tts.summarizer.model` picks the model (default `gpt-5.4-mini`), and `tts.summarizer.batch_window_seconds` sets how often it summarizes (default 15). Model presets do not change this model; see [Model presets](/configuration/model-presets#what-a-preset-will-not-set).
+
+## Speak announcements somewhere else
+
+An external sidecar is any program that reads Overdeck's announcements and speaks them itself, for example on another machine or with another TTS engine. Overdeck does not ship one. Two interfaces let you build one.
+
+**The event stream.** `GET /events/stream?types=activity.tts` on the dashboard streams each announcement as Server-Sent Events. Each event's payload carries `utterance`, `priority` (0 and 1 are high priority, 2 is status), `issueId`, `source` and `eventType`. `activity.tts` is part of the public catalog that `GET /events/version` returns.
+
+```bash
+curl -N "http://127.0.0.1:3011/events/stream?types=activity.tts"
+```
+
+A process on the same machine can connect without a credential, unless you set `OVERDECK_EVENTS_TOKEN`. From another machine, use a scoped token: `pan token create <name> --scopes read:events`. See [Remote access](/configuration/remote-access#what-the-lan-can-reach).
+
+**The daemon's speak endpoint.** A sidecar can also play text through the Overdeck daemon with `POST http://127.0.0.1:8787/speak` and a JSON body such as `{"text": "Build is green", "voice": "Vivian"}`. Every POST must carry the daemon token from `~/.overdeck/secrets/qwen-tts.token` in an `X-Overdeck-TTS-Token` header or as `Authorization: Bearer <token>`; without it the daemon answers 401. The daemon holds at most 6 waiting requests and answers 429 when its queue is full. `tts.daemonHost` and `tts.daemonPort` (default `127.0.0.1` and `8787`) set the address the daemon listens on and the dashboard sends to.
+
+If your sidecar speaks on the same machine as the dashboard, leave **Enable TTS** off so you do not hear each announcement twice.
+
+## Troubleshooting
+
+- **Nothing is spoken.** Run `pan tts status`, and check the **Daemon status** badge in **Settings → TTS**. Then check that **Enable TTS** is on and a saved voice is set as the System Voice.
+- **A clone voice stopped working.** Clones made with an older model are rejected. Make the clone again from its VoiceDesign description.
+- **Dictation says "Moonshine sidecar binary not found".** Switch **STT provider** to **Google Cloud STT**, or build the sidecar from a source checkout with `npm run build:sidecar`.
+- **Dictation says "Another voice transcription session is already active".** Close the other voice panel or the AutoPreso page, then try again.
+
+## Known issues
+
+- Dictation sends each sentence to AutoPreso too. When AutoPreso is not open, the panel shows "AutoPreso transcript processing is not live". Dictation through Google Cloud STT can also be transcribed at the wrong speed. Both are tracked in [#5204](https://github.com/eltmon/overdeck/issues/5204).
+- **Rate** has no effect ([#5574](https://github.com/eltmon/overdeck/issues/5574)).
+- The Settings **Voice Map** and **Utterance Templates** list event keys that are never emitted ([#5575](https://github.com/eltmon/overdeck/issues/5575)).
+- npm installs cannot build the Moonshine sidecar ([#5576](https://github.com/eltmon/overdeck/issues/5576)).
+- **Input device**, **Output device** and **Voice volume** in Settings → Voice are not used ([#5577](https://github.com/eltmon/overdeck/issues/5577)).
+
+## Get help
+
+- Ask questions on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P).
+- Report bugs and request features in [GitHub Issues](https://github.com/eltmon/overdeck/issues).
