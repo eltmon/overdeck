@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5502",
   "created": "2026-11-19T05:29:14.806Z",
-  "updated": "2026-11-19T05:49:07.017Z",
+  "updated": "2026-11-19T05:49:12.788Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -358,6 +358,11 @@
     "audit-open-in-overdeck.ac2": {
       "status": "completed",
       "doneAt": "2026-11-19T05:49:07.017Z"
+    },
+    "audit-issue-pipeline": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5502",
+      "claimedAt": "2026-11-19T05:49:12.788Z"
     }
   }
 }
