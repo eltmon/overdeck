@@ -196,30 +196,32 @@ to add one.
 | Settings → Anywhere: pair dialog, paired devices, status card | v0.65.0 | [Remote access](/configuration/remote-access) |
 | Scoped API tokens (`pan token`, Settings → Access Tokens) | v0.65.0 | [Remote access](/configuration/remote-access) |
 | **Continue on another device** from a conversation: open it on another screen, or hand it off through the vault | v0.65.0 | [Remote access](/configuration/remote-access#open-one-conversation-on-another-screen) |
-| The overdeck.ai directory: your machines in Settings → Anywhere → Directory, linking by two-screen approval, the free account's 3 machines | next release | [Remote access](/configuration/remote-access#find-your-machines-through-overdeck-ai) |
-| Direct connections between your machines with no Tailscale (`direct` routes) | next release | [Linked machines](/configuration/linked-machines) |
-| The relay add-on: relay routes, **Using relay**, the 50 GB monthly allowance | next release | [Remote access](/configuration/remote-access#find-your-machines-through-overdeck-ai) |
-| The webhook inbox: triggers that hold events for 24 hours while a machine is offline | next release | [Triggers](/configuration/triggers#hold-events-with-the-directory-inbox) |
-| Linked machines: link your machines over an end-to-end encrypted channel on LAN, Tailscale, direct or relay routes | next release | [Linked machines](/configuration/linked-machines) |
-| Conversations across machines: one shared list, remote control, **Pull here**, **Open preview** | next release | [Linked machines](/configuration/linked-machines#sharing-conversations) |
-| Work across machines: the Machine field, **Auto** placement, delegation, fleet Needs-You, usage and **Compare settings** | next release | [Linked machines](/configuration/linked-machines#start-work-on-another-machine) |
-| Gauntlet lanes on any linked machine (`pan lane start --machine`) | next release | [Lanes](/reference/lanes#lanes-on-other-machines) |
-| SSH machines: Overdeck starts or adopts `pan up` over SSH and links it | next release | [Linked machines](/configuration/linked-machines#ssh-machines) |
-| `pan connect`: one command turns a fresh server into a lasting linked machine | next release | [pan machines](/cli/machines#connect) |
-| Fly VMs as machines (`pan machines add-fly`) | next release | [Linked machines](/configuration/linked-machines#fly-machines) |
-| Fleet versions and **Update all**, including harness CLIs | next release | [Linked machines](/configuration/linked-machines#fleet-versions-and-update-all) |
-| The desktop app opens a chosen machine's dashboard with no local server | next release | [Remote access](/configuration/remote-access#from-the-desktop-app) |
-| **Set up Tailscale**: install, sign in, Serve HTTPS and peer discovery | next release | [Tailscale](/configuration/tailscale) |
-| The phone app over Tailscale Serve: answer a question in three taps | next release | [Phone](/configuration/phone) |
-| Push notifications sent from your machine with Web Push, optional ntfy | next release | [Push notifications](/configuration/push-notifications) |
-| Webhook triggers (`pan triggers`), published through Tailscale Funnel | next release | [Webhook triggers](/configuration/triggers) |
-| The MCP server (`pan mcp serve`, **Copy MCP URL**), with its tools in every Claude Code, Codex, `acp` and `opencode` agent | next release | [MCP server](/configuration/mcp) |
-| OAuth sign-in for MCP clients, approved in your dashboard (`pan mcp oauth`) | next release | [MCP server](/configuration/mcp#sign-in-with-oauth) |
-| Public MCP for hosted bots through Tailscale Funnel | next release | [MCP server](/configuration/mcp#public-mcp-for-hosted-bots) |
-| Connect a bot: Hermes, OpenClaw, Grok Build, Grok Bot and the xAI API, and the Overdeck connector (`pan mcp connector`) | next release | [Connect a bot](/configuration/bots) |
-| Sign in to overdeck.ai (`pan account login`, `status`, `logout`, or **Sign in** on the dashboard Account card) | next release | [pan account](/cli/account) |
-| Pipeline agents' transcripts saved to the Session Vault automatically | next release | [Session Vault](/configuration/session-vault) |
-| Shared sessions: share a conversation by link, viewers watch it live in their own Overdeck | next release | [Shared sessions](/configuration/shared-sessions) |
+| The overdeck.ai directory: your machines in Settings → Anywhere → Directory, linking by two-screen approval, the free account's 3 machines | v0.73.0 | [Remote access](/configuration/remote-access#find-your-machines-through-overdeck-ai) |
+| Direct connections between your machines with no Tailscale (`direct` routes) | v0.73.0 | [Linked machines](/configuration/linked-machines) |
+| The relay add-on: relay routes, **Using relay**, the 50 GB monthly allowance | v0.73.0 | [Remote access](/configuration/remote-access#find-your-machines-through-overdeck-ai) |
+| The webhook inbox: triggers that hold events for 24 hours while a machine is offline | v0.73.0 | [Triggers](/configuration/triggers#hold-events-with-the-directory-inbox) |
+| Linked machines: link your machines over an end-to-end encrypted channel on LAN, Tailscale, direct or relay routes | v0.73.0 | [Linked machines](/configuration/linked-machines) |
+| Conversations across machines: one shared list, remote control, **Pull here**, **Open preview** | v0.73.0 | [Linked machines](/configuration/linked-machines#sharing-conversations) |
+| Work across machines: the Machine field, **Auto** placement, delegation, fleet Needs-You, usage and **Compare settings** | v0.73.0 | [Linked machines](/configuration/linked-machines#start-work-on-another-machine) |
+| Gauntlet lanes on any linked machine (`pan lane start --machine`) | v0.73.0 | [Lanes](/reference/lanes#lanes-on-other-machines) |
+| SSH machines: Overdeck starts or adopts `pan up` over SSH and links it | v0.73.0 | [Linked machines](/configuration/linked-machines#ssh-machines) |
+| `pan connect`: one command turns a fresh server into a lasting linked machine | v0.73.0 | [pan machines](/cli/machines#connect) |
+| Fly VMs as machines (`pan machines add-fly`) | v0.73.0 | [Linked machines](/configuration/linked-machines#fly-machines) |
+| Fleet versions and **Update all**, including harness CLIs | v0.73.0 | [Linked machines](/configuration/linked-machines#fleet-versions-and-update-all) |
+| The desktop app opens a chosen machine's dashboard with no local server | v0.73.0 | [Remote access](/configuration/remote-access#from-the-desktop-app) |
+| **Set up Tailscale**: install, sign in, Serve HTTPS and peer discovery | v0.73.0 | [Tailscale](/configuration/tailscale) |
+| The phone app over Tailscale Serve: answer a question in three taps | v0.73.0 | [Phone](/configuration/phone) |
+| Native iPhone and Android apps: pair by QR code, answer questions, push notifications sealed to each phone (TestFlight and Play internal testing) | v0.74.0 | [Phone](/configuration/phone) |
+| Push notifications sent from your machine with Web Push, optional ntfy | v0.73.0 | [Push notifications](/configuration/push-notifications) |
+| Webhook triggers (`pan triggers`), published through Tailscale Funnel | v0.73.0 | [Webhook triggers](/configuration/triggers) |
+| The MCP server (`pan mcp serve`, **Copy MCP URL**), with its tools in every Claude Code, Codex, `acp`, `opencode` and `grok` agent | v0.73.0; agent tools v0.74.0 | [MCP server](/configuration/mcp) |
+| OAuth sign-in for MCP clients, approved in your dashboard (`pan mcp oauth`) | v0.74.0 | [MCP server](/configuration/mcp#sign-in-with-oauth) |
+| Public MCP for hosted bots through Tailscale Funnel | v0.74.0 | [MCP server](/configuration/mcp#public-mcp-for-hosted-bots) |
+| Connect a bot: Hermes, OpenClaw, Grok Build, Grok Bot and the xAI API, and the Overdeck connector (`pan mcp connector`) | v0.74.0 | [Connect a bot](/configuration/bots) |
+| Sign in to overdeck.ai (`pan account login`, `status`, `logout`, or **Sign in** on the dashboard Account card) | v0.73.0; dashboard **Sign in** v0.74.0 | [pan account](/cli/account) |
+| The account page at account.overdeck.ai/account: plan, relay use, machines, delete account | v0.74.0 | [pan account](/cli/account) |
+| Pipeline agents' transcripts saved to the Session Vault automatically | v0.73.0 | [Session Vault](/configuration/session-vault) |
+| Shared sessions: share a conversation by link, viewers watch it live in their own Overdeck | v0.74.0 | [Shared sessions](/configuration/shared-sessions) |
 
 ## Roadmap
 
@@ -236,7 +238,7 @@ consists of hosted services.
     [PAN-2609](https://github.com/eltmon/overdeck/issues/2609)
   </Step>
   <Step title="One Overdeck server per machine, linked">
-    **Shipped (next release). Free, open source.**
+    **Shipped (v0.73.0). Free, open source.**
 
     Each machine runs its own Overdeck server with its own identity, and your machines link
     over an end-to-end encrypted channel on any route: LAN, Tailscale, a direct connection or
@@ -256,12 +258,14 @@ consists of hosted services.
     [PAN-4654](https://github.com/eltmon/overdeck/issues/4654)
   </Step>
   <Step title="Notifications, remote access and a mobile web app">
-    **Shipped (next release). Free, open source.**
+    **Shipped (v0.73.0). Free, open source.**
 
     Needs-you notifications are sent from your own machine with Web Push, encrypted so the
     push service cannot read them, with ntfy as an option. Remote access goes through
     Tailscale Serve, which Overdeck installs and sets up for you, instead of a tunnel. The
-    phone app is an installable web app reached over Tailscale. See
+    phone app is an installable web app reached over Tailscale. Native iPhone and Android
+    apps that use the same end-to-end encrypted channel as linked machines followed in
+    v0.74.0 and are in TestFlight and Play internal testing. See
     [Push notifications](/configuration/push-notifications),
     [Tailscale](/configuration/tailscale) and [Phone](/configuration/phone).
     [PAN-2354](https://github.com/eltmon/overdeck/issues/2354),
@@ -269,7 +273,7 @@ consists of hosted services.
     [PAN-1254](https://github.com/eltmon/overdeck/issues/1254)
   </Step>
   <Step title="Fly VMs as machines">
-    **Shipped (next release). Free, open source; you pay Fly directly.**
+    **Shipped (v0.73.0). Free, open source; you pay Fly directly.**
 
     `pan machines add-fly` starts a Fly.io VM that runs Overdeck and links to your machine,
     so it runs conversations and gauntlet lanes like any other linked machine. `pan start <id>
@@ -284,7 +288,7 @@ consists of hosted services.
     ([PAN-1676](https://github.com/eltmon/overdeck/issues/1676)).
   </Step>
   <Step title="Webhook triggers and the MCP server">
-    **Shipped (next release). Free, open source.**
+    **Shipped (v0.73.0). Free, open source.**
 
     Webhook triggers start or message a conversation when a service such as GitHub or Stripe
     posts to it, published through Tailscale Funnel or held by the directory inbox while a
@@ -298,16 +302,16 @@ consists of hosted services.
     ([PAN-2353](https://github.com/eltmon/overdeck/issues/2353)).
   </Step>
   <Step title="Hosted services on overdeck.ai">
-    **Account service, directory, relay add-on, webhook inbox and shared sessions built (next
-    release, invite-only); billing and the hosted vault planned. This is the paid plan
-    above.**
+    **Account service, directory, relay add-on and webhook inbox shipped in v0.73.0, and
+    shared sessions and the account page in v0.74.0, all invite-only. Paid plans are
+    invite-only for now; the hosted vault is planned. This is the paid plan above.**
 
     The account service, the directory with direct connections, the relay add-on and the
-    webhook inbox are built and ship in the next release. overdeck.ai accounts are invite-only:
-    testers are added by the operator. A machine signs in with
-    [`pan account login`](/cli/account), which runs once per machine and is optional. Still
-    planned: billing and the hosted Session Vault. Shared sessions are built:
-    a host shares a conversation by link and viewers watch it live in their own Overdeck
+    webhook inbox shipped in v0.73.0. overdeck.ai accounts are invite-only: testers are added
+    by the operator. A machine signs in with [`pan account login`](/cli/account), which runs
+    once per machine and is optional. Paid plans are invite-only for now. The hosted Session
+    Vault is still planned. Shared sessions shipped in v0.74.0: a host shares a conversation by
+    link and viewers watch it live in their own Overdeck
     ([Shared sessions](/configuration/shared-sessions)); viewers can suggest prompts, and
     contributors can send them.
 
