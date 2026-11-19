@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-19T01:54:59.493461Z · model: claude-opus-5-5 · open: 942_
+_Last sequenced: 2026-11-19T02:37:05.286352Z · model: claude-opus-5-5 · open: 945_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -472,6 +472,7 @@ _Last sequenced: 2026-11-19T01:54:59.493461Z · model: claude-opus-5-5 · open: 
 | 446 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
 | 447 | PAN-5180 | M | medium | ok |  |  | Tab-open REST burst (~45 requests) delays every client 1.0-1.4 s; uncached prerequisite and status probes. |
 | 447 | PAN-5562 | M | medium | ok |  |  | pan cost today/week/month/report read dead per-day files and print $0; budgets never accrue; Costs page Event Count wrong. |
+| 447 | PAN-5576 | S | medium | ok |  |  | Moonshine, the default dictation provider, has no sidecar on npm installs; pan install builds only in a source checkout. |
 | 448 | PAN-5264 | M | medium | ok |  |  | Attribute the app-rest GitHub caller (1,422 untraced App REST calls/hour), then cut the largest path. |
 | 449 | PAN-5340 | S | medium | ok |  |  | A Preview link to another Markdown file should open it in Preview, not Edit. Follows PAN-5337. |
 | 450 | PAN-5440 | L | medium | ok |  |  | React Compiler burn-down for all remaining components: 78 skips in 42 files, 288 memo sites. Largest group; do last. |
@@ -484,7 +485,6 @@ _Last sequenced: 2026-11-19T01:54:59.493461Z · model: claude-opus-5-5 · open: 
 | 455 | PAN-5317 | S | medium | ok |  |  | CodeRabbit follow-up on PR #5127: route live Codex app-server sends correctly; no replayable mail for keyed sends. |
 | 455 | PAN-5565 | XS | medium | ok |  |  | CodeRabbit follow-up on merged PAN-5541: close only the answered request; keep seeded queries fresh in a test. |
 | 456 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
-| 456 | PAN-5479 | S | medium | ok |  |  | Docs P2: merge the unpublished workspaces config page into features/workspaces and memory pages. Lane A item 9. |
 | 456 | PAN-5560 | S | medium | ok |  |  | pan docs reindex ignores docs.* config and, from an npm install, silently overwrites a full index with a partial corpus. |
 | 457 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
 | 458 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
@@ -492,7 +492,7 @@ _Last sequenced: 2026-11-19T01:54:59.493461Z · model: claude-opus-5-5 · open: 
 | 459 | PAN-2469 | S | medium | ok |  |  | Assembly landed (mergeReadySlots + finalization); remaining: alarm when all slots merged but no review requested. Swarm dormant. |
 | 459 | PAN-5500 | L | medium | ok |  |  | Docs audit: line-by-line accuracy check of the 21 Overdeck Anywhere pages against main. Lane A item 11. |
 | 460 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
-| 460 | PAN-5502 | L | medium | ok |  | PAN-5479 | Docs audit: line-by-line accuracy check of the 14 Features pages; waits on PAN-5479/5482. |
+| 460 | PAN-5502 | L | medium | ok |  |  | Docs audit: line-by-line accuracy check of the 14 Features pages; waits on PAN-5479/5482. |
 | 461 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
 | 461 | PAN-5504 | L | medium | ok |  |  | Docs audit: line-by-line accuracy check of the 16 Guides and Reference pages; waits on PAN-5482. Lane A item 13. |
 | 462 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
@@ -561,8 +561,11 @@ _Last sequenced: 2026-11-19T01:54:59.493461Z · model: claude-opus-5-5 · open: 
 | 520 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
 | 521 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
 | 522 | PAN-5231 | S | medium | ok |  |  | Explorer: retrying Send through pipeline after a partial failure creates a second issue and branch. |
+| 522 | PAN-5575 | S | medium | ok |  |  | TTS Voice Map and Utterance Templates offer 10 event keys nothing emits; mapped voices and templates never apply. |
 | 523 | PAN-5204 | S | medium | ok |  |  | Voice: mixed 16/24 kHz sample rates on /ws/voice, and dictation turns leak into AutoPreso as errors. |
+| 523 | PAN-5574 | S | medium | ok |  |  | Settings TTS Rate is sent to the Qwen3-TTS daemon, which ignores it; fix in the daemon or remove the control. |
 | 524 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
+| 524 | PAN-5577 | S | medium | ok |  |  | Settings Voice input device, output device and volume are saved to localStorage but nothing reads them. |
 | 525 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
 | 526 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
 | 527 | PAN-2566 | L | medium | ok | ✓ |  | Triage list of genuine Traycer capability gaps; a container for child issues, not directly workable. |
@@ -653,7 +656,7 @@ _Last sequenced: 2026-11-19T01:54:59.493461Z · model: claude-opus-5-5 · open: 
 | 612 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
 | 612 | PAN-5501 | M | medium | ok |  |  | Docs audit: line-by-line accuracy check of the 7 CLI Reference pages; PAN-5478 merged, so it can run. Lane B item 9. |
 | 613 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
-| 613 | PAN-5499 | S | medium | ok |  |  | Docs audit: Getting Started, Vision, Changelog intro (5 pages); waits on PAN-5480. |
+| 613 | PAN-5578 | XS | low | ok |  | PAN-5481 | pan-tts SKILL.md and EXTERNAL-EVENT-STREAM.md cite a private sidecar, port 3000, 2048-dim embeddings, stale catalog. |
 | 614 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
 | 615 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
 | 616 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
@@ -1277,10 +1280,10 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-19T01:54:59.493461Z",
+  "generatedAt": "2026-11-19T02:37:05.286352Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 942,
+  "openCount": 945,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -7193,6 +7196,19 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "planning": "auto"
     },
     {
+      "issue": "PAN-5576",
+      "rank": 447,
+      "size": "S",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Moonshine, the default dictation provider, has no sidecar on npm installs; pan install builds only in a source checkout.",
+      "rationale": "New: default composer dictation fails for every npm install user, so it ranks with the other npm-install breakages.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-5264",
       "rank": 448,
       "size": "M",
@@ -7341,19 +7357,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "planning": "skip"
     },
     {
-      "issue": "PAN-5479",
-      "rank": 456,
-      "size": "S",
-      "importance": "medium",
-      "score": 46,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Docs P2: merge the unpublished workspaces config page into features/workspaces and memory pages. Lane A item 9.",
-      "rationale": "Rank unchanged; PAN-5483 closed, so that dependency is removed.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-5560",
       "rank": 456,
       "size": "S",
@@ -7448,9 +7451,7 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "importance": "medium",
       "score": 45,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5479"
-      ],
+      "dependsOn": [],
       "why": "Docs audit: line-by-line accuracy check of the 14 Features pages; waits on PAN-5479/5482.",
       "rationale": "Rank unchanged; PAN-5482 closed, so that dependency is removed.",
       "gate": "auto",
@@ -8300,6 +8301,19 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "planning": "auto"
     },
     {
+      "issue": "PAN-5575",
+      "rank": 522,
+      "size": "S",
+      "importance": "medium",
+      "score": 45,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "TTS Voice Map and Utterance Templates offer 10 event keys nothing emits; mapped voices and templates never apply.",
+      "rationale": "New: inert TTS settings keys found while planning PAN-5481; ranked with the other voice bugs.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-5204",
       "rank": 523,
       "size": "S",
@@ -8312,6 +8326,19 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "planning": "auto"
     },
     {
+      "issue": "PAN-5574",
+      "rank": 523,
+      "size": "S",
+      "importance": "medium",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Settings TTS Rate is sent to the Qwen3-TTS daemon, which ignores it; fix in the daemon or remove the control.",
+      "rationale": "New: a dead TTS setting found while planning PAN-5481; ranked with the other voice bugs.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2625",
       "rank": 524,
       "size": "XS",
@@ -8320,6 +8347,19 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "condition": "ok",
       "dependsOn": [],
       "why": "auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5577",
+      "rank": 524,
+      "size": "S",
+      "importance": "medium",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Settings Voice input device, output device and volume are saved to localStorage but nothing reads them.",
+      "rationale": "New: three inert Voice settings rows found while planning PAN-5481; ranked with the other voice bugs.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9426,15 +9466,17 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "planning": "auto"
     },
     {
-      "issue": "PAN-5499",
+      "issue": "PAN-5578",
       "rank": 613,
-      "size": "S",
-      "importance": "medium",
-      "score": 41,
+      "size": "XS",
+      "importance": "low",
+      "score": 38,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "Docs audit: Getting Started, Vision, Changelog intro (5 pages); waits on PAN-5480.",
-      "rationale": "Rank unchanged; PAN-5480 closed, so that dependency is removed.",
+      "dependsOn": [
+        "PAN-5481"
+      ],
+      "why": "pan-tts SKILL.md and EXTERNAL-EVENT-STREAM.md cite a private sidecar, port 3000, 2048-dim embeddings, stale catalog.",
+      "rationale": "New: stale agent-facing docs; best done after PAN-5481 publishes voice.mdx, which these files should link to.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14248,21 +14290,7 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
     },
     {
       "from": "PAN-5467",
-      "to": "PAN-5479",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5467",
       "to": "PAN-5481",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5467",
-      "to": "PAN-5499",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
@@ -14296,11 +14324,11 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "confidence": 1
     },
     {
-      "from": "PAN-5479",
-      "to": "PAN-5502",
+      "from": "PAN-5481",
+      "to": "PAN-5578",
       "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
+      "source": "ai-inferred",
+      "confidence": 0.7
     },
     {
       "from": "PAN-5490",
@@ -14396,6 +14424,13 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
     {
       "from": "PAN-5567",
       "to": "PAN-5566",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-5575",
+      "to": "PAN-5578",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
