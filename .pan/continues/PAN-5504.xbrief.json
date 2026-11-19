@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5504",
   "created": "2026-11-19T07:15:41.251Z",
-  "updated": "2026-11-19T07:37:55.420Z",
+  "updated": "2026-11-19T07:38:49.519Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -356,9 +356,26 @@
       "doneAt": "2026-11-19T07:37:50.798Z"
     },
     "audit-legacy-codebases": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5504",
-      "claimedAt": "2026-11-19T07:37:55.420Z"
+      "claimedAt": "2026-11-19T07:37:55.420Z",
+      "doneAt": "2026-11-19T07:38:49.518Z"
+    },
+    "audit-legacy-codebases.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:38:49.518Z"
+    },
+    "audit-legacy-codebases.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:38:49.518Z"
+    },
+    "audit-legacy-codebases.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:38:49.518Z"
+    },
+    "audit-legacy-codebases.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T07:38:49.518Z"
     }
   }
 }
