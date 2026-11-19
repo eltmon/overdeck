@@ -60,3 +60,29 @@ there under Auto is refused; the error points you to Bypass in Settings > Permis
 
 A mode change applies to new launches only. A Claude Code process already running keeps the flags it started with;
 agents and conversations already running keep their old mode until they are restarted or resumed.
+
+## Override the mode for one command
+
+A global `--yolo` flag overrides the permission mode for the current `pan` command only, in any argv position:
+
+```bash
+pan start PAN-12 --yolo        # this agent runs in Bypass
+pan up --no-yolo               # dashboard and everything it launches run in Auto
+PAN_YOLO=true pan start PAN-12 # same effect as --yolo, set as an environment variable
+```
+
+`--yolo` and `--yolo=true` switch to Bypass; `--yolo=false` and `--no-yolo` force Auto. `PAN_YOLO` accepts the same
+true-ish values (`1`, `true`, `yes`, `y`, `on`) and false-ish values (`0`, `false`, `no`, `n`, `off`); anything else
+is ignored.
+
+The mode for a command is resolved in this order:
+
+1. `PAN_YOLO` (which `--yolo` sets on the current process).
+2. `claude.permissionMode` from `~/.overdeck/config.yaml`.
+3. Auto, if the config cannot be read.
+
+**Reach.** `PAN_YOLO` affects the `pan` process you ran and whatever it starts. `pan start PAN-12 --yolo` launches
+that one work agent in Bypass. `pan up --yolo` starts the dashboard server with Bypass in its environment, so every
+agent and conversation that dashboard process launches runs in Bypass for as long as that dashboard process keeps
+running. Agents and conversations already running when you set the flag are unchanged. For a change that outlives a
+single command, use Settings > **Permissions**.
