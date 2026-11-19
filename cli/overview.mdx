@@ -1,19 +1,12 @@
 ---
-title: CLI Overview
+title: "pan CLI overview: command groups, help and issue IDs"
+sidebarTitle: "CLI Overview"
 description: "An introduction to the pan command-line interface: how its commands are organized, how they map to the dashboard, and how to get help."
 ---
 
-import { ThemedImage } from "/snippets/themed-image.mdx";
-
 The Overdeck CLI (`pan`) provides a comprehensive set of commands for managing agents, workspaces, and multi-project orchestration.
 
-Every CLI command has a counterpart in the dashboard, where the same agents, conversations, and workflow are managed visually. The Command Deck below shows a live agent: the left column with the project switcher and the project's conversations and issues, and the agent's turn-by-turn tool calls and reasoning in the center. The Needs-you / Project / Global feed is on `/activity`.
-
-<ThemedImage
-  light="/images/dashboard/command-deck-hero-light.png"
-  dark="/images/dashboard/command-deck-hero-dark.png"
-  alt="Command Deck: the left column with the project's conversations and issues, and an agent's turn-by-turn tool calls and reasoning"
-/>
+Most day-to-day CLI commands have a counterpart in the dashboard, where the same agents, conversations, and workflow are managed visually. The Command Deck shows a live agent: the left column with the project switcher and the project's conversations and issues, and the agent's turn-by-turn tool calls and reasoning in the center. The Needs-you / Project / Global feed is on `/activity`.
 
 <Tip>
   The CLI and dashboard operate on the same state. You can spawn an agent from the terminal with `pan start MIN-123` and watch its reasoning stream into the Command Deck, or start it from the board and drive it from the CLI: they are two views of one orchestrator.
@@ -26,7 +19,7 @@ The Overdeck CLI is designed around a few key principles:
 1. **Agent-centric** - Commands focus on spawning, monitoring, and controlling AI agents
 2. **Workspace isolation** - Each issue gets its own git worktree workspace
 3. **Multi-project support** - Manage multiple projects from a single installation
-4. **Integration-first** - Works seamlessly with GitHub, Linear, GitLab, Rally, and Jira
+4. **Integration-first** - Works with issues in GitHub, Linear, Rally and Jira, and with code on GitHub or GitLab
 
 ## Command Structure
 
@@ -34,15 +27,19 @@ Overdeck commands are organized into logical groups:
 
 | Group | Purpose | Examples |
 |-------|---------|----------|
-| **Core** | System management | `pan up`, `pan down`, `pan sync`, `pan doctor` |
+| **Core** | System management | `pan up`, `pan down`, `pan sync`, `pan doctor`, `pan reload`, `pan restart`, `pan update` |
 | **Work** | Agent management | `pan start`, `pan status`, `pan tell`, `pan kill` |
 | **Workspace** | Workspace lifecycle | `pan workspace create`, `pan workspace destroy` |
 | **Review** | Code review loop | `pan review request`, `pan review restart`, `pan review abort` |
 | **Project** | Project registry | `pan project add`, `pan project list` |
-| **Conversations** | Session history and conversation metadata ([reference](/cli/conversation-commands)) | `pan conv list`, `pan conv search` ([searching](/features/conversations#search-from-the-command-line)), `pan conv move`, `pan conv link-pr` ([linking pull requests](/features/conversations#linking-a-pull-request-by-hand)), `pan conv schedule add` ([scheduled runs](/features/conversations#scheduled-runs)) |
-| **Pipeline** | Plan, track and close issues, the Flywheel ([reference](/cli/pipeline-commands)) | `pan plan`, `pan task`, `pan show`, `pan close` |
+| **Skills** | Skills and per-level overrides ([reference](/cli/skills-commands)) | `pan skills`, `pan sync` |
+| **Conversations** | Session history and conversation metadata ([reference](/cli/conversation-commands)) | `pan conv list`, `pan conv search` ([searching](/features/conversations#search-from-the-command-line)), `pan conv move`, `pan conv link-pr` ([linking pull requests](/features/conversations#linking-a-pull-request-by-hand)), `pan conv schedule add` ([scheduled runs](/features/conversations#scheduled-runs)), `pan handoff`, `pan fork`, `pan resume` |
+| **Pipeline** | Plan, track and close issues, the Flywheel ([reference](/cli/pipeline-commands)) | `pan plan`, `pan task`, `pan show`, `pan close`, `pan flywheel`, `pan orders`, `pan done`, `pan strike` |
 | **Memory** | Curated facts, observation memory, context layers ([reference](/cli/memory-commands)) | `pan memory search`, `pan memory add`, `pan context list` |
 | **Admin** | Specialists, remote workspaces, Cloister | `pan admin specialists list`, `pan admin remote status`, `pan admin cloister status` |
+| **Operations** | Health, resources, cost, hygiene ([reference](/cli/hygiene)) | `pan health` (experimental: turn on Settings → Experimental → **Experimental features** to show it), `pan resources` (experimental), `pan cost` (experimental), `pan hygiene` |
+| **Machines** | Linked machines, workers, lanes ([reference](/cli/machines)) | `pan machines`, `pan connect`, `pan worker run`, `pan lane start` |
+| **Sharing** | Shared sessions, Session Vault, accounts ([reference](/cli/share)) | `pan share`, `pan join`, `pan vault`, `pan account` |
 
 ## Installation & Setup
 
@@ -64,7 +61,7 @@ pan doctor
 
 ### Issue-based workflows
 
-Most commands accept an issue identifier (e.g., `MIN-123`, `42`):
+Most commands accept an issue identifier such as `MIN-123`. A GitHub issue uses its project's `issue_prefix`, so eltmon/overdeck#42 is `PAN-42`. A bare number such as `42` works for commands that act on an existing agent (`pan tell`, `pan kill`, `pan show`, `pan close`, `pan reopen` …) when exactly one agent on this machine matches; `pan start` needs the full ID:
 
 ```bash
 pan start MIN-123           # Spawn agent
@@ -88,10 +85,10 @@ pan workspace destroy MIN-123        # Clean up workspace
 Many operations can be performed either via CLI or dashboard:
 
 ```bash
-pan up    # Start dashboard at localhost:3011
+pan up    # Start the dashboard (https://overdeck.localhost with Traefik, else http://localhost:3011)
 ```
 
-The dashboard provides a visual interface for all CLI operations.
+The dashboard provides a visual interface for most CLI operations.
 
 ## Getting Help
 
@@ -103,9 +100,11 @@ pan --help
 pan start --help
 pan workspace --help
 
-# Command documentation
-man pan              # If installed via package manager
+# Help for a subcommand
+pan help workspace
 ```
+
+Run `pan doctor` to check your setup, or `pan diagnose` to collect a redacted diagnostic bundle and start an agent on the problem. Ask questions on the [Overdeck Discord](https://discord.gg/ZpHE2ZTv5P) and report bugs on [GitHub Issues](https://github.com/eltmon/overdeck/issues).
 
 ## Common Options
 
@@ -114,16 +113,17 @@ man pan              # If installed via package manager
 | Flag | Description |
 |------|-------------|
 | `--help` | Show help for any command |
-| `--version` | Show Overdeck version |
-| `--verbose` | Enable verbose output |
+| `-V`, `--version` | Show Overdeck version |
+| `--yolo [value]` | Override the permission mode for spawned Claude Code agents (`--yolo=false` forces auto mode); works in any position |
 
 ### Issue identifiers
 
 Commands accept various issue identifier formats:
 
 - **Linear**: `MIN-123`, `min-123` (case-insensitive)
-- **GitHub**: `#42`, `42` (numeric)
-- **GitLab**: `!42`, `42` (numeric)
+- **GitHub**: `PAN-42` (the project's `issue_prefix` plus the issue number)
+- **Rally**: `F29698`, `US1234`, `DE123`
+- **Jira**: `PROJ-123`
 
 ## Configuration
 
@@ -131,8 +131,9 @@ Overdeck stores configuration in:
 
 - `~/.overdeck.env` - API keys and tokens
 - `~/.overdeck/projects.yaml` - Registered projects
-- `~/.overdeck/project-mappings.json` - Linear project mappings
-- Project-level: `.overdeck.json` - Project-specific settings
+- `~/.overdeck/config.yaml` - Global settings (`pan admin config set` writes here)
+- `~/.overdeck/config.toml` - Dashboard ports, Traefik and remote workspace switches
+- Project-level: `.pan.yaml` in the repository root - Project-specific settings (a legacy `.overdeck.yaml` still loads, with a deprecation warning)
 
 ## Next Steps
 
@@ -143,6 +144,14 @@ Overdeck stores configuration in:
 - [Memory Commands](/cli/memory-commands) - Manage memory facts, context layers and the knowledge bundle
 - [Workspace Commands](/cli/workspace-commands) - Workspace management
 - [Review Commands](/cli/review-commands) - Request, restart, and abort code review
+- [Hygiene Check](/cli/hygiene) - Audit pushes, PRs, agents, branches and disk
+- [Skills Commands](/cli/skills-commands) - List skills and set overrides
+- [pan machines](/cli/machines) - Link machines, run workers and lanes on them
+- [pan share](/cli/share) - Share a conversation by link
+- [pan mcp](/cli/mcp)
+- [pan triggers](/cli/triggers)
+- [pan tailscale](/cli/tailscale)
+- [pan account](/cli/account)
 - [pan vault](/cli/vault) - Session Vault: save and continue conversations on another machine
 - [pan pair](/cli/pair) - Pair another device with this machine's dashboard
 - [pan devices](/cli/devices) - List and revoke paired devices
