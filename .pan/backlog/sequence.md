@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-19T00:27:00.657390Z · model: claude-opus-5-5 · open: 943_
+_Last sequenced: 2026-11-19T01:22:34.036723Z · model: claude-opus-5-5 · open: 942_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -135,6 +135,7 @@ _Last sequenced: 2026-11-19T00:27:00.657390Z · model: claude-opus-5-5 · open: 
 | 126 | PAN-4184 | S | high | needs-refinement |  |  | --no-deacon on the host port is refused as a peer after the old server stops, so the escape hatch may leave no dashboard; fix unpicked |
 | 127 | PAN-2511 | XS | high | ok |  |  | Work agents burn 20+ min on false test failures |
 | 128 | PAN-2763 | S | high | ok |  |  | Workspace node_modules is symlinked to the primary repo, breaking test resolution |
+| 128 | PAN-3579 | M | high | ok |  |  | Workspace page Pull/Run/Open and palette activate send no CSRF token, so they 403 now; ~20 more bare-header mutations at risk. |
 | 129 | PAN-2170 | XS | high | ok |  |  | Docker init container lacks Python |
 | 130 | PAN-1198 | S | high | ok |  |  | Workspace init container's bun install doesn't populate container-node-modules named volume |
 | 131 | PAN-4453 | XS | high | ok |  |  | runtimes/codex.ts uses homedir() not OVERDECK_HOME; isolated homes write thread ids into the real ~/.overdeck |
@@ -197,7 +198,6 @@ _Last sequenced: 2026-11-19T00:27:00.657390Z · model: claude-opus-5-5 · open: 
 | 188 | PAN-2376 | XL | high | stale | ✓ |  | Epic: CI/CD reliability — all 21 named children are closed; needs an operator disposition (close or restate) |
 | 189 | PAN-3775 | S | high | ok |  |  | makeDbLive opens overdeck.db unmigrated; zero-table db poisons a vitest worker home and breaks later read-only audits. |
 | 190 | PAN-3652 | XS | high | ok |  |  | No workflow_dispatch on ci.yml / state-plane-branches.yml, so an unverified main tip can never be verified and DoD row 6 blocks close-out. |
-| 191 | PAN-3579 | M | high | ok |  |  | ~20 frontend mutations hand-write JSON headers and omit the CSRF token, so each 403s the moment its route becomes guarded. |
 | 192 | PAN-3541 | S | high | ok |  |  | Review restart loops on the session-resume menu because eligibility ignores how the prior session ended; partial mechanical break landed. |
 | 193 | PAN-3463 | S | high | ok |  |  | A legitimate empty-diff slot outcome can never pass item verify, so the slot wedges and blocks dispatch of remaining items forever. |
 | 194 | PAN-3460 | S | high | ok |  |  | Per-item verify_commands that run the whole root suite make slot merge gates load-fragile and hold a patrol in flight for ~17 minutes. |
@@ -650,7 +650,6 @@ _Last sequenced: 2026-11-19T00:27:00.657390Z · model: claude-opus-5-5 · open: 
 | 609 | PAN-1545 | XS | medium | ok |  |  | New Terminal button |
 | 610 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
 | 611 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
-| 611 | PAN-5503 | L | medium | ok |  |  | Docs audit: line-by-line accuracy check of the 21 Configuration pages; PAN-5472 merged, so it is unblocked. |
 | 612 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
 | 612 | PAN-5501 | M | medium | ok |  |  | Docs audit: line-by-line accuracy check of the 7 CLI Reference pages; PAN-5478 merged, so it can run. Lane B item 9. |
 | 613 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
@@ -1278,10 +1277,10 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-19T00:27:00.657390Z",
+  "generatedAt": "2026-11-19T01:22:34.036723Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 943,
+  "openCount": 942,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -2978,6 +2977,19 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "planning": "auto"
     },
     {
+      "issue": "PAN-3579",
+      "rank": 128,
+      "size": "M",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Workspace page Pull/Run/Open and palette activate send no CSRF token, so they 403 now; ~20 more bare-header mutations at risk.",
+      "rationale": "Raised from 191: a 2026-11-19 comment found live breakage, not just latent risk. WorkspaceActionBand Pull, Save run command, Run and Files/Editor open hit CSRF-guarded workspace-registry routes without the token, and CommandPalette activate sends no headers, so core workspace-page actions fail for cookie sessions today.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2170",
       "rank": 129,
       "size": "XS",
@@ -3764,18 +3776,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "condition": "ok",
       "dependsOn": [],
       "why": "No workflow_dispatch on ci.yml / state-plane-branches.yml, so an unverified main tip can never be verified and DoD row 6 blocks close-out.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3579",
-      "rank": 191,
-      "size": "M",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "~20 frontend mutations hand-write JSON headers and omit the CSRF token, so each 403s the moment its route becomes guarded.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9388,19 +9388,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "planning": "auto"
     },
     {
-      "issue": "PAN-5503",
-      "rank": 611,
-      "size": "L",
-      "importance": "medium",
-      "score": 42,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Docs audit: line-by-line accuracy check of the 21 Configuration pages; PAN-5472 merged, so it is unblocked.",
-      "rationale": "Rank unchanged; PAN-5471 closed, so that dependency is removed. PAN-5472 merged (#5535), so that dependency is removed.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1490",
       "rank": 612,
       "size": "M",
@@ -14297,13 +14284,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
     {
       "from": "PAN-5467",
       "to": "PAN-5502",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5467",
-      "to": "PAN-5503",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
