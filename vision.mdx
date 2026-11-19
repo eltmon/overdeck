@@ -128,11 +128,11 @@ and the Flywheel so they can never disagree:
 
 ### UAT-required-before-merge (`require_uat_before_merge`, default ON)
 
-This setting decides whether Overdeck may merge a pull request on its own. When it is on (the default), every issue is
-**held**: Overdeck never merges the PR itself, and a human tests it and clicks Merge. When it is off, issues default to
-**auto**: once the PR is approved at its head commit, every check is green and GitHub says it is mergeable, Overdeck
-waits five minutes, so you can cancel, and then merges it. On a held issue, a failed browser UAT verdict also blocks
-the Merge button.
+This setting decides whether Overdeck may merge a pull request on its own, unless an issue or project override applies.
+When it is on (the default), every issue defaults to **held**: Overdeck never merges the PR itself, and a human tests it
+and clicks Merge. When it is off, issues default to **auto**: once the PR is approved at its head commit, every check is
+green and GitHub says it is mergeable, Overdeck waits five minutes, so you can cancel, and then merges it. On a held
+issue, a failed browser UAT verdict also blocks the Merge button.
 
 The setting is the last of three tiers, and the first one that is set wins:
 
