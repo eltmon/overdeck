@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5500",
+  "created": "2026-11-19T03:34:33.510Z",
+  "updated": "2026-11-19T03:34:33.510Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "anywhere-plans": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5500",
+      "claimedAt": "2026-11-19T03:34:33.510Z"
+    }
+  }
+}
