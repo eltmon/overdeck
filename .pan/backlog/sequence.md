@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-19T03:07:15.299163Z · model: claude-opus-5-5 · open: 946_
+_Last sequenced: 2026-11-19T03:49:28.334364Z · model: claude-opus-5-5 · open: 944_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -488,11 +488,10 @@ _Last sequenced: 2026-11-19T03:07:15.299163Z · model: claude-opus-5-5 · open: 
 | 456 | PAN-5560 | S | medium | ok |  |  | pan docs reindex ignores docs.* config and, from an npm install, silently overwrites a full index with a partial corpus. |
 | 457 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
 | 458 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
-| 458 | PAN-5481 | S | medium | ok |  |  | Docs P2: configuration/voice.mdx, dictation, tts.enabled, local Qwen3-TTS daemon, sidecars. Lane A item 10. |
 | 459 | PAN-2469 | S | medium | ok |  |  | Assembly landed (mergeReadySlots + finalization); remaining: alarm when all slots merged but no review requested. Swarm dormant. |
 | 459 | PAN-5500 | L | medium | ok |  |  | Docs audit: line-by-line accuracy check of the 21 Overdeck Anywhere pages against main. Lane A item 11. |
 | 460 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
-| 460 | PAN-5502 | L | medium | ok |  |  | Docs audit: line-by-line accuracy check of the 14 Features pages; waits on PAN-5479/5482. |
+| 460 | PAN-5502 | L | medium | ok |  |  | Docs audit: line-by-line accuracy check of the 14 Features pages; PAN-5479/5482 merged, so it can run. |
 | 461 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
 | 461 | PAN-5504 | L | medium | ok |  |  | Docs audit: line-by-line accuracy check of the 16 Guides and Reference pages; waits on PAN-5482. Lane A item 13. |
 | 462 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
@@ -654,10 +653,9 @@ _Last sequenced: 2026-11-19T03:07:15.299163Z · model: claude-opus-5-5 · open: 
 | 610 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
 | 611 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
 | 612 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
-| 612 | PAN-5501 | M | medium | ok |  |  | Docs audit: line-by-line accuracy check of the 7 CLI Reference pages; PAN-5478 merged, so it can run. Lane B item 9. |
 | 613 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
 | 613 | PAN-5499 | S | medium | ok |  |  | Docs audit: Getting Started, Vision, Changelog intro (5 pages); now in pipeline. Lane B item 10. |
-| 613 | PAN-5578 | XS | low | ok |  | PAN-5481 | pan-tts SKILL.md and EXTERNAL-EVENT-STREAM.md cite a private sidecar, port 3000, 2048-dim embeddings, stale catalog. |
+| 613 | PAN-5578 | XS | low | ok |  |  | pan-tts SKILL.md and EXTERNAL-EVENT-STREAM.md cite a private sidecar, port 3000, 2048-dim embeddings, stale catalog. |
 | 614 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
 | 615 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
 | 616 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
@@ -1281,10 +1279,10 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-19T03:07:15.299163Z",
+  "generatedAt": "2026-11-19T03:49:28.334364Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 946,
+  "openCount": 944,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -7395,19 +7393,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "planning": "auto"
     },
     {
-      "issue": "PAN-5481",
-      "rank": 458,
-      "size": "S",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Docs P2: configuration/voice.mdx, dictation, tts.enabled, local Qwen3-TTS daemon, sidecars. Lane A item 10.",
-      "rationale": "Rank unchanged; PAN-5483 closed, so that dependency is removed.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2469",
       "rank": 459,
       "size": "S",
@@ -7453,8 +7438,8 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "score": 45,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Docs audit: line-by-line accuracy check of the 14 Features pages; waits on PAN-5479/5482.",
-      "rationale": "Rank unchanged; PAN-5482 closed, so that dependency is removed.",
+      "why": "Docs audit: line-by-line accuracy check of the 14 Features pages; PAN-5479/5482 merged, so it can run.",
+      "rationale": "Rank unchanged; all page PRs it waited on have merged, and a PAN-5499 comment flags recaptured screenshots whose alt text may need updating.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9441,19 +9426,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "planning": "auto"
     },
     {
-      "issue": "PAN-5501",
-      "rank": 612,
-      "size": "M",
-      "importance": "medium",
-      "score": 41,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Docs audit: line-by-line accuracy check of the 7 CLI Reference pages; PAN-5478 merged, so it can run. Lane B item 9.",
-      "rationale": "Rank unchanged; PAN-5478 closed, so that dependency is removed.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1485",
       "rank": 613,
       "size": "S",
@@ -9486,11 +9458,9 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "importance": "low",
       "score": 38,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5481"
-      ],
+      "dependsOn": [],
       "why": "pan-tts SKILL.md and EXTERNAL-EVENT-STREAM.md cite a private sidecar, port 3000, 2048-dim embeddings, stale catalog.",
-      "rationale": "New: stale agent-facing docs; best done after PAN-5481 publishes voice.mdx, which these files should link to.",
+      "rationale": "Rank unchanged; PAN-5481 (voice.mdx) closed, so that dependency is removed and the link target now exists.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14304,13 +14274,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
     },
     {
       "from": "PAN-5467",
-      "to": "PAN-5481",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5467",
       "to": "PAN-5499",
       "type": "contains",
       "source": "github-ref",
@@ -14319,13 +14282,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
     {
       "from": "PAN-5467",
       "to": "PAN-5500",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-5467",
-      "to": "PAN-5501",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
@@ -14343,13 +14299,6 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-5481",
-      "to": "PAN-5578",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.7
     },
     {
       "from": "PAN-5490",
@@ -14406,6 +14355,13 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-5499",
+      "to": "PAN-5502",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     },
     {
       "from": "PAN-5532",
