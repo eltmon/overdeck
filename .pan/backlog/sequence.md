@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-19T02:37:05.286352Z · model: claude-opus-5-5 · open: 945_
+_Last sequenced: 2026-11-19T03:07:15.299163Z · model: claude-opus-5-5 · open: 946_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -656,6 +656,7 @@ _Last sequenced: 2026-11-19T02:37:05.286352Z · model: claude-opus-5-5 · open: 
 | 612 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
 | 612 | PAN-5501 | M | medium | ok |  |  | Docs audit: line-by-line accuracy check of the 7 CLI Reference pages; PAN-5478 merged, so it can run. Lane B item 9. |
 | 613 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
+| 613 | PAN-5499 | S | medium | ok |  |  | Docs audit: Getting Started, Vision, Changelog intro (5 pages); now in pipeline. Lane B item 10. |
 | 613 | PAN-5578 | XS | low | ok |  | PAN-5481 | pan-tts SKILL.md and EXTERNAL-EVENT-STREAM.md cite a private sidecar, port 3000, 2048-dim embeddings, stale catalog. |
 | 614 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
 | 615 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
@@ -1280,10 +1281,10 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-19T02:37:05.286352Z",
+  "generatedAt": "2026-11-19T03:07:15.299163Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 945,
+  "openCount": 946,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -9466,6 +9467,19 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
       "planning": "auto"
     },
     {
+      "issue": "PAN-5499",
+      "rank": 613,
+      "size": "S",
+      "importance": "medium",
+      "score": 41,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Docs audit: Getting Started, Vision, Changelog intro (5 pages); now in pipeline. Lane B item 10.",
+      "rationale": "Restored at its prior rank 613: the last run dropped it from the sequence although it stayed open; it is now in pipeline, so the rank is pinned.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-5578",
       "rank": 613,
       "size": "XS",
@@ -14291,6 +14305,13 @@ New this pass. A completed-handoff agent owed rework after a blocked verdict can
     {
       "from": "PAN-5467",
       "to": "PAN-5481",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5467",
+      "to": "PAN-5499",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
