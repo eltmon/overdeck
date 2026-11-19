@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-5479",
   "created": "2026-11-19T01:28:31.320Z",
-  "updated": "2026-11-19T01:43:37.551Z",
+  "updated": "2026-11-19T01:55:21.397Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-19T01:55Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-19T01:55:21.397Z"
+    }
+  ],
   "items": {
     "w1-features-kinds": {
       "status": "completed",
@@ -189,5 +195,14 @@
       "status": "completed",
       "doneAt": "2026-11-19T01:43:37.551Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-19T01:55:21Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5479 (PR #5572)\n\nCodeRabbit posted 2 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4623371436 · configuration/memory.mdx:320 [Minor]: Qualify partial environment overrides for query expansion.\n  https://github.com/eltmon/overdeck/pull/5572#discussion_r4623371436\n- Thread 4623371443 · configuration/memory.mdx:326 [Minor]: Correct the documented spending-cap scope.\n  https://github.com/eltmon/overdeck/pull/5572#discussion_r4623371443\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5572/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5479 -m \"CodeRabbit <thread ids>: <what you changed>\"`.\n   If you only replied, you are done.\n5. If PR #5572 has already merged when you read this, stop: after the merge Overdeck files a follow-up issue\n   for every thread with no reply, no later commit to its file, and no re-review request naming its thread id."
+    }
+  ]
 }
