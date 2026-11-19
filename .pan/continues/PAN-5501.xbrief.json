@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5501",
   "created": "2026-11-19T01:05:44.105Z",
-  "updated": "2026-11-19T01:31:47.447Z",
+  "updated": "2026-11-19T01:34:01.420Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -244,9 +244,26 @@
       "doneAt": "2026-11-19T01:31:39.725Z"
     },
     "workspace-list-to-safeguards": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5501",
-      "claimedAt": "2026-11-19T01:31:47.447Z"
+      "claimedAt": "2026-11-19T01:31:47.447Z",
+      "doneAt": "2026-11-19T01:34:01.419Z"
+    },
+    "workspace-list-to-safeguards.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:34:01.419Z"
+    },
+    "workspace-list-to-safeguards.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:34:01.419Z"
+    },
+    "workspace-list-to-safeguards.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:34:01.419Z"
+    },
+    "workspace-list-to-safeguards.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-19T01:34:01.419Z"
     }
   }
 }
